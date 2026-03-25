@@ -151,6 +151,129 @@ ipcMain.handle('stop-updates', async () => {
   }
 });
 
+ipcMain.handle('resolve-kvr', async (_event, directUrl, pluginName) => {
+  const https = require('https');
+
+  // Bogus landing pages KVR redirects to when a product doesn't exist
+  const KVR_INVALID_PAGES = [
+    '/plugins/the-newest-plugins',
+    '/plugins/newest',
+    '/plugins',
+  ];
+
+  function fetchWithFinalUrl(url, maxRedirects = 5) {
+    return new Promise((resolve, reject) => {
+      https.get(url, { timeout: 8000, headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      }}, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && maxRedirects > 0) {
+          let redirectUrl = res.headers.location;
+          if (redirectUrl.startsWith('/')) redirectUrl = 'https://www.kvraudio.com' + redirectUrl;
+
+          // Check if redirect target is a known invalid page
+          const redirectPath = redirectUrl.replace(/https?:\/\/[^/]+/, '').replace(/[?#].*/, '');
+          if (KVR_INVALID_PAGES.some(p => redirectPath.startsWith(p))) {
+            res.resume();
+            return resolve({ html: '', finalUrl: redirectUrl, valid: false });
+          }
+
+          res.resume();
+          return fetchWithFinalUrl(redirectUrl, maxRedirects - 1).then(resolve, reject);
+        }
+        let body = '';
+        res.on('data', (c) => body += c);
+        res.on('end', () => {
+          // Also check final URL in case of JS/meta redirects embedded in HTML
+          const finalPath = url.replace(/https?:\/\/[^/]+/, '').replace(/[?#].*/, '');
+          const isInvalid = KVR_INVALID_PAGES.some(p => finalPath.startsWith(p));
+          resolve({ html: body, finalUrl: url, valid: !isInvalid && res.statusCode < 400 });
+        });
+        res.on('error', reject);
+      }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
+    });
+  }
+
+  function fetchHtml(url) {
+    return fetchWithFinalUrl(url).then(r => r.html);
+  }
+
+  const platformKeywords = {
+    darwin: ['mac', 'macos', 'osx', 'os x', 'apple'],
+    win32: ['win', 'windows', 'pc'],
+    linux: ['linux', 'ubuntu', 'debian'],
+  }[process.platform] || [];
+
+  function extractDownloadUrl(html) {
+    // Find download/get links
+    const linkPattern = /href="(https?:\/\/[^"]*(?:download|get|buy|release)[^"]*)"/gi;
+    const allLinks = [];
+    let m;
+    while ((m = linkPattern.exec(html)) !== null) {
+      allLinks.push(m[1]);
+    }
+
+    // Prefer platform-specific link
+    for (const link of allLinks) {
+      const lower = link.toLowerCase();
+      if (platformKeywords.some(kw => lower.includes(kw))) {
+        return link;
+      }
+    }
+
+    // Check for platform text near download links
+    for (const kw of platformKeywords) {
+      const ctxPattern = new RegExp(
+        `(?:${kw})[^<]{0,80}?href="(https?:\\/\\/[^"]*(?:download|get)[^"]*)"` +
+        `|href="(https?:\\/\\/[^"]*(?:download|get)[^"]*)"[^<]{0,80}?(?:${kw})`, 'gi'
+      );
+      const ctxMatch = ctxPattern.exec(html);
+      if (ctxMatch) return ctxMatch[1] || ctxMatch[2];
+    }
+
+    // Any download link
+    return allLinks.length > 0 ? allLinks[0] : null;
+  }
+
+  async function scrapeProductPage(productUrl) {
+    try {
+      const html = await fetchHtml(productUrl);
+      const downloadUrl = extractDownloadUrl(html);
+      return { productUrl, downloadUrl };
+    } catch {
+      return { productUrl, downloadUrl: null };
+    }
+  }
+
+  // Try direct URL first -- follow redirects and check we didn't land on a generic page
+  try {
+    const response = await fetchWithFinalUrl(directUrl);
+    if (response.valid) {
+      const downloadUrl = extractDownloadUrl(response.html);
+      return { productUrl: response.finalUrl, downloadUrl };
+    }
+  } catch {}
+
+  // Fallback: search KVR
+  try {
+    const searchUrl = `https://www.kvraudio.com/plugins/search?q=${encodeURIComponent(pluginName)}`;
+    const html = await fetchHtml(searchUrl);
+
+    const pattern = /href="(\/product\/[^"]+)"/gi;
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      const foundUrl = 'https://www.kvraudio.com' + match[1];
+      const result = await scrapeProductPage(foundUrl);
+      return result;
+    }
+  } catch {}
+
+  // Last resort
+  return {
+    productUrl: `https://www.kvraudio.com/plugins/search?q=${encodeURIComponent(pluginName)}`,
+    downloadUrl: null,
+  };
+});
+
 ipcMain.handle('open-update-url', async (_event, url) => {
   const { shell } = require('electron');
   shell.openExternal(url);

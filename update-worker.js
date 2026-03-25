@@ -174,6 +174,8 @@ function extractKVRDownloadUrl(html, productUrl) {
   return { downloadUrl: productUrl, hasPlatformDownload: false };
 }
 
+const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
 // ── Main lookup function ──
 async function findLatestVersion(plugin) {
   const name = plugin.name;
@@ -183,9 +185,10 @@ async function findLatestVersion(plugin) {
   try {
     const productUrls = await searchKVR(name, mfg);
 
-    // Check up to 3 product pages for a version match
-    for (const productUrl of productUrls.slice(0, 3)) {
+    // Check up to 2 product pages for a version match
+    for (const productUrl of productUrls.slice(0, 2)) {
       try {
+        await delay(1500);
         const html = await fetch(productUrl);
 
         // Verify this page is actually about our plugin
@@ -215,6 +218,7 @@ async function findLatestVersion(plugin) {
 
   // Fallback: search KVR via DuckDuckGo site-restricted search
   try {
+    await delay(1500);
     const query = `site:kvraudio.com ${mfg} ${name} VST version`.trim();
     const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
     const ddgHtml = await fetch(ddgUrl);
@@ -228,6 +232,7 @@ async function findLatestVersion(plugin) {
 
     for (const kvrUrl of [...new Set(kvrLinks)].slice(0, 2)) {
       try {
+        await delay(1500);
         const html = await fetch(kvrUrl);
         const version = extractKVRVersion(html);
         if (version) {
@@ -250,8 +255,8 @@ async function findLatestVersion(plugin) {
 
 // ── Rate-limited concurrent processing ──
 async function processPlugins() {
-  const CONCURRENCY = 2;
-  const DELAY_MS = 1000;
+  const CONCURRENCY = 1;
+  const DELAY_MS = 2000;
   let processed = 0;
   const total = plugins.length;
   const results = new Map();

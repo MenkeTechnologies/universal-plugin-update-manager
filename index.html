@@ -86,7 +86,7 @@
       box-shadow: 0 0 15px 5px rgba(5, 217, 232, 0.04);
       pointer-events: none;
       z-index: 9997;
-      animation: hscan 4s linear infinite;
+      animation: hscan 12s linear infinite;
     }
 
     @keyframes hscan {
@@ -94,6 +94,31 @@
       5% { opacity: 1; }
       95% { opacity: 1; }
       100% { top: 100%; opacity: 0; }
+    }
+
+    /* Vertical sweeping scanline (left to right) */
+    .crt-scanline-v {
+      position: fixed;
+      top: 0; bottom: 0;
+      width: 2px;
+      background: linear-gradient(180deg,
+        transparent 0%,
+        rgba(255, 42, 109, 0.03) 20%,
+        rgba(255, 42, 109, 0.06) 50%,
+        rgba(255, 42, 109, 0.03) 80%,
+        transparent 100%
+      );
+      box-shadow: 0 0 15px 5px rgba(255, 42, 109, 0.03);
+      pointer-events: none;
+      z-index: 9997;
+      animation: vscan 18s linear infinite;
+    }
+
+    @keyframes vscan {
+      0% { left: -2px; opacity: 0; }
+      5% { opacity: 1; }
+      95% { opacity: 1; }
+      100% { left: 100%; opacity: 0; }
     }
 
     button, input, select { -webkit-app-region: no-drag; font-family: 'Share Tech Mono', monospace; }
@@ -476,15 +501,18 @@
     }
 
     .btn-kvr {
-      background: transparent;
+      background: linear-gradient(135deg, rgba(249, 240, 2, 0.15), rgba(249, 240, 2, 0.05));
       color: var(--yellow);
-      border: 1px solid var(--yellow);
-      box-shadow: 0 0 4px var(--yellow-glow);
+      border: 1px solid rgba(249, 240, 2, 0.5);
+      box-shadow: 0 0 6px var(--yellow-glow);
       font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
     }
     .btn-kvr:hover {
-      background: rgba(249, 240, 2, 0.08);
-      box-shadow: 0 0 10px var(--yellow-glow);
+      background: linear-gradient(135deg, rgba(249, 240, 2, 0.25), rgba(249, 240, 2, 0.1));
+      box-shadow: 0 0 12px rgba(249, 240, 2, 0.4), 0 0 25px var(--yellow-glow);
+      border-color: var(--yellow);
     }
 
     /* Empty / Loading states */
@@ -920,6 +948,7 @@
 </head>
 <body>
   <div class="crt-scanline"></div>
+  <div class="crt-scanline-v"></div>
   <div class="app">
     <div class="header">
       <div class="header-top">
@@ -1068,6 +1097,8 @@
         await window.vstUpdater.stopScan();
       } else if (currentOperation === 'updates') {
         await window.vstUpdater.stopUpdates();
+      } else if (currentOperation === 'kvr-resolve') {
+        stopKvrResolve();
       }
     }
 
@@ -1134,6 +1165,7 @@
           list.innerHTML = '<div class="state-message"><div class="state-icon">&#128270;</div><h2>No Plugins Found</h2><p>No VST2, VST3, or Audio Unit plugins were found in the standard system directories.</p></div>';
         } else {
           renderPlugins(allPlugins);
+          resolveKvrDownloads();
         }
       } catch (err) {
         if (err.message !== 'stopped') {
@@ -1167,10 +1199,14 @@
       const mfgBtn = mfgUrl
         ? `<button class="btn-small btn-mfg" onclick="openUpdate('${mfgUrl}')" title="${mfgUrl}">&#127760;</button>`
         : '';
-      const kvrBtn = p.kvrUrl
-        ? `<button class="btn-small btn-kvr" onclick="openUpdate('${p.kvrUrl}')" title="${p.kvrUrl}">KVR</button>`
+      const kvrUrl = p.kvrUrl || buildKvrUrl(p.name, p.manufacturer);
+      const kvrBtn = `<button class="btn-small btn-kvr" onclick="openKvr(this, '${kvrUrl.replace(/'/g, "\\'")}', '${escapePath(p.name)}')" title="${escapeHtml(kvrUrl)}">KVR</button>`;
+      // Show download button if a download URL was found on KVR (regardless of update status)
+      const dlUrl = p.updateUrl || null;
+      const dlBtn = dlUrl
+        ? `<button class="btn-small btn-download btn-dl-kvr" onclick="openUpdate('${dlUrl.replace(/'/g, "\\'")}')" title="${escapeHtml(dlUrl)}">&#11015; Download</button>`
         : '';
-      let actionsHtml = kvrBtn + mfgBtn + `<button class="btn-small btn-folder" onclick="openFolder('${escapePath(p.path)}')" title="${escapePath(p.path)}">&#128193;</button>`;
+      let actionsHtml = dlBtn + kvrBtn + mfgBtn + `<button class="btn-small btn-folder" onclick="openFolder('${escapePath(p.path)}')" title="${escapePath(p.path)}">&#128193;</button>`;
 
       if (p.hasUpdate !== undefined) {
         if (p.hasUpdate) {
@@ -1178,11 +1214,6 @@
             <span class="version-arrow">&#8594;</span>
             <span class="version-latest">v${p.latestVersion}</span>`;
           badgeHtml = '<span class="badge badge-update">Update Available</span>';
-          if (p.hasPlatformDownload && p.updateUrl) {
-            actionsHtml = `<button class="btn-small btn-download" onclick="openUpdate('${p.updateUrl}')" title="Download for your OS">&#11015; Download</button>` + actionsHtml;
-          } else if (p.updateUrl) {
-            actionsHtml = `<button class="btn-small btn-update" onclick="openUpdate('${p.updateUrl}')">Get Update</button>` + actionsHtml;
-          }
         } else {
           badgeHtml = '<span class="badge badge-current">Up to Date</span>';
         }
@@ -1351,6 +1382,36 @@
       window.vstUpdater.openUpdateUrl(url);
     }
 
+    async function openKvr(btn, directUrl, pluginName) {
+      const origText = btn.textContent;
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const result = await window.vstUpdater.resolveKvr(directUrl, pluginName);
+        const productUrl = result.productUrl || directUrl;
+        btn.title = productUrl;
+        btn.onclick = () => openUpdate(productUrl);
+        window.vstUpdater.openUpdateUrl(productUrl);
+
+        // If a download link was found, add a download button next to KVR
+        if (result.downloadUrl) {
+          const card = btn.closest('.plugin-card');
+          if (card && !card.querySelector('.btn-dl-kvr')) {
+            const dlBtn = document.createElement('button');
+            dlBtn.className = 'btn-small btn-download btn-dl-kvr';
+            dlBtn.title = result.downloadUrl;
+            dlBtn.innerHTML = '&#11015; Download';
+            dlBtn.onclick = () => openUpdate(result.downloadUrl);
+            btn.parentNode.insertBefore(dlBtn, btn);
+          }
+        }
+      } catch {
+        window.vstUpdater.openUpdateUrl(directUrl);
+      }
+      btn.textContent = origText;
+      btn.disabled = false;
+    }
+
     function openFolder(pluginPath) {
       window.vstUpdater.openPluginFolder(pluginPath);
     }
@@ -1411,6 +1472,20 @@
 
     function escapePath(str) {
       return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function slugify(str) {
+      return str.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function buildKvrUrl(name, manufacturer) {
+      const slug = slugify(name);
+      if (manufacturer && manufacturer !== 'Unknown') {
+        return `https://www.kvraudio.com/product/${slug}-by-${slugify(manufacturer)}`;
+      }
+      return `https://www.kvraudio.com/product/${slug}`;
     }
 
     function buildDirsTable(directories, plugins) {
@@ -1629,6 +1704,85 @@
       return `${months}mo ago`;
     }
 
+    // Background KVR download link resolver
+    let kvrResolveAbort = false;
+
+    async function resolveKvrDownloads() {
+      kvrResolveAbort = false;
+
+      // Deduplicate by name+manufacturer
+      const seen = new Map();
+      const queue = [];
+      for (const p of allPlugins) {
+        if (p.updateUrl) continue; // already has a download URL
+        const key = `${p.manufacturer}|||${p.name}`.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.set(key, true);
+        queue.push(p);
+      }
+
+      if (queue.length === 0) return;
+
+      currentOperation = 'kvr-resolve';
+      showStopButton();
+      const statusBar = document.getElementById('statusBar');
+      const statusText = document.getElementById('statusText');
+      const statusStats = document.getElementById('statusStats');
+      statusBar.classList.add('active');
+      statusStats.innerHTML = '';
+
+      let resolved = 0;
+      let downloads = 0;
+
+      for (const plugin of queue) {
+        if (kvrResolveAbort) break;
+
+        const kvrUrl = buildKvrUrl(plugin.name, plugin.manufacturer);
+        statusText.textContent = `Resolving KVR: ${plugin.name} (${resolved + 1}/${queue.length})`;
+
+        try {
+          const result = await window.vstUpdater.resolveKvr(kvrUrl, plugin.name);
+          const productUrl = result.productUrl || kvrUrl;
+          const downloadUrl = result.downloadUrl || null;
+
+          // Update all matching plugin cards (same name+manufacturer may appear as VST2/VST3/AU)
+          for (const p of allPlugins) {
+            if (p.name === plugin.name && p.manufacturer === plugin.manufacturer) {
+              p.kvrUrl = productUrl;
+              if (downloadUrl) p.updateUrl = downloadUrl;
+
+              const escapedPath = escapePath(p.path);
+              const card = document.querySelector(`.plugin-card[data-path="${CSS.escape(escapedPath)}"]`);
+              if (card) {
+                const temp = document.createElement('div');
+                temp.innerHTML = buildPluginCardHtml(p);
+                card.replaceWith(temp.firstElementChild);
+              }
+            }
+          }
+
+          if (downloadUrl) downloads++;
+        } catch {}
+
+        resolved++;
+        statusStats.innerHTML =
+          `<span style="color: var(--green);">${downloads} downloads</span>` +
+          `<span class="stat-pending">${queue.length - resolved} pending</span>`;
+
+        // Rate limit
+        if (!kvrResolveAbort && resolved < queue.length) {
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+
+      statusBar.classList.remove('active');
+      hideStopButton();
+    }
+
+    function stopKvrResolve() {
+      kvrResolveAbort = true;
+    }
+
     // Auto-load last scan on startup
     (async function loadLastScan() {
       try {
@@ -1645,6 +1799,8 @@
         document.getElementById('dirsList').innerHTML = buildDirsTable(latest.directories || [], allPlugins);
 
         renderPlugins(allPlugins);
+        // Start resolving KVR download links in background
+        resolveKvrDownloads();
       } catch (err) {
         console.error('Failed to load last scan:', err);
       }

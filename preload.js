@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('vstUpdater', {
     ipcRenderer.on('update-progress', handler);
     return () => ipcRenderer.removeListener('update-progress', handler);
   },
+  resolveKvr: (directUrl, pluginName) => ipcRenderer.invoke('resolve-kvr', directUrl, pluginName),
   openUpdateUrl: (url) => ipcRenderer.invoke('open-update-url', url),
   openPluginFolder: (path) => ipcRenderer.invoke('open-plugin-folder', path),
   // History
