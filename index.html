@@ -442,6 +442,12 @@
       border: 1px solid rgba(57, 255, 20, 0.3);
     }
 
+    .badge-unknown {
+      background: rgba(61, 79, 106, 0.15);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
     .plugin-actions {
       display: flex; gap: 6px;
     }
@@ -488,6 +494,14 @@
       color: var(--magenta);
       border-color: var(--magenta);
       box-shadow: 0 0 8px var(--magenta-glow);
+    }
+
+    .btn-no-web {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      opacity: 0.35;
+      cursor: not-allowed;
     }
 
     .btn-download {
@@ -948,7 +962,6 @@
 </head>
 <body>
   <div class="crt-scanline"></div>
-  <div class="crt-scanline-v"></div>
   <div class="app">
     <div class="header">
       <div class="header-top">
@@ -1198,7 +1211,7 @@
       const mfgUrl = p.manufacturerUrl || null;
       const mfgBtn = mfgUrl
         ? `<button class="btn-small btn-mfg" onclick="openUpdate('${mfgUrl}')" title="${mfgUrl}">&#127760;</button>`
-        : '';
+        : `<button class="btn-small btn-no-web" disabled title="No manufacturer website">&#128683;</button>`;
       const kvrUrl = p.kvrUrl || buildKvrUrl(p.name, p.manufacturer);
       const kvrBtn = `<button class="btn-small btn-kvr" onclick="openKvr(this, '${kvrUrl.replace(/'/g, "\\'")}', '${escapePath(p.name)}')" title="${escapeHtml(kvrUrl)}">KVR</button>`;
       // Show download button if a download URL was found on KVR (regardless of update status)
@@ -1214,6 +1227,8 @@
             <span class="version-arrow">&#8594;</span>
             <span class="version-latest">v${p.latestVersion}</span>`;
           badgeHtml = '<span class="badge badge-update">Update Available</span>';
+        } else if (p.source === 'not-found') {
+          badgeHtml = '<span class="badge badge-unknown">Unknown Latest</span>';
         } else {
           badgeHtml = '<span class="badge badge-current">Up to Date</span>';
         }
