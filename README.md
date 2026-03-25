@@ -98,6 +98,22 @@ Requires [Node.js](https://nodejs.org/) and npm. Electron is pulled in as a dev 
 
 ---
 
+## // TESTING //
+
+```bash
+# Run all unit tests
+npm test
+```
+
+Tests cover:
+- **History module** -- save, retrieve, delete, clear, 50-scan limit, diff (added/removed/version-changed), latest scan retrieval
+- **Scanner helpers** -- plugin type mapping (`.vst`/`.vst3`/`.component`/`.dll`), file size formatting
+- **Update worker logic** -- version parsing, version comparison, KVR URL builder (slug generation, manufacturer suffix)
+
+Tests use Node.js built-in test runner (`node --test`) -- no external test framework needed.
+
+---
+
 ## // BUILD & DISTRIBUTE //
 
 ```bash
@@ -146,6 +162,28 @@ Built packages land in `dist/`:
 
 ---
 
+## // KVR AUDIO RATE LIMITING //
+
+This app queries [KVR Audio](https://www.kvraudio.com) to find plugin versions and
+download links. To avoid overloading KVR's servers, strict rate limiting is enforced:
+
+| Setting | Value |
+|---------|-------|
+| Concurrent requests | 1 (sequential) |
+| Delay between plugins | 2 seconds |
+| Delay between KVR page fetches | 1.5 seconds |
+| Delay before DuckDuckGo fallback | 1.5 seconds |
+| Max product pages checked per plugin | 2 |
+
+The background KVR resolver (auto-runs on startup) also uses 2-second delays
+between plugins. You can stop it anytime with the Stop button.
+
+> With ~2600 plugins at 2s each, a full update check takes roughly 90 minutes.
+> Results are cached on each plugin card -- subsequent clicks are instant.
+> Use the Stop button to cancel early; already-resolved plugins keep their results.
+
+---
+
 ## // PROJECT ARCHITECTURE //
 
 ```
@@ -156,6 +194,10 @@ scanner-worker.js  -- Worker thread for non-blocking plugin scanning
 update-worker.js   -- Worker thread for version checking via KVR Audio
 history.js         -- Scan history persistence + diff engine
 index.html         -- Single-file cyberpunk UI (HTML/CSS/JS)
+test/              -- Unit tests (node --test)
+  history.test.js  -- History CRUD, diff, limits
+  scanner.test.js  -- Plugin type mapping, size formatting
+  update-worker.test.js -- Version comparison, KVR URL builder
 ```
 
 ---

@@ -25,4 +25,7 @@ contextBridge.exposeInMainWorld('vstUpdater', {
   clearHistory: () => ipcRenderer.invoke('history-clear'),
   diffScans: (oldId, newId) => ipcRenderer.invoke('history-diff', oldId, newId),
   getLatestScan: () => ipcRenderer.invoke('history-latest'),
+  // KVR cache
+  getKvrCache: () => ipcRenderer.invoke('kvr-cache-get'),
+  updateKvrCache: (entries) => ipcRenderer.invoke('kvr-cache-update', entries),
 });

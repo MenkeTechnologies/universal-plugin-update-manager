@@ -1,8 +1,76 @@
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
 
-const HISTORY_FILE = path.join(app.getPath('userData'), 'scan-history.json');
+let HISTORY_FILE;
+try {
+  const electron = require('electron');
+  const app = electron.app || (electron.remote && electron.remote.app);
+  if (app && typeof app.getPath === 'function') {
+    HISTORY_FILE = path.join(app.getPath('userData'), 'scan-history.json');
+  } else {
+    throw new Error('no app');
+  }
+} catch {
+  // Fallback for testing outside Electron
+  HISTORY_FILE = path.join(__dirname, 'scan-history.json');
+}
+
+let KVR_CACHE_FILE;
+try {
+  const electron2 = require('electron');
+  const app2 = electron2.app || (electron2.remote && electron2.remote.app);
+  if (app2 && typeof app2.getPath === 'function') {
+    KVR_CACHE_FILE = path.join(app2.getPath('userData'), 'kvr-cache.json');
+  } else {
+    throw new Error('no app');
+  }
+} catch {
+  KVR_CACHE_FILE = path.join(__dirname, 'kvr-cache.json');
+}
+
+function setHistoryFile(filePath) {
+  HISTORY_FILE = filePath;
+}
+
+function setKvrCacheFile(filePath) {
+  KVR_CACHE_FILE = filePath;
+}
+
+function loadKvrCache() {
+  try {
+    if (fs.existsSync(KVR_CACHE_FILE)) {
+      return JSON.parse(fs.readFileSync(KVR_CACHE_FILE, 'utf8'));
+    }
+  } catch {}
+  return {};
+}
+
+function saveKvrCache(cache) {
+  fs.writeFileSync(KVR_CACHE_FILE, JSON.stringify(cache, null, 2), 'utf8');
+}
+
+function updateKvrCache(entries) {
+  const cache = loadKvrCache();
+  for (const entry of entries) {
+    cache[entry.key] = {
+      kvrUrl: entry.kvrUrl,
+      updateUrl: entry.updateUrl || null,
+      latestVersion: entry.latestVersion || null,
+      hasUpdate: entry.hasUpdate || false,
+      source: entry.source || 'kvr',
+      timestamp: new Date().toISOString(),
+    };
+  }
+  saveKvrCache(cache);
+}
+
+function getKvrCache() {
+  return loadKvrCache();
+}
+
+function clearKvrCache() {
+  saveKvrCache({});
+}
 
 function loadHistory() {
   try {
@@ -95,4 +163,4 @@ function getLatestScan() {
   return history.scans.length > 0 ? history.scans[0] : null;
 }
 
-module.exports = { saveScan, getScans, getScanDetail, deleteScan, clearHistory, diffScans, getLatestScan };
+module.exports = { saveScan, getScans, getScanDetail, deleteScan, clearHistory, diffScans, getLatestScan, setHistoryFile, setKvrCacheFile, updateKvrCache, getKvrCache, clearKvrCache };

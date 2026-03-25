@@ -107,6 +107,14 @@ ipcMain.handle('history-latest', async () => {
   return history.getLatestScan();
 });
 
+ipcMain.handle('kvr-cache-get', async () => {
+  return history.getKvrCache();
+});
+
+ipcMain.handle('kvr-cache-update', async (_event, entries) => {
+  history.updateKvrCache(entries);
+});
+
 ipcMain.handle('check-updates', async (_event, plugins) => {
   return new Promise((resolve, reject) => {
     updateWorker = new Worker(path.join(__dirname, 'update-worker.js'), {

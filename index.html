@@ -1221,8 +1221,8 @@
         : `<button class="btn-small btn-no-web" disabled title="No manufacturer website">&#128683;</button>`;
       const kvrUrl = p.kvrUrl || buildKvrUrl(p.name, p.manufacturer);
       const kvrBtn = `<button class="btn-small btn-kvr" onclick="openKvr(this, '${kvrUrl.replace(/'/g, "\\'")}', '${escapePath(p.name)}')" title="${escapeHtml(kvrUrl)}">KVR</button>`;
-      // Show download button if a download URL was found on KVR (regardless of update status)
-      const dlUrl = p.updateUrl || null;
+      // Show download button only if plugin has an update available
+      const dlUrl = (p.hasUpdate && p.updateUrl) ? p.updateUrl : null;
       const dlBtn = dlUrl
         ? `<button class="btn-small btn-download btn-dl-kvr" onclick="openUpdate('${dlUrl.replace(/'/g, "\\'")}')" title="${escapeHtml(dlUrl)}">&#11015; Download</button>`
         : '';
@@ -1421,10 +1421,12 @@
         btn.onclick = () => openUpdate(productUrl);
         window.vstUpdater.openUpdateUrl(productUrl);
 
-        // If a download link was found, add a download button next to KVR
+        // If a download link was found and plugin has an update, add download button
         if (result.downloadUrl) {
           const card = btn.closest('.plugin-card');
-          if (card && !card.querySelector('.btn-dl-kvr')) {
+          const pluginPath = card ? card.dataset.path : null;
+          const plugin = pluginPath && allPlugins.find(p => escapePath(p.path) === pluginPath);
+          if (plugin && plugin.hasUpdate && card && !card.querySelector('.btn-dl-kvr')) {
             const dlBtn = document.createElement('button');
             dlBtn.className = 'btn-small btn-download btn-dl-kvr';
             dlBtn.title = result.downloadUrl;
@@ -1777,7 +1779,7 @@
           for (const p of allPlugins) {
             if (p.name === plugin.name && p.manufacturer === plugin.manufacturer) {
               p.kvrUrl = productUrl;
-              if (downloadUrl) p.updateUrl = downloadUrl;
+              if (downloadUrl && p.hasUpdate) p.updateUrl = downloadUrl;
 
               const escapedPath = escapePath(p.path);
               const card = document.querySelector(`.plugin-card[data-path="${CSS.escape(escapedPath)}"]`);
@@ -1811,6 +1813,29 @@
       kvrResolveAbort = true;
     }
 
+    function kvrCacheKey(plugin) {
+      return `${(plugin.manufacturer || 'Unknown').toLowerCase()}|||${plugin.name.toLowerCase()}`;
+    }
+
+    // Apply cached KVR data to plugins
+    function applyKvrCache(plugins, cache) {
+      for (const p of plugins) {
+        const cached = cache[kvrCacheKey(p)];
+        if (cached) {
+          p.kvrUrl = cached.kvrUrl || p.kvrUrl;
+          p.source = cached.source || p.source;
+          if (cached.latestVersion && cached.latestVersion !== p.version) {
+            p.latestVersion = cached.latestVersion;
+            p.currentVersion = p.version;
+            p.hasUpdate = cached.hasUpdate || false;
+          }
+          if (cached.updateUrl && p.hasUpdate) {
+            p.updateUrl = cached.updateUrl;
+          }
+        }
+      }
+    }
+
     // Auto-load last scan on startup
     (async function loadLastScan() {
       try {
@@ -1818,16 +1843,33 @@
         if (!latest || !latest.plugins || latest.plugins.length === 0) return;
 
         allPlugins = latest.plugins;
+
+        // Restore cached KVR results
+        try {
+          const kvrCache = await window.vstUpdater.getKvrCache();
+          applyKvrCache(allPlugins, kvrCache);
+        } catch {}
+
         document.getElementById('totalCount').textContent = allPlugins.length;
         document.getElementById('btnCheckUpdates').disabled = false;
         document.getElementById('toolbar').style.display = 'flex';
+
+        // Update stat counters from cached data
+        const withUpdates = allPlugins.filter(p => p.hasUpdate).length;
+        const unknown = allPlugins.filter(p => p.source === 'not-found').length;
+        const upToDate = allPlugins.filter(p => !p.hasUpdate && p.source && p.source !== 'not-found').length;
+        if (withUpdates || unknown || upToDate) {
+          document.getElementById('updateCount').textContent = withUpdates;
+          document.getElementById('unknownCount').textContent = unknown;
+          document.getElementById('upToDateCount').textContent = upToDate;
+        }
 
         const dirsSection = document.getElementById('dirsSection');
         dirsSection.style.display = 'block';
         document.getElementById('dirsList').innerHTML = buildDirsTable(latest.directories || [], allPlugins);
 
         renderPlugins(allPlugins);
-        // Start resolving KVR download links in background
+        // Resume resolving KVR links for plugins not yet cached
         resolveKvrDownloads();
       } catch (err) {
         console.error('Failed to load last scan:', err);
