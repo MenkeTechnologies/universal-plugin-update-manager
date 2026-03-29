@@ -1,0 +1,378 @@
+use regex::Regex;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+
+const KVR_INVALID_PAGES: &[&str] = &[
+    "/plugins/the-newest-plugins",
+    "/plugins/newest",
+    "/plugins",
+];
+
+const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KvrResult {
+    #[serde(rename = "productUrl")]
+    pub product_url: String,
+    #[serde(rename = "downloadUrl")]
+    pub download_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateResult {
+    #[serde(rename = "latestVersion")]
+    pub latest_version: String,
+    #[serde(rename = "hasUpdate")]
+    pub has_update: bool,
+    pub source: String,
+    #[serde(rename = "updateUrl")]
+    pub update_url: Option<String>,
+    #[serde(rename = "kvrUrl")]
+    pub kvr_url: Option<String>,
+    #[serde(rename = "hasPlatformDownload")]
+    pub has_platform_download: bool,
+}
+
+fn platform_keywords() -> Vec<&'static str> {
+    if cfg!(target_os = "macos") {
+        vec!["mac", "macos", "osx", "os x", "apple"]
+    } else if cfg!(target_os = "windows") {
+        vec!["win", "windows", "pc"]
+    } else {
+        vec!["linux", "ubuntu", "debian"]
+    }
+}
+
+fn build_client() -> Client {
+    Client::builder()
+        .user_agent(USER_AGENT)
+        .timeout(std::time::Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .build()
+        .unwrap_or_default()
+}
+
+async fn fetch_with_validation(client: &Client, url: &str) -> Option<(String, String, bool)> {
+    let resp = client.get(url).send().await.ok()?;
+    let final_url = resp.url().to_string();
+    let final_path = resp
+        .url()
+        .path()
+        .split('?')
+        .next()
+        .unwrap_or("")
+        .split('#')
+        .next()
+        .unwrap_or("");
+    let is_invalid = KVR_INVALID_PAGES
+        .iter()
+        .any(|p| final_path.starts_with(p));
+    let status = resp.status();
+    let html = resp.text().await.ok()?;
+    Some((html, final_url, !is_invalid && status.is_success()))
+}
+
+async fn fetch_html(client: &Client, url: &str) -> Option<String> {
+    let resp = client.get(url).send().await.ok()?;
+    resp.text().await.ok()
+}
+
+fn extract_download_url(html: &str) -> Option<(String, bool)> {
+    let link_re = Regex::new(r#"href="(https?://[^"]*(?:download|get|buy|release)[^"]*)""#).ok()?;
+    let all_links: Vec<String> = link_re
+        .captures_iter(html)
+        .map(|c| c[1].to_string())
+        .collect();
+
+    let keywords = platform_keywords();
+
+    // Prefer platform-specific link
+    for link in &all_links {
+        let lower = link.to_lowercase();
+        if keywords.iter().any(|kw| lower.contains(kw)) {
+            return Some((link.clone(), true));
+        }
+    }
+
+    // Check for platform text near download links
+    for kw in &keywords {
+        let pattern = format!(
+            r#"(?i)(?:{})[^<]{{0,80}}?href="(https?://[^"]*(?:download|get)[^"]*)"|href="(https?://[^"]*(?:download|get)[^"]*)"[^<]{{0,80}}?(?:{})"#,
+            regex::escape(kw),
+            regex::escape(kw)
+        );
+        if let Ok(re) = Regex::new(&pattern) {
+            if let Some(caps) = re.captures(html) {
+                let url = caps
+                    .get(1)
+                    .or_else(|| caps.get(2))
+                    .map(|m| m.as_str().to_string());
+                if let Some(u) = url {
+                    return Some((u, true));
+                }
+            }
+        }
+    }
+
+    // Any download link
+    all_links.first().map(|l| (l.clone(), false))
+}
+
+pub fn extract_version(html: &str) -> Option<String> {
+    let patterns = [
+        r"(?i)Version\s*[:]\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
+        r"(?i)(?:Latest\s+)?Version</(?:dt|th|span|div|label)>\s*<(?:dd|td|span|div)[^>]*>\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
+        r#"(?i)softwareVersion["\s:>]+(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)"#,
+        r"(?i)(?:current|latest|release|version)[^<]{0,40}?v?(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
+        r"(?i)Version\s*(?:<[^>]*>\s*)*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
+    ];
+
+    for pat in &patterns {
+        if let Ok(re) = Regex::new(pat) {
+            if let Some(caps) = re.captures(html) {
+                let ver = caps[1].to_string();
+                // Filter out dates
+                let date_re = Regex::new(r"^20[0-2]\d\.|^\d{4}\.").ok()?;
+                if !date_re.is_match(&ver) {
+                    return Some(ver);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+pub fn parse_version(ver: &str) -> Vec<i32> {
+    if ver.is_empty() || ver == "Unknown" {
+        return vec![0, 0, 0];
+    }
+    ver.split('.')
+        .map(|n| n.parse::<i32>().unwrap_or(0))
+        .collect()
+}
+
+pub fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
+    let pa = parse_version(a);
+    let pb = parse_version(b);
+    let len = pa.len().max(pb.len());
+    for i in 0..len {
+        let va = pa.get(i).copied().unwrap_or(0);
+        let vb = pb.get(i).copied().unwrap_or(0);
+        match va.cmp(&vb) {
+            std::cmp::Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    std::cmp::Ordering::Equal
+}
+
+pub async fn resolve_kvr(direct_url: &str, plugin_name: &str) -> KvrResult {
+    let client = build_client();
+
+    // Try direct URL first
+    if let Some((html, final_url, valid)) = fetch_with_validation(&client, direct_url).await {
+        if valid {
+            let download_url = extract_download_url(&html).map(|(u, _)| u);
+            return KvrResult {
+                product_url: final_url,
+                download_url,
+            };
+        }
+    }
+
+    // Fallback: search KVR
+    let search_url = format!(
+        "https://www.kvraudio.com/plugins/search?q={}",
+        urlencoding::encode(plugin_name)
+    );
+    if let Some(html) = fetch_html(&client, &search_url).await {
+        let pattern = Regex::new(r#"href="(/product/[^"]+)""#).unwrap();
+        let mut seen = std::collections::HashSet::new();
+        let mut product_links = Vec::new();
+        for caps in pattern.captures_iter(&html) {
+            let href = caps[1].to_string();
+            if seen.insert(href.clone()) {
+                product_links.push(format!("https://www.kvraudio.com{}", href));
+            }
+        }
+
+        let name_slug = plugin_name
+            .to_lowercase()
+            .replace(|c: char| !c.is_alphanumeric(), "-")
+            .trim_matches('-')
+            .to_string();
+        let name_words: Vec<String> = plugin_name
+            .to_lowercase()
+            .replace(|c: char| !c.is_alphanumeric(), " ")
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .collect();
+
+        for found_url in product_links.iter().take(5) {
+            let url_slug = found_url
+                .split("/product/")
+                .nth(1)
+                .unwrap_or("")
+                .to_string();
+            let matching_words = name_words
+                .iter()
+                .filter(|w| w.len() > 1 && url_slug.contains(w.as_str()))
+                .count();
+            let threshold = (name_words.len() as f64 * 0.5).ceil() as usize;
+
+            if url_slug.contains(&name_slug) || matching_words >= threshold {
+                if let Some(page_html) = fetch_html(&client, found_url).await {
+                    let download_url = extract_download_url(&page_html).map(|(u, _)| u);
+                    return KvrResult {
+                        product_url: found_url.clone(),
+                        download_url,
+                    };
+                }
+            }
+        }
+
+        if let Some(first_url) = product_links.first() {
+            if let Some(page_html) = fetch_html(&client, first_url).await {
+                let download_url = extract_download_url(&page_html).map(|(u, _)| u);
+                return KvrResult {
+                    product_url: first_url.clone(),
+                    download_url,
+                };
+            }
+        }
+    }
+
+    // Last resort
+    KvrResult {
+        product_url: format!(
+            "https://www.kvraudio.com/plugins/search?q={}",
+            urlencoding::encode(plugin_name)
+        ),
+        download_url: None,
+    }
+}
+
+pub async fn find_latest_version(
+    name: &str,
+    manufacturer: &str,
+    current_version: &str,
+) -> Option<UpdateResult> {
+    let client = build_client();
+    let mfg = if manufacturer != "Unknown" {
+        manufacturer
+    } else {
+        ""
+    };
+
+    // Try KVR search
+    let query = format!("{} {}", mfg, name).trim().to_string();
+    let search_url = format!(
+        "https://www.kvraudio.com/plugins/search?q={}",
+        urlencoding::encode(&query)
+    );
+
+    if let Some(html) = fetch_html(&client, &search_url).await {
+        let pattern = Regex::new(r#"href="(/product/[^"]+)""#).unwrap();
+        let mut product_links: Vec<String> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for caps in pattern.captures_iter(&html) {
+            let href = caps[1].to_string();
+            if seen.insert(href.clone()) {
+                product_links.push(format!("https://www.kvraudio.com{}", href));
+            }
+        }
+
+        // Also try /plugins/ style links
+        let plugin_pattern = Regex::new(r#"href="(/plugins/[^"]+)""#).unwrap();
+        for caps in plugin_pattern.captures_iter(&html) {
+            let href = caps[1].to_string();
+            if !href.contains("/search") && !href.contains("/category") && seen.insert(href.clone())
+            {
+                product_links.push(format!("https://www.kvraudio.com{}", href));
+            }
+        }
+
+        for product_url in product_links.iter().take(2) {
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
+            if let Some(page_html) = fetch_html(&client, product_url).await {
+                let clean_name = name
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect::<String>()
+                    .to_lowercase();
+                let page_text = Regex::new(r"<[^>]+>")
+                    .unwrap()
+                    .replace_all(&page_html, "")
+                    .to_lowercase();
+
+                if !page_text.contains(&clean_name) && !page_text.contains(&name.to_lowercase()) {
+                    continue;
+                }
+
+                if let Some(version) = extract_version(&page_html) {
+                    let (download_url, has_platform) =
+                        extract_download_url(&page_html).unwrap_or((product_url.clone(), false));
+                    let has_update =
+                        compare_versions(&version, current_version) == std::cmp::Ordering::Greater;
+                    return Some(UpdateResult {
+                        latest_version: version,
+                        has_update,
+                        source: "kvr".into(),
+                        update_url: Some(download_url),
+                        kvr_url: Some(product_url.clone()),
+                        has_platform_download: has_platform,
+                    });
+                }
+            }
+        }
+    }
+
+    // Fallback: DuckDuckGo site-restricted search
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    let ddg_query = format!("site:kvraudio.com {} {} VST version", mfg, name)
+        .trim()
+        .to_string();
+    let ddg_url = format!(
+        "https://html.duckduckgo.com/html/?q={}",
+        urlencoding::encode(&ddg_query)
+    );
+
+    if let Some(ddg_html) = fetch_html(&client, &ddg_url).await {
+        let kvr_link_re =
+            Regex::new(r#"href="[^"]*?(https?://(?:www\.)?kvraudio\.com/product/[^"&]+)"#)
+                .unwrap();
+        let mut kvr_links: Vec<String> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        for caps in kvr_link_re.captures_iter(&ddg_html) {
+            let url = caps[1].to_string();
+            if seen.insert(url.clone()) {
+                kvr_links.push(url);
+            }
+        }
+
+        for kvr_url in kvr_links.iter().take(2) {
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
+            if let Some(page_html) = fetch_html(&client, kvr_url).await {
+                if let Some(version) = extract_version(&page_html) {
+                    let (download_url, has_platform) =
+                        extract_download_url(&page_html).unwrap_or((kvr_url.clone(), false));
+                    let has_update =
+                        compare_versions(&version, current_version) == std::cmp::Ordering::Greater;
+                    return Some(UpdateResult {
+                        latest_version: version,
+                        has_update,
+                        source: "kvr-ddg".into(),
+                        update_url: Some(download_url),
+                        kvr_url: Some(kvr_url.clone()),
+                        has_platform_download: has_platform,
+                    });
+                }
+            }
+        }
+    }
+
+    None
+}

@@ -1,0 +1,33 @@
+[package]
+name = "universal-plugin-update-manager"
+version = "1.0.0"
+description = "Universal desktop app to scan and update VST/VST3/AU audio plugins"
+authors = ["MenkeTechnologies <MenkeTechnologies@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
+regex = "1"
+walkdir = "2"
+rand = "0.8"
+dirs = "5"
+plist = "1"
+opener = "0.7"
+chrono = "0.4"
+urlencoding = "2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[lib]
+name = "app_lib"
+crate-type = ["rlib"]
+
+[profile.dev]
+debug = 0
+opt-level = 1

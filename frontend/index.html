@@ -42,7 +42,6 @@
       color: var(--text);
       height: 100vh;
       overflow: hidden;
-      -webkit-app-region: drag;
     }
 
     /* Horizontal scanline overlay */
@@ -135,6 +134,7 @@
       border-bottom: 1px solid var(--border);
       background: linear-gradient(180deg, #0d0d1f 0%, var(--bg-secondary) 100%);
       position: relative;
+      -webkit-app-region: drag;
     }
 
     .header::after {
@@ -1298,13 +1298,13 @@
           </div>
         </div>
         <div class="header-actions">
-          <button class="btn btn-stop" id="btnStop" onclick="stopCurrentOperation()" style="display:none;">
+          <button class="btn btn-stop" id="btnStop" data-action="stopCurrentOperation" style="display:none;">
             &#9632; Stop
           </button>
-          <button class="btn btn-secondary" id="btnScan" onclick="scanPlugins()">
+          <button class="btn btn-secondary" id="btnScan" data-action="scanPlugins">
             &#8635; Scan Plugins
           </button>
-          <button class="btn btn-primary" id="btnCheckUpdates" onclick="checkUpdates()" disabled>
+          <button class="btn btn-primary" id="btnCheckUpdates" data-action="checkUpdates" disabled>
             &#9889; Check Updates
           </button>
         </div>
@@ -1342,24 +1342,24 @@
     </div>
 
     <div class="tab-nav">
-      <button class="tab-btn active" onclick="switchTab('plugins')">Plugins</button>
-      <button class="tab-btn" onclick="switchTab('history')">History</button>
-      <button class="tab-btn" onclick="switchTab('samples')">Samples</button>
+      <button class="tab-btn active" data-action="switchTab" data-tab="plugins">Plugins</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="history">History</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="samples">Samples</button>
     </div>
 
     <div class="tab-content active" id="tabPlugins">
     <div class="toolbar" id="toolbar" style="display: none;">
       <div class="search-box">
         <span class="search-icon">&#128269;</span>
-        <input type="text" id="searchInput" placeholder="Search plugins..." oninput="filterPlugins()">
+        <input type="text" id="searchInput" placeholder="Search plugins..." data-action="filterPlugins">
       </div>
-      <select class="filter-select" id="typeFilter" onchange="filterPlugins()">
+      <select class="filter-select" id="typeFilter" data-action="filterPlugins">
         <option value="all">All Types</option>
         <option value="VST2">VST2</option>
         <option value="VST3">VST3</option>
         <option value="AU">Audio Units</option>
       </select>
-      <select class="filter-select" id="statusFilter" onchange="filterPlugins()">
+      <select class="filter-select" id="statusFilter" data-action="filterPlugins">
         <option value="all">All Status</option>
         <option value="update">Updates Available</option>
         <option value="current">Up to Date</option>
@@ -1374,8 +1374,8 @@
       </div>
       <div class="batch-controls">
         <span class="batch-progress" id="batchProgress"></span>
-        <button class="btn-skip" id="btnSkip" onclick="skipUpdate()">Skip</button>
-        <button class="btn-next" id="btnNext" onclick="openNextUpdate()">Open Next Update</button>
+        <button class="btn-skip" id="btnSkip" data-action="skipUpdate">Skip</button>
+        <button class="btn-next" id="btnNext" data-action="openNextUpdate">Open Next Update</button>
       </div>
     </div>
 
@@ -1388,7 +1388,7 @@
     </div>
 
     <div class="dirs-section" id="dirsSection" style="display: none;">
-      <div class="dirs-toggle" onclick="toggleDirs()">
+      <div class="dirs-toggle" data-action="toggleDirs">
         <span id="dirsArrow">&#9654;</span>
         <span>Scanned Directories</span>
       </div>
@@ -1401,7 +1401,7 @@
         <div class="history-sidebar">
           <div class="history-sidebar-header">
             <span>Scan History</span>
-            <button class="btn-danger" onclick="clearAllHistory()">Clear All</button>
+            <button class="btn-danger" data-action="clearAllHistory">Clear All</button>
           </div>
           <div class="history-list" id="historyList">
             <div class="empty-history">
@@ -1422,13 +1422,13 @@
     <div class="tab-content" id="tabSamples">
       <div class="audio-container">
         <div class="audio-toolbar">
-          <button class="btn btn-primary" id="btnScanAudio" onclick="scanAudioSamples()">&#127925; Scan Samples</button>
-          <button class="btn btn-stop" id="btnStopAudio" style="display: none;" onclick="stopAudioScan()">&#9632; Stop</button>
+          <button class="btn btn-primary" id="btnScanAudio" data-action="scanAudioSamples">&#127925; Scan Samples</button>
+          <button class="btn btn-stop" id="btnStopAudio" style="display: none;" data-action="stopAudioScan">&#9632; Stop</button>
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="audioSearchInput" placeholder="Search samples by name, path, or format..." oninput="filterAudioSamples()">
+            <input type="text" id="audioSearchInput" placeholder="Search samples by name, path, or format..." data-action="filterAudioSamples">
           </div>
-          <select class="filter-select" id="audioFormatFilter" onchange="filterAudioSamples()">
+          <select class="filter-select" id="audioFormatFilter" data-action="filterAudioSamples">
             <option value="all">All Formats</option>
             <option value="WAV">WAV</option>
             <option value="MP3">MP3</option>
@@ -1461,15 +1461,15 @@
         </div>
         <div class="audio-now-playing" id="audioNowPlaying">
           <div class="now-playing-controls">
-            <button class="btn-small btn-play" id="npBtnPlay" onclick="toggleAudioPlayback()" title="Play/Pause">&#9654;</button>
-            <button class="btn-small btn-loop" id="npBtnLoop" onclick="toggleAudioLoop()" title="Loop">&#8634;</button>
+            <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause">&#9654;</button>
+            <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Loop">&#8634;</button>
           </div>
           <span class="now-playing-name" id="npName"></span>
-          <div class="now-playing-waveform" id="npWaveform" onclick="seekAudio(event)">
+          <div class="now-playing-waveform" id="npWaveform" data-action="seekAudio">
             <div class="now-playing-progress" id="npProgress"></div>
           </div>
           <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
-          <button class="btn-small btn-stop" onclick="stopAudioPlayback()" style="font-size: 10px; padding: 4px 8px;">&#10005;</button>
+          <button class="btn-small btn-stop" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;">&#10005;</button>
         </div>
       </div>
     </div>
@@ -1484,6 +1484,112 @@
   </div>
 
   <script>
+    // Tauri IPC bridge — replaces Electron's preload.js window.vstUpdater API
+    const { invoke, convertFileSrc } = window.__TAURI__.core;
+    const { listen } = window.__TAURI__.event;
+
+    // Event delegation — replaces inline onclick/oninput/onchange for Tauri v2 CSP compatibility
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-action]');
+      if (!el) return;
+      // If there's a data-action-stop container between the target and the matched action element, skip parent actions
+      if (el.dataset.action === 'toggleMetadata') {
+        const stop = e.target.closest('[data-action-stop]');
+        if (stop && el.contains(stop)) return;
+      }
+      const action = el.dataset.action;
+      switch (action) {
+        case 'stopCurrentOperation': stopCurrentOperation(); break;
+        case 'scanPlugins': scanPlugins(); break;
+        case 'checkUpdates': checkUpdates(); break;
+        case 'switchTab': switchTab(el.dataset.tab); break;
+        case 'skipUpdate': skipUpdate(); break;
+        case 'openNextUpdate': openNextUpdate(); break;
+        case 'toggleDirs': toggleDirs(); break;
+        case 'clearAllHistory': clearAllHistory(); break;
+        case 'scanAudioSamples': scanAudioSamples(); break;
+        case 'stopAudioScan': stopAudioScan(); break;
+        case 'toggleAudioPlayback': toggleAudioPlayback(); break;
+        case 'toggleAudioLoop': toggleAudioLoop(); break;
+        case 'seekAudio': seekAudio(e); break;
+        case 'stopAudioPlayback': stopAudioPlayback(); break;
+        case 'openUpdate': openUpdate(el.dataset.url); break;
+        case 'openKvr': openKvr(el, el.dataset.url, el.dataset.name); break;
+        case 'openFolder': openFolder(el.dataset.path); break;
+        case 'openAudioFolder': openAudioFolder(el.dataset.path); break;
+        case 'selectScan': selectScan(el.dataset.id, el.dataset.type); break;
+        case 'runDiff': runDiff(el.dataset.id); break;
+        case 'runAudioDiff': runAudioDiff(el.dataset.id); break;
+        case 'deleteScanEntry': deleteScanEntry(el.dataset.id); break;
+        case 'deleteAudioScanEntry': deleteAudioScanEntry(el.dataset.id); break;
+        case 'sortAudio': sortAudio(el.dataset.key); break;
+        case 'loadMoreAudio': loadMoreAudio(); break;
+        case 'toggleMetadata': toggleMetadata(el.dataset.path, e); break;
+        case 'previewAudio': previewAudio(el.dataset.path); break;
+        case 'toggleRowLoop': toggleRowLoop(el.dataset.path, e); break;
+      }
+    });
+    document.addEventListener('input', (e) => {
+      const action = e.target.dataset.action;
+      if (action === 'filterPlugins') filterPlugins();
+      else if (action === 'filterAudioSamples') filterAudioSamples();
+    });
+    document.addEventListener('change', (e) => {
+      const action = e.target.dataset.action;
+      if (action === 'filterPlugins') filterPlugins();
+      else if (action === 'filterAudioSamples') filterAudioSamples();
+    });
+
+    window.vstUpdater = {
+      getVersion: () => invoke('get_version'),
+      scanPlugins: () => invoke('scan_plugins'),
+      stopScan: () => invoke('stop_scan'),
+      onScanProgress: (callback) => {
+        let unlisten = null;
+        listen('scan-progress', (event) => callback(event.payload)).then(fn => unlisten = fn);
+        return () => { if (unlisten) unlisten(); };
+      },
+      checkUpdates: (plugins) => invoke('check_updates', { plugins }),
+      stopUpdates: () => invoke('stop_updates'),
+      onUpdateProgress: (callback) => {
+        let unlisten = null;
+        listen('update-progress', (event) => callback(event.payload)).then(fn => unlisten = fn);
+        return () => { if (unlisten) unlisten(); };
+      },
+      resolveKvr: (directUrl, pluginName) => invoke('resolve_kvr', { directUrl, pluginName }),
+      openUpdateUrl: (url) => invoke('open_update_url', { url }),
+      openPluginFolder: (path) => invoke('open_plugin_folder', { pluginPath: path }),
+      // History
+      getScans: () => invoke('history_get_scans'),
+      getScanDetail: (id) => invoke('history_get_detail', { id }),
+      deleteScan: (id) => invoke('history_delete', { id }),
+      clearHistory: () => invoke('history_clear'),
+      diffScans: (oldId, newId) => invoke('history_diff', { oldId, newId }),
+      getLatestScan: () => invoke('history_latest'),
+      // Audio samples
+      scanAudioSamples: () => invoke('scan_audio_samples'),
+      stopAudioScan: () => invoke('stop_audio_scan'),
+      onAudioScanProgress: (callback) => {
+        let unlisten = null;
+        listen('audio-scan-progress', (event) => callback(event.payload)).then(fn => unlisten = fn);
+        return () => { if (unlisten) unlisten(); };
+      },
+      openAudioFolder: (path) => invoke('open_audio_folder', { filePath: path }),
+      getAudioMetadata: (filePath) => invoke('get_audio_metadata', { filePath }),
+      getAudioFileUrl: (filePath) => invoke('get_audio_file_url', { filePath }),
+      // Audio history
+      saveAudioScan: (samples) => invoke('audio_history_save', { samples }),
+      getAudioScans: () => invoke('audio_history_get_scans'),
+      getAudioScanDetail: (id) => invoke('audio_history_get_detail', { id }),
+      deleteAudioScan: (id) => invoke('audio_history_delete', { id }),
+      clearAudioHistory: () => invoke('audio_history_clear'),
+      getLatestAudioScan: () => invoke('audio_history_latest'),
+      diffAudioScans: (oldId, newId) => invoke('audio_history_diff', { oldId, newId }),
+      // KVR cache
+      getKvrCache: () => invoke('kvr_cache_get'),
+      updateKvrCache: (entries) => invoke('kvr_cache_update', { entries }),
+    };
+
     let allPlugins = [];
     let pluginsWithUpdates = [];
     let currentOperation = null; // 'scan' or 'updates'
@@ -1609,16 +1715,16 @@
       let badgeHtml = '';
       const mfgUrl = p.manufacturerUrl || null;
       const mfgBtn = mfgUrl
-        ? `<button class="btn-small btn-mfg" onclick="openUpdate('${mfgUrl}')" title="${mfgUrl}">&#127760;</button>`
+        ? `<button class="btn-small btn-mfg" data-action="openUpdate" data-url="${mfgUrl}" title="${mfgUrl}">&#127760;</button>`
         : `<button class="btn-small btn-no-web" disabled title="No manufacturer website">&#128683;</button>`;
       const kvrUrl = p.kvrUrl || buildKvrUrl(p.name, p.manufacturer);
-      const kvrBtn = `<button class="btn-small btn-kvr" onclick="openKvr(this, '${kvrUrl.replace(/'/g, "\\'")}', '${escapePath(p.name)}')" title="${escapeHtml(kvrUrl)}">KVR</button>`;
+      const kvrBtn = `<button class="btn-small btn-kvr" data-action="openKvr" data-url="${kvrUrl.replace(/'/g, '&apos;')}" data-name="${escapePath(p.name)}" title="${escapeHtml(kvrUrl)}">KVR</button>`;
       // Show download button only if plugin has an update available
       const dlUrl = (p.hasUpdate && p.updateUrl) ? p.updateUrl : null;
       const dlBtn = dlUrl
-        ? `<button class="btn-small btn-download btn-dl-kvr" onclick="openUpdate('${dlUrl.replace(/'/g, "\\'")}')" title="${escapeHtml(dlUrl)}">&#11015; Download</button>`
+        ? `<button class="btn-small btn-download btn-dl-kvr" data-action="openUpdate" data-url="${dlUrl.replace(/'/g, '&apos;')}" title="${escapeHtml(dlUrl)}">&#11015; Download</button>`
         : '';
-      let actionsHtml = dlBtn + kvrBtn + mfgBtn + `<button class="btn-small btn-folder" onclick="openFolder('${escapePath(p.path)}')" title="${escapePath(p.path)}">&#128193;</button>`;
+      let actionsHtml = dlBtn + kvrBtn + mfgBtn + `<button class="btn-small btn-folder" data-action="openFolder" data-path="${escapePath(p.path)}" title="${escapePath(p.path)}">&#128193;</button>`;
 
       if (p.hasUpdate !== undefined) {
         if (p.hasUpdate) {
@@ -2030,7 +2136,7 @@
           : `${s.pluginCount} plugin${s.pluginCount !== 1 ? 's' : ''}`;
         const typeTag = isAudio ? 'Samples' : 'Plugins';
         return `
-          <div class="history-item${selected}" onclick="selectScan('${s.id}', '${s._type}')">
+          <div class="history-item${selected}" data-action="selectScan" data-id="${s.id}" data-type="${s._type}">
             <div class="history-item-date">${icon} ${dateStr} at ${timeStr}</div>
             <div class="history-item-meta">
               <span style="color: ${isAudio ? 'var(--yellow)' : 'var(--cyan)'}; font-weight: 600;">${typeTag}</span>
@@ -2073,7 +2179,7 @@
               <option value="">Select a scan...</option>
               ${options}
             </select>
-            <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 12px;" onclick="runDiff('${id}')">Compare</button>
+            <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 12px;" data-action="runDiff" data-id="${id}">Compare</button>
           </div>`;
       }
 
@@ -2092,7 +2198,7 @@
             <h2>${dateStr}</h2>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${timeStr} &middot; ${detail.pluginCount} plugins &middot; ${typeBreakdown}</div>
           </div>
-          <button class="btn-danger" onclick="deleteScanEntry('${id}')">Delete</button>
+          <button class="btn-danger" data-action="deleteScanEntry" data-id="${id}">Delete</button>
         </div>
         ${compareHtml}
         <div id="diffResults"></div>
@@ -2112,7 +2218,7 @@
                 </div>
                 <div></div><div></div>
                 <div class="plugin-actions">
-                  <button class="btn-small btn-folder" onclick="openFolder('${escapePath(p.path)}')" title="${escapePath(p.path)}">&#128193;</button>
+                  <button class="btn-small btn-folder" data-action="openFolder" data-path="${escapePath(p.path)}" title="${escapePath(p.path)}">&#128193;</button>
                 </div>
               </div>`;
           }).join('')}
@@ -2148,7 +2254,7 @@
               <option value="">Select a scan...</option>
               ${options}
             </select>
-            <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 12px;" onclick="runAudioDiff('${id}')">Compare</button>
+            <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 12px;" data-action="runAudioDiff" data-id="${id}">Compare</button>
           </div>`;
       }
 
@@ -2159,7 +2265,7 @@
             <h2>&#127925; ${dateStr}</h2>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${timeStr} &middot; ${detail.sampleCount} samples &middot; ${formatAudioSize(detail.totalBytes)} &middot; ${fmtBreakdown}</div>
           </div>
-          <button class="btn-danger" onclick="deleteAudioScanEntry('${id}')">Delete</button>
+          <button class="btn-danger" data-action="deleteAudioScanEntry" data-id="${id}">Delete</button>
         </div>
         ${compareHtml}
         <div id="diffResults"></div>
@@ -2178,7 +2284,7 @@
                 </div>
                 <div></div><div></div>
                 <div class="plugin-actions">
-                  <button class="btn-small btn-folder" onclick="openAudioFolder('${escapePath(s.path)}')" title="${escapePath(s.path)}">&#128193;</button>
+                  <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${escapePath(s.path)}" title="${escapePath(s.path)}">&#128193;</button>
                 </div>
               </div>`;
           }).join('')}
@@ -2631,11 +2737,11 @@
       tableWrap.innerHTML = `<table class="audio-table" id="audioTable">
         <thead>
           <tr>
-            <th onclick="sortAudio('name')" style="width: 28%;">Name <span class="sort-arrow" id="sortArrowName">&#9660;</span></th>
-            <th onclick="sortAudio('format')" class="col-format">Format <span class="sort-arrow" id="sortArrowFormat"></span></th>
-            <th onclick="sortAudio('size')" class="col-size">Size <span class="sort-arrow" id="sortArrowSize"></span></th>
-            <th onclick="sortAudio('modified')" class="col-date">Modified <span class="sort-arrow" id="sortArrowModified"></span></th>
-            <th onclick="sortAudio('directory')" style="width: 30%;">Path <span class="sort-arrow" id="sortArrowDirectory"></span></th>
+            <th data-action="sortAudio" data-key="name" style="width: 28%;">Name <span class="sort-arrow" id="sortArrowName">&#9660;</span></th>
+            <th data-action="sortAudio" data-key="format" class="col-format">Format <span class="sort-arrow" id="sortArrowFormat"></span></th>
+            <th data-action="sortAudio" data-key="size" class="col-size">Size <span class="sort-arrow" id="sortArrowSize"></span></th>
+            <th data-action="sortAudio" data-key="modified" class="col-date">Modified <span class="sort-arrow" id="sortArrowModified"></span></th>
+            <th data-action="sortAudio" data-key="directory" style="width: 30%;">Path <span class="sort-arrow" id="sortArrowDirectory"></span></th>
             <th class="col-actions"></th>
           </tr>
         </thead>
@@ -2704,7 +2810,7 @@
 
     function appendLoadMore(tbody) {
       tbody.insertAdjacentHTML('beforeend',
-        `<tr id="audioLoadMore"><td colspan="6" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" onclick="loadMoreAudio()">
+        `<tr id="audioLoadMore"><td colspan="6" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" data-action="loadMoreAudio">
           Showing ${audioRenderCount} of ${filteredAudioSamples.length} &#8212; click to load more
         </td></tr>`);
     }
@@ -2726,18 +2832,18 @@
       const ep = escapePath(s.path);
       const isPlaying = audioPlayerPath === s.path;
       const rowClass = isPlaying ? ' class="row-playing"' : '';
-      return `<tr${rowClass} data-audio-path="${ep}" onclick="toggleMetadata('${ep}', event)">
+      return `<tr${rowClass} data-audio-path="${ep}" data-action="toggleMetadata" data-path="${ep}">
         <td class="col-name" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</td>
         <td class="col-format"><span class="format-badge ${fmtClass}">${s.format}</span></td>
         <td class="col-size">${s.sizeFormatted}</td>
         <td class="col-date">${s.modified}</td>
         <td class="col-path" title="${escapeHtml(s.path)}">${escapeHtml(s.directory)}</td>
-        <td class="col-actions" onclick="event.stopPropagation()">
-          <button class="btn-small btn-play${isPlaying ? ' playing' : ''}" onclick="previewAudio('${ep}')" title="Preview">
+        <td class="col-actions" data-action-stop>
+          <button class="btn-small btn-play${isPlaying ? ' playing' : ''}" data-action="previewAudio" data-path="${ep}" title="Preview">
             ${isPlaying && !audioPlayer.paused ? '&#9646;&#9646;' : '&#9654;'}
           </button>
-          <button class="btn-small btn-loop${isPlaying && audioLooping ? ' active' : ''}" onclick="toggleRowLoop('${ep}', event)" title="Loop">&#8634;</button>
-          <button class="btn-small btn-folder" onclick="openAudioFolder('${ep}')" title="Reveal in Finder">&#128193;</button>
+          <button class="btn-small btn-loop${isPlaying && audioLooping ? ' active' : ''}" data-action="toggleRowLoop" data-path="${ep}" title="Loop">&#8634;</button>
+          <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${ep}" title="Reveal in Finder">&#128193;</button>
         </td>
       </tr>`;
     }
@@ -2762,8 +2868,7 @@
 
       // New file
       try {
-        const fileUrl = await window.vstUpdater.getAudioFileUrl(filePath);
-        audioPlayer.src = fileUrl;
+        audioPlayer.src = convertFileSrc(filePath);
         audioPlayer.loop = audioLooping;
         audioPlayerPath = filePath;
         audioPlayer.play();
