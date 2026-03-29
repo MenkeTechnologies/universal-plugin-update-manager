@@ -114,7 +114,7 @@ Requires [Node.js](https://nodejs.org/), [pnpm](https://pnpm.io/), and [Rust](ht
 pnpm test
 
 # Run Rust backend tests only
-cd src-tauri && cargo test -- --test-threads=1
+cd src-tauri && cargo test
 
 # Run JavaScript unit tests only
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
