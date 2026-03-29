@@ -293,10 +293,180 @@
       box-shadow: 0 0 15px rgba(255, 7, 58, 0.4);
     }
 
-    .btn-theme {
-      padding: 8px 12px;
-      font-size: 16px;
-      min-width: 38px;
+    /* Settings page */
+    .settings-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 32px;
+      max-width: 700px;
+    }
+
+    .settings-section {
+      margin-bottom: 32px;
+    }
+
+    .settings-heading {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cyan);
+      text-shadow: 0 0 8px var(--cyan-glow);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      margin-bottom: 6px;
+      transition: border-color 0.2s;
+    }
+
+    .settings-row:hover {
+      border-left-color: var(--cyan);
+    }
+
+    .settings-label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .settings-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .settings-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .settings-control {
+      flex-shrink: 0;
+      margin-left: 24px;
+    }
+
+    .btn-settings-action {
+      padding: 6px 16px;
+      font-size: 11px;
+    }
+
+    .settings-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+    }
+
+    .settings-toggle-label {
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      min-width: 32px;
+      text-align: right;
+    }
+
+    .settings-toggle-track {
+      width: 40px;
+      height: 22px;
+      border-radius: 11px;
+      background: var(--border);
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .settings-toggle.active .settings-toggle-track {
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-glow);
+    }
+
+    .settings-toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--text);
+      transition: left 0.2s;
+    }
+
+    .settings-toggle.active .settings-toggle-thumb {
+      left: 21px;
+    }
+
+    .app.no-crt::after,
+    .app.no-crt::before {
+      display: none;
+    }
+
+    .scheme-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .scheme-btn {
+      padding: 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      cursor: pointer;
+      text-align: left;
+      font-family: 'Share Tech Mono', monospace;
+      transition: all 0.2s;
+    }
+
+    .scheme-btn:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-dim);
+    }
+
+    .scheme-btn.active {
+      border-color: var(--cyan);
+      border-left: 3px solid var(--cyan);
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
+    .scheme-btn-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .scheme-btn-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .scheme-btn-preview {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .scheme-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
     }
 
     /* Stats bar */
@@ -1403,9 +1573,6 @@
           <button class="btn btn-primary" id="btnCheckUpdates" data-action="checkUpdates" disabled>
             &#9889; Check Updates
           </button>
-          <button class="btn btn-secondary btn-theme" id="btnTheme" data-action="toggleTheme" title="Toggle light/dark theme">
-            &#9788;
-          </button>
         </div>
       </div>
       <div class="stats-bar" id="statsBar">
@@ -1450,6 +1617,7 @@
       <button class="tab-btn" data-action="switchTab" data-tab="history">History</button>
       <button class="tab-btn" data-action="switchTab" data-tab="samples">Samples</button>
       <button class="tab-btn" data-action="switchTab" data-tab="daw">DAW Projects</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="settings">&#9881; Settings</button>
     </div>
 
     <div class="tab-content active" id="tabPlugins">
@@ -1625,6 +1793,138 @@
       </div>
     </div>
 
+    <div class="tab-content" id="tabSettings">
+      <div class="settings-container">
+        <div class="settings-section">
+          <h2 class="settings-heading">Appearance</h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Theme</span>
+              <span class="settings-desc">Switch between dark cyberpunk and clean light mode</span>
+            </div>
+            <div class="settings-control">
+              <button class="settings-toggle" id="settingTheme" data-action="settingToggleTheme">
+                <span class="settings-toggle-label" id="settingThemeLabel">Dark</span>
+                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">CRT Scanline Effects</span>
+              <span class="settings-desc">Animated scanline overlays and vignette</span>
+            </div>
+            <div class="settings-control">
+              <button class="settings-toggle" id="settingCrt" data-action="settingToggleCrt">
+                <span class="settings-toggle-label" id="settingCrtLabel">On</span>
+                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="settings-heading">Color Scheme</h2>
+          <div class="scheme-grid" id="schemeGrid">
+            <button class="scheme-btn active" data-action="settingColorScheme" data-scheme="cyberpunk">
+              <div class="scheme-btn-name">Cyberpunk</div>
+              <div class="scheme-btn-desc">Hot pink + cyan neon</div>
+              <div class="scheme-btn-preview">
+                <span class="scheme-dot" style="background: #ff2a6d;"></span>
+                <span class="scheme-dot" style="background: #05d9e8;"></span>
+                <span class="scheme-dot" style="background: #d300c5;"></span>
+                <span class="scheme-dot" style="background: #39ff14;"></span>
+              </div>
+            </button>
+            <button class="scheme-btn" data-action="settingColorScheme" data-scheme="midnight">
+              <div class="scheme-btn-name">Midnight</div>
+              <div class="scheme-btn-desc">Deep blue + electric purple</div>
+              <div class="scheme-btn-preview">
+                <span class="scheme-dot" style="background: #7c3aed;"></span>
+                <span class="scheme-dot" style="background: #38bdf8;"></span>
+                <span class="scheme-dot" style="background: #6366f1;"></span>
+                <span class="scheme-dot" style="background: #39ff14;"></span>
+              </div>
+            </button>
+            <button class="scheme-btn" data-action="settingColorScheme" data-scheme="matrix">
+              <div class="scheme-btn-name">Matrix</div>
+              <div class="scheme-btn-desc">Terminal green on black</div>
+              <div class="scheme-btn-preview">
+                <span class="scheme-dot" style="background: #22c55e;"></span>
+                <span class="scheme-dot" style="background: #39ff14;"></span>
+                <span class="scheme-dot" style="background: #16a34a;"></span>
+                <span class="scheme-dot" style="background: #a3e635;"></span>
+              </div>
+            </button>
+            <button class="scheme-btn" data-action="settingColorScheme" data-scheme="ember">
+              <div class="scheme-btn-name">Ember</div>
+              <div class="scheme-btn-desc">Warm amber + orange</div>
+              <div class="scheme-btn-preview">
+                <span class="scheme-dot" style="background: #f59e0b;"></span>
+                <span class="scheme-dot" style="background: #fb923c;"></span>
+                <span class="scheme-dot" style="background: #ea580c;"></span>
+                <span class="scheme-dot" style="background: #fde047;"></span>
+              </div>
+            </button>
+            <button class="scheme-btn" data-action="settingColorScheme" data-scheme="arctic">
+              <div class="scheme-btn-name">Arctic</div>
+              <div class="scheme-btn-desc">Cool whites + icy blue</div>
+              <div class="scheme-btn-preview">
+                <span class="scheme-dot" style="background: #0ea5e9;"></span>
+                <span class="scheme-dot" style="background: #67e8f9;"></span>
+                <span class="scheme-dot" style="background: #06b6d4;"></span>
+                <span class="scheme-dot" style="background: #a5f3fc;"></span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="settings-heading">Data</h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Reset Column Widths</span>
+              <span class="settings-desc">Clear saved table column sizes and restore defaults</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-secondary btn-settings-action" data-action="settingResetColumns">Reset</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Clear All History</span>
+              <span class="settings-desc">Remove all plugin, audio, and DAW scan history</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-stop btn-settings-action" data-action="settingClearAllHistory">Clear</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Clear KVR Cache</span>
+              <span class="settings-desc">Remove cached version lookups — next check will re-fetch all</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-stop btn-settings-action" data-action="settingClearKvrCache">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="settings-heading">About</h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Universal Plugin Update Manager</span>
+              <span class="settings-desc">
+                Version <span id="settingsVersion"></span><br>
+                by MenkeTechnologies
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="status-bar" id="statusBar">
       <div class="status-bar-inner">
         <span class="status-spinner"></span>
@@ -1688,7 +1988,12 @@
         case 'deleteDawScanEntry': deleteDawScanEntry(el.dataset.id); break;
         case 'exportPlugins': exportPlugins(); break;
         case 'importPlugins': importPlugins(); break;
-        case 'toggleTheme': toggleTheme(); break;
+        case 'settingToggleTheme': settingToggleTheme(); break;
+        case 'settingToggleCrt': settingToggleCrt(); break;
+        case 'settingResetColumns': settingResetColumns(); break;
+        case 'settingClearAllHistory': settingClearAllHistory(); break;
+        case 'settingClearKvrCache': settingClearKvrCache(); break;
+        case 'settingColorScheme': settingColorScheme(el.dataset.scheme); break;
       }
     });
     document.addEventListener('input', (e) => {
@@ -2212,23 +2517,183 @@
       }
     }
 
-    // ── Theme toggle ──
+    // ── Settings ──
 
-    function toggleTheme() {
+    const COLOR_SCHEMES = {
+      cyberpunk: {
+        label: 'Cyberpunk',
+        desc: 'Hot pink + cyan neon (default)',
+        vars: {} // uses :root defaults
+      },
+      midnight: {
+        label: 'Midnight',
+        desc: 'Deep blue + electric purple',
+        vars: {
+          '--accent': '#7c3aed', '--accent-light': '#a78bfa',
+          '--accent-glow': 'rgba(124, 58, 237, 0.4)',
+          '--cyan': '#38bdf8', '--cyan-glow': 'rgba(56, 189, 248, 0.4)',
+          '--cyan-dim': 'rgba(56, 189, 248, 0.15)',
+          '--magenta': '#6366f1', '--magenta-glow': 'rgba(99, 102, 241, 0.3)',
+        }
+      },
+      matrix: {
+        label: 'Matrix',
+        desc: 'Terminal green on black',
+        vars: {
+          '--accent': '#22c55e', '--accent-light': '#4ade80',
+          '--accent-glow': 'rgba(34, 197, 94, 0.4)',
+          '--cyan': '#39ff14', '--cyan-glow': 'rgba(57, 255, 20, 0.4)',
+          '--cyan-dim': 'rgba(57, 255, 20, 0.15)',
+          '--magenta': '#16a34a', '--magenta-glow': 'rgba(22, 163, 74, 0.3)',
+          '--yellow': '#a3e635', '--yellow-glow': 'rgba(163, 230, 53, 0.2)',
+        }
+      },
+      ember: {
+        label: 'Ember',
+        desc: 'Warm amber + orange tones',
+        vars: {
+          '--accent': '#f59e0b', '--accent-light': '#fbbf24',
+          '--accent-glow': 'rgba(245, 158, 11, 0.4)',
+          '--cyan': '#fb923c', '--cyan-glow': 'rgba(251, 146, 60, 0.4)',
+          '--cyan-dim': 'rgba(251, 146, 60, 0.15)',
+          '--magenta': '#ea580c', '--magenta-glow': 'rgba(234, 88, 12, 0.3)',
+          '--yellow': '#fde047', '--yellow-glow': 'rgba(253, 224, 71, 0.2)',
+        }
+      },
+      arctic: {
+        label: 'Arctic',
+        desc: 'Cool whites + icy blue',
+        vars: {
+          '--accent': '#0ea5e9', '--accent-light': '#38bdf8',
+          '--accent-glow': 'rgba(14, 165, 233, 0.4)',
+          '--cyan': '#67e8f9', '--cyan-glow': 'rgba(103, 232, 249, 0.4)',
+          '--cyan-dim': 'rgba(103, 232, 249, 0.15)',
+          '--magenta': '#06b6d4', '--magenta-glow': 'rgba(6, 182, 212, 0.3)',
+          '--yellow': '#a5f3fc', '--yellow-glow': 'rgba(165, 243, 252, 0.2)',
+        }
+      },
+    };
+
+    // Default root CSS values (captured once to allow scheme reset)
+    const ROOT_DEFAULTS = {};
+    (function captureDefaults() {
+      const style = getComputedStyle(document.documentElement);
+      for (const key of Object.keys(COLOR_SCHEMES.midnight.vars)) {
+        ROOT_DEFAULTS[key] = style.getPropertyValue(key).trim();
+      }
+    })();
+
+    function applyColorScheme(name) {
+      const scheme = COLOR_SCHEMES[name];
+      if (!scheme) return;
+      const root = document.documentElement.style;
+      // Reset all to defaults first
+      for (const [k, v] of Object.entries(ROOT_DEFAULTS)) {
+        root.setProperty(k, v);
+      }
+      // Apply scheme overrides
+      for (const [k, v] of Object.entries(scheme.vars)) {
+        root.setProperty(k, v);
+      }
+      localStorage.setItem('colorScheme', name);
+      refreshSettingsUI();
+    }
+
+    function settingColorScheme(name) {
+      applyColorScheme(name);
+    }
+
+    function settingToggleTheme() {
       const html = document.documentElement;
       const current = html.getAttribute('data-theme');
       const next = current === 'light' ? 'dark' : 'light';
       html.setAttribute('data-theme', next);
       localStorage.setItem('theme', next);
-      document.getElementById('btnTheme').innerHTML = next === 'light' ? '&#9790;' : '&#9788;';
+      refreshSettingsUI();
     }
 
-    // Restore saved theme
-    (function restoreTheme() {
+    function settingToggleCrt() {
+      const current = localStorage.getItem('crtEffects') !== 'off';
+      const next = !current;
+      localStorage.setItem('crtEffects', next ? 'on' : 'off');
+      applyCrtSetting(next);
+      refreshSettingsUI();
+    }
+
+    function applyCrtSetting(on) {
+      document.querySelectorAll('.crt-scanline, .crt-scanline-v').forEach(el => {
+        el.style.display = on ? '' : 'none';
+      });
+      const app = document.querySelector('.app');
+      if (app) {
+        app.classList.toggle('no-crt', !on);
+      }
+    }
+
+    function settingResetColumns() {
+      localStorage.removeItem('columnWidths');
+      // Re-init tables if they exist
+      const audioTable = document.getElementById('audioTable');
+      const dawTable = document.getElementById('dawTable');
+      if (audioTable) {
+        audioTable.querySelectorAll('thead th').forEach(th => { th.style.width = ''; });
+      }
+      if (dawTable) {
+        dawTable.querySelectorAll('thead th').forEach(th => { th.style.width = ''; });
+      }
+    }
+
+    async function settingClearAllHistory() {
+      await Promise.all([
+        window.vstUpdater.clearHistory(),
+        window.vstUpdater.clearAudioHistory(),
+        window.vstUpdater.clearDawHistory(),
+      ]);
+    }
+
+    async function settingClearKvrCache() {
+      // Clear by writing empty cache
+      await window.vstUpdater.updateKvrCache([]);
+    }
+
+    function refreshSettingsUI() {
+      const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+      const themeBtn = document.getElementById('settingTheme');
+      const themeLabel = document.getElementById('settingThemeLabel');
+      themeBtn.classList.toggle('active', theme === 'light');
+      themeLabel.textContent = theme === 'light' ? 'Light' : 'Dark';
+
+      const crtOn = localStorage.getItem('crtEffects') !== 'off';
+      const crtBtn = document.getElementById('settingCrt');
+      const crtLabel = document.getElementById('settingCrtLabel');
+      crtBtn.classList.toggle('active', crtOn);
+      crtLabel.textContent = crtOn ? 'On' : 'Off';
+
+      // Color scheme buttons
+      const currentScheme = localStorage.getItem('colorScheme') || 'cyberpunk';
+      document.querySelectorAll('.scheme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.scheme === currentScheme);
+      });
+
+      // Version
+      const ver = document.getElementById('appVersion')?.textContent || '';
+      const settingsVer = document.getElementById('settingsVersion');
+      if (settingsVer) settingsVer.textContent = ver;
+    }
+
+    // Restore settings on load
+    (function restoreSettings() {
       const saved = localStorage.getItem('theme');
       if (saved === 'light') {
         document.documentElement.setAttribute('data-theme', 'light');
-        document.getElementById('btnTheme').innerHTML = '&#9790;';
+      }
+      const crt = localStorage.getItem('crtEffects');
+      if (crt === 'off') {
+        applyCrtSetting(false);
+      }
+      const scheme = localStorage.getItem('colorScheme');
+      if (scheme && scheme !== 'cyberpunk') {
+        applyColorScheme(scheme);
       }
     })();
 
@@ -2356,7 +2821,7 @@
 
     // ── Tab switching ──
     function switchTab(tab) {
-      const tabs = ['plugins', 'history', 'samples', 'daw'];
+      const tabs = ['plugins', 'history', 'samples', 'daw', 'settings'];
       document.querySelectorAll('.tab-btn').forEach((b, i) => {
         b.classList.toggle('active', tab === tabs[i]);
       });
@@ -2364,7 +2829,9 @@
       document.getElementById('tabHistory').classList.toggle('active', tab === 'history');
       document.getElementById('tabSamples').classList.toggle('active', tab === 'samples');
       document.getElementById('tabDaw').classList.toggle('active', tab === 'daw');
+      document.getElementById('tabSettings').classList.toggle('active', tab === 'settings');
       if (tab === 'history') loadHistory();
+      if (tab === 'settings') refreshSettingsUI();
     }
 
     // ── History ──
