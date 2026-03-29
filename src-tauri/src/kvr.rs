@@ -1,6 +1,42 @@
 use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
+
+// Pre-compiled regexes for hot paths
+static DOWNLOAD_LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"href="(https?://[^"]*(?:download|get|buy|release)[^"]*)""#).unwrap()
+});
+static PRODUCT_LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"href="(/product/[^"]+)""#).unwrap()
+});
+static PLUGINS_LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"href="(/plugins/[^"]+)""#).unwrap()
+});
+static KVR_DDG_LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"href="[^"]*?(https?://(?:www\.)?kvraudio\.com/product/[^"&]+)"#).unwrap()
+});
+static HTML_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"<[^>]+>").unwrap()
+});
+static DATE_FILTER_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^20[0-2]\d\.|^\d{4}\.").unwrap()
+});
+static VERSION_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    [
+        r"(?i)Version\s*[:]\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
+        r"(?i)(?:Latest\s+)?Version</(?:dt|th|span|div|label)>\s*<(?:dd|td|span|div)[^>]*>\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
+        r#"(?i)softwareVersion["\s:>]+(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)"#,
+        r"(?i)(?:current|latest|release|version)[^<]{0,40}?v?(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
+        r"(?i)Version\s*(?:<[^>]*>\s*)*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
+    ]
+    .iter()
+    .map(|p| Regex::new(p).unwrap())
+    .collect()
+});
+pub static URL_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"https?://[^\s)"',]+"#).unwrap()
+});
 
 const KVR_INVALID_PAGES: &[&str] = &[
     "/plugins/the-newest-plugins",
@@ -78,8 +114,7 @@ async fn fetch_html(client: &Client, url: &str) -> Option<String> {
 }
 
 fn extract_download_url(html: &str) -> Option<(String, bool)> {
-    let link_re = Regex::new(r#"href="(https?://[^"]*(?:download|get|buy|release)[^"]*)""#).ok()?;
-    let all_links: Vec<String> = link_re
+    let all_links: Vec<String> = DOWNLOAD_LINK_RE
         .captures_iter(html)
         .map(|c| c[1].to_string())
         .collect();
@@ -119,23 +154,11 @@ fn extract_download_url(html: &str) -> Option<(String, bool)> {
 }
 
 pub fn extract_version(html: &str) -> Option<String> {
-    let patterns = [
-        r"(?i)Version\s*[:]\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
-        r"(?i)(?:Latest\s+)?Version</(?:dt|th|span|div|label)>\s*<(?:dd|td|span|div)[^>]*>\s*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
-        r#"(?i)softwareVersion["\s:>]+(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)"#,
-        r"(?i)(?:current|latest|release|version)[^<]{0,40}?v?(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
-        r"(?i)Version\s*(?:<[^>]*>\s*)*(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)",
-    ];
-
-    for pat in &patterns {
-        if let Ok(re) = Regex::new(pat) {
-            if let Some(caps) = re.captures(html) {
-                let ver = caps[1].to_string();
-                // Filter out dates
-                let date_re = Regex::new(r"^20[0-2]\d\.|^\d{4}\.").ok()?;
-                if !date_re.is_match(&ver) {
-                    return Some(ver);
-                }
+    for re in VERSION_PATTERNS.iter() {
+        if let Some(caps) = re.captures(html) {
+            let ver = caps[1].to_string();
+            if !DATE_FILTER_RE.is_match(&ver) {
+                return Some(ver);
             }
         }
     }
@@ -187,26 +210,23 @@ pub async fn resolve_kvr(direct_url: &str, plugin_name: &str) -> KvrResult {
         urlencoding::encode(plugin_name)
     );
     if let Some(html) = fetch_html(&client, &search_url).await {
-        let pattern = Regex::new(r#"href="(/product/[^"]+)""#).unwrap();
         let mut seen = std::collections::HashSet::new();
         let mut product_links = Vec::new();
-        for caps in pattern.captures_iter(&html) {
+        for caps in PRODUCT_LINK_RE.captures_iter(&html) {
             let href = caps[1].to_string();
             if seen.insert(href.clone()) {
                 product_links.push(format!("https://www.kvraudio.com{}", href));
             }
         }
 
-        let name_slug = plugin_name
-            .to_lowercase()
+        let name_lower = plugin_name.to_lowercase();
+        let name_slug = name_lower
             .replace(|c: char| !c.is_alphanumeric(), "-")
             .trim_matches('-')
             .to_string();
-        let name_words: Vec<String> = plugin_name
-            .to_lowercase()
-            .replace(|c: char| !c.is_alphanumeric(), " ")
-            .split_whitespace()
-            .map(|s| s.to_string())
+        let name_words: Vec<&str> = name_lower
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
             .collect();
 
         for found_url in product_links.iter().take(5) {
@@ -217,7 +237,7 @@ pub async fn resolve_kvr(direct_url: &str, plugin_name: &str) -> KvrResult {
                 .to_string();
             let matching_words = name_words
                 .iter()
-                .filter(|w| w.len() > 1 && url_slug.contains(w.as_str()))
+                .filter(|w| w.len() > 1 && url_slug.contains(*w))
                 .count();
             let threshold = (name_words.len() as f64 * 0.5).ceil() as usize;
 
@@ -273,10 +293,9 @@ pub async fn find_latest_version(
     );
 
     if let Some(html) = fetch_html(&client, &search_url).await {
-        let pattern = Regex::new(r#"href="(/product/[^"]+)""#).unwrap();
         let mut product_links: Vec<String> = Vec::new();
         let mut seen = std::collections::HashSet::new();
-        for caps in pattern.captures_iter(&html) {
+        for caps in PRODUCT_LINK_RE.captures_iter(&html) {
             let href = caps[1].to_string();
             if seen.insert(href.clone()) {
                 product_links.push(format!("https://www.kvraudio.com{}", href));
@@ -284,8 +303,7 @@ pub async fn find_latest_version(
         }
 
         // Also try /plugins/ style links
-        let plugin_pattern = Regex::new(r#"href="(/plugins/[^"]+)""#).unwrap();
-        for caps in plugin_pattern.captures_iter(&html) {
+        for caps in PLUGINS_LINK_RE.captures_iter(&html) {
             let href = caps[1].to_string();
             if !href.contains("/search") && !href.contains("/category") && seen.insert(href.clone())
             {
@@ -302,8 +320,7 @@ pub async fn find_latest_version(
                     .filter(|c| c.is_alphanumeric())
                     .collect::<String>()
                     .to_lowercase();
-                let page_text = Regex::new(r"<[^>]+>")
-                    .unwrap()
+                let page_text = HTML_TAG_RE
                     .replace_all(&page_html, "")
                     .to_lowercase();
 
@@ -340,12 +357,9 @@ pub async fn find_latest_version(
     );
 
     if let Some(ddg_html) = fetch_html(&client, &ddg_url).await {
-        let kvr_link_re =
-            Regex::new(r#"href="[^"]*?(https?://(?:www\.)?kvraudio\.com/product/[^"&]+)"#)
-                .unwrap();
         let mut kvr_links: Vec<String> = Vec::new();
         let mut seen = std::collections::HashSet::new();
-        for caps in kvr_link_re.captures_iter(&ddg_html) {
+        for caps in KVR_DDG_LINK_RE.captures_iter(&ddg_html) {
             let url = caps[1].to_string();
             if seen.insert(url.clone()) {
                 kvr_links.push(url);

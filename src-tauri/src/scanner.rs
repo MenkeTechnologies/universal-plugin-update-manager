@@ -150,8 +150,7 @@ fn read_plist_info(plugin_path: &Path) -> (Option<String>, Option<String>, Optio
             .get("NSHumanReadableCopyright")
             .and_then(|v| v.as_string())
         {
-            let url_re = regex::Regex::new(r#"https?://[^\s)"',]+"#).unwrap();
-            if let Some(m) = url_re.find(copyright) {
+            if let Some(m) = crate::kvr::URL_RE.find(copyright) {
                 manufacturer_url = Some(m.as_str().to_string());
             }
         }

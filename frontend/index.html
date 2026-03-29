@@ -2597,14 +2597,34 @@
       list.innerHTML = plugins.map(p => buildPluginCardHtml(p)).join('');
     }
 
-    function filterPlugins() {
+    // Debounce helper for search inputs
+    function debounce(fn, ms) {
+      let timer;
+      return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), ms);
+      };
+    }
+
+    // Cache lowercased names to avoid repeated allocations during filtering
+    function ensureSearchCache(plugins) {
+      for (const p of plugins) {
+        if (p._nameLower === undefined) {
+          p._nameLower = p.name.toLowerCase();
+          p._mfgLower = (p.manufacturer || '').toLowerCase();
+        }
+      }
+    }
+
+    const _filterPluginsImmediate = function() {
       const search = document.getElementById('searchInput').value.toLowerCase();
       const typeFilter = document.getElementById('typeFilter').value;
       const statusFilter = document.getElementById('statusFilter').value;
 
+      ensureSearchCache(allPlugins);
+
       let filtered = allPlugins.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(search) ||
-          (p.manufacturer && p.manufacturer.toLowerCase().includes(search));
+        const matchesSearch = !search || p._nameLower.includes(search) || p._mfgLower.includes(search);
         const matchesType = typeFilter === 'all' || p.type === typeFilter;
         let matchesStatus = true;
         if (statusFilter === 'update') matchesStatus = p.hasUpdate === true;
@@ -2614,7 +2634,9 @@
       });
 
       renderPlugins(filtered);
-    }
+    };
+
+    const filterPlugins = debounce(_filterPluginsImmediate, 120);
 
     function openUpdate(url) {
       window.vstUpdater.openUpdateUrl(url);

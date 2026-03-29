@@ -1160,6 +1160,119 @@ describe('filterPlugins with sort settings', () => {
   });
 });
 
+describe('debounce', () => {
+  function debounce(fn, ms) {
+    let timer;
+    return function(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), ms);
+    };
+  }
+
+  it('delays execution', (t, done) => {
+    let called = 0;
+    const debounced = debounce(() => { called++; }, 50);
+    debounced();
+    debounced();
+    debounced();
+    assert.strictEqual(called, 0);
+    setTimeout(() => {
+      assert.strictEqual(called, 1);
+      done();
+    }, 100);
+  });
+
+  it('passes arguments through', (t, done) => {
+    let received;
+    const debounced = debounce((a, b) => { received = [a, b]; }, 20);
+    debounced(1, 2);
+    setTimeout(() => {
+      assert.deepStrictEqual(received, [1, 2]);
+      done();
+    }, 50);
+  });
+});
+
+describe('ensureSearchCache', () => {
+  function ensureSearchCache(plugins) {
+    for (const p of plugins) {
+      if (p._nameLower === undefined) {
+        p._nameLower = p.name.toLowerCase();
+        p._mfgLower = (p.manufacturer || '').toLowerCase();
+      }
+    }
+  }
+
+  it('adds lowercase cache properties', () => {
+    const plugins = [{ name: 'Serum', manufacturer: 'Xfer Records' }];
+    ensureSearchCache(plugins);
+    assert.strictEqual(plugins[0]._nameLower, 'serum');
+    assert.strictEqual(plugins[0]._mfgLower, 'xfer records');
+  });
+
+  it('does not overwrite existing cache', () => {
+    const plugins = [{ name: 'Serum', manufacturer: 'Xfer', _nameLower: 'cached', _mfgLower: 'cached' }];
+    ensureSearchCache(plugins);
+    assert.strictEqual(plugins[0]._nameLower, 'cached');
+  });
+
+  it('handles null manufacturer', () => {
+    const plugins = [{ name: 'Test', manufacturer: null }];
+    ensureSearchCache(plugins);
+    assert.strictEqual(plugins[0]._mfgLower, '');
+  });
+
+  it('handles missing manufacturer', () => {
+    const plugins = [{ name: 'Test' }];
+    ensureSearchCache(plugins);
+    assert.strictEqual(plugins[0]._mfgLower, '');
+  });
+});
+
+describe('filterPlugins with cached search', () => {
+  function ensureSearchCache(plugins) {
+    for (const p of plugins) {
+      if (p._nameLower === undefined) {
+        p._nameLower = p.name.toLowerCase();
+        p._mfgLower = (p.manufacturer || '').toLowerCase();
+      }
+    }
+  }
+
+  function filterPlugins(plugins, search, typeFilter, statusFilter) {
+    ensureSearchCache(plugins);
+    return plugins.filter(p => {
+      const matchesSearch = !search || p._nameLower.includes(search) || p._mfgLower.includes(search);
+      const matchesType = typeFilter === 'all' || p.type === typeFilter;
+      let matchesStatus = true;
+      if (statusFilter === 'update') matchesStatus = p.hasUpdate === true;
+      if (statusFilter === 'current') matchesStatus = p.hasUpdate === false && p.source !== 'not-found';
+      if (statusFilter === 'unknown') matchesStatus = !p.hasUpdate && p.source === 'not-found';
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }
+
+  const plugins = [
+    { name: 'Serum', type: 'VST3', manufacturer: 'Xfer', hasUpdate: true, source: 'kvr' },
+    { name: 'Massive', type: 'VST2', manufacturer: 'NI', hasUpdate: false, source: 'kvr' },
+  ];
+
+  it('empty search matches all', () => {
+    assert.strictEqual(filterPlugins(plugins, '', 'all', 'all').length, 2);
+  });
+
+  it('uses cached lowercase for search', () => {
+    const result = filterPlugins(plugins, 'serum', 'all', 'all');
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0]._nameLower, 'serum');
+  });
+
+  it('searches manufacturer via cache', () => {
+    const result = filterPlugins(plugins, 'xfer', 'all', 'all');
+    assert.strictEqual(result.length, 1);
+  });
+});
+
 describe('page size parsing', () => {
   it('parses valid page size', () => {
     assert.strictEqual(parseInt('500', 10), 500);
