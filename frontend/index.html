@@ -2318,6 +2318,8 @@
     let allPlugins = [];
     let pluginsWithUpdates = [];
     let currentOperation = null; // 'scan' or 'updates'
+    let AUDIO_PAGE_SIZE = parseInt(localStorage.getItem('pageSize') || '500', 10);
+    let DAW_PAGE_SIZE = parseInt(localStorage.getItem('pageSize') || '500', 10);
 
     // Common audio plugin manufacturers where bundle ID doesn't match KVR slug
     const KVR_MANUFACTURER_MAP = {
@@ -4014,7 +4016,6 @@
       });
     }
 
-    let AUDIO_PAGE_SIZE = parseInt(localStorage.getItem('pageSize') || '500', 10);
     let audioRenderCount = 0;
 
     function renderAudioTable() {
@@ -4406,7 +4407,6 @@
       });
     }
 
-    let DAW_PAGE_SIZE = parseInt(localStorage.getItem('pageSize') || '500', 10);
     let dawRenderCount = 0;
 
     function renderDawTable() {
