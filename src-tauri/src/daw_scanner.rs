@@ -164,37 +164,27 @@ pub fn walk_for_daw(
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(64);
     let visited = Arc::new(Mutex::new(HashSet::new()));
 
-    let collector = std::thread::spawn(move || {
-        let mut all = Vec::new();
-        for projects in rx {
-            all.extend(projects);
-        }
-        all
+    let roots_owned: Vec<PathBuf> = roots.to_vec();
+    let stop2 = stop.clone();
+    let found2 = found.clone();
+    std::thread::spawn(move || {
+        roots_owned.par_iter().for_each(|root| {
+            if stop2.load(Ordering::Relaxed) {
+                return;
+            }
+            walk_dir_parallel(root, 0, &visited, &tx, &found2, batch_size, &stop2);
+        });
     });
 
-    roots.par_iter().for_each(|root| {
-        if stop.load(Ordering::Relaxed) || should_stop() {
+    // Stream results to callback as they arrive
+    let mut total_found = 0usize;
+    for projects in rx {
+        if should_stop() {
             stop.store(true, Ordering::Relaxed);
-            return;
+            break;
         }
-        walk_dir_parallel(
-            root,
-            0,
-            &visited,
-            &tx,
-            &found,
-            batch_size,
-            &stop,
-            should_stop,
-        );
-    });
-    drop(tx);
-
-    let all_projects = collector.join().unwrap_or_default();
-    let mut delivered = 0usize;
-    for chunk in all_projects.chunks(batch_size) {
-        delivered += chunk.len();
-        on_batch(chunk, delivered);
+        total_found += projects.len();
+        on_batch(&projects, total_found);
     }
 }
 
@@ -207,9 +197,8 @@ fn walk_dir_parallel(
     found: &Arc<AtomicUsize>,
     batch_size: usize,
     stop: &Arc<AtomicBool>,
-    should_stop: &(dyn Fn() -> bool + Sync),
 ) {
-    if depth > 30 || stop.load(Ordering::Relaxed) || should_stop() {
+    if depth > 30 || stop.load(Ordering::Relaxed) {
         return;
     }
 
@@ -307,16 +296,7 @@ fn walk_dir_parallel(
     }
 
     subdirs.par_iter().for_each(|subdir| {
-        walk_dir_parallel(
-            subdir,
-            depth + 1,
-            visited,
-            tx,
-            found,
-            batch_size,
-            stop,
-            should_stop,
-        );
+        walk_dir_parallel(subdir, depth + 1, visited, tx, found, batch_size, stop);
     });
 }
 

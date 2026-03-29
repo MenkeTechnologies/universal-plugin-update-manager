@@ -91,42 +91,28 @@ pub fn walk_for_audio(
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<AudioSample>>(64);
     let visited = Arc::new(Mutex::new(HashSet::new()));
 
-    let collector = std::thread::spawn(move || {
-        let mut total = 0usize;
-        let mut pending = Vec::new();
-        for samples in rx {
-            total += samples.len();
-            pending.extend(samples);
-            // We can't call on_batch here (not Send), so collect all
-        }
-        (pending, total)
+    // Spawn parallel walkers on a separate thread so we can drain results here
+    let roots_owned: Vec<PathBuf> = roots.to_vec();
+    let stop2 = stop.clone();
+    let found2 = found.clone();
+    std::thread::spawn(move || {
+        roots_owned.par_iter().for_each(|root| {
+            if stop2.load(Ordering::Relaxed) {
+                return;
+            }
+            walk_dir_parallel(root, 0, &visited, &tx, &found2, batch_size, &stop2);
+        });
     });
 
-    // Walk all roots in parallel using rayon
-    roots.par_iter().for_each(|root| {
-        if stop.load(Ordering::Relaxed) || should_stop() {
+    // Stream results to callback as they arrive
+    let mut total_found = 0usize;
+    for samples in rx {
+        if should_stop() {
             stop.store(true, Ordering::Relaxed);
-            return;
+            break;
         }
-        walk_dir_parallel(
-            root,
-            0,
-            &visited,
-            &tx,
-            &found,
-            batch_size,
-            &stop,
-            should_stop,
-        );
-    });
-    drop(tx);
-
-    let (all_samples, _) = collector.join().unwrap_or_default();
-    // Deliver in batches to the callback
-    let mut delivered = 0usize;
-    for chunk in all_samples.chunks(batch_size) {
-        delivered += chunk.len();
-        on_batch(chunk, delivered);
+        total_found += samples.len();
+        on_batch(&samples, total_found);
     }
 }
 
@@ -139,9 +125,8 @@ fn walk_dir_parallel(
     found: &Arc<AtomicUsize>,
     batch_size: usize,
     stop: &Arc<AtomicBool>,
-    should_stop: &(dyn Fn() -> bool + Sync),
 ) {
-    if depth > 30 || stop.load(Ordering::Relaxed) || should_stop() {
+    if depth > 30 || stop.load(Ordering::Relaxed) {
         return;
     }
 
@@ -225,16 +210,7 @@ fn walk_dir_parallel(
 
     // Recurse into subdirectories in parallel
     subdirs.par_iter().for_each(|subdir| {
-        walk_dir_parallel(
-            subdir,
-            depth + 1,
-            visited,
-            tx,
-            found,
-            batch_size,
-            stop,
-            should_stop,
-        );
+        walk_dir_parallel(subdir, depth + 1, visited, tx, found, batch_size, stop);
     });
 }
 

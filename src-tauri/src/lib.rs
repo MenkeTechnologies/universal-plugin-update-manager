@@ -131,25 +131,56 @@ async fn scan_plugins(
             .filter(|p| seen.insert(p.to_string_lossy().to_string()))
             .collect();
 
-        // Process all plugins in parallel
+        // Process plugins in parallel, streaming results to UI via channel
         use rayon::prelude::*;
-        let all_infos: Vec<_> = unique_paths
-            .par_iter()
-            .filter(|_| !scan_state.stop_scan.load(Ordering::Relaxed))
-            .filter_map(|p| scanner::get_plugin_info(p))
-            .collect();
-
-        // Emit progress in batches
         let batch_size = 10;
+        let (tx, rx) = std::sync::mpsc::sync_channel::<scanner::PluginInfo>(64);
+        let stop_flag = std::sync::Arc::new(AtomicBool::new(false));
+        let stop_flag2 = stop_flag.clone();
+
+        std::thread::spawn(move || {
+            unique_paths.par_iter().for_each(|p| {
+                if stop_flag2.load(Ordering::Relaxed) {
+                    return;
+                }
+                if let Some(info) = scanner::get_plugin_info(p) {
+                    let _ = tx.send(info);
+                }
+            });
+        });
+
         let mut all_plugins = Vec::new();
-        for (i, chunk) in all_infos.chunks(batch_size).enumerate() {
-            all_plugins.extend_from_slice(chunk);
+        let mut batch = Vec::new();
+        let mut processed = 0usize;
+        for info in rx {
+            if scan_state.stop_scan.load(Ordering::Relaxed) {
+                stop_flag.store(true, Ordering::Relaxed);
+                break;
+            }
+            batch.push(info);
+            processed += 1;
+            if batch.len() >= batch_size || processed == total {
+                all_plugins.extend(batch.clone());
+                let _ = app_handle.emit(
+                    "scan-progress",
+                    serde_json::json!({
+                        "phase": "scanning",
+                        "plugins": batch,
+                        "processed": processed,
+                        "total": total
+                    }),
+                );
+                batch.clear();
+            }
+        }
+        if !batch.is_empty() {
+            all_plugins.extend(batch.clone());
             let _ = app_handle.emit(
                 "scan-progress",
                 serde_json::json!({
                     "phase": "scanning",
-                    "plugins": chunk,
-                    "processed": std::cmp::min((i + 1) * batch_size, all_infos.len()),
+                    "plugins": batch,
+                    "processed": processed,
                     "total": total
                 }),
             );
@@ -391,7 +422,7 @@ async fn scan_audio_samples(
         "audio-scan-progress",
         serde_json::json!({
             "phase": "status",
-            "message": "Walking filesystem for audio files..."
+            "message": "Walking filesystem directories parallelized for audio files..."
         }),
     );
 
@@ -511,7 +542,7 @@ async fn scan_daw_projects(
         "daw-scan-progress",
         serde_json::json!({
             "phase": "status",
-            "message": "Walking filesystem for DAW project files..."
+            "message": "Walking filesystem directories parallelized for DAW project files..."
         }),
     );
 
