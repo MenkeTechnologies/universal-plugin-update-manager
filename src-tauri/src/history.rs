@@ -129,7 +129,18 @@ pub struct AudioScanDiff {
     pub removed: Vec<AudioSample>,
 }
 
+#[cfg(test)]
+thread_local! {
+    static TEST_DATA_DIR: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+}
+
 fn get_data_dir() -> PathBuf {
+    #[cfg(test)]
+    {
+        if let Some(dir) = TEST_DATA_DIR.with(|d| d.borrow().clone()) {
+            return dir;
+        }
+    }
     dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("com.menketechnologies.universal-plugin-update-manager")
@@ -515,6 +526,16 @@ mod tests {
         assert!(ts.ends_with('Z'));
     }
 
+    fn with_test_dir<F: FnOnce()>(name: &str, f: F) {
+        let dir = std::env::temp_dir().join(format!("upum_test_{}", name));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::create_dir_all(&dir);
+        TEST_DATA_DIR.with(|d| *d.borrow_mut() = Some(dir.clone()));
+        f();
+        TEST_DATA_DIR.with(|d| *d.borrow_mut() = None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     fn make_plugin(name: &str, version: &str, path: &str) -> PluginInfo {
         PluginInfo {
             name: name.into(),
@@ -542,151 +563,149 @@ mod tests {
 
     #[test]
     fn test_scan_history_crud() {
-        clear_history();
-        // Save
-        let plugins = vec![
-            make_plugin("PlugA", "1.0", "/tmp/a.vst3"),
-            make_plugin("PlugB", "2.0", "/tmp/b.vst3"),
-        ];
-        let dirs = vec!["/tmp".to_string()];
-        let snap = save_scan(&plugins, &dirs);
-        assert_eq!(snap.plugin_count, 2);
+        with_test_dir("scan_crud", || {
+            let plugins = vec![
+                make_plugin("PlugA", "1.0", "/tmp/a.vst3"),
+                make_plugin("PlugB", "2.0", "/tmp/b.vst3"),
+            ];
+            let dirs = vec!["/tmp".to_string()];
+            let snap = save_scan(&plugins, &dirs);
+            assert_eq!(snap.plugin_count, 2);
 
-        // Get list
-        let scans = get_scans();
-        assert!(scans.iter().any(|s| s.id == snap.id));
+            let scans = get_scans();
+            assert!(scans.iter().any(|s| s.id == snap.id));
 
-        // Get detail
-        let detail = get_scan_detail(&snap.id);
-        assert!(detail.is_some());
-        assert_eq!(detail.unwrap().plugins.len(), 2);
+            let detail = get_scan_detail(&snap.id);
+            assert!(detail.is_some());
+            assert_eq!(detail.unwrap().plugins.len(), 2);
 
-        // Latest
-        let latest = get_latest_scan();
-        assert!(latest.is_some());
+            let latest = get_latest_scan();
+            assert!(latest.is_some());
 
-        // Delete
-        delete_scan(&snap.id);
-        assert!(get_scan_detail(&snap.id).is_none());
+            delete_scan(&snap.id);
+            assert!(get_scan_detail(&snap.id).is_none());
+        });
     }
 
     #[test]
     fn test_scan_history_limit_50() {
-        // Clear first
-        clear_history();
-        let plugins = vec![make_plugin("P", "1.0", "/tmp/p.vst3")];
-        let dirs = vec!["/tmp".to_string()];
-        for _ in 0..55 {
-            save_scan(&plugins, &dirs);
-        }
-        let scans = get_scans();
-        assert!(scans.len() <= 50);
-        clear_history();
+        with_test_dir("scan_limit", || {
+            let plugins = vec![make_plugin("P", "1.0", "/tmp/p.vst3")];
+            let dirs = vec!["/tmp".to_string()];
+            for _ in 0..55 {
+                save_scan(&plugins, &dirs);
+            }
+            let scans = get_scans();
+            assert!(scans.len() <= 50);
+        });
     }
 
     #[test]
     fn test_diff_scans_added_removed() {
-        clear_history();
-        let plugins1 = vec![
-            make_plugin("PlugA", "1.0", "/tmp/a.vst3"),
-            make_plugin("PlugB", "1.0", "/tmp/b.vst3"),
-        ];
-        let plugins2 = vec![
-            make_plugin("PlugB", "1.0", "/tmp/b.vst3"),
-            make_plugin("PlugC", "1.0", "/tmp/c.vst3"),
-        ];
-        let dirs = vec!["/tmp".to_string()];
-        let snap1 = save_scan(&plugins1, &dirs);
-        let snap2 = save_scan(&plugins2, &dirs);
+        with_test_dir("diff_added_removed", || {
+            let plugins1 = vec![
+                make_plugin("PlugA", "1.0", "/tmp/a.vst3"),
+                make_plugin("PlugB", "1.0", "/tmp/b.vst3"),
+            ];
+            let plugins2 = vec![
+                make_plugin("PlugB", "1.0", "/tmp/b.vst3"),
+                make_plugin("PlugC", "1.0", "/tmp/c.vst3"),
+            ];
+            let dirs = vec!["/tmp".to_string()];
+            let snap1 = save_scan(&plugins1, &dirs);
+            let snap2 = save_scan(&plugins2, &dirs);
 
-        let diff = diff_scans(&snap1.id, &snap2.id).unwrap();
-        assert_eq!(diff.added.len(), 1);
-        assert_eq!(diff.added[0].name, "PlugC");
-        assert_eq!(diff.removed.len(), 1);
-        assert_eq!(diff.removed[0].name, "PlugA");
-        clear_history();
+            let diff = diff_scans(&snap1.id, &snap2.id).unwrap();
+            assert_eq!(diff.added.len(), 1);
+            assert_eq!(diff.added[0].name, "PlugC");
+            assert_eq!(diff.removed.len(), 1);
+            assert_eq!(diff.removed[0].name, "PlugA");
+        });
     }
 
     #[test]
     fn test_diff_scans_version_changed() {
-        clear_history();
-        let plugins1 = vec![make_plugin("PlugA", "1.0", "/tmp/vc_a.vst3")];
-        let plugins2 = vec![make_plugin("PlugA", "2.0", "/tmp/vc_a.vst3")];
-        let dirs = vec!["/tmp".to_string()];
-        let snap1 = save_scan(&plugins1, &dirs);
-        let snap2 = save_scan(&plugins2, &dirs);
+        with_test_dir("diff_version", || {
+            let plugins1 = vec![make_plugin("PlugA", "1.0", "/tmp/vc_a.vst3")];
+            let plugins2 = vec![make_plugin("PlugA", "2.0", "/tmp/vc_a.vst3")];
+            let dirs = vec!["/tmp".to_string()];
+            let snap1 = save_scan(&plugins1, &dirs);
+            let snap2 = save_scan(&plugins2, &dirs);
 
-        let diff = diff_scans(&snap1.id, &snap2.id).unwrap();
-        assert_eq!(diff.version_changed.len(), 1);
-        assert_eq!(diff.version_changed[0].previous_version, "1.0");
-        assert_eq!(diff.version_changed[0].plugin.version, "2.0");
-        clear_history();
+            let diff = diff_scans(&snap1.id, &snap2.id).unwrap();
+            assert_eq!(diff.version_changed.len(), 1);
+            assert_eq!(diff.version_changed[0].previous_version, "1.0");
+            assert_eq!(diff.version_changed[0].plugin.version, "2.0");
+        });
     }
 
     #[test]
     fn test_kvr_cache_crud() {
-        let entries = vec![KvrCacheUpdateEntry {
-            key: "test-plugin".into(),
-            kvr_url: Some("https://kvr.com/test".into()),
-            update_url: None,
-            latest_version: Some("1.5".into()),
-            has_update: Some(true),
-            source: Some("kvr".into()),
-        }];
-        update_kvr_cache(&entries);
+        with_test_dir("kvr_cache", || {
+            let entries = vec![KvrCacheUpdateEntry {
+                key: "test-plugin".into(),
+                kvr_url: Some("https://kvr.com/test".into()),
+                update_url: None,
+                latest_version: Some("1.5".into()),
+                has_update: Some(true),
+                source: Some("kvr".into()),
+            }];
+            update_kvr_cache(&entries);
 
-        let cache = load_kvr_cache();
-        assert!(cache.contains_key("test-plugin"));
-        let entry = &cache["test-plugin"];
-        assert_eq!(entry.latest_version, Some("1.5".into()));
-        assert!(entry.has_update);
+            let cache = load_kvr_cache();
+            assert!(cache.contains_key("test-plugin"));
+            let entry = &cache["test-plugin"];
+            assert_eq!(entry.latest_version, Some("1.5".into()));
+            assert!(entry.has_update);
+        });
     }
 
     #[test]
     fn test_audio_history_crud() {
-        clear_audio_history();
-        let samples = vec![
-            make_sample("kick", "/tmp/kick.wav", "WAV"),
-            make_sample("snare", "/tmp/snare.mp3", "MP3"),
-        ];
-        let snap = save_audio_scan(&samples);
-        assert_eq!(snap.sample_count, 2);
-        assert_eq!(snap.total_bytes, 2048);
-        assert_eq!(snap.format_counts.get("WAV"), Some(&1));
-        assert_eq!(snap.format_counts.get("MP3"), Some(&1));
+        with_test_dir("audio_crud", || {
+            let samples = vec![
+                make_sample("kick", "/tmp/kick.wav", "WAV"),
+                make_sample("snare", "/tmp/snare.mp3", "MP3"),
+            ];
+            let snap = save_audio_scan(&samples);
+            assert_eq!(snap.sample_count, 2);
+            assert_eq!(snap.total_bytes, 2048);
+            assert_eq!(snap.format_counts.get("WAV"), Some(&1));
+            assert_eq!(snap.format_counts.get("MP3"), Some(&1));
 
-        let scans = get_audio_scans();
-        assert!(scans.iter().any(|s| s.id == snap.id));
+            let scans = get_audio_scans();
+            assert!(scans.iter().any(|s| s.id == snap.id));
 
-        let detail = get_audio_scan_detail(&snap.id).unwrap();
-        assert_eq!(detail.samples.len(), 2);
+            let detail = get_audio_scan_detail(&snap.id).unwrap();
+            assert_eq!(detail.samples.len(), 2);
 
-        let latest = get_latest_audio_scan().unwrap();
-        assert_eq!(latest.id, snap.id);
+            let latest = get_latest_audio_scan().unwrap();
+            assert_eq!(latest.id, snap.id);
 
-        delete_audio_scan(&snap.id);
-        assert!(get_audio_scan_detail(&snap.id).is_none());
+            delete_audio_scan(&snap.id);
+            assert!(get_audio_scan_detail(&snap.id).is_none());
+        });
     }
 
     #[test]
     fn test_audio_diff() {
-        clear_audio_history();
-        let samples1 = vec![
-            make_sample("kick", "/tmp/kick.wav", "WAV"),
-            make_sample("snare", "/tmp/snare.wav", "WAV"),
-        ];
-        let samples2 = vec![
-            make_sample("snare", "/tmp/snare.wav", "WAV"),
-            make_sample("hihat", "/tmp/hihat.wav", "WAV"),
-        ];
-        let snap1 = save_audio_scan(&samples1);
-        let snap2 = save_audio_scan(&samples2);
+        with_test_dir("audio_diff", || {
+            let samples1 = vec![
+                make_sample("kick", "/tmp/kick.wav", "WAV"),
+                make_sample("snare", "/tmp/snare.wav", "WAV"),
+            ];
+            let samples2 = vec![
+                make_sample("snare", "/tmp/snare.wav", "WAV"),
+                make_sample("hihat", "/tmp/hihat.wav", "WAV"),
+            ];
+            let snap1 = save_audio_scan(&samples1);
+            let snap2 = save_audio_scan(&samples2);
 
-        let diff = diff_audio_scans(&snap1.id, &snap2.id).unwrap();
-        assert_eq!(diff.added.len(), 1);
-        assert_eq!(diff.added[0].name, "hihat");
-        assert_eq!(diff.removed.len(), 1);
-        assert_eq!(diff.removed[0].name, "kick");
-        clear_audio_history();
+            let diff = diff_audio_scans(&snap1.id, &snap2.id).unwrap();
+            assert_eq!(diff.added.len(), 1);
+            assert_eq!(diff.added[0].name, "hihat");
+            assert_eq!(diff.removed.len(), 1);
+            assert_eq!(diff.removed[0].name, "kick");
+        });
     }
 }
