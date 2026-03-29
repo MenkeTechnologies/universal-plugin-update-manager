@@ -123,3 +123,65 @@ describe('KVR URL builder', () => {
     );
   });
 });
+
+describe('parseVersion edge cases', () => {
+  function parseVersion(ver) {
+    if (!ver || ver === 'Unknown') return [0, 0, 0];
+    return ver.split('.').map(n => parseInt(n, 10) || 0);
+  }
+
+  it('returns [0,0,0] for empty string', () => {
+    assert.deepStrictEqual(parseVersion(''), [0, 0, 0]);
+  });
+
+  it('handles version with text', () => {
+    assert.deepStrictEqual(parseVersion('1.2.beta'), [1, 2, 0]);
+  });
+
+  it('handles single number', () => {
+    assert.deepStrictEqual(parseVersion('5'), [5]);
+  });
+
+  it('handles leading zeros', () => {
+    assert.deepStrictEqual(parseVersion('01.02.03'), [1, 2, 3]);
+  });
+});
+
+describe('compareVersions edge cases', () => {
+  function parseVersion(ver) {
+    if (!ver || ver === 'Unknown') return [0, 0, 0];
+    return ver.split('.').map(n => parseInt(n, 10) || 0);
+  }
+
+  function compareVersions(a, b) {
+    const pa = parseVersion(a);
+    const pb = parseVersion(b);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+      const diff = (pa[i] || 0) - (pb[i] || 0);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  }
+
+  it('both Unknown returns 0', () => {
+    assert.strictEqual(compareVersions('Unknown', 'Unknown'), 0);
+  });
+
+  it('both null returns 0', () => {
+    assert.strictEqual(compareVersions(null, null), 0);
+  });
+
+  it('four-part vs three-part', () => {
+    assert.ok(compareVersions('1.0.0.1', '1.0.0') > 0);
+  });
+
+  it('same major.minor, different patch', () => {
+    assert.ok(compareVersions('2.1.5', '2.1.3') > 0);
+    assert.ok(compareVersions('2.1.3', '2.1.5') < 0);
+  });
+
+  it('handles very large version numbers', () => {
+    assert.ok(compareVersions('100.200.300', '100.200.299') > 0);
+  });
+});

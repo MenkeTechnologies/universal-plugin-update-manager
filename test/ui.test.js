@@ -749,3 +749,305 @@ describe('buildPluginCardHtml', () => {
     assert.ok(html.includes('&lt;b&gt;Bold&lt;/b&gt;'));
   });
 });
+
+// ── CSV escape helper (mirrors backend csv_escape) ──
+
+describe('csvEscape', () => {
+  function csvEscape(s) {
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  it('returns plain string unchanged', () => {
+    assert.strictEqual(csvEscape('hello'), 'hello');
+  });
+
+  it('wraps string with comma in quotes', () => {
+    assert.strictEqual(csvEscape('a,b'), '"a,b"');
+  });
+
+  it('escapes double quotes inside', () => {
+    assert.strictEqual(csvEscape('say "hi"'), '"say ""hi"""');
+  });
+
+  it('wraps string with newline', () => {
+    assert.strictEqual(csvEscape('line1\nline2'), '"line1\nline2"');
+  });
+
+  it('handles empty string', () => {
+    assert.strictEqual(csvEscape(''), '');
+  });
+
+  it('handles comma and quotes together', () => {
+    assert.strictEqual(csvEscape('a,"b"'), '"a,""b"""');
+  });
+});
+
+// ── Plugin filtering logic ──
+
+describe('filterPlugins logic', () => {
+  function filterPlugins(plugins, search, typeFilter, statusFilter) {
+    return plugins.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(search) ||
+        (p.manufacturer && p.manufacturer.toLowerCase().includes(search));
+      const matchesType = typeFilter === 'all' || p.type === typeFilter;
+      let matchesStatus = true;
+      if (statusFilter === 'update') matchesStatus = p.hasUpdate === true;
+      if (statusFilter === 'current') matchesStatus = p.hasUpdate === false && p.source !== 'not-found';
+      if (statusFilter === 'unknown') matchesStatus = !p.hasUpdate && p.source === 'not-found';
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }
+
+  const plugins = [
+    { name: 'Serum', type: 'VST3', manufacturer: 'Xfer', hasUpdate: true, source: 'kvr' },
+    { name: 'Massive', type: 'VST2', manufacturer: 'Native Instruments', hasUpdate: false, source: 'kvr' },
+    { name: 'Diva', type: 'VST3', manufacturer: 'u-he', hasUpdate: false, source: 'not-found' },
+    { name: 'Compressor', type: 'AU', manufacturer: 'Apple', hasUpdate: false, source: 'kvr' },
+  ];
+
+  it('returns all plugins with no filters', () => {
+    assert.strictEqual(filterPlugins(plugins, '', 'all', 'all').length, 4);
+  });
+
+  it('filters by search term on name', () => {
+    const result = filterPlugins(plugins, 'serum', 'all', 'all');
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, 'Serum');
+  });
+
+  it('filters by search term on manufacturer', () => {
+    const result = filterPlugins(plugins, 'native', 'all', 'all');
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, 'Massive');
+  });
+
+  it('filters by type VST3', () => {
+    const result = filterPlugins(plugins, '', 'VST3', 'all');
+    assert.strictEqual(result.length, 2);
+  });
+
+  it('filters by type AU', () => {
+    const result = filterPlugins(plugins, '', 'AU', 'all');
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, 'Compressor');
+  });
+
+  it('filters by status update', () => {
+    const result = filterPlugins(plugins, '', 'all', 'update');
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, 'Serum');
+  });
+
+  it('filters by status current (up to date)', () => {
+    const result = filterPlugins(plugins, '', 'all', 'current');
+    assert.strictEqual(result.length, 2);
+    assert.ok(result.some(p => p.name === 'Massive'));
+    assert.ok(result.some(p => p.name === 'Compressor'));
+  });
+
+  it('filters by status unknown', () => {
+    const result = filterPlugins(plugins, '', 'all', 'unknown');
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, 'Diva');
+  });
+
+  it('combines search and type filter', () => {
+    const result = filterPlugins(plugins, 'u-he', 'VST3', 'all');
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].name, 'Diva');
+  });
+
+  it('combines all filters returning empty', () => {
+    const result = filterPlugins(plugins, 'serum', 'AU', 'all');
+    assert.strictEqual(result.length, 0);
+  });
+
+  it('search is case insensitive (caller lowercases)', () => {
+    const result = filterPlugins(plugins, 'SERUM'.toLowerCase(), 'all', 'all');
+    assert.strictEqual(result.length, 1);
+  });
+});
+
+// ── escapePath edge cases ──
+
+describe('escapePath edge cases', () => {
+  it('handles consecutive backslashes', () => {
+    assert.strictEqual(escapePath('C:\\\\share'), 'C:\\\\\\\\share');
+  });
+
+  it('handles path with both backslash and quote', () => {
+    assert.strictEqual(escapePath("C:\\it's\\file"), "C:\\\\it\\'s\\\\file");
+  });
+
+  it('handles empty string', () => {
+    assert.strictEqual(escapePath(''), '');
+  });
+});
+
+// ── slugify edge cases ──
+
+describe('slugify edge cases', () => {
+  it('handles consecutive uppercase letters (no split within run)', () => {
+    // The regex only splits lowercase→uppercase, so XML stays together
+    assert.strictEqual(slugify('XMLParser'), 'xmlparser');
+  });
+
+  it('handles mixed case with numbers', () => {
+    assert.strictEqual(slugify('Pro3Editor'), 'pro-3-editor');
+  });
+
+  it('handles single character', () => {
+    assert.strictEqual(slugify('X'), 'x');
+  });
+
+  it('handles unicode by stripping', () => {
+    assert.strictEqual(slugify('café'), 'caf');
+  });
+});
+
+// ── buildKvrUrl edge cases ──
+
+describe('buildKvrUrl edge cases', () => {
+  it('handles manufacturer with all special chars', () => {
+    const url = buildKvrUrl('Test', '!!!');
+    assert.strictEqual(url, 'https://www.kvraudio.com/product/test-by-');
+  });
+
+  it('handles camelCase plugin name', () => {
+    const url = buildKvrUrl('ProChannel', 'SomeCo');
+    assert.strictEqual(url, 'https://www.kvraudio.com/product/pro-channel-by-some-co');
+  });
+
+  it('handles AudioDamage mapping', () => {
+    const url = buildKvrUrl('Dubstation', 'AudioDamage');
+    assert.strictEqual(url, 'https://www.kvraudio.com/product/dubstation-by-audio-damage');
+  });
+
+  it('handles izotope mapping', () => {
+    const url = buildKvrUrl('Ozone', 'iZotope');
+    assert.strictEqual(url, 'https://www.kvraudio.com/product/ozone-by-izotope');
+  });
+
+  it('handles eventide mapping', () => {
+    const url = buildKvrUrl('H3000', 'Eventide');
+    assert.strictEqual(url, 'https://www.kvraudio.com/product/h-3000-by-eventide');
+  });
+});
+
+// ── applyKvrCache edge cases ──
+
+describe('applyKvrCache edge cases', () => {
+  it('does not set hasUpdate when latestVersion equals current', () => {
+    const plugins = [{ name: 'Test', manufacturer: 'Co', version: '1.0' }];
+    const cache = { 'co|||test': { latestVersion: '1.0', hasUpdate: false } };
+    applyKvrCache(plugins, cache);
+    assert.strictEqual(plugins[0].hasUpdate, undefined);
+  });
+
+  it('handles multiple plugins with different cache states', () => {
+    const plugins = [
+      { name: 'A', manufacturer: 'X', version: '1.0' },
+      { name: 'B', manufacturer: 'Y', version: '2.0' },
+    ];
+    const cache = {
+      'x|||a': { latestVersion: '2.0', hasUpdate: true, kvrUrl: 'https://kvr/a' },
+      'y|||b': { kvrUrl: 'https://kvr/b' },
+    };
+    applyKvrCache(plugins, cache);
+    assert.strictEqual(plugins[0].hasUpdate, true);
+    assert.strictEqual(plugins[0].latestVersion, '2.0');
+    assert.strictEqual(plugins[1].kvrUrl, 'https://kvr/b');
+    assert.strictEqual(plugins[1].hasUpdate, undefined);
+  });
+
+  it('applies source from cache', () => {
+    const plugins = [{ name: 'Test', manufacturer: 'Co', version: '1.0' }];
+    const cache = { 'co|||test': { source: 'kvr-direct' } };
+    applyKvrCache(plugins, cache);
+    assert.strictEqual(plugins[0].source, 'kvr-direct');
+  });
+});
+
+// ── metaItem edge cases ──
+
+describe('metaItem edge cases', () => {
+  it('handles zero value (falsy becomes dash)', () => {
+    const html = metaItem('Count', 0);
+    // 0 is falsy, so (value || '—') yields '—'
+    assert.ok(html.includes('\u2014'));
+  });
+
+  it('handles boolean false (falsy becomes dash)', () => {
+    const html = metaItem('Active', false);
+    assert.ok(html.includes('\u2014'));
+  });
+
+  it('handles long value', () => {
+    const long = 'a'.repeat(500);
+    const html = metaItem('Data', long);
+    assert.ok(html.includes(long));
+  });
+});
+
+// ── buildPluginCardHtml edge cases ──
+
+describe('buildPluginCardHtml edge cases', () => {
+  function makePlugin(overrides) {
+    return {
+      name: 'TestPlugin',
+      type: 'VST3',
+      manufacturer: 'TestCo',
+      version: '1.0.0',
+      path: '/usr/lib/vst3/TestPlugin.vst3',
+      size: '2.5 MB',
+      modified: '2025-01-01',
+      ...overrides,
+    };
+  }
+
+  it('renders KVR button for every plugin', () => {
+    const html = buildPluginCardHtml(makePlugin());
+    assert.ok(html.includes('btn-kvr'));
+    assert.ok(html.includes('KVR'));
+  });
+
+  it('renders folder button for every plugin', () => {
+    const html = buildPluginCardHtml(makePlugin());
+    assert.ok(html.includes('btn-folder'));
+  });
+
+  it('does not show download when hasUpdate but no updateUrl', () => {
+    const html = buildPluginCardHtml(makePlugin({
+      hasUpdate: true,
+      currentVersion: '1.0',
+      latestVersion: '2.0',
+      updateUrl: null,
+    }));
+    assert.ok(!html.includes('btn-download'));
+  });
+
+  it('escapes path with special characters', () => {
+    const html = buildPluginCardHtml(makePlugin({ path: "/usr/lib/it's a plugin.vst3" }));
+    assert.ok(html.includes("\\'s"));
+  });
+
+  it('shows version arrow when update available', () => {
+    const html = buildPluginCardHtml(makePlugin({
+      hasUpdate: true,
+      currentVersion: '1.0',
+      latestVersion: '2.0',
+    }));
+    assert.ok(html.includes('version-arrow'));
+    assert.ok(html.includes('v1.0'));
+    assert.ok(html.includes('v2.0'));
+  });
+
+  it('shows plugin size and modified date', () => {
+    const html = buildPluginCardHtml(makePlugin({ size: '15.3 MB', modified: '2025-06-15' }));
+    assert.ok(html.includes('15.3 MB'));
+    assert.ok(html.includes('2025-06-15'));
+  });
+});

@@ -653,6 +653,269 @@ fn import_plugins_json(file_path: String) -> Result<Vec<PluginInfo>, String> {
         .collect())
 }
 
+// ── Tests ──
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn make_plugin(name: &str, plugin_type: &str) -> PluginInfo {
+        PluginInfo {
+            name: name.into(),
+            path: format!("/lib/{}.vst3", name),
+            plugin_type: plugin_type.into(),
+            version: "1.0.0".into(),
+            manufacturer: "TestCo".into(),
+            manufacturer_url: Some("https://testco.com".into()),
+            size: "2.5 MB".into(),
+            modified: "2025-01-01".into(),
+        }
+    }
+
+    #[test]
+    fn test_csv_escape_plain() {
+        assert_eq!(csv_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn test_csv_escape_comma() {
+        assert_eq!(csv_escape("a,b"), "\"a,b\"");
+    }
+
+    #[test]
+    fn test_csv_escape_quotes() {
+        assert_eq!(csv_escape("say \"hi\""), "\"say \"\"hi\"\"\"");
+    }
+
+    #[test]
+    fn test_csv_escape_newline() {
+        assert_eq!(csv_escape("line1\nline2"), "\"line1\nline2\"");
+    }
+
+    #[test]
+    fn test_csv_escape_empty() {
+        assert_eq!(csv_escape(""), "");
+    }
+
+    #[test]
+    fn test_csv_escape_comma_and_quotes() {
+        assert_eq!(csv_escape("a,\"b\""), "\"a,\"\"b\"\"\"");
+    }
+
+    #[test]
+    fn test_plugins_to_export_empty() {
+        let result = plugins_to_export(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_plugins_to_export_preserves_fields() {
+        let plugins = vec![make_plugin("Serum", "VST3")];
+        let exported = plugins_to_export(&plugins);
+        assert_eq!(exported.len(), 1);
+        assert_eq!(exported[0].name, "Serum");
+        assert_eq!(exported[0].plugin_type, "VST3");
+        assert_eq!(exported[0].version, "1.0.0");
+        assert_eq!(exported[0].manufacturer, "TestCo");
+        assert_eq!(exported[0].manufacturer_url, Some("https://testco.com".into()));
+    }
+
+    #[test]
+    fn test_plugins_to_export_no_url() {
+        let mut p = make_plugin("NoUrl", "AU");
+        p.manufacturer_url = None;
+        let exported = plugins_to_export(&[p]);
+        assert_eq!(exported[0].manufacturer_url, None);
+    }
+
+    #[test]
+    fn test_export_import_json_roundtrip() {
+        let tmp = std::env::temp_dir().join("upum_test_export_json.json");
+        let _ = fs::remove_file(&tmp);
+
+        let plugins = vec![
+            make_plugin("PluginA", "VST3"),
+            make_plugin("PluginB", "AU"),
+        ];
+
+        export_plugins_json(plugins.clone(), tmp.to_string_lossy().to_string()).unwrap();
+        let imported = import_plugins_json(tmp.to_string_lossy().to_string()).unwrap();
+
+        assert_eq!(imported.len(), 2);
+        assert_eq!(imported[0].name, "PluginA");
+        assert_eq!(imported[0].plugin_type, "VST3");
+        assert_eq!(imported[1].name, "PluginB");
+        assert_eq!(imported[1].plugin_type, "AU");
+        assert_eq!(imported[1].manufacturer, "TestCo");
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_export_json_contains_metadata() {
+        let tmp = std::env::temp_dir().join("upum_test_export_meta.json");
+        let _ = fs::remove_file(&tmp);
+
+        let plugins = vec![make_plugin("Test", "VST2")];
+        export_plugins_json(plugins, tmp.to_string_lossy().to_string()).unwrap();
+
+        let content = fs::read_to_string(&tmp).unwrap();
+        let payload: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert_eq!(payload["version"], "1.0");
+        assert!(payload["exported_at"].as_str().unwrap().contains("T"));
+        assert_eq!(payload["plugins"].as_array().unwrap().len(), 1);
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_export_csv_format() {
+        let tmp = std::env::temp_dir().join("upum_test_export.csv");
+        let _ = fs::remove_file(&tmp);
+
+        let plugins = vec![make_plugin("Serum", "VST3")];
+        export_plugins_csv(plugins, tmp.to_string_lossy().to_string()).unwrap();
+
+        let content = fs::read_to_string(&tmp).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines[0], "Name,Type,Version,Manufacturer,Manufacturer URL,Path,Size,Modified");
+        assert!(lines[1].starts_with("Serum,VST3,1.0.0,TestCo,"));
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_export_csv_escapes_commas() {
+        let tmp = std::env::temp_dir().join("upum_test_export_escape.csv");
+        let _ = fs::remove_file(&tmp);
+
+        let mut p = make_plugin("Plugin, With Comma", "VST3");
+        p.manufacturer = "Company, Inc.".into();
+        export_plugins_csv(vec![p], tmp.to_string_lossy().to_string()).unwrap();
+
+        let content = fs::read_to_string(&tmp).unwrap();
+        assert!(content.contains("\"Plugin, With Comma\""));
+        assert!(content.contains("\"Company, Inc.\""));
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_json_invalid_file() {
+        let result = import_plugins_json("/nonexistent/path.json".into());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_import_json_invalid_format() {
+        let tmp = std::env::temp_dir().join("upum_test_import_bad.json");
+        fs::write(&tmp, "not valid json").unwrap();
+
+        let result = import_plugins_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_err());
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_json_empty_plugins() {
+        let tmp = std::env::temp_dir().join("upum_test_import_empty.json");
+        let content = r#"{"version":"1.0","exported_at":"2025-01-01T00:00:00Z","plugins":[]}"#;
+        fs::write(&tmp, content).unwrap();
+
+        let result = import_plugins_json(tmp.to_string_lossy().to_string()).unwrap();
+        assert!(result.is_empty());
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_export_csv_empty_plugins() {
+        let tmp = std::env::temp_dir().join("upum_test_export_empty.csv");
+        let _ = fs::remove_file(&tmp);
+
+        export_plugins_csv(vec![], tmp.to_string_lossy().to_string()).unwrap();
+        let content = fs::read_to_string(&tmp).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines.len(), 1); // header only
+        assert!(lines[0].starts_with("Name,"));
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_plugins_to_export_multiple() {
+        let plugins = vec![
+            make_plugin("A", "VST2"),
+            make_plugin("B", "VST3"),
+            make_plugin("C", "AU"),
+        ];
+        let exported = plugins_to_export(&plugins);
+        assert_eq!(exported.len(), 3);
+        assert_eq!(exported[0].name, "A");
+        assert_eq!(exported[2].plugin_type, "AU");
+    }
+
+    #[test]
+    fn test_export_payload_serde() {
+        let payload = ExportPayload {
+            version: "1.0".into(),
+            exported_at: "2025-01-01T00:00:00Z".into(),
+            plugins: vec![ExportPlugin {
+                name: "Test".into(),
+                plugin_type: "VST3".into(),
+                version: "2.0".into(),
+                manufacturer: "Co".into(),
+                manufacturer_url: None,
+                path: "/test".into(),
+                size: "1 MB".into(),
+                modified: "2025-01-01".into(),
+            }],
+        };
+
+        let json = serde_json::to_string(&payload).unwrap();
+        let deserialized: ExportPayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.version, "1.0");
+        assert_eq!(deserialized.plugins.len(), 1);
+        assert_eq!(deserialized.plugins[0].name, "Test");
+        assert!(deserialized.plugins[0].manufacturer_url.is_none());
+    }
+
+    #[test]
+    fn test_export_plugin_skips_none_url_in_json() {
+        let plugin = ExportPlugin {
+            name: "Test".into(),
+            plugin_type: "VST3".into(),
+            version: "1.0".into(),
+            manufacturer: "Co".into(),
+            manufacturer_url: None,
+            path: "/test".into(),
+            size: "1 MB".into(),
+            modified: "2025-01-01".into(),
+        };
+        let json = serde_json::to_string(&plugin).unwrap();
+        assert!(!json.contains("manufacturer_url"));
+    }
+
+    #[test]
+    fn test_export_plugin_includes_url_in_json() {
+        let plugin = ExportPlugin {
+            name: "Test".into(),
+            plugin_type: "VST3".into(),
+            version: "1.0".into(),
+            manufacturer: "Co".into(),
+            manufacturer_url: Some("https://co.com".into()),
+            path: "/test".into(),
+            size: "1 MB".into(),
+            modified: "2025-01-01".into(),
+        };
+        let json = serde_json::to_string(&plugin).unwrap();
+        assert!(json.contains("manufacturer_url"));
+        assert!(json.contains("https://co.com"));
+    }
+}
+
 // ── App setup ──
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
