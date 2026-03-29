@@ -65,6 +65,10 @@ document.addEventListener('click', (e) => {
     case 'saveCustomScheme': saveCustomScheme(); break;
     case 'deleteCustomSchemes': deleteCustomSchemes(); break;
     case 'loadCustomPreset': loadCustomPreset(el.dataset.idx); break;
+    case 'saveCustomDirs': saveCustomDirs(); break;
+    case 'saveAudioScanDirs': saveAudioScanDirs(); break;
+    case 'saveDawScanDirs': saveDawScanDirs(); break;
+    case 'openPrefsFile': openPrefsFile(); break;
   }
 });
 document.addEventListener('input', (e) => {
@@ -83,11 +87,9 @@ document.addEventListener('change', (e) => {
   else if (action === 'settingDefaultTypeFilter') settingSaveSelect('defaultTypeFilter', e.target.value);
   else if (action === 'settingPluginSort') settingSaveSelect('pluginSort', e.target.value);
   else if (action === 'settingAudioSort') settingSaveSelect('audioSort', e.target.value);
-  else if (action === 'settingCustomDirs') settingSaveCustomDirs();
+  else if (action === 'settingDawSort') settingSaveSelect('dawSort', e.target.value);
 });
-document.addEventListener('blur', (e) => {
-  if (e.target.dataset.action === 'settingCustomDirs') settingSaveCustomDirs();
-}, true);
+document.addEventListener('blur', (e) => {}, true);
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
@@ -124,7 +126,7 @@ document.addEventListener('keydown', (e) => {
 
 window.vstUpdater = {
   getVersion: () => invoke('get_version'),
-  scanPlugins: () => invoke('scan_plugins'),
+  scanPlugins: (customRoots) => invoke('scan_plugins', { customRoots: customRoots || null }),
   stopScan: () => invoke('stop_scan'),
   onScanProgress: (callback) => {
     let unlisten = null;
@@ -149,7 +151,7 @@ window.vstUpdater = {
   diffScans: (oldId, newId) => invoke('history_diff', { oldId, newId }),
   getLatestScan: () => invoke('history_latest'),
   // Audio samples
-  scanAudioSamples: () => invoke('scan_audio_samples'),
+  scanAudioSamples: (customRoots) => invoke('scan_audio_samples', { customRoots: customRoots || null }),
   stopAudioScan: () => invoke('stop_audio_scan'),
   onAudioScanProgress: (callback) => {
     let unlisten = null;
@@ -159,7 +161,7 @@ window.vstUpdater = {
   openAudioFolder: (path) => invoke('open_audio_folder', { filePath: path }),
   getAudioMetadata: (filePath) => invoke('get_audio_metadata', { filePath }),
   // Audio history
-  saveAudioScan: (samples) => invoke('audio_history_save', { samples }),
+  saveAudioScan: (samples, roots) => invoke('audio_history_save', { samples, roots: roots || null }),
   getAudioScans: () => invoke('audio_history_get_scans'),
   getAudioScanDetail: (id) => invoke('audio_history_get_detail', { id }),
   deleteAudioScan: (id) => invoke('audio_history_delete', { id }),
@@ -167,7 +169,7 @@ window.vstUpdater = {
   getLatestAudioScan: () => invoke('audio_history_latest'),
   diffAudioScans: (oldId, newId) => invoke('audio_history_diff', { oldId, newId }),
   // DAW projects
-  scanDawProjects: () => invoke('scan_daw_projects'),
+  scanDawProjects: (customRoots) => invoke('scan_daw_projects', { customRoots: customRoots || null }),
   stopDawScan: () => invoke('stop_daw_scan'),
   onDawScanProgress: (callback) => {
     let unlisten = null;
@@ -176,7 +178,7 @@ window.vstUpdater = {
   },
   openDawFolder: (path) => invoke('open_daw_folder', { filePath: path }),
   // DAW history
-  saveDawScan: (projects) => invoke('daw_history_save', { projects }),
+  saveDawScan: (projects, roots) => invoke('daw_history_save', { projects, roots: roots || null }),
   getDawScans: () => invoke('daw_history_get_scans'),
   getDawScanDetail: (id) => invoke('daw_history_get_detail', { id }),
   deleteDawScan: (id) => invoke('daw_history_delete', { id }),

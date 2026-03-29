@@ -47,6 +47,9 @@ function renderHistoryList() {
       : `${s.pluginCount} plugin${s.pluginCount !== 1 ? 's' : ''}`;
     const typeTag = isDaw ? 'DAW Projects' : isAudio ? 'Samples' : 'Plugins';
     const typeColor = isDaw ? 'var(--magenta)' : isAudio ? 'var(--yellow)' : 'var(--cyan)';
+    const rootsHint = s.roots && s.roots.length > 0
+      ? `<div class="history-item-roots" title="${s.roots.map(r => escapeHtml(r)).join('\n')}">${s.roots.map(r => escapeHtml(r)).join(', ')}</div>`
+      : '';
     return `
       <div class="history-item${selected}" data-action="selectScan" data-id="${s.id}" data-type="${s._type}">
         <div class="history-item-date">${icon} ${dateStr} at ${timeStr}</div>
@@ -55,6 +58,7 @@ function renderHistoryList() {
           <span>${label}</span>
           <span>${timeAgo(d)}</span>
         </div>
+        ${rootsHint}
       </div>`;
   }).join('');
 }
@@ -108,12 +112,17 @@ async function selectScan(id, type) {
     return `<span class="plugin-type ${cls}">${t}: ${c}</span>`;
   }).join(' ');
 
+  const rootsHtml = detail.roots && detail.roots.length > 0
+    ? `<div class="history-detail-roots"><span style="color: var(--text-dim); font-size: 11px;">Scanned:</span> ${detail.roots.map(r => `<code class="root-path">${escapeHtml(r)}</code>`).join(' ')}</div>`
+    : '';
+
   const container = document.getElementById('historyDetail');
   container.innerHTML = `
     <div class="history-detail-header">
       <div>
         <h2>${dateStr}</h2>
         <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${timeStr} &middot; ${detail.pluginCount} plugins &middot; ${typeBreakdown}</div>
+        ${rootsHtml}
       </div>
       <button class="btn-danger" data-action="deleteScanEntry" data-id="${id}">Delete</button>
     </div>
@@ -175,12 +184,17 @@ async function selectAudioScan(id) {
       </div>`;
   }
 
+  const audioRootsHtml = detail.roots && detail.roots.length > 0
+    ? `<div class="history-detail-roots"><span style="color: var(--text-dim); font-size: 11px;">Scanned:</span> ${detail.roots.map(r => `<code class="root-path">${escapeHtml(r)}</code>`).join(' ')}</div>`
+    : '';
+
   const container = document.getElementById('historyDetail');
   container.innerHTML = `
     <div class="history-detail-header">
       <div>
         <h2>&#127925; ${dateStr}</h2>
         <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${timeStr} &middot; ${detail.sampleCount} samples &middot; ${formatAudioSize(detail.totalBytes)} &middot; ${fmtBreakdown}</div>
+        ${audioRootsHtml}
       </div>
       <button class="btn-danger" data-action="deleteAudioScanEntry" data-id="${id}">Delete</button>
     </div>
@@ -276,12 +290,17 @@ async function selectDawScan(id) {
       </div>`;
   }
 
+  const dawRootsHtml = detail.roots && detail.roots.length > 0
+    ? `<div class="history-detail-roots"><span style="color: var(--text-dim); font-size: 11px;">Scanned:</span> ${detail.roots.map(r => `<code class="root-path">${escapeHtml(r)}</code>`).join(' ')}</div>`
+    : '';
+
   const container = document.getElementById('historyDetail');
   container.innerHTML = `
     <div class="history-detail-header">
       <div>
         <h2>&#127911; ${dateStr}</h2>
         <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${timeStr} &middot; ${detail.projectCount} projects &middot; ${formatAudioSize(detail.totalBytes)} &middot; ${dawBreakdown}</div>
+        ${dawRootsHtml}
       </div>
       <button class="btn-danger" data-action="deleteDawScanEntry" data-id="${id}">Delete</button>
     </div>

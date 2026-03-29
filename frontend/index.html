@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Universal Plugin Update Manager</title>
+  <title>AUDIO_HAXOR</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap');
 
@@ -636,6 +636,17 @@
       color: var(--text-muted);
     }
 
+    .settings-saved-msg {
+      font-size: 11px;
+      color: var(--green);
+      margin-left: 8px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .settings-saved-msg.visible {
+      opacity: 1;
+    }
+
     /* Stats bar */
     .stats-bar {
       display: flex; gap: 24px; align-items: center;
@@ -1169,6 +1180,28 @@
     .history-item-meta {
       font-size: 11px; color: var(--text-muted);
       display: flex; gap: 12px;
+    }
+
+    .history-item-roots {
+      font-size: 10px; color: var(--text-muted);
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .history-detail-roots {
+      margin-top: 6px;
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+
+    .root-path {
+      font-size: 11px;
+      background: var(--bg-hover);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      color: var(--text-dim);
     }
 
     .history-detail {
@@ -1719,7 +1752,7 @@
         <div class="logo">
           <div class="logo-icon">&#9835;</div>
           <div class="logo-text">
-            <h1>Universal Plugin Update Manager</h1>
+            <h1>AUDIO_HAXOR</h1>
             <span class="logo-author">by MenkeTechnologies</span>
             <span class="logo-version" id="appVersion"></span>
           </div>
@@ -1822,7 +1855,7 @@
     <div class="plugin-list" id="pluginList">
       <div class="state-message" id="emptyState">
         <div class="state-icon">&#127911;</div>
-        <h2>Welcome to Universal Plugin Update Manager</h2>
+        <h2>Welcome to AUDIO_HAXOR</h2>
         <p>Click <strong>"Scan Plugins"</strong> to discover all VST2, VST3, and Audio Unit plugins installed on your system.</p>
       </div>
     </div>
@@ -2089,7 +2122,31 @@
               <span class="settings-desc">Additional directories to scan for plugins (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" data-action="settingCustomDirs"></textarea>
+              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveCustomDirs" style="margin-top: 6px;">Save</button>
+              <span class="settings-saved-msg" id="savedMsgCustomDirs"></span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Audio Scan Directories</span>
+              <span class="settings-desc">Additional directories to scan for audio samples (one per line)</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveAudioScanDirs" style="margin-top: 6px;">Save</button>
+              <span class="settings-saved-msg" id="savedMsgAudioScanDirs"></span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">DAW Scan Directories</span>
+              <span class="settings-desc">Additional directories to scan for DAW project files (one per line)</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveDawScanDirs" style="margin-top: 6px;">Save</button>
+              <span class="settings-saved-msg" id="savedMsgDawScanDirs"></span>
             </div>
           </div>
           <div class="settings-row">
@@ -2191,6 +2248,22 @@
               </select>
             </div>
           </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Default DAW Sort</span>
+              <span class="settings-desc">How DAW projects are ordered after scanning</span>
+            </div>
+            <div class="settings-control">
+              <select class="settings-select" id="settingDawSort" data-action="settingDawSort">
+                <option value="name">Name</option>
+                <option value="daw">DAW</option>
+                <option value="format">Format</option>
+                <option value="size">Size</option>
+                <option value="modified">Modified Date</option>
+                <option value="directory">Path</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div class="settings-section">
@@ -2228,7 +2301,7 @@
           <h2 class="settings-heading">About</h2>
           <div class="settings-row">
             <div class="settings-label">
-              <span class="settings-title">Universal Plugin Update Manager</span>
+              <span class="settings-title">AUDIO_HAXOR</span>
               <span class="settings-desc">
                 Version <span id="settingsVersion"></span><br>
                 by MenkeTechnologies

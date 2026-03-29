@@ -1,7 +1,7 @@
 {
-  "name": "universal-plugin-update-manager",
+  "name": "audio-haxor",
   "version": "1.1.0",
-  "description": "Universal desktop app to scan and update VST/VST3/AU audio plugins",
+  "description": "Desktop app to scan and manage VST/VST3/AU audio plugins, samples, and DAW projects",
   "scripts": {
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

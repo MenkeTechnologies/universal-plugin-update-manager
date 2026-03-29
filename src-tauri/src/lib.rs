@@ -84,7 +84,10 @@ fn get_version(app: AppHandle) -> String {
 }
 
 #[tauri::command]
-async fn scan_plugins(app: AppHandle) -> Result<serde_json::Value, String> {
+async fn scan_plugins(
+    app: AppHandle,
+    custom_roots: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
     let state = app.state::<ScanState>();
 
     if state.scanning.swap(true, Ordering::SeqCst) {
@@ -95,7 +98,14 @@ async fn scan_plugins(app: AppHandle) -> Result<serde_json::Value, String> {
     let app_handle = app.clone();
     let result = tokio::task::spawn_blocking(move || {
         let scan_state = app_handle.state::<ScanState>();
-        let directories = scanner::get_vst_directories();
+        let mut directories = scanner::get_vst_directories();
+        if let Some(extra) = custom_roots {
+            for r in extra {
+                if std::path::Path::new(&r).exists() && !directories.contains(&r) {
+                    directories.push(r);
+                }
+            }
+        }
         let plugin_paths = scanner::discover_plugins(&directories);
         let total = plugin_paths.len();
 
@@ -147,7 +157,8 @@ async fn scan_plugins(app: AppHandle) -> Result<serde_json::Value, String> {
         }
 
         all_plugins.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        let snapshot = history::save_scan(&all_plugins, &directories);
+        let roots: Vec<String> = directories.clone();
+        let snapshot = history::save_scan(&all_plugins, &directories, &roots);
 
         serde_json::json!({
             "plugins": all_plugins,
@@ -367,7 +378,10 @@ fn kvr_cache_update(entries: Vec<KvrCacheUpdateEntry>) {
 
 // Audio scanner commands
 #[tauri::command]
-async fn scan_audio_samples(app: AppHandle) -> Result<serde_json::Value, String> {
+async fn scan_audio_samples(
+    app: AppHandle,
+    custom_roots: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
     let state = app.state::<AudioScanState>();
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("Audio scan already in progress".into());
@@ -385,7 +399,15 @@ async fn scan_audio_samples(app: AppHandle) -> Result<serde_json::Value, String>
     let app_handle = app.clone();
     let result = tokio::task::spawn_blocking(move || {
         let audio_state = app_handle.state::<AudioScanState>();
-        let roots = audio_scanner::get_audio_roots();
+        let mut roots = audio_scanner::get_audio_roots();
+        if let Some(extra) = custom_roots {
+            for r in extra {
+                let p = std::path::PathBuf::from(&r);
+                if p.exists() && !roots.contains(&p) {
+                    roots.push(p);
+                }
+            }
+        }
         let mut all_samples: Vec<AudioSample> = Vec::new();
 
         audio_scanner::walk_for_audio(
@@ -404,8 +426,12 @@ async fn scan_audio_samples(app: AppHandle) -> Result<serde_json::Value, String>
             &|| audio_state.stop_scan.load(Ordering::SeqCst),
         );
 
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
         all_samples.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        serde_json::json!({ "samples": all_samples })
+        serde_json::json!({ "samples": all_samples, "roots": root_strs })
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -428,8 +454,11 @@ fn get_audio_metadata(file_path: String) -> audio_scanner::AudioMetadata {
 
 // Audio history commands
 #[tauri::command]
-fn audio_history_save(samples: Vec<AudioSample>) -> history::AudioScanSnapshot {
-    history::save_audio_scan(&samples)
+fn audio_history_save(
+    samples: Vec<AudioSample>,
+    roots: Option<Vec<String>>,
+) -> history::AudioScanSnapshot {
+    history::save_audio_scan(&samples, &roots.unwrap_or_default())
 }
 
 #[tauri::command]
@@ -464,7 +493,10 @@ fn audio_history_diff(old_id: String, new_id: String) -> Option<history::AudioSc
 
 // DAW scanner commands
 #[tauri::command]
-async fn scan_daw_projects(app: AppHandle) -> Result<serde_json::Value, String> {
+async fn scan_daw_projects(
+    app: AppHandle,
+    custom_roots: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
     let state = app.state::<DawScanState>();
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("DAW scan already in progress".into());
@@ -482,7 +514,15 @@ async fn scan_daw_projects(app: AppHandle) -> Result<serde_json::Value, String> 
     let app_handle = app.clone();
     let result = tokio::task::spawn_blocking(move || {
         let daw_state = app_handle.state::<DawScanState>();
-        let roots = daw_scanner::get_daw_roots();
+        let mut roots = daw_scanner::get_daw_roots();
+        if let Some(extra) = custom_roots {
+            for r in extra {
+                let p = std::path::PathBuf::from(&r);
+                if p.exists() && !roots.contains(&p) {
+                    roots.push(p);
+                }
+            }
+        }
         let mut all_projects: Vec<DawProject> = Vec::new();
 
         daw_scanner::walk_for_daw(
@@ -501,8 +541,12 @@ async fn scan_daw_projects(app: AppHandle) -> Result<serde_json::Value, String> 
             &|| daw_state.stop_scan.load(Ordering::SeqCst),
         );
 
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
         all_projects.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        serde_json::json!({ "projects": all_projects })
+        serde_json::json!({ "projects": all_projects, "roots": root_strs })
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -520,8 +564,11 @@ async fn stop_daw_scan(app: AppHandle) -> Result<(), String> {
 
 // DAW history commands
 #[tauri::command]
-fn daw_history_save(projects: Vec<DawProject>) -> history::DawScanSnapshot {
-    history::save_daw_scan(&projects)
+fn daw_history_save(
+    projects: Vec<DawProject>,
+    roots: Option<Vec<String>>,
+) -> history::DawScanSnapshot {
+    history::save_daw_scan(&projects, &roots.unwrap_or_default())
 }
 
 #[tauri::command]

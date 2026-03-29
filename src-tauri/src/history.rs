@@ -12,6 +12,8 @@ pub struct ScanSnapshot {
     pub plugin_count: usize,
     pub plugins: Vec<PluginInfo>,
     pub directories: Vec<String>,
+    #[serde(default)]
+    pub roots: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +22,8 @@ pub struct ScanSummary {
     pub timestamp: String,
     #[serde(rename = "pluginCount")]
     pub plugin_count: usize,
+    #[serde(default)]
+    pub roots: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,6 +105,8 @@ pub struct DawScanSnapshot {
     #[serde(rename = "dawCounts")]
     pub daw_counts: std::collections::HashMap<String, usize>,
     pub projects: Vec<DawProject>,
+    #[serde(default)]
+    pub roots: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,6 +119,8 @@ pub struct DawScanSummary {
     pub total_bytes: u64,
     #[serde(rename = "dawCounts")]
     pub daw_counts: std::collections::HashMap<String, usize>,
+    #[serde(default)]
+    pub roots: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,6 +162,8 @@ pub struct AudioScanSnapshot {
     #[serde(rename = "formatCounts")]
     pub format_counts: std::collections::HashMap<String, usize>,
     pub samples: Vec<AudioSample>,
+    #[serde(default)]
+    pub roots: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,6 +176,8 @@ pub struct AudioScanSummary {
     pub total_bytes: u64,
     #[serde(rename = "formatCounts")]
     pub format_counts: std::collections::HashMap<String, usize>,
+    #[serde(default)]
+    pub roots: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,7 +209,7 @@ fn get_data_dir() -> PathBuf {
     }
     dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("com.menketechnologies.universal-plugin-update-manager")
+        .join("com.menketechnologies.audio-haxor")
 }
 
 fn ensure_data_dir() -> PathBuf {
@@ -330,7 +342,7 @@ fn save_history(history: &ScanHistory) {
     }
 }
 
-pub fn save_scan(plugins: &[PluginInfo], directories: &[String]) -> ScanSnapshot {
+pub fn save_scan(plugins: &[PluginInfo], directories: &[String], roots: &[String]) -> ScanSnapshot {
     let mut history = load_history();
     let snapshot = ScanSnapshot {
         id: gen_id(),
@@ -338,6 +350,7 @@ pub fn save_scan(plugins: &[PluginInfo], directories: &[String]) -> ScanSnapshot
         plugin_count: plugins.len(),
         plugins: plugins.to_vec(),
         directories: directories.to_vec(),
+        roots: roots.to_vec(),
     };
     history.scans.insert(0, snapshot.clone());
     if history.scans.len() > 50 {
@@ -356,6 +369,7 @@ pub fn get_scans() -> Vec<ScanSummary> {
             id: s.id.clone(),
             timestamp: s.timestamp.clone(),
             plugin_count: s.plugin_count,
+            roots: s.roots.clone(),
         })
         .collect()
 }
@@ -426,11 +440,13 @@ pub fn diff_scans(old_id: &str, new_id: &str) -> Option<ScanDiff> {
             id: old_scan.id.clone(),
             timestamp: old_scan.timestamp.clone(),
             plugin_count: old_scan.plugin_count,
+            roots: old_scan.roots.clone(),
         },
         new_scan: ScanSummary {
             id: new_scan.id.clone(),
             timestamp: new_scan.timestamp.clone(),
             plugin_count: new_scan.plugin_count,
+            roots: new_scan.roots.clone(),
         },
         added,
         removed,
@@ -503,7 +519,7 @@ fn save_audio_history(history: &AudioHistory) {
     }
 }
 
-pub fn save_audio_scan(samples: &[AudioSample]) -> AudioScanSnapshot {
+pub fn save_audio_scan(samples: &[AudioSample], roots: &[String]) -> AudioScanSnapshot {
     let mut history = load_audio_history();
     let mut format_counts = std::collections::HashMap::new();
     let mut total_bytes = 0u64;
@@ -518,6 +534,7 @@ pub fn save_audio_scan(samples: &[AudioSample]) -> AudioScanSnapshot {
         total_bytes,
         format_counts,
         samples: samples.to_vec(),
+        roots: roots.to_vec(),
     };
     history.scans.insert(0, snapshot.clone());
     if history.scans.len() > 50 {
@@ -538,6 +555,7 @@ pub fn get_audio_scans() -> Vec<AudioScanSummary> {
             sample_count: s.sample_count,
             total_bytes: s.total_bytes,
             format_counts: s.format_counts.clone(),
+            roots: s.roots.clone(),
         })
         .collect()
 }
@@ -583,7 +601,7 @@ fn save_daw_history(history: &DawHistory) {
     }
 }
 
-pub fn save_daw_scan(projects: &[DawProject]) -> DawScanSnapshot {
+pub fn save_daw_scan(projects: &[DawProject], roots: &[String]) -> DawScanSnapshot {
     let mut history = load_daw_history();
     let mut daw_counts = std::collections::HashMap::new();
     let mut total_bytes = 0u64;
@@ -598,6 +616,7 @@ pub fn save_daw_scan(projects: &[DawProject]) -> DawScanSnapshot {
         total_bytes,
         daw_counts,
         projects: projects.to_vec(),
+        roots: roots.to_vec(),
     };
     history.scans.insert(0, snapshot.clone());
     if history.scans.len() > 50 {
@@ -618,6 +637,7 @@ pub fn get_daw_scans() -> Vec<DawScanSummary> {
             project_count: s.project_count,
             total_bytes: s.total_bytes,
             daw_counts: s.daw_counts.clone(),
+            roots: s.roots.clone(),
         })
         .collect()
 }
@@ -673,6 +693,7 @@ pub fn diff_daw_scans(old_id: &str, new_id: &str) -> Option<DawScanDiff> {
             project_count: old_scan.project_count,
             total_bytes: old_scan.total_bytes,
             daw_counts: old_scan.daw_counts.clone(),
+            roots: old_scan.roots.clone(),
         },
         new_scan: DawScanSummary {
             id: new_scan.id.clone(),
@@ -680,6 +701,7 @@ pub fn diff_daw_scans(old_id: &str, new_id: &str) -> Option<DawScanDiff> {
             project_count: new_scan.project_count,
             total_bytes: new_scan.total_bytes,
             daw_counts: new_scan.daw_counts.clone(),
+            roots: new_scan.roots.clone(),
         },
         added,
         removed,
@@ -717,6 +739,7 @@ pub fn diff_audio_scans(old_id: &str, new_id: &str) -> Option<AudioScanDiff> {
             sample_count: old_scan.sample_count,
             total_bytes: old_scan.total_bytes,
             format_counts: old_scan.format_counts.clone(),
+            roots: old_scan.roots.clone(),
         },
         new_scan: AudioScanSummary {
             id: new_scan.id.clone(),
@@ -724,6 +747,7 @@ pub fn diff_audio_scans(old_id: &str, new_id: &str) -> Option<AudioScanDiff> {
             sample_count: new_scan.sample_count,
             total_bytes: new_scan.total_bytes,
             format_counts: new_scan.format_counts.clone(),
+            roots: new_scan.roots.clone(),
         },
         added,
         removed,
@@ -808,7 +832,7 @@ mod tests {
                 make_plugin("PlugB", "2.0", "/tmp/b.vst3"),
             ];
             let dirs = vec!["/tmp".to_string()];
-            let snap = save_scan(&plugins, &dirs);
+            let snap = save_scan(&plugins, &dirs, &dirs);
             assert_eq!(snap.plugin_count, 2);
 
             let scans = get_scans();
@@ -832,7 +856,7 @@ mod tests {
             let plugins = vec![make_plugin("P", "1.0", "/tmp/p.vst3")];
             let dirs = vec!["/tmp".to_string()];
             for _ in 0..55 {
-                save_scan(&plugins, &dirs);
+                save_scan(&plugins, &dirs, &dirs);
             }
             let scans = get_scans();
             assert!(scans.len() <= 50);
@@ -851,8 +875,8 @@ mod tests {
                 make_plugin("PlugC", "1.0", "/tmp/c.vst3"),
             ];
             let dirs = vec!["/tmp".to_string()];
-            let snap1 = save_scan(&plugins1, &dirs);
-            let snap2 = save_scan(&plugins2, &dirs);
+            let snap1 = save_scan(&plugins1, &dirs, &dirs);
+            let snap2 = save_scan(&plugins2, &dirs, &dirs);
 
             let diff = diff_scans(&snap1.id, &snap2.id).unwrap();
             assert_eq!(diff.added.len(), 1);
@@ -868,8 +892,8 @@ mod tests {
             let plugins1 = vec![make_plugin("PlugA", "1.0", "/tmp/vc_a.vst3")];
             let plugins2 = vec![make_plugin("PlugA", "2.0", "/tmp/vc_a.vst3")];
             let dirs = vec!["/tmp".to_string()];
-            let snap1 = save_scan(&plugins1, &dirs);
-            let snap2 = save_scan(&plugins2, &dirs);
+            let snap1 = save_scan(&plugins1, &dirs, &dirs);
+            let snap2 = save_scan(&plugins2, &dirs, &dirs);
 
             let diff = diff_scans(&snap1.id, &snap2.id).unwrap();
             assert_eq!(diff.version_changed.len(), 1);
@@ -906,7 +930,7 @@ mod tests {
                 make_sample("kick", "/tmp/kick.wav", "WAV"),
                 make_sample("snare", "/tmp/snare.mp3", "MP3"),
             ];
-            let snap = save_audio_scan(&samples);
+            let snap = save_audio_scan(&samples, &[]);
             assert_eq!(snap.sample_count, 2);
             assert_eq!(snap.total_bytes, 2048);
             assert_eq!(snap.format_counts.get("WAV"), Some(&1));
@@ -930,9 +954,9 @@ mod tests {
     fn test_save_scan_preserves_order() {
         with_test_dir("scan_order", || {
             let dirs = vec!["/tmp".to_string()];
-            let s1 = save_scan(&[make_plugin("A", "1.0", "/tmp/a.vst3")], &dirs);
-            let s2 = save_scan(&[make_plugin("B", "1.0", "/tmp/b.vst3")], &dirs);
-            let s3 = save_scan(&[make_plugin("C", "1.0", "/tmp/c.vst3")], &dirs);
+            let s1 = save_scan(&[make_plugin("A", "1.0", "/tmp/a.vst3")], &dirs, &dirs);
+            let s2 = save_scan(&[make_plugin("B", "1.0", "/tmp/b.vst3")], &dirs, &dirs);
+            let s3 = save_scan(&[make_plugin("C", "1.0", "/tmp/c.vst3")], &dirs, &dirs);
 
             let scans = get_scans();
             // Newest first
@@ -946,7 +970,7 @@ mod tests {
     fn test_delete_nonexistent_scan() {
         with_test_dir("delete_nonexistent", || {
             let dirs = vec!["/tmp".to_string()];
-            let snap = save_scan(&[make_plugin("X", "1.0", "/tmp/x.vst3")], &dirs);
+            let snap = save_scan(&[make_plugin("X", "1.0", "/tmp/x.vst3")], &dirs, &dirs);
 
             // Delete a fake id - should not crash
             delete_scan("totally-fake-id-12345");
@@ -961,7 +985,7 @@ mod tests {
     fn test_clear_history_idempotent() {
         with_test_dir("clear_idempotent", || {
             let dirs = vec!["/tmp".to_string()];
-            save_scan(&[make_plugin("X", "1.0", "/tmp/x.vst3")], &dirs);
+            save_scan(&[make_plugin("X", "1.0", "/tmp/x.vst3")], &dirs, &dirs);
 
             clear_history();
             assert!(get_scans().is_empty());
@@ -980,8 +1004,8 @@ mod tests {
                 make_plugin("PlugB", "2.0", "/tmp/b.vst3"),
             ];
             let dirs = vec!["/tmp".to_string()];
-            let snap1 = save_scan(&plugins, &dirs);
-            let snap2 = save_scan(&plugins, &dirs);
+            let snap1 = save_scan(&plugins, &dirs, &dirs);
+            let snap2 = save_scan(&plugins, &dirs, &dirs);
 
             let diff = diff_scans(&snap1.id, &snap2.id).unwrap();
             assert!(diff.added.is_empty(), "added should be empty");
@@ -1009,7 +1033,7 @@ mod tests {
         with_test_dir("audio_limit_50", || {
             let sample = vec![make_sample("kick", "/tmp/kick.wav", "WAV")];
             for _ in 0..55 {
-                save_audio_scan(&sample);
+                save_audio_scan(&sample, &[]);
             }
             let scans = get_audio_scans();
             assert!(
@@ -1103,8 +1127,8 @@ mod tests {
                 make_sample("snare", "/tmp/snare.wav", "WAV"),
                 make_sample("hihat", "/tmp/hihat.wav", "WAV"),
             ];
-            let snap1 = save_audio_scan(&samples1);
-            let snap2 = save_audio_scan(&samples2);
+            let snap1 = save_audio_scan(&samples1, &[]);
+            let snap2 = save_audio_scan(&samples2, &[]);
 
             let diff = diff_audio_scans(&snap1.id, &snap2.id).unwrap();
             assert_eq!(diff.added.len(), 1);
@@ -1134,7 +1158,7 @@ mod tests {
                 make_daw_project("Song1", "/tmp/song1.als", "ALS", "Ableton Live"),
                 make_daw_project("Song2", "/tmp/song2.flp", "FLP", "FL Studio"),
             ];
-            let snap = save_daw_scan(&projects);
+            let snap = save_daw_scan(&projects, &[]);
             assert_eq!(snap.project_count, 2);
             assert_eq!(snap.total_bytes, 4096);
             assert_eq!(snap.daw_counts.get("Ableton Live"), Some(&1));
@@ -1164,7 +1188,7 @@ mod tests {
                 "Ableton Live",
             )];
             for _ in 0..55 {
-                save_daw_scan(&projects);
+                save_daw_scan(&projects, &[]);
             }
             let scans = get_daw_scans();
             assert!(
@@ -1186,8 +1210,8 @@ mod tests {
                 make_daw_project("Song2", "/tmp/song2.flp", "FLP", "FL Studio"),
                 make_daw_project("Song3", "/tmp/song3.rpp", "RPP", "REAPER"),
             ];
-            let snap1 = save_daw_scan(&projects1);
-            let snap2 = save_daw_scan(&projects2);
+            let snap1 = save_daw_scan(&projects1, &[]);
+            let snap2 = save_daw_scan(&projects2, &[]);
 
             let diff = diff_daw_scans(&snap1.id, &snap2.id).unwrap();
             assert_eq!(diff.added.len(), 1);

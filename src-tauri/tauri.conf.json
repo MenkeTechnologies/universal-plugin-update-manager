@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/v2/crates/tauri-utils/schema.json",
-  "productName": "Universal Plugin Update Manager",
+  "productName": "AUDIO_HAXOR",
   "version": "1.1.0",
-  "identifier": "com.menketechnologies.universal-plugin-update-manager",
+  "identifier": "com.menketechnologies.audio-haxor",
   "build": {
     "frontendDist": "../frontend"
   },
@@ -10,9 +10,9 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Universal Plugin Update Manager",
-        "width": 1400,
-        "height": 900,
+        "title": "AUDIO_HAXOR",
+        "width": 1800,
+        "height": 1100,
         "minWidth": 800,
         "minHeight": 600,
         "decorations": true,

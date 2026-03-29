@@ -245,13 +245,14 @@ async function scanDawProjects() {
   });
 
   try {
-    const result = await window.vstUpdater.scanDawProjects();
+    const dawRoots = (prefs.getItem('dawScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const result = await window.vstUpdater.scanDawProjects(dawRoots.length ? dawRoots : undefined);
     if (dawScanProgressCleanup) { dawScanProgressCleanup(); dawScanProgressCleanup = null; }
     flushPendingProjects();
     allDawProjects = result.projects;
     rebuildDawStats();
     filterDawProjects();
-    try { await window.vstUpdater.saveDawScan(result.projects); } catch (e) { console.error('Failed to save DAW scan history:', e); }
+    try { await window.vstUpdater.saveDawScan(result.projects, result.roots); } catch (e) { console.error('Failed to save DAW scan history:', e); }
   } catch (err) {
     if (dawScanProgressCleanup) { dawScanProgressCleanup(); dawScanProgressCleanup = null; }
     flushPendingProjects();

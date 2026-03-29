@@ -1,30 +1,21 @@
 ```
- ██▓███   ██▓     █    ██   ▄████  ██▓ ███▄    █
-▓██░  ██▒▓██▒     ██  ▓██▒ ██▒ ▀█▒▓██▒ ██ ▀█   █
-▓██░ ██▓▒▒██░    ▓██  ▒██░▒██░▄▄▄░▒██▒▓██  ▀█ ██▒
-▒██▄█▓▒ ▒▒██░    ▓▓█  ░██░░▓█  ██▓░██░▓██▒  ▐▌██▒
-▒██▒ ░  ░░██████▒▒▒█████▓ ░▒▓███▀▒░██░▒██░   ▓██░
-▒▓▒░ ░  ░░ ▒░▓  ░░▒▓▒ ▒ ▒  ░▒   ▒ ░▓  ░ ▒░   ▒ ▒
-░▒ ░      ░ ░ ▒  ░░░▒░ ░ ░  ░   ░  ▒ ░░ ░░   ░ ▒░
-░░          ░ ░    ░░░ ░ ░░ ░   ░  ▒ ░   ░   ░ ░
-              ░  ░   ░          ░  ░           ░
+  ▄▄▄       █    ██ ▓█████▄  ██▓ ▒█████
+ ▒████▄     ██  ▓██▒▒██▀ ██▌▓██▒▒██▒  ██▒
+ ▒██  ▀█▄  ▓██  ▒██░░██   █▌▒██▒▒██░  ██▒
+ ░██▄▄▄▄██ ▓▓█  ░██░░▓█▄   ▌░██░▒██   ██░
+  ▓█   ▓██▒▒▒█████▓ ░▒████▓ ░██░░ ████▓▒░
+  ▒▒   ▓▒█░░▒▓▒ ▒ ▒  ▒▒▓  ▒ ░▓  ░ ▒░▒░▒░
 
- █    ██  ██▓███  ▓█████▄  ▄▄▄     ▄▄▄█████▓▓█████
- ██  ▓██▒▓██░  ██▒▒██▀ ██▌▒████▄   ▓  ██▒ ▓▒▓█   ▀
-▓██  ▒██░▓██░ ██▓▒░██   █▌▒██  ▀█▄ ▒ ▓██░ ▒░▒███
-▓▓█  ░██░▒██▄█▓▒ ▒░▓█▄   ▌░██▄▄▄▄██░ ▓██▓ ░ ▒▓█  ▄
-▒▒█████▓ ▒██▒ ░  ░░▒████▓  ▓█   ▓██▒ ▒██▒ ░ ░▒████▒
-░▒▓▒ ▒ ▒ ▒▓▒░ ░  ░ ▒▒▓  ▒  ▒▒   ▓▒█░ ▒ ░░   ░░ ▒░ ░
- ███▄ ▄███▓ ▄▄▄       ███▄    █  ▄▄▄        ▄████ ▓█████  ██▀███
-▓██▒▀█▀ ██▒▒████▄     ██ ▀█   █ ▒████▄     ██▒ ▀█▒▓█   ▀ ▓██ ▒ ██▒
-▓██    ▓██░▒██  ▀█▄   ▓██  ▀█ ██▒▒██  ▀█▄  ▒██░▄▄▄░▒███   ▓██ ░▄█ ▒
-▒██    ▒██ ░██▄▄▄▄██  ▓██▒  ▐▌██▒░██▄▄▄▄██ ░▓█  ██▓▒▓█  ▄ ▒██▀▀█▄
-▒██▒   ░██▒ ▓█   ▓██▒ ▒██░   ▓██░ ▓█   ▓██▒░▒▓███▀▒░▒████▒░██▓ ▒██▒
+ ██░ ██  ▄▄▄      ▒██   ██▒ ▒█████   ██▀███
+▓██░ ██▒▒████▄    ▒▒ █ █ ▒░▒██▒  ██▒▓██ ▒ ██▒
+▒██▀▀██░▒██  ▀█▄  ░░  █   ░▒██░  ██▒▓██ ░▄█ ▒
+░▓█ ░██ ░██▄▄▄▄██  ░ █ █ ▒ ▒██   ██░▒██▀▀█▄
+░▓████▒   ▓█   ▓██▒▒██▒ ▒██▒░ ████▓▒░░██▓ ▒██▒
 ```
 
-> **// SYSTEM ONLINE -- UNIVERSAL PLUGIN UPDATE MANAGER v1.0.0 // by MenkeTechnologies**
+> **// SYSTEM ONLINE -- AUDIO_HAXOR v1.1.0 // by MenkeTechnologies**
 
-A high-voltage **Tauri v2** desktop app that jacks into your system's audio plugin directories, maps every VST2/VST3/AU module it finds, checks the web for the latest versions, and maintains a full changelog of every scan -- so nothing slips through the cracks. Rust backend with a cyberpunk CRT interface featuring neon glow, scanline overlays, and glitch effects.
+A high-voltage **Tauri v2** desktop app that jacks into your system's audio plugin directories, maps every VST2/VST3/AU module it finds, scans audio sample libraries, discovers DAW project files, checks the web for the latest plugin versions, and maintains a full changelog of every scan -- so nothing slips through the cracks. Rust backend with a cyberpunk CRT interface featuring neon glow, scanline overlays, glitch effects, and multiple color schemes.
 
 ---
 
@@ -70,12 +61,15 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | Module | Function |
 |--------|----------|
 | **Plugin Scanner** | Detects VST2, VST3, and AU plugins from platform-specific directories on macOS, Windows, and Linux. Runs in a background worker thread -- UI stays fully responsive |
+| **Audio Scanner** | Discovers audio samples (WAV, FLAC, AIFF, MP3, OGG, etc.) with metadata extraction, file size formatting, and symlink deduplication. Inline audio preview via Tauri's native `asset://` protocol |
+| **DAW Scanner** | Finds DAW project files across 14+ formats -- Ableton (.als), Logic (.logicx), FL Studio (.flp), REAPER (.rpp), Cubase/Nuendo (.cpr/.npr), Pro Tools (.ptx/.ptf), Bitwig (.bwproject), Studio One (.song), Reason (.reason), Audacity (.aup/.aup3), GarageBand (.band), Ardour (.ardour), and dawproject (.dawproject) |
 | **Version Intel** | Reads version, manufacturer, and website URL from macOS bundle plists (`CFBundleShortVersionString`, `CFBundleIdentifier`, `NSHumanReadableCopyright`) |
 | **Update Checker** | Searches [KVR Audio](https://www.kvraudio.com) for each plugin's latest version. Falls back to DuckDuckGo site-restricted KVR search. Runs in a worker thread with rate limiting and streams results back incrementally |
 | **KVR Integration** | Yellow KVR button on every plugin links directly to its KVR Audio product page. URL is constructed from plugin name + manufacturer with smart slug generation (camelCase splitting, manufacturer lookup table). Falls back to KVR search if the direct URL doesn't exist |
 | **KVR Cache** | Resolved KVR data (product URLs, download links, versions) is persisted to `kvr-cache.json`. On restart, cached results are restored instantly and the background resolver resumes from where it left off |
 | **Download Button** | Green download button appears on plugins with a confirmed newer version and a KVR download link (platform-specific when available) |
-| **Scan History** | Stores up to 50 scan snapshots locally with full diff support between any two scans |
+| **Export/Import** | Export plugin lists to JSON, CSV, or TSV via native file dialogs. Import previously exported scans |
+| **Scan History** | Stores up to 50 scan snapshots locally (plugins, audio, and DAW scans merged) with full diff support between any two scans |
 | **Batch Updater** | Walk through all outdated plugins one by one with skip/open controls |
 | **Manufacturer Link** | Globe button on each plugin opens the manufacturer's website directly (derived from bundle ID). Shows a disabled icon when no website is available |
 | **Reveal in Finder** | Folder button opens the plugin's filesystem location. Tooltip shows the full path on hover |
@@ -83,6 +77,8 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Stop Control** | Cancel any in-progress scan, update check, or KVR resolution without losing already-discovered results |
 | **Auto-Restore** | Last scan results + KVR cache load automatically on app startup -- no need to re-scan or re-check every launch |
 | **Unknown Tracking** | Plugins where no version info was found online show "Unknown Latest" badge and are counted separately from "Up to Date" |
+| **Color Schemes** | Multiple themes including cyberpunk (default), light mode, and custom schemes with configurable CSS variables |
+| **Resizable Columns** | Drag column borders to resize. Widths persist across sessions |
 
 ---
 
@@ -120,22 +116,23 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (79 tests)
+### Rust tests (118 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
 | **kvr** | 27 | Version parsing, version comparison, HTML version extraction (6 formats), download URL extraction, platform keyword detection, date filtering |
 | **history** | 19 | Scan CRUD, 50-scan limit, diff (added/removed/version-changed), KVR cache CRUD, audio history CRUD, audio diff, ID generation |
 | **audio_scanner** | 18 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories |
+| **daw_scanner** | 39 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
 | **scanner** | 15 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration |
 
-### JavaScript tests (124 tests)
+### JavaScript tests (207 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
 | **ui** | 96 | `escapeHtml`, `escapePath`, `slugify`, `buildKvrUrl`, `formatAudioSize`, `formatTime`, `getFormatClass`, `timeAgo`, `kvrCacheKey`, `buildDirsTable`, `applyKvrCache`, `metaItem`, `buildPluginCardHtml` |
 | **update-worker** | 17 | Version parsing, version comparison, KVR URL builder (slug generation, manufacturer suffix) |
-| **scanner** | 11 | Plugin type mapping (`.vst`/`.vst3`/`.component`/`.dll`), file size formatting |
+| **scanner** | 94 | Plugin type mapping (`.vst`/`.vst3`/`.component`/`.dll`), file size formatting, DAW type mapping, audio format detection |
 
 ---
 
@@ -150,12 +147,12 @@ Built packages land in `src-tauri/target/release/bundle/`:
 
 | Platform | Format | Output |
 |----------|--------|--------|
-| macOS    | App Bundle | `Universal Plugin Update Manager.app` |
-| macOS    | DMG    | `Universal Plugin Update Manager_x.x.x_aarch64.dmg` |
-| Windows  | NSIS   | `Universal Plugin Update Manager Setup x.x.x.exe` |
-| Windows  | MSI    | `Universal Plugin Update Manager_x.x.x_x64_en-US.msi` |
-| Linux    | AppImage | `universal-plugin-update-manager_x.x.x_amd64.AppImage` |
-| Linux    | Debian   | `universal-plugin-update-manager_x.x.x_amd64.deb` |
+| macOS    | App Bundle | `AUDIO_HAXOR.app` |
+| macOS    | DMG    | `AUDIO_HAXOR_x.x.x_aarch64.dmg` |
+| Windows  | NSIS   | `AUDIO_HAXOR Setup x.x.x.exe` |
+| Windows  | MSI    | `AUDIO_HAXOR_x.x.x_x64_en-US.msi` |
+| Linux    | AppImage | `audio-haxor_x.x.x_amd64.AppImage` |
+| Linux    | Debian   | `audio-haxor_x.x.x_amd64.deb` |
 
 > Each platform builds natively. The macOS DMG is unsigned -- users right-click → Open on first launch to bypass Gatekeeper.
 
@@ -169,18 +166,29 @@ Built packages land in `src-tauri/target/release/bundle/`:
                 of 10. Collects name, type, version, manufacturer, website,
                 size, and mod date.
 
-[2] CHECK ----> Async Rust tasks search KVR Audio for each plugin's product
+[2] AUDIO ----> Separate scanner discovers audio samples (WAV, FLAC, AIFF,
+                MP3, OGG) with metadata extraction. Inline playback via
+                Tauri's native asset:// protocol for zero-latency local
+                file streaming.
+
+[3] DAW ------> DAW scanner finds project files across 14+ DAW formats
+                (Ableton, Logic, FL Studio, REAPER, Cubase, Pro Tools,
+                Bitwig, Studio One, Reason, Audacity, GarageBand, Ardour,
+                dawproject). Tracks file sizes and modification dates.
+
+[4] CHECK ----> Async Rust tasks search KVR Audio for each plugin's product
                 page, scrape version info. Falls back to DuckDuckGo
                 site:kvraudio.com search. Groups by manufacturer to reduce
                 duplicate queries. Cards update in-place as results arrive.
                 Status bar shows current plugin and live tallies.
 
-[3] HISTORY --> Each scan is persisted to disk as JSON. Diff any two snapshots
-                to see what was added, removed, or version-bumped.
+[5] HISTORY --> Each scan is persisted to disk as JSON. Plugin, audio, and
+                DAW scans are merged in the history timeline. Diff any two
+                snapshots to see what was added, removed, or version-bumped.
                 Last scan auto-restores on startup.
 
-[4] AUDIO ----> Audio sample preview uses Tauri's native asset:// protocol
-                via convertFileSrc for zero-latency local file playback.
+[6] EXPORT ---> Export plugin lists to JSON, CSV, or TSV via native file
+                dialogs. Import previously exported scans.
 ```
 
 ---
@@ -216,17 +224,31 @@ src-tauri/
     lib.rs             -- IPC command handlers + app setup
     scanner.rs         -- Plugin filesystem scanner (VST2/VST3/AU)
     audio_scanner.rs   -- Audio sample discovery + metadata extraction
+    daw_scanner.rs     -- DAW project scanner (14+ formats)
     history.rs         -- Scan history persistence + diff engine
     kvr.rs             -- KVR Audio scraper + version checker
   Cargo.toml           -- Rust dependencies
   tauri.conf.json      -- Tauri app configuration + CSP + bundling
 
 frontend/
-  index.html           -- Single-file cyberpunk UI (HTML/CSS/JS)
+  index.html           -- Cyberpunk CRT UI (HTML/CSS)
+  js/
+    app.js             -- Startup, auto-load last scan, restore preferences
+    audio.js           -- Audio sample scanning + inline playback
+    columns.js         -- Resizable table columns with width persistence
+    daw.js             -- DAW project scanning + stats
+    export.js          -- Export/import plugins (JSON/CSV/TSV)
+    history.js         -- Scan history management + merged timeline
+    ipc.js             -- Tauri v2 IPC bridge + event delegation
+    kvr.js             -- KVR Audio resolver + cache management
+    plugins.js         -- Plugin scanning, filtering, sorting, updates
+    settings.js        -- Color schemes + theme switching
+    utils.js           -- Shared helpers (escaping, slugs, formatting)
 
-test/                  -- Unit tests
-  scanner.test.js      -- Plugin type mapping, size formatting
+test/
+  scanner.test.js      -- Plugin/audio/DAW type mapping, size formatting
   update-worker.test.js -- Version comparison, KVR URL builder
+  ui.test.js           -- UI helper functions, HTML builders
 ```
 
 ---

@@ -32,6 +32,21 @@ const COLOR_SCHEMES = {
       '--bg-primary': '#05050a', '--bg-secondary': '#0a0a14',
       '--bg-card': '#0d0d1a', '--bg-hover': '#12122a',
       '--border': '#1a1a3e', '--border-glow': '#2a1a4e',
+    },
+    lightVars: {
+      '--accent': '#d6196e', '--accent-light': '#e84d8a',
+      '--accent-glow': 'rgba(214, 25, 110, 0.15)',
+      '--cyan': '#0891b2', '--cyan-glow': 'rgba(8, 145, 178, 0.2)',
+      '--cyan-dim': 'rgba(8, 145, 178, 0.08)',
+      '--magenta': '#a300a3', '--magenta-glow': 'rgba(163, 0, 163, 0.15)',
+      '--green': '#15803d', '--green-bg': 'rgba(21, 128, 61, 0.08)',
+      '--yellow': '#a16207', '--yellow-glow': 'rgba(161, 98, 7, 0.1)',
+      '--orange': '#c2410c', '--orange-bg': 'rgba(194, 65, 12, 0.06)',
+      '--red': '#dc2626',
+      '--text': '#1e293b', '--text-dim': '#475569', '--text-muted': '#94a3b8',
+      '--bg-primary': '#f0f2f5', '--bg-secondary': '#e4e7ec',
+      '--bg-card': '#ffffff', '--bg-hover': '#f7f8fa',
+      '--border': '#cbd5e1', '--border-glow': '#a5b4c8',
     }
   },
   midnight: {
@@ -51,6 +66,21 @@ const COLOR_SCHEMES = {
       '--bg-primary': '#050510', '--bg-secondary': '#0a0a1e',
       '--bg-card': '#0d0d28', '--bg-hover': '#141432',
       '--border': '#1e1e4a', '--border-glow': '#2e1e5a',
+    },
+    lightVars: {
+      '--accent': '#6d28d9', '--accent-light': '#8b5cf6',
+      '--accent-glow': 'rgba(109, 40, 217, 0.15)',
+      '--cyan': '#0284c7', '--cyan-glow': 'rgba(2, 132, 199, 0.2)',
+      '--cyan-dim': 'rgba(2, 132, 199, 0.08)',
+      '--magenta': '#4f46e5', '--magenta-glow': 'rgba(79, 70, 229, 0.15)',
+      '--green': '#059669', '--green-bg': 'rgba(5, 150, 105, 0.08)',
+      '--yellow': '#7c3aed', '--yellow-glow': 'rgba(124, 58, 237, 0.1)',
+      '--orange': '#6366f1', '--orange-bg': 'rgba(99, 102, 241, 0.06)',
+      '--red': '#e11d48',
+      '--text': '#1e1b4b', '--text-dim': '#4338ca', '--text-muted': '#a5b4fc',
+      '--bg-primary': '#eef2ff', '--bg-secondary': '#e0e7ff',
+      '--bg-card': '#ffffff', '--bg-hover': '#f5f3ff',
+      '--border': '#c7d2fe', '--border-glow': '#a5b4fc',
     }
   },
   matrix: {
@@ -70,6 +100,21 @@ const COLOR_SCHEMES = {
       '--bg-primary': '#020a02', '--bg-secondary': '#061006',
       '--bg-card': '#081408', '--bg-hover': '#0e200e',
       '--border': '#1a3a1a', '--border-glow': '#1a4a1a',
+    },
+    lightVars: {
+      '--accent': '#16a34a', '--accent-light': '#22c55e',
+      '--accent-glow': 'rgba(22, 163, 74, 0.15)',
+      '--cyan': '#15803d', '--cyan-glow': 'rgba(21, 128, 61, 0.2)',
+      '--cyan-dim': 'rgba(21, 128, 61, 0.08)',
+      '--magenta': '#166534', '--magenta-glow': 'rgba(22, 101, 52, 0.15)',
+      '--green': '#22c55e', '--green-bg': 'rgba(34, 197, 94, 0.08)',
+      '--yellow': '#65a30d', '--yellow-glow': 'rgba(101, 163, 13, 0.1)',
+      '--orange': '#4ade80', '--orange-bg': 'rgba(74, 222, 128, 0.06)',
+      '--red': '#dc2626',
+      '--text': '#14532d', '--text-dim': '#166534', '--text-muted': '#86efac',
+      '--bg-primary': '#f0fdf4', '--bg-secondary': '#dcfce7',
+      '--bg-card': '#ffffff', '--bg-hover': '#f0fdf4',
+      '--border': '#bbf7d0', '--border-glow': '#86efac',
     }
   },
   ember: {
@@ -89,6 +134,21 @@ const COLOR_SCHEMES = {
       '--bg-primary': '#0a0502', '--bg-secondary': '#120a04',
       '--bg-card': '#1a0e06', '--bg-hover': '#24140a',
       '--border': '#3e2a1a', '--border-glow': '#4e3a1a',
+    },
+    lightVars: {
+      '--accent': '#d97706', '--accent-light': '#f59e0b',
+      '--accent-glow': 'rgba(217, 119, 6, 0.15)',
+      '--cyan': '#ea580c', '--cyan-glow': 'rgba(234, 88, 12, 0.2)',
+      '--cyan-dim': 'rgba(234, 88, 12, 0.08)',
+      '--magenta': '#c2410c', '--magenta-glow': 'rgba(194, 65, 12, 0.15)',
+      '--green': '#65a30d', '--green-bg': 'rgba(101, 163, 13, 0.08)',
+      '--yellow': '#a16207', '--yellow-glow': 'rgba(161, 98, 7, 0.1)',
+      '--orange': '#c2410c', '--orange-bg': 'rgba(194, 65, 12, 0.06)',
+      '--red': '#dc2626',
+      '--text': '#451a03', '--text-dim': '#92400e', '--text-muted': '#fbbf24',
+      '--bg-primary': '#fffbeb', '--bg-secondary': '#fef3c7',
+      '--bg-card': '#ffffff', '--bg-hover': '#fffbeb',
+      '--border': '#fde68a', '--border-glow': '#fbbf24',
     }
   },
   arctic: {
@@ -108,6 +168,21 @@ const COLOR_SCHEMES = {
       '--bg-primary': '#020a0e', '--bg-secondary': '#041218',
       '--bg-card': '#061a22', '--bg-hover': '#0a2430',
       '--border': '#1a3a4e', '--border-glow': '#1a4a5e',
+    },
+    lightVars: {
+      '--accent': '#0284c7', '--accent-light': '#0ea5e9',
+      '--accent-glow': 'rgba(2, 132, 199, 0.15)',
+      '--cyan': '#0891b2', '--cyan-glow': 'rgba(8, 145, 178, 0.2)',
+      '--cyan-dim': 'rgba(8, 145, 178, 0.08)',
+      '--magenta': '#0e7490', '--magenta-glow': 'rgba(14, 116, 144, 0.15)',
+      '--green': '#0d9488', '--green-bg': 'rgba(13, 148, 136, 0.08)',
+      '--yellow': '#155e75', '--yellow-glow': 'rgba(21, 94, 117, 0.1)',
+      '--orange': '#06b6d4', '--orange-bg': 'rgba(6, 182, 212, 0.06)',
+      '--red': '#e11d48',
+      '--text': '#164e63', '--text-dim': '#0e7490', '--text-muted': '#a5f3fc',
+      '--bg-primary': '#ecfeff', '--bg-secondary': '#cffafe',
+      '--bg-card': '#ffffff', '--bg-hover': '#ecfeff',
+      '--border': '#a5f3fc', '--border-glow': '#67e8f9',
     }
   },
 };
@@ -142,17 +217,14 @@ function applyColorScheme(name) {
   if (!scheme) return;
   prefs.setItem('colorScheme', name);
   prefs.removeItem('customSchemeVars');
-  // In light mode, only save the preference — don't apply inline vars
-  // that would override [data-theme="light"] CSS
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  if (!isLight) {
-    const root = document.documentElement.style;
-    for (const [k, v] of Object.entries(ROOT_DEFAULTS)) {
-      root.setProperty(k, v);
-    }
-    for (const [k, v] of Object.entries(scheme.vars)) {
-      root.setProperty(k, v);
-    }
+  const vars = isLight && scheme.lightVars ? scheme.lightVars : scheme.vars;
+  const root = document.documentElement.style;
+  for (const key of SCHEME_VAR_KEYS) {
+    root.removeProperty(key);
+  }
+  for (const [k, v] of Object.entries(vars)) {
+    root.setProperty(k, v);
   }
   refreshSettingsUI();
 }
@@ -195,11 +267,10 @@ function applyCustomVars(vars) {
   }
 }
 
-function applySchemeVarsIfDark(vars) {
-  if (document.documentElement.getAttribute('data-theme') === 'light') return;
+function applySchemeVars(vars) {
   const root = document.documentElement.style;
-  for (const [k, v] of Object.entries(ROOT_DEFAULTS)) {
-    root.setProperty(k, v);
+  for (const key of SCHEME_VAR_KEYS) {
+    root.removeProperty(key);
   }
   applyCustomVars(vars);
 }
@@ -208,7 +279,7 @@ function applyCustomScheme() {
   const vars = readCustomColorsFromPickers();
   prefs.setItem('colorScheme', 'custom');
   prefs.setItem('customSchemeVars', JSON.stringify(vars));
-  applySchemeVarsIfDark(vars);
+  applySchemeVars(vars);
   document.querySelectorAll('.scheme-btn').forEach(b => b.classList.remove('active'));
   refreshCustomPresetUI();
 }
@@ -221,7 +292,7 @@ function saveCustomScheme() {
   prefs.setItem('customSchemePresets', JSON.stringify(presets));
   prefs.setItem('colorScheme', 'custom-' + (presets.length - 1));
   prefs.setItem('customSchemeVars', JSON.stringify(vars));
-  applySchemeVarsIfDark(vars);
+  applySchemeVars(vars);
   document.querySelectorAll('.scheme-btn').forEach(b => b.classList.remove('active'));
   refreshCustomPresetUI();
 }
@@ -236,7 +307,7 @@ function loadCustomPreset(idx) {
   }
   prefs.setItem('colorScheme', 'custom-' + idx);
   prefs.setItem('customSchemeVars', JSON.stringify(preset.vars));
-  applySchemeVarsIfDark(preset.vars);
+  applySchemeVars(preset.vars);
   document.querySelectorAll('.scheme-btn').forEach(b => b.classList.remove('active'));
   refreshCustomPresetUI();
 }
@@ -282,20 +353,15 @@ function settingToggleTheme() {
   const next = current === 'light' ? 'dark' : 'light';
   html.setAttribute('data-theme', next);
   prefs.setItem('theme', next);
-  if (next === 'light') {
-    // Clear all inline scheme vars so [data-theme="light"] CSS takes over
-    for (const key of SCHEME_VAR_KEYS) {
-      html.style.removeProperty(key);
+  const scheme = prefs.getItem('colorScheme') || 'cyberpunk';
+  if (scheme.startsWith('custom')) {
+    const customVars = JSON.parse(prefs.getItem('customSchemeVars') || '{}');
+    if (next === 'light') {
+      for (const key of SCHEME_VAR_KEYS) html.style.removeProperty(key);
     }
+    if (Object.keys(customVars).length > 0) applyCustomVars(customVars);
   } else {
-    // Reapply color scheme for dark mode
-    const scheme = prefs.getItem('colorScheme') || 'cyberpunk';
-    if (scheme.startsWith('custom')) {
-      const customVars = JSON.parse(prefs.getItem('customSchemeVars') || '{}');
-      if (Object.keys(customVars).length > 0) applyCustomVars(customVars);
-    } else {
-      applyColorScheme(scheme);
-    }
+    applyColorScheme(scheme);
   }
   refreshSettingsUI();
 }
@@ -373,9 +439,30 @@ function settingSaveSelect(key, value) {
   prefs.setItem(key, value);
 }
 
-function settingSaveCustomDirs() {
+function showSavedMsg(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = 'Saved';
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 2000);
+}
+
+function saveCustomDirs() {
   const val = document.getElementById('settingCustomDirs').value.trim();
   prefs.setItem('customDirs', val);
+  showSavedMsg('savedMsgCustomDirs');
+}
+
+function saveAudioScanDirs() {
+  const val = document.getElementById('settingAudioScanDirs').value.trim();
+  prefs.setItem('audioScanDirs', val);
+  showSavedMsg('savedMsgAudioScanDirs');
+}
+
+function saveDawScanDirs() {
+  const val = document.getElementById('settingDawScanDirs').value.trim();
+  prefs.setItem('dawScanDirs', val);
+  showSavedMsg('savedMsgDawScanDirs');
 }
 
 function getSettingValue(key, defaultVal) {
@@ -457,6 +544,18 @@ function refreshSettingsUI() {
   const customDirsEl = document.getElementById('settingCustomDirs');
   if (customDirsEl) customDirsEl.value = customDirs;
 
+  const audioScanDirs = prefs.getItem('audioScanDirs') || '';
+  const audioScanDirsEl = document.getElementById('settingAudioScanDirs');
+  if (audioScanDirsEl) audioScanDirsEl.value = audioScanDirs;
+
+  const dawScanDirs = prefs.getItem('dawScanDirs') || '';
+  const dawScanDirsEl = document.getElementById('settingDawScanDirs');
+  if (dawScanDirsEl) dawScanDirsEl.value = dawScanDirs;
+
+  const dawSort = getSettingValue('dawSort', 'name');
+  const dawSortEl = document.getElementById('settingDawSort');
+  if (dawSortEl) dawSortEl.value = dawSort;
+
   // Custom scheme presets
   refreshCustomPresetUI();
 
@@ -488,18 +587,14 @@ function restoreSettings() {
   if (crt === 'off') {
     applyCrtSetting(false);
   }
-  // Only apply color scheme inline styles in dark mode;
-  // light mode uses its own CSS vars via [data-theme="light"]
-  if (saved !== 'light') {
-    const scheme = prefs.getItem('colorScheme');
-    if (scheme && scheme.startsWith('custom')) {
-      const customVars = JSON.parse(prefs.getItem('customSchemeVars') || '{}');
-      if (Object.keys(customVars).length > 0) {
-        applyCustomVars(customVars);
-      }
-    } else if (scheme && scheme !== 'cyberpunk') {
-      applyColorScheme(scheme);
+  const scheme = prefs.getItem('colorScheme');
+  if (scheme && scheme.startsWith('custom')) {
+    const customVars = JSON.parse(prefs.getItem('customSchemeVars') || '{}');
+    if (Object.keys(customVars).length > 0) {
+      applyCustomVars(customVars);
     }
+  } else if (scheme && scheme !== 'cyberpunk') {
+    applyColorScheme(scheme);
   }
   const pageSize = parseInt(prefs.getItem('pageSize') || '500', 10);
   AUDIO_PAGE_SIZE = pageSize;

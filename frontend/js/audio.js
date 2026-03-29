@@ -128,14 +128,15 @@ async function scanAudioSamples() {
   });
 
   try {
-    const result = await window.vstUpdater.scanAudioSamples();
+    const audioRoots = (prefs.getItem('audioScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const result = await window.vstUpdater.scanAudioSamples(audioRoots.length ? audioRoots : undefined);
     if (audioScanProgressCleanup) { audioScanProgressCleanup(); audioScanProgressCleanup = null; }
     flushPendingSamples();
     allAudioSamples = result.samples;
     rebuildAudioStats();
     filterAudioSamples();
     // Save to history
-    try { await window.vstUpdater.saveAudioScan(result.samples); } catch (e) { console.error('Failed to save audio scan history:', e); }
+    try { await window.vstUpdater.saveAudioScan(result.samples, result.roots); } catch (e) { console.error('Failed to save audio scan history:', e); }
   } catch (err) {
     if (audioScanProgressCleanup) { audioScanProgressCleanup(); audioScanProgressCleanup = null; }
     flushPendingSamples();

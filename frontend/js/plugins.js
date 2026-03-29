@@ -45,7 +45,8 @@ async function scanPlugins() {
   });
 
   try {
-    const result = await window.vstUpdater.scanPlugins();
+    const customDirs = (prefs.getItem('customDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const result = await window.vstUpdater.scanPlugins(customDirs.length ? customDirs : undefined);
     // Final state -- use the sorted full list from the main process
     allPlugins = result.plugins;
 
