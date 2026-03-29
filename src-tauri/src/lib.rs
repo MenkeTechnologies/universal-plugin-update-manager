@@ -1041,19 +1041,42 @@ fn export_presets_json(presets: Vec<PresetFile>, file_path: String) -> Result<()
 #[tauri::command]
 fn import_presets_json(file_path: String) -> Result<Vec<PresetFile>, String> {
     let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&data).map_err(|e| e.to_string())
+    if let Ok(arr) = serde_json::from_str::<Vec<PresetFile>>(&data) {
+        return Ok(arr);
+    }
+    let val: serde_json::Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    if let Some(arr) = val.get("presets") {
+        return serde_json::from_value(arr.clone()).map_err(|e| e.to_string());
+    }
+    Err("Expected a JSON array of presets or { \"presets\": [...] }".into())
 }
 
 #[tauri::command]
 fn import_audio_json(file_path: String) -> Result<Vec<AudioSample>, String> {
     let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&data).map_err(|e| e.to_string())
+    // Accept bare array or { "samples": [...] } envelope
+    if let Ok(arr) = serde_json::from_str::<Vec<AudioSample>>(&data) {
+        return Ok(arr);
+    }
+    let val: serde_json::Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    if let Some(arr) = val.get("samples") {
+        return serde_json::from_value(arr.clone()).map_err(|e| e.to_string());
+    }
+    Err("Expected a JSON array of samples or { \"samples\": [...] }".into())
 }
 
 #[tauri::command]
 fn import_daw_json(file_path: String) -> Result<Vec<DawProject>, String> {
     let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&data).map_err(|e| e.to_string())
+    // Accept bare array or { "projects": [...] } envelope
+    if let Ok(arr) = serde_json::from_str::<Vec<DawProject>>(&data) {
+        return Ok(arr);
+    }
+    let val: serde_json::Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    if let Some(arr) = val.get("projects") {
+        return serde_json::from_value(arr.clone()).map_err(|e| e.to_string());
+    }
+    Err("Expected a JSON array of projects or { \"projects\": [...] }".into())
 }
 
 // ── Tests ──
@@ -1319,6 +1342,233 @@ mod tests {
         let json = serde_json::to_string(&plugin).unwrap();
         assert!(json.contains("manufacturer_url"));
         assert!(json.contains("https://co.com"));
+    }
+
+    // ── Import/Export tests for all scan types ──
+
+    fn make_audio_sample(name: &str, format: &str) -> AudioSample {
+        AudioSample {
+            name: name.into(),
+            path: format!("/tmp/{}.{}", name, format.to_lowercase()),
+            directory: "/tmp".into(),
+            format: format.into(),
+            size: 1024,
+            size_formatted: "1.0 KB".into(),
+            modified: "2025-01-01".into(),
+        }
+    }
+
+    fn make_daw_project(name: &str, format: &str, daw: &str) -> DawProject {
+        DawProject {
+            name: name.into(),
+            path: format!("/tmp/{}.{}", name, format.to_lowercase()),
+            directory: "/tmp".into(),
+            format: format.into(),
+            daw: daw.into(),
+            size: 2048,
+            size_formatted: "2.0 KB".into(),
+            modified: "2025-01-01".into(),
+        }
+    }
+
+    fn make_preset(name: &str, format: &str) -> PresetFile {
+        PresetFile {
+            name: name.into(),
+            path: format!("/tmp/{}.{}", name, format.to_lowercase()),
+            directory: "/tmp".into(),
+            format: format.into(),
+            size: 512,
+            size_formatted: "512 B".into(),
+            modified: "2025-01-01".into(),
+        }
+    }
+
+    #[test]
+    fn test_import_audio_json_valid() {
+        let tmp = std::env::temp_dir().join("upum_test_import_audio.json");
+        let samples = vec![
+            make_audio_sample("kick", "WAV"),
+            make_audio_sample("snare", "FLAC"),
+        ];
+        let json = serde_json::to_string_pretty(&samples).unwrap();
+        fs::write(&tmp, &json).unwrap();
+
+        let result = import_audio_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_ok());
+        let imported = result.unwrap();
+        assert_eq!(imported.len(), 2);
+        assert_eq!(imported[0].name, "kick");
+        assert_eq!(imported[1].format, "FLAC");
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_audio_json_invalid_format() {
+        let tmp = std::env::temp_dir().join("upum_test_import_audio_bad.json");
+        fs::write(&tmp, r#"{"not": "an array"}"#).unwrap();
+
+        let result = import_audio_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_err());
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_audio_json_nonexistent() {
+        let result = import_audio_json("/tmp/nonexistent_audio_file.json".into());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_import_daw_json_valid() {
+        let tmp = std::env::temp_dir().join("upum_test_import_daw.json");
+        let projects = vec![
+            make_daw_project("Song1", "ALS", "Ableton Live"),
+            make_daw_project("Song2", "FLP", "FL Studio"),
+        ];
+        let json = serde_json::to_string_pretty(&projects).unwrap();
+        fs::write(&tmp, &json).unwrap();
+
+        let result = import_daw_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_ok());
+        let imported = result.unwrap();
+        assert_eq!(imported.len(), 2);
+        assert_eq!(imported[0].daw, "Ableton Live");
+        assert_eq!(imported[1].format, "FLP");
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_daw_json_invalid_format() {
+        let tmp = std::env::temp_dir().join("upum_test_import_daw_bad.json");
+        fs::write(&tmp, "not json at all").unwrap();
+
+        let result = import_daw_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_err());
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_presets_json_valid() {
+        let tmp = std::env::temp_dir().join("upum_test_import_presets.json");
+        let presets = vec![make_preset("Lead", "FXP"), make_preset("Pad", "VSTPRESET")];
+        let json = serde_json::to_string_pretty(&presets).unwrap();
+        fs::write(&tmp, &json).unwrap();
+
+        let result = import_presets_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_ok());
+        let imported = result.unwrap();
+        assert_eq!(imported.len(), 2);
+        assert_eq!(imported[0].name, "Lead");
+        assert_eq!(imported[1].format, "VSTPRESET");
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_presets_json_invalid_format() {
+        let tmp = std::env::temp_dir().join("upum_test_import_presets_bad.json");
+        fs::write(&tmp, r#"[{"wrong": "fields"}]"#).unwrap();
+
+        let result = import_presets_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_err());
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_export_import_presets_roundtrip() {
+        let tmp = std::env::temp_dir().join("upum_test_preset_roundtrip.json");
+        let presets = vec![
+            make_preset("Bass", "FXB"),
+            make_preset("Keys", "AUPRESET"),
+            make_preset("Strings", "H2P"),
+        ];
+
+        export_presets_json(presets.clone(), tmp.to_string_lossy().to_string()).unwrap();
+        let imported = import_presets_json(tmp.to_string_lossy().to_string()).unwrap();
+
+        assert_eq!(imported.len(), 3);
+        assert_eq!(imported[0].name, presets[0].name);
+        assert_eq!(imported[1].format, presets[1].format);
+        assert_eq!(imported[2].size, presets[2].size);
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_export_import_audio_roundtrip() {
+        let tmp = std::env::temp_dir().join("upum_test_audio_roundtrip.json");
+        let samples = vec![
+            make_audio_sample("hi-hat", "WAV"),
+            make_audio_sample("pad", "FLAC"),
+        ];
+
+        export_audio_json(samples.clone(), tmp.to_string_lossy().to_string()).unwrap();
+        let imported = import_audio_json(tmp.to_string_lossy().to_string()).unwrap();
+
+        assert_eq!(imported.len(), 2);
+        assert_eq!(imported[0].name, "hi-hat");
+        assert_eq!(imported[1].format, "FLAC");
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_export_import_daw_roundtrip() {
+        let tmp = std::env::temp_dir().join("upum_test_daw_roundtrip.json");
+        let projects = vec![
+            make_daw_project("Track1", "LOGICX", "Logic Pro"),
+            make_daw_project("Track2", "RPP", "REAPER"),
+        ];
+
+        export_daw_json(projects.clone(), tmp.to_string_lossy().to_string()).unwrap();
+        let imported = import_daw_json(tmp.to_string_lossy().to_string()).unwrap();
+
+        assert_eq!(imported.len(), 2);
+        assert_eq!(imported[0].daw, "Logic Pro");
+        assert_eq!(imported[1].format, "RPP");
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_presets_json_nonexistent() {
+        let result = import_presets_json("/tmp/nonexistent_preset_file.json".into());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_import_daw_json_nonexistent() {
+        let result = import_daw_json("/tmp/nonexistent_daw_file.json".into());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_import_audio_json_empty_array() {
+        let tmp = std::env::temp_dir().join("upum_test_import_audio_empty.json");
+        fs::write(&tmp, "[]").unwrap();
+
+        let result = import_audio_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_presets_json_empty_array() {
+        let tmp = std::env::temp_dir().join("upum_test_import_presets_empty.json");
+        fs::write(&tmp, "[]").unwrap();
+
+        let result = import_presets_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+
+        let _ = fs::remove_file(&tmp);
     }
 }
 

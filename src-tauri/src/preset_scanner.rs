@@ -9,16 +9,16 @@ use std::sync::{Arc, Mutex};
 const PRESET_EXTENSIONS: &[&str] = &[
     ".fxp",       // VST2 preset
     ".fxb",       // VST2 bank
-    ".vstpreset",  // VST3 preset
-    ".aupreset",   // Audio Unit preset
-    ".adv",        // Ableton device preset
-    ".adg",        // Ableton rack preset
-    ".nki",        // Kontakt instrument
-    ".nksn",       // Kontakt snapshot
-    ".h2p",        // u-he preset
-    ".syx",        // MIDI SysEx dump
-    ".tfx",        // Tone2 preset
-    ".pjunoxl",    // TAL preset
+    ".vstpreset", // VST3 preset
+    ".aupreset",  // Audio Unit preset
+    ".adv",       // Ableton device preset
+    ".adg",       // Ableton rack preset
+    ".nki",       // Kontakt instrument
+    ".nksn",      // Kontakt snapshot
+    ".h2p",       // u-he preset
+    ".syx",       // MIDI SysEx dump
+    ".tfx",       // Tone2 preset
+    ".pjunoxl",   // TAL preset
 ];
 
 const SKIP_DIRS: &[&str] = &[
@@ -100,7 +100,9 @@ pub fn walk_for_presets(
             if stop2.load(Ordering::Relaxed) {
                 return;
             }
-            walk_dir_parallel(root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude);
+            walk_dir_parallel(
+                root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude,
+            );
         });
     });
 
@@ -212,7 +214,16 @@ fn walk_dir_parallel(
     }
 
     subdirs.par_iter().for_each(|subdir| {
-        walk_dir_parallel(subdir, depth + 1, visited, tx, found, batch_size, stop, exclude);
+        walk_dir_parallel(
+            subdir,
+            depth + 1,
+            visited,
+            tx,
+            found,
+            batch_size,
+            stop,
+            exclude,
+        );
     });
 }
 

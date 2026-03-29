@@ -3,6 +3,65 @@ function updateExportButton() {
   document.getElementById('btnExport').style.display = allPlugins.length > 0 ? '' : 'none';
 }
 
+async function showImportError(type, err) {
+  const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+  const examples = {
+    plugins: `[
+  {
+    "name": "Serum",
+    "path": "/Library/Audio/Plug-Ins/VST3/Serum.vst3",
+    "type": "VST3",
+    "version": "1.3.5",
+    "manufacturer": "Xfer Records",
+    "size": "12.5 MB",
+    "modified": "2024-01-15"
+  }
+]`,
+    audio: `[
+  {
+    "name": "kick",
+    "path": "/Users/you/Samples/kick.wav",
+    "directory": "/Users/you/Samples",
+    "format": "WAV",
+    "size": 102400,
+    "sizeFormatted": "100.0 KB",
+    "modified": "2024-01-15"
+  }
+]`,
+    daw: `[
+  {
+    "name": "MySong",
+    "path": "/Users/you/Music/MySong.als",
+    "directory": "/Users/you/Music",
+    "format": "ALS",
+    "daw": "Ableton Live",
+    "size": 524288,
+    "sizeFormatted": "512.0 KB",
+    "modified": "2024-01-15"
+  }
+]`,
+    presets: `[
+  {
+    "name": "Lead Synth",
+    "path": "/Users/you/Presets/Lead.fxp",
+    "directory": "/Users/you/Presets",
+    "format": "FXP",
+    "size": 4096,
+    "sizeFormatted": "4.0 KB",
+    "modified": "2024-01-15"
+  }
+]`,
+  };
+
+  const msg = `Invalid file format.\n\nError: ${err}\n\nExpected a JSON array like:\n\n${examples[type] || examples.plugins}`;
+
+  if (dialogApi && dialogApi.message) {
+    await dialogApi.message(msg, { title: 'Import Error', kind: 'error' });
+  } else {
+    alert(msg);
+  }
+}
+
 // ── Export / Import ──
 
 async function exportPlugins() {
@@ -50,15 +109,18 @@ async function importPlugins() {
 
   try {
     const imported = await window.vstUpdater.importJson(filePath);
-    if (imported && imported.length > 0) {
-      allPlugins = imported;
-      document.getElementById('totalCount').textContent = allPlugins.length;
-      document.getElementById('btnCheckUpdates').disabled = false;
-      document.getElementById('btnExport').style.display = '';
-      renderPlugins(allPlugins);
+    if (!imported || !Array.isArray(imported) || imported.length === 0) {
+      await showImportError('plugins', 'File contains no plugins or is empty.');
+      return;
     }
+    allPlugins = imported;
+    document.getElementById('totalCount').textContent = allPlugins.length;
+    document.getElementById('btnCheckUpdates').disabled = false;
+    document.getElementById('btnExport').style.display = '';
+    renderPlugins(allPlugins);
+    resolveKvrDownloads();
   } catch (err) {
-    console.error('Import failed:', err);
+    await showImportError('plugins', err.message || String(err));
   }
 }
 
@@ -139,13 +201,15 @@ async function importAudio() {
   if (!filePath) return;
   try {
     const imported = await window.vstUpdater.importAudioJson(filePath);
-    if (imported && imported.length > 0) {
-      allAudioSamples = imported;
-      rebuildAudioStats();
-      filterAudioSamples();
-      document.getElementById('btnExportAudio').style.display = '';
+    if (!imported || !Array.isArray(imported) || imported.length === 0) {
+      await showImportError('audio', 'File contains no audio samples or is empty.');
+      return;
     }
-  } catch (err) { console.error('Audio import failed:', err); }
+    allAudioSamples = imported;
+    rebuildAudioStats();
+    filterAudioSamples();
+    document.getElementById('btnExportAudio').style.display = '';
+  } catch (err) { await showImportError('audio', err.message || String(err)); }
 }
 
 async function importDaw() {
@@ -161,13 +225,15 @@ async function importDaw() {
   if (!filePath) return;
   try {
     const imported = await window.vstUpdater.importDawJson(filePath);
-    if (imported && imported.length > 0) {
-      allDawProjects = imported;
-      rebuildDawStats();
-      filterDawProjects();
-      document.getElementById('btnExportDaw').style.display = '';
+    if (!imported || !Array.isArray(imported) || imported.length === 0) {
+      await showImportError('daw', 'File contains no DAW projects or is empty.');
+      return;
     }
-  } catch (err) { console.error('DAW import failed:', err); }
+    allDawProjects = imported;
+    rebuildDawStats();
+    filterDawProjects();
+    document.getElementById('btnExportDaw').style.display = '';
+  } catch (err) { await showImportError('daw', err.message || String(err)); }
 }
 
 async function importPresets() {
@@ -183,11 +249,13 @@ async function importPresets() {
   if (!filePath) return;
   try {
     const imported = await window.vstUpdater.importPresetsJson(filePath);
-    if (imported && imported.length > 0) {
-      allPresets = imported;
-      rebuildPresetStats();
-      filterPresets();
-      document.getElementById('btnExportPresets').style.display = '';
+    if (!imported || !Array.isArray(imported) || imported.length === 0) {
+      await showImportError('presets', 'File contains no presets or is empty.');
+      return;
     }
-  } catch (err) { console.error('Preset import failed:', err); }
+    allPresets = imported;
+    rebuildPresetStats();
+    filterPresets();
+    document.getElementById('btnExportPresets').style.display = '';
+  } catch (err) { await showImportError('presets', err.message || String(err)); }
 }
