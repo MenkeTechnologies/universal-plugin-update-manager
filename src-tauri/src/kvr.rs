@@ -376,3 +376,102 @@ pub async fn find_latest_version(
 
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_version_basic() {
+        assert_eq!(parse_version("1.2.3"), vec![1, 2, 3]);
+        assert_eq!(parse_version("10.0"), vec![10, 0]);
+        assert_eq!(parse_version("1.0.0.1"), vec![1, 0, 0, 1]);
+    }
+
+    #[test]
+    fn test_parse_version_unknown() {
+        assert_eq!(parse_version("Unknown"), vec![0, 0, 0]);
+        assert_eq!(parse_version(""), vec![0, 0, 0]);
+    }
+
+    #[test]
+    fn test_compare_versions_equal() {
+        assert_eq!(compare_versions("1.0.0", "1.0.0"), std::cmp::Ordering::Equal);
+        assert_eq!(compare_versions("2.1", "2.1.0"), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn test_compare_versions_greater() {
+        assert_eq!(compare_versions("2.0.0", "1.9.9"), std::cmp::Ordering::Greater);
+        assert_eq!(compare_versions("1.1", "1.0.9"), std::cmp::Ordering::Greater);
+        assert_eq!(compare_versions("1.0.1", "1.0.0"), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn test_compare_versions_less() {
+        assert_eq!(compare_versions("1.0.0", "1.0.1"), std::cmp::Ordering::Less);
+        assert_eq!(compare_versions("0.9", "1.0"), std::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn test_compare_versions_different_lengths() {
+        assert_eq!(compare_versions("1.0", "1.0.0.0"), std::cmp::Ordering::Equal);
+        assert_eq!(compare_versions("1.0.0.1", "1.0"), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn test_extract_version_basic() {
+        let html = r#"<div>Version: 3.5.2</div>"#;
+        assert_eq!(extract_version(html), Some("3.5.2".into()));
+    }
+
+    #[test]
+    fn test_extract_version_latest() {
+        let html = r#"<dt>Latest Version</dt><dd>2.1.0</dd>"#;
+        assert_eq!(extract_version(html), Some("2.1.0".into()));
+    }
+
+    #[test]
+    fn test_extract_version_software_version() {
+        let html = r#"{"softwareVersion": "1.4.7"}"#;
+        assert_eq!(extract_version(html), Some("1.4.7".into()));
+    }
+
+    #[test]
+    fn test_extract_version_filters_dates() {
+        let html = r#"<div>Version: 2024.01.15</div>"#;
+        assert_eq!(extract_version(html), None);
+    }
+
+    #[test]
+    fn test_extract_version_none() {
+        let html = r#"<div>No version info here</div>"#;
+        assert_eq!(extract_version(html), None);
+    }
+
+    #[test]
+    fn test_extract_version_four_part() {
+        let html = r#"<span>Version: 1.2.3.4</span>"#;
+        assert_eq!(extract_version(html), Some("1.2.3.4".into()));
+    }
+
+    #[test]
+    fn test_extract_download_url_basic() {
+        let html = r#"<a href="https://example.com/download/plugin-v1.zip">Download</a>"#;
+        let result = extract_download_url(html);
+        assert!(result.is_some());
+        let (url, _) = result.unwrap();
+        assert_eq!(url, "https://example.com/download/plugin-v1.zip");
+    }
+
+    #[test]
+    fn test_extract_download_url_none() {
+        let html = r#"<a href="https://example.com/about">About</a>"#;
+        assert!(extract_download_url(html).is_none());
+    }
+
+    #[test]
+    fn test_platform_keywords_not_empty() {
+        assert!(!platform_keywords().is_empty());
+    }
+}

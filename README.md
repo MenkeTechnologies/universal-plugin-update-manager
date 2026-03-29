@@ -24,7 +24,7 @@
 
 > **// SYSTEM ONLINE -- UNIVERSAL PLUGIN UPDATE MANAGER v1.0.0 // by MenkeTechnologies**
 
-A high-voltage Electron desktop app that jacks into your system's audio plugin directories, maps every VST2/VST3/AU module it finds, checks the web for the latest versions, and maintains a full changelog of every scan -- so nothing slips through the cracks. Cyberpunk CRT interface with neon glow, scanline overlays, and glitch effects.
+A high-voltage **Tauri v2** desktop app that jacks into your system's audio plugin directories, maps every VST2/VST3/AU module it finds, checks the web for the latest versions, and maintains a full changelog of every scan -- so nothing slips through the cracks. Rust backend with a cyberpunk CRT interface featuring neon glow, scanline overlays, and glitch effects.
 
 ---
 
@@ -96,74 +96,88 @@ cd universal-plugin-update-manager
 # Install dependencies
 npm install
 
-# Boot the system
-npm start
+# Run in development mode
+npm run tauri:dev
+
+# Build for distribution
+npm run tauri:build
 ```
 
-Requires [Node.js](https://nodejs.org/) and npm. Electron is pulled in as a dev dependency.
+Requires [Node.js](https://nodejs.org/), npm, and [Rust](https://rustup.rs/). The Tauri CLI is pulled in as a dev dependency.
 
 ---
 
 ## // TESTING //
 
 ```bash
-# Run all unit tests
+# Run Rust backend tests
+cd src-tauri && cargo test -- --test-threads=1
+
+# Run JavaScript unit tests
 npm test
 ```
 
-Tests cover:
-- **History module** -- save, retrieve, delete, clear, 50-scan limit, diff (added/removed/version-changed), latest scan retrieval
-- **Scanner helpers** -- plugin type mapping (`.vst`/`.vst3`/`.component`/`.dll`), file size formatting
-- **Update worker logic** -- version parsing, version comparison, KVR URL builder (slug generation, manufacturer suffix)
+### Rust tests (40 tests)
 
-Tests use Node.js built-in test runner (`node --test`) -- no external test framework needed.
+| Module | Coverage |
+|--------|----------|
+| **scanner** | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration |
+| **kvr** | Version parsing, version comparison, HTML version extraction (6 formats), download URL extraction, date filtering |
+| **history** | Scan CRUD, 50-scan limit, diff (added/removed/version-changed), KVR cache, audio history CRUD, audio diff |
+| **audio_server** | MIME type mapping, request path extraction (with URL-encoded spaces), server binding |
+
+### JavaScript tests
+
+| Module | Coverage |
+|--------|----------|
+| **history** | Save, retrieve, delete, clear, 50-scan limit, diff (added/removed/version-changed), latest scan retrieval |
+| **scanner** | Plugin type mapping (`.vst`/`.vst3`/`.component`/`.dll`), file size formatting |
+| **update-worker** | Version parsing, version comparison, KVR URL builder (slug generation, manufacturer suffix) |
 
 ---
 
 ## // BUILD & DISTRIBUTE //
 
 ```bash
-# Build for all platforms (macOS, Windows, Linux)
-npm run dist
-
-# Build for a single platform
-npm run dist:mac      # DMG + ZIP (universal binary)
-npm run dist:win      # NSIS installer + portable EXE
-npm run dist:linux    # AppImage + .deb package
+# Build optimized release bundle
+npm run tauri:build
 ```
 
-Built packages land in `dist/`:
+Built packages land in `src-tauri/target/release/bundle/`:
 
 | Platform | Format | Output |
 |----------|--------|--------|
-| macOS    | DMG    | `Universal Plugin Update Manager-x.x.x-universal.dmg` |
-| macOS    | ZIP    | `Universal Plugin Update Manager-x.x.x-universal-mac.zip` |
+| macOS    | App Bundle | `Universal Plugin Update Manager.app` |
+| macOS    | DMG    | `Universal Plugin Update Manager_x.x.x_aarch64.dmg` |
 | Windows  | NSIS   | `Universal Plugin Update Manager Setup x.x.x.exe` |
-| Windows  | Portable | `Universal Plugin Update Manager x.x.x.exe` |
-| Linux    | AppImage | `Universal Plugin Update Manager-x.x.x.AppImage` |
+| Windows  | MSI    | `Universal Plugin Update Manager_x.x.x_x64_en-US.msi` |
+| Linux    | AppImage | `universal-plugin-update-manager_x.x.x_amd64.AppImage` |
 | Linux    | Debian   | `universal-plugin-update-manager_x.x.x_amd64.deb` |
 
-> Cross-compilation: macOS can build for all three platforms. Windows and Linux
-> can only build for their own platform natively.
+> Each platform builds natively. The macOS DMG is unsigned -- users right-click → Open on first launch to bypass Gatekeeper.
 
 ---
 
 ## // HOW IT WORKS //
 
 ```
-[1] SCAN -----> Background worker crawls platform-specific plugin directories.
-                Streams results to the UI in batches of 10. Collects name,
-                type, version, manufacturer, website, size, and mod date.
+[1] SCAN -----> Rust backend crawls platform-specific plugin directories.
+                Streams results to the WebView via Tauri events in batches
+                of 10. Collects name, type, version, manufacturer, website,
+                size, and mod date.
 
-[2] CHECK ----> Worker thread searches KVR Audio for each plugin's product
-                page, scrapes version info. Falls back to DuckDuckGo
+[2] CHECK ----> Async Rust tasks search KVR Audio for each plugin's product
+                page, scrape version info. Falls back to DuckDuckGo
                 site:kvraudio.com search. Groups by manufacturer to reduce
                 duplicate queries. Cards update in-place as results arrive.
                 Status bar shows current plugin and live tallies.
 
-[3] HISTORY --> Each scan is persisted to disk. Diff any two snapshots
+[3] HISTORY --> Each scan is persisted to disk as JSON. Diff any two snapshots
                 to see what was added, removed, or version-bumped.
                 Last scan auto-restores on startup.
+
+[4] AUDIO ----> Audio sample preview uses Tauri's native asset:// protocol
+                via convertFileSrc for zero-latency local file playback.
 ```
 
 ---
@@ -193,16 +207,30 @@ between plugins. You can stop it anytime with the Stop button.
 ## // PROJECT ARCHITECTURE //
 
 ```
-main.js            -- Electron main process + IPC handlers + worker management
-preload.js         -- Context bridge exposing APIs to the renderer
-scanner.js         -- Plugin filesystem scanner (sync, legacy)
-scanner-worker.js  -- Worker thread for non-blocking plugin scanning
-update-worker.js   -- Worker thread for version checking via KVR Audio
-history.js         -- Scan history persistence + diff engine
-index.html         -- Single-file cyberpunk UI (HTML/CSS/JS)
-test/              -- Unit tests (node --test)
-  history.test.js  -- History CRUD, diff, limits
-  scanner.test.js  -- Plugin type mapping, size formatting
+src-tauri/
+  src/
+    main.rs            -- Tauri entry point
+    lib.rs             -- IPC command handlers + app setup
+    scanner.rs         -- Plugin filesystem scanner (VST2/VST3/AU)
+    audio_scanner.rs   -- Audio sample discovery + metadata extraction
+    audio_server.rs    -- Local HTTP server for audio streaming (legacy)
+    history.rs         -- Scan history persistence + diff engine
+    kvr.rs             -- KVR Audio scraper + version checker
+  Cargo.toml           -- Rust dependencies
+  tauri.conf.json      -- Tauri app configuration + CSP + bundling
+
+frontend/
+  index.html           -- Single-file cyberpunk UI (HTML/CSS/JS)
+  main.js              -- Electron main process (legacy, unused by Tauri)
+  preload.js           -- Context bridge (legacy, unused by Tauri)
+  scanner.js           -- Plugin scanner JS (legacy, unused by Tauri)
+  scanner-worker.js    -- Scanner worker thread (legacy, unused by Tauri)
+  update-worker.js     -- Update checker worker (legacy, unused by Tauri)
+  history.js           -- History module JS (legacy, unused by Tauri)
+
+test/                  -- Unit tests (node --test)
+  history.test.js      -- History CRUD, diff, limits
+  scanner.test.js      -- Plugin type mapping, size formatting
   update-worker.test.js -- Version comparison, KVR URL builder
 ```
 

@@ -228,3 +228,92 @@ pub fn discover_plugins(directories: &[String]) -> Vec<PathBuf> {
 
     plugin_paths
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_get_plugin_type() {
+        assert_eq!(get_plugin_type(".vst"), "VST2");
+        assert_eq!(get_plugin_type(".vst3"), "VST3");
+        assert_eq!(get_plugin_type(".component"), "AU");
+        assert_eq!(get_plugin_type(".dll"), "VST2");
+        assert_eq!(get_plugin_type(".exe"), "Unknown");
+    }
+
+    #[test]
+    fn test_format_size() {
+        assert_eq!(format_size(0), "0 B");
+        assert_eq!(format_size(512), "512.0 B");
+        assert_eq!(format_size(1024), "1.0 KB");
+        assert_eq!(format_size(1536), "1.5 KB");
+        assert_eq!(format_size(1048576), "1.0 MB");
+        assert_eq!(format_size(1073741824), "1.0 GB");
+    }
+
+    #[test]
+    fn test_discover_plugins_empty_dir() {
+        let tmp = std::env::temp_dir().join("upum_test_discover_empty");
+        let _ = fs::create_dir_all(&tmp);
+        let dirs = vec![tmp.to_string_lossy().to_string()];
+        let result = discover_plugins(&dirs);
+        assert!(result.is_empty());
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_discover_plugins_finds_vst() {
+        let tmp = std::env::temp_dir().join("upum_test_discover_vst");
+        let _ = fs::remove_dir_all(&tmp);
+        let _ = fs::create_dir_all(&tmp);
+
+        // Create fake plugin bundles (directories with plugin extensions)
+        let vst2 = tmp.join("TestPlugin.vst");
+        let vst3 = tmp.join("TestPlugin.vst3");
+        let au = tmp.join("TestPlugin.component");
+        let txt = tmp.join("readme.txt");
+        let _ = fs::create_dir_all(&vst2);
+        let _ = fs::create_dir_all(&vst3);
+        let _ = fs::create_dir_all(&au);
+        let _ = fs::write(&txt, "not a plugin");
+
+        let dirs = vec![tmp.to_string_lossy().to_string()];
+        let mut result = discover_plugins(&dirs);
+        result.sort();
+
+        assert_eq!(result.len(), 3);
+        assert!(result.iter().any(|p| p.extension().unwrap() == "vst"));
+        assert!(result.iter().any(|p| p.extension().unwrap() == "vst3"));
+        assert!(result.iter().any(|p| p.extension().unwrap() == "component"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_discover_plugins_nonexistent_dir() {
+        let dirs = vec!["/nonexistent/path/that/does/not/exist".to_string()];
+        let result = discover_plugins(&dirs);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_get_directory_size() {
+        let tmp = std::env::temp_dir().join("upum_test_dir_size");
+        let _ = fs::remove_dir_all(&tmp);
+        let _ = fs::create_dir_all(tmp.join("sub"));
+        let _ = fs::write(tmp.join("a.txt"), "hello"); // 5 bytes
+        let _ = fs::write(tmp.join("sub").join("b.txt"), "world!"); // 6 bytes
+        assert_eq!(get_directory_size(&tmp), 11);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_get_vst_directories_returns_existing_only() {
+        let dirs = get_vst_directories();
+        for d in &dirs {
+            assert!(Path::new(d).exists(), "Directory {} should exist", d);
+        }
+    }
+}
