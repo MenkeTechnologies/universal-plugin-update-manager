@@ -1,9 +1,10 @@
 pub mod audio_scanner;
+pub mod daw_scanner;
 pub mod history;
 pub mod kvr;
 pub mod scanner;
 
-use history::{AudioSample, KvrCacheUpdateEntry};
+use history::{AudioSample, DawProject, KvrCacheUpdateEntry};
 use scanner::PluginInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -22,6 +23,11 @@ struct UpdateState {
 }
 
 struct AudioScanState {
+    scanning: AtomicBool,
+    stop_scan: AtomicBool,
+}
+
+struct DawScanState {
     scanning: AtomicBool,
     stop_scan: AtomicBool,
 }
@@ -413,6 +419,103 @@ fn audio_history_diff(
     history::diff_audio_scans(&old_id, &new_id)
 }
 
+// DAW scanner commands
+#[tauri::command]
+async fn scan_daw_projects(app: AppHandle) -> Result<serde_json::Value, String> {
+    let state = app.state::<DawScanState>();
+    if state.scanning.swap(true, Ordering::SeqCst) {
+        return Err("DAW scan already in progress".into());
+    }
+    state.stop_scan.store(false, Ordering::SeqCst);
+
+    let _ = app.emit(
+        "daw-scan-progress",
+        serde_json::json!({
+            "phase": "status",
+            "message": "Walking filesystem for DAW project files..."
+        }),
+    );
+
+    let app_handle = app.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let daw_state = app_handle.state::<DawScanState>();
+        let roots = daw_scanner::get_daw_roots();
+        let mut all_projects: Vec<DawProject> = Vec::new();
+
+        daw_scanner::walk_for_daw(
+            &roots,
+            &mut |batch, found| {
+                all_projects.extend_from_slice(batch);
+                let _ = app_handle.emit(
+                    "daw-scan-progress",
+                    serde_json::json!({
+                        "phase": "scanning",
+                        "projects": batch,
+                        "found": found
+                    }),
+                );
+            },
+            &|| daw_state.stop_scan.load(Ordering::SeqCst),
+        );
+
+        all_projects.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        serde_json::json!({ "projects": all_projects })
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    state.scanning.store(false, Ordering::SeqCst);
+    Ok(result)
+}
+
+#[tauri::command]
+async fn stop_daw_scan(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<DawScanState>();
+    state.stop_scan.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+// DAW history commands
+#[tauri::command]
+fn daw_history_save(projects: Vec<DawProject>) -> history::DawScanSnapshot {
+    history::save_daw_scan(&projects)
+}
+
+#[tauri::command]
+fn daw_history_get_scans() -> Vec<history::DawScanSummary> {
+    history::get_daw_scans()
+}
+
+#[tauri::command]
+fn daw_history_get_detail(id: String) -> Option<history::DawScanSnapshot> {
+    history::get_daw_scan_detail(&id)
+}
+
+#[tauri::command]
+fn daw_history_delete(id: String) {
+    history::delete_daw_scan(&id);
+}
+
+#[tauri::command]
+fn daw_history_clear() {
+    history::clear_daw_history();
+}
+
+#[tauri::command]
+fn daw_history_latest() -> Option<history::DawScanSnapshot> {
+    history::get_latest_daw_scan()
+}
+
+#[tauri::command]
+fn daw_history_diff(old_id: String, new_id: String) -> Option<history::DawScanDiff> {
+    history::diff_daw_scans(&old_id, &new_id)
+}
+
+#[tauri::command]
+async fn open_daw_folder(file_path: String) -> Result<(), String> {
+    open_plugin_folder(file_path).await
+}
+
 #[tauri::command]
 async fn open_update_url(url: String) -> Result<(), String> {
     opener::open(&url).map_err(|e| e.to_string())
@@ -469,6 +572,10 @@ pub fn run() {
             scanning: AtomicBool::new(false),
             stop_scan: AtomicBool::new(false),
         })
+        .manage(DawScanState {
+            scanning: AtomicBool::new(false),
+            stop_scan: AtomicBool::new(false),
+        })
         .invoke_handler(tauri::generate_handler![
             get_version,
             scan_plugins,
@@ -494,6 +601,16 @@ pub fn run() {
             audio_history_clear,
             audio_history_latest,
             audio_history_diff,
+            scan_daw_projects,
+            stop_daw_scan,
+            daw_history_save,
+            daw_history_get_scans,
+            daw_history_get_detail,
+            daw_history_delete,
+            daw_history_clear,
+            daw_history_latest,
+            daw_history_diff,
+            open_daw_folder,
             open_update_url,
             open_plugin_folder,
             open_audio_folder,

@@ -76,6 +76,60 @@ pub struct KvrCacheUpdateEntry {
     pub source: Option<String>,
 }
 
+// DAW project types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DawProject {
+    pub name: String,
+    pub path: String,
+    pub directory: String,
+    pub format: String,
+    pub daw: String,
+    pub size: u64,
+    #[serde(rename = "sizeFormatted")]
+    pub size_formatted: String,
+    pub modified: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DawScanSnapshot {
+    pub id: String,
+    pub timestamp: String,
+    #[serde(rename = "projectCount")]
+    pub project_count: usize,
+    #[serde(rename = "totalBytes")]
+    pub total_bytes: u64,
+    #[serde(rename = "dawCounts")]
+    pub daw_counts: std::collections::HashMap<String, usize>,
+    pub projects: Vec<DawProject>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DawScanSummary {
+    pub id: String,
+    pub timestamp: String,
+    #[serde(rename = "projectCount")]
+    pub project_count: usize,
+    #[serde(rename = "totalBytes")]
+    pub total_bytes: u64,
+    #[serde(rename = "dawCounts")]
+    pub daw_counts: std::collections::HashMap<String, usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DawHistory {
+    pub scans: Vec<DawScanSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DawScanDiff {
+    #[serde(rename = "oldScan")]
+    pub old_scan: DawScanSummary,
+    #[serde(rename = "newScan")]
+    pub new_scan: DawScanSummary,
+    pub added: Vec<DawProject>,
+    pub removed: Vec<DawProject>,
+}
+
 // Audio scan types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioSample {
@@ -162,6 +216,10 @@ fn kvr_cache_file() -> PathBuf {
 
 fn audio_history_file() -> PathBuf {
     ensure_data_dir().join("audio-scan-history.json")
+}
+
+fn daw_history_file() -> PathBuf {
+    ensure_data_dir().join("daw-scan-history.json")
 }
 
 fn gen_id() -> String {
@@ -445,6 +503,130 @@ pub fn clear_audio_history() {
 pub fn get_latest_audio_scan() -> Option<AudioScanSnapshot> {
     let history = load_audio_history();
     history.scans.into_iter().next()
+}
+
+// ── DAW scan history ──
+
+fn load_daw_history() -> DawHistory {
+    let path = daw_history_file();
+    if path.exists() {
+        if let Ok(data) = fs::read_to_string(&path) {
+            if let Ok(h) = serde_json::from_str(&data) {
+                return h;
+            }
+        }
+    }
+    DawHistory { scans: vec![] }
+}
+
+fn save_daw_history(history: &DawHistory) {
+    let path = daw_history_file();
+    if let Ok(data) = serde_json::to_string_pretty(history) {
+        let _ = fs::write(path, data);
+    }
+}
+
+pub fn save_daw_scan(projects: &[DawProject]) -> DawScanSnapshot {
+    let mut history = load_daw_history();
+    let mut daw_counts = std::collections::HashMap::new();
+    let mut total_bytes = 0u64;
+    for p in projects {
+        *daw_counts.entry(p.daw.clone()).or_insert(0) += 1;
+        total_bytes += p.size;
+    }
+    let snapshot = DawScanSnapshot {
+        id: gen_id(),
+        timestamp: now_iso(),
+        project_count: projects.len(),
+        total_bytes,
+        daw_counts,
+        projects: projects.to_vec(),
+    };
+    history.scans.insert(0, snapshot.clone());
+    if history.scans.len() > 50 {
+        history.scans.truncate(50);
+    }
+    save_daw_history(&history);
+    snapshot
+}
+
+pub fn get_daw_scans() -> Vec<DawScanSummary> {
+    let history = load_daw_history();
+    history
+        .scans
+        .iter()
+        .map(|s| DawScanSummary {
+            id: s.id.clone(),
+            timestamp: s.timestamp.clone(),
+            project_count: s.project_count,
+            total_bytes: s.total_bytes,
+            daw_counts: s.daw_counts.clone(),
+        })
+        .collect()
+}
+
+pub fn get_daw_scan_detail(id: &str) -> Option<DawScanSnapshot> {
+    let history = load_daw_history();
+    history.scans.into_iter().find(|s| s.id == id)
+}
+
+pub fn delete_daw_scan(id: &str) {
+    let mut history = load_daw_history();
+    history.scans.retain(|s| s.id != id);
+    save_daw_history(&history);
+}
+
+pub fn clear_daw_history() {
+    save_daw_history(&DawHistory { scans: vec![] });
+}
+
+pub fn get_latest_daw_scan() -> Option<DawScanSnapshot> {
+    let history = load_daw_history();
+    history.scans.into_iter().next()
+}
+
+pub fn diff_daw_scans(old_id: &str, new_id: &str) -> Option<DawScanDiff> {
+    let history = load_daw_history();
+    let old_scan = history.scans.iter().find(|s| s.id == old_id)?;
+    let new_scan = history.scans.iter().find(|s| s.id == new_id)?;
+
+    let old_paths: std::collections::HashSet<&str> =
+        old_scan.projects.iter().map(|p| p.path.as_str()).collect();
+    let new_paths: std::collections::HashSet<&str> =
+        new_scan.projects.iter().map(|p| p.path.as_str()).collect();
+
+    let added: Vec<DawProject> = new_scan
+        .projects
+        .iter()
+        .filter(|p| !old_paths.contains(p.path.as_str()))
+        .cloned()
+        .collect();
+
+    let removed: Vec<DawProject> = old_scan
+        .projects
+        .iter()
+        .filter(|p| !new_paths.contains(p.path.as_str()))
+        .cloned()
+        .collect();
+
+    Some(DawScanDiff {
+        old_scan: DawScanSummary {
+            id: old_scan.id.clone(),
+            timestamp: old_scan.timestamp.clone(),
+            project_count: old_scan.project_count,
+            total_bytes: old_scan.total_bytes,
+            daw_counts: old_scan.daw_counts.clone(),
+        },
+        new_scan: DawScanSummary {
+            id: new_scan.id.clone(),
+            timestamp: new_scan.timestamp.clone(),
+            project_count: new_scan.project_count,
+            total_bytes: new_scan.total_bytes,
+            daw_counts: new_scan.daw_counts.clone(),
+        },
+        added,
+        removed,
+    })
 }
 
 pub fn diff_audio_scans(old_id: &str, new_id: &str) -> Option<AudioScanDiff> {
@@ -866,6 +1048,84 @@ mod tests {
             assert_eq!(diff.added[0].name, "hihat");
             assert_eq!(diff.removed.len(), 1);
             assert_eq!(diff.removed[0].name, "kick");
+        });
+    }
+
+    fn make_daw_project(name: &str, path: &str, format: &str, daw: &str) -> DawProject {
+        DawProject {
+            name: name.into(),
+            path: path.into(),
+            directory: "/tmp".into(),
+            format: format.into(),
+            daw: daw.into(),
+            size: 2048,
+            size_formatted: "2.0 KB".into(),
+            modified: "2024-01-01".into(),
+        }
+    }
+
+    #[test]
+    fn test_daw_history_crud() {
+        with_test_dir("daw_crud", || {
+            let projects = vec![
+                make_daw_project("Song1", "/tmp/song1.als", "ALS", "Ableton Live"),
+                make_daw_project("Song2", "/tmp/song2.flp", "FLP", "FL Studio"),
+            ];
+            let snap = save_daw_scan(&projects);
+            assert_eq!(snap.project_count, 2);
+            assert_eq!(snap.total_bytes, 4096);
+            assert_eq!(snap.daw_counts.get("Ableton Live"), Some(&1));
+            assert_eq!(snap.daw_counts.get("FL Studio"), Some(&1));
+
+            let scans = get_daw_scans();
+            assert!(scans.iter().any(|s| s.id == snap.id));
+
+            let detail = get_daw_scan_detail(&snap.id).unwrap();
+            assert_eq!(detail.projects.len(), 2);
+
+            let latest = get_latest_daw_scan().unwrap();
+            assert_eq!(latest.id, snap.id);
+
+            delete_daw_scan(&snap.id);
+            assert!(get_daw_scan_detail(&snap.id).is_none());
+        });
+    }
+
+    #[test]
+    fn test_daw_history_limit_50() {
+        with_test_dir("daw_limit_50", || {
+            let projects = vec![make_daw_project("Song", "/tmp/song.als", "ALS", "Ableton Live")];
+            for _ in 0..55 {
+                save_daw_scan(&projects);
+            }
+            let scans = get_daw_scans();
+            assert!(
+                scans.len() <= 50,
+                "DAW history should be limited to 50, got {}",
+                scans.len()
+            );
+        });
+    }
+
+    #[test]
+    fn test_daw_diff() {
+        with_test_dir("daw_diff", || {
+            let projects1 = vec![
+                make_daw_project("Song1", "/tmp/song1.als", "ALS", "Ableton Live"),
+                make_daw_project("Song2", "/tmp/song2.flp", "FLP", "FL Studio"),
+            ];
+            let projects2 = vec![
+                make_daw_project("Song2", "/tmp/song2.flp", "FLP", "FL Studio"),
+                make_daw_project("Song3", "/tmp/song3.rpp", "RPP", "REAPER"),
+            ];
+            let snap1 = save_daw_scan(&projects1);
+            let snap2 = save_daw_scan(&projects2);
+
+            let diff = diff_daw_scans(&snap1.id, &snap2.id).unwrap();
+            assert_eq!(diff.added.len(), 1);
+            assert_eq!(diff.added[0].name, "Song3");
+            assert_eq!(diff.removed.len(), 1);
+            assert_eq!(diff.removed[0].name, "Song1");
         });
     }
 }
