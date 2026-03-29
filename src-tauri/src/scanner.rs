@@ -66,7 +66,7 @@ pub fn get_vst_directories() -> Vec<String> {
         .collect()
 }
 
-fn get_plugin_type(ext: &str) -> &str {
+pub fn get_plugin_type(ext: &str) -> &str {
     match ext {
         ".vst" => "VST2",
         ".vst3" => "VST3",
@@ -91,7 +91,7 @@ fn get_directory_size(dir: &Path) -> u64 {
     size
 }
 
-fn format_size(bytes: u64) -> String {
+pub fn format_size(bytes: u64) -> String {
     if bytes == 0 {
         return "0 B".into();
     }

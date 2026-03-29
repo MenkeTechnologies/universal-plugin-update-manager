@@ -101,7 +101,7 @@ async fn fetch_html(client: &Client, url: &str) -> Option<String> {
     resp.text().await.ok()
 }
 
-fn extract_download_url(html: &str) -> Option<(String, bool)> {
+pub fn extract_download_url(html: &str) -> Option<(String, bool)> {
     let all_links: Vec<String> = DOWNLOAD_LINK_RE
         .captures_iter(html)
         .map(|c| c[1].to_string())

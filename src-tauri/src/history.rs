@@ -276,7 +276,7 @@ pub fn remove_preference(key: &str) {
     save_preferences(&prefs);
 }
 
-fn gen_id() -> String {
+pub fn gen_id() -> String {
     use rand::Rng;
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -291,7 +291,7 @@ fn gen_id() -> String {
     )
 }
 
-fn radix_string(mut n: u64, base: u64) -> String {
+pub fn radix_string(mut n: u64, base: u64) -> String {
     if n == 0 {
         return "0".into();
     }

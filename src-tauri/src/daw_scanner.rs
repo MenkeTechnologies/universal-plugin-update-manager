@@ -40,7 +40,7 @@ const SKIP_DIRS: &[&str] = &[
     "__pycache__",
 ];
 
-fn format_size(bytes: u64) -> String {
+pub fn format_size(bytes: u64) -> String {
     if bytes == 0 {
         return "0 B".into();
     }
@@ -65,7 +65,7 @@ fn get_directory_size(path: &Path) -> u64 {
     total
 }
 
-fn ext_matches(path: &Path) -> Option<String> {
+pub fn ext_matches(path: &Path) -> Option<String> {
     let name = path.file_name()?.to_string_lossy().to_lowercase();
     for ext in DAW_EXTENSIONS {
         if name.ends_with(ext) {
@@ -75,7 +75,7 @@ fn ext_matches(path: &Path) -> Option<String> {
     None
 }
 
-fn is_package_ext(path: &Path) -> bool {
+pub fn is_package_ext(path: &Path) -> bool {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().to_lowercase())
@@ -83,7 +83,7 @@ fn is_package_ext(path: &Path) -> bool {
     PACKAGE_EXTENSIONS.iter().any(|ext| name.ends_with(ext))
 }
 
-fn daw_name_for_format(format: &str) -> &'static str {
+pub fn daw_name_for_format(format: &str) -> &'static str {
     match format {
         "ALS" | "ALP" => "Ableton Live",
         "LOGICX" => "Logic Pro",

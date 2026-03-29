@@ -19,7 +19,7 @@ const SKIP_DIRS: &[&str] = &[
     "__pycache__",
 ];
 
-fn format_size(bytes: u64) -> String {
+pub fn format_size(bytes: u64) -> String {
     if bytes == 0 {
         return "0 B".into();
     }
