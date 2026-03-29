@@ -135,13 +135,27 @@ function formatBytes(bytes) {
   return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
 }
 
+function formatUptime(secs) {
+  if (!secs) return '0s';
+  if (secs < 60) return secs + 's';
+  if (secs < 3600) return Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return h + 'h ' + m + 'm';
+}
+
 async function updateHeaderInfo() {
   try {
-    const stats = await window.vstUpdater.getProcessStats();
-    const memEl = document.getElementById('headerMem');
-    const thrEl = document.getElementById('headerThreads');
-    if (memEl) memEl.textContent = formatBytes(stats.memBytes);
-    if (thrEl) thrEl.textContent = stats.threads;
+    const s = await window.vstUpdater.getProcessStats();
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('headerCpu', s.cpuPercent + '%');
+    set('headerMem', formatBytes(s.rssBytes));
+    set('headerVirt', formatBytes(s.virtualBytes));
+    set('headerThreads', s.threads);
+    set('headerPool', s.rayonThreads);
+    set('headerFds', s.openFds);
+    set('headerUptime', formatUptime(s.uptimeSecs));
+    set('headerPid', s.pid);
   } catch {}
 }
 

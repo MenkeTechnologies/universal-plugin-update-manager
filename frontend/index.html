@@ -1804,9 +1804,15 @@
           </div>
         </div>
         <div class="header-actions">
-          <div class="header-info">
-            <div class="header-info-item" title="Memory usage (RSS)">MEM <span class="header-info-value" id="headerMem">--</span></div>
-            <div class="header-info-item" title="Thread count">THR <span class="header-info-value" id="headerThreads">--</span></div>
+          <div class="header-info" id="headerStats">
+            <div class="header-info-item" title="CPU usage (%)">CPU <span class="header-info-value" id="headerCpu">--</span></div>
+            <div class="header-info-item" title="Resident memory (RSS)">RSS <span class="header-info-value" id="headerMem">--</span></div>
+            <div class="header-info-item" title="Virtual memory">VIRT <span class="header-info-value" id="headerVirt">--</span></div>
+            <div class="header-info-item" title="Total threads">THR <span class="header-info-value" id="headerThreads">--</span></div>
+            <div class="header-info-item" title="Rayon worker pool size">POOL <span class="header-info-value" id="headerPool">--</span></div>
+            <div class="header-info-item" title="Open file descriptors">FD <span class="header-info-value" id="headerFds">--</span></div>
+            <div class="header-info-item" title="Process uptime">UP <span class="header-info-value" id="headerUptime">--</span></div>
+            <div class="header-info-item" title="Process ID">PID <span class="header-info-value" id="headerPid">--</span></div>
           </div>
           <button class="btn-scan-all" id="btnScanAll" data-action="scanAll">&#9889; Scan All</button>
           <button class="btn-scan-all" id="btnStopAll" data-action="stopAll" style="display:none; background: var(--red);">&#9632; Stop All</button>

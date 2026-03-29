@@ -1032,14 +1032,39 @@ fn import_plugins_json(file_path: String) -> Result<Vec<PluginInfo>, String> {
 
 // ── Process stats ──
 
+use std::sync::atomic::AtomicU64;
+use std::time::Instant;
+
+static LAST_CPU_TIME: AtomicU64 = AtomicU64::new(0);
+static LAST_WALL_TIME: AtomicU64 = AtomicU64::new(0);
+
 #[tauri::command]
 fn get_process_stats() -> serde_json::Value {
-    let mem_bytes = get_rss_bytes();
+    let rss = get_rss_bytes();
+    let virt = get_virtual_bytes();
     let threads = get_thread_count();
+    let cpu_pct = get_cpu_percent();
+    let rayon_threads = rayon::current_num_threads();
+    let uptime_secs = get_uptime_secs();
+    let pid = std::process::id();
+    let open_fds = get_open_fd_count();
+
     serde_json::json!({
-        "memBytes": mem_bytes,
+        "pid": pid,
+        "rssBytes": rss,
+        "virtualBytes": virt,
         "threads": threads,
+        "cpuPercent": cpu_pct,
+        "rayonThreads": rayon_threads,
+        "uptimeSecs": uptime_secs,
+        "openFds": open_fds,
     })
+}
+
+static APP_START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+
+fn get_uptime_secs() -> u64 {
+    APP_START.get_or_init(Instant::now).elapsed().as_secs()
 }
 
 #[cfg(target_os = "macos")]
@@ -1065,16 +1090,7 @@ fn get_rss_bytes() -> u64 {
 
 #[cfg(target_os = "linux")]
 fn get_rss_bytes() -> u64 {
-    std::fs::read_to_string("/proc/self/status")
-        .ok()
-        .and_then(|s| {
-            s.lines()
-                .find(|l| l.starts_with("VmRSS:"))
-                .and_then(|l| l.split_whitespace().nth(1))
-                .and_then(|v| v.parse::<u64>().ok())
-                .map(|kb| kb * 1024)
-        })
-        .unwrap_or(0)
+    read_proc_field("VmRSS:").map(|kb| kb * 1024).unwrap_or(0)
 }
 
 #[cfg(target_os = "windows")]
@@ -1082,11 +1098,44 @@ fn get_rss_bytes() -> u64 {
     0
 }
 
+#[cfg(target_os = "macos")]
+#[allow(deprecated)]
+fn get_virtual_bytes() -> u64 {
+    unsafe {
+        let mut info: libc::mach_task_basic_info_data_t = std::mem::zeroed();
+        let mut count = (std::mem::size_of::<libc::mach_task_basic_info_data_t>()
+            / std::mem::size_of::<libc::natural_t>()) as u32;
+        let kr = libc::task_info(
+            libc::mach_task_self(),
+            libc::MACH_TASK_BASIC_INFO,
+            &mut info as *mut _ as *mut i32,
+            &mut count,
+        );
+        if kr == libc::KERN_SUCCESS {
+            info.virtual_size as u64
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn get_virtual_bytes() -> u64 {
+    read_proc_field("VmSize:").map(|kb| kb * 1024).unwrap_or(0)
+}
+
+#[cfg(target_os = "windows")]
+fn get_virtual_bytes() -> u64 {
+    0
+}
+
 fn get_thread_count() -> u32 {
     #[cfg(target_os = "macos")]
     {
+        // Read thread count from proc_pidinfo
+        let pid = std::process::id();
         let output = std::process::Command::new("ps")
-            .args(["-M", "-p", &std::process::id().to_string()])
+            .args(["-M", "-p", &pid.to_string()])
             .output();
         if let Ok(out) = output {
             let s = String::from_utf8_lossy(&out.stdout);
@@ -1096,20 +1145,113 @@ fn get_thread_count() -> u32 {
     }
     #[cfg(target_os = "linux")]
     {
-        std::fs::read_to_string("/proc/self/status")
-            .ok()
-            .and_then(|s| {
-                s.lines()
-                    .find(|l| l.starts_with("Threads:"))
-                    .and_then(|l| l.split_whitespace().nth(1))
-                    .and_then(|v| v.parse().ok())
-            })
-            .unwrap_or(0)
+        read_proc_field("Threads:").map(|v| v as u32).unwrap_or(0)
     }
     #[cfg(target_os = "windows")]
     {
         0
     }
+}
+
+#[cfg(target_os = "macos")]
+#[allow(deprecated)]
+fn get_cpu_percent() -> f64 {
+    unsafe {
+        let mut info: libc::task_thread_times_info_data_t = std::mem::zeroed();
+        let mut count = (std::mem::size_of::<libc::task_thread_times_info_data_t>()
+            / std::mem::size_of::<libc::natural_t>()) as u32;
+        let kr = libc::task_info(
+            libc::mach_task_self(),
+            libc::TASK_THREAD_TIMES_INFO,
+            &mut info as *mut _ as *mut i32,
+            &mut count,
+        );
+        if kr != libc::KERN_SUCCESS {
+            return 0.0;
+        }
+        let user_us =
+            info.user_time.seconds as u64 * 1_000_000 + info.user_time.microseconds as u64;
+        let sys_us =
+            info.system_time.seconds as u64 * 1_000_000 + info.system_time.microseconds as u64;
+        let total_us = user_us + sys_us;
+
+        let prev = LAST_CPU_TIME.swap(total_us, Ordering::Relaxed);
+        let now_ns = Instant::now()
+            .duration_since(*APP_START.get_or_init(Instant::now))
+            .as_micros() as u64;
+        let prev_wall = LAST_WALL_TIME.swap(now_ns, Ordering::Relaxed);
+
+        let wall_delta = now_ns.saturating_sub(prev_wall);
+        let cpu_delta = total_us.saturating_sub(prev);
+
+        if wall_delta == 0 {
+            return 0.0;
+        }
+        let ncpus = num_cpus::get() as f64;
+        let pct = (cpu_delta as f64 / wall_delta as f64) * 100.0 / ncpus;
+        (pct * 10.0).round() / 10.0
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn get_cpu_percent() -> f64 {
+    // Read from /proc/self/stat: utime + stime in clock ticks
+    if let Ok(stat) = std::fs::read_to_string("/proc/self/stat") {
+        let parts: Vec<&str> = stat.split_whitespace().collect();
+        if parts.len() > 14 {
+            let utime = parts[13].parse::<u64>().unwrap_or(0);
+            let stime = parts[14].parse::<u64>().unwrap_or(0);
+            let ticks_per_sec = unsafe { libc::sysconf(libc::_SC_CLK_TCK) } as u64;
+            let total_us = (utime + stime) * 1_000_000 / ticks_per_sec.max(1);
+
+            let prev = LAST_CPU_TIME.swap(total_us, Ordering::Relaxed);
+            let now_ns = Instant::now()
+                .duration_since(*APP_START.get_or_init(Instant::now))
+                .as_micros() as u64;
+            let prev_wall = LAST_WALL_TIME.swap(now_ns, Ordering::Relaxed);
+
+            let wall_delta = now_ns.saturating_sub(prev_wall);
+            let cpu_delta = total_us.saturating_sub(prev);
+
+            if wall_delta > 0 {
+                let ncpus = num_cpus::get() as f64;
+                let pct = (cpu_delta as f64 / wall_delta as f64) * 100.0 / ncpus;
+                return (pct * 10.0).round() / 10.0;
+            }
+        }
+    }
+    0.0
+}
+
+#[cfg(target_os = "windows")]
+fn get_cpu_percent() -> f64 {
+    0.0
+}
+
+fn get_open_fd_count() -> u32 {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        if let Ok(entries) = std::fs::read_dir("/dev/fd") {
+            return entries.count() as u32;
+        }
+        0
+    }
+    #[cfg(target_os = "windows")]
+    {
+        0
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn read_proc_field(field: &str) -> Option<u64> {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with(field))
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|v| v.parse().ok())
+        })
 }
 
 // ── Preset export/import ──
@@ -1658,9 +1800,16 @@ mod tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize rayon thread pool — sized for concurrent scans across all cores
+    // Initialize app start time for uptime tracking
+    APP_START.get_or_init(Instant::now);
+
+    // Initialize rayon thread pool with panic handler to prevent crashes
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_cpus::get())
+        .stack_size(8 * 1024 * 1024) // 8MB stack per thread for deep recursion
+        .panic_handler(|panic_info| {
+            eprintln!("Rayon thread panicked: {:?}", panic_info);
+        })
         .build_global()
         .ok();
 
