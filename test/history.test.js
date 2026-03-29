@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const history = require('../history');
+const history = require('../frontend/history');
 
 let tmpFile;
 
