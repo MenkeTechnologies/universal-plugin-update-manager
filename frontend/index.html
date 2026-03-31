@@ -828,6 +828,78 @@
     }
     .filter-select:focus { border-color: var(--cyan); box-shadow: 0 0 10px var(--cyan-dim); }
 
+    /* Multi-select filter */
+    .multi-filter {
+      position: relative;
+      display: inline-block;
+    }
+    .multi-filter-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      border-radius: 2px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .multi-filter-btn:hover {
+      border-color: var(--cyan);
+    }
+    .multi-filter-label.multi-filter-active {
+      color: var(--cyan);
+    }
+    .multi-filter-arrow {
+      font-size: 8px;
+      color: var(--text-muted);
+    }
+    .multi-filter-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 1000;
+      min-width: 100%;
+      max-height: 280px;
+      overflow-y: auto;
+      background: var(--bg-primary);
+      border: 1px solid var(--cyan);
+      box-shadow: 0 0 15px var(--cyan-glow), 0 4px 16px rgba(0,0,0,0.5);
+      padding: 4px 0;
+      margin-top: 2px;
+    }
+    .multi-filter-dropdown.open { display: block; }
+    .multi-filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .multi-filter-item:hover {
+      background: rgba(5,217,232,0.08);
+    }
+    .multi-filter-item input[type="checkbox"] {
+      accent-color: var(--cyan);
+      cursor: pointer;
+    }
+    .multi-filter-all {
+      font-weight: 600;
+      color: var(--text-dim);
+    }
+    .multi-filter-sep {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 8px;
+    }
+
     /* Plugin list */
     .plugin-list {
       flex: 1;
@@ -3175,6 +3247,7 @@
   <script src="js/audio.js"></script>
   <script src="js/daw.js"></script>
   <script src="js/presets.js"></script>
+  <script src="js/multi-filter.js"></script>
   <script src="js/favorites.js"></script>
   <script src="js/context-menu.js"></script>
   <script src="js/columns.js"></script>

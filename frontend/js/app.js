@@ -35,6 +35,7 @@
   await prefs.load();
   restoreSettings();
   initTabDragReorder();
+  initMultiFilters();
 
   try {
     const latest = await window.vstUpdater.getLatestScan();

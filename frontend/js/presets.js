@@ -79,7 +79,7 @@ function filterPresets() {
   const search = document.getElementById('presetSearchInput')?.value || '';
   const formatEl = document.getElementById('presetFormatFilter');
   if (formatEl) autoSelectDropdown(formatEl, search);
-  const formatFilter = formatEl?.value || 'all';
+  const fmtSet = getMultiFilterValues('presetFormatFilter');
   const mode = getSearchMode('regexPresets');
   _lastPresetSearch = search;
   _lastPresetMode = mode;
@@ -87,7 +87,7 @@ function filterPresets() {
   if (search) {
     const scored = [];
     for (const p of allPresets) {
-      if (formatFilter !== 'all' && p.format !== formatFilter) continue;
+      if (fmtSet && !fmtSet.has(p.format)) continue;
       const score = searchScore(search, [p.name, p.path, p.format], mode);
       if (score > 0) scored.push({ item: p, score });
     }
@@ -95,7 +95,7 @@ function filterPresets() {
     filteredPresets = scored.map(s => s.item);
   } else {
     filteredPresets = allPresets.filter(p => {
-      if (formatFilter !== 'all' && p.format !== formatFilter) return false;
+      if (fmtSet && !fmtSet.has(p.format)) return false;
       return true;
     });
   }

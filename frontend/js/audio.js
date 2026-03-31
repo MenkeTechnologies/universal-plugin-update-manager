@@ -96,10 +96,10 @@ async function scanAudioSamples(resume = false) {
 
     // Incrementally append matching rows (cap DOM at 2000 during scan)
     const search = document.getElementById('audioSearchInput').value || '';
-    const fmt = document.getElementById('audioFormatFilter').value;
+    const scanFmtSet = getMultiFilterValues('audioFormatFilter');
     const scanMode = getSearchMode('regexAudio');
     const matching = toAdd.filter(s => {
-      if (fmt !== 'all' && s.format !== fmt) return false;
+      if (scanFmtSet && !scanFmtSet.has(s.format)) return false;
       if (search && !searchMatch(search, [s.name, s.path, s.format], scanMode)) return false;
       return true;
     });
@@ -236,9 +236,8 @@ let _lastAudioMode = 'fuzzy';
 function filterAudioSamples() {
   const search = document.getElementById('audioSearchInput').value || '';
   const formatEl = document.getElementById('audioFormatFilter');
-  // Auto-activate format dropdown when search matches a format
   autoSelectDropdown(formatEl, search);
-  const format = formatEl.value;
+  const fmtSet = getMultiFilterValues('audioFormatFilter');
   const mode = getSearchMode('regexAudio');
   _lastAudioSearch = search;
   _lastAudioMode = mode;
@@ -246,7 +245,7 @@ function filterAudioSamples() {
   if (search) {
     const scored = [];
     for (const s of allAudioSamples) {
-      if (format !== 'all' && s.format !== format) continue;
+      if (fmtSet && !fmtSet.has(s.format)) continue;
       const score = searchScore(search, [s.name, s.path, s.format], mode);
       if (score > 0) scored.push({ item: s, score });
     }
@@ -254,7 +253,7 @@ function filterAudioSamples() {
     filteredAudioSamples = scored.map(s => s.item);
   } else {
     filteredAudioSamples = allAudioSamples.filter(s => {
-      if (format !== 'all' && s.format !== format) return false;
+      if (fmtSet && !fmtSet.has(s.format)) return false;
       return true;
     });
     sortAudioArray();

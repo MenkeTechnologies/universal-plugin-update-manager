@@ -88,7 +88,7 @@ function filterDawProjects() {
   const search = document.getElementById('dawSearchInput').value || '';
   const dawEl = document.getElementById('dawDawFilter');
   autoSelectDropdown(dawEl, search);
-  const daw = dawEl.value;
+  const dawSet = getMultiFilterValues('dawDawFilter');
   const mode = getSearchMode('regexDaw');
   _lastDawSearch = search;
   _lastDawMode = mode;
@@ -96,7 +96,7 @@ function filterDawProjects() {
   if (search) {
     const scored = [];
     for (const p of allDawProjects) {
-      if (daw !== 'all' && p.daw !== daw) continue;
+      if (dawSet && !dawSet.has(p.daw)) continue;
       const score = searchScore(search, [p.name, p.path, p.daw, p.format], mode);
       if (score > 0) scored.push({ item: p, score });
     }
@@ -104,7 +104,7 @@ function filterDawProjects() {
     filteredDawProjects = scored.map(s => s.item);
   } else {
     filteredDawProjects = allDawProjects.filter(p => {
-      if (daw !== 'all' && p.daw !== daw) return false;
+      if (dawSet && !dawSet.has(p.daw)) return false;
       return true;
     });
     sortDawArray();
@@ -229,10 +229,10 @@ async function scanDawProjects(resume = false) {
     progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
 
     const search = document.getElementById('dawSearchInput').value || '';
-    const daw = document.getElementById('dawDawFilter').value;
+    const scanDawSet = getMultiFilterValues('dawDawFilter');
     const scanMode = getSearchMode('regexDaw');
     const matching = toAdd.filter(p => {
-      if (daw !== 'all' && p.daw !== daw) return false;
+      if (scanDawSet && !scanDawSet.has(p.daw)) return false;
       if (search && !searchMatch(search, [p.name, p.path, p.daw], scanMode)) return false;
       return true;
     });

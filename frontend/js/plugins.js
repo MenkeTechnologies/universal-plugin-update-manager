@@ -323,21 +323,22 @@ const _filterPluginsImmediate = function() {
   const search = document.getElementById('searchInput').value;
   const typeEl = document.getElementById('typeFilter');
   autoSelectDropdown(typeEl, search);
-  const typeFilter = typeEl.value;
-  const statusFilter = document.getElementById('statusFilter').value;
+  const typeSet = getMultiFilterValues('typeFilter');
+  const statusSet = getMultiFilterValues('statusFilter');
   const mode = getSearchMode('regexPlugins');
   _lastPluginSearch = search;
   _lastPluginMode = mode;
 
   let scored = [];
   for (const p of allPlugins) {
-    const matchesType = typeFilter === 'all' || p.type === typeFilter;
-    if (!matchesType) continue;
-    let matchesStatus = true;
-    if (statusFilter === 'update') matchesStatus = p.hasUpdate === true;
-    if (statusFilter === 'current') matchesStatus = p.hasUpdate === false && p.source !== 'not-found';
-    if (statusFilter === 'unknown') matchesStatus = !p.hasUpdate && p.source === 'not-found';
-    if (!matchesStatus) continue;
+    if (typeSet && !typeSet.has(p.type)) continue;
+    if (statusSet) {
+      let matchesStatus = false;
+      if (statusSet.has('update') && p.hasUpdate === true) matchesStatus = true;
+      if (statusSet.has('current') && p.hasUpdate === false && p.source !== 'not-found') matchesStatus = true;
+      if (statusSet.has('unknown') && !p.hasUpdate && p.source === 'not-found') matchesStatus = true;
+      if (!matchesStatus) continue;
+    }
     const score = searchScore(search, [p.name, p.manufacturer || ''], mode);
     if (score > 0) scored.push({ plugin: p, score });
   }

@@ -301,27 +301,24 @@ const EXT_TO_FILTER = {
 };
 
 // Auto-select dropdown when search matches a format/type keyword.
-// Only activates on exact keyword match. Keeps filter sticky once set —
-// does not reset unless search is fully cleared.
+// Works with both native selects and multi-filter widgets.
 function autoSelectDropdown(selectEl, search) {
   if (!selectEl) return;
   const q = search.trim().toLowerCase().replace(/^\./, '');
   if (!q) {
-    // Reset to all only when search is completely empty
     if (selectEl._autoSet) {
-      selectEl.value = 'all';
+      setMultiFilterValue(selectEl.id, 'all');
       selectEl._autoSet = false;
     }
     return;
   }
-  // Check each word in the search for a format match
   const words = q.split(/\s+/);
   for (const word of words) {
     const mapped = EXT_TO_FILTER[word];
     if (mapped) {
       const option = [...selectEl.options].find(o => o.value === mapped);
-      if (option && selectEl.value !== mapped) {
-        selectEl.value = mapped;
+      if (option) {
+        setMultiFilterValue(selectEl.id, mapped);
         selectEl._autoSet = true;
       }
       return;
