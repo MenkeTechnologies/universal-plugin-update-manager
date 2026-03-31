@@ -323,10 +323,12 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
         &[
             ("autoScan", "autoScan"),
             ("autoUpdate", "autoUpdate"),
+            ("singleClickPlay", "singleClickPlay"),
             ("defaultTypeFilter", "defaultTypeFilter"),
             ("customDirs", "customDirs"),
             ("audioScanDirs", "audioScanDirs"),
             ("dawScanDirs", "dawScanDirs"),
+            ("presetScanDirs", "presetScanDirs"),
         ],
     ),
     (
@@ -341,6 +343,8 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
         "performance",
         &[("pageSize", "pageSize"), ("flushInterval", "flushInterval")],
     ),
+    ("player", &[("playerDock", "dock")]),
+    ("tabs", &[("tabOrder", "order")]),
     (
         "customScheme",
         &[
@@ -349,6 +353,9 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
     ("data", &[("columnWidths", "widths")]),
+    ("favorites", &[("favorites", "items")]),
+    ("notes", &[("itemNotes", "itemNotes")]),
+    ("history", &[("recentlyPlayed", "recentlyPlayed")]),
 ];
 
 fn default_config() -> PrefsMap {

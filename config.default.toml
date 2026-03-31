@@ -12,10 +12,12 @@ crtEffects = "on"
 [scanning]
 autoScan = "off"
 autoUpdate = "off"
+singleClickPlay = "off"
 defaultTypeFilter = "all"
 customDirs = ""
 audioScanDirs = ""
 dawScanDirs = ""
+presetScanDirs = ""
 
 [sorting]
 pluginSort = "name-asc"
@@ -24,7 +26,13 @@ dawSort = "name"
 
 [performance]
 pageSize = "500"
-flushInterval = "300"
+flushInterval = "100"
+
+[player]
+dock = "dock-br"
+
+[tabs]
+order = '["plugins","samples","daw","presets","favorites","history","settings"]'
 
 [data]
 widths = {}
@@ -32,3 +40,12 @@ widths = {}
 [customScheme]
 vars = {}
 presets = []
+
+[favorites]
+items = []
+
+[notes]
+itemNotes = {}
+
+[history]
+recentlyPlayed = []
