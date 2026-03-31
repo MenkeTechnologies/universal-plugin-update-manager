@@ -86,18 +86,29 @@ let _lastDawMode = 'fuzzy';
 
 function filterDawProjects() {
   const search = document.getElementById('dawSearchInput').value || '';
-  const daw = document.getElementById('dawDawFilter').value;
+  const dawEl = document.getElementById('dawDawFilter');
+  autoSelectDropdown(dawEl, search);
+  const daw = dawEl.value;
   const mode = getSearchMode('regexDaw');
   _lastDawSearch = search;
   _lastDawMode = mode;
 
-  filteredDawProjects = allDawProjects.filter(p => {
-    if (daw !== 'all' && p.daw !== daw) return false;
-    if (search && !searchMatch(search, [p.name, p.path, p.daw, p.format], mode)) return false;
-    return true;
-  });
-
-  sortDawArray();
+  if (search) {
+    const scored = [];
+    for (const p of allDawProjects) {
+      if (daw !== 'all' && p.daw !== daw) continue;
+      const score = searchScore(search, [p.name, p.path, p.daw, p.format], mode);
+      if (score > 0) scored.push({ item: p, score });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    filteredDawProjects = scored.map(s => s.item);
+  } else {
+    filteredDawProjects = allDawProjects.filter(p => {
+      if (daw !== 'all' && p.daw !== daw) return false;
+      return true;
+    });
+    sortDawArray();
+  }
   renderDawTable();
 }
 

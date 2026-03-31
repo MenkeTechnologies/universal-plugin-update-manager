@@ -321,23 +321,29 @@ let _lastPluginMode = 'fuzzy';
 
 const _filterPluginsImmediate = function() {
   const search = document.getElementById('searchInput').value;
-  const typeFilter = document.getElementById('typeFilter').value;
+  const typeEl = document.getElementById('typeFilter');
+  autoSelectDropdown(typeEl, search);
+  const typeFilter = typeEl.value;
   const statusFilter = document.getElementById('statusFilter').value;
   const mode = getSearchMode('regexPlugins');
   _lastPluginSearch = search;
   _lastPluginMode = mode;
 
-  let filtered = allPlugins.filter(p => {
-    const matchesSearch = searchMatch(search, [p.name, p.manufacturer || ''], mode);
+  let scored = [];
+  for (const p of allPlugins) {
     const matchesType = typeFilter === 'all' || p.type === typeFilter;
+    if (!matchesType) continue;
     let matchesStatus = true;
     if (statusFilter === 'update') matchesStatus = p.hasUpdate === true;
     if (statusFilter === 'current') matchesStatus = p.hasUpdate === false && p.source !== 'not-found';
     if (statusFilter === 'unknown') matchesStatus = !p.hasUpdate && p.source === 'not-found';
-    return matchesSearch && matchesType && matchesStatus;
-  });
-
-  renderPlugins(filtered);
+    if (!matchesStatus) continue;
+    const score = searchScore(search, [p.name, p.manufacturer || ''], mode);
+    if (score > 0) scored.push({ plugin: p, score });
+  }
+  // Sort by score descending when searching, preserve original order otherwise
+  if (search) scored.sort((a, b) => b.score - a.score);
+  renderPlugins(scored.map(s => s.plugin));
 };
 
 const filterPlugins = debounce(_filterPluginsImmediate, 120);

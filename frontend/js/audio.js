@@ -235,18 +235,30 @@ let _lastAudioMode = 'fuzzy';
 
 function filterAudioSamples() {
   const search = document.getElementById('audioSearchInput').value || '';
-  const format = document.getElementById('audioFormatFilter').value;
+  const formatEl = document.getElementById('audioFormatFilter');
+  // Auto-activate format dropdown when search matches a format
+  autoSelectDropdown(formatEl, search);
+  const format = formatEl.value;
   const mode = getSearchMode('regexAudio');
   _lastAudioSearch = search;
   _lastAudioMode = mode;
 
-  filteredAudioSamples = allAudioSamples.filter(s => {
-    if (format !== 'all' && s.format !== format) return false;
-    if (search && !searchMatch(search, [s.name, s.path, s.format], mode)) return false;
-    return true;
-  });
-
-  sortAudioArray();
+  if (search) {
+    const scored = [];
+    for (const s of allAudioSamples) {
+      if (format !== 'all' && s.format !== format) continue;
+      const score = searchScore(search, [s.name, s.path, s.format], mode);
+      if (score > 0) scored.push({ item: s, score });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    filteredAudioSamples = scored.map(s => s.item);
+  } else {
+    filteredAudioSamples = allAudioSamples.filter(s => {
+      if (format !== 'all' && s.format !== format) return false;
+      return true;
+    });
+    sortAudioArray();
+  }
   renderAudioTable();
 }
 

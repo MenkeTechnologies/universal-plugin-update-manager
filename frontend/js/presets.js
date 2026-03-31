@@ -77,25 +77,39 @@ let _lastPresetMode = 'fuzzy';
 
 function filterPresets() {
   const search = document.getElementById('presetSearchInput')?.value || '';
-  const formatFilter = document.getElementById('presetFormatFilter')?.value || 'all';
+  const formatEl = document.getElementById('presetFormatFilter');
+  if (formatEl) autoSelectDropdown(formatEl, search);
+  const formatFilter = formatEl?.value || 'all';
   const mode = getSearchMode('regexPresets');
   _lastPresetSearch = search;
   _lastPresetMode = mode;
 
-  filteredPresets = allPresets.filter(p => {
-    if (formatFilter !== 'all' && p.format !== formatFilter) return false;
-    if (search && !searchMatch(search, [p.name, p.path, p.format], mode)) return false;
-    return true;
-  });
+  if (search) {
+    const scored = [];
+    for (const p of allPresets) {
+      if (formatFilter !== 'all' && p.format !== formatFilter) continue;
+      const score = searchScore(search, [p.name, p.path, p.format], mode);
+      if (score > 0) scored.push({ item: p, score });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    filteredPresets = scored.map(s => s.item);
+  } else {
+    filteredPresets = allPresets.filter(p => {
+      if (formatFilter !== 'all' && p.format !== formatFilter) return false;
+      return true;
+    });
+  }
 
-  const key = presetSortKey;
-  const dir = presetSortAsc ? 1 : -1;
-  filteredPresets.sort((a, b) => {
-    if (key === 'size') return (a.size - b.size) * dir;
-    const av = (a[key] || '').toLowerCase();
-    const bv = (b[key] || '').toLowerCase();
+  if (!search) {
+    const key = presetSortKey;
+    const dir = presetSortAsc ? 1 : -1;
+    filteredPresets.sort((a, b) => {
+      if (key === 'size') return (a.size - b.size) * dir;
+      const av = (a[key] || '').toLowerCase();
+      const bv = (b[key] || '').toLowerCase();
     return av < bv ? -dir : av > bv ? dir : 0;
-  });
+    });
+  }
 
   presetRenderCount = 0;
   const tbody = document.getElementById('presetTableBody');

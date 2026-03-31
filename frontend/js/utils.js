@@ -152,41 +152,70 @@ function parseToken(token) {
   return { type, text, negate };
 }
 
-function matchToken(token, value) {
+// Score bonus for substring/exact matches over fuzzy-only
+const SCORE_SUBSTRING_BONUS = 1000;
+const SCORE_EXACT_BONUS = 2000;      // full string match
+const SCORE_PREFIX_BONUS = 1500;
+
+// Score a single token against a value. Returns score > 0 for match, 0 for no match.
+function scoreToken(token, value) {
   const v = value.toLowerCase(), t = token.text.toLowerCase();
   switch (token.type) {
-    case 'exact': return v.includes(t);
-    case 'prefix': return v.startsWith(t);
-    case 'suffix': return v.endsWith(t);
+    case 'exact': return v.includes(t) ? SCORE_SUBSTRING_BONUS + t.length * SCORE_MATCH : 0;
+    case 'prefix': return v.startsWith(t) ? SCORE_PREFIX_BONUS + t.length * SCORE_MATCH : 0;
+    case 'suffix': return v.endsWith(t) ? SCORE_SUBSTRING_BONUS + t.length * SCORE_MATCH : 0;
     case 'fuzzy': {
+      // Try exact/substring first — always prioritized
+      if (v === t) return SCORE_EXACT_BONUS + t.length * SCORE_MATCH;
+      if (v.includes(t)) return SCORE_SUBSTRING_BONUS + t.length * SCORE_MATCH;
+      // Fuzzy fallback
       const m = fzfMatch(token.text, value);
-      return m !== null;
+      return m ? m.score : 0;
     }
   }
-  return false;
+  return 0;
 }
 
 // Unified search: checks fields against fzf-style query.
 // mode: 'fuzzy' (default) or 'regex'
-function searchMatch(query, fields, mode) {
-  if (!query) return true;
+// Returns score > 0 for match, 0 for no match. Use searchMatch() for boolean.
+function searchScore(query, fields, mode) {
+  if (!query) return 1; // empty query matches everything
   if (mode === 'regex') {
     try {
       const re = new RegExp(query, 'i');
-      return fields.some(f => re.test(f));
+      return fields.some(f => re.test(f)) ? 1 : 0;
     } catch {
-      return fields.some(f => f.toLowerCase().includes(query.toLowerCase()));
+      return fields.some(f => f.toLowerCase().includes(query.toLowerCase())) ? 1 : 0;
     }
   }
   const groups = parseFzfQuery(query);
+  let totalScore = 0;
   // All groups must match (AND between groups)
-  return groups.every(orGroup => {
-    // Any term in the OR group must match
-    return orGroup.some(token => {
-      const matched = fields.some(f => matchToken(token, f));
-      return token.negate ? !matched : matched;
-    });
-  });
+  for (const orGroup of groups) {
+    let bestGroupScore = 0;
+    for (const token of orGroup) {
+      let tokenBest = 0;
+      for (const f of fields) {
+        const s = scoreToken(token, f);
+        if (s > tokenBest) tokenBest = s;
+      }
+      if (token.negate) {
+        if (tokenBest > 0) return 0; // negated term matched => fail
+        bestGroupScore = 1; // negated term didn't match => pass
+      } else {
+        if (tokenBest > bestGroupScore) bestGroupScore = tokenBest;
+      }
+    }
+    if (bestGroupScore === 0) return 0; // group didn't match
+    totalScore += bestGroupScore;
+  }
+  return totalScore;
+}
+
+// Boolean wrapper for backward compat
+function searchMatch(query, fields, mode) {
+  return searchScore(query, fields, mode) > 0;
 }
 
 // Get best fuzzy match indices for highlighting a single field
@@ -246,6 +275,54 @@ function highlightMatch(text, query, mode) {
   }
   if (inMark) result += '</mark>';
   return result;
+}
+
+// Extension-to-dropdown value mapping for auto-select
+const EXT_TO_FILTER = {
+  // Audio formats
+  'wav': 'WAV', 'mp3': 'MP3', 'aiff': 'AIFF', 'aif': 'AIF',
+  'flac': 'FLAC', 'ogg': 'OGG', 'm4a': 'M4A', 'aac': 'AAC',
+  // Plugin types
+  'vst2': 'VST2', 'vst3': 'VST3', 'au': 'Audio Units', 'component': 'Audio Units',
+  // DAW formats → DAW names
+  'als': 'Ableton Live', 'alp': 'Ableton Live', 'ableton': 'Ableton Live',
+  'logicx': 'Logic Pro', 'logic': 'Logic Pro',
+  'flp': 'FL Studio', 'fl': 'FL Studio',
+  'cpr': 'Cubase', 'cubase': 'Cubase',
+  'rpp': 'REAPER', 'reaper': 'REAPER',
+  'ptx': 'Pro Tools', 'ptf': 'Pro Tools', 'protools': 'Pro Tools',
+  'bwproject': 'Bitwig Studio', 'bitwig': 'Bitwig Studio',
+  'song': 'Studio One', 'studioone': 'Studio One',
+  'reason': 'Reason',
+  'aup': 'Audacity', 'aup3': 'Audacity', 'audacity': 'Audacity',
+  'band': 'GarageBand', 'garageband': 'GarageBand',
+  'ardour': 'Ardour',
+  'dawproject': 'DAWproject',
+};
+
+// Auto-select dropdown when search matches a format/type keyword.
+// Resets to 'all' when search is cleared or no longer matches.
+function autoSelectDropdown(selectEl, search) {
+  if (!selectEl) return;
+  const q = search.trim().toLowerCase().replace(/^\./, '');
+  if (!q) {
+    if (selectEl.value !== 'all') selectEl.value = 'all';
+    return;
+  }
+  const mapped = EXT_TO_FILTER[q];
+  if (mapped) {
+    // Check if this value exists in the dropdown
+    const option = [...selectEl.options].find(o => o.value === mapped);
+    if (option && selectEl.value !== mapped) {
+      selectEl.value = mapped;
+    }
+  } else if (selectEl.value !== 'all') {
+    // Check if current selection's text still matches
+    const currentOpt = selectEl.options[selectEl.selectedIndex];
+    if (currentOpt && !currentOpt.text.toLowerCase().includes(q) && currentOpt.value !== 'all') {
+      selectEl.value = 'all';
+    }
+  }
 }
 
 // Get search mode for a tab's regex toggle
