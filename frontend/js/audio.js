@@ -476,10 +476,8 @@ async function toggleMetadata(filePath, event) {
   // Don't toggle if clicking buttons
   if (event.target.closest('.col-actions')) return;
 
-  // Single-click playback when enabled
-  if (prefs.getItem('singleClickPlay') === 'on') {
-    previewAudio(filePath);
-  }
+  // Single-click starts playback
+  previewAudio(filePath);
 
   const tbody = document.getElementById('audioTableBody');
   if (!tbody) return;
