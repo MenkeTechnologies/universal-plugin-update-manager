@@ -284,20 +284,10 @@
       color: var(--text); font-weight: 600;
     }
 
-    .btn-scan-all {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 14px;
-      font-size: 12px;
-      font-family: inherit;
-      cursor: pointer;
+    .header-actions .btn {
       white-space: nowrap;
-      transition: opacity 0.2s;
+      font-family: inherit;
     }
-    .btn-scan-all:hover { opacity: 0.85; }
-    .btn-scan-all:disabled { opacity: 0.5; cursor: default; }
 
     .btn {
       padding: 8px 18px;
@@ -1840,9 +1830,9 @@
             <div class="header-info-item" title="Process uptime">UP <span class="header-info-value" id="headerUptime">--</span></div>
             <div class="header-info-item" title="Process ID">PID <span class="header-info-value" id="headerPid">--</span></div>
           </div>
-          <button class="btn-scan-all" id="btnScanAll" data-action="scanAll">&#9889; Scan All</button>
-          <button class="btn-scan-all" id="btnStopAll" data-action="stopAll" style="display:none; background: var(--red);">&#9632; Stop All</button>
-          <button class="btn-scan-all" id="btnResumeAll" data-action="resumeAll" style="display:none; background: var(--green);">&#9654; Resume All</button>
+          <button class="btn btn-primary" id="btnScanAll" data-action="scanAll">&#9889; Scan All</button>
+          <button class="btn btn-stop" id="btnStopAll" data-action="stopAll" style="display:none;">&#9632; Stop All</button>
+          <button class="btn btn-secondary" id="btnResumeAll" data-action="resumeAll" style="display:none;">&#9654; Resume All</button>
         </div>
       </div>
       <div class="stats-bar" id="statsBar">

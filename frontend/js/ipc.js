@@ -93,6 +93,13 @@ document.addEventListener('click', (e) => {
     case 'openPrefsFile': openPrefsFile(); break;
   }
 });
+document.addEventListener('dblclick', (e) => {
+  const row = e.target.closest('#dawTableBody tr[data-daw-path]');
+  if (row) {
+    e.preventDefault();
+    window.vstUpdater.openDawProject(row.dataset.dawPath);
+  }
+});
 document.addEventListener('input', (e) => {
   const action = e.target.dataset.action;
   if (action === 'filterPlugins') filterPlugins();
@@ -221,6 +228,7 @@ window.vstUpdater = {
     return () => { if (unlisten) unlisten(); };
   },
   openDawFolder: (path) => invoke('open_daw_folder', { filePath: path }),
+  openDawProject: (path) => invoke('open_daw_project', { filePath: path }),
   // DAW history
   saveDawScan: (projects, roots) => invoke('daw_history_save', { projects, roots: roots || null }),
   getDawScans: () => invoke('daw_history_get_scans'),

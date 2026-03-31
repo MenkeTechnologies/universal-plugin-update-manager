@@ -792,6 +792,11 @@ async fn open_daw_folder(file_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn open_daw_project(file_path: String) -> Result<(), String> {
+    opener::open(&file_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn open_update_url(url: String) -> Result<(), String> {
     opener::open(&url).map_err(|e| e.to_string())
 }
@@ -1871,6 +1876,7 @@ pub fn run() {
             daw_history_latest,
             daw_history_diff,
             open_daw_folder,
+            open_daw_project,
             open_update_url,
             open_plugin_folder,
             open_audio_folder,

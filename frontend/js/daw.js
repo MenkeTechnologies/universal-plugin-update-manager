@@ -68,7 +68,7 @@ function getDawBadgeClass(daw) {
 function buildDawRow(p) {
   const ep = escapePath(p.path);
   const dawClass = getDawBadgeClass(p.daw);
-  return `<tr data-daw-path="${ep}">
+  return `<tr data-daw-path="${ep}" title="Double-click to open in ${escapeHtml(p.daw)}" style="cursor: pointer;">
     <td class="col-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</td>
     <td class="col-format"><span class="format-badge ${dawClass}">${escapeHtml(p.daw)}</span></td>
     <td class="col-format"><span class="format-badge format-default">${p.format}</span></td>
