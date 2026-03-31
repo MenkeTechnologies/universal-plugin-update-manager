@@ -291,9 +291,11 @@ fn walk_dir_parallel(
             continue;
         }
         if let Some(format) = ext_matches(&path) {
-            // Validate .band packages to avoid false positives
-            if format == "BAND" && is_pkg && !is_valid_band_package(&path) {
-                continue;
+            // .band is ONLY valid as a GarageBand package directory, never as a plain file
+            if format == "BAND" {
+                if !is_pkg || !is_valid_band_package(&path) {
+                    continue;
+                }
             }
             let (size, modified) = if is_pkg {
                 let sz = get_directory_size(&path);
