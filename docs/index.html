@@ -664,7 +664,7 @@
           <div class="step-number">A</div>
           <div class="step-content">
             <h3>Unified Timeline</h3>
-            <p>The History tab (<kbd>Cmd+6</kbd>) shows a merged timeline of all scan types: plugins, audio samples, DAW projects, and presets. Up to 50 snapshots are stored. Each entry shows the scan type, timestamp, and item count.</p>
+            <p>The History tab (<kbd>Cmd+7</kbd>) shows a merged timeline of all scan types: plugins, audio samples, DAW projects, and presets. Up to 50 snapshots are stored. Each entry shows the scan type, timestamp, and item count.</p>
           </div>
         </div>
         <div class="guide-step">
@@ -694,8 +694,9 @@
         <tr><td><kbd>Cmd</kbd> + <kbd>3</kbd></td><td>DAW Projects tab</td></tr>
         <tr><td><kbd>Cmd</kbd> + <kbd>4</kbd></td><td>Presets tab</td></tr>
         <tr><td><kbd>Cmd</kbd> + <kbd>5</kbd></td><td>Favorites tab</td></tr>
-        <tr><td><kbd>Cmd</kbd> + <kbd>6</kbd></td><td>History tab</td></tr>
-        <tr><td><kbd>Cmd</kbd> + <kbd>7</kbd></td><td>Settings tab</td></tr>
+        <tr><td><kbd>Cmd</kbd> + <kbd>6</kbd></td><td>Notes tab</td></tr>
+        <tr><td><kbd>Cmd</kbd> + <kbd>7</kbd></td><td>History tab</td></tr>
+        <tr><td><kbd>Cmd</kbd> + <kbd>8</kbd></td><td>Settings tab</td></tr>
         <tr><td><kbd>Cmd</kbd> + <kbd>F</kbd></td><td>Focus the search box in the active tab</td></tr>
         <tr><td><kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></td><td>Scan All</td></tr>
         <tr><td><kbd>Cmd</kbd> + <kbd>.</kbd></td><td>Stop All</td></tr>
@@ -746,34 +747,45 @@
       </div>
       <div class="feature-card">
         <h3>Testing</h3>
-        <p>136 Rust tests (scanner, KVR, history, audio, DAW, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 44 Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
+        <p>178 Rust tests (lib, history, KVR, scanner, DAW, audio, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 385 total. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
       </div>
     </div>
     <pre style="margin-top: 32px;">
 src-tauri/src/
+  main.rs            -- Tauri entry point
+  lib.rs             -- IPC commands, export/import, file ops, PDF generation
   scanner.rs         -- Plugin scanner (VST2/VST3/AU, architecture detection)
   audio_scanner.rs   -- Audio sample discovery + metadata extraction
   daw_scanner.rs     -- DAW project scanner (14+ formats)
-  kvr.rs             -- KVR Audio scraper + version checker
+  preset_scanner.rs  -- Plugin preset discovery
   history.rs         -- Scan history persistence + diff engine
-  lib.rs             -- IPC commands, export/import, PDF generation
+  kvr.rs             -- KVR Audio scraper + version checker
 
-frontend/js/
+frontend/js/  (24 modules)
   app.js             -- Startup, auto-load, preferences
   audio.js           -- Sample scanning, playback, visualizer, player dock
-  plugins.js         -- Plugin scanning, filtering, updates
-  daw.js             -- DAW project scanning + stats
-  presets.js         -- Preset scanning + filtering
-  favorites.js       -- Favorites management
-  export.js          -- Export/import (JSON/TOML/CSV/TSV/PDF)
-  context-menu.js    -- Right-click menus for all elements
-  multi-filter.js    -- Multi-select checkbox dropdowns
-  utils.js           -- fzf search, highlighting, ETA, helpers
-  history.js         -- Scan history timeline + diff
-  settings.js        -- Themes, color schemes, toggles
+  batch-select.js    -- Checkbox selection + batch operations
   columns.js         -- Resizable table columns
+  context-menu.js    -- Right-click menus for all elements
+  daw.js             -- DAW project scanning + stats
+  disk-usage.js      -- Stacked bar charts for storage breakdown
+  duplicates.js      -- Duplicate detection modal
+  export.js          -- Export/import (JSON/TOML/CSV/TSV/PDF)
+  favorites.js       -- Favorites management
+  file-browser.js    -- Filesystem navigation with tags + notes
+  help-overlay.js    -- Keyboard shortcuts reference overlay
+  history.js         -- Scan history timeline + diff
   ipc.js             -- Tauri IPC bridge + event delegation
-  kvr.js             -- KVR resolver + cache</pre>
+  keyboard-nav.js    -- Arrow key / j/k table row navigation
+  kvr.js             -- KVR resolver + cache
+  multi-filter.js    -- Multi-select checkbox dropdowns
+  notes.js           -- Note editor + tag management + tag cloud
+  plugins.js         -- Plugin scanning, filtering, updates
+  presets.js         -- Preset scanning + filtering
+  settings.js        -- Themes, color schemes, toggles
+  shortcuts.js       -- Customizable keyboard shortcuts
+  sort-persist.js    -- Sort column/direction persistence per tab
+  utils.js           -- fzf search, highlighting, ETA, helpers</pre>
   </div>
 </section>
 

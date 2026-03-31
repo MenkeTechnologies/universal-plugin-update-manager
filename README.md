@@ -135,15 +135,17 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (158 tests)
+### Rust tests (178 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
+| **lib** | 51 | Export/import roundtrips (JSON, TOML, CSV, TSV), preset export/import, DAW/audio import, CSV escaping, file ops (list dir, rename, delete), `.band` validation, serde payloads |
+| **history** | 35 | Scan CRUD, 50-scan limit, diff (added/removed/version-changed), KVR cache CRUD, audio history CRUD, audio diff, DAW history CRUD, DAW diff, ID generation, preference storage |
 | **kvr** | 27 | Version parsing, version comparison, HTML version extraction (6 formats), download URL extraction, platform keyword detection, date filtering |
-| **history** | 19 | Scan CRUD, 50-scan limit, diff (added/removed/version-changed), KVR cache CRUD, audio history CRUD, audio diff, ID generation |
+| **scanner** | 24 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration, architecture detection |
+| **daw_scanner** | 19 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
 | **audio_scanner** | 18 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories |
-| **daw_scanner** | 39 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
-| **scanner** | 15 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration |
+| **preset_scanner** | 4 | Preset discovery, directory walking, stop signal, format detection |
 
 ### JavaScript tests (207 tests)
 
@@ -206,8 +208,8 @@ Built packages land in `src-tauri/target/release/bundle/`:
                 snapshots to see what was added, removed, or version-bumped.
                 Last scan auto-restores on startup.
 
-[6] EXPORT ---> Export plugin lists to JSON, CSV, or TSV via native file
-                dialogs. Import previously exported scans.
+[6] EXPORT ---> Export any tab to JSON, TOML, CSV, TSV, or PDF via native
+                file dialogs. Import from JSON or TOML.
 ```
 
 ---
@@ -240,10 +242,11 @@ between plugins. You can stop it anytime with the Stop button.
 src-tauri/
   src/
     main.rs            -- Tauri entry point
-    lib.rs             -- IPC command handlers + app setup
+    lib.rs             -- IPC command handlers, export/import, file ops
     scanner.rs         -- Plugin filesystem scanner (VST2/VST3/AU)
     audio_scanner.rs   -- Audio sample discovery + metadata extraction
     daw_scanner.rs     -- DAW project scanner (14+ formats)
+    preset_scanner.rs  -- Plugin preset discovery
     history.rs         -- Scan history persistence + diff engine
     kvr.rs             -- KVR Audio scraper + version checker
   Cargo.toml           -- Rust dependencies
@@ -253,17 +256,29 @@ frontend/
   index.html           -- Cyberpunk CRT UI (HTML/CSS)
   js/
     app.js             -- Startup, auto-load last scan, restore preferences
-    audio.js           -- Audio sample scanning + inline playback
+    audio.js           -- Audio sample scanning + inline playback + floating player
+    batch-select.js    -- Checkbox selection + batch operations
     columns.js         -- Resizable table columns with width persistence
-    context-menu.js    -- Right-click context menus for all tabs
+    context-menu.js    -- Right-click context menus for all elements
     daw.js             -- DAW project scanning + stats
-    export.js          -- Export/import plugins (JSON/CSV/TSV)
+    disk-usage.js      -- Stacked bar charts for storage breakdown
+    duplicates.js      -- Duplicate detection modal
+    export.js          -- Export/import (JSON/TOML/CSV/TSV/PDF)
+    favorites.js       -- Favorites management
+    file-browser.js    -- Filesystem navigation with tags + notes
+    help-overlay.js    -- Keyboard shortcuts reference overlay
     history.js         -- Scan history management + merged timeline
     ipc.js             -- Tauri v2 IPC bridge + event delegation
+    keyboard-nav.js    -- Arrow key / j/k table row navigation
     kvr.js             -- KVR Audio resolver + cache management
+    multi-filter.js    -- Multi-select checkbox dropdowns
+    notes.js           -- Note editor + tag management + tag cloud
     plugins.js         -- Plugin scanning, filtering, sorting, updates
-    settings.js        -- Color schemes + theme switching
-    utils.js           -- Shared helpers (escaping, slugs, formatting)
+    presets.js         -- Preset scanning + filtering
+    settings.js        -- Color schemes, themes, toggles, preferences
+    shortcuts.js       -- Customizable keyboard shortcuts
+    sort-persist.js    -- Sort column/direction persistence per tab
+    utils.js           -- fzf search, escaping, slugs, formatting
 
 test/
   scanner.test.js      -- Plugin/audio/DAW type mapping, size formatting
