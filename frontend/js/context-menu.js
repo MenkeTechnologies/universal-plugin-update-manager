@@ -48,6 +48,15 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') hideContextMenu();
 });
 
+// Open file with specific app
+function openWithApp(filePath, appName) {
+  window.vstUpdater.openWithApp(filePath, appName).then(() => {
+    showToast(`Opening in ${appName}...`);
+  }).catch(err => {
+    showToast(`${appName} not available — ${err}`, 4000, 'error');
+  });
+}
+
 // Copy helper
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
@@ -118,6 +127,12 @@ document.addEventListener('contextmenu', (e) => {
     const items = [
       { icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? 'Pause' : 'Play', action: () => previewAudio(path) },
       { icon: '&#8634;', label: 'Loop', action: () => { toggleRowLoop(path, new MouseEvent('click')); } },
+      '---',
+      { icon: '&#127926;', label: 'Open in Music', action: () => openWithApp(path, 'Music') },
+      { icon: '&#127911;', label: 'Open in QuickTime', action: () => openWithApp(path, 'QuickTime Player') },
+      { icon: '&#127908;', label: 'Open in Audacity', action: () => openWithApp(path, 'Audacity') },
+      { icon: '&#9889;', label: 'Open in Default App', action: () => window.vstUpdater.openDawProject(path).catch(() => {}) },
+      '---',
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => openAudioFolder(path) },
       { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } },
       '---',

@@ -370,6 +370,7 @@ window.vstUpdater = {
   exportToml: (data, filePath) => invoke('export_toml', { data, filePath }),
   importToml: (filePath) => invoke('import_toml', { filePath }),
   exportPdf: (title, headers, rows, filePath) => invoke('export_pdf', { title, headers, rows, filePath }),
+  openWithApp: (filePath, appName) => invoke('open_with_app', { filePath, appName }),
   // File browser
   listDirectory: (dirPath) => invoke('fs_list_dir', { dirPath }),
   deleteFile: (filePath) => invoke('delete_file', { filePath }),

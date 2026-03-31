@@ -879,6 +879,50 @@ async fn open_daw_project(file_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_with_app(file_path: String, app_name: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("open")
+            .args(["-a", &app_name, &file_path])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("Could not open with {}: {}", app_name, stderr.trim()));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("cmd")
+            .args(["/C", "start", "", &file_path])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err(format!("Could not open with {}", app_name));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let output = std::process::Command::new("xdg-open")
+            .arg(&file_path)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err(format!("Could not open with {}", app_name));
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn open_update_url(url: String) -> Result<(), String> {
     opener::open(&url).map_err(|e| e.to_string())
 }
@@ -2629,6 +2673,7 @@ pub fn run() {
             import_presets_json,
             import_audio_json,
             import_daw_json,
+            open_with_app,
             fs_list_dir,
             delete_file,
             rename_file,
