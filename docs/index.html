@@ -255,7 +255,7 @@
       </div>
       <div class="feature-card">
         <h3><span class="icon">&#127925;</span> Audio Sample Scanner</h3>
-        <p>Discovers WAV, FLAC, AIFF, MP3, OGG samples with metadata. Click to play with waveform preview. Seekable waveform in both the metadata panel and floating player with playback cursor.</p>
+        <p>Discovers WAV, FLAC, AIFF, MP3, OGG samples with metadata. Click to play with waveform preview and BPM estimation. Seekable waveform in metadata panel and floating player.</p>
       </div>
       <div class="feature-card">
         <h3><span class="icon">&#127911;</span> DAW Project Scanner</h3>
@@ -760,13 +760,14 @@
       </div>
       <div class="feature-card">
         <h3>Testing</h3>
-        <p>192 Rust tests (lib, history, KVR, scanner, DAW, audio, xref, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 399 total. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
+        <p>203 Rust tests (lib, history, KVR, scanner, DAW, audio, bpm, xref, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 410 total. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
       </div>
     </div>
     <pre style="margin-top: 32px;">
 src-tauri/src/
   main.rs            -- Tauri entry point
   lib.rs             -- IPC commands, export/import, file ops, PDF generation
+  bpm.rs             -- BPM estimation via onset-strength autocorrelation
   scanner.rs         -- Plugin scanner (VST2/VST3/AU, architecture detection)
   audio_scanner.rs   -- Audio sample discovery + metadata extraction
   daw_scanner.rs     -- DAW project scanner (14+ formats)

@@ -14,6 +14,7 @@
 //! - [`history`] — Scan history persistence, diffing, and preferences
 
 pub mod audio_scanner;
+pub mod bpm;
 pub mod daw_scanner;
 pub mod history;
 pub mod kvr;
@@ -882,6 +883,11 @@ async fn open_daw_project(file_path: String) -> Result<(), String> {
 #[tauri::command]
 async fn extract_project_plugins(file_path: String) -> Result<Vec<xref::PluginRef>, String> {
     Ok(xref::extract_plugins(&file_path))
+}
+
+#[tauri::command]
+async fn estimate_bpm(file_path: String) -> Result<Option<f64>, String> {
+    Ok(bpm::estimate_bpm(&file_path))
 }
 
 #[tauri::command]
@@ -2648,6 +2654,7 @@ pub fn run() {
             open_daw_folder,
             open_daw_project,
             extract_project_plugins,
+            estimate_bpm,
             open_update_url,
             open_plugin_folder,
             open_audio_folder,

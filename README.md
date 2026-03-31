@@ -100,6 +100,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Cyberpunk Visualizer** | Animated equalizer bars in the floating player with cyan-to-magenta gradient. Bars bounce when playing, freeze on pause. Border glow pulse effect |
 | **PDF Export** | Export any tab to PDF (A4 landscape, Helvetica, auto-paginated, header with item count and timestamp) |
 | **TOML Export/Import** | Export/import all tabs in TOML format alongside JSON, CSV, TSV |
+| **BPM Estimation** | Estimates tempo for WAV and AIFF samples using onset-strength autocorrelation. Shown in the metadata panel with a loading spinner while computing. Cached in memory. BPM appears in the floating player meta line after detection |
 | **Command Palette** | Press <kbd>Cmd+K</kbd> to open a fuzzy search across all items — plugins, samples, DAW projects, presets, bookmarked directories, tags, tabs, and actions. Arrow keys to navigate, Enter to select, Escape to dismiss. Uses the same fzf scoring engine as tab search bars |
 | **Directory Bookmarks** | Bookmark favorite directories in the File Browser for instant navigation. Chips displayed above the file list, persisted across sessions. Right-click any folder to bookmark it |
 
@@ -139,7 +140,7 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (192 tests)
+### Rust tests (203 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -149,6 +150,7 @@ node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 | **scanner** | 24 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration, architecture detection |
 | **daw_scanner** | 19 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
 | **audio_scanner** | 18 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories |
+| **bpm** | 11 | WAV/AIFF PCM reading, onset-strength autocorrelation, click track detection (90/120/140 BPM), silence rejection, short file handling, 8/16-bit decode, stereo mixdown, extra chunk handling |
 | **xref** | 14 | Ableton .als gzip XML parsing (VST2/VST3/AU), REAPER .rpp plaintext parsing (VST/VST3/AU/CLAP), deduplication, sorting, error handling |
 | **preset_scanner** | 4 | Preset discovery, directory walking, stop signal, format detection |
 
@@ -248,6 +250,7 @@ src-tauri/
   src/
     main.rs            -- Tauri entry point
     lib.rs             -- IPC command handlers, export/import, file ops
+    bpm.rs             -- BPM estimation via onset-strength autocorrelation
     scanner.rs         -- Plugin filesystem scanner (VST2/VST3/AU)
     audio_scanner.rs   -- Audio sample discovery + metadata extraction
     daw_scanner.rs     -- DAW project scanner (14+ formats)

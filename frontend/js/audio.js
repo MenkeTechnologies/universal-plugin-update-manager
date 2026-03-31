@@ -610,6 +610,9 @@ async function toggleMetadata(filePath, event) {
     if (meta.duration) items += metaItem('Duration', formatTime(meta.duration));
     if (meta.byteRate) items += metaItem('Byte Rate', formatAudioSize(meta.byteRate) + '/s');
 
+    // BPM placeholder — filled async
+    items += `<div class="meta-item" id="metaBpmItem"><span class="meta-label">BPM</span><span class="meta-value" id="metaBpmValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
+
     items += metaItem('Created', new Date(meta.created).toLocaleString());
     items += metaItem('Modified', new Date(meta.modified).toLocaleString());
     items += metaItem('Accessed', new Date(meta.accessed).toLocaleString());
@@ -641,8 +644,43 @@ async function toggleMetadata(filePath, event) {
         if (timeLabel) timeLabel.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(audioPlayer.duration)}`;
       }
     }
+
+    // Estimate BPM async (WAV/AIFF only)
+    const bpmFormats = ['WAV', 'AIFF', 'AIF'];
+    if (bpmFormats.includes(meta.format)) {
+      estimateBpmForMeta(filePath);
+    } else {
+      const bpmEl = document.getElementById('metaBpmValue');
+      if (bpmEl) bpmEl.textContent = 'N/A (format not supported)';
+    }
   } catch (err) {
     metaRow.innerHTML = `<td colspan="6"><div class="audio-meta-panel"><span style="color: var(--red);">Failed to load metadata</span></div></td>`;
+  }
+}
+
+// BPM cache
+const _bpmCache = {};
+
+async function estimateBpmForMeta(filePath) {
+  const bpmEl = document.getElementById('metaBpmValue');
+  if (!bpmEl) return;
+
+  if (_bpmCache[filePath] !== undefined) {
+    bpmEl.textContent = _bpmCache[filePath] ? _bpmCache[filePath] + ' BPM' : '—';
+    return;
+  }
+
+  try {
+    const bpm = await window.vstUpdater.estimateBpm(filePath);
+    _bpmCache[filePath] = bpm;
+    // Check the panel is still showing this file
+    const currentBpmEl = document.getElementById('metaBpmValue');
+    const metaRow = document.getElementById('audioMetaRow');
+    if (currentBpmEl && metaRow && metaRow.getAttribute('data-meta-path') === filePath) {
+      currentBpmEl.textContent = bpm ? bpm + ' BPM' : '—';
+    }
+  } catch {
+    if (bpmEl) bpmEl.textContent = '—';
   }
 }
 
@@ -898,6 +936,7 @@ function updateMetaLine() {
   const sample = allAudioSamples.find(s => s.path === audioPlayerPath);
   if (!sample) { el.textContent = audioPlayerPath.split('/').pop(); return; }
   const parts = [sample.format, sample.sizeFormatted];
+  if (_bpmCache[audioPlayerPath]) parts.push(_bpmCache[audioPlayerPath] + ' BPM');
   if (sample.directory) parts.push(sample.directory);
   el.textContent = parts.join(' \u2022 ');
 }
