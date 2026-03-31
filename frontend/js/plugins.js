@@ -283,12 +283,22 @@ function renderPlugins(plugins) {
   list.innerHTML = plugins.map(p => buildPluginCardHtml(p)).join('');
 }
 
-// Debounce helper for search inputs
+// Debounce helper — fires immediately on first call, then debounces
 function debounce(fn, ms) {
   let timer;
+  let lastCall = 0;
   return function(...args) {
     clearTimeout(timer);
-    timer = setTimeout(() => fn.apply(this, args), ms);
+    const now = performance.now();
+    if (now - lastCall >= ms) {
+      lastCall = now;
+      fn.apply(this, args);
+    } else {
+      timer = setTimeout(() => {
+        lastCall = performance.now();
+        fn.apply(this, args);
+      }, ms);
+    }
   };
 }
 
