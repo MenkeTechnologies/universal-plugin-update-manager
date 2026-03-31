@@ -474,6 +474,8 @@ function clearAudioPlaybackUI() {
   np.classList.remove('np-playing');
   document.getElementById('npProgress').style.width = '0%';
   document.getElementById('npTime').textContent = '0:00 / 0:00';
+  const npCursor = document.getElementById('npCursor');
+  if (npCursor) npCursor.style.display = 'none';
   updatePlayBtnStates();
 }
 
@@ -510,7 +512,24 @@ function updatePlaybackTime() {
   const dur = audioPlayer.duration;
   document.getElementById('npTime').textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
   if (dur > 0) {
-    document.getElementById('npProgress').style.width = ((cur / dur) * 100) + '%';
+    const pct = (cur / dur) * 100;
+    document.getElementById('npProgress').style.width = pct + '%';
+    // Playback cursor — floating player
+    const npCursor = document.getElementById('npCursor');
+    if (npCursor) {
+      npCursor.style.display = '';
+      npCursor.style.left = pct + '%';
+    }
+    // Playback cursor — metadata panel
+    const metaWaveform = document.getElementById('metaWaveformBox');
+    if (metaWaveform && metaWaveform.dataset.path === audioPlayerPath) {
+      const fill = metaWaveform.querySelector('.waveform-progress-fill');
+      const cursor = metaWaveform.querySelector('.waveform-cursor');
+      const timeLabel = metaWaveform.querySelector('.waveform-time-label');
+      if (fill) fill.style.width = pct + '%';
+      if (cursor) cursor.style.left = pct + '%';
+      if (timeLabel) timeLabel.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+    }
   }
 }
 
@@ -596,7 +615,32 @@ async function toggleMetadata(filePath, event) {
     items += metaItem('Accessed', new Date(meta.accessed).toLocaleString());
     items += metaItem('Permissions', meta.permissions);
 
-    metaRow.innerHTML = `<td colspan="6"><div class="audio-meta-panel">${items}</div></td>`;
+    // Waveform preview with seek support
+    const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" data-action="seekMetaWaveform">
+      <canvas id="metaWaveformCanvas"></canvas>
+      <div class="waveform-progress-fill"></div>
+      <div class="waveform-cursor" style="left:0;"></div>
+      <div class="waveform-time-label">${meta.duration ? formatTime(meta.duration) : ''}</div>
+    </div>`;
+
+    metaRow.innerHTML = `<td colspan="6"><div class="audio-meta-panel">${waveformHtml}${items}</div></td>`;
+
+    // Draw waveform on the meta canvas
+    drawMetaWaveform(filePath);
+
+    // Sync cursor if already playing this track
+    if (audioPlayerPath === filePath && audioPlayer.duration > 0) {
+      const pct = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+      const box = document.getElementById('metaWaveformBox');
+      if (box) {
+        const fill = box.querySelector('.waveform-progress-fill');
+        const cursor = box.querySelector('.waveform-cursor');
+        const timeLabel = box.querySelector('.waveform-time-label');
+        if (fill) fill.style.width = pct + '%';
+        if (cursor) cursor.style.left = pct + '%';
+        if (timeLabel) timeLabel.textContent = `${formatTime(audioPlayer.currentTime)} / ${formatTime(audioPlayer.duration)}`;
+      }
+    }
   } catch (err) {
     metaRow.innerHTML = `<td colspan="6"><div class="audio-meta-panel"><span style="color: var(--red);">Failed to load metadata</span></div></td>`;
   }
@@ -790,6 +834,62 @@ function renderWaveformData(ctx, canvas, peaks) {
     ctx.fillStyle = `rgba(${r},${g},${b},0.6)`;
     ctx.fillRect(x, mid - barH, barW - 0.5, barH * 2);
   }
+}
+
+async function drawMetaWaveform(filePath) {
+  const canvas = document.getElementById('metaWaveformCanvas');
+  if (!canvas) return;
+  const container = canvas.parentElement;
+  canvas.width = container.offsetWidth * (window.devicePixelRatio || 1);
+  canvas.height = container.offsetHeight * (window.devicePixelRatio || 1);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (_waveformCache[filePath]) {
+    renderWaveformData(ctx, canvas, _waveformCache[filePath]);
+    return;
+  }
+
+  try {
+    if (!_audioCtx) _audioCtx = new AudioContext();
+    const src = convertFileSrc(filePath);
+    const resp = await fetch(src);
+    const buf = await resp.arrayBuffer();
+    const audioBuf = await _audioCtx.decodeAudioData(buf);
+    const raw = audioBuf.getChannelData(0);
+
+    const bars = Math.min(canvas.width, 300);
+    const step = Math.floor(raw.length / bars);
+    const peaks = [];
+    for (let i = 0; i < bars; i++) {
+      let max = 0;
+      const start = i * step;
+      for (let j = start; j < start + step && j < raw.length; j++) {
+        const abs = Math.abs(raw[j]);
+        if (abs > max) max = abs;
+      }
+      peaks.push(max);
+    }
+
+    _waveformCache[filePath] = peaks;
+    renderWaveformData(ctx, canvas, peaks);
+  } catch {
+    ctx.strokeStyle = 'rgba(5,217,232,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height / 2);
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+  }
+}
+
+function seekMetaWaveform(event) {
+  if (!audioPlayerPath || !audioPlayer.duration) return;
+  const box = document.getElementById('metaWaveformBox');
+  if (!box) return;
+  const rect = box.getBoundingClientRect();
+  const pct = (event.clientX - rect.left) / rect.width;
+  audioPlayer.currentTime = pct * audioPlayer.duration;
 }
 
 function updateMetaLine() {

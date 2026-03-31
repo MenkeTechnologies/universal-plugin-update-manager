@@ -92,6 +92,7 @@ document.addEventListener('click', (e) => {
     case 'toggleAudioPlayback': toggleAudioPlayback(); break;
     case 'toggleAudioLoop': toggleAudioLoop(); break;
     case 'seekAudio': seekAudio(e); break;
+    case 'seekMetaWaveform': seekMetaWaveform(e); break;
     case 'stopAudioPlayback': stopAudioPlayback(); break;
     case 'openUpdate': openUpdate(el.dataset.url); break;
     case 'openKvr': openKvr(el, el.dataset.url, el.dataset.name); break;
