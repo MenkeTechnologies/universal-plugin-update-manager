@@ -22,6 +22,12 @@ const ALL_IMPORT_FILTERS = [
 
 // ── Export Modal ──
 
+function exportFileName(label, count) {
+  const now = new Date();
+  const ts = now.toISOString().slice(0, 19).replace(/[T:]/g, '-');
+  return `audiohaxor-${label}-${count}items-${ts}`;
+}
+
 const EXPORT_FORMATS = [
   { id: 'json', label: 'JSON', ext: 'json', icon: '{ }', desc: 'Full data, re-importable' },
   { id: 'toml', label: 'TOML', ext: 'toml', icon: '[T]', desc: 'Human-readable config' },
@@ -152,7 +158,7 @@ function exportPlugins() {
   if (allPlugins.length === 0) return;
   _exportCtx = {
     title: 'Plugin Inventory',
-    defaultName: 'plugin-inventory',
+    defaultName: exportFileName('plugins', allPlugins.length),
     exportFn: async (fmt, filePath) => {
       if (fmt === 'pdf') {
         const headers = ['Name', 'Type', 'Version', 'Manufacturer', 'Architecture', 'Size', 'Modified'];
@@ -174,7 +180,7 @@ function exportAudio() {
   if (allAudioSamples.length === 0) return;
   _exportCtx = {
     title: 'Audio Samples',
-    defaultName: 'audio-samples',
+    defaultName: exportFileName('samples', allAudioSamples.length),
     exportFn: async (fmt, filePath) => {
       if (fmt === 'pdf') {
         const headers = ['Name', 'Format', 'Size', 'Modified', 'Path'];
@@ -196,7 +202,7 @@ function exportDaw() {
   if (allDawProjects.length === 0) return;
   _exportCtx = {
     title: 'DAW Projects',
-    defaultName: 'daw-projects',
+    defaultName: exportFileName('daw-projects', allDawProjects.length),
     exportFn: async (fmt, filePath) => {
       if (fmt === 'pdf') {
         const headers = ['Name', 'DAW', 'Format', 'Size', 'Modified', 'Path'];
@@ -218,7 +224,7 @@ function exportPresets() {
   if (allPresets.length === 0) return;
   _exportCtx = {
     title: 'Presets',
-    defaultName: 'presets',
+    defaultName: exportFileName('presets', allPresets.length),
     exportFn: async (fmt, filePath) => {
       if (fmt === 'pdf') {
         const headers = ['Name', 'Format', 'Size', 'Modified', 'Path'];
