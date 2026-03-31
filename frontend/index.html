@@ -1753,24 +1753,84 @@
     }
     .audio-now-playing.active { display: flex; }
 
-    /* Expanded player — centered, larger, with history */
+    /* Expanded player — larger, stays bottom-right, with history */
     .audio-now-playing.expanded {
-      top: 50%;
-      left: 50%;
-      bottom: auto;
-      right: auto;
-      transform: translate(-50%, -50%);
       width: 560px;
       max-height: 80vh;
-      padding: 20px 24px 16px;
+      padding: 0;
       box-shadow: 0 0 40px var(--cyan-glow), 0 8px 40px rgba(0,0,0,0.7);
       animation: none;
+    }
+    .audio-now-playing.expanded .np-toolbar {
+      display: flex;
+    }
+    .audio-now-playing.expanded .np-body {
+      padding: 14px 20px 16px;
+    }
+    .audio-now-playing.expanded #npCloseBtn {
+      display: none;
     }
     .audio-now-playing.expanded .now-playing-name {
       font-size: 16px;
     }
     .audio-now-playing.expanded .now-playing-waveform {
       height: 36px;
+    }
+
+    /* Player toolbar — only visible when expanded */
+    .np-toolbar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: rgba(5,217,232,0.05);
+      border-bottom: 1px solid var(--border);
+      -webkit-app-region: drag;
+      cursor: default;
+    }
+    .np-toolbar-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--cyan);
+      font-family: 'Orbitron', sans-serif;
+    }
+    .np-toolbar-actions {
+      display: flex;
+      gap: 4px;
+      -webkit-app-region: no-drag;
+    }
+    .np-toolbar-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: all 0.15s;
+    }
+    .np-toolbar-btn:hover {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      background: rgba(5,217,232,0.08);
+    }
+    .np-toolbar-btn.btn-close:hover {
+      color: var(--red);
+      border-color: var(--red);
+      background: rgba(255,7,58,0.08);
+    }
+
+    .np-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px 16px 12px;
     }
 
     .np-history {
@@ -2116,43 +2176,52 @@
 <body>
   <div class="ctx-menu" id="ctxMenu"></div>
   <div class="audio-now-playing" id="audioNowPlaying">
-    <div class="now-playing-header">
-      <span class="now-playing-name" id="npName"></span>
-      <button class="btn-small btn-stop" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;" title="Close">&#10005;</button>
-    </div>
-    <div class="now-playing-transport">
-      <div class="now-playing-controls">
-        <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause">&#9654;</button>
-        <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Loop">&#8634;</button>
-      </div>
-      <div class="now-playing-waveform" id="npWaveform" data-action="seekAudio">
-        <div class="now-playing-progress" id="npProgress"></div>
-      </div>
-      <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
-    </div>
-    <div class="now-playing-transport">
-      <div class="now-playing-volume">
-        <label>Vol</label>
-        <input type="range" class="volume-slider" id="npVolume" min="0" max="100" value="100" data-action="setVolume">
-        <span class="volume-pct" id="npVolumePct">100%</span>
-      </div>
-      <div class="now-playing-speed">
-        <label>Speed</label>
-        <select class="speed-select" id="npSpeed" data-action="setPlaybackSpeed">
-          <option value="0.25">0.25x</option>
-          <option value="0.5">0.5x</option>
-          <option value="0.75">0.75x</option>
-          <option value="1" selected>1x</option>
-          <option value="1.25">1.25x</option>
-          <option value="1.5">1.5x</option>
-          <option value="2">2x</option>
-        </select>
+    <div class="np-toolbar">
+      <span class="np-toolbar-title">&#9835; Audio Player</span>
+      <div class="np-toolbar-actions">
+        <button class="np-toolbar-btn" data-action="collapsePlayer" title="Minimize">&#9866;</button>
+        <button class="np-toolbar-btn btn-close" data-action="stopAudioPlayback" title="Close">&#10005;</button>
       </div>
     </div>
-    <div class="np-expand-hint">double-click to expand</div>
-    <div class="np-history" id="npHistory">
-      <div class="np-history-title">Recently Played</div>
-      <div id="npHistoryList"></div>
+    <div class="np-body">
+      <div class="now-playing-header">
+        <span class="now-playing-name" id="npName"></span>
+        <button class="btn-small btn-stop" id="npCloseBtn" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;" title="Close">&#10005;</button>
+      </div>
+      <div class="now-playing-transport">
+        <div class="now-playing-controls">
+          <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause">&#9654;</button>
+          <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Loop">&#8634;</button>
+        </div>
+        <div class="now-playing-waveform" id="npWaveform" data-action="seekAudio">
+          <div class="now-playing-progress" id="npProgress"></div>
+        </div>
+        <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
+      </div>
+      <div class="now-playing-transport">
+        <div class="now-playing-volume">
+          <label>Vol</label>
+          <input type="range" class="volume-slider" id="npVolume" min="0" max="100" value="100" data-action="setVolume">
+          <span class="volume-pct" id="npVolumePct">100%</span>
+        </div>
+        <div class="now-playing-speed">
+          <label>Speed</label>
+          <select class="speed-select" id="npSpeed" data-action="setPlaybackSpeed">
+            <option value="0.25">0.25x</option>
+            <option value="0.5">0.5x</option>
+            <option value="0.75">0.75x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+        </div>
+      </div>
+      <div class="np-expand-hint">double-click to expand</div>
+      <div class="np-history" id="npHistory">
+        <div class="np-history-title">Recently Played</div>
+        <div id="npHistoryList"></div>
+      </div>
     </div>
   </div>
   <div class="toast-container" id="toastContainer"></div>

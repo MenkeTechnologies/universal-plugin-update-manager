@@ -93,6 +93,7 @@ document.addEventListener('click', (e) => {
     case 'savePresetScanDirs': savePresetScanDirs(); break;
     case 'openPrefsFile': openPrefsFile(); break;
     case 'toggleRegex': toggleRegex(el); break;
+    case 'collapsePlayer': collapsePlayer(); break;
   }
 });
 document.addEventListener('dblclick', (e) => {

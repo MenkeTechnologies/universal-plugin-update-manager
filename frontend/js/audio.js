@@ -598,6 +598,10 @@ function togglePlayerExpanded() {
   }
 }
 
+function collapsePlayer() {
+  document.getElementById('audioNowPlaying').classList.remove('expanded');
+}
+
 // Double-click to expand/collapse player
 document.getElementById('audioNowPlaying').addEventListener('dblclick', (e) => {
   // Don't toggle if clicking controls
