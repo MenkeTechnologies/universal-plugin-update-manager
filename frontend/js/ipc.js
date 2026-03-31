@@ -47,6 +47,7 @@ listen('menu-action', (event) => {
     case 'toggle_loop': toggleAudioLoop(); break;
     case 'stop_playback': stopAudioPlayback(); break;
     case 'expand_player': togglePlayerExpanded(); break;
+    case 'next_track': nextTrack(); break;
     // Help
     case 'github': openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
     case 'docs': openUpdate('https://menketechnologies.github.io/universal-plugin-update-manager/'); break;

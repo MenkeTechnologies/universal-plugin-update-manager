@@ -2796,6 +2796,45 @@ pub fn run() {
                 }
             });
 
+            // System tray
+            use tauri::tray::*;
+            let tray_menu = MenuBuilder::new(app)
+                .text("tray_show", "Show AUDIO_HAXOR")
+                .separator()
+                .text("tray_scan_all", "Scan All")
+                .text("tray_stop_all", "Stop All")
+                .separator()
+                .text("tray_play_pause", "Play / Pause")
+                .text("tray_next", "Next Track")
+                .separator()
+                .text("tray_quit", "Quit")
+                .build()?;
+
+            let _tray = TrayIconBuilder::new()
+                .menu(&tray_menu)
+                .tooltip("AUDIO_HAXOR")
+                .on_menu_event(move |app_handle, event| {
+                    let id = event.id().as_ref();
+                    if id == "tray_quit" {
+                        app_handle.exit(0);
+                    } else if id == "tray_show" {
+                        if let Some(win) = app_handle.get_webview_window("main") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
+                    } else if let Some(win) = app_handle.get_webview_window("main") {
+                        let action = match id {
+                            "tray_scan_all" => "scan_all",
+                            "tray_stop_all" => "stop_all",
+                            "tray_play_pause" => "play_pause",
+                            "tray_next" => "next_track",
+                            _ => return,
+                        };
+                        let _ = win.emit("menu-action", action);
+                    }
+                })
+                .build(app)?;
+
             Ok(())
         })
         .run(tauri::generate_context!())

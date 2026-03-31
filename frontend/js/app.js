@@ -123,6 +123,8 @@
   }
 
   hideGlobalProgress();
+  renderWelcomeDashboard();
+  renderShortcutSettings();
   updateHeaderInfo();
   setInterval(updateHeaderInfo, 2000); // refresh process stats every 2s
 
@@ -135,6 +137,30 @@
     });
   }
 })();
+
+function renderWelcomeDashboard() {
+  const el = document.getElementById('welcomeDashboard');
+  if (!el) return;
+  const favCount = getFavorites().length;
+  const noteCount = Object.keys(getNotes()).length;
+  const tagCount = getAllTags().length;
+  const recentCount = recentlyPlayed.length;
+  el.innerHTML = [
+    { value: allPlugins.length, label: 'Plugins', color: 'var(--cyan)' },
+    { value: allAudioSamples.length, label: 'Samples', color: 'var(--yellow)' },
+    { value: allDawProjects.length, label: 'DAW Projects', color: 'var(--magenta)' },
+    { value: allPresets.length, label: 'Presets', color: 'var(--orange)' },
+    { value: favCount, label: 'Favorites', color: 'var(--yellow)' },
+    { value: noteCount, label: 'Notes', color: 'var(--green)' },
+    { value: tagCount, label: 'Tags', color: 'var(--accent)' },
+    { value: recentCount, label: 'Recently Played', color: 'var(--cyan)' },
+  ].filter(s => s.value > 0).map(s =>
+    `<div class="welcome-stat" style="border-left-color: ${s.color};">
+      <div class="welcome-stat-value" style="color: ${s.color};">${s.value}</div>
+      <div class="welcome-stat-label">${s.label}</div>
+    </div>`
+  ).join('');
+}
 
 function formatBytes(bytes) {
   if (!bytes || bytes === 0) return '0 B';
