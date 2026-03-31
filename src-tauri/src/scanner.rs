@@ -165,12 +165,11 @@ fn read_plist_info(_plugin_path: &Path) -> (Option<String>, Option<String>, Opti
 }
 
 /// Detect binary architectures for a plugin bundle.
-/// Uses `lipo -archs` on macOS, falls back to `file` command.
+/// Reads Mach-O headers directly — no subprocess spawning for speed.
 fn detect_architectures(plugin_path: &Path) -> Vec<String> {
     // Find the main binary inside the bundle
     let contents_macos = plugin_path.join("Contents").join("MacOS");
     let binary = if contents_macos.is_dir() {
-        // Pick the first executable in Contents/MacOS
         fs::read_dir(&contents_macos)
             .ok()
             .and_then(|entries| {
@@ -190,56 +189,78 @@ fn detect_architectures(plugin_path: &Path) -> Vec<String> {
         None => return Vec::new(),
     };
 
-    // Try lipo -archs (macOS only, works for universal binaries)
-    #[cfg(target_os = "macos")]
-    {
-        if let Ok(output) = std::process::Command::new("lipo")
-            .args(["-archs", &binary.to_string_lossy()])
-            .output()
-        {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let archs: Vec<String> = stdout
-                    .split_whitespace()
-                    .map(|a| match a {
-                        "arm64" | "arm64e" => "ARM64".to_string(),
-                        "x86_64" => "x86_64".to_string(),
-                        "i386" => "i386".to_string(),
-                        other => other.to_string(),
-                    })
-                    .collect();
-                if !archs.is_empty() {
-                    return archs;
-                }
-            }
-        }
+    // Read first 4KB — enough for all headers
+    let mut buf = [0u8; 4096];
+    let n = match fs::File::open(&binary).and_then(|mut f| {
+        use std::io::Read;
+        f.read(&mut buf)
+    }) {
+        Ok(n) => n,
+        Err(_) => return Vec::new(),
+    };
+    if n < 8 {
+        return Vec::new();
     }
 
-    // Fallback: read Mach-O / PE magic bytes
-    if let Ok(bytes) = fs::read(&binary) {
-        if bytes.len() >= 8 {
-            // Mach-O fat binary
-            let magic = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-            if magic == 0xCAFEBABE || magic == 0xBEBAFECA {
-                return vec!["Universal".to_string()];
-            }
-            // Mach-O thin
-            if bytes.len() >= 5 {
-                let mh_magic = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-                if mh_magic == 0xFEEDFACF {
-                    // 64-bit Mach-O
-                    let cpu_type = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
-                    return vec![match cpu_type {
-                        0x0100000C => "ARM64".to_string(),
-                        0x01000007 => "x86_64".to_string(),
-                        _ => format!("Mach-O({})", cpu_type),
-                    }];
-                }
-            }
-            // PE (Windows DLL)
-            if bytes[0] == b'M' && bytes[1] == b'Z' {
-                return vec!["x86_64".to_string()]; // Simplified
-            }
+    let magic = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]);
+
+    // Fat (universal) binary — parse arch list from fat header
+    if magic == 0xCAFEBABE || magic == 0xBEBAFECA {
+        let is_be = magic == 0xCAFEBABE;
+        let nfat = if is_be {
+            u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]])
+        } else {
+            u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]])
+        } as usize;
+        let mut archs = Vec::new();
+        for i in 0..nfat.min(10) {
+            let off = 8 + i * 20;
+            if off + 4 > n { break; }
+            let cpu = if is_be {
+                u32::from_be_bytes([buf[off], buf[off+1], buf[off+2], buf[off+3]])
+            } else {
+                u32::from_le_bytes([buf[off], buf[off+1], buf[off+2], buf[off+3]])
+            };
+            archs.push(match cpu {
+                0x0100000C => "ARM64".to_string(),
+                0x01000007 => "x86_64".to_string(),
+                7 => "i386".to_string(),
+                _ => format!("cpu:{}", cpu),
+            });
+        }
+        return archs;
+    }
+
+    // Thin Mach-O 64-bit
+    let mh_magic = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
+    if mh_magic == 0xFEEDFACF {
+        let cpu = u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]);
+        return vec![match cpu {
+            0x0100000C => "ARM64".to_string(),
+            0x01000007 => "x86_64".to_string(),
+            _ => format!("cpu:{}", cpu),
+        }];
+    }
+    // Thin Mach-O 32-bit
+    if mh_magic == 0xFEEDFACE {
+        let cpu = u32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]);
+        return vec![match cpu {
+            7 => "i386".to_string(),
+            _ => format!("cpu:{}", cpu),
+        }];
+    }
+
+    // PE (Windows DLL)
+    if buf[0] == b'M' && buf[1] == b'Z' && n >= 64 {
+        let pe_off = u32::from_le_bytes([buf[60], buf[61], buf[62], buf[63]]) as usize;
+        if pe_off + 6 <= n && buf[pe_off] == b'P' && buf[pe_off+1] == b'E' {
+            let machine = u16::from_le_bytes([buf[pe_off+4], buf[pe_off+5]]);
+            return vec![match machine {
+                0x8664 => "x86_64".to_string(),
+                0x014c => "i386".to_string(),
+                0xAA64 => "ARM64".to_string(),
+                _ => format!("pe:{}", machine),
+            }];
         }
     }
 
