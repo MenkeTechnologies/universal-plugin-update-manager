@@ -18,6 +18,7 @@ customDirs = ""
 audioScanDirs = ""
 dawScanDirs = ""
 presetScanDirs = ""
+includeAbletonBackups = "off"
 
 [sorting]
 pluginSort = "name-asc"

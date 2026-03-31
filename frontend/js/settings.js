@@ -472,6 +472,12 @@ function settingToggleSingleClickPlay() {
   refreshSettingsUI();
 }
 
+function settingToggleIncludeBackups() {
+  const current = prefs.getItem('includeAbletonBackups') === 'on';
+  prefs.setItem('includeAbletonBackups', current ? 'off' : 'on');
+  refreshSettingsUI();
+}
+
 function settingUpdatePageSize(val) {
   document.getElementById('settingPageSizeValue').textContent = val;
   prefs.setItem('pageSize', val);
@@ -592,6 +598,15 @@ function refreshSettingsUI() {
   if (singleClickBtn) {
     singleClickBtn.classList.toggle('active', singleClick);
     singleClickLabel.textContent = singleClick ? 'On' : 'Off';
+  }
+
+  // Include Ableton backups
+  const includeBackups = prefs.getItem('includeAbletonBackups') === 'on';
+  const backupsBtn = document.getElementById('settingIncludeBackups');
+  const backupsLabel = document.getElementById('settingIncludeBackupsLabel');
+  if (backupsBtn) {
+    backupsBtn.classList.toggle('active', includeBackups);
+    backupsLabel.textContent = includeBackups ? 'On' : 'Off';
   }
 
   // Page size

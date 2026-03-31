@@ -49,6 +49,11 @@ const SKIP_DIRS: &[&str] = &[
     "__pycache__",
 ];
 
+/// Additional directories to skip when not including Ableton backups.
+/// Ableton stores auto-saved backup Live Sets in a "Backup" folder
+/// inside each project directory.
+const BACKUP_DIRS: &[&str] = &["Backup"];
+
 pub fn format_size(bytes: u64) -> String {
     if bytes == 0 {
         return "0 B".into();
@@ -171,6 +176,7 @@ pub fn walk_for_daw(
     on_batch: &mut dyn FnMut(&[DawProject], usize),
     should_stop: &(dyn Fn() -> bool + Sync),
     exclude: Option<HashSet<String>>,
+    include_backups: bool,
 ) {
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
@@ -188,7 +194,7 @@ pub fn walk_for_daw(
                 return;
             }
             walk_dir_parallel(
-                root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude,
+                root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude, include_backups,
             );
         });
     });
@@ -215,6 +221,7 @@ fn walk_dir_parallel(
     batch_size: usize,
     stop: &Arc<AtomicBool>,
     exclude: &Arc<HashSet<String>>,
+    include_backups: bool,
 ) {
     if depth > 30 || stop.load(Ordering::Relaxed) {
         return;
@@ -243,6 +250,9 @@ fn walk_dir_parallel(
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
         if name_str.starts_with('.') || SKIP_DIRS.contains(&name_str.as_ref()) {
+            continue;
+        }
+        if !include_backups && BACKUP_DIRS.contains(&name_str.as_ref()) {
             continue;
         }
         let path = entry.path();
@@ -330,6 +340,7 @@ fn walk_dir_parallel(
             batch_size,
             stop,
             exclude,
+            include_backups,
         );
     });
 }
@@ -427,6 +438,7 @@ mod tests {
             },
             &|| false,
             None,
+            false,
         );
         assert_eq!(total, 0);
         let _ = fs::remove_dir_all(&tmp);
@@ -448,6 +460,7 @@ mod tests {
             },
             &|| false,
             None,
+            false,
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("mysong.als"));
@@ -473,6 +486,7 @@ mod tests {
             },
             &|| false,
             None,
+            false,
         );
         assert_eq!(found.len(), 3);
         let formats: Vec<&str> = found.iter().map(|d| d.format.as_str()).collect();
@@ -497,6 +511,7 @@ mod tests {
             },
             &|| true,
             None,
+            false,
         );
         assert_eq!(found.len(), 0);
         let _ = fs::remove_dir_all(&tmp);
@@ -519,6 +534,7 @@ mod tests {
             },
             &|| false,
             None,
+            false,
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("visible"));
@@ -548,6 +564,7 @@ mod tests {
             },
             &|| false,
             None,
+            false,
         );
         assert_eq!(found.len(), 2);
         let formats: Vec<&str> = found.iter().map(|d| d.format.as_str()).collect();
@@ -574,6 +591,7 @@ mod tests {
             },
             &|| false,
             None,
+            false,
         );
         assert!(
             batch_call_count >= 2,
@@ -604,6 +622,7 @@ mod tests {
                 },
                 &|| false,
                 None,
+                false,
             );
             let count = found.iter().filter(|d| d.name == "test").count();
             assert_eq!(

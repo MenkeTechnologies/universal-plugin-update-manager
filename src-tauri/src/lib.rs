@@ -634,6 +634,13 @@ async fn scan_daw_projects(
             },
             &|| daw_state.stop_scan.load(Ordering::SeqCst),
             exclude_set,
+            {
+                let prefs = history::load_preferences();
+                prefs.get("includeAbletonBackups")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s == "on")
+                    .unwrap_or(false)
+            },
         );
 
         let root_strs: Vec<String> = roots
