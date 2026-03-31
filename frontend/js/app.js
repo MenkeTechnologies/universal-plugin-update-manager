@@ -37,6 +37,7 @@
   restoreSettings();
   initTabDragReorder();
   initMultiFilters();
+  initSortPersistence();
 
   try {
     const latest = await window.vstUpdater.getLatestScan();

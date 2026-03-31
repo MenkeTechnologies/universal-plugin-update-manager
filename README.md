@@ -84,6 +84,13 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Floating Player** | Draggable audio player that docks to any corner (drag the handle or toolbar to reposition, snaps to nearest quadrant). Features play/pause, loop, seek bar, volume slider, and playback speed (0.25x-2x). Double-click to expand with recently played history (up to 50 tracks). Dock position persists across sessions |
 | **Context Menus** | Right-click context menus on every interactive element -- plugins (KVR, manufacturer, reveal, copy), samples (play, loop, reveal, copy), DAW projects (open in DAW, reveal, copy), presets (reveal, copy), and history entries (view, delete) |
 | **Toast Notifications** | Slide-in notifications for actions like opening DAW projects or revealing files in Finder |
+| **Disk Usage** | Stacked bar charts showing space breakdown by format/type per tab. Visual representation of storage usage with color-coded legends |
+| **Batch Selection** | Checkbox column in all tables for multi-item operations. Select all/deselect, batch favorite, copy paths, export selected as JSON |
+| **Duplicate Detection** | Find duplicate files by name+size across plugins, samples, DAW projects, and presets. Modal report grouped by type with full paths |
+| **Notes & Tags** | Add notes and comma-separated tags to any item via right-click. Notes persisted in preferences with note indicator icon on tagged items |
+| **Keyboard Navigation** | Arrow keys/j/k to navigate table rows, Enter to activate, Space to play samples, Home/End to jump. Visual selection highlight |
+| **Help Overlay** | Press <kbd>?</kbd> to show a keyboard shortcuts reference overlay covering navigation, actions, search operators, and mouse interactions |
+| **Sort Persistence** | Last-used sort column and direction saved per tab, restored on app restart |
 
 ---
 

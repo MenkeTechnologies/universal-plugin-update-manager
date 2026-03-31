@@ -145,6 +145,7 @@ document.addEventListener('contextmenu', (e) => {
       '---',
       ...[(() => { const f = isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
         action: () => f ? removeFavorite(path) : addFavorite('preset', path, name, { format: presetRow.querySelector('.format-badge')?.textContent }) }; })()],
+      { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
     ];
     showContextMenu(e, items);
     return;
@@ -240,6 +241,8 @@ document.addEventListener('contextmenu', (e) => {
       items.push({ icon: '&#8613;', label: 'Import Presets', action: () => importPresets() });
     }
     if (items.length) {
+      items.push('---');
+      items.push({ icon: '&#128270;', label: 'Find Duplicates', action: () => showDuplicateReport() });
       showContextMenu(e, items);
       return;
     }
