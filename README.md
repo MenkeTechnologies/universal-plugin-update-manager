@@ -61,24 +61,26 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | Module | Function |
 |--------|----------|
 | **Plugin Scanner** | Detects VST2, VST3, and AU plugins from platform-specific directories on macOS, Windows, and Linux. Runs in a background worker thread -- UI stays fully responsive |
-| **Audio Scanner** | Discovers audio samples (WAV, FLAC, AIFF, MP3, OGG, etc.) with metadata extraction, file size formatting, and symlink deduplication. Inline audio preview via Tauri's native `asset://` protocol |
+| **Audio Scanner** | Discovers audio samples (WAV, FLAC, AIFF, MP3, OGG, etc.) with metadata extraction, file size formatting, and symlink deduplication. Double-click any sample row to start playback. Floating music player with volume, playback speed, seek bar, and loop controls persists across all tabs |
 | **DAW Scanner** | Finds DAW project files across 14+ formats -- Ableton (.als), Logic (.logicx), FL Studio (.flp), REAPER (.rpp), Cubase/Nuendo (.cpr/.npr), Pro Tools (.ptx/.ptf), Bitwig (.bwproject), Studio One (.song), Reason (.reason), Audacity (.aup/.aup3), GarageBand (.band), Ardour (.ardour), and dawproject (.dawproject). Double-click any project row to open it directly in its DAW |
 | **Version Intel** | Reads version, manufacturer, and website URL from macOS bundle plists (`CFBundleShortVersionString`, `CFBundleIdentifier`, `NSHumanReadableCopyright`) |
 | **Update Checker** | Searches [KVR Audio](https://www.kvraudio.com) for each plugin's latest version. Falls back to DuckDuckGo site-restricted KVR search. Runs in a worker thread with rate limiting and streams results back incrementally |
-| **KVR Integration** | Yellow KVR button on every plugin links directly to its KVR Audio product page. URL is constructed from plugin name + manufacturer with smart slug generation (camelCase splitting, manufacturer lookup table). Falls back to KVR search if the direct URL doesn't exist |
+| **KVR Integration** | Yellow KVR button on every plugin links directly to its KVR Audio product page. Double-click any plugin card to open it on KVR. URL is constructed from plugin name + manufacturer with smart slug generation (camelCase splitting, manufacturer lookup table). Falls back to KVR search if the direct URL doesn't exist |
 | **KVR Cache** | Resolved KVR data (product URLs, download links, versions) is persisted to `kvr-cache.json`. On restart, cached results are restored instantly and the background resolver resumes from where it left off |
 | **Download Button** | Green download button appears on plugins with a confirmed newer version and a KVR download link (platform-specific when available) |
 | **Export/Import** | Export plugin lists to JSON, CSV, or TSV via native file dialogs. Import previously exported scans |
 | **Scan History** | Stores up to 50 scan snapshots locally (plugins, audio, and DAW scans merged) with full diff support between any two scans |
 | **Batch Updater** | Walk through all outdated plugins one by one with skip/open controls |
 | **Manufacturer Link** | Globe button on each plugin opens the manufacturer's website directly (derived from bundle ID). Shows a disabled icon when no website is available |
-| **Reveal in Finder** | Folder button opens the plugin's filesystem location. Tooltip shows the full path on hover |
+| **Reveal in Finder** | Folder button opens the plugin's filesystem location. Double-click any preset row to reveal it in Finder. Tooltip shows the full path on hover |
 | **Directory Breakdown** | Expandable table showing plugin counts and type breakdown per scanned directory |
 | **Stop Control** | Cancel any in-progress scan, update check, or KVR resolution without losing already-discovered results |
 | **Auto-Restore** | Last scan results + KVR cache load automatically on app startup -- no need to re-scan or re-check every launch |
 | **Unknown Tracking** | Plugins where no version info was found online show "Unknown Latest" badge and are counted separately from "Up to Date" |
 | **Color Schemes** | Multiple themes including cyberpunk (default), light mode, and custom schemes with configurable CSS variables |
 | **Resizable Columns** | Drag column borders to resize. Widths persist across sessions |
+| **Floating Player** | Cyberpunk-styled floating audio player in the bottom-right corner with play/pause, loop, seek bar, volume slider, and playback speed (0.25x-2x). Persists across tab switches |
+| **Toast Notifications** | Slide-in notifications for actions like opening DAW projects or revealing files in Finder |
 
 ---
 

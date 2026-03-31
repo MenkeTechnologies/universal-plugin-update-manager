@@ -458,6 +458,16 @@ function seekAudio(event) {
   audioPlayer.currentTime = pct * audioPlayer.duration;
 }
 
+function setAudioVolume(value) {
+  const vol = parseInt(value, 10) / 100;
+  audioPlayer.volume = Math.max(0, Math.min(1, vol));
+  document.getElementById('npVolumePct').textContent = value + '%';
+}
+
+function setPlaybackSpeed(value) {
+  audioPlayer.playbackRate = parseFloat(value);
+}
+
 // ── Metadata Panel ──
 async function toggleMetadata(filePath, event) {
   // Don't toggle if clicking buttons

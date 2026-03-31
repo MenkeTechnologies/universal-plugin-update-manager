@@ -94,16 +94,49 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('dblclick', (e) => {
-  const row = e.target.closest('#dawTableBody tr[data-daw-path]');
-  if (row) {
+  // DAW projects — open in DAW
+  const dawRow = e.target.closest('#dawTableBody tr[data-daw-path]');
+  if (dawRow) {
     e.preventDefault();
-    const filePath = row.dataset.dawPath;
-    const name = row.querySelector('.col-name')?.textContent || filePath.split('/').pop();
-    row.classList.remove('row-opening');
-    void row.offsetWidth;
-    row.classList.add('row-opening');
+    const filePath = dawRow.dataset.dawPath;
+    const name = dawRow.querySelector('.col-name')?.textContent || filePath.split('/').pop();
+    dawRow.classList.remove('row-opening');
+    void dawRow.offsetWidth;
+    dawRow.classList.add('row-opening');
     showToast(`Opening ${name}...`);
     window.vstUpdater.openDawProject(filePath);
+    return;
+  }
+
+  // Audio samples — start playback
+  const audioRow = e.target.closest('#audioTableBody tr[data-audio-path]');
+  if (audioRow && !e.target.closest('.col-actions')) {
+    e.preventDefault();
+    previewAudio(audioRow.getAttribute('data-audio-path'));
+    return;
+  }
+
+  // Plugins — open on KVR
+  const pluginCard = e.target.closest('#pluginList .plugin-card');
+  if (pluginCard && !e.target.closest('.plugin-actions')) {
+    e.preventDefault();
+    const kvrBtn = pluginCard.querySelector('[data-action="openKvr"]');
+    if (kvrBtn) {
+      openKvr(kvrBtn, kvrBtn.dataset.url, kvrBtn.dataset.name);
+    }
+    return;
+  }
+
+  // Presets — reveal in Finder
+  const presetRow = e.target.closest('#presetTableBody tr');
+  if (presetRow && !e.target.closest('.col-actions')) {
+    e.preventDefault();
+    const folderBtn = presetRow.querySelector('[data-action="openPresetFolder"]');
+    if (folderBtn) {
+      openPresetFolder(folderBtn.dataset.path);
+      showToast('Revealing preset in Finder...');
+    }
+    return;
   }
 });
 document.addEventListener('input', (e) => {
@@ -112,6 +145,7 @@ document.addEventListener('input', (e) => {
   else if (action === 'filterAudioSamples') filterAudioSamples();
   else if (action === 'filterDawProjects') filterDawProjects();
   else if (action === 'filterPresets') filterPresets();
+  else if (action === 'setVolume') setAudioVolume(e.target.value);
   else if (action === 'settingPageSize') settingUpdatePageSize(e.target.value);
   else if (action === 'settingFlushInterval') settingUpdateFlushInterval(e.target.value);
 });
@@ -121,6 +155,7 @@ document.addEventListener('change', (e) => {
   else if (action === 'filterAudioSamples') filterAudioSamples();
   else if (action === 'filterDawProjects') filterDawProjects();
   else if (action === 'filterPresets') filterPresets();
+  else if (action === 'setPlaybackSpeed') setPlaybackSpeed(e.target.value);
   else if (action === 'settingDefaultTypeFilter') settingSaveSelect('defaultTypeFilter', e.target.value);
   else if (action === 'settingPluginSort') settingSaveSelect('pluginSort', e.target.value);
   else if (action === 'settingAudioSort') settingSaveSelect('audioSort', e.target.value);

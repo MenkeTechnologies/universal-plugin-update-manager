@@ -813,6 +813,7 @@
       margin-bottom: 6px;
       transition: all 0.2s;
       position: relative;
+      cursor: pointer;
     }
 
     .plugin-card::before {
@@ -1707,24 +1708,45 @@
     /* Now-playing bar */
     .audio-now-playing {
       display: none;
-      padding: 8px 24px;
-      background: linear-gradient(90deg, rgba(57,255,20,0.08), rgba(5,217,232,0.05));
-      border-top: 1px solid var(--border);
-      align-items: center;
-      gap: 12px;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      width: 360px;
+      padding: 14px 16px 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--cyan);
+      border-radius: 2px;
+      box-shadow: 0 0 20px var(--cyan-glow), 0 4px 24px rgba(0,0,0,0.5);
+      flex-direction: column;
+      gap: 10px;
       font-size: 11px;
       -webkit-app-region: no-drag;
+      animation: toast-in 0.3s ease-out;
     }
     .audio-now-playing.active { display: flex; }
+
+    .now-playing-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
 
     .now-playing-name {
       font-weight: 600;
       color: var(--cyan);
-      flex-shrink: 0;
-      max-width: 300px;
+      flex: 1;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .now-playing-transport {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .now-playing-waveform {
@@ -1755,6 +1777,74 @@
     .now-playing-controls {
       display: flex; gap: 6px;
       flex-shrink: 0;
+    }
+
+    .now-playing-volume {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .now-playing-volume label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .volume-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 80px;
+      height: 4px;
+      background: var(--border);
+      outline: none;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan-glow);
+      cursor: pointer;
+    }
+
+    .volume-pct {
+      font-size: 10px;
+      font-family: 'Orbitron', sans-serif;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      min-width: 30px;
+    }
+
+    .now-playing-speed {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .now-playing-speed label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .speed-select {
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-size: 10px;
+      font-family: inherit;
+      padding: 2px 4px;
+      cursor: pointer;
+      border-radius: 2px;
     }
 
     /* Metadata detail row */
@@ -1851,6 +1941,41 @@
   </style>
 </head>
 <body>
+  <div class="audio-now-playing" id="audioNowPlaying">
+    <div class="now-playing-header">
+      <span class="now-playing-name" id="npName"></span>
+      <button class="btn-small btn-stop" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;" title="Close">&#10005;</button>
+    </div>
+    <div class="now-playing-transport">
+      <div class="now-playing-controls">
+        <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause">&#9654;</button>
+        <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Loop">&#8634;</button>
+      </div>
+      <div class="now-playing-waveform" id="npWaveform" data-action="seekAudio">
+        <div class="now-playing-progress" id="npProgress"></div>
+      </div>
+      <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
+    </div>
+    <div class="now-playing-transport">
+      <div class="now-playing-volume">
+        <label>Vol</label>
+        <input type="range" class="volume-slider" id="npVolume" min="0" max="100" value="100" data-action="setVolume">
+        <span class="volume-pct" id="npVolumePct">100%</span>
+      </div>
+      <div class="now-playing-speed">
+        <label>Speed</label>
+        <select class="speed-select" id="npSpeed" data-action="setPlaybackSpeed">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+        </select>
+      </div>
+    </div>
+  </div>
   <div class="toast-container" id="toastContainer"></div>
   <div class="crt-scanline"></div>
   <div class="app">
@@ -2053,18 +2178,6 @@
             <h2>Audio Sample Index</h2>
             <p>Click <strong>"Scan Samples"</strong> to find all audio files (WAV, MP3, AIFF, FLAC, etc.) on your system.</p>
           </div>
-        </div>
-        <div class="audio-now-playing" id="audioNowPlaying">
-          <div class="now-playing-controls">
-            <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause">&#9654;</button>
-            <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Loop">&#8634;</button>
-          </div>
-          <span class="now-playing-name" id="npName"></span>
-          <div class="now-playing-waveform" id="npWaveform" data-action="seekAudio">
-            <div class="now-playing-progress" id="npProgress"></div>
-          </div>
-          <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
-          <button class="btn-small btn-stop" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;">&#10005;</button>
         </div>
       </div>
     </div>
