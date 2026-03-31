@@ -14,7 +14,7 @@ pub struct PluginInfo {
     pub manufacturer_url: Option<String>,
     pub size: String,
     pub modified: String,
-    #[serde(rename = "architectures")]
+    #[serde(rename = "architectures", default)]
     pub architectures: Vec<String>,
 }
 
