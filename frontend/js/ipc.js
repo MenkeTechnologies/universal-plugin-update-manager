@@ -97,7 +97,13 @@ document.addEventListener('dblclick', (e) => {
   const row = e.target.closest('#dawTableBody tr[data-daw-path]');
   if (row) {
     e.preventDefault();
-    window.vstUpdater.openDawProject(row.dataset.dawPath);
+    const filePath = row.dataset.dawPath;
+    const name = row.querySelector('.col-name')?.textContent || filePath.split('/').pop();
+    row.classList.remove('row-opening');
+    void row.offsetWidth;
+    row.classList.add('row-opening');
+    showToast(`Opening ${name}...`);
+    window.vstUpdater.openDawProject(filePath);
   }
 });
 document.addEventListener('input', (e) => {
@@ -154,6 +160,15 @@ document.addEventListener('keydown', (e) => {
     if (idx < tabs.length) switchTab(tabs[idx]);
   }
 });
+
+function showToast(message, duration = 2500) {
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
 
 window.vstUpdater = {
   getVersion: () => invoke('get_version'),

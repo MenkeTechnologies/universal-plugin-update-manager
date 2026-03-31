@@ -1804,9 +1804,54 @@
     .audio-table .row-expanded td {
       border-bottom-color: transparent;
     }
+
+    /* Toast notifications */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 10px 18px;
+      border-radius: 2px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Orbitron', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      border: 1px solid var(--cyan);
+      background: var(--bg-primary);
+      box-shadow: 0 0 15px var(--cyan-glow), 0 0 30px rgba(5,217,232,0.1);
+      animation: toast-in 0.3s ease-out, toast-out 0.3s ease-in 2.2s forwards;
+      pointer-events: auto;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(40px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes toast-out {
+      from { opacity: 1; transform: translateX(0); }
+      to   { opacity: 0; transform: translateX(40px); }
+    }
+
+    /* Row open flash */
+    @keyframes row-open-flash {
+      0%   { background: rgba(5,217,232,0.15); }
+      100% { background: transparent; }
+    }
+    .row-opening {
+      animation: row-open-flash 0.8s ease-out;
+    }
   </style>
 </head>
 <body>
+  <div class="toast-container" id="toastContainer"></div>
   <div class="crt-scanline"></div>
   <div class="app">
     <div class="header">
