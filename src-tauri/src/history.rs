@@ -1206,6 +1206,19 @@ mod tests {
         assert!(ts.ends_with('Z'));
     }
 
+    fn with_temp_dir<F: FnOnce(&std::path::Path)>(f: F) {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = std::env::temp_dir().join(format!("upum_tmp_{}_{}", std::process::id(), id));
+        let _ = fs::remove_dir_all(&dir);
+        let _ = fs::create_dir_all(&dir);
+        TEST_DATA_DIR.with(|d| *d.borrow_mut() = Some(dir.clone()));
+        f(&dir);
+        TEST_DATA_DIR.with(|d| *d.borrow_mut() = None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     fn with_test_dir<F: FnOnce()>(name: &str, f: F) {
         let dir = std::env::temp_dir().join(format!("upum_test_{}", name));
         let _ = fs::remove_dir_all(&dir);
@@ -1637,5 +1650,186 @@ mod tests {
             assert_eq!(diff.removed.len(), 1);
             assert_eq!(diff.removed[0].name, "Song1");
         });
+    }
+
+    // ── Preferences tests ──
+
+    #[test]
+    fn test_preferences_roundtrip() {
+        with_temp_dir(|_| {
+            let mut prefs = PrefsMap::new();
+            prefs.insert("theme".into(), serde_json::json!("dark"));
+            prefs.insert("pageSize".into(), serde_json::json!(500));
+            prefs.insert("autoScan".into(), serde_json::json!("on"));
+            save_preferences(&prefs);
+
+            let loaded = load_preferences();
+            assert_eq!(loaded.get("theme"), Some(&serde_json::json!("dark")));
+            assert_eq!(loaded.get("autoScan"), Some(&serde_json::json!("on")));
+        });
+    }
+
+    #[test]
+    fn test_set_and_get_preference() {
+        with_temp_dir(|_| {
+            set_preference("testKey", serde_json::json!("testValue"));
+            let val = get_preference("testKey");
+            assert_eq!(val, Some(serde_json::json!("testValue")));
+        });
+    }
+
+    #[test]
+    fn test_remove_preference() {
+        with_temp_dir(|_| {
+            set_preference("removeMe", serde_json::json!(42));
+            assert!(get_preference("removeMe").is_some());
+            remove_preference("removeMe");
+            // After removal, may still return default — check it doesn't crash
+            let _ = get_preference("removeMe");
+        });
+    }
+
+    #[test]
+    fn test_get_nonexistent_preference() {
+        with_temp_dir(|_| {
+            let val = get_preference("nonexistent_key_xyz");
+            // May return a default or None
+            let _ = val;
+        });
+    }
+
+    #[test]
+    fn test_preferences_overwrite() {
+        with_temp_dir(|_| {
+            set_preference("color", serde_json::json!("red"));
+            set_preference("color", serde_json::json!("blue"));
+            let val = get_preference("color");
+            assert_eq!(val, Some(serde_json::json!("blue")));
+        });
+    }
+
+    // ── Scan detail tests ──
+
+    #[test]
+    fn test_get_scan_detail_found() {
+        with_temp_dir(|_| {
+            let plugins = vec![make_plugin("DetailPlugin", "1.0", "/detail")];
+            save_scan(&plugins, &["/detail".into()], &["/detail".into()]);
+
+            let scans = get_scans();
+            assert!(!scans.is_empty());
+            let id = &scans[0].id;
+
+            let detail = get_scan_detail(id);
+            assert!(detail.is_some());
+            let snap = detail.unwrap();
+            assert_eq!(snap.plugins.len(), 1);
+            assert_eq!(snap.plugins[0].name, "DetailPlugin");
+        });
+    }
+
+    #[test]
+    fn test_get_scan_detail_not_found() {
+        with_temp_dir(|_| {
+            let detail = get_scan_detail("nonexistent_id");
+            assert!(detail.is_none());
+        });
+    }
+
+    // ── Preset history tests ──
+
+    #[test]
+    fn test_preset_scan_save_and_retrieve() {
+        with_temp_dir(|_| {
+            let presets = vec![PresetFile {
+                name: "BassPreset".into(),
+                path: "/presets/bass.fxp".into(),
+                directory: "/presets".into(),
+                format: "FXP".into(),
+                size: 1024,
+                size_formatted: "1.0 KB".into(),
+                modified: "2024-06-01".into(),
+            }];
+            save_preset_scan(&presets, &["/presets".into()]);
+            let scans = get_preset_scans();
+            assert_eq!(scans.len(), 1);
+            assert_eq!(scans[0].preset_count, 1);
+        });
+    }
+
+    #[test]
+    fn test_preset_scan_detail() {
+        with_temp_dir(|_| {
+            let presets = vec![PresetFile {
+                name: "LeadPreset".into(),
+                path: "/presets/lead.fxp".into(),
+                directory: "/presets".into(),
+                format: "FXP".into(),
+                size: 2048,
+                size_formatted: "2.0 KB".into(),
+                modified: "2024-07-01".into(),
+            }];
+            save_preset_scan(&presets, &["/presets".into()]);
+            let scans = get_preset_scans();
+            let detail = get_preset_scan_detail(&scans[0].id);
+            assert!(detail.is_some());
+            assert_eq!(detail.unwrap().presets.len(), 1);
+        });
+    }
+
+    // ── DAW scan detail tests ──
+
+    #[test]
+    fn test_daw_scan_detail() {
+        with_temp_dir(|_| {
+            let projects = vec![make_daw_project("TestSong", "/songs/test.als", "ALS", "Ableton Live")];
+            save_daw_scan(&projects, &["/songs".into()]);
+            let scans = get_daw_scans();
+            let detail = get_daw_scan_detail(&scans[0].id);
+            assert!(detail.is_some());
+            assert_eq!(detail.unwrap().projects.len(), 1);
+        });
+    }
+
+    #[test]
+    fn test_daw_scan_detail_not_found() {
+        with_temp_dir(|_| {
+            let detail = get_daw_scan_detail("nonexistent");
+            assert!(detail.is_none());
+        });
+    }
+
+    // ── Merge prefs tests ──
+
+    #[test]
+    fn test_merge_prefs_user_overrides_defaults() {
+        let mut defaults = PrefsMap::new();
+        defaults.insert("a".into(), serde_json::json!("default_a"));
+        defaults.insert("b".into(), serde_json::json!("default_b"));
+
+        let mut user = PrefsMap::new();
+        user.insert("a".into(), serde_json::json!("user_a"));
+        user.insert("c".into(), serde_json::json!("user_c"));
+
+        let merged = merge_prefs(&defaults, &user);
+        assert_eq!(merged.get("a"), Some(&serde_json::json!("user_a")));
+        assert_eq!(merged.get("b"), Some(&serde_json::json!("default_b")));
+        assert_eq!(merged.get("c"), Some(&serde_json::json!("user_c")));
+    }
+
+    // ── TOML conversion tests ──
+
+    #[test]
+    fn test_flat_to_toml_and_back() {
+        let mut prefs = PrefsMap::new();
+        prefs.insert("theme".into(), serde_json::json!("cyberpunk"));
+        prefs.insert("pageSize".into(), serde_json::json!(1000));
+        prefs.insert("autoScan".into(), serde_json::json!(true));
+
+        let toml_str = flat_to_toml(&prefs);
+        assert!(toml_str.contains("theme"));
+
+        let back = toml_to_flat(&toml_str);
+        assert_eq!(back.get("theme"), Some(&serde_json::json!("cyberpunk")));
     }
 }

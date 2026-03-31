@@ -1,3 +1,18 @@
+//! AUDIO_HAXOR — Tauri v2 desktop app for audio plugin management.
+//!
+//! This crate provides the Rust backend for scanning audio plugins (VST2/VST3/AU),
+//! audio samples, DAW project files, and presets. It includes KVR Audio version
+//! checking, scan history with diffing, and export to JSON/TOML/CSV/TSV/PDF.
+//!
+//! # Modules
+//!
+//! - [`scanner`] — Plugin filesystem scanner with architecture detection
+//! - [`audio_scanner`] — Audio sample discovery and metadata extraction
+//! - [`daw_scanner`] — DAW project scanner (14+ formats)
+//! - [`preset_scanner`] — Plugin preset discovery
+//! - [`kvr`] — KVR Audio scraper and version checker
+//! - [`history`] — Scan history persistence, diffing, and preferences
+
 pub mod audio_scanner;
 pub mod daw_scanner;
 pub mod history;
@@ -2193,8 +2208,18 @@ pub fn run() {
                 &view_sep2, &reset_columns, &reset_tabs,
             ])?;
 
+            // Playback menu
+            let play_pause = MenuItem::with_id(handle, "play_pause", "Play / Pause", true, Some("Space"))?;
+            let toggle_loop = MenuItem::with_id(handle, "toggle_loop", "Toggle Loop", true, Some("CmdOrCtrl+L"))?;
+            let stop_playback = MenuItem::with_id(handle, "stop_playback", "Stop Playback", true, Some("CmdOrCtrl+Shift+."))?;
+            let expand_player = MenuItem::with_id(handle, "expand_player", "Expand / Collapse Player", true, Some("CmdOrCtrl+Shift+M"))?;
+
+            let playback_menu = Submenu::with_id_and_items(handle, "playback", "Playback", true, &[
+                &play_pause, &toggle_loop, &stop_playback, &expand_player,
+            ])?;
+
             // Data menu
-            let clear_history = MenuItem::with_id(handle, "clear_history", "Clear All History...", true, None::<&str>)?;
+            let clear_history = MenuItem::with_id(handle, "clear_history", "Clear All History...", true, Some("CmdOrCtrl+Shift+Delete"))?;
             let clear_kvr = MenuItem::with_id(handle, "clear_kvr", "Clear KVR Cache...", true, None::<&str>)?;
             let clear_favorites = MenuItem::with_id(handle, "clear_favorites", "Clear Favorites...", true, None::<&str>)?;
 
@@ -2202,16 +2227,28 @@ pub fn run() {
                 &clear_history, &clear_kvr, &clear_favorites,
             ])?;
 
+            // Window menu
+            let minimize = PredefinedMenuItem::minimize(handle, None)?;
+            let zoom = PredefinedMenuItem::maximize(handle, None)?;
+            let win_sep = PredefinedMenuItem::separator(handle)?;
+            let close_win = PredefinedMenuItem::close_window(handle, None)?;
+
+            let window_menu = Submenu::with_id_and_items(handle, "window", "Window", true, &[
+                &minimize, &zoom, &win_sep, &close_win,
+            ])?;
+
             // Help menu
             let github = MenuItem::with_id(handle, "github", "GitHub Repository", true, None::<&str>)?;
+            let docs = MenuItem::with_id(handle, "docs", "Documentation", true, None::<&str>)?;
+            let help_sep = PredefinedMenuItem::separator(handle)?;
             let about = PredefinedMenuItem::about(handle, Some("About AUDIO_HAXOR"), None)?;
 
             let help_menu = Submenu::with_id_and_items(handle, "help", "Help", true, &[
-                &github, &about,
+                &github, &docs, &help_sep, &about,
             ])?;
 
             let menu = Menu::with_items(handle, &[
-                &file_menu, &edit_menu, &scan_menu, &view_menu, &data_menu, &help_menu,
+                &file_menu, &edit_menu, &scan_menu, &view_menu, &playback_menu, &data_menu, &window_menu, &help_menu,
             ])?;
             app.set_menu(menu)?;
 

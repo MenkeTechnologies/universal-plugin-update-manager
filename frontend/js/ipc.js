@@ -41,8 +41,14 @@ listen('menu-action', (event) => {
     case 'clear_history': settingClearAllHistory(); break;
     case 'clear_kvr': settingClearKvrCache(); break;
     case 'clear_favorites': clearFavorites(); break;
+    // Playback
+    case 'play_pause': toggleAudioPlayback(); break;
+    case 'toggle_loop': toggleAudioLoop(); break;
+    case 'stop_playback': stopAudioPlayback(); break;
+    case 'expand_player': togglePlayerExpanded(); break;
     // Help
     case 'github': openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
+    case 'docs': openUpdate('https://menketechnologies.github.io/universal-plugin-update-manager/'); break;
     // Find (handled by existing Cmd+F)
     case 'find': {
       const activeTab = document.querySelector('.tab-content.active');
@@ -226,14 +232,6 @@ document.addEventListener('keydown', (e) => {
   const isMac = navigator.platform.includes('Mac');
   const mod = isMac ? e.metaKey : e.ctrlKey;
 
-  // Cmd/Ctrl+F — focus search in active tab
-  if (mod && e.key === 'f') {
-    e.preventDefault();
-    const activeTab = document.querySelector('.tab-content.active');
-    const input = activeTab?.querySelector('input[type="text"]');
-    if (input) { input.focus(); input.select(); }
-  }
-
   // Escape — clear search or stop operation
   if (e.key === 'Escape') {
     const focused = document.activeElement;
@@ -245,13 +243,8 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  // Cmd/Ctrl+1-7 — switch tabs
-  if (mod && e.key >= '1' && e.key <= '7') {
-    e.preventDefault();
-    const tabs = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'history', 'settings'];
-    const idx = parseInt(e.key) - 1;
-    if (idx < tabs.length) switchTab(tabs[idx]);
-  }
+  // Cmd/Ctrl+1-7 — handled by native menu accelerators
+  // Cmd+F — handled by native menu accelerator (find)
 });
 
 function showToast(message, duration = 2500, type = '') {
