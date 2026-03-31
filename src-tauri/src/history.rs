@@ -1238,6 +1238,7 @@ mod tests {
             manufacturer: "TestMfg".into(),
             manufacturer_url: None,
             size: "1.0 MB".into(),
+            size_bytes: 1048576,
             modified: "2024-01-01".into(),
             architectures: vec![],
         }

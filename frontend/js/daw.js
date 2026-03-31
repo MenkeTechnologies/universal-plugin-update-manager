@@ -47,7 +47,7 @@ function initDawTable() {
   tableWrap.innerHTML = `<table class="audio-table" id="dawTable">
     <thead>
       <tr>
-        <th style="width: 30px; padding: 0;"></th>
+        <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="Select all"></th>
         <th data-action="sortDaw" data-key="name" style="width: 23%;">Name <span class="sort-arrow" id="dawSortArrowName">&#9660;</span><span class="col-resize"></span></th>
         <th data-action="sortDaw" data-key="daw" class="col-format" style="width: 12%;">DAW <span class="sort-arrow" id="dawSortArrowDaw"></span><span class="col-resize"></span></th>
         <th data-action="sortDaw" data-key="format" class="col-format" style="width: 80px;">Format <span class="sort-arrow" id="dawSortArrowFormat"></span><span class="col-resize"></span></th>

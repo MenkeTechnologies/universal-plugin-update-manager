@@ -124,5 +124,9 @@ document.addEventListener('click', (e) => {
     else if (act === 'copyPaths') batchCopyPaths();
     else if (act === 'exportJson') batchExportSelected();
     else if (act === 'reveal') batchRevealAll();
+    else if (act === 'toggleAll') {
+      if (action.checked) selectAllVisible();
+      else deselectAll();
+    }
   }
 });

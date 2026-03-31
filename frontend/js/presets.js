@@ -197,7 +197,7 @@ async function scanPresets(resume = false) {
       firstBatch = false;
       tableWrap.innerHTML = `<table class="audio-table" id="presetTable">
         <thead><tr>
-          <th style="width: 30px; padding: 0;"></th>
+          <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="Select all"></th>
           <th data-action="sortPreset" data-key="name" style="width: 25%;">Name <span class="sort-arrow" id="presetSortArrowName">&#9660;</span></th>
           <th data-action="sortPreset" data-key="format" class="col-format" style="width: 100px;">Format <span class="sort-arrow" id="presetSortArrowFormat"></span></th>
           <th data-action="sortPreset" data-key="directory" style="width: 35%;">Path <span class="sort-arrow" id="presetSortArrowDirectory"></span></th>

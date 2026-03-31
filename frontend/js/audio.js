@@ -230,7 +230,7 @@ function initAudioTable() {
   tableWrap.innerHTML = `<table class="audio-table" id="audioTable">
     <thead>
       <tr>
-        <th style="width: 30px; padding: 0;"></th>
+        <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="Select all"></th>
         <th data-action="sortAudio" data-key="name" style="width: 26%;">Name <span class="sort-arrow" id="sortArrowName">&#9660;</span><span class="col-resize"></span></th>
         <th data-action="sortAudio" data-key="format" class="col-format" style="width: 70px;">Format <span class="sort-arrow" id="sortArrowFormat"></span><span class="col-resize"></span></th>
         <th data-action="sortAudio" data-key="size" class="col-size" style="width: 90px;">Size <span class="sort-arrow" id="sortArrowSize"></span><span class="col-resize"></span></th>

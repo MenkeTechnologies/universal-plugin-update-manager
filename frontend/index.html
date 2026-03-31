@@ -1762,39 +1762,83 @@
     }
 
     /* Batch selection */
+    /* Batch selection */
+    .col-cb {
+      width: 30px;
+      text-align: center;
+      padding: 0 !important;
+      vertical-align: middle;
+    }
     .batch-cb {
-      accent-color: var(--cyan);
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-radius: 2px;
+      background: transparent;
       cursor: pointer;
-      width: 14px;
-      height: 14px;
+      position: relative;
+      vertical-align: middle;
+      transition: all 0.15s;
+    }
+    .batch-cb:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan-dim);
+    }
+    .batch-cb:checked {
+      background: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan-glow);
+    }
+    .batch-cb:checked::after {
+      content: '';
+      position: absolute;
+      left: 3px; top: 0px;
+      width: 5px; height: 9px;
+      border: solid var(--bg-primary);
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+    .batch-cb-all {
+      width: 16px; height: 16px;
     }
     .batch-action-bar {
       display: none;
       position: fixed;
       bottom: 0; left: 0; right: 0;
       z-index: 8000;
-      background: var(--bg-primary);
-      border-top: 1px solid var(--cyan);
-      box-shadow: 0 -2px 20px var(--cyan-glow);
-      padding: 8px 24px;
+      background: linear-gradient(180deg, var(--bg-primary), rgba(5,5,10,0.98));
+      border-top: 2px solid var(--cyan);
+      box-shadow: 0 -4px 30px var(--cyan-glow), 0 -1px 10px rgba(0,0,0,0.5);
+      padding: 10px 24px;
       align-items: center;
       gap: 12px;
       animation: slideUp 0.2s ease-out;
+      flex-wrap: wrap;
     }
     @keyframes slideUp {
-      from { transform: translateY(100%); }
-      to { transform: translateY(0); }
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
     .batch-action-bar .batch-count {
       font-family: 'Orbitron', sans-serif;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--cyan);
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
+      text-shadow: 0 0 8px var(--cyan-glow);
+      min-width: 100px;
     }
     .batch-action-bar .btn {
-      padding: 6px 14px;
+      padding: 7px 16px;
       font-size: 11px;
+    }
+    .batch-action-bar .batch-sep {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      flex-shrink: 0;
     }
 
     /* Keyboard navigation selection */
@@ -2986,11 +3030,13 @@
   </div>
   <div class="batch-action-bar" id="batchActionBar">
     <span class="batch-count" id="batchCount">0 selected</span>
+    <div class="batch-sep"></div>
     <button class="btn btn-secondary" data-batch-action="selectAll" title="Select all visible rows">Select All</button>
-    <button class="btn btn-secondary" data-batch-action="deselectAll" title="Clear selection">Deselect</button>
+    <button class="btn btn-stop" data-batch-action="deselectAll" title="Clear selection">&#10005; Clear</button>
+    <div class="batch-sep"></div>
     <button class="btn btn-secondary" data-batch-action="favorite" title="Add selected to favorites">&#9733; Favorite</button>
     <button class="btn btn-secondary" data-batch-action="copyPaths" title="Copy paths to clipboard">&#128203; Copy Paths</button>
-    <button class="btn btn-secondary" data-batch-action="exportJson" title="Copy selected as JSON">&#8615; Export JSON</button>
+    <button class="btn btn-secondary" data-batch-action="exportJson" title="Copy selected as JSON">&#8615; JSON</button>
     <button class="btn btn-secondary" data-batch-action="reveal" title="Reveal first selected in Finder">&#128193; Reveal</button>
   </div>
   <div class="toast-container" id="toastContainer"></div>

@@ -52,8 +52,9 @@ function updateAudioDiskUsage() {
   const counts = {};
   const bytes = {};
   for (const s of allAudioSamples) {
+    const sz = typeof s.size === 'number' && isFinite(s.size) ? s.size : 0;
     counts[s.format] = (counts[s.format] || 0) + 1;
-    bytes[s.format] = (bytes[s.format] || 0) + (s.size || 0);
+    bytes[s.format] = (bytes[s.format] || 0) + sz;
   }
   const data = Object.entries(bytes).map(([label, b]) => ({
     label, bytes: b, sizeStr: formatAudioSize(b),
@@ -80,14 +81,8 @@ function updatePluginDiskUsage() {
   if (typeof allPlugins === 'undefined' || allPlugins.length === 0) return;
   const bytes = {};
   for (const p of allPlugins) {
-    // Parse size string back to bytes (approximate)
-    const sizeStr = p.size || '0 B';
-    const match = sizeStr.match(/([\d.]+)\s*(B|KB|MB|GB)/i);
-    if (!match) continue;
-    const num = parseFloat(match[1]);
-    const unit = match[2].toUpperCase();
-    const mult = { 'B': 1, 'KB': 1024, 'MB': 1048576, 'GB': 1073741824 }[unit] || 1;
-    bytes[p.type] = (bytes[p.type] || 0) + num * mult;
+    const sz = typeof p.sizeBytes === 'number' && isFinite(p.sizeBytes) ? p.sizeBytes : 0;
+    bytes[p.type] = (bytes[p.type] || 0) + sz;
   }
   const data = Object.entries(bytes).map(([label, b]) => ({
     label, bytes: b, sizeStr: formatAudioSize(b),

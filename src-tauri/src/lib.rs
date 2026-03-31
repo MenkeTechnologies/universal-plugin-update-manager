@@ -47,6 +47,8 @@ struct ExportPlugin {
     manufacturer_url: Option<String>,
     path: String,
     size: String,
+    #[serde(rename = "sizeBytes", default)]
+    size_bytes: u64,
     modified: String,
     #[serde(default)]
     architectures: Vec<String>,
@@ -941,6 +943,7 @@ fn plugins_to_export(plugins: &[PluginInfo]) -> Vec<ExportPlugin> {
             manufacturer_url: p.manufacturer_url.clone(),
             path: p.path.clone(),
             size: p.size.clone(),
+            size_bytes: p.size_bytes,
             modified: p.modified.clone(),
             architectures: p.architectures.clone(),
         })
@@ -1090,6 +1093,7 @@ fn import_plugins_json(file_path: String) -> Result<Vec<PluginInfo>, String> {
             manufacturer: p.manufacturer,
             manufacturer_url: p.manufacturer_url,
             size: p.size,
+            size_bytes: p.size_bytes,
             modified: p.modified,
             architectures: p.architectures,
         })
@@ -1513,6 +1517,7 @@ mod tests {
             manufacturer: "TestCo".into(),
             manufacturer_url: Some("https://testco.com".into()),
             size: "2.5 MB".into(),
+            size_bytes: 2621440,
             modified: "2025-01-01".into(),
             architectures: vec!["ARM64".into(), "x86_64".into()],
         }
@@ -1718,6 +1723,7 @@ mod tests {
                 manufacturer_url: None,
                 path: "/test".into(),
                 size: "1 MB".into(),
+                size_bytes: 1048576,
                 modified: "2025-01-01".into(),
                 architectures: vec![],
             }],
@@ -1741,6 +1747,7 @@ mod tests {
             manufacturer_url: None,
             path: "/test".into(),
             size: "1 MB".into(),
+            size_bytes: 0,
             modified: "2025-01-01".into(),
             architectures: vec![],
         };
@@ -1758,6 +1765,7 @@ mod tests {
             manufacturer_url: Some("https://co.com".into()),
             path: "/test".into(),
             size: "1 MB".into(),
+            size_bytes: 0,
             modified: "2025-01-01".into(),
             architectures: vec![],
         };

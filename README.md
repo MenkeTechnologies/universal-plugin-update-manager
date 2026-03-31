@@ -13,7 +13,7 @@
 ░▓████▒   ▓█   ▓██▒▒██▒ ▒██▒░ ████▓▒░░██▓ ▒██▒
 ```
 
-> **// SYSTEM ONLINE -- AUDIO_HAXOR v1.1.0 // by MenkeTechnologies**
+> **// SYSTEM ONLINE -- AUDIO_HAXOR v1.3.0 // by MenkeTechnologies**
 
 A high-voltage **Tauri v2** desktop app that jacks into your system's audio plugin directories, maps every VST2/VST3/AU module it finds, scans audio sample libraries, discovers DAW project files, checks the web for the latest plugin versions, and maintains a full changelog of every scan -- so nothing slips through the cracks. Rust backend with a cyberpunk CRT interface featuring neon glow, scanline overlays, glitch effects, and multiple color schemes.
 
@@ -60,7 +60,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 
 | Module | Function |
 |--------|----------|
-| **Plugin Scanner** | Detects VST2, VST3, and AU plugins from platform-specific directories on macOS, Windows, and Linux. Shows architecture badges (ARM64, x86_64, Universal) per plugin via `lipo -archs` with Mach-O fallback. Runs in a background worker thread -- UI stays fully responsive |
+| **Plugin Scanner** | Detects VST2, VST3, and AU plugins from platform-specific directories on macOS, Windows, and Linux. Shows architecture badges (ARM64, x86_64, Universal) per plugin via direct Mach-O/PE header parsing. Tracks raw byte sizes for accurate disk usage charts. Runs in a background worker thread -- UI stays fully responsive |
 | **Audio Scanner** | Discovers audio samples (WAV, FLAC, AIFF, MP3, OGG, etc.) with metadata extraction, file size formatting, and symlink deduplication. Double-click any sample row to start playback (or single-click with the setting enabled). Floating music player with volume, playback speed, seek bar, and loop controls persists across all tabs |
 | **DAW Scanner** | Finds DAW project files across 14+ formats -- Ableton (.als), Logic (.logicx), FL Studio (.flp), REAPER (.rpp), Cubase/Nuendo (.cpr/.npr), Pro Tools (.ptx/.ptf), Bitwig (.bwproject), Studio One (.song), Reason (.reason), Audacity (.aup/.aup3), GarageBand (.band), Ardour (.ardour), and dawproject (.dawproject). Double-click any project row to open it directly in its DAW |
 | **Version Intel** | Reads version, manufacturer, and website URL from macOS bundle plists (`CFBundleShortVersionString`, `CFBundleIdentifier`, `NSHumanReadableCopyright`) |
@@ -91,6 +91,13 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Keyboard Navigation** | Arrow keys/j/k to navigate table rows, Enter to activate, Space to play samples, Home/End to jump. Visual selection highlight |
 | **Help Overlay** | Press <kbd>?</kbd> to show a keyboard shortcuts reference overlay covering navigation, actions, search operators, and mouse interactions |
 | **Sort Persistence** | Last-used sort column and direction saved per tab, restored on app restart |
+| **Multi-Select Filters** | All filter dropdowns support multiple selections (e.g. VST2 + AU, WAV + FLAC). Checkbox-based custom dropdown with "All" toggle |
+| **Native Menu Bar** | Full menu bar with File, Edit, Scan, View, Playback, Data, Window, Help menus. All functionality accessible from menus with keyboard accelerators |
+| **ETA Timers** | Estimated time remaining on plugin scans and update checks. Elapsed time on audio, DAW, and preset scans |
+| **Draggable Tabs** | Drag tabs to reorder. Order persisted across sessions. Reset Tab Order in settings |
+| **Cyberpunk Visualizer** | Animated equalizer bars in the floating player with cyan-to-magenta gradient. Bars bounce when playing, freeze on pause. Border glow pulse effect |
+| **PDF Export** | Export any tab to PDF (A4 landscape, Helvetica, auto-paginated, header with item count and timestamp) |
+| **TOML Export/Import** | Export/import all tabs in TOML format alongside JSON, CSV, TSV |
 
 ---
 
@@ -128,7 +135,7 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (118 tests)
+### Rust tests (158 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
