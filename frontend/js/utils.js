@@ -15,6 +15,7 @@ function fuzzyMatch(needle, haystack) {
 
 // Unified search: checks one or more fields against the query.
 // mode: 'fuzzy' (default) or 'regex'
+// Fuzzy mode: substring first, then fuzzy fallback for typo tolerance
 function searchMatch(query, fields, mode) {
   if (!query) return true;
   if (mode === 'regex') {
@@ -26,7 +27,11 @@ function searchMatch(query, fields, mode) {
     }
   }
   const q = query.toLowerCase();
-  return fields.some(f => fuzzyMatch(q, f.toLowerCase()));
+  // Substring match first (exact)
+  if (fields.some(f => f.toLowerCase().includes(q))) return true;
+  // Fuzzy fallback — only if query is short enough to avoid noise
+  if (q.length >= 3) return fields.some(f => fuzzyMatch(q, f.toLowerCase()));
+  return false;
 }
 
 // Get search mode for a tab's regex toggle
