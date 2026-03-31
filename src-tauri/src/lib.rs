@@ -163,8 +163,8 @@ async fn scan_plugins(
 
         // Process plugins in parallel, streaming results to UI via channel
         use rayon::prelude::*;
-        let batch_size = 20;
-        let (tx, rx) = std::sync::mpsc::sync_channel::<scanner::PluginInfo>(256);
+        let batch_size = 30;
+        let (tx, rx) = std::sync::mpsc::sync_channel::<scanner::PluginInfo>(512);
         let stop_flag = std::sync::Arc::new(AtomicBool::new(false));
         let stop_flag2 = stop_flag.clone();
 
@@ -2103,10 +2103,12 @@ pub fn run() {
     // Initialize app start time for uptime tracking
     APP_START.get_or_init(Instant::now);
 
-    // Initialize rayon thread pool — 2x CPU cores to saturate I/O-bound scans.
-    // Filesystem scanning is mostly I/O wait, so extra threads keep cores busy
-    // while others block on disk reads. 8MB stack for deep directory recursion.
-    let pool_size = num_cpus::get() * 2;
+    // Initialize rayon thread pool — 4x CPU cores to maximize throughput.
+    // Filesystem scanning is heavily I/O-bound: threads spend most time waiting
+    // on disk reads, stat calls, and plist parsing. With 4x oversubscription,
+    // there are always runnable threads when others are blocked on I/O.
+    // On a fast machine (e.g. 12-core M2 Max), this gives 48 worker threads.
+    let pool_size = num_cpus::get() * 4;
     rayon::ThreadPoolBuilder::new()
         .num_threads(pool_size)
         .stack_size(8 * 1024 * 1024)

@@ -175,7 +175,7 @@ pub fn walk_for_daw(
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(256);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(512);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
 
