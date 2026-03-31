@@ -2252,6 +2252,68 @@
       font-family: 'Orbitron', sans-serif;
       letter-spacing: 1px;
     }
+    /* Tags manager */
+    .tags-manager {
+      padding: 12px 24px 120px;
+    }
+    .tag-manager-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--yellow);
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      transition: border-color 0.2s;
+    }
+    .tag-manager-card:hover { border-left-color: var(--cyan); }
+    .tag-manager-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .tag-manager-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--yellow);
+      flex: 1;
+    }
+    .tag-manager-count {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+    .tag-manager-items {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .tag-manager-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: var(--text-dim);
+      border-radius: 2px;
+    }
+    .tag-manager-item:hover { background: rgba(5,217,232,0.04); }
+    .tag-manager-item-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tag-stats {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 1px;
+    }
+
     .note-tag-suggestions {
       margin-bottom: 12px;
     }
@@ -3428,7 +3490,8 @@
       <button class="tab-btn" data-action="switchTab" data-tab="daw" title="DAW project files (Cmd+3)">DAW Projects</button>
       <button class="tab-btn" data-action="switchTab" data-tab="presets" title="Plugin presets (Cmd+4)">Presets</button>
       <button class="tab-btn" data-action="switchTab" data-tab="favorites" title="Favorited items (Cmd+5)">&#9733; Favorites</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="notes" title="Notes &amp; tags (Cmd+6)">&#128221; Notes</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="notes" title="Notes &amp; tags">&#128221; Notes</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="tags" title="Tag manager">&#127991; Tags</button>
       <button class="tab-btn" data-action="switchTab" data-tab="files" title="File browser">&#128193; Files</button>
       <button class="tab-btn" data-action="switchTab" data-tab="history" title="Scan history and diffs (Cmd+6)">History</button>
       <button class="tab-btn" data-action="switchTab" data-tab="settings" title="App settings (Cmd+7)">&#9881; Settings</button>
@@ -3518,6 +3581,25 @@
             <div class="state-icon">&#9733;</div>
             <h2>No Favorites</h2>
             <p>Right-click any plugin, sample, DAW project, or preset and choose <strong>"Add to Favorites"</strong>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tabTags">
+      <div class="audio-container">
+        <div class="audio-toolbar">
+          <div class="search-box" style="flex: 1;">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" id="tagSearchInput" placeholder="Search tags..." data-action="filterTags">
+          </div>
+          <button class="btn btn-primary" data-action="createTag" title="Create a new tag">+ New Tag</button>
+        </div>
+        <div class="tags-manager" id="tagsManager">
+          <div class="state-message" id="tagsEmptyState">
+            <div class="state-icon">&#127991;</div>
+            <h2>No Tags</h2>
+            <p>Right-click any item and choose <strong>"Add Note"</strong> to add tags, or use the quick-tag menu.</p>
           </div>
         </div>
       </div>

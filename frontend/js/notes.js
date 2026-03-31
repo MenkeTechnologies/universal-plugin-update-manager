@@ -285,7 +285,70 @@ function clearAllNotes() {
   if (!confirm('Delete all notes and tags?')) return;
   prefs.setItem('itemNotes', {});
   renderNotesTab();
+  renderGlobalTagBar();
   showToast('All notes deleted');
+}
+
+// ── Tags Manager Tab ──
+function renderTagsManager() {
+  const container = document.getElementById('tagsManager');
+  const empty = document.getElementById('tagsEmptyState');
+  if (!container) return;
+
+  const tagCounts = getTagCounts();
+  const allTags = Object.keys(tagCounts).sort();
+  const search = (document.getElementById('tagSearchInput')?.value || '').toLowerCase();
+  const filtered = search ? allTags.filter(t => t.toLowerCase().includes(search)) : allTags;
+
+  if (filtered.length === 0) {
+    if (empty) empty.style.display = allTags.length === 0 ? '' : 'none';
+    container.innerHTML = allTags.length > 0
+      ? '<div class="state-message"><div class="state-icon">&#128269;</div><h2>No matching tags</h2></div>'
+      : '';
+    if (allTags.length === 0 && empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  const notes = getNotes();
+  const totalItems = Object.keys(notes).length;
+
+  let html = `<div class="tag-stats">${allTags.length} tags across ${totalItems} items</div>`;
+
+  html += filtered.map(tag => {
+    const count = tagCounts[tag];
+    const items = getItemsWithTag(tag);
+    return `<div class="tag-manager-card">
+      <div class="tag-manager-header">
+        <span class="tag-manager-name">${escapeHtml(tag)}</span>
+        <span class="tag-manager-count">${count} item${count !== 1 ? 's' : ''}</span>
+        <button class="btn-small btn-secondary" data-tag-action="rename" data-tag="${escapeHtml(tag)}" style="padding:3px 8px;font-size:10px;">Rename</button>
+        <button class="btn-small btn-secondary" data-tag-action="filter" data-tag="${escapeHtml(tag)}" style="padding:3px 8px;font-size:10px;">Filter All Tabs</button>
+        <button class="btn-small btn-stop" data-tag-action="delete" data-tag="${escapeHtml(tag)}" style="padding:3px 8px;font-size:10px;">&#10005;</button>
+      </div>
+      <div class="tag-manager-items">
+        ${items.slice(0, 20).map(item => {
+          const name = item.path.split('/').pop().replace(/\.[^.]+$/, '');
+          return `<div class="tag-manager-item">
+            <span class="tag-manager-item-name" title="${escapeHtml(item.path)}">${escapeHtml(name)}</span>
+            <button class="btn-small" data-tag-action="remove-from" data-tag="${escapeHtml(tag)}" data-path="${escapeHtml(item.path)}" style="padding:2px 6px;font-size:9px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">&#10005;</button>
+          </div>`;
+        }).join('')}
+        ${items.length > 20 ? `<div style="color:var(--text-muted);font-size:11px;padding:4px 8px;">...and ${items.length - 20} more</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = html;
+}
+
+function createNewTag() {
+  const tag = prompt('Enter new tag name:');
+  if (!tag || !tag.trim()) return;
+  // Tag doesn't get attached to anything yet — it exists once added to an item
+  showToast(`Tag "${tag.trim()}" created. Right-click an item to apply it.`);
+  // Just show the tag manager
+  renderTagsManager();
 }
 
 // ── Global Tag Filter ──
@@ -371,7 +434,43 @@ document.addEventListener('click', (e) => {
     } else if (act === 'delete') {
       setNote(path, '', []);
       renderNotesTab();
+      renderGlobalTagBar();
       showToast('Note deleted');
     }
+  }
+
+  // Tag manager actions
+  const tagAction = e.target.closest('[data-tag-action]');
+  if (tagAction) {
+    const act = tagAction.dataset.tagAction;
+    const tag = tagAction.dataset.tag;
+    if (act === 'rename') {
+      const newName = prompt(`Rename tag "${tag}" to:`, tag);
+      if (newName && newName.trim() && newName.trim() !== tag) {
+        renameTag(tag, newName.trim());
+        renderTagsManager();
+        renderGlobalTagBar();
+      }
+    } else if (act === 'delete') {
+      if (confirm(`Remove tag "${tag}" from all items?`)) {
+        deleteTag(tag);
+        renderTagsManager();
+        renderGlobalTagBar();
+      }
+    } else if (act === 'filter') {
+      setGlobalTag(tag);
+      switchTab('plugins'); // Switch to plugins to see the filter in action
+    } else if (act === 'remove-from') {
+      const path = tagAction.dataset.path;
+      removeTagFromItem(path, tag);
+      renderTagsManager();
+      renderGlobalTagBar();
+      showToast(`Tag "${tag}" removed`);
+    }
+  }
+
+  // Create tag button
+  if (e.target.closest('[data-action="createTag"]')) {
+    createNewTag();
   }
 });
