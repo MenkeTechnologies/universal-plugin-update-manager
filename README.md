@@ -63,6 +63,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Plugin Scanner** | Detects VST2, VST3, and AU plugins from platform-specific directories on macOS, Windows, and Linux. Shows architecture badges (ARM64, x86_64, Universal) per plugin via direct Mach-O/PE header parsing. Tracks raw byte sizes for accurate disk usage charts. Runs in a background worker thread -- UI stays fully responsive |
 | **Audio Scanner** | Discovers audio samples (WAV, FLAC, AIFF, MP3, OGG, etc.) with metadata extraction, file size formatting, and symlink deduplication. Double-click any sample row to start playback (or single-click with the setting enabled). Floating music player with volume, playback speed, seek bar, and loop controls persists across all tabs |
 | **DAW Scanner** | Finds DAW project files across 14+ formats -- Ableton (.als), Logic (.logicx), FL Studio (.flp), REAPER (.rpp), Cubase/Nuendo (.cpr/.npr), Pro Tools (.ptx/.ptf), Bitwig (.bwproject), Studio One (.song), Reason (.reason), Audacity (.aup/.aup3), GarageBand (.band), Ardour (.ardour), and dawproject (.dawproject). Double-click any project row to open it directly in its DAW |
+| **Plugin Cross-Reference** | Parses Ableton Live (.als) and REAPER (.rpp) project files to extract plugin references (VST2, VST3, AU, CLAP). Shows plugin count badges on DAW rows. Click to see full plugin list. Reverse lookup: right-click any plugin to find which projects use it. Build full index across all supported projects with one click |
 | **Version Intel** | Reads version, manufacturer, and website URL from macOS bundle plists (`CFBundleShortVersionString`, `CFBundleIdentifier`, `NSHumanReadableCopyright`) |
 | **Update Checker** | Searches [KVR Audio](https://www.kvraudio.com) for each plugin's latest version. Falls back to DuckDuckGo site-restricted KVR search. Runs in a worker thread with rate limiting and streams results back incrementally |
 | **KVR Integration** | Yellow KVR button on every plugin links directly to its KVR Audio product page. Double-click any plugin card to open it on KVR. URL is constructed from plugin name + manufacturer with smart slug generation (camelCase splitting, manufacturer lookup table). Falls back to KVR search if the direct URL doesn't exist |
@@ -137,7 +138,7 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (178 tests)
+### Rust tests (192 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -147,6 +148,7 @@ node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 | **scanner** | 24 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration, architecture detection |
 | **daw_scanner** | 19 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
 | **audio_scanner** | 18 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories |
+| **xref** | 14 | Ableton .als gzip XML parsing (VST2/VST3/AU), REAPER .rpp plaintext parsing (VST/VST3/AU/CLAP), deduplication, sorting, error handling |
 | **preset_scanner** | 4 | Preset discovery, directory walking, stop signal, format detection |
 
 ### JavaScript tests (207 tests)
@@ -249,6 +251,7 @@ src-tauri/
     audio_scanner.rs   -- Audio sample discovery + metadata extraction
     daw_scanner.rs     -- DAW project scanner (14+ formats)
     preset_scanner.rs  -- Plugin preset discovery
+    xref.rs            -- Plugin ↔ DAW cross-reference engine
     history.rs         -- Scan history persistence + diff engine
     kvr.rs             -- KVR Audio scraper + version checker
   Cargo.toml           -- Rust dependencies
@@ -281,6 +284,7 @@ frontend/
     shortcuts.js       -- Customizable keyboard shortcuts
     sort-persist.js    -- Sort column/direction persistence per tab
     utils.js           -- fzf search, escaping, slugs, formatting
+    xref.js            -- Plugin ↔ DAW cross-reference UI + index
 
 test/
   scanner.test.js      -- Plugin/audio/DAW type mapping, size formatting

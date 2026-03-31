@@ -111,6 +111,7 @@ document.addEventListener('click', (e) => {
     case 'scanDawProjects': scanDawProjects(); break;
     case 'resumeDawScan': scanDawProjects(true); break;
     case 'stopDawScan': stopDawScan(); break;
+    case 'buildXrefIndex': buildXrefIndex().then(() => filterDawProjects()); break;
     case 'scanPresets': scanPresets(); break;
     case 'resumePresetScan': scanPresets(true); break;
     case 'stopPresetScan': stopPresetScan(); break;
@@ -348,6 +349,7 @@ window.vstUpdater = {
   },
   openDawFolder: (path) => invoke('open_daw_folder', { filePath: path }),
   openDawProject: (path) => invoke('open_daw_project', { filePath: path }),
+  extractProjectPlugins: (path) => invoke('extract_project_plugins', { filePath: path }),
   // DAW history
   saveDawScan: (projects, roots) => invoke('daw_history_save', { projects, roots: roots || null }),
   getDawScans: () => invoke('daw_history_get_scans'),

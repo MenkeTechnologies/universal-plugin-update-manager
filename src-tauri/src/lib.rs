@@ -19,6 +19,7 @@ pub mod history;
 pub mod kvr;
 pub mod preset_scanner;
 pub mod scanner;
+pub mod xref;
 
 use history::{AudioSample, DawProject, KvrCacheUpdateEntry, PresetFile};
 use scanner::PluginInfo;
@@ -876,6 +877,11 @@ async fn open_daw_project(file_path: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+async fn extract_project_plugins(file_path: String) -> Result<Vec<xref::PluginRef>, String> {
+    Ok(xref::extract_plugins(&file_path))
 }
 
 #[tauri::command]
@@ -2641,6 +2647,7 @@ pub fn run() {
             daw_history_diff,
             open_daw_folder,
             open_daw_project,
+            extract_project_plugins,
             open_update_url,
             open_plugin_folder,
             open_audio_folder,

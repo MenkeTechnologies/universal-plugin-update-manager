@@ -322,6 +322,10 @@
         <p>Right-click any item to add notes and tags. Persisted in preferences. Note indicator icons on annotated items.</p>
       </div>
       <div class="feature-card">
+        <h3><span class="icon">&#9889;</span> Plugin Cross-Reference</h3>
+        <p>Parses Ableton (.als) and REAPER (.rpp) projects to extract plugin references. See which plugins each project uses, or find which projects use a given plugin.</p>
+      </div>
+      <div class="feature-card">
         <h3><span class="icon">&#128278;</span> Directory Bookmarks</h3>
         <p>Bookmark favorite directories in the File Browser for instant navigation. Chips displayed above the file list. Right-click any folder to bookmark it.</p>
       </div>
@@ -751,7 +755,7 @@
       </div>
       <div class="feature-card">
         <h3>Testing</h3>
-        <p>178 Rust tests (lib, history, KVR, scanner, DAW, audio, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 385 total. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
+        <p>192 Rust tests (lib, history, KVR, scanner, DAW, audio, xref, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 399 total. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
       </div>
     </div>
     <pre style="margin-top: 32px;">
@@ -762,10 +766,11 @@ src-tauri/src/
   audio_scanner.rs   -- Audio sample discovery + metadata extraction
   daw_scanner.rs     -- DAW project scanner (14+ formats)
   preset_scanner.rs  -- Plugin preset discovery
+  xref.rs            -- Plugin ↔ DAW cross-reference engine
   history.rs         -- Scan history persistence + diff engine
   kvr.rs             -- KVR Audio scraper + version checker
 
-frontend/js/  (24 modules)
+frontend/js/  (25 modules)
   app.js             -- Startup, auto-load, preferences
   audio.js           -- Sample scanning, playback, visualizer, player dock
   batch-select.js    -- Checkbox selection + batch operations
@@ -789,7 +794,8 @@ frontend/js/  (24 modules)
   settings.js        -- Themes, color schemes, toggles
   shortcuts.js       -- Customizable keyboard shortcuts
   sort-persist.js    -- Sort column/direction persistence per tab
-  utils.js           -- fzf search, highlighting, ETA, helpers</pre>
+  utils.js           -- fzf search, highlighting, ETA, helpers
+  xref.js            -- Plugin ↔ DAW cross-reference UI + index</pre>
   </div>
 </section>
 

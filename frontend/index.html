@@ -1961,6 +1961,48 @@
     }
     .modal-close:hover { color: var(--red); border-color: var(--red); }
     .modal-body { padding: 20px; }
+    .modal-wide { max-width: 640px; }
+
+    /* Plugin xref */
+    .xref-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      font-size: 10px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      cursor: pointer;
+      color: var(--text-muted);
+      background: transparent;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .xref-badge:hover { border-color: var(--cyan); color: var(--cyan); }
+    .xref-badge.has-plugins { color: var(--cyan); border-color: rgba(5,217,232,0.3); }
+    .xref-list { list-style: none; padding: 0; }
+    .xref-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(26,26,62,0.3);
+    }
+    .xref-item:last-child { border-bottom: none; }
+    .xref-item-name { flex: 1; color: var(--text); font-size: 13px; }
+    .xref-item-mfg { color: var(--text-muted); font-size: 11px; }
+    .xref-item-type {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 2px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .xref-type-vst2 { background: rgba(5,217,232,0.1); color: var(--cyan); border: 1px solid rgba(5,217,232,0.3); }
+    .xref-type-vst3 { background: rgba(211,0,197,0.1); color: var(--magenta); border: 1px solid rgba(211,0,197,0.3); }
+    .xref-type-au { background: rgba(57,255,20,0.1); color: var(--green); border: 1px solid rgba(57,255,20,0.3); }
+    .xref-type-clap { background: rgba(249,240,2,0.1); color: var(--yellow); border: 1px solid rgba(249,240,2,0.3); }
+    .xref-unsupported { color: var(--text-muted); font-size: 12px; text-align: center; padding: 24px; }
 
     /* Help overlay grid */
     .help-grid {
@@ -3832,6 +3874,7 @@
           <button class="btn btn-stop" id="btnStopDaw" style="display: none;" data-action="stopDawScan" title="Stop the current scan">&#9632; Stop</button>
           <button class="btn btn-secondary" id="btnExportDaw" data-action="exportDaw" style="display:none;" title="Export projects to JSON">&#8615; Export</button>
           <button class="btn btn-secondary" id="btnImportDaw" data-action="importDaw" title="Import projects from JSON">&#8613; Import</button>
+          <button class="btn btn-secondary" id="btnXrefIndex" data-action="buildXrefIndex" title="Scan all Ableton/REAPER projects for plugin references">&#9889; Plugin Index</button>
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
             <input type="text" id="dawSearchInput" placeholder="Fuzzy search projects..." data-action="filterDawProjects">
@@ -4391,6 +4434,7 @@
   <script src="js/file-browser.js"></script>
   <script src="js/notes.js"></script>
   <script src="js/duplicates.js"></script>
+  <script src="js/xref.js"></script>
   <script src="js/context-menu.js"></script>
   <script src="js/help-overlay.js"></script>
   <script src="js/shortcuts.js"></script>

@@ -113,6 +113,12 @@ document.addEventListener('contextmenu', (e) => {
     items.push({ icon: pluginFav ? '&#9734;' : '&#9733;', label: pluginFav ? 'Remove from Favorites' : 'Add to Favorites',
       action: () => pluginFav ? removeFavorite(path) : addFavorite('plugin', path, name, { format: pluginCard.querySelector('.plugin-type')?.textContent }) });
     items.push({ icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) });
+    if (typeof findProjectsUsingPlugin === 'function') {
+      items.push({ icon: '&#9889;', label: 'Find Projects Using This', action: () => {
+        const projects = findProjectsUsingPlugin(name);
+        showReverseXrefModal(name, projects);
+      }});
+    }
     items.push(...quickTagItems(path, name));
     showContextMenu(e, items);
     return;
@@ -158,6 +164,9 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#9654;', label: `Open in ${dawName}`, action: () => { showToast(`Opening "${name}" in ${dawName}...`); window.vstUpdater.openDawProject(path).catch(err => showToast(`${dawName} not installed — ${err}`, 4000, 'error')); } },
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => openDawFolder(path) },
       { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      ...(typeof isXrefSupported === 'function' && isXrefSupported(dawRow.querySelector('.format-badge.format-default')?.textContent || '')
+        ? [{ icon: '&#9889;', label: 'Show Plugins Used', action: () => showProjectPlugins(path, name) }]
+        : []),
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
       { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },

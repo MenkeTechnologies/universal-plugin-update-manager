@@ -71,11 +71,16 @@ function buildDawRow(p) {
   const ep = escapePath(p.path);
   const dawClass = getDawBadgeClass(p.daw);
   const checked = batchSelected.has(p.path) ? ' checked' : '';
+  const xrefSupported = typeof isXrefSupported === 'function' && isXrefSupported(p.format);
+  const cached = typeof _xrefCache !== 'undefined' && _xrefCache[p.path];
+  const xrefBtn = xrefSupported
+    ? `<button class="xref-badge${cached && cached.length > 0 ? ' has-plugins' : ''}" data-action="showXref" data-path="${ep}" data-name="${escapeHtml(p.name)}" title="Show plugins used in this project">&#9889;${cached ? ' ' + cached.length : ''}</button>`
+    : '';
   return `<tr data-daw-path="${ep}" title="Double-click to open in ${escapeHtml(p.daw)}" style="cursor: pointer;">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(p.name)}">${noteIndicator(p.path)}${highlightMatch(p.name, _lastDawSearch, _lastDawMode)}</td>
     <td class="col-format"><span class="format-badge ${dawClass}">${escapeHtml(p.daw)}</span></td>
-    <td class="col-format"><span class="format-badge format-default">${p.format}</span></td>
+    <td class="col-format"><span class="format-badge format-default">${p.format}</span>${xrefBtn}</td>
     <td class="col-size">${p.sizeFormatted}</td>
     <td class="col-date">${p.modified}</td>
     <td class="col-path" title="${escapeHtml(p.path)}">${escapeHtml(p.directory)}</td>
