@@ -354,9 +354,6 @@
       gap: 0 32px;
       align-content: start;
     }
-    #tabSettings {
-      overflow: auto !important;
-    }
 
     @media (min-width: 600px) {
       .settings-container { padding: 24px 32px 160px; }
@@ -1416,7 +1413,7 @@
       border-left: 2px solid var(--cyan);
     }
 
-    .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; min-height: 0; }
+    .tab-content { display: none; flex: 1; overflow: auto; flex-direction: column; min-height: 0; }
     .tab-content.active { animation: tabFadeIn 0.2s ease-out; }
     @keyframes tabFadeIn {
       from { opacity: 0; }
