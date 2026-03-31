@@ -1749,8 +1749,111 @@
       font-size: 11px;
       -webkit-app-region: no-drag;
       animation: toast-in 0.3s ease-out;
+      transition: width 0.3s, top 0.3s, left 0.3s, bottom 0.3s, right 0.3s, max-height 0.3s;
     }
     .audio-now-playing.active { display: flex; }
+
+    /* Expanded player — centered, larger, with history */
+    .audio-now-playing.expanded {
+      top: 50%;
+      left: 50%;
+      bottom: auto;
+      right: auto;
+      transform: translate(-50%, -50%);
+      width: 560px;
+      max-height: 80vh;
+      padding: 20px 24px 16px;
+      box-shadow: 0 0 40px var(--cyan-glow), 0 8px 40px rgba(0,0,0,0.7);
+      animation: none;
+    }
+    .audio-now-playing.expanded .now-playing-name {
+      font-size: 16px;
+    }
+    .audio-now-playing.expanded .now-playing-waveform {
+      height: 36px;
+    }
+
+    .np-history {
+      display: none;
+      flex-direction: column;
+      gap: 0;
+      max-height: 340px;
+      overflow-y: auto;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      margin-top: 4px;
+    }
+    .audio-now-playing.expanded .np-history {
+      display: flex;
+    }
+    .np-history-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .np-history-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.15s;
+    }
+    .np-history-item:hover {
+      background: rgba(5,217,232,0.08);
+    }
+    .np-history-item.active {
+      background: rgba(5,217,232,0.12);
+      border-left: 2px solid var(--cyan);
+    }
+    .np-history-item .np-h-icon {
+      color: var(--text-muted);
+      font-size: 10px;
+      flex-shrink: 0;
+      width: 16px;
+      text-align: center;
+    }
+    .np-history-item.active .np-h-icon {
+      color: var(--cyan);
+    }
+    .np-history-item .np-h-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 11px;
+      color: var(--text);
+    }
+    .np-history-item .np-h-format {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .np-history-item .np-h-dur {
+      font-size: 10px;
+      font-family: 'Orbitron', sans-serif;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      flex-shrink: 0;
+    }
+
+    .np-expand-hint {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-align: center;
+      letter-spacing: 1px;
+      opacity: 0.5;
+      cursor: default;
+    }
+    .audio-now-playing.expanded .np-expand-hint {
+      display: none;
+    }
 
     .now-playing-header {
       display: flex;
@@ -2040,6 +2143,11 @@
           <option value="2">2x</option>
         </select>
       </div>
+    </div>
+    <div class="np-expand-hint">double-click to expand</div>
+    <div class="np-history" id="npHistory">
+      <div class="np-history-title">Recently Played</div>
+      <div id="npHistoryList"></div>
     </div>
   </div>
   <div class="toast-container" id="toastContainer"></div>

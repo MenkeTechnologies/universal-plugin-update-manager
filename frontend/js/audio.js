@@ -11,6 +11,8 @@ let audioPlayerPath = null;
 let audioLooping = false;
 let audioPlaybackRAF = null;
 let expandedMetaPath = null;
+let recentlyPlayed = [];
+const MAX_RECENT = 50;
 
 audioPlayer.addEventListener('ended', () => {
   if (!audioLooping) {
@@ -354,7 +356,12 @@ async function previewAudio(filePath) {
     const np = document.getElementById('audioNowPlaying');
     np.classList.add('active');
     const sample = allAudioSamples.find(s => s.path === filePath);
-    document.getElementById('npName').textContent = sample ? `${sample.name}.${sample.format.toLowerCase()}` : filePath.split('/').pop();
+    const displayName = sample ? `${sample.name}.${sample.format.toLowerCase()}` : filePath.split('/').pop();
+    document.getElementById('npName').textContent = displayName;
+
+    // Track recently played
+    addToRecentlyPlayed(filePath, sample);
+
     updatePlayBtnStates();
     updateNowPlayingBtn();
   } catch (err) {
@@ -414,7 +421,9 @@ function stopAudioPlayback() {
 }
 
 function clearAudioPlaybackUI() {
-  document.getElementById('audioNowPlaying').classList.remove('active');
+  const np = document.getElementById('audioNowPlaying');
+  np.classList.remove('active');
+  np.classList.remove('expanded');
   document.getElementById('npProgress').style.width = '0%';
   document.getElementById('npTime').textContent = '0:00 / 0:00';
   updatePlayBtnStates();
@@ -431,6 +440,7 @@ function updatePlayBtnStates() {
     row.classList.toggle('row-playing', isThis && !audioPlayer.paused);
   });
   updateLoopBtnStates();
+  renderRecentlyPlayed();
 }
 
 function updateNowPlayingBtn() {
@@ -548,3 +558,57 @@ function metaItem(label, value) {
 function openAudioFolder(filePath) {
   window.vstUpdater.openAudioFolder(filePath);
 }
+
+// ── Recently Played / Expanded Player ──
+function addToRecentlyPlayed(filePath, sample) {
+  // Remove duplicate if already in list
+  recentlyPlayed = recentlyPlayed.filter(r => r.path !== filePath);
+  // Add to front
+  recentlyPlayed.unshift({
+    path: filePath,
+    name: sample ? sample.name : filePath.split('/').pop().replace(/\.[^.]+$/, ''),
+    format: sample ? sample.format : filePath.split('.').pop().toUpperCase(),
+    size: sample ? sample.sizeFormatted : '',
+  });
+  // Cap
+  if (recentlyPlayed.length > MAX_RECENT) recentlyPlayed.length = MAX_RECENT;
+  renderRecentlyPlayed();
+}
+
+function renderRecentlyPlayed() {
+  const list = document.getElementById('npHistoryList');
+  if (!list) return;
+  list.innerHTML = recentlyPlayed.map(r => {
+    const isActive = r.path === audioPlayerPath;
+    const isPlaying = isActive && !audioPlayer.paused;
+    return `<div class="np-history-item${isActive ? ' active' : ''}" data-action="playRecent" data-path="${escapePath(r.path)}">
+      <span class="np-h-icon">${isPlaying ? '&#9654;' : '&#9835;'}</span>
+      <span class="np-h-name" title="${escapeHtml(r.path)}">${escapeHtml(r.name)}</span>
+      <span class="np-h-format">${r.format}</span>
+      ${r.size ? `<span class="np-h-dur">${r.size}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function togglePlayerExpanded() {
+  const np = document.getElementById('audioNowPlaying');
+  np.classList.toggle('expanded');
+  if (np.classList.contains('expanded')) {
+    renderRecentlyPlayed();
+  }
+}
+
+// Double-click to expand/collapse player
+document.getElementById('audioNowPlaying').addEventListener('dblclick', (e) => {
+  // Don't toggle if clicking controls
+  if (e.target.closest('button, input, select, .now-playing-waveform, .np-history-item')) return;
+  togglePlayerExpanded();
+});
+
+// Play from recently played list
+document.getElementById('npHistoryList')?.addEventListener('click', (e) => {
+  const item = e.target.closest('[data-action="playRecent"]');
+  if (item) {
+    previewAudio(item.dataset.path);
+  }
+});
