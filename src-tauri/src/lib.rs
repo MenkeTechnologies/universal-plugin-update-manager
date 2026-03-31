@@ -2092,6 +2092,7 @@ pub fn run() {
             get_prefs_path,
         ])
         .setup(|app| {
+            // Restore window size/position
             let prefs = history::load_preferences();
             if let Some(win_val) = prefs.get("window") {
                 if let Some(win) = app.get_webview_window("main") {
@@ -2109,6 +2110,120 @@ pub fn run() {
                     }
                 }
             }
+
+            // Build menu bar
+            use tauri::menu::*;
+
+            let handle = app.handle();
+
+            // File menu
+            let scan_all = MenuItem::with_id(handle, "scan_all", "Scan All", true, Some("CmdOrCtrl+Shift+S"))?;
+            let stop_all = MenuItem::with_id(handle, "stop_all", "Stop All", true, Some("CmdOrCtrl+."))?;
+            let sep1 = PredefinedMenuItem::separator(handle)?;
+            let export_plugins = MenuItem::with_id(handle, "export_plugins", "Export Plugins...", true, Some("CmdOrCtrl+E"))?;
+            let import_plugins = MenuItem::with_id(handle, "import_plugins", "Import Plugins...", true, Some("CmdOrCtrl+I"))?;
+            let sep2 = PredefinedMenuItem::separator(handle)?;
+            let export_audio = MenuItem::with_id(handle, "export_audio", "Export Samples...", true, None::<&str>)?;
+            let import_audio = MenuItem::with_id(handle, "import_audio", "Import Samples...", true, None::<&str>)?;
+            let sep3 = PredefinedMenuItem::separator(handle)?;
+            let export_daw = MenuItem::with_id(handle, "export_daw", "Export DAW Projects...", true, None::<&str>)?;
+            let import_daw = MenuItem::with_id(handle, "import_daw", "Import DAW Projects...", true, None::<&str>)?;
+            let sep4 = PredefinedMenuItem::separator(handle)?;
+            let export_presets = MenuItem::with_id(handle, "export_presets", "Export Presets...", true, None::<&str>)?;
+            let import_presets = MenuItem::with_id(handle, "import_presets", "Import Presets...", true, None::<&str>)?;
+            let sep5 = PredefinedMenuItem::separator(handle)?;
+            let open_prefs = MenuItem::with_id(handle, "open_prefs", "Open Preferences File", true, Some("CmdOrCtrl+,"))?;
+
+            let file_menu = Submenu::with_id_and_items(handle, "file", "File", true, &[
+                &scan_all, &stop_all, &sep1,
+                &export_plugins, &import_plugins, &sep2,
+                &export_audio, &import_audio, &sep3,
+                &export_daw, &import_daw, &sep4,
+                &export_presets, &import_presets, &sep5,
+                &open_prefs,
+            ])?;
+
+            // Edit menu
+            let edit_undo = PredefinedMenuItem::undo(handle, None)?;
+            let edit_redo = PredefinedMenuItem::redo(handle, None)?;
+            let edit_sep1 = PredefinedMenuItem::separator(handle)?;
+            let edit_cut = PredefinedMenuItem::cut(handle, None)?;
+            let edit_copy = PredefinedMenuItem::copy(handle, None)?;
+            let edit_paste = PredefinedMenuItem::paste(handle, None)?;
+            let edit_select_all = PredefinedMenuItem::select_all(handle, None)?;
+            let edit_sep2 = PredefinedMenuItem::separator(handle)?;
+            let find = MenuItem::with_id(handle, "find", "Find...", true, Some("CmdOrCtrl+F"))?;
+
+            let edit_menu = Submenu::with_id_and_items(handle, "edit", "Edit", true, &[
+                &edit_undo, &edit_redo, &edit_sep1,
+                &edit_cut, &edit_copy, &edit_paste, &edit_select_all, &edit_sep2,
+                &find,
+            ])?;
+
+            // Scan menu
+            let scan_plugins = MenuItem::with_id(handle, "scan_plugins", "Scan Plugins", true, Some("CmdOrCtrl+Shift+P"))?;
+            let scan_audio = MenuItem::with_id(handle, "scan_audio", "Scan Samples", true, Some("CmdOrCtrl+Shift+A"))?;
+            let scan_daw = MenuItem::with_id(handle, "scan_daw", "Scan DAW Projects", true, Some("CmdOrCtrl+Shift+D"))?;
+            let scan_presets = MenuItem::with_id(handle, "scan_presets", "Scan Presets", true, Some("CmdOrCtrl+Shift+R"))?;
+            let scan_sep = PredefinedMenuItem::separator(handle)?;
+            let check_updates = MenuItem::with_id(handle, "check_updates", "Check Updates", true, Some("CmdOrCtrl+U"))?;
+
+            let scan_menu = Submenu::with_id_and_items(handle, "scan", "Scan", true, &[
+                &scan_plugins, &scan_audio, &scan_daw, &scan_presets, &scan_sep, &check_updates,
+            ])?;
+
+            // View menu
+            let tab_plugins = MenuItem::with_id(handle, "tab_plugins", "Plugins", true, Some("CmdOrCtrl+1"))?;
+            let tab_samples = MenuItem::with_id(handle, "tab_samples", "Samples", true, Some("CmdOrCtrl+2"))?;
+            let tab_daw = MenuItem::with_id(handle, "tab_daw", "DAW Projects", true, Some("CmdOrCtrl+3"))?;
+            let tab_presets = MenuItem::with_id(handle, "tab_presets", "Presets", true, Some("CmdOrCtrl+4"))?;
+            let tab_favorites = MenuItem::with_id(handle, "tab_favorites", "Favorites", true, Some("CmdOrCtrl+5"))?;
+            let tab_history = MenuItem::with_id(handle, "tab_history", "History", true, Some("CmdOrCtrl+6"))?;
+            let tab_settings = MenuItem::with_id(handle, "tab_settings", "Settings", true, Some("CmdOrCtrl+7"))?;
+            let view_sep = PredefinedMenuItem::separator(handle)?;
+            let toggle_theme = MenuItem::with_id(handle, "toggle_theme", "Toggle Light/Dark", true, Some("CmdOrCtrl+T"))?;
+            let toggle_crt = MenuItem::with_id(handle, "toggle_crt", "Toggle CRT Effects", true, None::<&str>)?;
+            let view_sep2 = PredefinedMenuItem::separator(handle)?;
+            let reset_columns = MenuItem::with_id(handle, "reset_columns", "Reset Column Widths", true, None::<&str>)?;
+            let reset_tabs = MenuItem::with_id(handle, "reset_tabs", "Reset Tab Order", true, None::<&str>)?;
+
+            let view_menu = Submenu::with_id_and_items(handle, "view", "View", true, &[
+                &tab_plugins, &tab_samples, &tab_daw, &tab_presets, &tab_favorites, &tab_history, &tab_settings,
+                &view_sep, &toggle_theme, &toggle_crt,
+                &view_sep2, &reset_columns, &reset_tabs,
+            ])?;
+
+            // Data menu
+            let clear_history = MenuItem::with_id(handle, "clear_history", "Clear All History...", true, None::<&str>)?;
+            let clear_kvr = MenuItem::with_id(handle, "clear_kvr", "Clear KVR Cache...", true, None::<&str>)?;
+            let clear_favorites = MenuItem::with_id(handle, "clear_favorites", "Clear Favorites...", true, None::<&str>)?;
+
+            let data_menu = Submenu::with_id_and_items(handle, "data", "Data", true, &[
+                &clear_history, &clear_kvr, &clear_favorites,
+            ])?;
+
+            // Help menu
+            let github = MenuItem::with_id(handle, "github", "GitHub Repository", true, None::<&str>)?;
+            let about = PredefinedMenuItem::about(handle, Some("About AUDIO_HAXOR"), None)?;
+
+            let help_menu = Submenu::with_id_and_items(handle, "help", "Help", true, &[
+                &github, &about,
+            ])?;
+
+            let menu = Menu::with_items(handle, &[
+                &file_menu, &edit_menu, &scan_menu, &view_menu, &data_menu, &help_menu,
+            ])?;
+            app.set_menu(menu)?;
+
+            // Handle menu events — emit to frontend JS
+            let handle2 = app.handle().clone();
+            app.on_menu_event(move |_app, event| {
+                let id = event.id().0.as_str();
+                if let Some(win) = handle2.get_webview_window("main") {
+                    let _ = win.emit("menu-action", id);
+                }
+            });
+
             Ok(())
         })
         .run(tauri::generate_context!())

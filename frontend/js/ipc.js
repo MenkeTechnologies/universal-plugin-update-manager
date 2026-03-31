@@ -2,6 +2,57 @@
 const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
+// ── Menu bar event handler ──
+listen('menu-action', (event) => {
+  const id = event.payload;
+  switch (id) {
+    // File
+    case 'scan_all': scanAll(); break;
+    case 'stop_all': stopAll(); break;
+    case 'export_plugins': exportPlugins(); break;
+    case 'import_plugins': importPlugins(); break;
+    case 'export_audio': exportAudio(); break;
+    case 'import_audio': importAudio(); break;
+    case 'export_daw': exportDaw(); break;
+    case 'import_daw': importDaw(); break;
+    case 'export_presets': exportPresets(); break;
+    case 'import_presets': importPresets(); break;
+    case 'open_prefs': openPrefsFile(); break;
+    // Scan
+    case 'scan_plugins': scanPlugins(); break;
+    case 'scan_audio': scanAudioSamples(); break;
+    case 'scan_daw': scanDawProjects(); break;
+    case 'scan_presets': scanPresets(); break;
+    case 'check_updates': checkUpdates(); break;
+    // View — tabs
+    case 'tab_plugins': switchTab('plugins'); break;
+    case 'tab_samples': switchTab('samples'); break;
+    case 'tab_daw': switchTab('daw'); break;
+    case 'tab_presets': switchTab('presets'); break;
+    case 'tab_favorites': switchTab('favorites'); break;
+    case 'tab_history': switchTab('history'); break;
+    case 'tab_settings': switchTab('settings'); break;
+    // View — appearance
+    case 'toggle_theme': settingToggleTheme(); break;
+    case 'toggle_crt': settingToggleCrt(); break;
+    case 'reset_columns': settingResetColumns(); break;
+    case 'reset_tabs': settingResetTabOrder(); break;
+    // Data
+    case 'clear_history': settingClearAllHistory(); break;
+    case 'clear_kvr': settingClearKvrCache(); break;
+    case 'clear_favorites': clearFavorites(); break;
+    // Help
+    case 'github': openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
+    // Find (handled by existing Cmd+F)
+    case 'find': {
+      const activeTab = document.querySelector('.tab-content.active');
+      const input = activeTab?.querySelector('input[type="text"]');
+      if (input) { input.focus(); input.select(); }
+      break;
+    }
+  }
+});
+
 // Event delegation — replaces inline onclick/oninput/onchange for Tauri v2 CSP compatibility
 document.addEventListener('click', (e) => {
   if (e.target.closest('.col-resize')) return;
