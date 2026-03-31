@@ -429,18 +429,29 @@ function settingResetColumns() {
 
 async function settingClearAllHistory() {
   if (!confirm('Clear all plugin, audio, DAW, and preset scan history? This cannot be undone.')) return;
-  await Promise.all([
-    window.vstUpdater.clearHistory(),
-    window.vstUpdater.clearAudioHistory(),
-    window.vstUpdater.clearDawHistory(),
-    window.vstUpdater.clearPresetHistory(),
-  ]);
-  showToast('All scan history cleared');
+  showGlobalProgress();
+  try {
+    await Promise.all([
+      window.vstUpdater.clearHistory(),
+      window.vstUpdater.clearAudioHistory(),
+      window.vstUpdater.clearDawHistory(),
+      window.vstUpdater.clearPresetHistory(),
+    ]);
+    showToast('All scan history cleared');
+  } catch (e) {
+    showToast(`Failed to clear history — ${e.message || e}`, 4000, 'error');
+  } finally { hideGlobalProgress(); }
 }
 
 async function settingClearKvrCache() {
   if (!confirm('Clear all cached KVR version lookups? Next update check will re-fetch everything.')) return;
-  await window.vstUpdater.updateKvrCache([]);
+  showGlobalProgress();
+  try {
+    await window.vstUpdater.updateKvrCache([]);
+    showToast('KVR cache cleared');
+  } catch (e) {
+    showToast(`Failed to clear KVR cache — ${e.message || e}`, 4000, 'error');
+  } finally { hideGlobalProgress(); }
 }
 
 function settingToggleAutoScan() {

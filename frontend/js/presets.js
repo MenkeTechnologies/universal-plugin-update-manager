@@ -181,6 +181,8 @@ async function scanPresets(resume = false) {
   let pendingPresets = [];
   let pendingFound = 0;
   let flushScheduled = false;
+  const presetEta = createETA();
+  presetEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '300', 10);
   let lastFlush = 0;
 
@@ -217,7 +219,8 @@ async function scanPresets(resume = false) {
     }
 
     rebuildPresetStats();
-    btn.innerHTML = `&#8635; ${pendingFound} found`;
+    const presetElapsed = presetEta.elapsed();
+    btn.innerHTML = `&#8635; ${pendingFound} found${presetElapsed ? ' — ' + presetElapsed : ''}`;
     lastFlush = performance.now();
   }
 

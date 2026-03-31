@@ -73,6 +73,8 @@ async function scanAudioSamples(resume = false) {
   let pendingSamples = [];
   let pendingFound = 0;
   let flushScheduled = false;
+  const audioEta = createETA();
+  audioEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '300', 10);
   let lastFlush = 0;
 
@@ -91,7 +93,8 @@ async function scanAudioSamples(resume = false) {
 
     allAudioSamples.push(...toAdd);
     accumulateAudioStats(toAdd);
-    btn.innerHTML = `&#8635; ${pendingFound} found`;
+    const audioElapsed = audioEta.elapsed();
+    btn.innerHTML = `&#8635; ${pendingFound} found${audioElapsed ? ' — ' + audioElapsed : ''}`;
     progressFill.style.width = '';
     progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
 
@@ -206,6 +209,7 @@ function updateAudioStats() {
   // Update top stats bar sample count
   document.getElementById('sampleCount').textContent = allAudioSamples.length;
   document.getElementById('btnExportAudio').style.display = allAudioSamples.length > 0 ? '' : 'none';
+  if (typeof updateAudioDiskUsage === 'function') updateAudioDiskUsage();
 }
 
 function rebuildAudioStats() {
@@ -219,7 +223,8 @@ function initAudioTable() {
   tableWrap.innerHTML = `<table class="audio-table" id="audioTable">
     <thead>
       <tr>
-        <th data-action="sortAudio" data-key="name" style="width: 28%;">Name <span class="sort-arrow" id="sortArrowName">&#9660;</span><span class="col-resize"></span></th>
+        <th style="width: 30px; padding: 0;"></th>
+        <th data-action="sortAudio" data-key="name" style="width: 26%;">Name <span class="sort-arrow" id="sortArrowName">&#9660;</span><span class="col-resize"></span></th>
         <th data-action="sortAudio" data-key="format" class="col-format" style="width: 70px;">Format <span class="sort-arrow" id="sortArrowFormat"></span><span class="col-resize"></span></th>
         <th data-action="sortAudio" data-key="size" class="col-size" style="width: 90px;">Size <span class="sort-arrow" id="sortArrowSize"></span><span class="col-resize"></span></th>
         <th data-action="sortAudio" data-key="modified" class="col-date" style="width: 100px;">Modified <span class="sort-arrow" id="sortArrowModified"></span><span class="col-resize"></span></th>
@@ -331,7 +336,9 @@ function buildAudioRow(s) {
   const ep = escapePath(s.path);
   const isPlaying = audioPlayerPath === s.path;
   const rowClass = isPlaying ? ' class="row-playing"' : '';
+  const checked = batchSelected.has(s.path) ? ' checked' : '';
   return `<tr${rowClass} data-audio-path="${ep}" data-action="toggleMetadata" data-path="${ep}">
+    <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(s.name)}">${highlightMatch(s.name, _lastAudioSearch, _lastAudioMode)}</td>
     <td class="col-format"><span class="format-badge ${fmtClass}">${s.format}</span></td>
     <td class="col-size">${s.sizeFormatted}</td>

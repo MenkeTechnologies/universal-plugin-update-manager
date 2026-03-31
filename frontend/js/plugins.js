@@ -26,17 +26,20 @@ async function scanPlugins(resume = false) {
 
   // Listen for streaming progress from the worker
   let firstBatch = true;
+  const eta = createETA();
   if (scanProgressCleanup) scanProgressCleanup();
   scanProgressCleanup = window.vstUpdater.onScanProgress((data) => {
     if (data.phase === 'start') {
       list.innerHTML = '';
       btn.innerHTML = `&#8635; 0 / ${data.total}`;
+      eta.start();
     } else if (data.phase === 'scanning') {
       // Append new plugins to the list incrementally
       allPlugins.push(...data.plugins);
       const pct = Math.round((data.processed / data.total) * 100);
       progressFill.style.width = pct + '%';
-      btn.innerHTML = `&#8635; ${data.processed} / ${data.total}`;
+      const etaStr = eta.estimate(data.processed, data.total);
+      btn.innerHTML = `&#8635; ${data.processed} / ${data.total}${etaStr ? ' — ' + etaStr : ''}`;
       document.getElementById('totalCount').textContent = allPlugins.length;
 
       // Render the new batch directly into the list
@@ -167,21 +170,25 @@ async function checkUpdates() {
   // Track which plugins have been updated (by path)
   const updatedByPath = new Map();
 
+  const updateEta = createETA();
   if (updateProgressCleanup) updateProgressCleanup();
   updateProgressCleanup = window.vstUpdater.onUpdateProgress((data) => {
     if (data.phase === 'start') {
       btn.innerHTML = `&#9889; 0 / ${data.total}`;
       statusText.textContent = `Searching for updates across ${data.total} plugins...`;
+      updateEta.start();
     } else if (data.phase === 'checking') {
       const pct = Math.round((data.processed / data.total) * 100);
       progressFill.style.width = pct + '%';
-      btn.innerHTML = `&#9889; ${data.processed} / ${data.total}`;
+      const updateEtaStr = updateEta.estimate(data.processed, data.total);
+      btn.innerHTML = `&#9889; ${data.processed} / ${data.total}${updateEtaStr ? ' — ' + updateEtaStr : ''}`;
 
       // Show current plugin being checked
       const lastPlugin = data.plugins[data.plugins.length - 1];
       if (lastPlugin) {
         const mfg = lastPlugin.manufacturer !== 'Unknown' ? lastPlugin.manufacturer + ' ' : '';
-        statusText.textContent = `Checking ${mfg}${lastPlugin.name} (${data.processed}/${data.total})`;
+        const updateRemaining = updateEta.estimate(data.processed, data.total);
+        statusText.textContent = `Checking ${mfg}${lastPlugin.name} (${data.processed}/${data.total})${updateRemaining ? ' — ' + updateRemaining + ' remaining' : ''}`;
       }
 
       // Update individual plugin cards in-place and save to KVR cache
@@ -290,6 +297,7 @@ function renderPlugins(plugins) {
 
   list.innerHTML = plugins.map(p => buildPluginCardHtml(p)).join('');
   list.classList.add('fade-in');
+  if (typeof updatePluginDiskUsage === 'function') updatePluginDiskUsage();
 }
 
 // Debounce helper — fires immediately on first call, then debounces

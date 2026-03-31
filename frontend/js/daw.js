@@ -33,6 +33,7 @@ function updateDawStats() {
   document.getElementById('dawTotalSize').textContent = formatAudioSize(dawStatBytes);
   document.getElementById('dawProjectCount').textContent = allDawProjects.length;
   document.getElementById('btnExportDaw').style.display = allDawProjects.length > 0 ? '' : 'none';
+  if (typeof updateDawDiskUsage === 'function') updateDawDiskUsage();
 }
 
 function rebuildDawStats() {
@@ -46,7 +47,8 @@ function initDawTable() {
   tableWrap.innerHTML = `<table class="audio-table" id="dawTable">
     <thead>
       <tr>
-        <th data-action="sortDaw" data-key="name" style="width: 25%;">Name <span class="sort-arrow" id="dawSortArrowName">&#9660;</span><span class="col-resize"></span></th>
+        <th style="width: 30px; padding: 0;"></th>
+        <th data-action="sortDaw" data-key="name" style="width: 23%;">Name <span class="sort-arrow" id="dawSortArrowName">&#9660;</span><span class="col-resize"></span></th>
         <th data-action="sortDaw" data-key="daw" class="col-format" style="width: 12%;">DAW <span class="sort-arrow" id="dawSortArrowDaw"></span><span class="col-resize"></span></th>
         <th data-action="sortDaw" data-key="format" class="col-format" style="width: 80px;">Format <span class="sort-arrow" id="dawSortArrowFormat"></span><span class="col-resize"></span></th>
         <th data-action="sortDaw" data-key="size" class="col-size" style="width: 90px;">Size <span class="sort-arrow" id="dawSortArrowSize"></span><span class="col-resize"></span></th>
@@ -68,7 +70,9 @@ function getDawBadgeClass(daw) {
 function buildDawRow(p) {
   const ep = escapePath(p.path);
   const dawClass = getDawBadgeClass(p.daw);
+  const checked = batchSelected.has(p.path) ? ' checked' : '';
   return `<tr data-daw-path="${ep}" title="Double-click to open in ${escapeHtml(p.daw)}" style="cursor: pointer;">
+    <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(p.name)}">${highlightMatch(p.name, _lastDawSearch, _lastDawMode)}</td>
     <td class="col-format"><span class="format-badge ${dawClass}">${escapeHtml(p.daw)}</span></td>
     <td class="col-format"><span class="format-badge format-default">${p.format}</span></td>
@@ -207,6 +211,8 @@ async function scanDawProjects(resume = false) {
   let pendingProjects = [];
   let pendingFound = 0;
   let flushScheduled = false;
+  const dawEta = createETA();
+  dawEta.start();
   const FLUSH_INTERVAL = 300;
   let lastFlush = 0;
 
@@ -225,7 +231,8 @@ async function scanDawProjects(resume = false) {
 
     allDawProjects.push(...toAdd);
     accumulateDawStats(toAdd);
-    btn.innerHTML = `&#8635; ${pendingFound} found`;
+    const dawElapsed = dawEta.elapsed();
+    btn.innerHTML = `&#8635; ${pendingFound} found${dawElapsed ? ' — ' + dawElapsed : ''}`;
     progressFill.style.width = '';
     progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
 

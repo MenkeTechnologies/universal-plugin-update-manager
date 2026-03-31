@@ -9,23 +9,28 @@ let historyDawScanList = [];
 let historyPresetScanList = [];
 
 async function loadHistory() {
-  const [pluginScans, audioScans, dawScans, presetScans] = await Promise.all([
-    window.vstUpdater.getScans(),
-    window.vstUpdater.getAudioScans(),
-    window.vstUpdater.getDawScans(),
-    window.vstUpdater.getPresetScans(),
-  ]);
-  historyScanList = pluginScans;
-  historyAudioScanList = audioScans;
-  historyDawScanList = dawScans;
-  historyPresetScanList = presetScans;
-  historyMergedList = [
-    ...pluginScans.map(s => ({ ...s, _type: 'plugin' })),
-    ...audioScans.map(s => ({ ...s, _type: 'audio' })),
-    ...dawScans.map(s => ({ ...s, _type: 'daw' })),
-    ...presetScans.map(s => ({ ...s, _type: 'preset' })),
-  ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  renderHistoryList();
+  showGlobalProgress();
+  try {
+    const [pluginScans, audioScans, dawScans, presetScans] = await Promise.all([
+      window.vstUpdater.getScans(),
+      window.vstUpdater.getAudioScans(),
+      window.vstUpdater.getDawScans(),
+      window.vstUpdater.getPresetScans(),
+    ]);
+    historyScanList = pluginScans;
+    historyAudioScanList = audioScans;
+    historyDawScanList = dawScans;
+    historyPresetScanList = presetScans;
+    historyMergedList = [
+      ...pluginScans.map(s => ({ ...s, _type: 'plugin' })),
+      ...audioScans.map(s => ({ ...s, _type: 'audio' })),
+      ...dawScans.map(s => ({ ...s, _type: 'daw' })),
+      ...presetScans.map(s => ({ ...s, _type: 'preset' })),
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    renderHistoryList();
+  } catch (e) {
+    showToast(`Failed to load history — ${e.message || e}`, 4000, 'error');
+  } finally { hideGlobalProgress(); }
 }
 
 function renderHistoryList() {
