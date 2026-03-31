@@ -130,6 +130,7 @@ function buildPluginCardHtml(p) {
           <span>${escapeHtml(p.manufacturer)}</span>
           <span>${p.size}</span>
           <span>${p.modified}</span>
+          ${(p.architectures && p.architectures.length) ? p.architectures.map(a => `<span class="arch-badge arch-${a.toLowerCase()}">${a}</span>`).join('') : ''}
         </div>
       </div>
       <div class="plugin-version">${versionHtml}</div>

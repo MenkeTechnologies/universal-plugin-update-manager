@@ -14,6 +14,8 @@ pub struct PluginInfo {
     pub manufacturer_url: Option<String>,
     pub size: String,
     pub modified: String,
+    #[serde(rename = "architectures")]
+    pub architectures: Vec<String>,
 }
 
 pub fn get_vst_directories() -> Vec<String> {
@@ -162,6 +164,88 @@ fn read_plist_info(_plugin_path: &Path) -> (Option<String>, Option<String>, Opti
     (None, None, None)
 }
 
+/// Detect binary architectures for a plugin bundle.
+/// Uses `lipo -archs` on macOS, falls back to `file` command.
+fn detect_architectures(plugin_path: &Path) -> Vec<String> {
+    // Find the main binary inside the bundle
+    let contents_macos = plugin_path.join("Contents").join("MacOS");
+    let binary = if contents_macos.is_dir() {
+        // Pick the first executable in Contents/MacOS
+        fs::read_dir(&contents_macos)
+            .ok()
+            .and_then(|entries| {
+                entries
+                    .flatten()
+                    .find(|e| e.path().is_file())
+                    .map(|e| e.path())
+            })
+    } else if plugin_path.is_file() {
+        Some(plugin_path.to_path_buf())
+    } else {
+        None
+    };
+
+    let binary = match binary {
+        Some(b) => b,
+        None => return Vec::new(),
+    };
+
+    // Try lipo -archs (macOS only, works for universal binaries)
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = std::process::Command::new("lipo")
+            .args(["-archs", &binary.to_string_lossy()])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let archs: Vec<String> = stdout
+                    .split_whitespace()
+                    .map(|a| match a {
+                        "arm64" | "arm64e" => "ARM64".to_string(),
+                        "x86_64" => "x86_64".to_string(),
+                        "i386" => "i386".to_string(),
+                        other => other.to_string(),
+                    })
+                    .collect();
+                if !archs.is_empty() {
+                    return archs;
+                }
+            }
+        }
+    }
+
+    // Fallback: read Mach-O / PE magic bytes
+    if let Ok(bytes) = fs::read(&binary) {
+        if bytes.len() >= 8 {
+            // Mach-O fat binary
+            let magic = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            if magic == 0xCAFEBABE || magic == 0xBEBAFECA {
+                return vec!["Universal".to_string()];
+            }
+            // Mach-O thin
+            if bytes.len() >= 5 {
+                let mh_magic = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+                if mh_magic == 0xFEEDFACF {
+                    // 64-bit Mach-O
+                    let cpu_type = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+                    return vec![match cpu_type {
+                        0x0100000C => "ARM64".to_string(),
+                        0x01000007 => "x86_64".to_string(),
+                        _ => format!("Mach-O({})", cpu_type),
+                    }];
+                }
+            }
+            // PE (Windows DLL)
+            if bytes[0] == b'M' && bytes[1] == b'Z' {
+                return vec!["x86_64".to_string()]; // Simplified
+            }
+        }
+    }
+
+    Vec::new()
+}
+
 pub fn get_plugin_info(file_path: &Path) -> Option<PluginInfo> {
     let ext = file_path
         .extension()
@@ -192,6 +276,8 @@ pub fn get_plugin_info(file_path: &Path) -> Option<PluginInfo> {
         })
         .unwrap_or_default();
 
+    let architectures = detect_architectures(file_path);
+
     Some(PluginInfo {
         name,
         path: file_path.to_string_lossy().to_string(),
@@ -201,6 +287,7 @@ pub fn get_plugin_info(file_path: &Path) -> Option<PluginInfo> {
         manufacturer_url,
         size: format_size(size),
         modified,
+        architectures,
     })
 }
 

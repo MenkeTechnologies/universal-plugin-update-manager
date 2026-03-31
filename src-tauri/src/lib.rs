@@ -33,6 +33,8 @@ struct ExportPlugin {
     path: String,
     size: String,
     modified: String,
+    #[serde(default)]
+    architectures: Vec<String>,
 }
 
 // Shared state for cancellation
@@ -925,6 +927,7 @@ fn plugins_to_export(plugins: &[PluginInfo]) -> Vec<ExportPlugin> {
             path: p.path.clone(),
             size: p.size.clone(),
             modified: p.modified.clone(),
+            architectures: p.architectures.clone(),
         })
         .collect()
 }
@@ -1073,6 +1076,7 @@ fn import_plugins_json(file_path: String) -> Result<Vec<PluginInfo>, String> {
             manufacturer_url: p.manufacturer_url,
             size: p.size,
             modified: p.modified,
+            architectures: p.architectures,
         })
         .collect())
 }
@@ -1367,6 +1371,7 @@ mod tests {
             manufacturer_url: Some("https://testco.com".into()),
             size: "2.5 MB".into(),
             modified: "2025-01-01".into(),
+            architectures: vec!["ARM64".into(), "x86_64".into()],
         }
     }
 
@@ -1571,6 +1576,7 @@ mod tests {
                 path: "/test".into(),
                 size: "1 MB".into(),
                 modified: "2025-01-01".into(),
+                architectures: vec![],
             }],
         };
 
@@ -1593,6 +1599,7 @@ mod tests {
             path: "/test".into(),
             size: "1 MB".into(),
             modified: "2025-01-01".into(),
+            architectures: vec![],
         };
         let json = serde_json::to_string(&plugin).unwrap();
         assert!(!json.contains("manufacturer_url"));
@@ -1609,6 +1616,7 @@ mod tests {
             path: "/test".into(),
             size: "1 MB".into(),
             modified: "2025-01-01".into(),
+            architectures: vec![],
         };
         let json = serde_json::to_string(&plugin).unwrap();
         assert!(json.contains("manufacturer_url"));

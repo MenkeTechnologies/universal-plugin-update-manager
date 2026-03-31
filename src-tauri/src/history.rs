@@ -1226,6 +1226,7 @@ mod tests {
             manufacturer_url: None,
             size: "1.0 MB".into(),
             modified: "2024-01-01".into(),
+            architectures: vec![],
         }
     }
 
