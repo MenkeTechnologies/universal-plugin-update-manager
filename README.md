@@ -68,7 +68,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **KVR Integration** | Yellow KVR button on every plugin links directly to its KVR Audio product page. Double-click any plugin card to open it on KVR. URL is constructed from plugin name + manufacturer with smart slug generation (camelCase splitting, manufacturer lookup table). Falls back to KVR search if the direct URL doesn't exist |
 | **KVR Cache** | Resolved KVR data (product URLs, download links, versions) is persisted to `kvr-cache.json`. On restart, cached results are restored instantly and the background resolver resumes from where it left off |
 | **Download Button** | Green download button appears on plugins with a confirmed newer version and a KVR download link (platform-specific when available) |
-| **Export/Import** | Export plugin lists to JSON, CSV, or TSV via native file dialogs. Import previously exported scans |
+| **Export/Import** | Export all tabs (plugins, samples, DAW projects, presets) to JSON, TOML, CSV, or TSV via native file dialogs. Import from JSON or TOML. Format auto-detected from file extension |
 | **Scan History** | Stores up to 50 scan snapshots locally (plugins, audio, and DAW scans merged) with full diff support between any two scans |
 | **Batch Updater** | Walk through all outdated plugins one by one with skip/open controls |
 | **Manufacturer Link** | Globe button on each plugin opens the manufacturer's website directly (derived from bundle ID). Shows a disabled icon when no website is available |

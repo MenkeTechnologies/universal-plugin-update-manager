@@ -1314,6 +1314,41 @@ fn export_presets_json(presets: Vec<PresetFile>, file_path: String) -> Result<()
 }
 
 #[tauri::command]
+fn export_presets_dsv(presets: Vec<PresetFile>, file_path: String) -> Result<(), String> {
+    let sep = detect_separator(&file_path);
+    let mut out = format!("Name{s}Format{s}Path{s}Directory{s}Size{s}Modified\n", s = sep);
+    for p in &presets {
+        out.push_str(&format!(
+            "{}{sep}{}{sep}{}{sep}{}{sep}{}{sep}{}\n",
+            dsv_escape(&p.name, sep),
+            dsv_escape(&p.format, sep),
+            dsv_escape(&p.path, sep),
+            dsv_escape(&p.directory, sep),
+            dsv_escape(&p.size_formatted, sep),
+            dsv_escape(&p.modified, sep),
+        ));
+    }
+    std::fs::write(&file_path, out).map_err(|e| e.to_string())
+}
+
+// ── TOML export (generic — works for all types via serde) ──
+
+#[tauri::command]
+fn export_toml(data: serde_json::Value, file_path: String) -> Result<(), String> {
+    let toml_str = toml::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    std::fs::write(&file_path, toml_str).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn import_toml(file_path: String) -> Result<serde_json::Value, String> {
+    let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+    let val: toml::Value = toml::from_str(&data).map_err(|e| e.to_string())?;
+    // Convert toml::Value to serde_json::Value
+    let json_str = serde_json::to_string(&val).map_err(|e| e.to_string())?;
+    serde_json::from_str(&json_str).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn import_presets_json(file_path: String) -> Result<Vec<PresetFile>, String> {
     let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
     if let Ok(arr) = serde_json::from_str::<Vec<PresetFile>>(&data) {
@@ -1952,6 +1987,9 @@ pub fn run() {
             preset_history_diff,
             open_preset_folder,
             export_presets_json,
+            export_presets_dsv,
+            export_toml,
+            import_toml,
             import_presets_json,
             import_audio_json,
             import_daw_json,
