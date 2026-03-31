@@ -14,6 +14,13 @@ let expandedMetaPath = null;
 let recentlyPlayed = [];
 const MAX_RECENT = 50;
 
+function loadRecentlyPlayed() {
+  recentlyPlayed = prefs.getObject('recentlyPlayed', []);
+}
+function saveRecentlyPlayed() {
+  prefs.setItem('recentlyPlayed', recentlyPlayed);
+}
+
 audioPlayer.addEventListener('ended', () => {
   if (!audioLooping) {
     updatePlayBtnStates();
@@ -603,6 +610,7 @@ function addToRecentlyPlayed(filePath, sample) {
   });
   // Cap
   if (recentlyPlayed.length > MAX_RECENT) recentlyPlayed.length = MAX_RECENT;
+  saveRecentlyPlayed();
   renderRecentlyPlayed();
 }
 
