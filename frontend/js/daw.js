@@ -176,6 +176,7 @@ function loadMoreDaw() {
 }
 
 async function scanDawProjects(resume = false) {
+  showGlobalProgress();
   const btn = document.getElementById('btnScanDaw');
   const resumeBtn = document.getElementById('btnResumeDaw');
   const stopBtn = document.getElementById('btnStopDaw');
@@ -295,6 +296,7 @@ async function scanDawProjects(resume = false) {
     showToast(`DAW scan failed — ${errMsg}`, 4000, 'error');
   }
 
+  hideGlobalProgress();
   btn.disabled = false;
   btn.innerHTML = '&#127911; Scan DAW Projects';
   stopBtn.style.display = 'none';

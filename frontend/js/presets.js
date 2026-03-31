@@ -152,6 +152,7 @@ function openPresetFolder(path) {
 }
 
 async function scanPresets(resume = false) {
+  showGlobalProgress();
   const btn = document.getElementById('btnScanPresets');
   const resumeBtn = document.getElementById('btnResumePresets');
   const stopBtn = document.getElementById('btnStopPresets');
@@ -263,6 +264,7 @@ async function scanPresets(resume = false) {
     showToast(`Preset scan failed — ${errMsg}`, 4000, 'error');
   }
 
+  hideGlobalProgress();
   btn.disabled = false;
   btn.innerHTML = '&#127924; Scan Presets';
   stopBtn.style.display = 'none';

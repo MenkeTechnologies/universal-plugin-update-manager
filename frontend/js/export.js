@@ -142,7 +142,7 @@ async function exportAudio() {
       await window.vstUpdater.exportAudioJson(allAudioSamples, filePath.endsWith('.json') ? filePath : filePath + '.json');
     }
     showToast('Samples exported');
-  } catch (err) { showToast(`Audio export failed — ${err.message || err || 'Unknown error'}`, 4000, 'error'); }
+  } catch (err) { showToast(`Audio export failed — ${err.message || err || 'Unknown error'}`, 4000, 'error'); } finally { hideGlobalProgress(); }
 }
 
 async function importAudio() {
@@ -152,6 +152,7 @@ async function importAudio() {
   if (!selected) return;
   const filePath = typeof selected === 'string' ? selected : selected.path;
   if (!filePath) return;
+  showGlobalProgress();
   try {
     let imported;
     if (filePath.endsWith('.toml')) {
@@ -169,7 +170,7 @@ async function importAudio() {
     filterAudioSamples();
     document.getElementById('btnExportAudio').style.display = '';
     showToast(`Imported ${imported.length} samples`);
-  } catch (err) { await showImportError('audio', err.message || String(err)); }
+  } catch (err) { await showImportError('audio', err.message || String(err)); } finally { hideGlobalProgress(); }
 }
 
 // ── DAW ──
@@ -184,6 +185,7 @@ async function exportDaw() {
     filters: ALL_EXPORT_FILTERS,
   });
   if (!filePath) return;
+  showGlobalProgress();
   try {
     const fmt = getFileFormat(filePath);
     if (fmt === 'pdf') {
@@ -198,7 +200,7 @@ async function exportDaw() {
       await window.vstUpdater.exportDawJson(allDawProjects, filePath.endsWith('.json') ? filePath : filePath + '.json');
     }
     showToast('DAW projects exported');
-  } catch (err) { showToast(`DAW export failed — ${err.message || err || 'Unknown error'}`, 4000, 'error'); }
+  } catch (err) { showToast(`DAW export failed — ${err.message || err || 'Unknown error'}`, 4000, 'error'); } finally { hideGlobalProgress(); }
 }
 
 async function importDaw() {
@@ -208,6 +210,7 @@ async function importDaw() {
   if (!selected) return;
   const filePath = typeof selected === 'string' ? selected : selected.path;
   if (!filePath) return;
+  showGlobalProgress();
   try {
     let imported;
     if (filePath.endsWith('.toml')) {
@@ -225,7 +228,7 @@ async function importDaw() {
     filterDawProjects();
     document.getElementById('btnExportDaw').style.display = '';
     showToast(`Imported ${imported.length} DAW projects`);
-  } catch (err) { await showImportError('daw', err.message || String(err)); }
+  } catch (err) { await showImportError('daw', err.message || String(err)); } finally { hideGlobalProgress(); }
 }
 
 // ── Presets ──
@@ -240,6 +243,7 @@ async function exportPresets() {
     filters: ALL_EXPORT_FILTERS,
   });
   if (!filePath) return;
+  showGlobalProgress();
   try {
     const fmt = getFileFormat(filePath);
     if (fmt === 'pdf') {
@@ -254,7 +258,7 @@ async function exportPresets() {
       await window.vstUpdater.exportPresetsJson(allPresets, filePath.endsWith('.json') ? filePath : filePath + '.json');
     }
     showToast('Presets exported');
-  } catch (err) { showToast(`Preset export failed — ${err.message || err || 'Unknown error'}`, 4000, 'error'); }
+  } catch (err) { showToast(`Preset export failed — ${err.message || err || 'Unknown error'}`, 4000, 'error'); } finally { hideGlobalProgress(); }
 }
 
 async function importPresets() {
@@ -264,6 +268,7 @@ async function importPresets() {
   if (!selected) return;
   const filePath = typeof selected === 'string' ? selected : selected.path;
   if (!filePath) return;
+  showGlobalProgress();
   try {
     let imported;
     if (filePath.endsWith('.toml')) {
@@ -281,5 +286,5 @@ async function importPresets() {
     filterPresets();
     document.getElementById('btnExportPresets').style.display = '';
     showToast(`Imported ${imported.length} presets`);
-  } catch (err) { await showImportError('presets', err.message || String(err)); }
+  } catch (err) { await showImportError('presets', err.message || String(err)); } finally { hideGlobalProgress(); }
 }

@@ -1,6 +1,7 @@
 let scanProgressCleanup = null;
 
 async function scanPlugins(resume = false) {
+  showGlobalProgress();
   const btn = document.getElementById('btnScan');
   const resumeBtn = document.getElementById('btnResumeScan');
   const progress = document.getElementById('progressBar');
@@ -80,6 +81,7 @@ async function scanPlugins(resume = false) {
   }
 
   if (scanProgressCleanup) { scanProgressCleanup(); scanProgressCleanup = null; }
+  hideGlobalProgress();
   stopBtn.style.display = 'none';
   btn.disabled = false;
   btn.innerHTML = '&#8635; Scan Plugins';
@@ -142,6 +144,7 @@ function buildPluginCardHtml(p) {
 let updateProgressCleanup = null;
 
 async function checkUpdates() {
+  showGlobalProgress();
   const btn = document.getElementById('btnCheckUpdates');
   const progress = document.getElementById('progressBar');
   const progressFill = progress.querySelector('.progress-fill');
@@ -263,6 +266,7 @@ async function checkUpdates() {
   }
 
   if (updateProgressCleanup) { updateProgressCleanup(); updateProgressCleanup = null; }
+  hideGlobalProgress();
   hideStopButton();
   statusBar.classList.remove('active');
   btn.disabled = false;
@@ -285,6 +289,7 @@ function renderPlugins(plugins) {
   }
 
   list.innerHTML = plugins.map(p => buildPluginCardHtml(p)).join('');
+  list.classList.add('fade-in');
 }
 
 // Debounce helper — fires immediately on first call, then debounces

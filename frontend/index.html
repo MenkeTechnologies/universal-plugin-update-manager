@@ -243,10 +243,16 @@
       font-size: 18px; font-weight: 900;
       letter-spacing: 3px;
       text-transform: uppercase;
-      background: linear-gradient(90deg, var(--cyan), #fff, var(--accent));
+      background: linear-gradient(90deg, var(--cyan), #fff, var(--accent), var(--cyan));
+      background-size: 300% 100%;
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       text-shadow: none;
       filter: drop-shadow(0 0 8px var(--cyan-glow));
+      animation: logo-shimmer 6s linear infinite;
+    }
+    @keyframes logo-shimmer {
+      0% { background-position: 0% 0%; }
+      100% { background-position: 300% 0%; }
     }
 
     .logo-author {
@@ -752,6 +758,7 @@
 
     .stat-dot {
       width: 8px; height: 8px; border-radius: 0;
+      animation: dot-pulse 2s ease-in-out infinite;
       clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
     }
 
@@ -945,6 +952,7 @@
       border-left-color: var(--accent);
       background: var(--bg-hover);
       box-shadow: 0 0 20px var(--cyan-dim), inset 0 0 30px rgba(5,217,232,0.03);
+      transform: translateX(2px);
     }
 
     .plugin-info h3 {
@@ -1406,6 +1414,11 @@
     }
 
     .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; min-height: 0; }
+    .tab-content.active { animation: tabFadeIn 0.2s ease-out; }
+    @keyframes tabFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
     .tab-content.active { display: flex; }
 
     /* History view */
@@ -1812,8 +1825,14 @@
       border-right: none;
     }
 
+    .audio-table tbody tr {
+      transition: transform 0.15s, background 0.15s;
+    }
     .audio-table tr:hover td {
       background: var(--bg-hover);
+    }
+    .audio-table tbody tr:hover {
+      transform: translateX(2px);
     }
 
     .audio-table .col-name {
@@ -1853,6 +1872,14 @@
       font-weight: 700;
       letter-spacing: 1.5px;
       text-transform: uppercase;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .format-badge:hover {
+      transform: scale(1.1);
+    }
+    @keyframes dot-pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
     }
 
     .format-wav { background: transparent; color: var(--cyan); border: 1px solid var(--cyan); box-shadow: 0 0 6px var(--cyan-dim); }

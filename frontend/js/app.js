@@ -31,6 +31,7 @@
 
 // Auto-load last scan on startup
 (async function loadLastScan() {
+  showGlobalProgress();
   // Load file-backed preferences before anything else
   await prefs.load();
   restoreSettings();
@@ -117,6 +118,7 @@
     filterPlugins();
   }
 
+  hideGlobalProgress();
   updateHeaderInfo();
   setInterval(updateHeaderInfo, 2000); // refresh process stats every 2s
 
