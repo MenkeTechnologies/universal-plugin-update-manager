@@ -617,3 +617,102 @@ document.getElementById('npHistoryList')?.addEventListener('click', (e) => {
     previewAudio(item.dataset.path);
   }
 });
+
+// ── Drag-to-dock ──
+(function initPlayerDrag() {
+  const np = document.getElementById('audioNowPlaying');
+  const handle = document.getElementById('npDragHandle');
+  const overlay = document.getElementById('dockOverlay');
+  const zones = { tl: 'dockTL', tr: 'dockTR', bl: 'dockBL', br: 'dockBR' };
+  let dragging = false, startX, startY, origX, origY;
+
+  function getCurrentDock() {
+    for (const cls of np.classList) {
+      if (cls.startsWith('dock-')) return cls;
+    }
+    return 'dock-br';
+  }
+
+  function setDock(dock) {
+    np.classList.remove('dock-tl', 'dock-tr', 'dock-bl', 'dock-br');
+    np.classList.add(dock);
+    prefs.setItem('playerDock', dock);
+  }
+
+  // Restore saved dock position
+  const saved = prefs.getItem('playerDock');
+  if (saved && ['dock-tl', 'dock-tr', 'dock-bl', 'dock-br'].includes(saved)) {
+    setDock(saved);
+  }
+
+  function nearestDock(x, y) {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    if (x < cx && y < cy) return 'dock-tl';
+    if (x >= cx && y < cy) return 'dock-tr';
+    if (x < cx && y >= cy) return 'dock-bl';
+    return 'dock-br';
+  }
+
+  function highlightZone(dock) {
+    Object.values(zones).forEach(id => document.getElementById(id).classList.remove('active'));
+    const map = { 'dock-tl': 'dockTL', 'dock-tr': 'dockTR', 'dock-bl': 'dockBL', 'dock-br': 'dockBR' };
+    const el = document.getElementById(map[dock]);
+    if (el) el.classList.add('active');
+  }
+
+  const toolbar = np.querySelector('.np-toolbar');
+
+  function onDragStart(e) {
+    if (e.button !== 0) return;
+    // Don't drag if clicking toolbar buttons
+    if (e.target.closest('.np-toolbar-actions')) return;
+    e.preventDefault();
+    dragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = np.getBoundingClientRect();
+    origX = rect.left;
+    origY = rect.top;
+
+    // Switch to absolute positioning for free drag
+    np.classList.remove('dock-tl', 'dock-tr', 'dock-bl', 'dock-br');
+    np.style.left = origX + 'px';
+    np.style.top = origY + 'px';
+    np.style.right = 'auto';
+    np.style.bottom = 'auto';
+    np.classList.add('dragging');
+    overlay.classList.add('visible');
+  }
+
+  handle.addEventListener('mousedown', onDragStart);
+  toolbar.addEventListener('mousedown', onDragStart);
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    np.style.left = (origX + dx) + 'px';
+    np.style.top = (origY + dy) + 'px';
+    highlightZone(nearestDock(e.clientX, e.clientY));
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    np.classList.remove('dragging');
+    overlay.classList.remove('visible');
+    Object.values(zones).forEach(id => document.getElementById(id).classList.remove('active'));
+
+    // Clear inline styles and snap to dock
+    np.style.left = '';
+    np.style.top = '';
+    np.style.right = '';
+    np.style.bottom = '';
+
+    const dock = nearestDock(e.clientX, e.clientY);
+    np.classList.add('snapping');
+    setDock(dock);
+    setTimeout(() => np.classList.remove('snapping'), 300);
+  });
+})();

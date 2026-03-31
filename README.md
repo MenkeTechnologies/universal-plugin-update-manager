@@ -80,7 +80,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Color Schemes** | Multiple themes including cyberpunk (default), light mode, and custom schemes with configurable CSS variables |
 | **Fuzzy Search** | All search bars default to fuzzy matching (characters match in order, not contiguous). Toggle the `.*` button to switch to regex mode with full pattern support. Available in all tabs |
 | **Resizable Columns** | Drag column borders to resize. Widths persist across sessions |
-| **Floating Player** | Cyberpunk-styled floating audio player in the bottom-right corner with play/pause, loop, seek bar, volume slider, and playback speed (0.25x-2x). Double-click to expand into a centered full player with recently played history (up to 50 tracks). Click any track in history to replay it. Persists across tab switches |
+| **Floating Player** | Draggable audio player that docks to any corner (drag the handle or toolbar to reposition, snaps to nearest quadrant). Features play/pause, loop, seek bar, volume slider, and playback speed (0.25x-2x). Double-click to expand with recently played history (up to 50 tracks). Dock position persists across sessions |
 | **Context Menus** | Right-click context menus on every interactive element -- plugins (KVR, manufacturer, reveal, copy), samples (play, loop, reveal, copy), DAW projects (open in DAW, reveal, copy), presets (reveal, copy), and history entries (view, delete) |
 | **Toast Notifications** | Slide-in notifications for actions like opening DAW projects or revealing files in Finder |
 
