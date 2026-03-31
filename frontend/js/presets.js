@@ -239,7 +239,7 @@ async function scanPresets(resume = false) {
   } catch (err) {
     if (presetScanProgressCleanup) { presetScanProgressCleanup(); presetScanProgressCleanup = null; }
     flushPending();
-    tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${err.message}</p></div>`;
+    tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${err.message || err || 'Unknown error'}</p></div>`;
   }
 
   btn.disabled = false;

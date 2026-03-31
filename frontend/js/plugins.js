@@ -74,7 +74,7 @@ async function scanPlugins(resume = false) {
       resumeBtn.style.display = '';
     }
   } catch (err) {
-    list.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${err.message}</p></div>`;
+    list.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${err.message || err || 'Unknown error'}</p></div>`;
   }
 
   if (scanProgressCleanup) { scanProgressCleanup(); scanProgressCleanup = null; }
@@ -253,7 +253,7 @@ async function checkUpdates() {
 
     renderPlugins(allPlugins);
   } catch (err) {
-    if (err.message !== 'stopped') {
+    if ((err.message || err) !== 'stopped') {
       console.error('Check updates error:', err);
     }
   }
