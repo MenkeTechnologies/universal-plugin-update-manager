@@ -164,12 +164,24 @@ async fn scan_plugins(
         // Process plugins in parallel, streaming results to UI via channel
         use rayon::prelude::*;
         let prefs = history::load_preferences();
-        let batch_size = prefs.get("batchSize")
-            .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
-            .unwrap_or(100).max(10).min(200);
-        let chan_buf = prefs.get("channelBuffer")
-            .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
-            .unwrap_or(512).max(64).min(2048);
+        let batch_size = prefs
+            .get("batchSize")
+            .and_then(|v| {
+                v.as_str()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .or(v.as_u64().map(|n| n as usize))
+            })
+            .unwrap_or(100)
+            .clamp(10, 200);
+        let chan_buf = prefs
+            .get("channelBuffer")
+            .and_then(|v| {
+                v.as_str()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .or(v.as_u64().map(|n| n as usize))
+            })
+            .unwrap_or(512)
+            .clamp(64, 2048);
         let (tx, rx) = std::sync::mpsc::sync_channel::<scanner::PluginInfo>(chan_buf);
         let stop_flag = std::sync::Arc::new(AtomicBool::new(false));
         let stop_flag2 = stop_flag.clone();
@@ -237,7 +249,7 @@ async fn scan_plugins(
     .await;
 
     state.scanning.store(false, Ordering::SeqCst);
-    Ok(result.map_err(|e| e.to_string())?)
+    result.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -512,7 +524,7 @@ async fn scan_audio_samples(
     .await;
 
     state.scanning.store(false, Ordering::SeqCst);
-    Ok(result.map_err(|e| e.to_string())?)
+    result.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -635,7 +647,7 @@ async fn scan_daw_projects(
     .await;
 
     state.scanning.store(false, Ordering::SeqCst);
-    Ok(result.map_err(|e| e.to_string())?)
+    result.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -753,7 +765,7 @@ async fn scan_presets(
     .await;
 
     state.scanning.store(false, Ordering::SeqCst);
-    Ok(result.map_err(|e| e.to_string())?)
+    result.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1337,7 +1349,10 @@ fn export_presets_json(presets: Vec<PresetFile>, file_path: String) -> Result<()
 #[tauri::command]
 fn export_presets_dsv(presets: Vec<PresetFile>, file_path: String) -> Result<(), String> {
     let sep = detect_separator(&file_path);
-    let mut out = format!("Name{s}Format{s}Path{s}Directory{s}Size{s}Modified\n", s = sep);
+    let mut out = format!(
+        "Name{s}Format{s}Path{s}Directory{s}Size{s}Modified\n",
+        s = sep
+    );
     for p in &presets {
         out.push_str(&format!(
             "{}{sep}{}{sep}{}{sep}{}{sep}{}{sep}{}\n",
@@ -1378,26 +1393,36 @@ fn export_pdf(
     rows: Vec<Vec<String>>,
     file_path: String,
 ) -> Result<(), String> {
-    use printpdf::*;
     use printpdf::path::{PaintMode, WindingOrder};
+    use printpdf::*;
 
     let page_w = Mm(297.0); // A4 landscape
     let page_h = Mm(210.0);
     let margin_x = 18.0_f32;
-    let margin_top = 15.0_f32;
+    let _margin_top = 15.0_f32;
     let margin_bottom = 18.0_f32;
     let row_height = 5.2_f32;
     let header_row_h = 7.0_f32;
     let col_count = headers.len();
     let usable_w = page_w.0 - margin_x * 2.0;
-    let col_w = if col_count > 0 { usable_w / col_count as f32 } else { usable_w };
+    let col_w = if col_count > 0 {
+        usable_w / col_count as f32
+    } else {
+        usable_w
+    };
     let version = env!("CARGO_PKG_VERSION");
     let total_pages = 1 + (rows.len() as f32 / 32.0).ceil() as usize;
 
     let (doc, page1, layer1) = PdfDocument::new(&title, page_w, page_h, "Layer 1");
-    let font = doc.add_builtin_font(BuiltinFont::Helvetica).map_err(|e| e.to_string())?;
-    let font_bold = doc.add_builtin_font(BuiltinFont::HelveticaBold).map_err(|e| e.to_string())?;
-    let font_italic = doc.add_builtin_font(BuiltinFont::HelveticaOblique).map_err(|e| e.to_string())?;
+    let font = doc
+        .add_builtin_font(BuiltinFont::Helvetica)
+        .map_err(|e| e.to_string())?;
+    let font_bold = doc
+        .add_builtin_font(BuiltinFont::HelveticaBold)
+        .map_err(|e| e.to_string())?;
+    let font_italic = doc
+        .add_builtin_font(BuiltinFont::HelveticaOblique)
+        .map_err(|e| e.to_string())?;
 
     let mut current_page = page1;
     let mut current_layer = layer1;
@@ -1406,13 +1431,27 @@ fn export_pdf(
     let mut row_idx = 0_usize;
 
     macro_rules! layer {
-        () => { doc.get_page(current_page).get_layer(current_layer) };
+        () => {
+            doc.get_page(current_page).get_layer(current_layer)
+        };
     }
 
     // Color helper (Color doesn't impl Clone)
-    fn rgb(r: f32, g: f32, b: f32) -> Color { Color::Rgb(Rgb::new(r, g, b, None)) }
+    fn rgb(r: f32, g: f32, b: f32) -> Color {
+        Color::Rgb(Rgb::new(r, g, b, None))
+    }
 
-    fn fill_rect(layer: &PdfLayerReference, x: f32, y: f32, w: f32, h: f32, r: f32, g: f32, b: f32) {
+    #[allow(clippy::too_many_arguments)]
+    fn fill_rect(
+        layer: &PdfLayerReference,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        r: f32,
+        g: f32,
+        b: f32,
+    ) {
         layer.set_fill_color(rgb(r, g, b));
         layer.set_outline_color(rgb(r, g, b));
         layer.set_outline_thickness(0.0);
@@ -1429,34 +1468,85 @@ fn export_pdf(
         });
     }
 
-    fn stroke_line(layer: &PdfLayerReference, x1: f32, y1: f32, x2: f32, y2: f32, r: f32, g: f32, b: f32, thickness: f32) {
+    #[allow(clippy::too_many_arguments)]
+    fn stroke_line(
+        layer: &PdfLayerReference,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        r: f32,
+        g: f32,
+        b: f32,
+        thickness: f32,
+    ) {
         layer.set_outline_color(rgb(r, g, b));
         layer.set_outline_thickness(thickness);
         let points = vec![
             (Point::new(Mm(x1), Mm(y1)), false),
             (Point::new(Mm(x2), Mm(y2)), false),
         ];
-        layer.add_line(Line { points, is_closed: false });
+        layer.add_line(Line {
+            points,
+            is_closed: false,
+        });
     }
 
     // ── Render page header ──
     let render_header = |layer_ref: &PdfLayerReference, y: &mut f32, page: usize| {
         // Dark header bar
-        fill_rect(layer_ref, 0.0, page_h.0 - 22.0, page_w.0, 22.0, 0.02, 0.02, 0.04);
+        fill_rect(
+            layer_ref,
+            0.0,
+            page_h.0 - 22.0,
+            page_w.0,
+            22.0,
+            0.02,
+            0.02,
+            0.04,
+        );
 
         // App name + music note (cyan)
         layer_ref.set_fill_color(rgb(0.02, 0.85, 0.91));
-        layer_ref.use_text("\u{266B} AUDIO_HAXOR", 14.0, Mm(margin_x), Mm(page_h.0 - 14.0), &font_bold);
+        layer_ref.use_text(
+            "\u{266B} AUDIO_HAXOR",
+            14.0,
+            Mm(margin_x),
+            Mm(page_h.0 - 14.0),
+            &font_bold,
+        );
 
         // Version (white)
         layer_ref.set_fill_color(rgb(1.0, 1.0, 1.0));
-        layer_ref.use_text(&format!("v{}", version), 8.0, Mm(margin_x + 68.0), Mm(page_h.0 - 14.0), &font);
+        layer_ref.use_text(
+            format!("v{}", version),
+            8.0,
+            Mm(margin_x + 68.0),
+            Mm(page_h.0 - 14.0),
+            &font,
+        );
 
         // Title on the right
-        layer_ref.use_text(&title, 12.0, Mm(page_w.0 - margin_x - 80.0), Mm(page_h.0 - 14.0), &font_bold);
+        layer_ref.use_text(
+            &title,
+            12.0,
+            Mm(page_w.0 - margin_x - 80.0),
+            Mm(page_h.0 - 14.0),
+            &font_bold,
+        );
 
         // Cyan accent line under header
-        stroke_line(layer_ref, 0.0, page_h.0 - 22.0, page_w.0, page_h.0 - 22.0, 0.02, 0.85, 0.91, 1.5);
+        stroke_line(
+            layer_ref,
+            0.0,
+            page_h.0 - 22.0,
+            page_w.0,
+            page_h.0 - 22.0,
+            0.02,
+            0.85,
+            0.91,
+            1.5,
+        );
 
         *y = page_h.0 - 28.0;
 
@@ -1476,7 +1566,16 @@ fn export_pdf(
     // ── Render column headers ──
     let render_col_headers = |layer_ref: &PdfLayerReference, y: &mut f32| {
         // Header background
-        fill_rect(layer_ref, margin_x - 1.0, *y - 1.5, usable_w + 2.0, header_row_h, 0.93, 0.93, 0.93);
+        fill_rect(
+            layer_ref,
+            margin_x - 1.0,
+            *y - 1.5,
+            usable_w + 2.0,
+            header_row_h,
+            0.93,
+            0.93,
+            0.93,
+        );
 
         layer_ref.set_fill_color(rgb(0.15, 0.15, 0.15));
         for (i, h) in headers.iter().enumerate() {
@@ -1486,23 +1585,52 @@ fn export_pdf(
         *y -= header_row_h;
 
         // Cyan line under headers
-        stroke_line(layer_ref, margin_x, *y + 1.0, page_w.0 - margin_x, *y + 1.0, 0.02, 0.85, 0.91, 0.8);
+        stroke_line(
+            layer_ref,
+            margin_x,
+            *y + 1.0,
+            page_w.0 - margin_x,
+            *y + 1.0,
+            0.02,
+            0.85,
+            0.91,
+            0.8,
+        );
     };
 
     // ── Render footer ──
     let render_footer = |layer_ref: &PdfLayerReference, page: usize| {
         let footer_y = 8.0;
         // Thin gray line
-        stroke_line(layer_ref, margin_x, footer_y + 3.0, page_w.0 - margin_x, footer_y + 3.0, 0.8, 0.8, 0.8, 0.3);
+        stroke_line(
+            layer_ref,
+            margin_x,
+            footer_y + 3.0,
+            page_w.0 - margin_x,
+            footer_y + 3.0,
+            0.8,
+            0.8,
+            0.8,
+            0.3,
+        );
 
         layer_ref.set_fill_color(rgb(0.55, 0.55, 0.55));
         layer_ref.use_text(
-            &format!("AUDIO_HAXOR v{} — {}", version, title),
-            7.0, Mm(margin_x), Mm(footer_y), &font,
+            format!("AUDIO_HAXOR v{} — {}", version, title),
+            7.0,
+            Mm(margin_x),
+            Mm(footer_y),
+            &font,
         );
 
         let page_str = format!("Page {} of {}", page, total_pages);
-        layer_ref.use_text(&page_str, 7.0, Mm(page_w.0 - margin_x - 25.0), Mm(footer_y), &font);
+        layer_ref.use_text(
+            &page_str,
+            7.0,
+            Mm(page_w.0 - margin_x - 25.0),
+            Mm(footer_y),
+            &font,
+        );
     };
 
     // ── First page ──
@@ -1528,7 +1656,16 @@ fn export_pdf(
 
         // Alternating row stripe
         if row_idx % 2 == 1 {
-            fill_rect(&layer!(), margin_x - 1.0, y - 1.2, usable_w + 2.0, row_height, 0.96, 0.96, 0.98);
+            fill_rect(
+                &layer!(),
+                margin_x - 1.0,
+                y - 1.2,
+                usable_w + 2.0,
+                row_height,
+                0.96,
+                0.96,
+                0.98,
+            );
         }
 
         layer!().set_fill_color(rgb(0.12, 0.12, 0.12));
@@ -2112,11 +2249,18 @@ pub fn run() {
     let prefs = history::load_preferences();
     let multiplier = prefs
         .get("threadMultiplier")
-        .and_then(|v| v.as_str().or_else(|| v.as_u64().map(|_| "")).and_then(|s| s.parse::<usize>().ok()))
-        .or_else(|| prefs.get("threadMultiplier").and_then(|v| v.as_u64().map(|n| n as usize)))
+        .and_then(|v| {
+            v.as_str()
+                .or_else(|| v.as_u64().map(|_| ""))
+                .and_then(|s| s.parse::<usize>().ok())
+        })
+        .or_else(|| {
+            prefs
+                .get("threadMultiplier")
+                .and_then(|v| v.as_u64().map(|n| n as usize))
+        })
         .unwrap_or(4)
-        .max(1)
-        .min(8);
+        .clamp(1, 8);
     let pool_size = num_cpus::get() * multiplier;
     rayon::ThreadPoolBuilder::new()
         .num_threads(pool_size)
@@ -2250,7 +2394,13 @@ pub fn run() {
             // App menu (macOS convention — first menu shows app name)
             let app_about = PredefinedMenuItem::about(handle, Some("About AUDIO_HAXOR"), None)?;
             let app_sep1 = PredefinedMenuItem::separator(handle)?;
-            let app_prefs = MenuItem::with_id(handle, "open_prefs_app", "Preferences...", true, Some("CmdOrCtrl+,"))?;
+            let app_prefs = MenuItem::with_id(
+                handle,
+                "open_prefs_app",
+                "Preferences...",
+                true,
+                Some("CmdOrCtrl+,"),
+            )?;
             let app_sep2 = PredefinedMenuItem::separator(handle)?;
             let app_services = PredefinedMenuItem::services(handle, None)?;
             let app_sep3 = PredefinedMenuItem::separator(handle)?;
@@ -2260,35 +2410,118 @@ pub fn run() {
             let app_sep4 = PredefinedMenuItem::separator(handle)?;
             let app_quit = PredefinedMenuItem::quit(handle, None)?;
 
-            let app_menu = Submenu::with_id_and_items(handle, "app", "AUDIO_HAXOR", true, &[
-                &app_about, &app_sep1, &app_prefs, &app_sep2,
-                &app_services, &app_sep3,
-                &app_hide, &app_hide_others, &app_show_all, &app_sep4,
-                &app_quit,
-            ])?;
+            let app_menu = Submenu::with_id_and_items(
+                handle,
+                "app",
+                "AUDIO_HAXOR",
+                true,
+                &[
+                    &app_about,
+                    &app_sep1,
+                    &app_prefs,
+                    &app_sep2,
+                    &app_services,
+                    &app_sep3,
+                    &app_hide,
+                    &app_hide_others,
+                    &app_show_all,
+                    &app_sep4,
+                    &app_quit,
+                ],
+            )?;
 
             // File menu
-            let scan_all = MenuItem::with_id(handle, "scan_all", "Scan All", true, Some("CmdOrCtrl+Shift+S"))?;
-            let stop_all = MenuItem::with_id(handle, "stop_all", "Stop All", true, Some("CmdOrCtrl+."))?;
+            let scan_all = MenuItem::with_id(
+                handle,
+                "scan_all",
+                "Scan All",
+                true,
+                Some("CmdOrCtrl+Shift+S"),
+            )?;
+            let stop_all =
+                MenuItem::with_id(handle, "stop_all", "Stop All", true, Some("CmdOrCtrl+."))?;
             let sep1 = PredefinedMenuItem::separator(handle)?;
-            let export_plugins = MenuItem::with_id(handle, "export_plugins", "Export Plugins...", true, Some("CmdOrCtrl+E"))?;
-            let import_plugins = MenuItem::with_id(handle, "import_plugins", "Import Plugins...", true, Some("CmdOrCtrl+I"))?;
+            let export_plugins = MenuItem::with_id(
+                handle,
+                "export_plugins",
+                "Export Plugins...",
+                true,
+                Some("CmdOrCtrl+E"),
+            )?;
+            let import_plugins = MenuItem::with_id(
+                handle,
+                "import_plugins",
+                "Import Plugins...",
+                true,
+                Some("CmdOrCtrl+I"),
+            )?;
             let sep2 = PredefinedMenuItem::separator(handle)?;
-            let export_audio = MenuItem::with_id(handle, "export_audio", "Export Samples...", true, None::<&str>)?;
-            let import_audio = MenuItem::with_id(handle, "import_audio", "Import Samples...", true, None::<&str>)?;
+            let export_audio = MenuItem::with_id(
+                handle,
+                "export_audio",
+                "Export Samples...",
+                true,
+                None::<&str>,
+            )?;
+            let import_audio = MenuItem::with_id(
+                handle,
+                "import_audio",
+                "Import Samples...",
+                true,
+                None::<&str>,
+            )?;
             let sep3 = PredefinedMenuItem::separator(handle)?;
-            let export_daw = MenuItem::with_id(handle, "export_daw", "Export DAW Projects...", true, None::<&str>)?;
-            let import_daw = MenuItem::with_id(handle, "import_daw", "Import DAW Projects...", true, None::<&str>)?;
+            let export_daw = MenuItem::with_id(
+                handle,
+                "export_daw",
+                "Export DAW Projects...",
+                true,
+                None::<&str>,
+            )?;
+            let import_daw = MenuItem::with_id(
+                handle,
+                "import_daw",
+                "Import DAW Projects...",
+                true,
+                None::<&str>,
+            )?;
             let sep4 = PredefinedMenuItem::separator(handle)?;
-            let export_presets = MenuItem::with_id(handle, "export_presets", "Export Presets...", true, None::<&str>)?;
-            let import_presets = MenuItem::with_id(handle, "import_presets", "Import Presets...", true, None::<&str>)?;
-            let file_menu = Submenu::with_id_and_items(handle, "file", "File", true, &[
-                &scan_all, &stop_all, &sep1,
-                &export_plugins, &import_plugins, &sep2,
-                &export_audio, &import_audio, &sep3,
-                &export_daw, &import_daw, &sep4,
-                &export_presets, &import_presets,
-            ])?;
+            let export_presets = MenuItem::with_id(
+                handle,
+                "export_presets",
+                "Export Presets...",
+                true,
+                None::<&str>,
+            )?;
+            let import_presets = MenuItem::with_id(
+                handle,
+                "import_presets",
+                "Import Presets...",
+                true,
+                None::<&str>,
+            )?;
+            let file_menu = Submenu::with_id_and_items(
+                handle,
+                "file",
+                "File",
+                true,
+                &[
+                    &scan_all,
+                    &stop_all,
+                    &sep1,
+                    &export_plugins,
+                    &import_plugins,
+                    &sep2,
+                    &export_audio,
+                    &import_audio,
+                    &sep3,
+                    &export_daw,
+                    &import_daw,
+                    &sep4,
+                    &export_presets,
+                    &import_presets,
+                ],
+            )?;
 
             // Edit menu
             let edit_undo = PredefinedMenuItem::undo(handle, None)?;
@@ -2301,63 +2534,213 @@ pub fn run() {
             let edit_sep2 = PredefinedMenuItem::separator(handle)?;
             let find = MenuItem::with_id(handle, "find", "Find...", true, Some("CmdOrCtrl+F"))?;
 
-            let edit_menu = Submenu::with_id_and_items(handle, "edit", "Edit", true, &[
-                &edit_undo, &edit_redo, &edit_sep1,
-                &edit_cut, &edit_copy, &edit_paste, &edit_select_all, &edit_sep2,
-                &find,
-            ])?;
+            let edit_menu = Submenu::with_id_and_items(
+                handle,
+                "edit",
+                "Edit",
+                true,
+                &[
+                    &edit_undo,
+                    &edit_redo,
+                    &edit_sep1,
+                    &edit_cut,
+                    &edit_copy,
+                    &edit_paste,
+                    &edit_select_all,
+                    &edit_sep2,
+                    &find,
+                ],
+            )?;
 
             // Scan menu
-            let scan_plugins = MenuItem::with_id(handle, "scan_plugins", "Scan Plugins", true, Some("CmdOrCtrl+Shift+P"))?;
-            let scan_audio = MenuItem::with_id(handle, "scan_audio", "Scan Samples", true, Some("CmdOrCtrl+Shift+A"))?;
-            let scan_daw = MenuItem::with_id(handle, "scan_daw", "Scan DAW Projects", true, Some("CmdOrCtrl+Shift+D"))?;
-            let scan_presets = MenuItem::with_id(handle, "scan_presets", "Scan Presets", true, Some("CmdOrCtrl+Shift+R"))?;
+            let scan_plugins = MenuItem::with_id(
+                handle,
+                "scan_plugins",
+                "Scan Plugins",
+                true,
+                Some("CmdOrCtrl+Shift+P"),
+            )?;
+            let scan_audio = MenuItem::with_id(
+                handle,
+                "scan_audio",
+                "Scan Samples",
+                true,
+                Some("CmdOrCtrl+Shift+A"),
+            )?;
+            let scan_daw = MenuItem::with_id(
+                handle,
+                "scan_daw",
+                "Scan DAW Projects",
+                true,
+                Some("CmdOrCtrl+Shift+D"),
+            )?;
+            let scan_presets = MenuItem::with_id(
+                handle,
+                "scan_presets",
+                "Scan Presets",
+                true,
+                Some("CmdOrCtrl+Shift+R"),
+            )?;
             let scan_sep = PredefinedMenuItem::separator(handle)?;
-            let check_updates = MenuItem::with_id(handle, "check_updates", "Check Updates", true, Some("CmdOrCtrl+U"))?;
+            let check_updates = MenuItem::with_id(
+                handle,
+                "check_updates",
+                "Check Updates",
+                true,
+                Some("CmdOrCtrl+U"),
+            )?;
 
-            let scan_menu = Submenu::with_id_and_items(handle, "scan", "Scan", true, &[
-                &scan_plugins, &scan_audio, &scan_daw, &scan_presets, &scan_sep, &check_updates,
-            ])?;
+            let scan_menu = Submenu::with_id_and_items(
+                handle,
+                "scan",
+                "Scan",
+                true,
+                &[
+                    &scan_plugins,
+                    &scan_audio,
+                    &scan_daw,
+                    &scan_presets,
+                    &scan_sep,
+                    &check_updates,
+                ],
+            )?;
 
             // View menu
-            let tab_plugins = MenuItem::with_id(handle, "tab_plugins", "Plugins", true, Some("CmdOrCtrl+1"))?;
-            let tab_samples = MenuItem::with_id(handle, "tab_samples", "Samples", true, Some("CmdOrCtrl+2"))?;
-            let tab_daw = MenuItem::with_id(handle, "tab_daw", "DAW Projects", true, Some("CmdOrCtrl+3"))?;
-            let tab_presets = MenuItem::with_id(handle, "tab_presets", "Presets", true, Some("CmdOrCtrl+4"))?;
-            let tab_favorites = MenuItem::with_id(handle, "tab_favorites", "Favorites", true, Some("CmdOrCtrl+5"))?;
-            let tab_history = MenuItem::with_id(handle, "tab_history", "History", true, Some("CmdOrCtrl+6"))?;
-            let tab_settings = MenuItem::with_id(handle, "tab_settings", "Settings", true, Some("CmdOrCtrl+7"))?;
+            let tab_plugins =
+                MenuItem::with_id(handle, "tab_plugins", "Plugins", true, Some("CmdOrCtrl+1"))?;
+            let tab_samples =
+                MenuItem::with_id(handle, "tab_samples", "Samples", true, Some("CmdOrCtrl+2"))?;
+            let tab_daw =
+                MenuItem::with_id(handle, "tab_daw", "DAW Projects", true, Some("CmdOrCtrl+3"))?;
+            let tab_presets =
+                MenuItem::with_id(handle, "tab_presets", "Presets", true, Some("CmdOrCtrl+4"))?;
+            let tab_favorites = MenuItem::with_id(
+                handle,
+                "tab_favorites",
+                "Favorites",
+                true,
+                Some("CmdOrCtrl+5"),
+            )?;
+            let tab_history =
+                MenuItem::with_id(handle, "tab_history", "History", true, Some("CmdOrCtrl+6"))?;
+            let tab_settings = MenuItem::with_id(
+                handle,
+                "tab_settings",
+                "Settings",
+                true,
+                Some("CmdOrCtrl+7"),
+            )?;
             let view_sep = PredefinedMenuItem::separator(handle)?;
-            let toggle_theme = MenuItem::with_id(handle, "toggle_theme", "Toggle Light/Dark", true, Some("CmdOrCtrl+T"))?;
-            let toggle_crt = MenuItem::with_id(handle, "toggle_crt", "Toggle CRT Effects", true, None::<&str>)?;
+            let toggle_theme = MenuItem::with_id(
+                handle,
+                "toggle_theme",
+                "Toggle Light/Dark",
+                true,
+                Some("CmdOrCtrl+T"),
+            )?;
+            let toggle_crt = MenuItem::with_id(
+                handle,
+                "toggle_crt",
+                "Toggle CRT Effects",
+                true,
+                None::<&str>,
+            )?;
             let view_sep2 = PredefinedMenuItem::separator(handle)?;
-            let reset_columns = MenuItem::with_id(handle, "reset_columns", "Reset Column Widths", true, None::<&str>)?;
-            let reset_tabs = MenuItem::with_id(handle, "reset_tabs", "Reset Tab Order", true, None::<&str>)?;
+            let reset_columns = MenuItem::with_id(
+                handle,
+                "reset_columns",
+                "Reset Column Widths",
+                true,
+                None::<&str>,
+            )?;
+            let reset_tabs =
+                MenuItem::with_id(handle, "reset_tabs", "Reset Tab Order", true, None::<&str>)?;
 
-            let view_menu = Submenu::with_id_and_items(handle, "view", "View", true, &[
-                &tab_plugins, &tab_samples, &tab_daw, &tab_presets, &tab_favorites, &tab_history, &tab_settings,
-                &view_sep, &toggle_theme, &toggle_crt,
-                &view_sep2, &reset_columns, &reset_tabs,
-            ])?;
+            let view_menu = Submenu::with_id_and_items(
+                handle,
+                "view",
+                "View",
+                true,
+                &[
+                    &tab_plugins,
+                    &tab_samples,
+                    &tab_daw,
+                    &tab_presets,
+                    &tab_favorites,
+                    &tab_history,
+                    &tab_settings,
+                    &view_sep,
+                    &toggle_theme,
+                    &toggle_crt,
+                    &view_sep2,
+                    &reset_columns,
+                    &reset_tabs,
+                ],
+            )?;
 
             // Playback menu
-            let play_pause = MenuItem::with_id(handle, "play_pause", "Play / Pause", true, Some("Space"))?;
-            let toggle_loop = MenuItem::with_id(handle, "toggle_loop", "Toggle Loop", true, Some("CmdOrCtrl+L"))?;
-            let stop_playback = MenuItem::with_id(handle, "stop_playback", "Stop Playback", true, Some("CmdOrCtrl+Shift+."))?;
-            let expand_player = MenuItem::with_id(handle, "expand_player", "Expand / Collapse Player", true, Some("CmdOrCtrl+Shift+M"))?;
+            let play_pause =
+                MenuItem::with_id(handle, "play_pause", "Play / Pause", true, Some("Space"))?;
+            let toggle_loop = MenuItem::with_id(
+                handle,
+                "toggle_loop",
+                "Toggle Loop",
+                true,
+                Some("CmdOrCtrl+L"),
+            )?;
+            let stop_playback = MenuItem::with_id(
+                handle,
+                "stop_playback",
+                "Stop Playback",
+                true,
+                Some("CmdOrCtrl+Shift+."),
+            )?;
+            let expand_player = MenuItem::with_id(
+                handle,
+                "expand_player",
+                "Expand / Collapse Player",
+                true,
+                Some("CmdOrCtrl+Shift+M"),
+            )?;
 
-            let playback_menu = Submenu::with_id_and_items(handle, "playback", "Playback", true, &[
-                &play_pause, &toggle_loop, &stop_playback, &expand_player,
-            ])?;
+            let playback_menu = Submenu::with_id_and_items(
+                handle,
+                "playback",
+                "Playback",
+                true,
+                &[&play_pause, &toggle_loop, &stop_playback, &expand_player],
+            )?;
 
             // Data menu
-            let clear_history = MenuItem::with_id(handle, "clear_history", "Clear All History...", true, Some("CmdOrCtrl+Shift+Delete"))?;
-            let clear_kvr = MenuItem::with_id(handle, "clear_kvr", "Clear KVR Cache...", true, None::<&str>)?;
-            let clear_favorites = MenuItem::with_id(handle, "clear_favorites", "Clear Favorites...", true, None::<&str>)?;
+            let clear_history = MenuItem::with_id(
+                handle,
+                "clear_history",
+                "Clear All History...",
+                true,
+                Some("CmdOrCtrl+Shift+Delete"),
+            )?;
+            let clear_kvr = MenuItem::with_id(
+                handle,
+                "clear_kvr",
+                "Clear KVR Cache...",
+                true,
+                None::<&str>,
+            )?;
+            let clear_favorites = MenuItem::with_id(
+                handle,
+                "clear_favorites",
+                "Clear Favorites...",
+                true,
+                None::<&str>,
+            )?;
 
-            let data_menu = Submenu::with_id_and_items(handle, "data", "Data", true, &[
-                &clear_history, &clear_kvr, &clear_favorites,
-            ])?;
+            let data_menu = Submenu::with_id_and_items(
+                handle,
+                "data",
+                "Data",
+                true,
+                &[&clear_history, &clear_kvr, &clear_favorites],
+            )?;
 
             // Window menu
             let minimize = PredefinedMenuItem::minimize(handle, None)?;
@@ -2365,21 +2748,36 @@ pub fn run() {
             let win_sep = PredefinedMenuItem::separator(handle)?;
             let close_win = PredefinedMenuItem::close_window(handle, None)?;
 
-            let window_menu = Submenu::with_id_and_items(handle, "window", "Window", true, &[
-                &minimize, &zoom, &win_sep, &close_win,
-            ])?;
+            let window_menu = Submenu::with_id_and_items(
+                handle,
+                "window",
+                "Window",
+                true,
+                &[&minimize, &zoom, &win_sep, &close_win],
+            )?;
 
             // Help menu
-            let github = MenuItem::with_id(handle, "github", "GitHub Repository", true, None::<&str>)?;
+            let github =
+                MenuItem::with_id(handle, "github", "GitHub Repository", true, None::<&str>)?;
             let docs = MenuItem::with_id(handle, "docs", "Documentation", true, None::<&str>)?;
 
-            let help_menu = Submenu::with_id_and_items(handle, "help", "Help", true, &[
-                &github, &docs,
-            ])?;
+            let help_menu =
+                Submenu::with_id_and_items(handle, "help", "Help", true, &[&github, &docs])?;
 
-            let menu = Menu::with_items(handle, &[
-                &app_menu, &file_menu, &edit_menu, &scan_menu, &view_menu, &playback_menu, &data_menu, &window_menu, &help_menu,
-            ])?;
+            let menu = Menu::with_items(
+                handle,
+                &[
+                    &app_menu,
+                    &file_menu,
+                    &edit_menu,
+                    &scan_menu,
+                    &view_menu,
+                    &playback_menu,
+                    &data_menu,
+                    &window_menu,
+                    &help_menu,
+                ],
+            )?;
             app.set_menu(menu)?;
 
             // Handle menu events — emit to frontend JS

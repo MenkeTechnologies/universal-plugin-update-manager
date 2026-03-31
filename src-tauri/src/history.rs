@@ -1796,7 +1796,12 @@ mod tests {
     #[test]
     fn test_daw_scan_detail() {
         with_temp_dir(|_| {
-            let projects = vec![make_daw_project("TestSong", "/songs/test.als", "ALS", "Ableton Live")];
+            let projects = vec![make_daw_project(
+                "TestSong",
+                "/songs/test.als",
+                "ALS",
+                "Ableton Live",
+            )];
             save_daw_scan(&projects, &["/songs".into()]);
             let scans = get_daw_scans();
             let detail = get_daw_scan_detail(&scans[0].id);

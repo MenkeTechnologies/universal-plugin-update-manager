@@ -179,14 +179,12 @@ fn detect_architectures(plugin_path: &Path) -> Vec<String> {
     // Find the main binary inside the bundle
     let contents_macos = plugin_path.join("Contents").join("MacOS");
     let binary = if contents_macos.is_dir() {
-        fs::read_dir(&contents_macos)
-            .ok()
-            .and_then(|entries| {
-                entries
-                    .flatten()
-                    .find(|e| e.path().is_file())
-                    .map(|e| e.path())
-            })
+        fs::read_dir(&contents_macos).ok().and_then(|entries| {
+            entries
+                .flatten()
+                .find(|e| e.path().is_file())
+                .map(|e| e.path())
+        })
     } else if plugin_path.is_file() {
         Some(plugin_path.to_path_buf())
     } else {
@@ -224,11 +222,13 @@ fn detect_architectures(plugin_path: &Path) -> Vec<String> {
         let mut archs = Vec::new();
         for i in 0..nfat.min(10) {
             let off = 8 + i * 20;
-            if off + 4 > n { break; }
+            if off + 4 > n {
+                break;
+            }
             let cpu = if is_be {
-                u32::from_be_bytes([buf[off], buf[off+1], buf[off+2], buf[off+3]])
+                u32::from_be_bytes([buf[off], buf[off + 1], buf[off + 2], buf[off + 3]])
             } else {
-                u32::from_le_bytes([buf[off], buf[off+1], buf[off+2], buf[off+3]])
+                u32::from_le_bytes([buf[off], buf[off + 1], buf[off + 2], buf[off + 3]])
             };
             archs.push(match cpu {
                 0x0100000C => "ARM64".to_string(),
@@ -262,8 +262,8 @@ fn detect_architectures(plugin_path: &Path) -> Vec<String> {
     // PE (Windows DLL)
     if buf[0] == b'M' && buf[1] == b'Z' && n >= 64 {
         let pe_off = u32::from_le_bytes([buf[60], buf[61], buf[62], buf[63]]) as usize;
-        if pe_off + 6 <= n && buf[pe_off] == b'P' && buf[pe_off+1] == b'E' {
-            let machine = u16::from_le_bytes([buf[pe_off+4], buf[pe_off+5]]);
+        if pe_off + 6 <= n && buf[pe_off] == b'P' && buf[pe_off + 1] == b'E' {
+            let machine = u16::from_le_bytes([buf[pe_off + 4], buf[pe_off + 5]]);
             return vec![match machine {
                 0x8664 => "x86_64".to_string(),
                 0x014c => "i386".to_string(),
@@ -646,7 +646,7 @@ mod tests {
         let mut header = vec![0u8; 48];
         header[0..4].copy_from_slice(&0xCAFEBABEu32.to_be_bytes());
         header[4..8].copy_from_slice(&2u32.to_be_bytes()); // nfat_arch = 2
-        // Arch 1: x86_64
+                                                           // Arch 1: x86_64
         header[8..12].copy_from_slice(&0x01000007u32.to_be_bytes());
         // Arch 2: ARM64 (at offset 28)
         header[28..32].copy_from_slice(&0x0100000Cu32.to_be_bytes());
