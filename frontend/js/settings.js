@@ -732,3 +732,103 @@ function restoreSettings() {
   DAW_PAGE_SIZE = pageSize;
 }
 // restoreSettings is called from loadLastScan after prefs.load()
+
+// ── Settings Section Drag Reorder ──
+function initSettingsSectionDrag() {
+  const container = document.querySelector('.settings-container');
+  if (!container) return;
+  let dragged = null;
+  let startY = 0;
+  let isDragging = false;
+
+  container.addEventListener('mousedown', (e) => {
+    const heading = e.target.closest('.settings-heading');
+    if (!heading || e.button !== 0) return;
+    const section = heading.closest('.settings-section');
+    if (!section) return;
+    dragged = section;
+    startY = e.clientY;
+    isDragging = false;
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragged) return;
+    if (!isDragging && Math.abs(e.clientY - startY) > 8) {
+      isDragging = true;
+      dragged.classList.add('section-dragging');
+    }
+    if (!isDragging) return;
+    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.settings-section');
+    container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
+    if (target && target !== dragged) {
+      target.classList.add('section-drag-over');
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!dragged) return;
+    if (isDragging) {
+      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.settings-section');
+      container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
+      dragged.classList.remove('section-dragging');
+      if (target && target !== dragged) {
+        const sections = [...container.querySelectorAll('.settings-section')];
+        const dragIdx = sections.indexOf(dragged);
+        const dropIdx = sections.indexOf(target);
+        if (dragIdx < dropIdx) {
+          container.insertBefore(dragged, target.nextSibling);
+        } else {
+          container.insertBefore(dragged, target);
+        }
+        saveSettingsSectionOrder();
+      }
+      // Suppress click
+      const suppress = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      container.addEventListener('click', suppress, { capture: true, once: true });
+    }
+    dragged = null;
+    isDragging = false;
+  });
+
+  restoreSettingsSectionOrder();
+}
+
+function saveSettingsSectionOrder() {
+  const sections = [...document.querySelectorAll('.settings-section[data-section]')].map(s => s.dataset.section);
+  prefs.setItem('settingsSectionOrder', JSON.stringify(sections));
+}
+
+function restoreSettingsSectionOrder() {
+  const saved = prefs.getItem('settingsSectionOrder');
+  if (!saved) return;
+  try {
+    const order = JSON.parse(saved);
+    if (!Array.isArray(order)) return;
+    const container = document.querySelector('.settings-container');
+    const sectionMap = {};
+    container.querySelectorAll('.settings-section[data-section]').forEach(s => {
+      sectionMap[s.dataset.section] = s;
+    });
+    for (const key of order) {
+      if (sectionMap[key]) container.appendChild(sectionMap[key]);
+    }
+    // Append any sections not in saved order
+    container.querySelectorAll('.settings-section[data-section]').forEach(s => {
+      if (!order.includes(s.dataset.section)) container.appendChild(s);
+    });
+  } catch {}
+}
+
+function resetSettingsSectionOrder() {
+  prefs.removeItem('settingsSectionOrder');
+  const container = document.querySelector('.settings-container');
+  const defaultOrder = ['appearance', 'colorscheme', 'scanning', 'performance', 'sorting', 'data', 'about'];
+  const sectionMap = {};
+  container.querySelectorAll('.settings-section[data-section]').forEach(s => {
+    sectionMap[s.dataset.section] = s;
+  });
+  for (const key of defaultOrder) {
+    if (sectionMap[key]) container.appendChild(sectionMap[key]);
+  }
+  showToast('Settings layout reset');
+}

@@ -367,6 +367,7 @@
     .settings-section {
       margin-bottom: 32px;
       overflow: hidden;
+      transition: opacity 0.2s;
     }
 
     .settings-heading {
@@ -380,6 +381,16 @@
       margin-bottom: 16px;
       padding-bottom: 8px;
       border-bottom: 1px solid var(--border);
+      cursor: grab;
+      user-select: none;
+    }
+    .settings-heading:active { cursor: grabbing; }
+    .settings-section.section-dragging {
+      opacity: 0.4;
+    }
+    .settings-section.section-drag-over {
+      border-top: 2px solid var(--cyan);
+      margin-top: -2px;
     }
 
     .settings-row {
@@ -3369,8 +3380,8 @@
 
     <div class="tab-content" id="tabSettings">
       <div class="settings-container">
-        <div class="settings-section">
-          <h2 class="settings-heading">Appearance</h2>
+        <div class="settings-section" data-section="appearance">
+          <h2 class="settings-heading">&#9776; Appearance</h2>
           <div class="settings-row">
             <div class="settings-label">
               <span class="settings-title">Theme</span>
@@ -3397,8 +3408,8 @@
           </div>
         </div>
 
-        <div class="settings-section">
-          <h2 class="settings-heading">Color Scheme</h2>
+        <div class="settings-section" data-section="colorscheme">
+          <h2 class="settings-heading">&#9776; Color Scheme</h2>
           <div class="scheme-grid" id="schemeGrid"></div>
           <div class="settings-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
             <div class="settings-label">
@@ -3491,8 +3502,8 @@
           </div>
         </div>
 
-        <div class="settings-section">
-          <h2 class="settings-heading">Scanning</h2>
+        <div class="settings-section" data-section="scanning">
+          <h2 class="settings-heading">&#9776; Scanning</h2>
           <div class="settings-row">
             <div class="settings-label">
               <span class="settings-title">Plugin Scan Directories</span>
@@ -3589,8 +3600,8 @@
           </div>
         </div>
 
-        <div class="settings-section">
-          <h2 class="settings-heading">Performance</h2>
+        <div class="settings-section" data-section="performance">
+          <h2 class="settings-heading">&#9776; Performance</h2>
           <div class="settings-row">
             <div class="settings-label">
               <span class="settings-title">Table Page Size</span>
@@ -3662,8 +3673,8 @@
           </div>
         </div>
 
-        <div class="settings-section">
-          <h2 class="settings-heading">Sorting</h2>
+        <div class="settings-section" data-section="sorting">
+          <h2 class="settings-heading">&#9776; Sorting</h2>
           <div class="settings-row">
             <div class="settings-label">
               <span class="settings-title">Default Plugin Sort</span>
@@ -3711,8 +3722,8 @@
           </div>
         </div>
 
-        <div class="settings-section">
-          <h2 class="settings-heading">Data</h2>
+        <div class="settings-section" data-section="data">
+          <h2 class="settings-heading">&#9776; Data</h2>
           <div class="settings-row">
             <div class="settings-label">
               <span class="settings-title">Reset Tab Order</span>
@@ -3720,6 +3731,15 @@
             </div>
             <div class="settings-control">
               <button class="btn btn-secondary btn-settings-action" data-action="settingResetTabOrder">Reset</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Reset Settings Layout</span>
+              <span class="settings-desc">Restore default settings section order (drag headings to rearrange)</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-secondary btn-settings-action" data-action="settingResetSectionOrder">Reset</button>
             </div>
           </div>
           <div class="settings-row">
@@ -3761,8 +3781,8 @@
           </div>
         </div>
 
-        <div class="settings-section">
-          <h2 class="settings-heading">About</h2>
+        <div class="settings-section" data-section="about">
+          <h2 class="settings-heading">&#9776; About</h2>
           <div class="settings-row">
             <div class="settings-label">
               <span class="settings-title">AUDIO_HAXOR</span>

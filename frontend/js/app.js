@@ -38,6 +38,7 @@
   initTabDragReorder();
   initMultiFilters();
   initSortPersistence();
+  initSettingsSectionDrag();
   loadRecentlyPlayed();
 
   try {
