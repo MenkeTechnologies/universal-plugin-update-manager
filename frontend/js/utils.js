@@ -571,7 +571,7 @@ function restoreTabOrder() {
 function settingResetTabOrder() {
   prefs.removeItem('tabOrder');
   const nav = document.querySelector('.tab-nav');
-  const defaultOrder = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'history', 'settings'];
+  const defaultOrder = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'files', 'history', 'settings'];
   const tabMap = {};
   nav.querySelectorAll('.tab-btn').forEach(btn => { tabMap[btn.dataset.tab] = btn; });
   for (const key of defaultOrder) {
@@ -592,9 +592,11 @@ function switchTab(tab) {
   document.getElementById('tabPresets').classList.toggle('active', tab === 'presets');
   document.getElementById('tabFavorites').classList.toggle('active', tab === 'favorites');
   document.getElementById('tabNotes').classList.toggle('active', tab === 'notes');
+  document.getElementById('tabFiles').classList.toggle('active', tab === 'files');
   document.getElementById('tabSettings').classList.toggle('active', tab === 'settings');
   if (tab === 'history') loadHistory();
   if (tab === 'favorites') renderFavorites();
   if (tab === 'notes') renderNotesTab();
+  if (tab === 'files') initFileBrowser();
   if (tab === 'settings') refreshSettingsUI();
 }

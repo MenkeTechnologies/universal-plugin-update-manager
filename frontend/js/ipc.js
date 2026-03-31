@@ -369,6 +369,11 @@ window.vstUpdater = {
   exportToml: (data, filePath) => invoke('export_toml', { data, filePath }),
   importToml: (filePath) => invoke('import_toml', { filePath }),
   exportPdf: (title, headers, rows, filePath) => invoke('export_pdf', { title, headers, rows, filePath }),
+  // File browser
+  listDirectory: (dirPath) => invoke('fs_list_dir', { dirPath }),
+  deleteFile: (filePath) => invoke('delete_file', { filePath }),
+  renameFile: (oldPath, newPath) => invoke('rename_file', { oldPath, newPath }),
+  getHomeDir: () => invoke('get_home_dir'),
   // Preferences (file-backed)
   getProcessStats: () => invoke('get_process_stats'),
   openPrefsFile: () => invoke('open_prefs_file'),

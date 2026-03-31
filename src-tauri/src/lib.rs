@@ -1700,6 +1700,81 @@ fn export_pdf(
     .map_err(|e| e.to_string())
 }
 
+// ── File browser ──
+
+#[tauri::command]
+fn fs_list_dir(dir_path: String) -> Result<serde_json::Value, String> {
+    let path = std::path::Path::new(&dir_path);
+    if !path.exists() {
+        return Err(format!("Directory not found: {}", dir_path));
+    }
+    if !path.is_dir() {
+        return Err(format!("Not a directory: {}", dir_path));
+    }
+
+    let mut entries = Vec::new();
+    let read = std::fs::read_dir(path).map_err(|e| e.to_string())?;
+    for entry in read.flatten() {
+        let ep = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') { continue; } // skip hidden
+        let is_dir = ep.is_dir();
+        let meta = std::fs::metadata(&ep).ok();
+        let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+        let modified = meta
+            .and_then(|m| m.modified().ok())
+            .map(|t| {
+                let dt: chrono::DateTime<chrono::Utc> = t.into();
+                dt.format("%Y-%m-%d %H:%M").to_string()
+            })
+            .unwrap_or_default();
+        let ext = ep.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        entries.push(serde_json::json!({
+            "name": name,
+            "path": ep.to_string_lossy(),
+            "isDir": is_dir,
+            "size": size,
+            "sizeFormatted": scanner::format_size(size),
+            "modified": modified,
+            "ext": ext,
+        }));
+    }
+    // Sort: dirs first, then by name
+    entries.sort_by(|a, b| {
+        let a_dir = a["isDir"].as_bool().unwrap_or(false);
+        let b_dir = b["isDir"].as_bool().unwrap_or(false);
+        b_dir.cmp(&a_dir).then_with(|| {
+            a["name"].as_str().unwrap_or("").to_lowercase().cmp(&b["name"].as_str().unwrap_or("").to_lowercase())
+        })
+    });
+    Ok(serde_json::json!({ "entries": entries, "path": dir_path }))
+}
+
+#[tauri::command]
+fn delete_file(file_path: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return Err("File not found".into());
+    }
+    if path.is_dir() {
+        std::fs::remove_dir_all(path).map_err(|e| e.to_string())
+    } else {
+        std::fs::remove_file(path).map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
+    std::fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_home_dir() -> Result<String, String> {
+    dirs::home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .ok_or_else(|| "Could not determine home directory".into())
+}
+
 #[tauri::command]
 fn import_presets_json(file_path: String) -> Result<Vec<PresetFile>, String> {
     let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
@@ -2369,6 +2444,10 @@ pub fn run() {
             import_presets_json,
             import_audio_json,
             import_daw_json,
+            fs_list_dir,
+            delete_file,
+            rename_file,
+            get_home_dir,
             get_process_stats,
             open_prefs_file,
             get_prefs_path,
