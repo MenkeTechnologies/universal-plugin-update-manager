@@ -140,19 +140,19 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (203 tests)
+### Rust tests (217 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
 | **lib** | 51 | Export/import roundtrips (JSON, TOML, CSV, TSV), preset export/import, DAW/audio import, CSV escaping, file ops (list dir, rename, delete), `.band` validation, serde payloads |
 | **history** | 35 | Scan CRUD, 50-scan limit, diff (added/removed/version-changed), KVR cache CRUD, audio history CRUD, audio diff, DAW history CRUD, DAW diff, ID generation, preference storage |
 | **kvr** | 27 | Version parsing, version comparison, HTML version extraction (6 formats), download URL extraction, platform keyword detection, date filtering |
-| **scanner** | 24 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration, architecture detection |
+| **scanner** | 26 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration, architecture detection, edge cases |
+| **audio_scanner** | 20 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories, batching |
 | **daw_scanner** | 19 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
-| **audio_scanner** | 18 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories |
-| **bpm** | 11 | WAV/AIFF PCM reading, onset-strength autocorrelation, click track detection (90/120/140 BPM), silence rejection, short file handling, 8/16-bit decode, stereo mixdown, extra chunk handling |
-| **xref** | 14 | Ableton .als gzip XML parsing (VST2/VST3/AU), REAPER .rpp plaintext parsing (VST/VST3/AU/CLAP), deduplication, sorting, error handling |
-| **preset_scanner** | 4 | Preset discovery, directory walking, stop signal, format detection |
+| **xref** | 17 | Ableton .als gzip XML parsing (VST2/VST3/AU), REAPER .rpp plaintext parsing (VST/VST3/AU/CLAP), deduplication, sorting, error handling, empty projects, .rpp-bak support |
+| **bpm** | 16 | WAV/AIFF PCM reading, onset-strength autocorrelation, click track detection (90/120/140/174 BPM), silence rejection, short file handling, 8/16/24-bit decode, stereo mixdown, extra chunk handling, AIFF parsing |
+| **preset_scanner** | 6 | Preset discovery, directory walking, stop signal, format detection, batching |
 
 ### JavaScript tests (207 tests)
 

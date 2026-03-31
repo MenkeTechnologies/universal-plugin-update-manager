@@ -333,6 +333,66 @@
         <h3><span class="icon">&#128278;</span> Directory Bookmarks</h3>
         <p>Bookmark favorite directories in the File Browser for instant navigation. Chips displayed above the file list. Right-click any folder to bookmark it.</p>
       </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#127926;</span> BPM Estimation</h3>
+        <p>Estimates tempo for WAV and AIFF samples using onset-strength autocorrelation. Shown in the metadata panel with a loading spinner while computing. Cached in memory. BPM appears in the floating player meta line.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#127754;</span> Waveform Preview</h3>
+        <p>Full-width waveform in the metadata panel when clicking a sample. Seekable — click anywhere to jump. Playback cursor and progress fill update in real-time. Cyan-to-magenta gradient. Peaks cached for instant re-display.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128193;</span> File Browser</h3>
+        <p>Full filesystem navigation tab with breadcrumb path bar. Browse, tag, and annotate any file or folder. Bookmark directories for instant access. Integrated with the command palette.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#127991;</span> Tags Manager</h3>
+        <p>Dedicated tab for managing all tags across the app. Rename, delete, filter, and list items per tag. Tag cloud visualization with usage counts. Quick-tag context menus and tag suggestions.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#9000;</span> Keyboard Navigation</h3>
+        <p>Arrow keys / j/k to navigate table rows. Enter to activate, Space to play samples, Home/End to jump. Visual selection highlight follows focus.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#10068;</span> Help Overlay</h3>
+        <p>Press <code>?</code> to show a keyboard shortcuts reference overlay covering navigation, actions, search operators, and mouse interactions.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128260;</span> Sort Persistence</h3>
+        <p>Last-used sort column and direction saved per tab, restored on app restart. Right-click column headers to sort ascending or descending.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#8596;</span> Resizable Columns</h3>
+        <p>Drag column borders in any table to resize. Widths persist across sessions. Right-click a column header to reset all column widths.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#8646;</span> Draggable Tabs</h3>
+        <p>Drag tabs to reorder. Order persisted across sessions. Reset via Settings or right-click the tab bar.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#127912;</span> Cyberpunk Visualizer</h3>
+        <p>Animated equalizer bars in the expanded floating player with cyan-to-magenta gradient. Bars bounce when playing, freeze on pause. Border glow pulse effect.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#9881;</span> Customizable Shortcuts</h3>
+        <p>Remap any keyboard shortcut in Settings. System tray integration with dashboard. Tab transitions with smooth animations.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128268;</span> Context Menus</h3>
+        <p>Right-click context menus on every interactive element — plugins, samples, DAW projects, presets, columns, search boxes, toolbars, settings, and the floating player.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128276;</span> Toast Notifications</h3>
+        <p>Slide-in notifications for actions like opening DAW projects, revealing files, bookmarking directories, and export confirmations.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128190;</span> KVR Cache & Auto-Restore</h3>
+        <p>Resolved KVR data persisted to kvr-cache.json. Last scan results + cache auto-load on startup — no re-scanning needed. Background resolver resumes from where it left off.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128187;</span> Architecture Detection</h3>
+        <p>Shows ARM64, x86_64, or Universal badges per plugin via direct Mach-O/PE header parsing. No subprocess spawning — reads binary headers directly.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -688,6 +748,124 @@
         </div>
       </div>
     </div>
+    <!-- Use Case 10: File Browser -->
+    <div style="margin-bottom: 64px;">
+      <h3 style="color: var(--cyan); font-family: 'Courier New', monospace; font-size: 20px; margin-bottom: 24px;">10. File Browser</h3>
+      <div class="guide-steps">
+        <div class="guide-step">
+          <div class="step-number">A</div>
+          <div class="step-content">
+            <h3>Navigate Your Filesystem</h3>
+            <p>The <strong>File Browser</strong> tab provides full filesystem navigation with a breadcrumb path bar. Click any directory to enter it, use the back button or breadcrumbs to go up. Shows file sizes, modification dates, and type indicators.</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-number">B</div>
+          <div class="step-content">
+            <h3>Bookmark Directories</h3>
+            <p>Right-click any folder to <strong>bookmark</strong> it. Bookmarked directories appear as chips above the file list for instant one-click navigation. Bookmarks persist across sessions and are searchable via the Command Palette (<kbd>Cmd+K</kbd>).</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-number">C</div>
+          <div class="step-content">
+            <h3>Tag & Annotate Files</h3>
+            <p>Right-click any file or folder to add <strong>tags</strong> and <strong>notes</strong>. Tags integrate with the Tags Manager tab for cross-referencing. Notes persist in preferences and display indicator icons.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Case 11: Tags Manager -->
+    <div style="margin-bottom: 64px;">
+      <h3 style="color: var(--cyan); font-family: 'Courier New', monospace; font-size: 20px; margin-bottom: 24px;">11. Tags Manager</h3>
+      <div class="guide-steps">
+        <div class="guide-step">
+          <div class="step-number">A</div>
+          <div class="step-content">
+            <h3>View All Tags</h3>
+            <p>The <strong>Tags Manager</strong> tab shows a tag cloud of all tags across the app with usage counts. Click any tag to see all items tagged with it — plugins, samples, DAW projects, presets, and files.</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-number">B</div>
+          <div class="step-content">
+            <h3>Rename & Delete Tags</h3>
+            <p>Right-click any tag to <strong>rename</strong> it (updates all tagged items) or <strong>delete</strong> it (removes from all items). Use the search box to filter tags. Quick-tag context menus suggest existing tags when annotating items.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Case 12: Plugin Cross-Reference -->
+    <div style="margin-bottom: 64px;">
+      <h3 style="color: var(--cyan); font-family: 'Courier New', monospace; font-size: 20px; margin-bottom: 24px;">12. Plugin Cross-Reference</h3>
+      <div class="guide-steps">
+        <div class="guide-step">
+          <div class="step-number">A</div>
+          <div class="step-content">
+            <h3>Build the Cross-Reference Index</h3>
+            <p>Click <strong>"Build xref Index"</strong> on the DAW Projects tab to parse all Ableton Live (.als) and REAPER (.rpp) project files. The parser extracts VST2, VST3, AU, and CLAP plugin references from each project. Plugin count badges appear on DAW project rows.</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-number">B</div>
+          <div class="step-content">
+            <h3>View Plugins Per Project</h3>
+            <p>Click the plugin count badge on any DAW project row to open a modal listing all plugins used in that project. The list is deduplicated and sorted. Shows plugin type (VST2/VST3/AU/CLAP) for each reference.</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-number">C</div>
+          <div class="step-content">
+            <h3>Reverse Lookup: Projects Per Plugin</h3>
+            <p>Right-click any plugin in the Plugins tab and choose <strong>"Find in Projects"</strong> to see which DAW projects reference that plugin. Useful for auditing plugin usage before uninstalling.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Case 13: Waveform & BPM -->
+    <div style="margin-bottom: 64px;">
+      <h3 style="color: var(--cyan); font-family: 'Courier New', monospace; font-size: 20px; margin-bottom: 24px;">13. Waveform Preview & BPM Detection</h3>
+      <div class="guide-steps">
+        <div class="guide-step">
+          <div class="step-number">A</div>
+          <div class="step-content">
+            <h3>Waveform Preview</h3>
+            <p>Click any sample row to see a <strong>full-width waveform</strong> rendered in the metadata panel. The waveform uses a cyan-to-magenta gradient. Click anywhere on the waveform to <strong>seek</strong> to that position. The playback cursor and progress fill update in real-time. Waveform peaks are cached in memory for instant re-display.</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-number">B</div>
+          <div class="step-content">
+            <h3>BPM Estimation</h3>
+            <p>For WAV and AIFF samples, the app estimates the <strong>tempo (BPM)</strong> using onset-strength autocorrelation. A loading spinner appears while computing. The detected BPM is shown in the metadata panel and in the floating player's meta line. Results are cached — subsequent clicks display instantly.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Case 14: Command Palette -->
+    <div style="margin-bottom: 64px;">
+      <h3 style="color: var(--cyan); font-family: 'Courier New', monospace; font-size: 20px; margin-bottom: 24px;">14. Command Palette</h3>
+      <div class="guide-steps">
+        <div class="guide-step">
+          <div class="step-number">A</div>
+          <div class="step-content">
+            <h3>Open the Palette</h3>
+            <p>Press <kbd>Cmd+K</kbd> to open the <strong>command palette</strong>. It fuzzy searches across <em>everything</em>: plugins, samples, DAW projects, presets, bookmarked directories, tags, tabs, and app actions. Uses the same fzf scoring engine as the tab search bars.</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="step-number">B</div>
+          <div class="step-content">
+            <h3>Navigate & Execute</h3>
+            <p>Use <kbd>↑</kbd>/<kbd>↓</kbd> arrow keys to navigate results. Press <kbd>Enter</kbd> to jump to the selected item (switches to its tab and highlights it). Press <kbd>Escape</kbd> to dismiss. Results update live as you type.</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -726,6 +904,10 @@
         <tr><td><kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>M</kbd></td><td>Expand / Collapse Player</td></tr>
         <tr><td><kbd>Cmd</kbd> + <kbd>,</kbd></td><td>Preferences (Settings tab)</td></tr>
         <tr><td><kbd>Escape</kbd></td><td>Clear search, close context menu, or stop current operation</td></tr>
+        <tr><td><kbd>?</kbd></td><td>Open help overlay (keyboard shortcuts reference)</td></tr>
+        <tr><td><kbd>↑</kbd> / <kbd>↓</kbd> / <kbd>j</kbd> / <kbd>k</kbd></td><td>Navigate table rows</td></tr>
+        <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>Jump to first / last row</td></tr>
+        <tr><td><kbd>Enter</kbd></td><td>Activate selected row (open, play, reveal)</td></tr>
         <tr><td>Double-click plugin card</td><td>Open on KVR Audio</td></tr>
         <tr><td>Double-click sample row</td><td>Start playback (also single-click)</td></tr>
         <tr><td>Double-click DAW project</td><td>Open project in its DAW application</td></tr>
@@ -760,7 +942,7 @@
       </div>
       <div class="feature-card">
         <h3>Testing</h3>
-        <p>203 Rust tests (lib, history, KVR, scanner, DAW, audio, bpm, xref, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 410 total. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
+        <p>217 Rust tests (lib, history, KVR, scanner, DAW, audio, bpm, xref, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 424 total. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
       </div>
     </div>
     <pre style="margin-top: 32px;">
