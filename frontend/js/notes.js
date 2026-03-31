@@ -1,5 +1,4 @@
 // ── Notes & Tags ──
-// Store notes and tags on any item, persisted in prefs
 
 function getNotes() {
   return prefs.getObject('itemNotes', {});
@@ -28,6 +27,75 @@ function getAllTags() {
   return [...tags].sort();
 }
 
+function getTagCounts() {
+  const notes = getNotes();
+  const counts = {};
+  for (const entry of Object.values(notes)) {
+    if (entry.tags) entry.tags.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+  }
+  return counts;
+}
+
+function getItemsWithTag(tag) {
+  const notes = getNotes();
+  return Object.entries(notes)
+    .filter(([, n]) => n.tags && n.tags.includes(tag))
+    .map(([path, n]) => ({ path, ...n }));
+}
+
+function hasTag(path, tag) {
+  const note = getNote(path);
+  return note?.tags?.includes(tag) || false;
+}
+
+function addTagToItem(path, tag) {
+  const note = getNote(path) || { note: '', tags: [] };
+  if (!note.tags.includes(tag)) {
+    note.tags.push(tag);
+    setNote(path, note.note, note.tags);
+  }
+}
+
+function removeTagFromItem(path, tag) {
+  const note = getNote(path);
+  if (!note) return;
+  note.tags = note.tags.filter(t => t !== tag);
+  setNote(path, note.note, note.tags);
+}
+
+function renameTag(oldTag, newTag) {
+  const notes = getNotes();
+  let changed = 0;
+  for (const [path, n] of Object.entries(notes)) {
+    if (n.tags && n.tags.includes(oldTag)) {
+      n.tags = n.tags.map(t => t === oldTag ? newTag : t);
+      n.tags = [...new Set(n.tags)]; // dedupe
+      changed++;
+    }
+  }
+  if (changed > 0) {
+    prefs.setItem('itemNotes', notes);
+    showToast(`Renamed "${oldTag}" → "${newTag}" on ${changed} items`);
+  }
+}
+
+function deleteTag(tag) {
+  const notes = getNotes();
+  let changed = 0;
+  for (const [path, n] of Object.entries(notes)) {
+    if (n.tags && n.tags.includes(tag)) {
+      n.tags = n.tags.filter(t => t !== tag);
+      changed++;
+    }
+  }
+  if (changed > 0) {
+    prefs.setItem('itemNotes', notes);
+    showToast(`Removed tag "${tag}" from ${changed} items`);
+  }
+}
+
+// ── Note Editor Modal ──
+
 let _noteModalPath = null;
 
 function showNoteEditor(path, name) {
@@ -38,6 +106,14 @@ function showNoteEditor(path, name) {
   const current = getNote(path);
   const noteText = current?.note || '';
   const tags = current?.tags?.join(', ') || '';
+  const allTags = getAllTags();
+  const suggestions = allTags.length > 0
+    ? `<div class="note-tag-suggestions" id="noteSuggestions">
+        <label class="note-label" style="margin-bottom:4px;">Existing tags <span style="color:var(--text-muted);font-weight:400;">(click to add)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">
+          ${allTags.map(t => `<span class="note-tag" style="cursor:pointer;" data-action-suggest="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('')}
+        </div>
+      </div>` : '';
 
   const html = `<div class="modal-overlay" id="noteModal" data-action-modal="closeNote">
     <div class="modal-content modal-small">
@@ -50,6 +126,7 @@ function showNoteEditor(path, name) {
         <textarea class="note-textarea" id="noteText" rows="4" placeholder="Add a note...">${escapeHtml(noteText)}</textarea>
         <label class="note-label">Tags <span style="color: var(--text-muted); font-weight: 400;">(comma-separated)</span></label>
         <input type="text" class="note-input" id="noteTags" placeholder="kick, bass, favorite" value="${escapeHtml(tags)}">
+        ${suggestions}
         <div class="note-actions">
           <button class="btn btn-primary" data-action-modal="saveNote">Save</button>
           <button class="btn btn-secondary" data-action-modal="closeNote">Cancel</button>
@@ -76,6 +153,8 @@ function saveNoteFromModal() {
   setNote(_noteModalPath, note, tags);
   closeNoteModal();
   showToast('Note saved');
+  // Refresh notes tab if visible
+  if (document.getElementById('tabNotes')?.classList.contains('active')) renderNotesTab();
 }
 
 function deleteNoteFromModal() {
@@ -83,26 +162,40 @@ function deleteNoteFromModal() {
   setNote(_noteModalPath, '', []);
   closeNoteModal();
   showToast('Note deleted');
+  if (document.getElementById('tabNotes')?.classList.contains('active')) renderNotesTab();
 }
 
-// Event delegation for note modal
+// Event delegation for note modal + tag suggestions
 document.addEventListener('click', (e) => {
   const action = e.target.closest('[data-action-modal]');
-  if (!action) return;
-  const act = action.dataset.actionModal;
-  if (act === 'closeNote') {
-    // Only close if clicking overlay background or close/cancel button
-    if (e.target === action || action.classList.contains('modal-close') || action.classList.contains('btn-secondary')) {
-      closeNoteModal();
+  if (action) {
+    const act = action.dataset.actionModal;
+    if (act === 'closeNote') {
+      if (e.target === action || action.classList.contains('modal-close') || action.classList.contains('btn-secondary')) {
+        closeNoteModal();
+      }
+    } else if (act === 'saveNote') {
+      saveNoteFromModal();
+    } else if (act === 'deleteNote') {
+      deleteNoteFromModal();
     }
-  } else if (act === 'saveNote') {
-    saveNoteFromModal();
-  } else if (act === 'deleteNote') {
-    deleteNoteFromModal();
+  }
+
+  // Tag suggestion click — append to tag input
+  const suggest = e.target.closest('[data-action-suggest]');
+  if (suggest) {
+    const tag = suggest.dataset.actionSuggest;
+    const input = document.getElementById('noteTags');
+    if (input) {
+      const current = input.value.split(',').map(t => t.trim()).filter(Boolean);
+      if (!current.includes(tag)) {
+        current.push(tag);
+        input.value = current.join(', ');
+      }
+    }
   }
 });
 
-// Close on Escape
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.getElementById('noteModal')) {
     closeNoteModal();
@@ -141,39 +234,47 @@ function renderNotesTab() {
   }).sort((a, b) => (b[1].updatedAt || '').localeCompare(a[1].updatedAt || ''));
 
   if (filtered.length === 0) {
-    if (empty) empty.style.display = entries.length === 0 ? '' : 'none';
-    list.innerHTML = entries.length > 0 && filtered.length === 0
-      ? '<div class="state-message"><div class="state-icon">&#128269;</div><h2>No matching notes</h2></div>'
-      : '';
-    if (entries.length === 0 && empty) empty.style.display = '';
+    if (entries.length === 0) {
+      list.innerHTML = '';
+      if (empty) empty.style.display = '';
+    } else {
+      if (empty) empty.style.display = 'none';
+      list.innerHTML = '<div class="state-message"><div class="state-icon">&#128269;</div><h2>No matching notes</h2></div>';
+    }
     return;
   }
   if (empty) empty.style.display = 'none';
 
-  // Tag cloud
-  const allTags = getAllTags();
+  // Tag cloud with counts
+  const tagCounts = getTagCounts();
+  const allTags = Object.keys(tagCounts).sort();
   let tagCloud = '';
   if (allTags.length > 0) {
-    tagCloud = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
-      <span class="note-tag" style="cursor:pointer;${!activeTag ? 'background:var(--yellow);color:var(--bg)' : ''}" data-action-tag="all">All</span>
-      ${allTags.map(t => `<span class="note-tag" style="cursor:pointer;${activeTag === t ? 'background:var(--yellow);color:var(--bg)' : ''}" data-action-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('')}
+    tagCloud = `<div class="notes-tag-cloud">
+      <span class="note-tag ${!activeTag ? 'tag-active' : ''}" style="cursor:pointer;" data-action-tag="all">All (${entries.length})</span>
+      ${allTags.map(t => `<span class="note-tag ${activeTag === t ? 'tag-active' : ''}" style="cursor:pointer;" data-action-tag="${escapeHtml(t)}">${escapeHtml(t)} (${tagCounts[t]})</span>`).join('')}
     </div>`;
   }
 
-  list.innerHTML = tagCloud + filtered.map(([path, n]) => {
+  // Stats summary
+  const statsHtml = `<div class="notes-stats">${entries.length} notes | ${allTags.length} tags${activeTag ? ` | Filtering: "${escapeHtml(activeTag)}"` : ''}</div>`;
+
+  list.innerHTML = tagCloud + statsHtml + filtered.map(([path, n]) => {
     const name = path.split('/').pop().replace(/\.[^.]+$/, '') || path;
-    const tags = (n.tags || []).map(t => `<span class="note-tag">${escapeHtml(t)}</span>`).join('');
+    const tags = (n.tags || []).map(t =>
+      `<span class="note-tag" style="cursor:pointer;" data-action-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`
+    ).join('');
     const date = n.updatedAt ? new Date(n.updatedAt).toLocaleString() : '';
     return `<div class="note-card">
       <div class="note-card-header">
-        <span class="note-card-name">${escapeHtml(name)}</span>
+        <span class="note-card-name" title="${escapeHtml(path)}">${escapeHtml(name)}</span>
         <span class="note-card-date">${date}</span>
         <div class="note-card-actions">
           <button class="btn-small btn-secondary" data-action-note="edit" data-path="${escapeHtml(path)}" data-name="${escapeHtml(name)}" title="Edit note" style="padding:3px 8px;font-size:10px;">Edit</button>
           <button class="btn-small btn-stop" data-action-note="delete" data-path="${escapeHtml(path)}" title="Delete note" style="padding:3px 8px;font-size:10px;">&#10005;</button>
         </div>
       </div>
-      <div class="note-card-path" title="${escapeHtml(path)}">${escapeHtml(path)}</div>
+      <div class="note-card-path">${escapeHtml(path)}</div>
       ${n.note ? `<div class="note-card-body">${escapeHtml(n.note)}</div>` : ''}
       ${tags ? `<div class="note-card-tags">${tags}</div>` : ''}
     </div>`;
@@ -187,11 +288,12 @@ function clearAllNotes() {
   showToast('All notes deleted');
 }
 
-// Tag click filtering + note card actions
+// Tag click filtering + note card actions + tag management
 document.addEventListener('click', (e) => {
   const tag = e.target.closest('[data-action-tag]');
   if (tag) {
     const list = document.getElementById('notesList');
+    if (!list) return;
     const val = tag.dataset.actionTag;
     list._activeTag = val === 'all' ? null : val;
     renderNotesTab();

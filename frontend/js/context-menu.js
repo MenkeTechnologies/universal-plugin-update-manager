@@ -60,6 +60,24 @@ document.addEventListener('contextmenu', (e) => {
 
   // ── Plugin cards ──
   const pluginCard = e.target.closest('#pluginList .plugin-card');
+  // Helper: build quick-tag menu items for a path
+  function quickTagItems(path, name) {
+    const items = [];
+    const note = getNote(path);
+    const currentTags = note?.tags || [];
+    const allTags = getAllTags();
+    if (allTags.length > 0) {
+      items.push('---');
+      for (const tag of allTags.slice(0, 8)) {
+        const has = currentTags.includes(tag);
+        items.push({ icon: has ? '&#10003;' : '&#9634;', label: `${has ? 'Remove' : 'Add'} tag: ${tag}`,
+          action: () => { if (has) removeTagFromItem(path, tag); else addTagToItem(path, tag); showToast(`Tag "${tag}" ${has ? 'removed' : 'added'}`); }
+        });
+      }
+    }
+    return items;
+  }
+
   if (pluginCard) {
     const name = pluginCard.querySelector('h3')?.textContent || '';
     const path = pluginCard.dataset.path || '';
@@ -85,6 +103,7 @@ document.addEventListener('contextmenu', (e) => {
     items.push({ icon: pluginFav ? '&#9734;' : '&#9733;', label: pluginFav ? 'Remove from Favorites' : 'Add to Favorites',
       action: () => pluginFav ? removeFavorite(path) : addFavorite('plugin', path, name, { format: pluginCard.querySelector('.plugin-type')?.textContent }) });
     items.push({ icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) });
+    items.push(...quickTagItems(path, name));
     showContextMenu(e, items);
     return;
   }
@@ -106,6 +125,7 @@ document.addEventListener('contextmenu', (e) => {
       ...[(() => { const f = isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
         action: () => f ? removeFavorite(path) : addFavorite('sample', path, name, { format: audioRow.querySelector('.format-badge')?.textContent }) }; })()],
       { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
+      ...quickTagItems(path, name),
     ];
     showContextMenu(e, items);
     return;
@@ -127,6 +147,7 @@ document.addEventListener('contextmenu', (e) => {
       ...[(() => { const f = isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
         action: () => f ? removeFavorite(path) : addFavorite('daw', path, name, { format: dawRow.querySelector('.format-badge:last-of-type')?.textContent, daw: dawName }) }; })()],
       { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
+      ...quickTagItems(path, name),
     ];
     showContextMenu(e, items);
     return;
@@ -146,6 +167,7 @@ document.addEventListener('contextmenu', (e) => {
       ...[(() => { const f = isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
         action: () => f ? removeFavorite(path) : addFavorite('preset', path, name, { format: presetRow.querySelector('.format-badge')?.textContent }) }; })()],
       { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
+      ...quickTagItems(path, name),
     ];
     showContextMenu(e, items);
     return;
