@@ -196,9 +196,11 @@ function searchScore(query, fields, mode) {
     let bestGroupScore = 0;
     for (const token of orGroup) {
       let tokenBest = 0;
-      for (const f of fields) {
-        const s = scoreToken(token, f);
-        if (s > tokenBest) tokenBest = s;
+      for (let fi = 0; fi < fields.length; fi++) {
+        // First field (name) gets 500 bonus, subsequent fields get less
+        const fieldBonus = fi === 0 ? 500 : 0;
+        const s = scoreToken(token, fields[fi]);
+        if (s > 0 && s + fieldBonus > tokenBest) tokenBest = s + fieldBonus;
       }
       if (token.negate) {
         if (tokenBest > 0) return 0; // negated term matched => fail

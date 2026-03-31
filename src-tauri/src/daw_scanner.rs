@@ -98,10 +98,28 @@ pub fn is_package_ext(path: &Path) -> bool {
 }
 
 /// Validate that a .band directory is actually a GarageBand project.
-/// Only `projectData` is accepted — it's a binary plist unique to GarageBand.
-/// No fallback heuristics: if projectData is missing, it's not a GarageBand project.
+/// Checks for `projectData` binary plist (must start with "bplist") AND
+/// requires at least one other GarageBand-specific marker to eliminate
+/// false positives from other macOS bundles that happen to use .band extension.
 fn is_valid_band_package(path: &Path) -> bool {
-    path.join("projectData").exists()
+    let pd = path.join("projectData");
+    if !pd.exists() {
+        return false;
+    }
+    // Verify projectData is a binary plist (starts with "bplist")
+    if let Ok(mut f) = fs::File::open(&pd) {
+        use std::io::Read;
+        let mut magic = [0u8; 6];
+        if f.read_exact(&mut magic).is_err() || &magic != b"bplist" {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    // Require at least one GarageBand-specific subdirectory
+    path.join("Media").is_dir()
+        || path.join("Output").is_dir()
+        || path.join("Freeze Files").is_dir()
 }
 
 pub fn daw_name_for_format(format: &str) -> &'static str {
@@ -551,10 +569,10 @@ mod tests {
         fs::create_dir_all(&logicx).unwrap();
         fs::write(logicx.join("projectdata"), b"logic data").unwrap();
 
-        // Create a .band package directory (must have projectData for validation)
+        // Create a .band package directory (must have bplist projectData + Media dir)
         let band = tmp.join("MyBand.band");
-        fs::create_dir_all(&band).unwrap();
-        fs::write(band.join("projectData"), b"band data").unwrap();
+        fs::create_dir_all(band.join("Media")).unwrap();
+        fs::write(band.join("projectData"), b"bplist00fake").unwrap();
 
         let mut found = Vec::new();
         walk_for_daw(
