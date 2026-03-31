@@ -3615,9 +3615,54 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingFlushInterval" min="100" max="1000" step="50" value="300" data-action="settingFlushInterval">
-                <span class="settings-range-value" id="settingFlushIntervalValue">300</span>
+                <input type="range" class="settings-range" id="settingFlushInterval" min="50" max="1000" step="50" value="100" data-action="settingFlushInterval">
+                <span class="settings-range-value" id="settingFlushIntervalValue">100</span>
               </div>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Thread Pool Multiplier</span>
+              <span class="settings-desc">Threads per CPU core for parallel scans. Higher = more I/O throughput. Restart required.</span>
+            </div>
+            <div class="settings-control">
+              <div class="settings-range-wrap">
+                <input type="range" class="settings-range" id="settingThreadMultiplier" min="1" max="8" step="1" value="4" data-action="settingThreadMultiplier">
+                <span class="settings-range-value" id="settingThreadMultiplierValue">4x</span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Channel Buffer Size</span>
+              <span class="settings-desc">IPC buffer capacity between scan threads and UI. Higher = less blocking. Restart required.</span>
+            </div>
+            <div class="settings-control">
+              <div class="settings-range-wrap">
+                <input type="range" class="settings-range" id="settingChannelBuffer" min="64" max="2048" step="64" value="512" data-action="settingChannelBuffer">
+                <span class="settings-range-value" id="settingChannelBufferValue">512</span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">Scan Batch Size</span>
+              <span class="settings-desc">Items per batch sent from scanner to UI. Larger = fewer IPC calls. Restart required.</span>
+            </div>
+            <div class="settings-control">
+              <div class="settings-range-wrap">
+                <input type="range" class="settings-range" id="settingBatchSize" min="10" max="200" step="10" value="100" data-action="settingBatchSize">
+                <span class="settings-range-value" id="settingBatchSizeValue">100</span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">System Info</span>
+              <span class="settings-desc">Current runtime configuration (read-only)</span>
+            </div>
+            <div class="settings-control">
+              <span id="settingPerfInfo" style="font-family: 'Courier New', monospace; font-size: 11px; color: var(--text-dim);"></span>
             </div>
           </div>
         </div>

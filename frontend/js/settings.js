@@ -484,6 +484,24 @@ function settingUpdateFlushInterval(val) {
   prefs.setItem('flushInterval', val);
 }
 
+function settingUpdateThreadMultiplier(val) {
+  document.getElementById('settingThreadMultiplierValue').textContent = val + 'x';
+  prefs.setItem('threadMultiplier', val);
+  showToast('Thread multiplier set to ' + val + 'x — restart to apply');
+}
+
+function settingUpdateChannelBuffer(val) {
+  document.getElementById('settingChannelBufferValue').textContent = val;
+  prefs.setItem('channelBuffer', val);
+  showToast('Channel buffer set to ' + val + ' — restart to apply');
+}
+
+function settingUpdateBatchSize(val) {
+  document.getElementById('settingBatchSizeValue').textContent = val;
+  prefs.setItem('batchSize', val);
+  showToast('Batch size set to ' + val + ' — restart to apply');
+}
+
 function settingSaveSelect(key, value) {
   prefs.setItem(key, value);
 }
@@ -592,6 +610,41 @@ function refreshSettingsUI() {
   if (flushEl) {
     flushEl.value = flush;
     flushValEl.textContent = flush;
+  }
+
+  // Thread multiplier
+  const threadMult = getSettingValue('threadMultiplier', '4');
+  const threadMultEl = document.getElementById('settingThreadMultiplier');
+  const threadMultValEl = document.getElementById('settingThreadMultiplierValue');
+  if (threadMultEl) {
+    threadMultEl.value = threadMult;
+    threadMultValEl.textContent = threadMult + 'x';
+  }
+
+  // Channel buffer
+  const chanBuf = getSettingValue('channelBuffer', '512');
+  const chanBufEl = document.getElementById('settingChannelBuffer');
+  const chanBufValEl = document.getElementById('settingChannelBufferValue');
+  if (chanBufEl) {
+    chanBufEl.value = chanBuf;
+    chanBufValEl.textContent = chanBuf;
+  }
+
+  // Batch size
+  const batchSz = getSettingValue('batchSize', '100');
+  const batchSzEl = document.getElementById('settingBatchSize');
+  const batchSzValEl = document.getElementById('settingBatchSizeValue');
+  if (batchSzEl) {
+    batchSzEl.value = batchSz;
+    batchSzValEl.textContent = batchSz;
+  }
+
+  // System perf info
+  const perfInfo = document.getElementById('settingPerfInfo');
+  if (perfInfo) {
+    const cpus = navigator.hardwareConcurrency || '?';
+    const threads = parseInt(threadMult) * parseInt(cpus);
+    perfInfo.textContent = `${cpus} cores | ${threads} threads | buf ${chanBuf} | batch ${batchSz}`;
   }
 
   // Selects

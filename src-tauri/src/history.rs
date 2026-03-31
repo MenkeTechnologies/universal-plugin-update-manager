@@ -341,7 +341,13 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
     ),
     (
         "performance",
-        &[("pageSize", "pageSize"), ("flushInterval", "flushInterval")],
+        &[
+            ("pageSize", "pageSize"),
+            ("flushInterval", "flushInterval"),
+            ("threadMultiplier", "threadMultiplier"),
+            ("channelBuffer", "channelBuffer"),
+            ("batchSize", "batchSize"),
+        ],
     ),
     ("player", &[("playerDock", "dock")]),
     ("tabs", &[("tabOrder", "order")]),

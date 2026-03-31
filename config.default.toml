@@ -27,6 +27,9 @@ dawSort = "name"
 [performance]
 pageSize = "500"
 flushInterval = "100"
+threadMultiplier = "4"
+channelBuffer = "512"
+batchSize = "100"
 
 [player]
 dock = "dock-br"

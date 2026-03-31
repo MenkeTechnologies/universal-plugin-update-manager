@@ -163,8 +163,14 @@ async fn scan_plugins(
 
         // Process plugins in parallel, streaming results to UI via channel
         use rayon::prelude::*;
-        let batch_size = 30;
-        let (tx, rx) = std::sync::mpsc::sync_channel::<scanner::PluginInfo>(512);
+        let prefs = history::load_preferences();
+        let batch_size = prefs.get("batchSize")
+            .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
+            .unwrap_or(100).max(10).min(200);
+        let chan_buf = prefs.get("channelBuffer")
+            .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
+            .unwrap_or(512).max(64).min(2048);
+        let (tx, rx) = std::sync::mpsc::sync_channel::<scanner::PluginInfo>(chan_buf);
         let stop_flag = std::sync::Arc::new(AtomicBool::new(false));
         let stop_flag2 = stop_flag.clone();
 
@@ -2099,12 +2105,19 @@ pub fn run() {
     // Initialize app start time for uptime tracking
     APP_START.get_or_init(Instant::now);
 
-    // Initialize rayon thread pool — 4x CPU cores to maximize throughput.
+    // Initialize rayon thread pool — multiplier read from config (default 4x).
     // Filesystem scanning is heavily I/O-bound: threads spend most time waiting
-    // on disk reads, stat calls, and plist parsing. With 4x oversubscription,
+    // on disk reads, stat calls, and plist parsing. Oversubscription ensures
     // there are always runnable threads when others are blocked on I/O.
-    // On a fast machine (e.g. 12-core M2 Max), this gives 48 worker threads.
-    let pool_size = num_cpus::get() * 4;
+    let prefs = history::load_preferences();
+    let multiplier = prefs
+        .get("threadMultiplier")
+        .and_then(|v| v.as_str().or_else(|| v.as_u64().map(|_| "")).and_then(|s| s.parse::<usize>().ok()))
+        .or_else(|| prefs.get("threadMultiplier").and_then(|v| v.as_u64().map(|n| n as usize)))
+        .unwrap_or(4)
+        .max(1)
+        .min(8);
+    let pool_size = num_cpus::get() * multiplier;
     rayon::ThreadPoolBuilder::new()
         .num_threads(pool_size)
         .stack_size(8 * 1024 * 1024)
