@@ -160,7 +160,7 @@ fn walk_dir_parallel(
     stop: &Arc<AtomicBool>,
     exclude: &Arc<HashSet<String>>,
 ) {
-    if depth > 30 || stop.load(Ordering::Relaxed) {
+    if depth > 50 || stop.load(Ordering::Relaxed) {
         return;
     }
 
@@ -211,14 +211,6 @@ fn walk_dir_parallel(
                 continue;
             }
             if let Ok(meta) = fs::metadata(&path) {
-                // Skip empty or unreadable files
-                if meta.len() == 0 {
-                    continue;
-                }
-                // Skip files where we can't read timestamps (broken symlinks, unmounted volumes)
-                if meta.modified().is_err() && meta.accessed().is_err() {
-                    continue;
-                }
                 let sample_name = path
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
@@ -748,9 +740,9 @@ mod tests {
         let tmp = std::env::temp_dir().join("upum_test_walk_depth");
         let _ = fs::remove_dir_all(&tmp);
 
-        // Create a dir structure 32 levels deep (exceeds depth > 30 guard)
+        // Create a dir structure 52 levels deep (exceeds depth > 50 guard)
         let mut deep = tmp.clone();
-        for i in 0..32 {
+        for i in 0..52 {
             deep = deep.join(format!("d{}", i));
         }
         fs::create_dir_all(&deep).unwrap();
@@ -767,7 +759,7 @@ mod tests {
         );
         assert!(
             !found.iter().any(|s| s.name == "deep"),
-            "Should not find audio files deeper than 30 levels"
+            "Should not find audio files deeper than 50 levels"
         );
         let _ = fs::remove_dir_all(&tmp);
     }

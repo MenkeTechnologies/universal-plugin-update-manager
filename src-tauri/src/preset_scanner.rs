@@ -154,7 +154,7 @@ fn walk_dir_parallel(
     stop: &Arc<AtomicBool>,
     exclude: &Arc<HashSet<String>>,
 ) {
-    if depth > 30 || stop.load(Ordering::Relaxed) {
+    if depth > 50 || stop.load(Ordering::Relaxed) {
         return;
     }
 

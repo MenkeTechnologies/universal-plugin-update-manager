@@ -284,7 +284,7 @@ fn walk_dir_parallel(
     exclude: &Arc<HashSet<String>>,
     include_backups: bool,
 ) {
-    if depth > 30 || stop.load(Ordering::Relaxed) {
+    if depth > 50 || stop.load(Ordering::Relaxed) {
         return;
     }
 
