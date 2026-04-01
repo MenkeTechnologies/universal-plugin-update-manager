@@ -862,6 +862,7 @@ function initSettingsSectionDrag() {
     if (!heading || e.button !== 0) return;
     const section = heading.closest('.settings-section');
     if (!section) return;
+    e.preventDefault();
     dragged = section;
     startY = e.clientY;
     isDragging = false;
