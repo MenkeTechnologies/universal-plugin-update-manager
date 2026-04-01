@@ -101,14 +101,10 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'ArrowUp' || e.key === 'k') {
     e.preventDefault();
     setNavIndex(_navIndex - 1);
-  } else if (e.key === 'Home' || e.key === 'G' && !e.shiftKey === false) {
-    // G = go to bottom (vim), Home handled below
-    if (e.key === 'Home') {
-      e.preventDefault();
-      setNavIndex(0);
-    }
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    setNavIndex(0);
   } else if (e.key === 'G') {
-    // Shift+G = go to last item
     e.preventDefault();
     setNavIndex(items.length - 1);
   } else if (e.key === 'g' && !e.metaKey && !e.ctrlKey) {
