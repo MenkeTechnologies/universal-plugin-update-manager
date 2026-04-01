@@ -100,12 +100,12 @@ pub fn walk_for_audio(
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
 
-    // Spawn parallel walkers with dedicated pool so scanners don't starve each other
+    // Dedicated pool so scanners don't starve each other (~quarter of cores each)
     let roots_owned: Vec<PathBuf> = roots.to_vec();
     let stop2 = stop.clone();
     let found2 = found.clone();
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(num_cpus::get().max(2))
+        .num_threads((num_cpus::get() / 4).max(2))
         .build()
         .unwrap();
     std::thread::spawn(move || {

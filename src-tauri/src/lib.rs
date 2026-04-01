@@ -189,9 +189,10 @@ async fn scan_plugins(
         let stop_flag = std::sync::Arc::new(AtomicBool::new(false));
         let stop_flag2 = stop_flag.clone();
 
-        // Dedicated thread pool so plugin scanning doesn't starve other scanners
+        // Dedicated thread pool so plugin scanning doesn't starve other scanners.
+        // Size: quarter of cores (min 2) so 4 parallel scanners share ~1x total cores.
         let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get().max(2))
+            .num_threads((num_cpus::get() / 4).max(2))
             .build()
             .unwrap();
         std::thread::spawn(move || {
