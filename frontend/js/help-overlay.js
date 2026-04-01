@@ -18,11 +18,20 @@ function toggleHelpOverlay() {
             <div class="help-row"><kbd>&#8984;1</kbd>-<kbd>&#8984;8</kbd> <span>Switch tabs</span></div>
             <div class="help-row"><kbd>&#8984;K</kbd> <span>Command palette</span></div>
             <div class="help-row"><kbd>&#8984;F</kbd> <span>Focus search</span></div>
-            <div class="help-row"><kbd>&#8593;</kbd> / <kbd>k</kbd> <span>Previous item</span></div>
-            <div class="help-row"><kbd>&#8595;</kbd> / <kbd>j</kbd> <span>Next item</span></div>
-            <div class="help-row"><kbd>Home</kbd> <span>First item</span></div>
-            <div class="help-row"><kbd>End</kbd> <span>Last item</span></div>
+            <div class="help-row"><kbd>j</kbd> / <kbd>&#8595;</kbd> <span>Next item</span></div>
+            <div class="help-row"><kbd>k</kbd> / <kbd>&#8593;</kbd> <span>Previous item</span></div>
+            <div class="help-row"><kbd>gg</kbd> <span>First item</span></div>
+            <div class="help-row"><kbd>G</kbd> <span>Last item</span></div>
+            <div class="help-row"><kbd>Ctrl+D</kbd> <span>Half-page down</span></div>
+            <div class="help-row"><kbd>Ctrl+U</kbd> <span>Half-page up</span></div>
+            <div class="help-row"><kbd>/</kbd> <span>Focus search</span></div>
             <div class="help-row"><kbd>Enter</kbd> <span>Open / activate item</span></div>
+            <div class="help-row"><kbd>o</kbd> <span>Reveal in Finder</span></div>
+            <div class="help-row"><kbd>y</kbd> <span>Yank (copy path)</span></div>
+            <div class="help-row"><kbd>p</kbd> <span>Play / preview</span></div>
+            <div class="help-row"><kbd>x</kbd> <span>Toggle favorite</span></div>
+            <div class="help-row"><kbd>v</kbd> <span>Toggle select</span></div>
+            <div class="help-row"><kbd>V</kbd> <span>Select all</span></div>
           </div>
           <div class="help-section">
             <h3>Playback</h3>

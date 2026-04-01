@@ -56,6 +56,24 @@ function activateNavItem() {
   }
 }
 
+// Vim g-prefix state
+let _vimGPending = false;
+let _vimGTimer = null;
+
+function _getSelectedPath() {
+  const items = getNavigableItems();
+  if (_navIndex < 0 || _navIndex >= items.length) return null;
+  const item = items[_navIndex];
+  return item.getAttribute('data-audio-path') || item.dataset.dawPath || item.dataset.presetPath || item.dataset.path || '';
+}
+
+function _getSelectedName() {
+  const items = getNavigableItems();
+  if (_navIndex < 0 || _navIndex >= items.length) return '';
+  const item = items[_navIndex];
+  return item.querySelector('.col-name,.plugin-name,h3,.fav-name')?.textContent?.trim() || '';
+}
+
 document.addEventListener('keydown', (e) => {
   // Don't navigate when typing in inputs
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
@@ -63,23 +81,113 @@ document.addEventListener('keydown', (e) => {
 
   const activeTab = document.querySelector('.tab-content.active')?.id;
   if (!activeTab) return;
+  const items = getNavigableItems();
 
+  // Handle gg (go to top)
+  if (_vimGPending) {
+    _vimGPending = false;
+    clearTimeout(_vimGTimer);
+    if (e.key === 'g') {
+      e.preventDefault();
+      setNavIndex(0);
+      return;
+    }
+  }
+
+  // ── Movement ──
   if (e.key === 'ArrowDown' || e.key === 'j') {
     e.preventDefault();
     setNavIndex(_navIndex + 1);
   } else if (e.key === 'ArrowUp' || e.key === 'k') {
     e.preventDefault();
     setNavIndex(_navIndex - 1);
-  } else if (e.key === 'Home') {
+  } else if (e.key === 'Home' || e.key === 'G' && !e.shiftKey === false) {
+    // G = go to bottom (vim), Home handled below
+    if (e.key === 'Home') {
+      e.preventDefault();
+      setNavIndex(0);
+    }
+  } else if (e.key === 'G') {
+    // Shift+G = go to last item
     e.preventDefault();
-    setNavIndex(0);
+    setNavIndex(items.length - 1);
+  } else if (e.key === 'g' && !e.metaKey && !e.ctrlKey) {
+    // First g — wait for second g
+    _vimGPending = true;
+    _vimGTimer = setTimeout(() => { _vimGPending = false; }, 500);
+    return;
   } else if (e.key === 'End') {
     e.preventDefault();
-    setNavIndex(getNavigableItems().length - 1);
+    setNavIndex(items.length - 1);
+
+  // ── Half-page scroll ──
+  } else if (e.key === 'd' && e.ctrlKey) {
+    e.preventDefault();
+    setNavIndex(_navIndex + 15);
+  } else if (e.key === 'u' && e.ctrlKey) {
+    e.preventDefault();
+    setNavIndex(_navIndex - 15);
+
+  // ── Actions ──
   } else if (e.key === 'Enter') {
     if (_navIndex >= 0) { e.preventDefault(); activateNavItem(); }
   } else if (e.key === ' ' && activeTab === 'tabSamples') {
     if (_navIndex >= 0) { e.preventDefault(); activateNavItem(); }
+
+  } else if (e.key === 'o') {
+    // o = open/reveal in Finder
+    e.preventDefault();
+    const path = _getSelectedPath();
+    if (path) {
+      if (typeof openFolder === 'function') openFolder(path);
+      else if (typeof openAudioFolder === 'function') openAudioFolder(path);
+    }
+
+  } else if (e.key === 'y') {
+    // y = yank (copy path)
+    e.preventDefault();
+    const path = _getSelectedPath();
+    if (path && typeof copyToClipboard === 'function') copyToClipboard(path);
+
+  } else if (e.key === 'x') {
+    // x = toggle favorite
+    e.preventDefault();
+    const path = _getSelectedPath();
+    const name = _getSelectedName();
+    if (path && typeof isFavorite === 'function') {
+      if (isFavorite(path)) { if (typeof removeFavorite === 'function') removeFavorite(path); }
+      else { if (typeof addFavorite === 'function') addFavorite('item', path, name); }
+    }
+
+  } else if (e.key === 'p') {
+    // p = preview/play audio
+    e.preventDefault();
+    const path = _getSelectedPath();
+    if (path && typeof previewAudio === 'function') previewAudio(path);
+
+  } else if (e.key === '/') {
+    // / = focus search (vim search)
+    e.preventDefault();
+    const activeContent = document.querySelector('.tab-content.active');
+    const input = activeContent?.querySelector('input[type="text"]');
+    if (input) { input.focus(); input.select(); }
+
+  } else if (e.key === 'v') {
+    // v = toggle batch select on current item
+    e.preventDefault();
+    if (_navIndex >= 0 && _navIndex < items.length) {
+      const cb = items[_navIndex].querySelector('.batch-cb');
+      if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+    }
+
+  } else if (e.key === 'V') {
+    // V = select all visible (visual line mode)
+    e.preventDefault();
+    if (typeof batchSelectAll === 'function') batchSelectAll();
+
+  } else if (e.key === 'd' && !e.ctrlKey) {
+    // dd would be handled by g-prefix pattern, single d = delete
+    // Just use Backspace behavior
   } else if (e.key === '?') {
     e.preventDefault();
     toggleHelpOverlay();

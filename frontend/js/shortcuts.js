@@ -35,7 +35,7 @@ const DEFAULT_SHORTCUTS = {
   'depGraph': { key: 'g', mod: true, label: 'Dependency graph' },
   'resetAllScans': { key: 'Backspace', mod: true, label: 'Reset all scans' },
   'toggleTheme': { key: 't', mod: true, label: 'Toggle light/dark theme' },
-  'openPrefs': { key: ',', mod: true, label: 'Open preferences file' },
+  'openPrefs': { key: ',', mod: true, label: 'Settings' },
   'nextTab': { key: 'Tab', mod: true, label: 'Next tab' },
   'prevTab': { key: 'Tab', mod: false, label: 'Previous tab (Shift held)' },
 };
@@ -223,7 +223,7 @@ function executeShortcut(id) {
   } else if (id === 'toggleTheme') {
     if (typeof settingToggleTheme === 'function') settingToggleTheme();
   } else if (id === 'openPrefs') {
-    if (typeof openPrefsFile === 'function') openPrefsFile();
+    switchTab('settings');
   } else if (id === 'nextTab') {
     _cycleTab(1);
   } else if (id === 'prevTab') {
