@@ -140,9 +140,9 @@ function showNoteEditor(path, name) {
       </div>
       <div class="modal-body">
         <label class="note-label">Note</label>
-        <textarea class="note-textarea" id="noteText" rows="4" placeholder="Add a note...">${escapeHtml(noteText)}</textarea>
+        <textarea class="note-textarea" id="noteText" rows="4" placeholder="Add a note..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">${escapeHtml(noteText)}</textarea>
         <label class="note-label">Tags <span style="color: var(--text-muted); font-weight: 400;">(comma-separated)</span></label>
-        <input type="text" class="note-input" id="noteTags" placeholder="kick, bass, favorite" value="${escapeHtml(tags)}">
+        <input type="text" class="note-input" id="noteTags" placeholder="kick, bass, favorite" value="${escapeHtml(tags)}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         ${suggestions}
         <div class="note-actions">
           <button class="btn btn-primary" data-action-modal="saveNote">Save</button>
@@ -381,7 +381,7 @@ function showTagWizard() {
       </div>
       <div class="modal-body">
         <div class="tag-wizard-add">
-          <input type="text" id="tagWizardInput" placeholder="New tag name..." autocomplete="off" spellcheck="false">
+          <input type="text" id="tagWizardInput" placeholder="New tag name..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           <button class="btn btn-primary" id="tagWizardAddBtn" data-action-tw="add">+ Add</button>
         </div>
         <div class="tag-wizard-list" id="tagWizardList"></div>
@@ -417,7 +417,7 @@ function renderTagWizardList() {
     const count = tagCounts[tag];
     const isRenaming = _tagWizardRenaming === tag;
     const nameHtml = isRenaming
-      ? `<input type="text" class="tag-wizard-rename-input" data-tw-rename-tag="${escapeHtml(tag)}" value="${escapeHtml(tag)}" autofocus>`
+      ? `<input type="text" class="tag-wizard-rename-input" data-tw-rename-tag="${escapeHtml(tag)}" value="${escapeHtml(tag)}" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">`
       : escapeHtml(tag);
     return `<div class="tag-wizard-row">
       <span class="tag-wizard-name">${nameHtml}</span>

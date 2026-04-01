@@ -128,7 +128,7 @@ function openPalette() {
 
   const html = `<div class="palette-overlay" id="paletteOverlay">
     <div class="palette-box">
-      <input type="text" class="palette-input" id="paletteInput" placeholder="Search everything... (plugins, samples, projects, actions)" autocomplete="off" spellcheck="false">
+      <input type="text" class="palette-input" id="paletteInput" placeholder="Search everything... (plugins, samples, projects, actions)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <div class="palette-results" id="paletteResults"></div>
     </div>
   </div>`;

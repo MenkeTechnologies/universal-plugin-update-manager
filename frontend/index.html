@@ -4034,7 +4034,7 @@
         <button class="btn btn-secondary" id="btnImport" data-action="importPlugins" title="Import plugin list from JSON">&#8613; Import</button>
         <div class="search-box" style="flex: 1;">
           <span class="search-icon">&#128269;</span>
-          <input type="text" id="searchInput" placeholder="Fuzzy search plugins..." data-action="filterPlugins">
+          <input type="text" id="searchInput" placeholder="Fuzzy search plugins..." data-action="filterPlugins" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           <button class="btn-regex" id="regexPlugins" data-action="toggleRegex" data-target="filterPlugins" title="Toggle regex search">.*</button>
         </div>
         <select class="filter-select" id="typeFilter" data-action="filterPlugins" title="Filter by plugin format">
@@ -4091,7 +4091,7 @@
         <div class="audio-toolbar">
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="favSearchInput" placeholder="Search favorites..." data-action="filterFavorites">
+            <input type="text" id="favSearchInput" placeholder="Search favorites..." data-action="filterFavorites" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           </div>
           <select class="filter-select" id="favTypeFilter" data-action="filterFavorites" title="Filter by item type">
             <option value="all">All Types</option>
@@ -4117,7 +4117,7 @@
         <div class="audio-toolbar">
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="tagSearchInput" placeholder="Search tags..." data-action="filterTags">
+            <input type="text" id="tagSearchInput" placeholder="Search tags..." data-action="filterTags" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           </div>
           <button class="btn btn-primary" data-action="createTag" title="Create a new tag">+ New Tag</button>
         </div>
@@ -4140,7 +4140,7 @@
           <div class="file-breadcrumb" id="fileBreadcrumb"></div>
           <div class="search-box" style="flex: 1; max-width: 300px;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="fileSearchInput" placeholder="Filter files..." data-action="filterFiles">
+            <input type="text" id="fileSearchInput" placeholder="Filter files..." data-action="filterFiles" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           </div>
         </div>
         <div class="file-favs" id="fileFavs" style="display:none;">
@@ -4162,7 +4162,7 @@
         <div class="audio-toolbar">
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="noteSearchInput" placeholder="Search notes and tags..." data-action="filterNotes">
+            <input type="text" id="noteSearchInput" placeholder="Search notes and tags..." data-action="filterNotes" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
           </div>
           <button class="btn btn-stop btn-settings-action" data-action="clearAllNotes" title="Delete all notes">Clear All</button>
         </div>
@@ -4209,7 +4209,7 @@
           <button class="btn btn-secondary" id="btnImportAudio" data-action="importAudio" title="Import samples from JSON">&#8613; Import</button>
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="audioSearchInput" placeholder="Fuzzy search samples..." data-action="filterAudioSamples">
+            <input type="text" id="audioSearchInput" placeholder="Fuzzy search samples..." data-action="filterAudioSamples" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             <button class="btn-regex" id="regexAudio" data-action="toggleRegex" data-target="filterAudioSamples" title="Toggle regex search">.*</button>
           </div>
           <select class="filter-select" id="audioFormatFilter" data-action="filterAudioSamples" title="Filter by audio format">
@@ -4258,7 +4258,7 @@
           <button class="btn btn-secondary" id="btnXrefIndex" data-action="buildXrefIndex" title="Scan all Ableton/REAPER projects for plugin references">&#9889; Plugin Index</button>
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="dawSearchInput" placeholder="Fuzzy search projects..." data-action="filterDawProjects">
+            <input type="text" id="dawSearchInput" placeholder="Fuzzy search projects..." data-action="filterDawProjects" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             <button class="btn-regex" id="regexDaw" data-action="toggleRegex" data-target="filterDawProjects" title="Toggle regex search">.*</button>
           </div>
           <select class="filter-select" id="dawDawFilter" data-action="filterDawProjects" title="Filter by DAW application">
@@ -4309,7 +4309,7 @@
           <button class="btn btn-secondary" id="btnImportPresets" data-action="importPresets" title="Import presets from JSON">&#8613; Import</button>
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="presetSearchInput" placeholder="Fuzzy search presets..." data-action="filterPresets">
+            <input type="text" id="presetSearchInput" placeholder="Fuzzy search presets..." data-action="filterPresets" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             <button class="btn-regex" id="regexPresets" data-action="toggleRegex" data-target="filterPresets" title="Toggle regex search">.*</button>
           </div>
           <select class="filter-select" id="presetFormatFilter" data-action="filterPresets" title="Filter by preset format">
@@ -4458,7 +4458,7 @@
                 <button class="btn btn-stop btn-settings-action" data-action="deleteCustomSchemes" id="btnDeleteCustom" style="display: none;" title="Delete all saved custom color presets">Delete Saved</button>
               </div>
               <div class="save-preset-row" id="savePresetRow" style="display: none;">
-                <input type="text" class="settings-input" id="savePresetName" placeholder="Preset name">
+                <input type="text" class="settings-input" id="savePresetName" placeholder="Preset name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                 <button class="btn btn-secondary btn-settings-action" data-action="confirmSavePreset" title="Save this color preset">Save</button>
                 <button class="btn btn-secondary btn-settings-action" data-action="cancelSavePreset" title="Cancel saving preset">Cancel</button>
               </div>
@@ -4475,7 +4475,7 @@
               <span class="settings-desc">Additional directories to scan for plugins (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path"></textarea>
+              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="saveCustomDirs" style="margin-top: 6px;" title="Save custom plugin scan directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgCustomDirs"></span>
             </div>
@@ -4486,7 +4486,7 @@
               <span class="settings-desc">Additional directories to scan for audio samples (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path"></textarea>
+              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="saveAudioScanDirs" style="margin-top: 6px;" title="Save custom audio sample scan directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgAudioScanDirs"></span>
             </div>
@@ -4497,7 +4497,7 @@
               <span class="settings-desc">Additional directories to scan for DAW project files (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path"></textarea>
+              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="saveDawScanDirs" style="margin-top: 6px;" title="Save custom DAW project scan directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgDawScanDirs"></span>
             </div>
@@ -4508,7 +4508,7 @@
               <span class="settings-desc">Additional directories to scan for plugin presets (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path"></textarea>
+              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="savePresetScanDirs" style="margin-top: 6px;" title="Save custom preset scan directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgPresetScanDirs"></span>
             </div>
