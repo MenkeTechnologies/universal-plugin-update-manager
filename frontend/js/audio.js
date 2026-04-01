@@ -1644,9 +1644,8 @@ function updateMetaLine() {
   }
 
   function draw() {
-    const w = canvas.width;
-    const h = canvas.height;
-    if (w === 0 || h === 0) { requestAnimationFrame(draw); return; }
+    const w = 800;
+    const h = 120;
     ctx.clearRect(0, 0, w, h);
 
     // Grid lines
@@ -1760,34 +1759,17 @@ function updateMetaLine() {
     requestAnimationFrame(draw);
   }
 
-  function sizeCanvas() {
-    const wrap = canvas.parentElement;
-    if (!wrap) return;
-    const w = wrap.clientWidth;
-    const h = wrap.clientHeight;
-    if (w > 0 && h > 0) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-  }
-
   // Start drawing when EQ section is visible
   const eqSection = document.getElementById('npEqSection');
   if (eqSection) {
     const observer = new MutationObserver(() => {
       if (eqSection.classList.contains('visible')) {
         ensureAudioGraph();
-        sizeCanvas();
         draw();
         observer.disconnect();
       }
     });
     observer.observe(eqSection, { attributes: true, attributeFilter: ['class'] });
-  }
-
-  // Resize canvas when player resizes (not every frame)
-  if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) {
-    new ResizeObserver(() => sizeCanvas()).observe(canvas.parentElement);
   }
 
   // Drag bands
