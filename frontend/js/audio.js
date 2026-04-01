@@ -1644,8 +1644,8 @@ function updateMetaLine() {
   }
 
   function draw() {
-    const w = 800;
-    const h = 120;
+    const w = canvas.width || 800;
+    const h = canvas.height || 120;
     ctx.clearRect(0, 0, w, h);
 
     // Grid lines
@@ -1760,12 +1760,27 @@ function updateMetaLine() {
   }
 
   // Start drawing when EQ section is visible
+  let _eqCanvasStarted = false;
+  function startEqCanvas() {
+    if (_eqCanvasStarted) return;
+    const wrap = canvas.parentElement;
+    if (!wrap) return;
+    const w = wrap.offsetWidth;
+    if (w > 0) {
+      canvas.width = w;
+      canvas.height = 120;
+      _eqCanvasStarted = true;
+      ensureAudioGraph();
+      draw();
+    }
+  }
+
   const eqSection = document.getElementById('npEqSection');
   if (eqSection) {
     const observer = new MutationObserver(() => {
       if (eqSection.classList.contains('visible')) {
-        ensureAudioGraph();
-        draw();
+        // Delay to let layout settle
+        setTimeout(startEqCanvas, 50);
         observer.disconnect();
       }
     });
@@ -1777,9 +1792,9 @@ function updateMetaLine() {
   canvas.addEventListener('mousedown', (e) => {
     ensureAudioGraph();
     const rect = canvas.getBoundingClientRect();
-    const scaleX = 800 / rect.width, scaleY = 120 / rect.height;
+    const w = canvas.width || 800, h = canvas.height || 120;
+    const scaleX = w / rect.width, scaleY = h / rect.height;
     const mx = (e.clientX - rect.left) * scaleX, my = (e.clientY - rect.top) * scaleY;
-    const w = 800, h = 120;
     for (const band of bands) {
       if (!band.filter) continue;
       const bx = freqToX(band.filter.frequency.value, w);
@@ -1795,9 +1810,9 @@ function updateMetaLine() {
   document.addEventListener('mousemove', (e) => {
     if (!_dragBand) return;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = 800 / rect.width, scaleY = 120 / rect.height;
+    const w = canvas.width || 800, h = canvas.height || 120;
+    const scaleX = w / rect.width, scaleY = h / rect.height;
     const mx = (e.clientX - rect.left) * scaleX, my = (e.clientY - rect.top) * scaleY;
-    const w = 800, h = 120;
     const freq = Math.max(FREQ_MIN, Math.min(FREQ_MAX, xToFreq(mx, w)));
     const gain = Math.max(GAIN_MIN, Math.min(GAIN_MAX, yToGain(my, h)));
     _dragBand.filter.frequency.value = freq;
