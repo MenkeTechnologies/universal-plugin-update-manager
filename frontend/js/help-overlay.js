@@ -39,11 +39,20 @@ function toggleHelpOverlay() {
             <div class="help-row"><kbd>&#8984;S</kbd> <span>Scan all</span></div>
             <div class="help-row"><kbd>&#8984;.</kbd> <span>Stop all scans</span></div>
             <div class="help-row"><kbd>&#8984;A</kbd> <span>Select all visible</span></div>
-            <div class="help-row"><kbd>R</kbd> <span>Reveal selected in Finder</span></div>
-            <div class="help-row"><kbd>C</kbd> <span>Copy selected path</span></div>
+            <div class="help-row"><kbd>&#8984;E</kbd> <span>Export current tab</span></div>
+            <div class="help-row"><kbd>&#8984;I</kbd> <span>Import to current tab</span></div>
+            <div class="help-row"><kbd>&#8984;D</kbd> <span>Find duplicates</span></div>
+            <div class="help-row"><kbd>&#8984;G</kbd> <span>Dependency graph</span></div>
+            <div class="help-row"><kbd>&#8984;T</kbd> <span>Toggle theme</span></div>
+            <div class="help-row"><kbd>&#8984;,</kbd> <span>Open preferences file</span></div>
+            <div class="help-row"><kbd>&#8984;Tab</kbd> <span>Next tab</span></div>
+            <div class="help-row"><kbd>&#8984;&#8679;Tab</kbd> <span>Previous tab</span></div>
+            <div class="help-row"><kbd>R</kbd> <span>Reveal in Finder</span></div>
+            <div class="help-row"><kbd>C</kbd> <span>Copy path</span></div>
             <div class="help-row"><kbd>F</kbd> <span>Toggle favorite</span></div>
-            <div class="help-row"><kbd>N</kbd> <span>Add note to selected</span></div>
-            <div class="help-row"><kbd>Del</kbd> <span>Delete selected file</span></div>
+            <div class="help-row"><kbd>N</kbd> <span>Add note</span></div>
+            <div class="help-row"><kbd>S</kbd> <span>Toggle shuffle</span></div>
+            <div class="help-row"><kbd>Del</kbd> <span>Delete selected</span></div>
             <div class="help-row"><kbd>Esc</kbd> <span>Close / clear / stop</span></div>
             <div class="help-row"><kbd>?</kbd> <span>Toggle this help</span></div>
           </div>

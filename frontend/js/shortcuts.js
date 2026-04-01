@@ -28,6 +28,16 @@ const DEFAULT_SHORTCUTS = {
   'deleteItem': { key: 'Backspace', mod: false, label: 'Delete selected' },
   'selectAll': { key: 'a', mod: true, label: 'Select all visible' },
   'escape': { key: 'Escape', mod: false, label: 'Close / clear / stop' },
+  'exportTab': { key: 'e', mod: true, label: 'Export current tab' },
+  'importTab': { key: 'i', mod: true, label: 'Import to current tab' },
+  'toggleShuffle': { key: 's', mod: false, label: 'Toggle shuffle' },
+  'findDuplicates': { key: 'd', mod: true, label: 'Find duplicates' },
+  'depGraph': { key: 'g', mod: true, label: 'Dependency graph' },
+  'resetAllScans': { key: 'Backspace', mod: true, label: 'Reset all scans' },
+  'toggleTheme': { key: 't', mod: true, label: 'Toggle light/dark theme' },
+  'openPrefs': { key: ',', mod: true, label: 'Open preferences file' },
+  'nextTab': { key: 'Tab', mod: true, label: 'Next tab' },
+  'prevTab': { key: 'Tab', mod: false, label: 'Previous tab (Shift held)' },
 };
 
 const TAB_MAP = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'history', 'settings'];
@@ -138,6 +148,13 @@ document.addEventListener('keydown', (e) => {
   const mod = isMac ? e.metaKey : e.ctrlKey;
   const shortcuts = getShortcuts();
 
+  // Special: Cmd+Tab / Cmd+Shift+Tab for tab cycling
+  if (mod && e.key === 'Tab') {
+    e.preventDefault();
+    _cycleTab(e.shiftKey ? -1 : 1);
+    return;
+  }
+
   for (const [id, sc] of Object.entries(shortcuts)) {
     if (sc.key === e.key && sc.mod === mod) {
       e.preventDefault();
@@ -191,7 +208,55 @@ function executeShortcut(id) {
     if (typeof batchSelectAll === 'function') batchSelectAll();
   } else if (id === 'escape') {
     _handleEscape();
+  } else if (id === 'exportTab') {
+    _exportCurrentTab();
+  } else if (id === 'importTab') {
+    _importCurrentTab();
+  } else if (id === 'toggleShuffle') {
+    if (typeof toggleShuffle === 'function') toggleShuffle();
+  } else if (id === 'findDuplicates') {
+    if (typeof showDuplicateReport === 'function') showDuplicateReport();
+  } else if (id === 'depGraph') {
+    if (typeof showDepGraph === 'function') showDepGraph();
+  } else if (id === 'resetAllScans') {
+    if (typeof resetAllScans === 'function') resetAllScans();
+  } else if (id === 'toggleTheme') {
+    if (typeof settingToggleTheme === 'function') settingToggleTheme();
+  } else if (id === 'openPrefs') {
+    if (typeof openPrefsFile === 'function') openPrefsFile();
+  } else if (id === 'nextTab') {
+    _cycleTab(1);
+  } else if (id === 'prevTab') {
+    _cycleTab(-1);
   }
+}
+
+function _exportCurrentTab() {
+  const active = document.querySelector('.tab-content.active')?.id;
+  if (active === 'tabPlugins' && typeof exportPlugins === 'function') exportPlugins();
+  else if (active === 'tabSamples' && typeof exportAudio === 'function') exportAudio();
+  else if (active === 'tabDaw' && typeof exportDaw === 'function') exportDaw();
+  else if (active === 'tabPresets' && typeof exportPresets === 'function') exportPresets();
+  else if (active === 'tabFavorites' && typeof exportFavorites === 'function') exportFavorites();
+  else if (active === 'tabNotes' && typeof exportNotes === 'function') exportNotes();
+}
+
+function _importCurrentTab() {
+  const active = document.querySelector('.tab-content.active')?.id;
+  if (active === 'tabPlugins' && typeof importPlugins === 'function') importPlugins();
+  else if (active === 'tabSamples' && typeof importAudio === 'function') importAudio();
+  else if (active === 'tabDaw' && typeof importDaw === 'function') importDaw();
+  else if (active === 'tabPresets' && typeof importPresets === 'function') importPresets();
+  else if (active === 'tabFavorites' && typeof importFavorites === 'function') importFavorites();
+  else if (active === 'tabNotes' && typeof importNotes === 'function') importNotes();
+}
+
+function _cycleTab(dir) {
+  const tabs = [...document.querySelectorAll('.tab-btn')];
+  const activeIdx = tabs.findIndex(t => t.classList.contains('active'));
+  const next = (activeIdx + dir + tabs.length) % tabs.length;
+  const tab = tabs[next]?.dataset?.tab;
+  if (tab) switchTab(tab);
 }
 
 function _adjustVolume(delta) {
