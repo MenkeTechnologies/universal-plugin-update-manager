@@ -35,6 +35,9 @@ function collectPaletteItems() {
   if (typeof buildXrefIndex === 'function') {
     items.push({ type: 'action', name: 'Build Plugin Index', icon: '&#9889;', action: () => buildXrefIndex() });
   }
+  if (typeof showDepGraph === 'function') {
+    items.push({ type: 'action', name: 'Plugin Dependency Graph', icon: '&#128200;', action: () => showDepGraph() });
+  }
 
   // Plugins
   if (typeof allPlugins !== 'undefined') {

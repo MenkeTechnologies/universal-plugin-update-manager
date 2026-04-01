@@ -112,6 +112,7 @@ document.addEventListener('click', (e) => {
     case 'resumeDawScan': scanDawProjects(true); break;
     case 'stopDawScan': stopDawScan(); break;
     case 'buildXrefIndex': buildXrefIndex().then(() => filterDawProjects()); break;
+    case 'showDepGraph': showDepGraph(); break;
     case 'scanPresets': scanPresets(); break;
     case 'resumePresetScan': scanPresets(true); break;
     case 'stopPresetScan': stopPresetScan(); break;

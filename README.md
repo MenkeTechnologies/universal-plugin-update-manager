@@ -84,7 +84,8 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Resizable Columns** | Drag column borders to resize. Widths persist across sessions |
 | **Floating Player** | Draggable audio player that docks to any corner. Play/pause, loop, shuffle, seek bar, volume, speed (0.25x-2x), recently played (50 tracks). Expanded mode adds 3-band EQ (Low 200Hz / Mid 1kHz / High 8kHz, ±12dB), preamp gain, stereo pan, mono toggle, and A-B loop with green/red waveform markers. Full Web Audio API processing chain |
 | **Waveform Preview** | Full-width waveform rendered in the metadata panel when clicking a sample row. Seekable — click anywhere on the waveform to jump to that position. Playback cursor and progress fill update in real-time. Waveform peaks cached in memory for instant re-display |
-| **Context Menus** | Right-click context menus on every interactive element -- plugins (KVR, manufacturer, reveal, copy), samples (play, loop, reveal, copy), DAW projects (open in DAW, reveal, copy), presets (reveal, copy), and history entries (view, delete) |
+| **Dependency Graph** | Visual plugin dependency map: most-used plugins ranked by project count with bar charts, projects sorted by plugin count, orphaned plugin detection (installed but unused). Accessible from DAW tab toolbar or command palette |
+| **Context Menus** | Right-click context menus on every interactive element -- plugins (KVR, manufacturer, reveal, copy), samples (play, loop, reveal, copy), DAW projects (open in DAW, reveal, copy), presets (reveal, copy), favorites, notes, tags, and history entries |
 | **Toast Notifications** | Slide-in notifications for actions like opening DAW projects or revealing files in Finder |
 | **Disk Usage** | Stacked bar charts showing space breakdown by format/type per tab. Visual representation of storage usage with color-coded legends |
 | **Batch Selection** | Checkbox column in all tables for multi-item operations. Select all/deselect, batch favorite, copy paths, export selected as JSON |
@@ -290,6 +291,7 @@ frontend/
     sort-persist.js    -- Sort column/direction persistence per tab
     utils.js           -- fzf search, escaping, slugs, formatting
     xref.js            -- Plugin ↔ DAW cross-reference UI + index
+    dep-graph.js       -- Plugin dependency graph visualization
 
 test/
   scanner.test.js      -- Plugin/audio/DAW type mapping, size formatting
