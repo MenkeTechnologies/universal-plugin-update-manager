@@ -32,6 +32,7 @@ function collectPaletteItems() {
   items.push({ type: 'action', name: 'Scan Presets', icon: '&#8635;', action: () => scanPresets() });
   items.push({ type: 'action', name: 'Check Updates', icon: '&#9889;', action: () => checkUpdates() });
   items.push({ type: 'action', name: 'Find Duplicates', icon: '&#128270;', action: () => showDuplicateReport() });
+  items.push({ type: 'action', name: 'Reset All Scans', icon: '&#128465;', action: () => resetAllScans() });
   if (typeof buildXrefIndex === 'function') {
     items.push({ type: 'action', name: 'Build Plugin Index', icon: '&#9889;', action: () => buildXrefIndex() });
   }

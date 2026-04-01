@@ -443,6 +443,63 @@ async function settingClearAllHistory() {
   } finally { hideGlobalProgress(); }
 }
 
+async function resetAllScans() {
+  if (!await confirmAction('Reset everything? This will clear all scan results, history, and KVR cache. The app will return to its initial state.\n\nThis cannot be undone.', 'Reset All Scans')) return;
+  showGlobalProgress('Reset');
+  try {
+    // Stop any running scans
+    await Promise.all([
+      window.vstUpdater.stopScan().catch(() => {}),
+      window.vstUpdater.stopAudioScan().catch(() => {}),
+      window.vstUpdater.stopDawScan().catch(() => {}),
+      window.vstUpdater.stopPresetScan().catch(() => {}),
+    ]);
+    // Clear backend history + KVR cache
+    await Promise.all([
+      window.vstUpdater.clearHistory(),
+      window.vstUpdater.clearAudioHistory(),
+      window.vstUpdater.clearDawHistory(),
+      window.vstUpdater.clearPresetHistory(),
+      window.vstUpdater.updateKvrCache([]),
+    ]);
+    // Clear in-memory data
+    allPlugins = [];
+    pluginsWithUpdates = [];
+    if (typeof allAudioSamples !== 'undefined') allAudioSamples = [];
+    if (typeof filteredAudioSamples !== 'undefined') filteredAudioSamples = [];
+    if (typeof allDawProjects !== 'undefined') allDawProjects = [];
+    if (typeof allPresets !== 'undefined') allPresets = [];
+    if (typeof recentlyPlayed !== 'undefined') { recentlyPlayed = []; saveRecentlyPlayed(); }
+    // Clear xref cache
+    if (typeof _xrefCache !== 'undefined') { for (const k in _xrefCache) delete _xrefCache[k]; }
+    // Reset plugin UI
+    document.getElementById('pluginList').innerHTML = '<div class="state-message" id="emptyState"><div class="state-icon">&#128268;</div><h2>Audio Plugin Scanner</h2><p>Click <strong>"Scan Plugins"</strong> to discover all VST2, VST3, and Audio Unit plugins on your system.</p></div>';
+    document.getElementById('totalCount').textContent = '0';
+    document.getElementById('dirsSection').style.display = 'none';
+    document.getElementById('btnCheckUpdates').disabled = true;
+    // Reset audio UI
+    const audioWrap = document.getElementById('audioTableWrap');
+    if (audioWrap) audioWrap.innerHTML = '<div class="state-message" id="audioEmptyState"><div class="state-icon">&#127925;</div><h2>Audio Sample Index</h2><p>Click <strong>"Scan Samples"</strong> to find all audio files.</p></div>';
+    const audioStats = document.getElementById('audioStats');
+    if (audioStats) audioStats.style.display = 'none';
+    // Reset DAW UI
+    const dawWrap = document.getElementById('dawTableWrap');
+    if (dawWrap) dawWrap.innerHTML = '<div class="state-message" id="dawEmptyState"><div class="state-icon">&#127911;</div><h2>DAW Project Scanner</h2><p>Click <strong>"Scan DAW Projects"</strong> to find project files.</p></div>';
+    const dawStats = document.getElementById('dawStats');
+    if (dawStats) dawStats.style.display = 'none';
+    // Reset preset UI
+    const presetWrap = document.getElementById('presetTableWrap');
+    if (presetWrap) presetWrap.innerHTML = '<div class="state-message" id="presetEmptyState"><div class="state-icon">&#127924;</div><h2>Preset Scanner</h2><p>Click <strong>"Scan Presets"</strong> to find preset files.</p></div>';
+    const presetStats = document.getElementById('presetStats');
+    if (presetStats) presetStats.style.display = 'none';
+    // Reset history
+    if (typeof loadHistory === 'function') loadHistory();
+    showToast('All scans reset to fresh state');
+  } catch (e) {
+    showToast(`Reset failed — ${e.message || e}`, 4000, 'error');
+  } finally { hideGlobalProgress('Reset'); }
+}
+
 async function settingClearKvrCache() {
   if (!await confirmAction('Clear all cached KVR version lookups? Next update check will re-fetch everything.', 'Clear KVR Cache')) return;
   showGlobalProgress();

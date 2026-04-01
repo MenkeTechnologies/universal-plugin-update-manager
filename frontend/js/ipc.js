@@ -144,6 +144,7 @@ document.addEventListener('click', (e) => {
     case 'settingResetTabOrder': settingResetTabOrder(); break;
     case 'settingClearAllHistory': settingClearAllHistory(); break;
     case 'settingClearKvrCache': settingClearKvrCache(); break;
+    case 'resetAllScans': resetAllScans(); break;
     case 'settingColorScheme': settingColorScheme(el.dataset.scheme); break;
     case 'settingToggleAutoScan': settingToggleAutoScan(); break;
     case 'settingToggleAutoUpdate': settingToggleAutoUpdate(); break;
