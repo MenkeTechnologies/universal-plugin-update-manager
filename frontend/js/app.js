@@ -129,7 +129,7 @@
   renderWelcomeDashboard();
   renderShortcutSettings();
   updateHeaderInfo();
-  setInterval(updateHeaderInfo, 2000); // refresh process stats every 2s
+  setInterval(updateHeaderInfo, 1000); // refresh process stats every 1s
 
   // Auto-scan on launch
   if (prefs.getItem('autoScan') === 'on' && allPlugins.length === 0) {

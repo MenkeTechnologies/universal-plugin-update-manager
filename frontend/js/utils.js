@@ -377,6 +377,8 @@ function formatTime(sec) {
 // ── Loading helpers ──
 function showGlobalProgress() {
   document.getElementById('globalProgress')?.classList.add('active');
+  // Refresh scan status badge immediately
+  if (typeof updateHeaderInfo === 'function') setTimeout(updateHeaderInfo, 100);
 }
 function hideGlobalProgress() {
   document.getElementById('globalProgress')?.classList.remove('active');
