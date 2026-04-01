@@ -1226,6 +1226,7 @@ fn get_process_stats() -> serde_json::Value {
         "threads": threads,
         "cpuPercent": cpu_pct,
         "rayonThreads": rayon_threads,
+        "numCpus": num_cpus::get(),
         "uptimeSecs": uptime_secs,
         "openFds": open_fds,
     })
