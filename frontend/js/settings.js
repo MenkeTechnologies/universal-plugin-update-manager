@@ -849,12 +849,17 @@ function restoreSettings() {
 }
 // restoreSettings is called from loadLastScan after prefs.load()
 
-// ── Settings Section Drag Reorder ──
+// ── Settings Section Drag Reorder (Trello-style) ──
 function initSettingsSectionDrag() {
   const container = document.querySelector('.settings-container');
   if (!container) return;
   let dragged = null;
+  let ghost = null;
+  let placeholder = null;
   let startY = 0;
+  let startX = 0;
+  let offsetY = 0;
+  let offsetX = 0;
   let isDragging = false;
 
   container.addEventListener('mousedown', (e) => {
@@ -864,7 +869,11 @@ function initSettingsSectionDrag() {
     if (!section) return;
     e.preventDefault();
     dragged = section;
+    const rect = section.getBoundingClientRect();
     startY = e.clientY;
+    startX = e.clientX;
+    offsetY = e.clientY - rect.top;
+    offsetX = e.clientX - rect.left;
     isDragging = false;
   });
 
@@ -872,14 +881,49 @@ function initSettingsSectionDrag() {
     if (!dragged) return;
     if (!isDragging && Math.abs(e.clientY - startY) > 8) {
       isDragging = true;
-      dragged.classList.add('section-dragging');
       document.body.style.userSelect = 'none';
-      e.preventDefault();
+      document.body.style.cursor = 'grabbing';
+
+      // Create placeholder
+      const rect = dragged.getBoundingClientRect();
+      placeholder = document.createElement('div');
+      placeholder.className = 'section-placeholder';
+      placeholder.style.height = rect.height + 'px';
+      dragged.parentNode.insertBefore(placeholder, dragged);
+
+      // Create floating ghost
+      ghost = dragged.cloneNode(true);
+      ghost.className = 'settings-section section-ghost';
+      ghost.style.width = rect.width + 'px';
+      ghost.style.left = (e.clientX - offsetX) + 'px';
+      ghost.style.top = (e.clientY - offsetY) + 'px';
+      document.body.appendChild(ghost);
+
+      // Hide original
+      dragged.style.display = 'none';
     }
-    if (!isDragging) return;
-    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.settings-section');
+    if (!isDragging || !ghost) return;
+
+    // Move ghost with cursor
+    ghost.style.left = (e.clientX - offsetX) + 'px';
+    ghost.style.top = (e.clientY - offsetY) + 'px';
+
+    // Find drop target — temporarily hide ghost to get element underneath
+    ghost.style.pointerEvents = 'none';
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    ghost.style.pointerEvents = '';
+    const target = el?.closest('.settings-section');
+
     container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
-    if (target && target !== dragged) {
+    if (target && target !== dragged && target !== placeholder) {
+      // Move placeholder to show where the section will land
+      const targetRect = target.getBoundingClientRect();
+      const midY = targetRect.top + targetRect.height / 2;
+      if (e.clientY < midY) {
+        container.insertBefore(placeholder, target);
+      } else {
+        container.insertBefore(placeholder, target.nextSibling);
+      }
       target.classList.add('section-drag-over');
     }
   });
@@ -887,28 +931,27 @@ function initSettingsSectionDrag() {
   document.addEventListener('mouseup', (e) => {
     if (!dragged) return;
     if (isDragging) {
-      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.settings-section');
       container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
-      dragged.classList.remove('section-dragging');
       document.body.style.userSelect = '';
-      if (target && target !== dragged) {
-        const sections = [...container.querySelectorAll('.settings-section')];
-        const dragIdx = sections.indexOf(dragged);
-        const dropIdx = sections.indexOf(target);
-        if (dragIdx < dropIdx) {
-          container.insertBefore(dragged, target.nextSibling);
-        } else {
-          container.insertBefore(dragged, target);
-        }
-        saveSettingsSectionOrder();
+      document.body.style.cursor = '';
+
+      // Move dragged section to placeholder position
+      if (placeholder && placeholder.parentNode) {
+        placeholder.parentNode.insertBefore(dragged, placeholder);
+        placeholder.remove();
       }
-      // Suppress click
+      dragged.style.display = '';
+      if (ghost) { ghost.remove(); ghost = null; }
+      placeholder = null;
+      saveSettingsSectionOrder();
+
       const suppress = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
       container.addEventListener('click', suppress, { capture: true, once: true });
     }
     dragged = null;
     isDragging = false;
     document.body.style.userSelect = '';
+    document.body.style.cursor = '';
   });
 
   restoreSettingsSectionOrder();
