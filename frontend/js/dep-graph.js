@@ -157,9 +157,10 @@ function showDepGraph() {
   if (projPanel) projPanel._fullHtml = projPanel.innerHTML;
   if (orphPanel) orphPanel._fullHtml = orphPanel.innerHTML;
 
-  // Search filtering
+  // Search filtering with match highlighting
   document.getElementById('depSearchInput')?.addEventListener('input', (e) => {
-    const q = e.target.value.trim().toLowerCase();
+    const q = e.target.value.trim();
+    const ql = q.toLowerCase();
     [usagePanel, projPanel, orphPanel].forEach(panel => {
       if (!panel || !panel._fullHtml) return;
       if (!q) { panel.innerHTML = panel._fullHtml; return; }
@@ -168,7 +169,16 @@ function showDepGraph() {
       const rows = tmp.querySelectorAll('.dep-plugin-row, .dep-project-row, .dep-orphan');
       rows.forEach(row => {
         const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(q) ? '' : 'none';
+        if (!text.includes(ql)) {
+          row.style.display = 'none';
+        } else {
+          // Highlight matches in name/mfg spans
+          row.querySelectorAll('.dep-plugin-name, .dep-plugin-mfg, .dep-project-name').forEach(span => {
+            if (typeof highlightMatch === 'function') {
+              span.innerHTML = highlightMatch(span.textContent, q, 'fuzzy');
+            }
+          });
+        }
       });
       panel.innerHTML = tmp.innerHTML;
     });
