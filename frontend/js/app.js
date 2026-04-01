@@ -42,6 +42,7 @@
   loadRecentlyPlayed();
   renderGlobalTagBar();
   if (typeof loadXrefCache === 'function') loadXrefCache();
+  if (typeof restoreFilterStates === 'function') restoreFilterStates();
 
   try {
     const latest = await window.vstUpdater.getLatestScan();

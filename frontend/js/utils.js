@@ -383,6 +383,32 @@ function showGlobalProgress() {
 function hideGlobalProgress() {
   document.getElementById('globalProgress')?.classList.remove('active');
 }
+// ── Persist filter dropdowns ──
+const _filterIds = ['typeFilter', 'statusFilter', 'favTypeFilter', 'audioFormatFilter', 'dawDawFilter'];
+
+function saveFilterState(id) {
+  const el = document.getElementById(id);
+  if (el) prefs.setItem('filter_' + id, el.value);
+}
+
+function restoreFilterStates() {
+  for (const id of _filterIds) {
+    const saved = prefs.getItem('filter_' + id);
+    const el = document.getElementById(id);
+    if (saved && el) {
+      el.value = saved;
+    }
+  }
+}
+
+// Auto-save on change
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('select.filter-select');
+  if (sel && _filterIds.includes(sel.id)) {
+    saveFilterState(sel.id);
+  }
+});
+
 function btnLoading(btn, loading) {
   if (!btn) return;
   if (loading) {
