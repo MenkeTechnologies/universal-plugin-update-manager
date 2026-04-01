@@ -212,45 +212,11 @@ async fn scan_plugins(
         let mut batch = Vec::new();
         let mut processed = 0usize;
 
-        loop {
+        for info in rx {
             if scan_state.stop_scan.load(Ordering::Relaxed) {
                 stop_flag.store(true, Ordering::Relaxed);
-                while rx.try_recv().is_ok() {}
                 break;
             }
-            // Drain all available items without blocking
-            let mut got_any = false;
-            while let Ok(info) = rx.try_recv() {
-                batch.push(info);
-                processed += 1;
-                got_any = true;
-                if batch.len() >= batch_size || processed == total {
-                    all_plugins.extend(batch.clone());
-                    let _ = app_handle.emit(
-                        "scan-progress",
-                        serde_json::json!({
-                            "phase": "scanning",
-                            "plugins": batch,
-                            "processed": processed,
-                            "total": total
-                        }),
-                    );
-                    batch.clear();
-                }
-                if scan_state.stop_scan.load(Ordering::Relaxed) { break; }
-            }
-            if scan_state.stop_scan.load(Ordering::Relaxed) {
-                stop_flag.store(true, Ordering::Relaxed);
-                while rx.try_recv().is_ok() {}
-                break;
-            }
-            if got_any { continue; }
-            // Channel empty — brief wait
-            let info = match rx.recv_timeout(std::time::Duration::from_millis(1)) {
-                Ok(info) => info,
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-            };
             batch.push(info);
             processed += 1;
             if batch.len() >= batch_size || processed == total {

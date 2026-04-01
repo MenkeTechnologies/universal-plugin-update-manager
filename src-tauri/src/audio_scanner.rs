@@ -123,29 +123,13 @@ pub fn walk_for_audio(
 
     // Stream results to callback as they arrive
     let mut total_found = 0usize;
-    loop {
+    for samples in rx {
         if should_stop() {
             stop.store(true, Ordering::Relaxed);
-            while rx.try_recv().is_ok() {}
             break;
         }
-        // Drain all available batches without blocking
-        let mut got_any = false;
-        while let Ok(samples) = rx.try_recv() {
-            total_found += samples.len();
-            on_batch(&samples, total_found);
-            got_any = true;
-            if should_stop() { stop.store(true, Ordering::Relaxed); break; }
-        }
-        if should_stop() { while rx.try_recv().is_ok() {} break; }
-        if !got_any {
-            // Channel empty — brief sleep then check if producers are done
-            match rx.recv_timeout(std::time::Duration::from_millis(1)) {
-                Ok(samples) => { total_found += samples.len(); on_batch(&samples, total_found); }
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-        }
+        total_found += samples.len();
+        on_batch(&samples, total_found);
     }
 }
 
