@@ -94,32 +94,45 @@ pub fn walk_for_presets(
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<PresetFile>>(512);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<PresetFile>>(2048);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
 
     let roots_owned: Vec<PathBuf> = roots.to_vec();
     let stop2 = stop.clone();
     let found2 = found.clone();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads((num_cpus::get() * 2).max(4))
+        .build()
+        .unwrap();
     std::thread::spawn(move || {
-        roots_owned.par_iter().for_each(|root| {
-            if stop2.load(Ordering::Relaxed) {
-                return;
-            }
-            walk_dir_parallel(
-                root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude,
-            );
+        pool.install(|| {
+            roots_owned.par_iter().for_each(|root| {
+                if stop2.load(Ordering::Relaxed) {
+                    return;
+                }
+                walk_dir_parallel(
+                    root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude,
+                );
+            });
         });
     });
 
     let mut total_found = 0usize;
-    for presets in rx {
+    loop {
         if should_stop() {
             stop.store(true, Ordering::Relaxed);
+            while rx.try_recv().is_ok() {}
             break;
         }
-        total_found += presets.len();
-        on_batch(&presets, total_found);
+        match rx.recv_timeout(std::time::Duration::from_millis(10)) {
+            Ok(presets) => {
+                total_found += presets.len();
+                on_batch(&presets, total_found);
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        }
     }
 }
 

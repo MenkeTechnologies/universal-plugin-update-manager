@@ -215,39 +215,51 @@ pub fn walk_for_daw(
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(512);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(2048);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
 
     let roots_owned: Vec<PathBuf> = roots.to_vec();
     let stop2 = stop.clone();
     let found2 = found.clone();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads((num_cpus::get() * 2).max(4))
+        .build()
+        .unwrap();
     std::thread::spawn(move || {
-        roots_owned.par_iter().for_each(|root| {
-            if stop2.load(Ordering::Relaxed) {
-                return;
-            }
-            walk_dir_parallel(
-                root,
-                0,
-                &visited,
-                &tx,
-                &found2,
-                batch_size,
-                &stop2,
-                &exclude,
-                include_backups,
-            );
+        pool.install(|| {
+            roots_owned.par_iter().for_each(|root| {
+                if stop2.load(Ordering::Relaxed) {
+                    return;
+                }
+                walk_dir_parallel(
+                    root,
+                    0,
+                    &visited,
+                    &tx,
+                    &found2,
+                    batch_size,
+                    &stop2,
+                    &exclude,
+                    include_backups,
+                );
+            });
         });
     });
 
-    // Stream results to callback as they arrive
+    // Stream results to callback as they arrive, checking stop frequently
     let mut total_found = 0usize;
-    for projects in rx {
+    loop {
         if should_stop() {
             stop.store(true, Ordering::Relaxed);
+            while rx.try_recv().is_ok() {}
             break;
         }
+        let projects = match rx.recv_timeout(std::time::Duration::from_millis(10)) {
+            Ok(p) => p,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        };
         total_found += projects.len();
         on_batch(&projects, total_found);
     }

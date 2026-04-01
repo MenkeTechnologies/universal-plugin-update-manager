@@ -96,34 +96,47 @@ pub fn walk_for_audio(
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<AudioSample>>(512);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<AudioSample>>(2048);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
 
-    // Spawn parallel walkers on a separate thread so we can drain results here
+    // Dedicated pool so scanners don't starve each other (~quarter of cores each)
     let roots_owned: Vec<PathBuf> = roots.to_vec();
     let stop2 = stop.clone();
     let found2 = found.clone();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads((num_cpus::get() * 2).max(4))
+        .build()
+        .unwrap();
     std::thread::spawn(move || {
-        roots_owned.par_iter().for_each(|root| {
-            if stop2.load(Ordering::Relaxed) {
-                return;
-            }
-            walk_dir_parallel(
-                root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude,
-            );
+        pool.install(|| {
+            roots_owned.par_iter().for_each(|root| {
+                if stop2.load(Ordering::Relaxed) {
+                    return;
+                }
+                walk_dir_parallel(
+                    root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude,
+                );
+            });
         });
     });
 
-    // Stream results to callback as they arrive
+    // Stream results to callback as they arrive, checking stop frequently
     let mut total_found = 0usize;
-    for samples in rx {
+    loop {
         if should_stop() {
             stop.store(true, Ordering::Relaxed);
+            while rx.try_recv().is_ok() {}
             break;
         }
-        total_found += samples.len();
-        on_batch(&samples, total_found);
+        match rx.recv_timeout(std::time::Duration::from_millis(10)) {
+            Ok(samples) => {
+                total_found += samples.len();
+                on_batch(&samples, total_found);
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        }
     }
 }
 
@@ -189,6 +202,14 @@ fn walk_dir_parallel(
                 continue;
             }
             if let Ok(meta) = fs::metadata(&path) {
+                // Skip empty or unreadable files
+                if meta.len() == 0 {
+                    continue;
+                }
+                // Skip files where we can't read timestamps (broken symlinks, unmounted volumes)
+                if meta.modified().is_err() && meta.accessed().is_err() {
+                    continue;
+                }
                 let sample_name = path
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
