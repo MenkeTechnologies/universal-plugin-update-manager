@@ -55,7 +55,8 @@
 
       document.getElementById('totalCount').textContent = allPlugins.length;
       document.getElementById('btnCheckUpdates').disabled = false;
-      document.getElementById('toolbar').style.display = 'flex';
+      const toolbar = document.getElementById('toolbar');
+      if (toolbar) toolbar.style.display = 'flex';
 
       // Update stat counters from cached data
       const withUpdates = allPlugins.filter(p => p.hasUpdate).length;
