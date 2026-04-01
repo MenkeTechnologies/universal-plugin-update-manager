@@ -522,7 +522,7 @@ function renderAudioTable() {
 
 function appendLoadMore(tbody) {
   tbody.insertAdjacentHTML('beforeend',
-    `<tr id="audioLoadMore"><td colspan="6" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" data-action="loadMoreAudio">
+    `<tr id="audioLoadMore"><td colspan="7" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" data-action="loadMoreAudio">
       Showing ${audioRenderCount} of ${filteredAudioSamples.length} &#8212; click to load more
     </td></tr>`);
 }
@@ -792,7 +792,7 @@ async function toggleMetadata(filePath, event) {
   metaRow.id = 'audioMetaRow';
   metaRow.className = 'audio-meta-row';
   metaRow.setAttribute('data-meta-path', filePath);
-  metaRow.innerHTML = `<td colspan="6"><div class="audio-meta-panel" style="justify-items: center;"><div class="spinner" style="width: 18px; height: 18px;"></div></div></td>`;
+  metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel" style="justify-items: center;"><div class="spinner" style="width: 18px; height: 18px;"></div></div></td>`;
   row.after(metaRow);
 
   // Fetch metadata
@@ -828,7 +828,7 @@ async function toggleMetadata(filePath, event) {
       <div class="waveform-time-label">${meta.duration ? formatTime(meta.duration) : ''}</div>
     </div>`;
 
-    metaRow.innerHTML = `<td colspan="6"><div class="audio-meta-panel">${waveformHtml}${items}</div></td>`;
+    metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel">${waveformHtml}${items}</div></td>`;
 
     // Draw waveform on the meta canvas
     drawMetaWaveform(filePath);
@@ -856,7 +856,7 @@ async function toggleMetadata(filePath, event) {
       if (bpmEl) bpmEl.textContent = 'N/A (format not supported)';
     }
   } catch (err) {
-    metaRow.innerHTML = `<td colspan="6"><div class="audio-meta-panel"><span style="color: var(--red);">Failed to load metadata</span></div></td>`;
+    metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel"><span style="color: var(--red);">Failed to load metadata</span></div></td>`;
   }
 }
 
