@@ -476,33 +476,75 @@ function toggleDirs() {
 function initTabDragReorder() {
   const nav = document.querySelector('.tab-nav');
   let draggedTab = null;
+  let ghost = null;
+  let placeholder = null;
   let dragStartX = 0;
+  let offsetX = 0;
+  let offsetY = 0;
   let isDragging = false;
   let didMove = false;
 
   nav.addEventListener('mousedown', (e) => {
     const btn = e.target.closest('.tab-btn');
     if (!btn || e.button !== 0) return;
+    e.preventDefault();
     draggedTab = btn;
     dragStartX = e.clientX;
+    const rect = btn.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
     isDragging = false;
     didMove = false;
   });
 
   document.addEventListener('mousemove', (e) => {
     if (!draggedTab) return;
-    // Start drag after 5px threshold to avoid accidental drags on click
     if (!isDragging && Math.abs(e.clientX - dragStartX) > 5) {
       isDragging = true;
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'grabbing';
+
+      // Create placeholder matching tab size
+      const rect = draggedTab.getBoundingClientRect();
+      placeholder = document.createElement('span');
+      placeholder.className = 'tab-placeholder';
+      placeholder.style.width = rect.width + 'px';
+      placeholder.style.height = rect.height + 'px';
+      draggedTab.parentNode.insertBefore(placeholder, draggedTab);
+
+      // Create floating ghost
+      ghost = document.createElement('span');
+      ghost.className = 'tab-ghost';
+      ghost.textContent = draggedTab.textContent.trim();
+      ghost.style.left = (e.clientX - offsetX) + 'px';
+      ghost.style.top = (e.clientY - offsetY) + 'px';
+      document.body.appendChild(ghost);
+
+      // Hide original
       draggedTab.classList.add('tab-dragging');
     }
-    if (!isDragging) return;
+    if (!isDragging || !ghost) return;
     didMove = true;
 
-    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.tab-btn');
+    // Move ghost with cursor
+    ghost.style.left = (e.clientX - offsetX) + 'px';
+    ghost.style.top = (e.clientY - offsetY) + 'px';
+
+    // Find drop target
+    ghost.style.display = 'none';
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    ghost.style.display = '';
+    const target = el?.closest('.tab-btn');
+
     nav.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-drag-over'));
-    if (target && target !== draggedTab) {
-      target.classList.add('tab-drag-over');
+    if (target && target !== draggedTab && target !== placeholder) {
+      const targetRect = target.getBoundingClientRect();
+      const midX = targetRect.left + targetRect.width / 2;
+      if (e.clientX < midX) {
+        nav.insertBefore(placeholder, target);
+      } else {
+        nav.insertBefore(placeholder, target.nextSibling);
+      }
     }
   });
 
@@ -510,21 +552,19 @@ function initTabDragReorder() {
     if (!draggedTab) return;
 
     if (isDragging) {
-      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.tab-btn');
       nav.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-drag-over'));
-      draggedTab.classList.remove('tab-dragging');
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
 
-      if (target && target !== draggedTab) {
-        const tabs = [...nav.querySelectorAll('.tab-btn')];
-        const dragIdx = tabs.indexOf(draggedTab);
-        const dropIdx = tabs.indexOf(target);
-        if (dragIdx < dropIdx) {
-          nav.insertBefore(draggedTab, target.nextSibling);
-        } else {
-          nav.insertBefore(draggedTab, target);
-        }
-        saveTabOrder();
+      // Move tab to placeholder position
+      if (placeholder && placeholder.parentNode) {
+        placeholder.parentNode.insertBefore(draggedTab, placeholder);
+        placeholder.remove();
       }
+      draggedTab.classList.remove('tab-dragging');
+      if (ghost) { ghost.remove(); ghost = null; }
+      placeholder = null;
+      saveTabOrder();
     }
 
     // Suppress the click that follows mouseup if we actually dragged
