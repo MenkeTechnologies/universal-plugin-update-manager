@@ -3369,6 +3369,26 @@
       color: var(--text-muted);
       margin-bottom: 6px;
     }
+    .np-search-input {
+      width: 100%;
+      padding: 5px 8px;
+      margin-bottom: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      color: var(--text);
+      font-size: 11px;
+      font-family: inherit;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .np-search-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 4px var(--cyan-glow);
+    }
+    .np-search-input::placeholder {
+      color: var(--text-dim);
+    }
     .np-history-item {
       display: flex;
       align-items: center;
@@ -3943,6 +3963,7 @@
       <div class="np-expand-hint">double-click to expand</div>
       <div class="np-history" id="npHistory">
         <div class="np-history-title">Recently Played</div>
+        <input type="text" class="np-search-input" id="npSearchInput" placeholder="Search songs..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         <div id="npHistoryList"></div>
       </div>
       <div style="text-align: center; padding: 6px 0;">

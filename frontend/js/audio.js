@@ -915,7 +915,42 @@ function addToRecentlyPlayed(filePath, sample) {
 function renderRecentlyPlayed() {
   const list = document.getElementById('npHistoryList');
   if (!list) return;
-  list.innerHTML = recentlyPlayed.map(r => {
+  const searchInput = document.getElementById('npSearchInput');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  let items;
+  if (query) {
+    // Search all audio samples + recently played, deduplicated
+    const seen = new Set();
+    items = [];
+    // Recently played first
+    for (const r of recentlyPlayed) {
+      if (r.name.toLowerCase().includes(query) || r.path.toLowerCase().includes(query)) {
+        if (!seen.has(r.path)) { seen.add(r.path); items.push(r); }
+      }
+    }
+    // Then all audio samples
+    if (typeof allAudioSamples !== 'undefined') {
+      for (const s of allAudioSamples) {
+        if (items.length >= 100) break;
+        if (s.name.toLowerCase().includes(query) || s.path.toLowerCase().includes(query)) {
+          if (!seen.has(s.path)) {
+            seen.add(s.path);
+            items.push({ path: s.path, name: s.name, format: s.format, size: s.sizeFormatted });
+          }
+        }
+      }
+    }
+  } else {
+    items = recentlyPlayed;
+  }
+
+  if (items.length === 0 && query) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:11px;padding:12px;">No matches</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(r => {
     const isActive = r.path === audioPlayerPath;
     const isPlaying = isActive && !audioPlayer.paused;
     return `<div class="np-history-item${isActive ? ' active' : ''}" data-action="playRecent" data-path="${escapeHtml(r.path)}">
@@ -926,6 +961,11 @@ function renderRecentlyPlayed() {
     </div>`;
   }).join('');
 }
+
+// Search input in player history
+document.getElementById('npSearchInput')?.addEventListener('input', () => {
+  renderRecentlyPlayed();
+});
 
 function togglePlayerExpanded() {
   const np = document.getElementById('audioNowPlaying');
