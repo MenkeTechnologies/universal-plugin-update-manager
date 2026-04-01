@@ -146,8 +146,9 @@ function applyKvrCache(plugins, cache) {
   }
 }
 
-function metaItem(label, value) {
-  return `<div class="meta-item"><span class="meta-label">${label}</span><span class="meta-value">${escapeHtml(String(value || '\u2014'))}</span></div>`;
+function metaItem(label, value, wide) {
+  const cls = wide ? 'meta-item meta-item-wide' : 'meta-item';
+  return `<div class="${cls}"><span class="meta-label">${label}</span><span class="meta-value">${escapeHtml(String(value || '\u2014'))}</span></div>`;
 }
 
 // ── Tests ──
@@ -1135,6 +1136,15 @@ describe('metaItem edge cases', () => {
     const long = 'a'.repeat(500);
     const html = metaItem('Data', long);
     assert.ok(html.includes(long));
+  });
+
+  it('adds meta-item-wide class when wide=true', () => {
+    const html = metaItem('Full Path', '/some/long/path');
+    assert.ok(html.includes('class="meta-item"'));
+    assert.ok(!html.includes('meta-item-wide'));
+
+    const wideHtml = metaItem('Full Path', '/some/long/path', true);
+    assert.ok(wideHtml.includes('meta-item meta-item-wide'));
   });
 });
 

@@ -801,10 +801,10 @@ async function toggleMetadata(filePath, event) {
     if (expandedMetaPath !== filePath) return; // user closed it
 
     let items = '';
-    items += metaItem('File Name', meta.fileName);
+    items += metaItem('File Name', meta.fileName, true);
     items += metaItem('Format', meta.format);
     items += metaItem('Size', formatAudioSize(meta.sizeBytes));
-    items += metaItem('Full Path', meta.fullPath);
+    items += metaItem('Full Path', meta.fullPath, true);
 
     if (meta.sampleRate) items += metaItem('Sample Rate', meta.sampleRate.toLocaleString() + ' Hz');
     if (meta.bitsPerSample) items += metaItem('Bit Depth', meta.bitsPerSample + '-bit');
@@ -886,8 +886,9 @@ async function estimateBpmForMeta(filePath) {
   }
 }
 
-function metaItem(label, value) {
-  return `<div class="meta-item"><span class="meta-label">${label}</span><span class="meta-value">${escapeHtml(String(value || '—'))}</span></div>`;
+function metaItem(label, value, wide) {
+  const cls = wide ? 'meta-item meta-item-wide' : 'meta-item';
+  return `<div class="${cls}"><span class="meta-label">${label}</span><span class="meta-value">${escapeHtml(String(value || '—'))}</span></div>`;
 }
 
 function openAudioFolder(filePath) {
