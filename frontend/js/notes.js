@@ -238,17 +238,21 @@ function renderNotesTab() {
   const search = (document.getElementById('noteSearchInput')?.value || '').toLowerCase();
   const activeTag = list._activeTag || null;
 
-  const filtered = entries.filter(([path, n]) => {
+  let filtered = entries.filter(([path, n]) => {
     if (activeTag && (!n.tags || !n.tags.includes(activeTag))) return false;
-    if (search) {
-      const name = path.split('/').pop() || '';
-      if (!name.toLowerCase().includes(search) &&
-          !path.toLowerCase().includes(search) &&
-          !(n.note || '').toLowerCase().includes(search) &&
-          !(n.tags || []).some(t => t.toLowerCase().includes(search))) return false;
-    }
     return true;
-  }).sort((a, b) => (b[1].updatedAt || '').localeCompare(a[1].updatedAt || ''));
+  });
+  if (search) {
+    const scored = filtered.map(([path, n]) => {
+      const name = path.split('/').pop() || '';
+      const fields = [name, path, n.note || '', ...(n.tags || [])];
+      return { entry: [path, n], score: searchScore(search, fields, 'fuzzy') };
+    }).filter(s => s.score > 0);
+    scored.sort((a, b) => b.score - a.score);
+    filtered = scored.map(s => s.entry);
+  } else {
+    filtered.sort((a, b) => (b[1].updatedAt || '').localeCompare(a[1].updatedAt || ''));
+  }
 
   if (filtered.length === 0) {
     if (entries.length === 0) {
@@ -390,7 +394,14 @@ function renderTagsManager() {
   const tagCounts = getTagCounts();
   const allTags = Object.keys(tagCounts).sort();
   const search = (document.getElementById('tagSearchInput')?.value || '').toLowerCase();
-  const filtered = search ? allTags.filter(t => t.toLowerCase().includes(search)) : allTags;
+  let filtered;
+  if (search) {
+    const scored = allTags.map(t => ({ t, score: searchScore(search, [t], 'fuzzy') })).filter(s => s.score > 0);
+    scored.sort((a, b) => b.score - a.score);
+    filtered = scored.map(s => s.t);
+  } else {
+    filtered = allTags;
+  }
 
   if (filtered.length === 0) {
     if (empty) empty.style.display = allTags.length === 0 ? '' : 'none';

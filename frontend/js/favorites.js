@@ -109,11 +109,15 @@ function renderFavorites() {
   const search = (document.getElementById('favSearchInput')?.value || '').toLowerCase();
   const typeFilter = document.getElementById('favTypeFilter')?.value || 'all';
 
-  const filtered = favs.filter(f => {
+  let filtered = favs.filter(f => {
     if (typeFilter !== 'all' && f.type !== typeFilter) return false;
-    if (search && !f.name.toLowerCase().includes(search) && !f.path.toLowerCase().includes(search)) return false;
     return true;
   });
+  if (search) {
+    const scored = filtered.map(f => ({ f, score: searchScore(search, [f.name, f.path], 'fuzzy') })).filter(s => s.score > 0);
+    scored.sort((a, b) => b.score - a.score);
+    filtered = scored.map(s => s.f);
+  }
 
   if (filtered.length === 0) {
     list.innerHTML = '';

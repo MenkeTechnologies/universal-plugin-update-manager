@@ -994,27 +994,24 @@ function renderRecentlyPlayed() {
 
   let items;
   if (query) {
-    // Search all audio samples + recently played, deduplicated
+    // Search all audio samples + recently played, deduplicated, scored by fzf
     const seen = new Set();
-    items = [];
-    // Recently played first
+    const scored = [];
     for (const r of recentlyPlayed) {
-      if (r.name.toLowerCase().includes(query) || r.path.toLowerCase().includes(query)) {
-        if (!seen.has(r.path)) { seen.add(r.path); items.push(r); }
-      }
+      const score = searchScore(query, [r.name, r.path], 'fuzzy');
+      if (score > 0 && !seen.has(r.path)) { seen.add(r.path); scored.push({ item: r, score: score + 1000 }); }
     }
-    // Then all audio samples
     if (typeof allAudioSamples !== 'undefined') {
       for (const s of allAudioSamples) {
-        if (items.length >= 100) break;
-        if (s.name.toLowerCase().includes(query) || s.path.toLowerCase().includes(query)) {
-          if (!seen.has(s.path)) {
-            seen.add(s.path);
-            items.push({ path: s.path, name: s.name, format: s.format, size: s.sizeFormatted });
-          }
+        const score = searchScore(query, [s.name, s.path], 'fuzzy');
+        if (score > 0 && !seen.has(s.path)) {
+          seen.add(s.path);
+          scored.push({ item: { path: s.path, name: s.name, format: s.format, size: s.sizeFormatted }, score });
         }
       }
     }
+    scored.sort((a, b) => b.score - a.score);
+    items = scored.slice(0, 100).map(s => s.item);
   } else {
     items = recentlyPlayed;
   }
@@ -1055,23 +1052,22 @@ function renderMiniSearchResults() {
   if (!query) { container.innerHTML = ''; return; }
 
   const seen = new Set();
-  const items = [];
+  const scored = [];
   for (const r of recentlyPlayed) {
-    if (r.name.toLowerCase().includes(query) || r.path.toLowerCase().includes(query)) {
-      if (!seen.has(r.path)) { seen.add(r.path); items.push(r); }
-    }
+    const score = searchScore(query, [r.name, r.path], 'fuzzy');
+    if (score > 0 && !seen.has(r.path)) { seen.add(r.path); scored.push({ item: r, score: score + 1000 }); }
   }
   if (typeof allAudioSamples !== 'undefined') {
     for (const s of allAudioSamples) {
-      if (items.length >= 50) break;
-      if (s.name.toLowerCase().includes(query) || s.path.toLowerCase().includes(query)) {
-        if (!seen.has(s.path)) {
-          seen.add(s.path);
-          items.push({ path: s.path, name: s.name, format: s.format, size: s.sizeFormatted });
-        }
+      const score = searchScore(query, [s.name, s.path], 'fuzzy');
+      if (score > 0 && !seen.has(s.path)) {
+        seen.add(s.path);
+        scored.push({ item: { path: s.path, name: s.name, format: s.format, size: s.sizeFormatted }, score });
       }
     }
   }
+  scored.sort((a, b) => b.score - a.score);
+  const items = scored.slice(0, 50).map(s => s.item);
 
   if (items.length === 0) {
     container.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:11px;padding:8px;">No matches</div>';
