@@ -1591,10 +1591,19 @@ fn export_pdf(
         vec![usable_w]
     };
     let version = env!("CARGO_PKG_VERSION");
-    // Calculate usable rows per page: (page height - header - footer - margins) / row height
-    let header_h = 22.0 + 6.0 + 7.0 + 1.0; // header bar + subtitle + col headers + gap
-    let rows_per_page = ((page_h.0 - header_h - margin_bottom - 5.0) / row_height) as usize;
-    let total_pages = if rows.is_empty() { 1 } else { ((rows.len() as f32) / rows_per_page as f32).ceil() as usize };
+    // Simulate layout to count pages accurately
+    let total_pages = {
+        let header_base = 22.0 + 7.0 + 1.0; // header bar + col headers + gap
+        let subtitle_h = 6.0; // only on first page
+        let footer_h = margin_bottom + 5.0;
+        let first_page_rows = ((page_h.0 - header_base - subtitle_h - footer_h) / row_height) as usize;
+        let other_page_rows = ((page_h.0 - header_base - footer_h) / row_height) as usize;
+        if rows.len() <= first_page_rows {
+            1
+        } else {
+            1 + ((rows.len() - first_page_rows) as f32 / other_page_rows as f32).ceil() as usize
+        }
+    };
 
     let (doc, page1, layer1) = PdfDocument::new(&title, page_w, page_h, "Layer 1");
     let font = doc
