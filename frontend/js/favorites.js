@@ -71,7 +71,7 @@ async function importFavorites() {
       const data = await window.vstUpdater.importToml(filePath);
       imported = data.favorites || data;
     } else {
-      const text = await window.__TAURI__.core.invoke('read_text_file', { filePath }));
+      const text = await window.__TAURI__.core.invoke('read_text_file', { filePath });
       imported = JSON.parse(text);
     }
     if (!Array.isArray(imported)) throw new Error('Expected an array');

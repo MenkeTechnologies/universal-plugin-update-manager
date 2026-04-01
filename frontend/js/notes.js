@@ -346,7 +346,7 @@ async function importNotes() {
     if (filePath.endsWith('.toml')) {
       imported = await window.vstUpdater.importToml(filePath);
     } else {
-      const text = await window.__TAURI__.core.invoke('read_text_file', { filePath }));
+      const text = await window.__TAURI__.core.invoke('read_text_file', { filePath });
       imported = JSON.parse(text);
     }
     // Merge notes

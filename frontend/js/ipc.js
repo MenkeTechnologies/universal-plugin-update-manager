@@ -72,7 +72,7 @@ document.addEventListener('click', (e) => {
     if (stop && el.contains(stop)) return;
   }
   const action = el.dataset.action;
-  switch (action) {
+  try { switch (action) {
     case 'stopCurrentOperation': stopCurrentOperation(); break;
     case 'scanAll': scanAll(); break;
     case 'stopAll': stopAll(); break;
@@ -187,7 +187,7 @@ document.addEventListener('click', (e) => {
     case 'setAbB': setAbLoopEnd(); break;
     case 'clearAbLoop': clearAbLoop(); break;
     case 'createTag': createNewTag(); break;
-  }
+  } } catch (err) { console.error('Action error:', action, err); showToast('Action error: ' + (err.message || err), 4000, 'error'); }
 });
 document.addEventListener('dblclick', (e) => {
   // DAW projects — open in DAW
