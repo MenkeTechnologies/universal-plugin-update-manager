@@ -1121,6 +1121,13 @@ function updateFavBtn() {
   if (btn) btn.style.color = audioPlayerPath && isFavorite(audioPlayerPath) ? 'var(--yellow)' : '';
 }
 
+function tagCurrentTrack() {
+  if (!audioPlayerPath) return;
+  const sample = typeof allAudioSamples !== 'undefined' && allAudioSamples.find(s => s.path === audioPlayerPath);
+  const name = sample ? sample.name : audioPlayerPath.split('/').pop().replace(/\.[^.]+$/, '');
+  if (typeof showNoteEditor === 'function') showNoteEditor(audioPlayerPath, name);
+}
+
 function collapsePlayer() {
   document.getElementById('audioNowPlaying').classList.remove('expanded');
   prefs.setItem('playerExpanded', 'off');
