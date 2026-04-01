@@ -69,14 +69,24 @@ function renderFavorites() {
     const typeClass = { plugin: 'type-vst3', sample: 'format-wav', daw: 'daw-ableton-live', preset: 'format-default' }[f.type] || 'format-default';
     const extra = f.format ? `<span class="format-badge format-default">${escapeHtml(f.format)}</span>` : '';
     const daw = f.daw ? `<span class="format-badge ${getDawBadgeClass ? getDawBadgeClass(f.daw) : 'format-default'}">${escapeHtml(f.daw)}</span>` : '';
-    return `<div class="fav-item" data-fav-path="${escapeHtml(f.path)}">
+    const hp = escapeHtml(f.path);
+    const isPlaying = f.type === 'sample' && typeof audioPlayerPath !== 'undefined' && audioPlayerPath === f.path && typeof audioPlayer !== 'undefined' && !audioPlayer.paused;
+    const playBtn = f.type === 'sample'
+      ? `<button class="btn-small btn-play${isPlaying ? ' playing' : ''}" data-action="previewAudio" data-path="${hp}" title="Play">${isPlaying ? '&#9646;&#9646;' : '&#9654;'}</button>`
+      : '';
+    const loopBtn = f.type === 'sample'
+      ? `<button class="btn-small btn-loop" data-action="toggleRowLoop" data-path="${hp}" title="Loop">&#8634;</button>`
+      : '';
+    const cursor = (f.type === 'sample' || f.type === 'daw') ? ' style="cursor:pointer;"' : '';
+    return `<div class="fav-item" data-path="${hp}" data-type="${f.type}" data-name="${escapeHtml(f.name)}"${cursor}>
       <span class="fav-star">&#9733;</span>
       <span class="fav-type"><span class="format-badge ${typeClass}">${typeLabel}</span></span>
-      <span class="fav-name" title="${escapeHtml(f.path)}">${escapeHtml(f.name)}</span>
+      <span class="fav-name" title="${hp}">${escapeHtml(f.name)}</span>
       ${extra}${daw}
       <span class="fav-actions">
-        <button class="btn-small btn-folder" data-action="openFavFolder" data-path="${escapeHtml(f.path)}" data-type="${f.type}" title="Reveal in Finder">&#128193;</button>
-        <button class="btn-small btn-stop" data-action="removeFav" data-path="${escapeHtml(f.path)}" title="Remove from favorites">&#10005;</button>
+        ${playBtn}${loopBtn}
+        <button class="btn-small btn-folder" data-action="openFavFolder" data-path="${hp}" data-type="${f.type}" title="Reveal in Finder">&#128193;</button>
+        <button class="btn-small btn-stop" data-action="removeFav" data-path="${hp}" title="Remove from favorites">&#10005;</button>
       </span>
     </div>`;
   }).join('');
@@ -97,5 +107,33 @@ document.addEventListener('click', (e) => {
     else if (type === 'sample') openAudioFolder(path);
     else if (type === 'daw') openDawFolder(path);
     else if (type === 'preset') openPresetFolder(path);
+    return;
+  }
+  // Single click on sample favorite → play
+  const favItem = e.target.closest('.fav-item[data-type="sample"]');
+  if (favItem && !e.target.closest('.fav-actions') && !e.target.closest('button')) {
+    const path = favItem.dataset.path;
+    if (path && typeof previewAudio === 'function') previewAudio(path);
+  }
+});
+
+// Double-click on DAW favorite → open in DAW, plugin → open KVR
+document.addEventListener('dblclick', (e) => {
+  const favItem = e.target.closest('.fav-item');
+  if (!favItem || e.target.closest('.fav-actions') || e.target.closest('button')) return;
+  const type = favItem.dataset.type;
+  const path = favItem.dataset.path;
+  const name = favItem.dataset.name || '';
+
+  if (type === 'daw') {
+    const daw = favItem.querySelector('.format-badge')?.textContent || 'DAW';
+    showToast(`Opening "${name}" in ${daw}...`);
+    window.vstUpdater.openDawProject(path).catch(err => showToast(`${daw} not installed — ${err}`, 4000, 'error'));
+  } else if (type === 'plugin') {
+    const plugin = typeof allPlugins !== 'undefined' && allPlugins.find(p => p.path === path);
+    const kvrUrl = plugin ? (plugin.kvrUrl || buildKvrUrl(plugin.name, plugin.manufacturer)) : buildKvrUrl(name, '');
+    window.vstUpdater.openUpdate(kvrUrl);
+  } else if (type === 'preset') {
+    if (typeof openPresetFolder === 'function') openPresetFolder(path);
   }
 });

@@ -390,22 +390,47 @@ document.addEventListener('contextmenu', (e) => {
     const path = favItem.dataset.path || '';
     const name = favItem.querySelector('.fav-name')?.textContent?.trim() || '';
     const type = favItem.dataset.type || '';
-    const items = [
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => openFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } },
-      '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
-      '---',
-      { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
-      { icon: '&#9734;', label: 'Remove from Favorites', action: () => { removeFavorite(path); if (typeof renderFavorites === 'function') renderFavorites(); } },
-    ];
+    const items = [];
+
     if (type === 'sample') {
-      items.unshift(
-        { icon: '&#9654;', label: 'Play', action: () => previewAudio(path) },
-        '---'
-      );
+      const isPlaying = typeof audioPlayerPath !== 'undefined' && audioPlayerPath === path && !audioPlayer.paused;
+      items.push({ icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? 'Pause' : 'Play', action: () => previewAudio(path) });
+      items.push({ icon: '&#8634;', label: 'Loop', action: () => toggleRowLoop(path, new MouseEvent('click')) });
+      items.push('---');
+      items.push({ icon: '&#127926;', label: 'Open in Music', action: () => openWithApp(path, 'Music') });
+      items.push({ icon: '&#127911;', label: 'Open in QuickTime', action: () => openWithApp(path, 'QuickTime Player') });
+      items.push({ icon: '&#127908;', label: 'Open in Audacity', action: () => openWithApp(path, 'Audacity') });
+      items.push('---');
+    } else if (type === 'daw') {
+      const daw = favItem.querySelector('.format-badge')?.textContent || 'DAW';
+      items.push({ icon: '&#9654;', label: `Open in ${daw}`, action: () => { showToast(`Opening "${name}" in ${daw}...`); window.vstUpdater.openDawProject(path).catch(err => showToast(`${daw} not installed — ${err}`, 4000, 'error')); } });
+      items.push('---');
+    } else if (type === 'plugin') {
+      const plugin = typeof allPlugins !== 'undefined' && allPlugins.find(p => p.path === path);
+      const kvrUrl = plugin ? (plugin.kvrUrl || buildKvrUrl(plugin.name, plugin.manufacturer)) : buildKvrUrl(name, '');
+      items.push({ icon: '&#127760;', label: 'Open on KVR', action: () => window.vstUpdater.openUpdate(kvrUrl) });
+      if (typeof findProjectsUsingPlugin === 'function') {
+        items.push({ icon: '&#9889;', label: 'Find Projects Using This', action: () => { const projects = findProjectsUsingPlugin(name); showReverseXrefModal(name, projects); } });
+      }
+      items.push('---');
     }
+
+    items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => {
+      if (type === 'sample') openAudioFolder(path);
+      else if (type === 'daw') openDawFolder(path);
+      else if (type === 'preset') openPresetFolder(path);
+      else openFolder(path);
+    }});
+    items.push({ icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } });
+    items.push('---');
+    items.push({ icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) });
+    items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) });
+    items.push('---');
+    items.push({ icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) });
+    items.push(...quickTagItems(path, name));
+    items.push('---');
+    items.push({ icon: '&#9734;', label: 'Remove from Favorites', action: () => { removeFavorite(path); if (typeof renderFavorites === 'function') renderFavorites(); } });
+
     showContextMenu(e, items);
     return;
   }
