@@ -809,6 +809,173 @@ mod tests {
     }
 
     #[test]
+    fn test_walk_completes_finds_all_files() {
+        // Ensure scan doesn't exit prematurely — all files must be found
+        let tmp = std::env::temp_dir().join("upum_test_walk_complete");
+        let _ = fs::remove_dir_all(&tmp);
+
+        // Create files across multiple subdirectories
+        for i in 0..5 {
+            let sub = tmp.join(format!("dir_{}", i));
+            fs::create_dir_all(&sub).unwrap();
+            for j in 0..10 {
+                fs::write(sub.join(format!("sample_{}_{}.wav", i, j)), b"wav").unwrap();
+            }
+        }
+        // Also files in root
+        for i in 0..5 {
+            fs::write(tmp.join(format!("root_{}.mp3", i)), b"mp3").unwrap();
+        }
+
+        let mut found = Vec::new();
+        walk_for_audio(
+            &[tmp.clone()],
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+            },
+            &|| false,
+            None,
+        );
+        assert_eq!(
+            found.len(),
+            55,
+            "Expected 55 files (5 dirs × 10 + 5 root), got {}",
+            found.len()
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_completes_deeply_nested() {
+        // Ensure deep directory structures don't cause early termination
+        let tmp = std::env::temp_dir().join("upum_test_walk_deep_complete");
+        let _ = fs::remove_dir_all(&tmp);
+
+        // Create a 20-level deep structure with files at each level
+        let mut dir = tmp.clone();
+        let mut expected = 0;
+        for i in 0..20 {
+            dir = dir.join(format!("level_{}", i));
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join(format!("file_{}.wav", i)), b"wav").unwrap();
+            expected += 1;
+        }
+
+        let mut found = Vec::new();
+        walk_for_audio(
+            &[tmp.clone()],
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+            },
+            &|| false,
+            None,
+        );
+        assert_eq!(
+            found.len(),
+            expected,
+            "Expected {} files across 20 nested levels, got {}",
+            expected,
+            found.len()
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_completes_with_mixed_formats() {
+        // All supported audio formats should be found
+        let tmp = std::env::temp_dir().join("upum_test_walk_formats");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let formats = ["wav", "mp3", "aiff", "aif", "flac", "ogg", "m4a", "aac", "opus"];
+        for fmt in &formats {
+            fs::write(tmp.join(format!("test.{}", fmt)), b"audio data").unwrap();
+        }
+        // Non-audio files should be ignored
+        fs::write(tmp.join("readme.txt"), b"text").unwrap();
+        fs::write(tmp.join("image.png"), b"image").unwrap();
+
+        let mut found = Vec::new();
+        walk_for_audio(
+            &[tmp.clone()],
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+            },
+            &|| false,
+            None,
+        );
+        assert_eq!(
+            found.len(),
+            formats.len(),
+            "Expected {} audio files, got {} (non-audio should be excluded)",
+            formats.len(),
+            found.len()
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_stop_midway_preserves_partial() {
+        // When stopped mid-scan, should have partial results (not empty, not full)
+        let tmp = std::env::temp_dir().join("upum_test_walk_stop_partial");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        for i in 0..200 {
+            fs::write(tmp.join(format!("sample_{}.wav", i)), b"wav data").unwrap();
+        }
+
+        let stop_after = std::sync::atomic::AtomicUsize::new(0);
+        let mut found = Vec::new();
+        walk_for_audio(
+            &[tmp.clone()],
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+                stop_after.fetch_add(1, Ordering::Relaxed);
+            },
+            &|| stop_after.load(Ordering::Relaxed) >= 1, // stop after first batch
+            None,
+        );
+        // Should have some results but not all 200
+        assert!(
+            !found.is_empty(),
+            "Should have partial results after stop"
+        );
+        assert!(
+            found.len() < 200,
+            "Should not have all 200 files after early stop, got {}",
+            found.len()
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_exclude_paths() {
+        let tmp = std::env::temp_dir().join("upum_test_walk_exclude");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        fs::write(tmp.join("keep.wav"), b"wav").unwrap();
+        fs::write(tmp.join("skip.wav"), b"wav").unwrap();
+
+        let skip_path = tmp.join("skip.wav").to_string_lossy().to_string();
+        let exclude = Some([skip_path].into_iter().collect());
+
+        let mut found = Vec::new();
+        walk_for_audio(
+            &[tmp.clone()],
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+            },
+            &|| false,
+            exclude,
+        );
+        assert_eq!(found.len(), 1);
+        assert!(found[0].name == "keep");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn test_get_audio_metadata_aiff() {
         let tmp = std::env::temp_dir().join("upum_test_meta_aiff");
         let _ = fs::remove_dir_all(&tmp);

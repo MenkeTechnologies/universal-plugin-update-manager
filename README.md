@@ -141,7 +141,7 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (225 tests)
+### Rust tests (230 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -149,7 +149,7 @@ node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 | **history** | 35 | Scan CRUD, 50-scan limit, diff (added/removed/version-changed), KVR cache CRUD, audio history CRUD, audio diff, DAW history CRUD, DAW diff, ID generation, preference storage |
 | **kvr** | 27 | Version parsing, version comparison, HTML version extraction (6 formats), download URL extraction, platform keyword detection, date filtering |
 | **scanner** | 26 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration, architecture detection, edge cases |
-| **audio_scanner** | 20 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories, batching |
+| **audio_scanner** | 25 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories, batching, scan completeness (all files found across nested dirs), deep nesting (20 levels), mixed format detection, stop-midway partial results, exclude paths |
 | **daw_scanner** | 19 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
 | **xref** | 25 | Ableton .als gzip XML parsing (VST2/VST3/AU), REAPER .rpp plaintext parsing (VST/VST3/AU/CLAP), plugin name normalization (arch/platform suffix stripping, case folding, whitespace collapse), case-insensitive deduplication, sorting, error handling, empty projects, .rpp-bak support |
 | **bpm** | 16 | WAV/AIFF PCM reading, onset-strength autocorrelation, click track detection (90/120/140/174 BPM), silence rejection, short file handling, 8/16/24-bit decode, stereo mixdown, extra chunk handling, AIFF parsing |
