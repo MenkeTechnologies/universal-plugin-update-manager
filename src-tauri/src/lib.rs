@@ -201,7 +201,9 @@ async fn scan_plugins(
                         return;
                     }
                     if let Some(info) = scanner::get_plugin_info(p) {
-                        if stop_flag2.load(Ordering::Relaxed) { return; }
+                        if stop_flag2.load(Ordering::Relaxed) {
+                            return;
+                        }
                         let _ = tx.send(info);
                     }
                 });
@@ -911,7 +913,9 @@ fn read_als_xml(file_path: String) -> Result<String, String> {
     let data = std::fs::read(&file_path).map_err(|e| e.to_string())?;
     let mut decoder = GzDecoder::new(&data[..]);
     let mut xml = String::new();
-    decoder.read_to_string(&mut xml).map_err(|e| format!("Not a valid gzip file: {}", e))?;
+    decoder
+        .read_to_string(&mut xml)
+        .map_err(|e| format!("Not a valid gzip file: {}", e))?;
     Ok(xml)
 }
 
@@ -1240,26 +1244,53 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
 
     // Preferences for scanner config
     let prefs = history::load_preferences();
-    let thread_mult = prefs.get("threadMultiplier")
-        .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
+    let thread_mult = prefs
+        .get("threadMultiplier")
+        .and_then(|v| {
+            v.as_str()
+                .and_then(|s| s.parse::<usize>().ok())
+                .or(v.as_u64().map(|n| n as usize))
+        })
         .unwrap_or(4);
-    let batch_size = prefs.get("batchSize")
-        .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
+    let batch_size = prefs
+        .get("batchSize")
+        .and_then(|v| {
+            v.as_str()
+                .and_then(|s| s.parse::<usize>().ok())
+                .or(v.as_u64().map(|n| n as usize))
+        })
         .unwrap_or(100);
-    let chan_buf = prefs.get("channelBuffer")
-        .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
+    let chan_buf = prefs
+        .get("channelBuffer")
+        .and_then(|v| {
+            v.as_str()
+                .and_then(|s| s.parse::<usize>().ok())
+                .or(v.as_u64().map(|n| n as usize))
+        })
         .unwrap_or(512);
-    let flush_interval = prefs.get("flushInterval")
-        .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
+    let flush_interval = prefs
+        .get("flushInterval")
+        .and_then(|v| {
+            v.as_str()
+                .and_then(|s| s.parse::<usize>().ok())
+                .or(v.as_u64().map(|n| n as usize))
+        })
         .unwrap_or(100);
-    let page_size = prefs.get("pageSize")
-        .and_then(|v| v.as_str().and_then(|s| s.parse::<usize>().ok()).or(v.as_u64().map(|n| n as usize)))
+    let page_size = prefs
+        .get("pageSize")
+        .and_then(|v| {
+            v.as_str()
+                .and_then(|s| s.parse::<usize>().ok())
+                .or(v.as_u64().map(|n| n as usize))
+        })
         .unwrap_or(500);
 
     // Data file sizes
     let data_dir = history::get_data_dir();
     let file_size = |name: &str| -> u64 {
-        std::fs::metadata(data_dir.join(name)).map(|m| m.len()).unwrap_or(0)
+        std::fs::metadata(data_dir.join(name))
+            .map(|m| m.len())
+            .unwrap_or(0)
     };
 
     serde_json::json!({
@@ -1584,16 +1615,21 @@ fn export_pdf(
             }
         }
         // Use 90th percentile length (not max) to avoid outlier skew
-        let p90_lens: Vec<usize> = col_lens.iter().map(|lens| {
-            let mut sorted = lens.clone();
-            sorted.sort();
-            let idx = (sorted.len() as f32 * 0.9).ceil() as usize;
-            sorted[idx.min(sorted.len() - 1)].min(120)
-        }).collect();
+        let p90_lens: Vec<usize> = col_lens
+            .iter()
+            .map(|lens| {
+                let mut sorted = lens.clone();
+                sorted.sort();
+                let idx = (sorted.len() as f32 * 0.9).ceil() as usize;
+                sorted[idx.min(sorted.len() - 1)].min(120)
+            })
+            .collect();
         // Ensure minimum representation for short columns (header len * 2)
-        let effective: Vec<usize> = p90_lens.iter().enumerate().map(|(i, &l)| {
-            l.max(headers[i].len() * 2).max(6)
-        }).collect();
+        let effective: Vec<usize> = p90_lens
+            .iter()
+            .enumerate()
+            .map(|(i, &l)| l.max(headers[i].len() * 2).max(6))
+            .collect();
         let total_len: usize = effective.iter().sum::<usize>().max(1);
         let min_col = 12.0_f32;
         let mut widths: Vec<f32> = effective
@@ -1783,7 +1819,6 @@ fn export_pdf(
             x += col_widths[i];
         }
         *y -= header_row_h;
-
     };
 
     // ── Render footer ──
@@ -1859,7 +1894,11 @@ fn export_pdf(
         layer!().set_fill_color(rgb(0.12, 0.12, 0.12));
         let mut x = margin_x + 0.5;
         for (i, cell) in row.iter().enumerate() {
-            let w = if i < col_widths.len() { col_widths[i] } else { 30.0 };
+            let w = if i < col_widths.len() {
+                col_widths[i]
+            } else {
+                30.0
+            };
             // At 7pt Helvetica, avg char width ~1.2mm
             let max_chars = (w / 1.2) as usize;
             let text = if cell.len() > max_chars && max_chars > 3 {
@@ -3214,13 +3253,8 @@ pub fn run() {
                 true,
                 None::<&str>,
             )?;
-            let toggle_mute = MenuItem::with_id(
-                handle,
-                "toggle_mute",
-                "Mute / Unmute",
-                true,
-                None::<&str>,
-            )?;
+            let toggle_mute =
+                MenuItem::with_id(handle, "toggle_mute", "Mute / Unmute", true, None::<&str>)?;
             let playback_sep = PredefinedMenuItem::separator(handle)?;
 
             let playback_menu = Submenu::with_id_and_items(
@@ -3229,9 +3263,16 @@ pub fn run() {
                 "Playback",
                 true,
                 &[
-                    &play_pause, &stop_playback, &playback_sep,
-                    &next_track, &prev_track, &toggle_loop, &toggle_shuffle, &toggle_mute,
-                    &playback_sep, &expand_player,
+                    &play_pause,
+                    &stop_playback,
+                    &playback_sep,
+                    &next_track,
+                    &prev_track,
+                    &toggle_loop,
+                    &toggle_shuffle,
+                    &toggle_mute,
+                    &playback_sep,
+                    &expand_player,
                 ],
             )?;
 
@@ -3301,8 +3342,11 @@ pub fn run() {
                 "Data",
                 true,
                 &[
-                    &clear_history, &clear_kvr, &clear_favorites,
-                    &data_sep, &reset_all,
+                    &clear_history,
+                    &clear_kvr,
+                    &clear_favorites,
+                    &data_sep,
+                    &reset_all,
                 ],
             )?;
 
@@ -3311,7 +3355,13 @@ pub fn run() {
                 "tools",
                 "Tools",
                 true,
-                &[&find_duplicates, &dep_graph, &data_sep, &cmd_palette, &help_overlay],
+                &[
+                    &find_duplicates,
+                    &dep_graph,
+                    &data_sep,
+                    &cmd_palette,
+                    &help_overlay,
+                ],
             )?;
 
             // Window menu
