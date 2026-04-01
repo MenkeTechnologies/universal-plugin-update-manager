@@ -445,7 +445,7 @@ async function settingClearAllHistory() {
 
 async function resetAllScans() {
   if (!await confirmAction('Reset everything? This will clear all scan results, history, and KVR cache. The app will return to its initial state.\n\nThis cannot be undone.', 'Reset All Scans')) return;
-  showGlobalProgress('Reset');
+  showGlobalProgress();
   try {
     // Stop any running scans
     await Promise.all([
@@ -497,7 +497,7 @@ async function resetAllScans() {
     showToast('All scans reset to fresh state');
   } catch (e) {
     showToast(`Reset failed — ${e.message || e}`, 4000, 'error');
-  } finally { hideGlobalProgress('Reset'); }
+  } finally { hideGlobalProgress(); }
 }
 
 async function settingClearKvrCache() {
