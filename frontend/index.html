@@ -3999,7 +3999,11 @@
       <div class="np-search-results" id="npSearchResults"></div>
       <div class="np-expand-hint">double-click to expand</div>
       <div class="np-history" id="npHistory">
-        <div class="np-history-title">Recently Played</div>
+        <div class="np-history-title">Recently Played
+          <button class="btn-small btn-secondary" data-action="exportRecentlyPlayed" title="Export play history as JSON" style="font-size:8px;padding:2px 6px;margin-left:6px;vertical-align:middle;">Export</button>
+          <button class="btn-small btn-secondary" data-action="importRecentlyPlayed" title="Import play history from JSON" style="font-size:8px;padding:2px 6px;vertical-align:middle;">Import</button>
+          <button class="btn-small btn-stop" data-action="clearRecentlyPlayed" title="Clear play history" style="font-size:8px;padding:2px 6px;vertical-align:middle;">Clear</button>
+        </div>
         <div id="npHistoryList"></div>
       </div>
       <div style="text-align: center; padding: 6px 0;">

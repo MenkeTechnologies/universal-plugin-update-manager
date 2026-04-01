@@ -214,6 +214,62 @@ function saveRecentlyPlayed() {
   prefs.setItem('recentlyPlayed', recentlyPlayed);
 }
 
+function clearRecentlyPlayed() {
+  recentlyPlayed = [];
+  saveRecentlyPlayed();
+  renderRecentlyPlayed();
+  showToast('Play history cleared');
+}
+
+async function exportRecentlyPlayed() {
+  const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+  if (!dialogApi) return;
+  const filePath = await dialogApi.save({
+    title: 'Export Play History',
+    defaultPath: 'play-history.json',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (!filePath) return;
+  const json = JSON.stringify(recentlyPlayed, null, 2);
+  await window.vstUpdater.writeFile(filePath, json).catch(() => {
+    // Fallback: use Rust fs
+    window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: json });
+  });
+  showToast(`Exported ${recentlyPlayed.length} tracks to ${filePath.split('/').pop()}`);
+}
+
+async function importRecentlyPlayed() {
+  const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+  if (!dialogApi) return;
+  const selected = await dialogApi.open({
+    title: 'Import Play History',
+    multiple: false,
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (!selected) return;
+  try {
+    const text = await window.__TAURI__.core.invoke('plugin:fs|read_text_file', { path: selected });
+    const imported = JSON.parse(text);
+    if (!Array.isArray(imported)) throw new Error('Expected an array');
+    // Merge: add imported items that aren't already in the list
+    const existing = new Set(recentlyPlayed.map(r => r.path));
+    let added = 0;
+    for (const item of imported) {
+      if (item.path && !existing.has(item.path)) {
+        recentlyPlayed.push(item);
+        existing.add(item.path);
+        added++;
+      }
+    }
+    if (recentlyPlayed.length > MAX_RECENT) recentlyPlayed.length = MAX_RECENT;
+    saveRecentlyPlayed();
+    renderRecentlyPlayed();
+    showToast(`Imported ${added} tracks (${imported.length} total, ${imported.length - added} duplicates skipped)`);
+  } catch (e) {
+    showToast(`Import failed: ${e.message || e}`, 4000, 'error');
+  }
+}
+
 audioPlayer.addEventListener('ended', () => {
   if (!audioLooping) {
     if (filteredAudioSamples.length > 1) {

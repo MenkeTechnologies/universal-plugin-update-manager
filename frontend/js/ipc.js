@@ -171,6 +171,9 @@ document.addEventListener('click', (e) => {
     case 'toggleShuffle': toggleShuffle(); break;
     case 'toggleMute': toggleMute(); break;
     case 'resetEq': resetEq(); break;
+    case 'clearRecentlyPlayed': clearRecentlyPlayed(); break;
+    case 'exportRecentlyPlayed': exportRecentlyPlayed(); break;
+    case 'importRecentlyPlayed': importRecentlyPlayed(); break;
     case 'toggleMono': toggleMono(); break;
     case 'toggleEqSection': toggleEqSection(); break;
     case 'setAbA': setAbLoopStart(); break;
