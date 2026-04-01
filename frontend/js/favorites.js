@@ -101,6 +101,7 @@ function clearFavorites() {
 }
 
 function renderFavorites() {
+  if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
   const list = document.getElementById('favList');
   const empty = document.getElementById('favEmptyState');
   if (!list) return;

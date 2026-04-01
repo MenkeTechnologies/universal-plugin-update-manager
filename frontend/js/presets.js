@@ -78,6 +78,7 @@ let _lastPresetSearch = '';
 let _lastPresetMode = 'fuzzy';
 
 function filterPresets() {
+  if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
   const search = document.getElementById('presetSearchInput')?.value || '';
   const formatEl = document.getElementById('presetFormatFilter');
   if (formatEl) autoSelectDropdown(formatEl, search);

@@ -94,6 +94,7 @@ let _lastDawSearch = '';
 let _lastDawMode = 'fuzzy';
 
 function filterDawProjects() {
+  if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
   const search = document.getElementById('dawSearchInput').value || '';
   const dawEl = document.getElementById('dawDawFilter');
   autoSelectDropdown(dawEl, search);

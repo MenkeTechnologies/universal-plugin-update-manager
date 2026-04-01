@@ -334,6 +334,7 @@ let _lastPluginSearch = '';
 let _lastPluginMode = 'fuzzy';
 
 const _filterPluginsImmediate = function() {
+  if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
   const search = document.getElementById('searchInput').value;
   const typeEl = document.getElementById('typeFilter');
   autoSelectDropdown(typeEl, search);

@@ -422,7 +422,10 @@ const _filterIds = ['typeFilter', 'statusFilter', 'favTypeFilter', 'audioFormatF
 
 function saveFilterState(id) {
   const el = document.getElementById(id);
-  if (el) prefs.setItem('filter_' + id, el.value);
+  if (el) {
+    prefs.setItem('filter_' + id, el.value);
+    console.log('Saved filter:', id, '=', el.value);
+  }
 }
 
 function restoreFilterStates() {
@@ -435,11 +438,17 @@ function restoreFilterStates() {
   }
 }
 
+// Save all filter states (called from filter functions)
+function saveAllFilterStates() {
+  for (const id of _filterIds) {
+    saveFilterState(id);
+  }
+}
+
 // Auto-save on change
 document.addEventListener('change', (e) => {
-  const sel = e.target.closest('select.filter-select');
-  if (sel && _filterIds.includes(sel.id)) {
-    saveFilterState(sel.id);
+  if (e.target.closest('select.filter-select')) {
+    saveAllFilterStates();
   }
 });
 

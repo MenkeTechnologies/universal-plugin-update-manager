@@ -516,6 +516,7 @@ let _lastAudioSearch = '';
 let _lastAudioMode = 'fuzzy';
 
 function filterAudioSamples() {
+  if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
   const search = document.getElementById('audioSearchInput').value || '';
   const formatEl = document.getElementById('audioFormatFilter');
   autoSelectDropdown(formatEl, search);
