@@ -418,7 +418,7 @@ function hideGlobalProgress() {
   document.getElementById('globalProgress')?.classList.remove('active');
 }
 // ── Persist filter dropdowns ──
-const _filterIds = ['typeFilter', 'statusFilter', 'favTypeFilter', 'audioFormatFilter', 'dawDawFilter'];
+const _filterIds = ['typeFilter', 'statusFilter', 'favTypeFilter', 'audioFormatFilter', 'dawDawFilter', 'presetFormatFilter'];
 
 function saveFilterState(id) {
   const el = document.getElementById(id);
