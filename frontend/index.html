@@ -1261,6 +1261,32 @@
       display: none;
     }
     .global-progress.active { display: block; }
+    .scan-status-badge {
+      position: fixed;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30001;
+      display: none;
+      gap: 12px;
+      padding: 4px 14px;
+      background: var(--bg-primary);
+      border: 1px solid var(--cyan);
+      border-radius: 20px;
+      box-shadow: 0 0 12px var(--cyan-glow), 0 2px 8px rgba(0,0,0,0.4);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--cyan);
+    }
+    .scan-status-badge[style*="display: none"] { display: none !important; }
+    .scan-status-badge:not([style*="display: none"]) { display: flex; }
+    .scan-status-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
     .global-progress-fill {
       height: 100%;
       background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--cyan));

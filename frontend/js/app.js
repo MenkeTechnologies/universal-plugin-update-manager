@@ -199,6 +199,29 @@ async function updateHeaderInfo() {
     set('headerSamples', typeof allAudioSamples !== 'undefined' ? allAudioSamples.length : 0);
     set('headerDaw', typeof allDawProjects !== 'undefined' ? allDawProjects.length : 0);
     set('headerPresets', typeof allPresets !== 'undefined' ? allPresets.length : 0);
+
+    // Scan status badge
+    const sc = s.scanner || {};
+    const active = [];
+    if (sc.pluginScanning) active.push('Plugins');
+    if (sc.audioScanning) active.push('Samples');
+    if (sc.dawScanning) active.push('DAW');
+    if (sc.presetScanning) active.push('Presets');
+    if (sc.updateChecking) active.push('Updates');
+    let badge = document.getElementById('scanStatusBadge');
+    if (active.length > 0) {
+      if (!badge) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="scan-status-badge" id="scanStatusBadge"></div>');
+        badge = document.getElementById('scanStatusBadge');
+      }
+      badge.style.display = '';
+      badge.innerHTML = active.map(s =>
+        `<span class="scan-status-item"><span class="spinner" style="width:8px;height:8px;"></span> ${s}</span>`
+      ).join('');
+    } else if (badge) {
+      badge.style.display = 'none';
+    }
   } catch (err) { console.error('updateHeaderInfo:', err); }
 }
 
