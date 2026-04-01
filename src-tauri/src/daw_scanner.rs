@@ -247,7 +247,6 @@ pub fn walk_for_daw(
         });
     });
 
-    // Stream results to callback as they arrive, checking stop frequently
     let mut total_found = 0usize;
     loop {
         if should_stop() {
@@ -255,13 +254,21 @@ pub fn walk_for_daw(
             while rx.try_recv().is_ok() {}
             break;
         }
-        let projects = match rx.recv_timeout(std::time::Duration::from_millis(10)) {
-            Ok(p) => p,
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-        };
-        total_found += projects.len();
-        on_batch(&projects, total_found);
+        let mut got_any = false;
+        while let Ok(projects) = rx.try_recv() {
+            total_found += projects.len();
+            on_batch(&projects, total_found);
+            got_any = true;
+            if should_stop() { stop.store(true, Ordering::Relaxed); break; }
+        }
+        if should_stop() { while rx.try_recv().is_ok() {} break; }
+        if !got_any {
+            match rx.recv_timeout(std::time::Duration::from_millis(1)) {
+                Ok(projects) => { total_found += projects.len(); on_batch(&projects, total_found); }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
     }
 }
 
