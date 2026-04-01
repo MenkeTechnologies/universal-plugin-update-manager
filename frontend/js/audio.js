@@ -221,21 +221,31 @@ function clearRecentlyPlayed() {
   showToast('Play history cleared');
 }
 
-async function exportRecentlyPlayed() {
-  const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
-  if (!dialogApi) return;
-  const filePath = await dialogApi.save({
-    title: 'Export Play History',
-    defaultPath: 'play-history.json',
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-  });
-  if (!filePath) return;
-  const json = JSON.stringify(recentlyPlayed, null, 2);
-  await window.vstUpdater.writeFile(filePath, json).catch(() => {
-    // Fallback: use Rust fs
-    window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: json });
-  });
-  showToast(`Exported ${recentlyPlayed.length} tracks to ${filePath.split('/').pop()}`);
+function exportRecentlyPlayed() {
+  if (recentlyPlayed.length === 0) { showToast('No play history to export'); return; }
+  _exportCtx = {
+    title: 'Play History',
+    defaultName: exportFileName('play-history', recentlyPlayed.length),
+    exportFn: async (fmt, filePath) => {
+      if (fmt === 'pdf') {
+        const headers = ['Name', 'Format', 'Size', 'Path'];
+        const rows = recentlyPlayed.map(r => [r.name, r.format, r.size || '', r.path]);
+        await window.vstUpdater.exportPdf('Play History', headers, rows, filePath);
+      } else if (fmt === 'csv' || fmt === 'tsv') {
+        const sep = fmt === 'tsv' ? '\t' : ',';
+        const esc = (v) => { const s = String(v || ''); return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s; };
+        const lines = ['Name' + sep + 'Format' + sep + 'Size' + sep + 'Path'];
+        for (const r of recentlyPlayed) lines.push([r.name, r.format, r.size || '', r.path].map(esc).join(sep));
+        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: lines.join('\n') });
+      } else if (fmt === 'toml') {
+        await window.vstUpdater.exportToml({ history: recentlyPlayed }, filePath);
+      } else {
+        const json = JSON.stringify(recentlyPlayed, null, 2);
+        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: json });
+      }
+    }
+  };
+  showExportModal('history', 'Play History', recentlyPlayed.length);
 }
 
 async function importRecentlyPlayed() {
@@ -244,14 +254,21 @@ async function importRecentlyPlayed() {
   const selected = await dialogApi.open({
     title: 'Import Play History',
     multiple: false,
-    filters: [{ name: 'JSON', extensions: ['json'] }],
+    filters: ALL_IMPORT_FILTERS,
   });
   if (!selected) return;
+  const filePath = typeof selected === 'string' ? selected : selected.path;
+  if (!filePath) return;
   try {
-    const text = await window.__TAURI__.core.invoke('plugin:fs|read_text_file', { path: selected });
-    const imported = JSON.parse(text);
+    let imported;
+    if (filePath.endsWith('.toml')) {
+      const data = await window.vstUpdater.importToml(filePath);
+      imported = data.history || data;
+    } else {
+      const text = await window.__TAURI__.core.invoke('plugin:fs|read_text_file', { path: filePath });
+      imported = JSON.parse(text);
+    }
     if (!Array.isArray(imported)) throw new Error('Expected an array');
-    // Merge: add imported items that aren't already in the list
     const existing = new Set(recentlyPlayed.map(r => r.path));
     let added = 0;
     for (const item of imported) {
@@ -264,7 +281,7 @@ async function importRecentlyPlayed() {
     if (recentlyPlayed.length > MAX_RECENT) recentlyPlayed.length = MAX_RECENT;
     saveRecentlyPlayed();
     renderRecentlyPlayed();
-    showToast(`Imported ${added} tracks (${imported.length} total, ${imported.length - added} duplicates skipped)`);
+    showToast(`Imported ${added} tracks (${imported.length - added} duplicates skipped)`);
   } catch (e) {
     showToast(`Import failed: ${e.message || e}`, 4000, 'error');
   }
