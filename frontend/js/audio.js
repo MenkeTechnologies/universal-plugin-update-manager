@@ -236,12 +236,12 @@ function exportRecentlyPlayed() {
         const esc = (v) => { const s = String(v || ''); return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s; };
         const lines = ['Name' + sep + 'Format' + sep + 'Size' + sep + 'Path'];
         for (const r of recentlyPlayed) lines.push([r.name, r.format, r.size || '', r.path].map(esc).join(sep));
-        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: lines.join('\n') });
+        await window.__TAURI__.core.invoke('write_text_file', { filePath, contents: lines.join('\n') });
       } else if (fmt === 'toml') {
         await window.vstUpdater.exportToml({ history: recentlyPlayed }, filePath);
       } else {
         const json = JSON.stringify(recentlyPlayed, null, 2);
-        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: json });
+        await window.__TAURI__.core.invoke('write_text_file', { filePath, contents: json });
       }
     }
   };
@@ -265,7 +265,7 @@ async function importRecentlyPlayed() {
       const data = await window.vstUpdater.importToml(filePath);
       imported = data.history || data;
     } else {
-      const text = await window.__TAURI__.core.invoke('plugin:fs|read_text_file', { path: filePath });
+      const text = await window.__TAURI__.core.invoke('read_text_file', { filePath }));
       imported = JSON.parse(text);
     }
     if (!Array.isArray(imported)) throw new Error('Expected an array');

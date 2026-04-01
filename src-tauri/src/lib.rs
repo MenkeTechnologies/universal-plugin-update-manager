@@ -1886,6 +1886,16 @@ fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn write_text_file(file_path: String, contents: String) -> Result<(), String> {
+    std::fs::write(&file_path, &contents).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_text_file(file_path: String) -> Result<String, String> {
+    std::fs::read_to_string(&file_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn get_home_dir() -> Result<String, String> {
     dirs::home_dir()
         .map(|p| p.to_string_lossy().to_string())
@@ -2756,6 +2766,8 @@ pub fn run() {
             fs_list_dir,
             delete_file,
             rename_file,
+            write_text_file,
+            read_text_file,
             get_home_dir,
             get_process_stats,
             open_prefs_file,

@@ -47,11 +47,11 @@ function exportFavorites() {
         const esc = (v) => { const s = String(v || ''); return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s; };
         const lines = ['Name' + sep + 'Type' + sep + 'Format' + sep + 'Path'];
         for (const f of favs) lines.push([f.name, f.type, f.format || f.daw || '', f.path].map(esc).join(sep));
-        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: lines.join('\n') });
+        await window.__TAURI__.core.invoke('write_text_file', { filePath, contents: lines.join('\n') });
       } else if (fmt === 'toml') {
         await window.vstUpdater.exportToml({ favorites: favs }, filePath);
       } else {
-        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: JSON.stringify(favs, null, 2) });
+        await window.__TAURI__.core.invoke('write_text_file', { filePath, contents: JSON.stringify(favs, null, 2) });
       }
     }
   };
@@ -71,7 +71,7 @@ async function importFavorites() {
       const data = await window.vstUpdater.importToml(filePath);
       imported = data.favorites || data;
     } else {
-      const text = await window.__TAURI__.core.invoke('plugin:fs|read_text_file', { path: filePath });
+      const text = await window.__TAURI__.core.invoke('read_text_file', { filePath }));
       imported = JSON.parse(text);
     }
     if (!Array.isArray(imported)) throw new Error('Expected an array');

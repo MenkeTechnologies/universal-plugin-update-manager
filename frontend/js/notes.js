@@ -323,11 +323,11 @@ function exportNotes() {
         const esc = (v) => { const s = String(v || ''); return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s; };
         const lines = ['Path' + sep + 'Note' + sep + 'Tags' + sep + 'Updated'];
         for (const [path, n] of entries) lines.push([path, n.note || '', (n.tags || []).join(', '), n.updatedAt || ''].map(esc).join(sep));
-        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: lines.join('\n') });
+        await window.__TAURI__.core.invoke('write_text_file', { filePath, contents: lines.join('\n') });
       } else if (fmt === 'toml') {
         await window.vstUpdater.exportToml(data, filePath);
       } else {
-        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: JSON.stringify(data, null, 2) });
+        await window.__TAURI__.core.invoke('write_text_file', { filePath, contents: JSON.stringify(data, null, 2) });
       }
     }
   };
@@ -346,7 +346,7 @@ async function importNotes() {
     if (filePath.endsWith('.toml')) {
       imported = await window.vstUpdater.importToml(filePath);
     } else {
-      const text = await window.__TAURI__.core.invoke('plugin:fs|read_text_file', { path: filePath });
+      const text = await window.__TAURI__.core.invoke('read_text_file', { filePath }));
       imported = JSON.parse(text);
     }
     // Merge notes
