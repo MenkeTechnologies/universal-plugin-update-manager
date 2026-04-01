@@ -962,10 +962,57 @@ function renderRecentlyPlayed() {
   }).join('');
 }
 
-// Search input in player history
+// Search input in player — renders to mini search results or expanded history list
 document.getElementById('npSearchInput')?.addEventListener('input', () => {
-  renderRecentlyPlayed();
+  const np = document.getElementById('audioNowPlaying');
+  if (np && np.classList.contains('expanded')) {
+    renderRecentlyPlayed();
+  } else {
+    renderMiniSearchResults();
+  }
 });
+
+function renderMiniSearchResults() {
+  const container = document.getElementById('npSearchResults');
+  if (!container) return;
+  const searchInput = document.getElementById('npSearchInput');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  if (!query) { container.innerHTML = ''; return; }
+
+  const seen = new Set();
+  const items = [];
+  for (const r of recentlyPlayed) {
+    if (r.name.toLowerCase().includes(query) || r.path.toLowerCase().includes(query)) {
+      if (!seen.has(r.path)) { seen.add(r.path); items.push(r); }
+    }
+  }
+  if (typeof allAudioSamples !== 'undefined') {
+    for (const s of allAudioSamples) {
+      if (items.length >= 50) break;
+      if (s.name.toLowerCase().includes(query) || s.path.toLowerCase().includes(query)) {
+        if (!seen.has(s.path)) {
+          seen.add(s.path);
+          items.push({ path: s.path, name: s.name, format: s.format, size: s.sizeFormatted });
+        }
+      }
+    }
+  }
+
+  if (items.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:11px;padding:8px;">No matches</div>';
+    return;
+  }
+
+  container.innerHTML = items.map(r => {
+    const isActive = r.path === audioPlayerPath;
+    return `<div class="np-history-item${isActive ? ' active' : ''}" data-action="playRecent" data-path="${escapeHtml(r.path)}">
+      <span class="np-h-icon">&#9835;</span>
+      <span class="np-h-name" title="${escapeHtml(r.path)}">${escapeHtml(r.name)}</span>
+      <span class="np-h-format">${r.format}</span>
+    </div>`;
+  }).join('');
+}
 
 function togglePlayerExpanded() {
   const np = document.getElementById('audioNowPlaying');

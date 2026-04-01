@@ -3389,6 +3389,19 @@
     .np-search-input::placeholder {
       color: var(--text-dim);
     }
+    .np-search-results {
+      max-height: 180px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .np-search-results:empty { display: none; }
+    .np-search-results::-webkit-scrollbar { width: 4px; }
+    .np-search-results::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .audio-now-playing.expanded .np-search-input,
+    .audio-now-playing.expanded .np-search-results {
+      display: none;
+    }
     .np-history-item {
       display: flex;
       align-items: center;
@@ -3960,10 +3973,11 @@
           </select>
         </div>
       </div>
+      <input type="text" class="np-search-input" id="npSearchInput" placeholder="Search songs..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <div class="np-search-results" id="npSearchResults"></div>
       <div class="np-expand-hint">double-click to expand</div>
       <div class="np-history" id="npHistory">
         <div class="np-history-title">Recently Played</div>
-        <input type="text" class="np-search-input" id="npSearchInput" placeholder="Search songs..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         <div id="npHistoryList"></div>
       </div>
       <div style="text-align: center; padding: 6px 0;">
