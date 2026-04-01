@@ -301,6 +301,14 @@ audioPlayer.addEventListener('timeupdate', updatePlaybackTime);
 
 // formatAudioSize and formatTime moved to utils.js
 
+function closeMetaRow() {
+  const meta = document.getElementById('audioMetaRow');
+  if (meta) meta.remove();
+  const expanded = document.querySelector('tr.row-expanded');
+  if (expanded) expanded.classList.remove('row-expanded');
+  expandedMetaPath = null;
+}
+
 function getFormatClass(format) {
   const f = format.toLowerCase();
   if (['wav', 'mp3', 'aiff', 'aif', 'flac', 'ogg', 'm4a', 'aac'].includes(f)) return 'format-' + f;
@@ -898,7 +906,8 @@ async function toggleMetadata(filePath, event) {
       <div class="waveform-time-label">${meta.duration ? formatTime(meta.duration) : ''}</div>
     </div>`;
 
-    metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel">${waveformHtml}${items}</div></td>`;
+    const closeBtn = `<button class="btn-small btn-stop" data-action="closeMetaRow" style="position:absolute;top:6px;right:6px;font-size:10px;padding:2px 6px;z-index:5;" title="Close metadata panel">&#10005;</button>`;
+    metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel" style="position:relative;">${closeBtn}${waveformHtml}${items}</div></td>`;
 
     // Draw waveform on the meta canvas
     drawMetaWaveform(filePath);

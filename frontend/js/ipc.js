@@ -187,6 +187,7 @@ document.addEventListener('click', (e) => {
     case 'setAbB': setAbLoopEnd(); break;
     case 'clearAbLoop': clearAbLoop(); break;
     case 'createTag': createNewTag(); break;
+    case 'closeMetaRow': closeMetaRow(); break;
   } } catch (err) { console.error('Action error:', action, err); showToast('Action error: ' + (err.message || err), 4000, 'error'); }
 });
 document.addEventListener('dblclick', (e) => {
