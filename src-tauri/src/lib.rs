@@ -1561,22 +1561,31 @@ fn export_pdf(
     let col_count = headers.len();
     let usable_w = page_w.0 - margin_x * 2.0;
 
-    // Calculate column widths proportional to content length
+    // Calculate column widths based on 90th percentile content length
     let col_widths: Vec<f32> = if col_count > 0 {
-        // Measure max char length per column (header + data), approximate width
-        let mut max_lens: Vec<usize> = headers.iter().map(|h| h.len()).collect();
+        // Collect all cell lengths per column
+        let mut col_lens: Vec<Vec<usize>> = headers.iter().map(|h| vec![h.len()]).collect();
         for row in &rows {
             for (i, cell) in row.iter().enumerate() {
-                if i < max_lens.len() {
-                    max_lens[i] = max_lens[i].max(cell.len());
+                if i < col_lens.len() {
+                    col_lens[i].push(cell.len());
                 }
             }
         }
-        // Cap individual column widths so very long paths don't dominate
-        let max_lens: Vec<usize> = max_lens.iter().map(|&l| l.min(150)).collect();
-        let total_len: usize = max_lens.iter().sum::<usize>().max(1);
-        let min_col = 10.0_f32; // minimum column width in mm
-        let mut widths: Vec<f32> = max_lens
+        // Use 90th percentile length (not max) to avoid outlier skew
+        let p90_lens: Vec<usize> = col_lens.iter().map(|lens| {
+            let mut sorted = lens.clone();
+            sorted.sort();
+            let idx = (sorted.len() as f32 * 0.9).ceil() as usize;
+            sorted[idx.min(sorted.len() - 1)].min(120)
+        }).collect();
+        // Ensure minimum representation for short columns (header len * 2)
+        let effective: Vec<usize> = p90_lens.iter().enumerate().map(|(i, &l)| {
+            l.max(headers[i].len() * 2).max(6)
+        }).collect();
+        let total_len: usize = effective.iter().sum::<usize>().max(1);
+        let min_col = 12.0_f32;
+        let mut widths: Vec<f32> = effective
             .iter()
             .map(|&l| (l as f32 / total_len as f32 * usable_w).max(min_col))
             .collect();
