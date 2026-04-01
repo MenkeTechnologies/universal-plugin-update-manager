@@ -1172,6 +1172,7 @@ function toggleMute() {
   const slider = document.getElementById('npVolume');
   if (audioMuted) {
     audioPlayer.volume = savedVolume;
+    if (_gainNode) _gainNode.gain.value = savedVolume * parseFloat(document.getElementById('npGainSlider')?.value || '1');
     audioMuted = false;
     if (btn) btn.innerHTML = '&#128264;';
     if (slider) slider.value = Math.round(savedVolume * 100);
@@ -1179,6 +1180,7 @@ function toggleMute() {
   } else {
     savedVolume = audioPlayer.volume;
     audioPlayer.volume = 0;
+    if (_gainNode) _gainNode.gain.value = 0;
     audioMuted = true;
     if (btn) btn.innerHTML = '&#128263;';
     if (slider) slider.value = 0;
@@ -1447,11 +1449,12 @@ function updateMetaLine() {
   });
 })();
 
-// ── Corner resize ──
+// ── Corner + edge resize ──
 (function initPlayerResize() {
   const np = document.getElementById('audioNowPlaying');
   let resizing = false;
   let corner = '';
+  let startDock = '';
   let startX, startY, startW, startH, startLeft, startTop;
 
   np.addEventListener('mousedown', (e) => {
@@ -1468,6 +1471,13 @@ function updateMetaLine() {
     startH = rect.height;
     startLeft = rect.left;
     startTop = rect.top;
+
+    // Remember current dock
+    startDock = '';
+    for (const cls of np.classList) {
+      if (cls.startsWith('dock-')) { startDock = cls; break; }
+    }
+    if (!startDock) startDock = prefs.getItem('playerDock') || 'dock-br';
 
     // Switch to absolute positioning for resize
     np.classList.remove('dock-tl', 'dock-tr', 'dock-bl', 'dock-br');
@@ -1527,19 +1537,7 @@ function updateMetaLine() {
     resizing = false;
     document.body.style.userSelect = '';
 
-    // Snap to nearest dock with the new size
-    const rect = np.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const wx = window.innerWidth / 2;
-    const wy = window.innerHeight / 2;
-    let dock;
-    if (cx < wx && cy < wy) dock = 'dock-tl';
-    else if (cx >= wx && cy < wy) dock = 'dock-tr';
-    else if (cx < wx && cy >= wy) dock = 'dock-bl';
-    else dock = 'dock-br';
-
-    // Keep the resized width/height, clear position styles, re-dock
+    // Snap back to the same dock with the new size
     const w = np.style.width;
     const h = np.style.height;
     np.style.left = '';
@@ -1549,8 +1547,8 @@ function updateMetaLine() {
     np.style.width = w;
     np.style.height = h;
     np.classList.add('snapping');
-    np.classList.add(dock);
-    prefs.setItem('playerDock', dock);
+    np.classList.add(startDock);
+    prefs.setItem('playerDock', startDock);
     prefs.setItem('playerWidth', w);
     prefs.setItem('playerHeight', h);
     setTimeout(() => np.classList.remove('snapping'), 300);
