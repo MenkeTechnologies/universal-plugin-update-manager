@@ -1029,7 +1029,7 @@ function renderRecentlyPlayed() {
     const isPlaying = isActive && !audioPlayer.paused;
     return `<div class="np-history-item${isActive ? ' active' : ''}" data-action="playRecent" data-path="${escapeHtml(r.path)}">
       <span class="np-h-icon">${isPlaying ? '&#9654;' : '&#9835;'}</span>
-      <span class="np-h-name" title="${escapeHtml(r.path)}">${escapeHtml(r.name)}</span>
+      <span class="np-h-name" title="${escapeHtml(r.path)}">${query ? highlightMatch(r.name, query, 'fuzzy') : escapeHtml(r.name)}</span>
       <span class="np-h-format">${r.format}</span>
       ${r.size ? `<span class="np-h-dur">${r.size}</span>` : ''}
     </div>`;
@@ -1082,7 +1082,7 @@ function renderMiniSearchResults() {
     const isActive = r.path === audioPlayerPath;
     return `<div class="np-history-item${isActive ? ' active' : ''}" data-action="playRecent" data-path="${escapeHtml(r.path)}">
       <span class="np-h-icon">&#9835;</span>
-      <span class="np-h-name" title="${escapeHtml(r.path)}">${escapeHtml(r.name)}</span>
+      <span class="np-h-name" title="${escapeHtml(r.path)}">${highlightMatch(r.name, query, 'fuzzy')}</span>
       <span class="np-h-format">${r.format}</span>
     </div>`;
   }).join('');
