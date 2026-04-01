@@ -1076,4 +1076,195 @@ mod tests {
         assert!(meta.sample_rate.is_none());
         let _ = fs::remove_dir_all(&tmp);
     }
+
+    /// Simulate a large network share scan: many files across many directories
+    /// with varying nesting depths and multiple roots. Verifies no files are
+    /// dropped by the channel/receiver and measures throughput.
+    #[test]
+    fn test_walk_simulated_network_share_large() {
+        let tmp = std::env::temp_dir().join("upum_test_smb_large");
+        let _ = fs::remove_dir_all(&tmp);
+
+        // Create 3 "mount points" (roots) with different structures
+        let mut expected_total = 0usize;
+
+        // Root 1: flat dir with many files (simulates sample pack)
+        let root1 = tmp.join("mount1");
+        fs::create_dir_all(&root1).unwrap();
+        for i in 0..500 {
+            fs::write(root1.join(format!("kick_{:04}.wav", i)), b"wav").unwrap();
+            expected_total += 1;
+        }
+
+        // Root 2: deeply nested (simulates organized library)
+        let root2 = tmp.join("mount2");
+        for cat in &["drums", "bass", "pads", "fx", "vocals"] {
+            for sub in &["processed", "raw", "oneshots"] {
+                let dir = root2.join(cat).join(sub);
+                fs::create_dir_all(&dir).unwrap();
+                for i in 0..20 {
+                    let ext = if i % 3 == 0 { "wav" } else if i % 3 == 1 { "mp3" } else { "flac" };
+                    fs::write(dir.join(format!("{}_{:02}.{}", cat, i, ext)), b"audio").unwrap();
+                    expected_total += 1;
+                }
+            }
+        }
+
+        // Root 3: mix of audio and non-audio (simulates project folder)
+        let root3 = tmp.join("mount3");
+        fs::create_dir_all(root3.join("audio")).unwrap();
+        fs::create_dir_all(root3.join("docs")).unwrap();
+        fs::create_dir_all(root3.join("audio").join("bounces")).unwrap();
+        for i in 0..50 {
+            fs::write(root3.join("audio").join(format!("track_{}.aiff", i)), b"aiff").unwrap();
+            expected_total += 1;
+        }
+        for i in 0..30 {
+            fs::write(root3.join("audio").join("bounces").join(format!("mix_{}.wav", i)), b"wav").unwrap();
+            expected_total += 1;
+        }
+        // Non-audio files that should be ignored
+        for i in 0..100 {
+            fs::write(root3.join("docs").join(format!("note_{}.txt", i)), b"text").unwrap();
+        }
+
+        let start = std::time::Instant::now();
+        let mut found = Vec::new();
+        let mut batch_count = 0usize;
+
+        walk_for_audio(
+            &[root1, root2, root3],
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+                batch_count += 1;
+            },
+            &|| false,
+            None,
+        );
+        let elapsed = start.elapsed();
+
+        assert_eq!(
+            found.len(),
+            expected_total,
+            "Expected {} files across 3 roots, got {} (dropped {})",
+            expected_total,
+            found.len(),
+            expected_total as isize - found.len() as isize
+        );
+        assert!(batch_count > 1, "Should have multiple batches, got {}", batch_count);
+
+        // Verify no duplicate paths
+        let mut paths: Vec<_> = found.iter().map(|s| s.path.clone()).collect();
+        paths.sort();
+        let before = paths.len();
+        paths.dedup();
+        assert_eq!(before, paths.len(), "Found duplicate paths in results");
+
+        eprintln!(
+            "SMB simulation: {} files in {:?} ({:.0} files/sec, {} batches)",
+            found.len(),
+            elapsed,
+            found.len() as f64 / elapsed.as_secs_f64(),
+            batch_count
+        );
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    /// Simulate intermittent metadata failures (common on SMB/NFS when
+    /// server is under load). Files where fs::metadata fails should be
+    /// skipped without aborting the scan.
+    #[test]
+    fn test_walk_survives_unreadable_files() {
+        let tmp = std::env::temp_dir().join("upum_test_smb_unreadable");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        // Create readable files
+        for i in 0..10 {
+            fs::write(tmp.join(format!("good_{}.wav", i)), b"wav data").unwrap();
+        }
+
+        // Create an unreadable file (permissions 000)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let bad = tmp.join("bad.wav");
+            fs::write(&bad, b"wav data").unwrap();
+            fs::set_permissions(&bad, fs::Permissions::from_mode(0o000)).unwrap();
+        }
+
+        let mut found = Vec::new();
+        walk_for_audio(
+            &[tmp.clone()],
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+            },
+            &|| false,
+            None,
+        );
+
+        // Should find at least the 10 good files (bad file may or may not
+        // appear depending on whether metadata() succeeds for root-owned files)
+        assert!(
+            found.len() >= 10,
+            "Should find at least 10 readable files, got {}",
+            found.len()
+        );
+
+        // Restore permissions for cleanup
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let bad = tmp.join("bad.wav");
+            let _ = fs::set_permissions(&bad, fs::Permissions::from_mode(0o644));
+        }
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    /// Simulate multiple concurrent scans on the same directory tree
+    /// (like scanAll running all 4 scanners). Verify no interference.
+    #[test]
+    fn test_walk_concurrent_scans_no_interference() {
+        let tmp = std::env::temp_dir().join("upum_test_concurrent");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        for i in 0..100 {
+            fs::write(tmp.join(format!("sample_{}.wav", i)), b"wav").unwrap();
+        }
+
+        // Run 4 scans concurrently (simulates scanAll)
+        let results: Vec<_> = (0..4)
+            .map(|_| {
+                let root = tmp.clone();
+                std::thread::spawn(move || {
+                    let mut found = Vec::new();
+                    walk_for_audio(
+                        &[root],
+                        &mut |batch, _count| {
+                            found.extend_from_slice(batch);
+                        },
+                        &|| false,
+                        None,
+                    );
+                    found.len()
+                })
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .collect();
+
+        // Each scan should find all 100 files independently
+        for (i, count) in results.iter().enumerate() {
+            assert_eq!(
+                *count, 100,
+                "Concurrent scan {} found {} files, expected 100",
+                i, count
+            );
+        }
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
 }
