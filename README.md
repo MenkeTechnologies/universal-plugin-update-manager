@@ -82,28 +82,37 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Fuzzy Search** | All search bars default to fuzzy matching (characters match in order, not contiguous). Toggle the `.*` button to switch to regex mode with full pattern support. Available in all tabs |
 | **Favorites** | Right-click any plugin, sample, DAW project, or preset to add/remove from favorites. Dedicated Favorites tab shows all starred items with type filter, search, reveal in Finder, and remove actions. Persisted across sessions |
 | **Resizable Columns** | Drag column borders to resize. Widths persist across sessions |
-| **Floating Player** | Draggable audio player that docks to any corner. Play/pause, loop, shuffle, seek bar, volume, speed (0.25x-2x), recently played (50 tracks). Expanded mode adds 3-band EQ (Low 200Hz / Mid 1kHz / High 8kHz, ±12dB), preamp gain, stereo pan, mono toggle, and A-B loop with green/red waveform markers. Full Web Audio API processing chain |
-| **Waveform Preview** | Full-width waveform rendered in the metadata panel when clicking a sample row. Seekable — click anywhere on the waveform to jump to that position. Playback cursor and progress fill update in real-time. Waveform peaks cached in memory for instant re-display |
-| **Dependency Graph** | Visual plugin dependency map: most-used plugins ranked by project count with bar charts, projects sorted by plugin count, orphaned plugin detection (installed but unused). Accessible from DAW tab toolbar or command palette |
-| **Context Menus** | Right-click context menus on every interactive element -- plugins (KVR, manufacturer, reveal, copy), samples (play, loop, reveal, copy), DAW projects (open in DAW, reveal, copy), presets (reveal, copy), favorites, notes, tags, and history entries |
+| **Floating Player** | Draggable audio player that docks to any corner with quadrant zone UI. Resizable from all 8 edges/corners. Play/pause, loop, shuffle, seek bar, volume, speed (0.25x-2x), recently played (50 tracks), song search with fzf matching, favorite/tag buttons. Expanded mode adds 3-band EQ, preamp gain, stereo pan, mono toggle, A-B loop. 60fps waveform playhead via requestAnimationFrame. Player state/size/dock persisted across sessions |
+| **Waveform Preview** | Full-width waveform rendered in the metadata panel when clicking a sample row. Seekable — click anywhere to jump. 60fps playhead cursor via rAF. Close button on metadata panel. Expand-on-click toggle in settings |
+| **Dependency Graph** | Visual plugin dependency map with search, 3 tabs (Most Used, By Project with inline drill-down + back button, Orphaned), bar charts, context menus on all rows. Prompts to build plugin index if empty. Persisted xref cache |
+| **ALS XML Viewer** | Right-click any .als file to decompress and view raw XML. fzf search with highlighted matches and line numbers. Export decompressed XML to file |
+| **Context Menus** | 36+ right-click context menus on every interactive element — plugins, samples, DAW projects, presets, favorites, notes, tags, history entries, audio player songs, dep graph rows, file browser, breadcrumbs, waveforms, EQ sliders, color schemes, shortcut keys, progress bars |
 | **Toast Notifications** | Slide-in notifications for actions like opening DAW projects or revealing files in Finder |
 | **Disk Usage** | Stacked bar charts showing space breakdown by format/type per tab. Visual representation of storage usage with color-coded legends |
 | **Batch Selection** | Checkbox column in all tables for multi-item operations. Select all/deselect, batch favorite, copy paths, export selected as JSON |
 | **Duplicate Detection** | Find duplicate files by name+size across plugins, samples, DAW projects, and presets. Modal report grouped by type with full paths |
 | **Notes & Tags** | Add notes and comma-separated tags to any item via right-click. Notes persisted in preferences with note indicator icon on tagged items |
-| **Keyboard Navigation** | Arrow keys/j/k to navigate table rows, Enter to activate, Space to play samples, Home/End to jump. Visual selection highlight. 30+ customizable keybindings |
-| **Help Overlay** | Press <kbd>?</kbd> to show keyboard shortcuts reference. Covers navigation, playback (loop, mute, volume), actions (scan, reveal, copy, favorite, note, delete), search operators, and mouse interactions |
+| **Keyboard Navigation** | Arrow keys/j/k to navigate table rows and file browser (Ableton-style: right enters dir, left goes up). 38 customizable keybindings including Cmd+E export, Cmd+I import, Cmd+Tab cycle tabs, Cmd+G dep graph, Cmd+T toggle theme |
+| **Help Overlay** | Press <kbd>?</kbd> to show all 38 keyboard shortcuts. Covers navigation, playback, actions, search operators, and mouse interactions |
 | **Sort Persistence** | Last-used sort column and direction saved per tab, restored on app restart |
 | **Multi-Select Filters** | All filter dropdowns support multiple selections (e.g. VST2 + AU, WAV + FLAC). Checkbox-based custom dropdown with "All" toggle |
 | **Native Menu Bar** | Full menu bar with File, Edit, Scan, View, Playback, Data, Window, Help menus. All functionality accessible from menus with keyboard accelerators |
 | **ETA Timers** | Estimated time remaining on plugin scans and update checks. Elapsed time on audio, DAW, and preset scans |
-| **Draggable Tabs** | Drag tabs to reorder. Order persisted across sessions. Reset Tab Order in settings |
+| **Draggable Tabs** | Trello-style drag and drop for tabs and settings sections. Floating ghost follows cursor with placeholder. Order persisted across sessions |
 | **Cyberpunk Visualizer** | Animated equalizer bars in the floating player with cyan-to-magenta gradient. Bars bounce when playing, freeze on pause. Border glow pulse effect |
-| **PDF Export** | Export any tab to PDF (A4 landscape, Helvetica, auto-paginated, header with item count and timestamp) |
+| **PDF Export** | Export any tab to PDF (A4 landscape, auto-sized columns proportional to content, 7pt font for maximum data density, background export with toast notification) |
 | **TOML Export/Import** | Export/import all tabs in TOML format alongside JSON, CSV, TSV |
 | **BPM Estimation** | Estimates tempo for WAV and AIFF samples using onset-strength autocorrelation. Shown in the metadata panel with a loading spinner while computing. Cached in memory. BPM appears in the floating player meta line after detection |
 | **Command Palette** | Press <kbd>Cmd+K</kbd> to open a fuzzy search across all items — plugins, samples, DAW projects, presets, bookmarked directories, tags, tabs, and actions. Arrow keys to navigate, Enter to select, Escape to dismiss. Uses the same fzf scoring engine as tab search bars |
 | **Directory Bookmarks** | Bookmark favorite directories in the File Browser for instant navigation. Chips displayed above the file list, persisted across sessions. Right-click any folder to bookmark it |
+| **Quick Nav Buttons** | File browser toolbar has Desktop, Downloads, Music, Documents, and Root (/) buttons for instant navigation |
+| **Cyberpunk Animations** | 30 CSS animations: neon focus pulse, button hover glow, modal zoom-in, context menu scale, format badge shimmer, toast glow pulse, neon gradient scrollbars, tactile depth shadows on every interactive element |
+| **System Info** | Real-time display of CPU cores/usage, memory RSS/VIRT, PID, threads, FDs, uptime, thread pool sizes, scanner config, active scan states with green dots, data file sizes, data directory path |
+| **fzf Tuning** | 8 configurable fuzzy search parameters (match score, gap penalties, boundary/camelCase/consecutive bonuses) in Settings with live preview and reset to defaults |
+| **Filter Persistence** | All 6 filter dropdowns (plugin type, status, favorite type, audio format, DAW, preset format) saved to prefs and restored on startup. Multi-select values preserved |
+| **Plugin Name Normalization** | Cross-reference matching normalizes plugin names: strips arch suffixes (x64, ARM64, Stereo), case-folds, collapses whitespace. "Serum", "SERUM (x64)", "serum" all match |
+| **macOS Firmlink Dedup** | Scanners normalize /System/Volumes/Data paths to prevent duplicate file discovery when scanning / |
+| **Browse Button** | Native folder picker in scan directory settings to grant macOS TCC permissions for mounted volumes |
 
 ---
 
@@ -141,7 +150,7 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (233 tests)
+### Rust tests (225 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|

@@ -3105,15 +3105,19 @@ pub fn run() {
                 true,
                 Some("CmdOrCtrl+5"),
             )?;
+            let tab_notes =
+                MenuItem::with_id(handle, "tab_notes", "Notes", true, Some("CmdOrCtrl+6"))?;
             let tab_history =
-                MenuItem::with_id(handle, "tab_history", "History", true, Some("CmdOrCtrl+6"))?;
+                MenuItem::with_id(handle, "tab_history", "History", true, Some("CmdOrCtrl+7"))?;
             let tab_settings = MenuItem::with_id(
                 handle,
                 "tab_settings",
                 "Settings",
                 true,
-                Some("CmdOrCtrl+7"),
+                Some("CmdOrCtrl+8"),
             )?;
+            let tab_files =
+                MenuItem::with_id(handle, "tab_files", "Files", true, Some("CmdOrCtrl+9"))?;
             let view_sep = PredefinedMenuItem::separator(handle)?;
             let toggle_theme = MenuItem::with_id(
                 handle,
@@ -3151,8 +3155,10 @@ pub fn run() {
                     &tab_daw,
                     &tab_presets,
                     &tab_favorites,
+                    &tab_notes,
                     &tab_history,
                     &tab_settings,
+                    &tab_files,
                     &view_sep,
                     &toggle_theme,
                     &toggle_crt,
@@ -3187,12 +3193,46 @@ pub fn run() {
                 Some("CmdOrCtrl+Shift+M"),
             )?;
 
+            let next_track = MenuItem::with_id(
+                handle,
+                "next_track",
+                "Next Track",
+                true,
+                Some("CmdOrCtrl+Right"),
+            )?;
+            let prev_track = MenuItem::with_id(
+                handle,
+                "prev_track",
+                "Previous Track",
+                true,
+                Some("CmdOrCtrl+Left"),
+            )?;
+            let toggle_shuffle = MenuItem::with_id(
+                handle,
+                "toggle_shuffle",
+                "Toggle Shuffle",
+                true,
+                None::<&str>,
+            )?;
+            let toggle_mute = MenuItem::with_id(
+                handle,
+                "toggle_mute",
+                "Mute / Unmute",
+                true,
+                None::<&str>,
+            )?;
+            let playback_sep = PredefinedMenuItem::separator(handle)?;
+
             let playback_menu = Submenu::with_id_and_items(
                 handle,
                 "playback",
                 "Playback",
                 true,
-                &[&play_pause, &toggle_loop, &stop_playback, &expand_player],
+                &[
+                    &play_pause, &stop_playback, &playback_sep,
+                    &next_track, &prev_track, &toggle_loop, &toggle_shuffle, &toggle_mute,
+                    &playback_sep, &expand_player,
+                ],
             )?;
 
             // Data menu
@@ -3218,12 +3258,60 @@ pub fn run() {
                 None::<&str>,
             )?;
 
+            let reset_all = MenuItem::with_id(
+                handle,
+                "reset_all",
+                "Reset All Scans...",
+                true,
+                Some("CmdOrCtrl+Shift+Backspace"),
+            )?;
+            let data_sep = PredefinedMenuItem::separator(handle)?;
+            let find_duplicates = MenuItem::with_id(
+                handle,
+                "find_duplicates",
+                "Find Duplicates",
+                true,
+                Some("CmdOrCtrl+D"),
+            )?;
+            let dep_graph = MenuItem::with_id(
+                handle,
+                "dep_graph",
+                "Dependency Graph",
+                true,
+                Some("CmdOrCtrl+G"),
+            )?;
+            let cmd_palette = MenuItem::with_id(
+                handle,
+                "cmd_palette",
+                "Command Palette",
+                true,
+                Some("CmdOrCtrl+K"),
+            )?;
+            let help_overlay = MenuItem::with_id(
+                handle,
+                "help_overlay",
+                "Keyboard Shortcuts",
+                true,
+                None::<&str>,
+            )?;
+
             let data_menu = Submenu::with_id_and_items(
                 handle,
                 "data",
                 "Data",
                 true,
-                &[&clear_history, &clear_kvr, &clear_favorites],
+                &[
+                    &clear_history, &clear_kvr, &clear_favorites,
+                    &data_sep, &reset_all,
+                ],
+            )?;
+
+            let tools_menu = Submenu::with_id_and_items(
+                handle,
+                "tools",
+                "Tools",
+                true,
+                &[&find_duplicates, &dep_graph, &data_sep, &cmd_palette, &help_overlay],
             )?;
 
             // Window menu
@@ -3258,6 +3346,7 @@ pub fn run() {
                     &view_menu,
                     &playback_menu,
                     &data_menu,
+                    &tools_menu,
                     &window_menu,
                     &help_menu,
                 ],

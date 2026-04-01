@@ -31,8 +31,10 @@ listen('menu-action', (event) => {
     case 'tab_daw': switchTab('daw'); break;
     case 'tab_presets': switchTab('presets'); break;
     case 'tab_favorites': switchTab('favorites'); break;
+    case 'tab_notes': switchTab('notes'); break;
     case 'tab_history': switchTab('history'); break;
     case 'tab_settings': switchTab('settings'); break;
+    case 'tab_files': switchTab('files'); break;
     // View — appearance
     case 'toggle_theme': settingToggleTheme(); break;
     case 'toggle_crt': settingToggleCrt(); break;
@@ -42,12 +44,21 @@ listen('menu-action', (event) => {
     case 'clear_history': settingClearAllHistory(); break;
     case 'clear_kvr': settingClearKvrCache(); break;
     case 'clear_favorites': clearFavorites(); break;
+    case 'reset_all': resetAllScans(); break;
     // Playback
     case 'play_pause': toggleAudioPlayback(); break;
     case 'toggle_loop': toggleAudioLoop(); break;
     case 'stop_playback': stopAudioPlayback(); break;
     case 'expand_player': togglePlayerExpanded(); break;
     case 'next_track': nextTrack(); break;
+    case 'prev_track': prevTrack(); break;
+    case 'toggle_shuffle': toggleShuffle(); break;
+    case 'toggle_mute': toggleMute(); break;
+    // Tools
+    case 'find_duplicates': showDuplicateReport(); break;
+    case 'dep_graph': showDepGraph(); break;
+    case 'cmd_palette': openPalette(); break;
+    case 'help_overlay': toggleHelpOverlay(); break;
     // Help
     case 'github': openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
     case 'docs': openUpdate('https://menketechnologies.github.io/universal-plugin-update-manager/'); break;
