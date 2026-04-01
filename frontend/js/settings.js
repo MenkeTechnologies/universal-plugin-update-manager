@@ -731,12 +731,18 @@ function refreshSettingsUI() {
     batchSzValEl.textContent = batchSz;
   }
 
-  // System perf info
+  // System perf info — get real core count from Rust backend
   const perfInfo = document.getElementById('settingPerfInfo');
   if (perfInfo) {
-    const cpus = navigator.hardwareConcurrency || '?';
-    const threads = parseInt(threadMult) * parseInt(cpus);
-    perfInfo.textContent = `${cpus} cores | ${threads} threads | buf ${chanBuf} | batch ${batchSz}`;
+    window.vstUpdater.getProcessStats().then(stats => {
+      const cpus = stats.numCpus || navigator.hardwareConcurrency || '?';
+      const threads = parseInt(threadMult) * parseInt(cpus);
+      perfInfo.textContent = `${cpus} cores | ${threads} threads | buf ${chanBuf} | batch ${batchSz}`;
+    }).catch(() => {
+      const cpus = navigator.hardwareConcurrency || '?';
+      const threads = parseInt(threadMult) * parseInt(cpus);
+      perfInfo.textContent = `${cpus} cores | ${threads} threads | buf ${chanBuf} | batch ${batchSz}`;
+    });
   }
 
   // Selects
