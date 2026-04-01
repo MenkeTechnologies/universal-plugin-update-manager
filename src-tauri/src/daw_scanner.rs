@@ -223,22 +223,24 @@ pub fn walk_for_daw(
     let stop2 = stop.clone();
     let found2 = found.clone();
     std::thread::spawn(move || {
-        roots_owned.par_iter().for_each(|root| {
-            if stop2.load(Ordering::Relaxed) {
-                return;
-            }
-            walk_dir_parallel(
-                root,
-                0,
-                &visited,
-                &tx,
-                &found2,
-                batch_size,
-                &stop2,
-                &exclude,
-                include_backups,
-            );
-        });
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            roots_owned.par_iter().for_each(|root| {
+                if stop2.load(Ordering::Relaxed) {
+                    return;
+                }
+                walk_dir_parallel(
+                    root,
+                    0,
+                    &visited,
+                    &tx,
+                    &found2,
+                    batch_size,
+                    &stop2,
+                    &exclude,
+                    include_backups,
+                );
+            });
+        }));
     });
 
     let mut total_found = 0usize;
@@ -279,7 +281,7 @@ fn walk_dir_parallel(
         Err(_) => return,
     };
     {
-        let mut vis = visited.lock().unwrap();
+        let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
         if !vis.insert(real_dir) {
             return;
         }

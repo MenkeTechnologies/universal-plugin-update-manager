@@ -190,15 +190,17 @@ async fn scan_plugins(
         let stop_flag2 = stop_flag.clone();
 
         std::thread::spawn(move || {
-            unique_paths.par_iter().for_each(|p| {
-                if stop_flag2.load(Ordering::Relaxed) {
-                    return;
-                }
-                if let Some(info) = scanner::get_plugin_info(p) {
-                    if stop_flag2.load(Ordering::Relaxed) { return; }
-                    let _ = tx.send(info);
-                }
-            });
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                unique_paths.par_iter().for_each(|p| {
+                    if stop_flag2.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    if let Some(info) = scanner::get_plugin_info(p) {
+                        if stop_flag2.load(Ordering::Relaxed) { return; }
+                        let _ = tx.send(info);
+                    }
+                });
+            }));
         });
 
         let mut all_plugins = Vec::new();
