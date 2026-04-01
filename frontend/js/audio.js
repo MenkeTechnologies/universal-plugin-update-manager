@@ -1440,3 +1440,107 @@ function updateMetaLine() {
     setTimeout(() => np.classList.remove('snapping'), 300);
   });
 })();
+
+// ── Corner resize ──
+(function initPlayerResize() {
+  const np = document.getElementById('audioNowPlaying');
+  let resizing = false;
+  let corner = '';
+  let startX, startY, startW, startH, startLeft, startTop;
+
+  np.addEventListener('mousedown', (e) => {
+    const handle = e.target.closest('[data-resize]');
+    if (!handle) return;
+    e.preventDefault();
+    e.stopPropagation();
+    resizing = true;
+    corner = handle.dataset.resize;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = np.getBoundingClientRect();
+    startW = rect.width;
+    startH = rect.height;
+    startLeft = rect.left;
+    startTop = rect.top;
+
+    // Switch to absolute positioning for resize
+    np.classList.remove('dock-tl', 'dock-tr', 'dock-bl', 'dock-br');
+    np.style.left = startLeft + 'px';
+    np.style.top = startTop + 'px';
+    np.style.right = 'auto';
+    np.style.bottom = 'auto';
+    np.style.width = startW + 'px';
+    np.style.height = startH + 'px';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!resizing) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    const minW = 280;
+    const minH = 200;
+
+    if (corner === 'br') {
+      np.style.width = Math.max(minW, startW + dx) + 'px';
+      np.style.height = Math.max(minH, startH + dy) + 'px';
+    } else if (corner === 'bl') {
+      const newW = Math.max(minW, startW - dx);
+      np.style.width = newW + 'px';
+      np.style.left = (startLeft + startW - newW) + 'px';
+      np.style.height = Math.max(minH, startH + dy) + 'px';
+    } else if (corner === 'tr') {
+      np.style.width = Math.max(minW, startW + dx) + 'px';
+      const newH = Math.max(minH, startH - dy);
+      np.style.height = newH + 'px';
+      np.style.top = (startTop + startH - newH) + 'px';
+    } else if (corner === 'tl') {
+      const newW = Math.max(minW, startW - dx);
+      np.style.width = newW + 'px';
+      np.style.left = (startLeft + startW - newW) + 'px';
+      const newH = Math.max(minH, startH - dy);
+      np.style.height = newH + 'px';
+      np.style.top = (startTop + startH - newH) + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!resizing) return;
+    resizing = false;
+    document.body.style.userSelect = '';
+
+    // Snap to nearest dock with the new size
+    const rect = np.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const wx = window.innerWidth / 2;
+    const wy = window.innerHeight / 2;
+    let dock;
+    if (cx < wx && cy < wy) dock = 'dock-tl';
+    else if (cx >= wx && cy < wy) dock = 'dock-tr';
+    else if (cx < wx && cy >= wy) dock = 'dock-bl';
+    else dock = 'dock-br';
+
+    // Keep the resized width/height, clear position styles, re-dock
+    const w = np.style.width;
+    const h = np.style.height;
+    np.style.left = '';
+    np.style.top = '';
+    np.style.right = '';
+    np.style.bottom = '';
+    np.style.width = w;
+    np.style.height = h;
+    np.classList.add('snapping');
+    np.classList.add(dock);
+    prefs.setItem('playerDock', dock);
+    prefs.setItem('playerWidth', w);
+    prefs.setItem('playerHeight', h);
+    setTimeout(() => np.classList.remove('snapping'), 300);
+  });
+
+  // Restore saved size
+  const savedW = prefs.getItem('playerWidth');
+  const savedH = prefs.getItem('playerHeight');
+  if (savedW) np.style.width = savedW;
+  if (savedH) np.style.height = savedH;
+})();

@@ -3100,10 +3100,24 @@
       flex-direction: column;
       font-size: 11px;
       -webkit-app-region: no-drag;
-      resize: both;
       overflow: auto;
     }
     .audio-now-playing.active { display: flex; }
+
+    /* Resize handles on all 4 corners */
+    .np-resize {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      z-index: 10;
+    }
+    .np-resize:hover, .np-resize:active {
+      background: rgba(5,217,232,0.15);
+    }
+    .np-resize-tl { top: 0; left: 0; cursor: nwse-resize; }
+    .np-resize-tr { top: 0; right: 0; cursor: nesw-resize; }
+    .np-resize-bl { bottom: 0; left: 0; cursor: nesw-resize; }
+    .np-resize-br { bottom: 0; right: 0; cursor: nwse-resize; }
 
     /* Dock positions */
     .audio-now-playing.dock-br { bottom: 24px; right: 24px; top: auto; left: auto; }
@@ -3971,6 +3985,10 @@
     <div class="dock-zone" id="dockBR" style="bottom:8px;right:8px;width:80px;height:60px;"></div>
   </div>
   <div class="audio-now-playing dock-br" id="audioNowPlaying">
+    <div class="np-resize np-resize-tl" data-resize="tl"></div>
+    <div class="np-resize np-resize-tr" data-resize="tr"></div>
+    <div class="np-resize np-resize-bl" data-resize="bl"></div>
+    <div class="np-resize np-resize-br" data-resize="br"></div>
     <div class="np-drag-handle" id="npDragHandle"><span class="np-drag-dots"></span></div>
     <div class="np-toolbar">
       <span class="np-toolbar-title">&#9835; Audio Player</span>
