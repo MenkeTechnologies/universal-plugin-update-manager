@@ -427,19 +427,30 @@ function saveFilterState(id) {
   const wrapper = el.nextElementSibling;
   if (wrapper && wrapper.classList.contains('multi-filter') && wrapper._selected) {
     const vals = [...wrapper._selected];
-    prefs.setItem('filter_' + id, vals.length > 0 ? vals : 'all');
+    if (vals.length > 0) {
+      prefs.setItem('filter_' + id, vals);
+    } else {
+      prefs.removeItem('filter_' + id); // "all" = no pref needed
+    }
   } else {
-    prefs.setItem('filter_' + id, el.value);
+    if (el.value && el.value !== 'all') {
+      prefs.setItem('filter_' + id, el.value);
+    } else {
+      prefs.removeItem('filter_' + id);
+    }
   }
 }
 
 function restoreFilterStates() {
   for (const id of _filterIds) {
-    const saved = prefs.getItem('filter_' + id);
-    if (!saved) continue;
+    let saved = prefs.getItem('filter_' + id);
+    if (!saved || saved === 'all') continue;
+    // Parse JSON array if stored as string
+    if (typeof saved === 'string') {
+      try { const parsed = JSON.parse(saved); if (Array.isArray(parsed)) saved = parsed; } catch {}
+    }
     const el = document.getElementById(id);
     if (!el) continue;
-    // Check for multi-filter
     const wrapper = el.nextElementSibling;
     if (wrapper && wrapper.classList.contains('multi-filter') && typeof setMultiFilterValue === 'function') {
       if (Array.isArray(saved)) {
@@ -452,11 +463,12 @@ function restoreFilterStates() {
           updateMultiFilterLabel(wrapper, allLabel);
         }
       }
-    } else if (typeof saved === 'string') {
+    } else if (typeof saved === 'string' && saved !== 'all') {
       el.value = saved;
     }
   }
-  _filtersRestored = true;
+  // Delay enabling saves until after initial data load completes
+  setTimeout(() => { _filtersRestored = true; }, 3000);
 }
 
 // Save all filter states (called from filter functions)
