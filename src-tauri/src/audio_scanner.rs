@@ -202,6 +202,14 @@ fn walk_dir_parallel(
                 continue;
             }
             if let Ok(meta) = fs::metadata(&path) {
+                // Skip empty or unreadable files
+                if meta.len() == 0 {
+                    continue;
+                }
+                // Skip files where we can't read timestamps (broken symlinks, unmounted volumes)
+                if meta.modified().is_err() && meta.accessed().is_err() {
+                    continue;
+                }
                 let sample_name = path
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
