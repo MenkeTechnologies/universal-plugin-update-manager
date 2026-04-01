@@ -877,6 +877,55 @@ function restoreSettings() {
 }
 // restoreSettings is called from loadLastScan after prefs.load()
 
+// ── fzf Parameter Settings ──
+function renderFzfSettings() {
+  const grid = document.getElementById('fzfSettingsGrid');
+  if (!grid) return;
+  const params = [
+    { key: 'SCORE_MATCH', label: 'Match Score', desc: 'Points per matched character', min: 1, max: 50 },
+    { key: 'SCORE_GAP_START', label: 'Gap Start Penalty', desc: 'Penalty for starting a gap', min: -20, max: 0 },
+    { key: 'SCORE_GAP_EXTENSION', label: 'Gap Extension', desc: 'Penalty per additional gap character', min: -10, max: 0 },
+    { key: 'BONUS_BOUNDARY', label: 'Word Boundary Bonus', desc: 'Bonus for matching at word boundaries', min: 0, max: 30 },
+    { key: 'BONUS_NON_WORD', label: 'Non-Word Bonus', desc: 'Bonus for non-word character transitions', min: 0, max: 30 },
+    { key: 'BONUS_CAMEL', label: 'CamelCase Bonus', desc: 'Bonus for camelCase transitions', min: 0, max: 30 },
+    { key: 'BONUS_CONSECUTIVE', label: 'Consecutive Bonus', desc: 'Bonus for consecutive matches', min: 0, max: 20 },
+    { key: 'BONUS_FIRST_CHAR_MULT', label: 'First Char Multiplier', desc: 'Multiplier for first character bonus', min: 1, max: 5 },
+  ];
+  grid.innerHTML = params.map(p => {
+    const val = window[p.key] ?? FZF_DEFAULTS[p.key];
+    return `<div class="settings-row" style="padding:6px 8px;margin-bottom:2px;">
+      <div class="settings-label" style="min-width:0;">
+        <span class="settings-title" style="font-size:11px;">${p.label}</span>
+        <span class="settings-desc" style="font-size:9px;">${p.desc}</span>
+      </div>
+      <div class="settings-control" style="display:flex;align-items:center;gap:6px;">
+        <input type="number" class="settings-input" data-fzf-param="${p.key}" value="${val}" min="${p.min}" max="${p.max}" step="1" style="width:60px;font-size:11px;padding:3px 6px;" title="${p.desc} (default: ${FZF_DEFAULTS[p.key]})">
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.addEventListener('input', (e) => {
+  const input = e.target.closest('[data-fzf-param]');
+  if (!input) return;
+  const key = input.dataset.fzfParam;
+  const val = parseFloat(input.value);
+  if (isNaN(val)) return;
+  window[key] = val;
+  // Update the module-level variable
+  switch (key) {
+    case 'SCORE_MATCH': SCORE_MATCH = val; break;
+    case 'SCORE_GAP_START': SCORE_GAP_START = val; break;
+    case 'SCORE_GAP_EXTENSION': SCORE_GAP_EXTENSION = val; break;
+    case 'BONUS_BOUNDARY': BONUS_BOUNDARY = val; break;
+    case 'BONUS_NON_WORD': BONUS_NON_WORD = val; break;
+    case 'BONUS_CAMEL': BONUS_CAMEL = val; break;
+    case 'BONUS_CONSECUTIVE': BONUS_CONSECUTIVE = val; break;
+    case 'BONUS_FIRST_CHAR_MULT': BONUS_FIRST_CHAR_MULT = val; break;
+  }
+  saveFzfParams();
+});
+
 // ── Settings Section Drag Reorder (Trello-style) ──
 function initSettingsSectionDrag() {
   const container = document.querySelector('.settings-container');

@@ -43,6 +43,8 @@
   renderGlobalTagBar();
   if (typeof loadXrefCache === 'function') loadXrefCache();
   if (typeof restoreFilterStates === 'function') restoreFilterStates();
+  if (typeof loadFzfParams === 'function') loadFzfParams();
+  if (typeof renderFzfSettings === 'function') renderFzfSettings();
 
   try {
     const latest = await window.vstUpdater.getLatestScan();

@@ -6,15 +6,49 @@ function escapeHtml(str) {
 
 // ── fzf-style fuzzy matching with scoring ──
 
-// Scoring constants (from fzf)
-const SCORE_MATCH = 16;
-const SCORE_GAP_START = -3;
-const SCORE_GAP_EXTENSION = -1;
-const BONUS_BOUNDARY = 9;
-const BONUS_NON_WORD = 8;
-const BONUS_CAMEL = 7;
-const BONUS_CONSECUTIVE = 4;
-const BONUS_FIRST_CHAR_MULT = 2;
+// Scoring constants (from fzf) — configurable via settings
+let SCORE_MATCH = 16;
+let SCORE_GAP_START = -3;
+let SCORE_GAP_EXTENSION = -1;
+let BONUS_BOUNDARY = 9;
+let BONUS_NON_WORD = 8;
+let BONUS_CAMEL = 7;
+let BONUS_CONSECUTIVE = 4;
+let BONUS_FIRST_CHAR_MULT = 2;
+
+const FZF_DEFAULTS = { SCORE_MATCH: 16, SCORE_GAP_START: -3, SCORE_GAP_EXTENSION: -1, BONUS_BOUNDARY: 9, BONUS_NON_WORD: 8, BONUS_CAMEL: 7, BONUS_CONSECUTIVE: 4, BONUS_FIRST_CHAR_MULT: 2 };
+
+function loadFzfParams() {
+  const saved = prefs.getObject('fzfParams', null);
+  if (saved) {
+    SCORE_MATCH = saved.SCORE_MATCH ?? 16;
+    SCORE_GAP_START = saved.SCORE_GAP_START ?? -3;
+    SCORE_GAP_EXTENSION = saved.SCORE_GAP_EXTENSION ?? -1;
+    BONUS_BOUNDARY = saved.BONUS_BOUNDARY ?? 9;
+    BONUS_NON_WORD = saved.BONUS_NON_WORD ?? 8;
+    BONUS_CAMEL = saved.BONUS_CAMEL ?? 7;
+    BONUS_CONSECUTIVE = saved.BONUS_CONSECUTIVE ?? 4;
+    BONUS_FIRST_CHAR_MULT = saved.BONUS_FIRST_CHAR_MULT ?? 2;
+  }
+}
+
+function saveFzfParams() {
+  prefs.setItem('fzfParams', { SCORE_MATCH, SCORE_GAP_START, SCORE_GAP_EXTENSION, BONUS_BOUNDARY, BONUS_NON_WORD, BONUS_CAMEL, BONUS_CONSECUTIVE, BONUS_FIRST_CHAR_MULT });
+}
+
+function resetFzfParams() {
+  Object.assign(window, FZF_DEFAULTS);
+  SCORE_MATCH = FZF_DEFAULTS.SCORE_MATCH;
+  SCORE_GAP_START = FZF_DEFAULTS.SCORE_GAP_START;
+  SCORE_GAP_EXTENSION = FZF_DEFAULTS.SCORE_GAP_EXTENSION;
+  BONUS_BOUNDARY = FZF_DEFAULTS.BONUS_BOUNDARY;
+  BONUS_NON_WORD = FZF_DEFAULTS.BONUS_NON_WORD;
+  BONUS_CAMEL = FZF_DEFAULTS.BONUS_CAMEL;
+  BONUS_CONSECUTIVE = FZF_DEFAULTS.BONUS_CONSECUTIVE;
+  BONUS_FIRST_CHAR_MULT = FZF_DEFAULTS.BONUS_FIRST_CHAR_MULT;
+  saveFzfParams();
+  if (typeof renderFzfSettings === 'function') renderFzfSettings();
+}
 
 function charClass(c) {
   if (c >= 'a' && c <= 'z') return 1; // lower
