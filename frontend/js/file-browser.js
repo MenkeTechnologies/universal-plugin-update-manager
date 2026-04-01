@@ -297,3 +297,98 @@ document.addEventListener('contextmenu', (e) => {
   showContextMenu(e, items);
   e.preventDefault();
 });
+
+// ── Ableton-style keyboard navigation ──
+let _fileNavIdx = -1;
+
+function getFileRows() {
+  return [...document.querySelectorAll('#fileList .file-row')];
+}
+
+function fileNavSelect(idx) {
+  const rows = getFileRows();
+  if (rows.length === 0) return;
+  // Clear previous
+  rows.forEach(r => r.classList.remove('file-selected'));
+  _fileNavIdx = Math.max(0, Math.min(idx, rows.length - 1));
+  const row = rows[_fileNavIdx];
+  row.classList.add('file-selected');
+  row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+document.addEventListener('click', (e) => {
+  const row = e.target.closest('#fileList .file-row');
+  if (row) {
+    const rows = getFileRows();
+    const idx = rows.indexOf(row);
+    if (idx >= 0) {
+      rows.forEach(r => r.classList.remove('file-selected'));
+      _fileNavIdx = idx;
+      row.classList.add('file-selected');
+    }
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  // Only handle when Files tab is active and not typing in an input
+  const activeTab = document.querySelector('.tab-content.active');
+  if (!activeTab || activeTab.id !== 'tabFiles') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+  const rows = getFileRows();
+  if (rows.length === 0) return;
+
+  if (e.key === 'ArrowDown' || e.key === 'j') {
+    e.preventDefault();
+    fileNavSelect(_fileNavIdx + 1);
+  } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    e.preventDefault();
+    fileNavSelect(_fileNavIdx - 1);
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    fileNavSelect(0);
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    fileNavSelect(rows.length - 1);
+  } else if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === 'l') {
+    // Right arrow / Enter: open directory or play/open file
+    e.preventDefault();
+    if (_fileNavIdx < 0 || _fileNavIdx >= rows.length) return;
+    const row = rows[_fileNavIdx];
+    const path = row.dataset.filePath;
+    const isDir = row.dataset.fileDir === 'true';
+    if (isDir) {
+      loadDirectory(path).then(() => {
+        _fileNavIdx = -1;
+        fileNavSelect(0);
+      });
+    } else {
+      const ext = path.split('.').pop().toLowerCase();
+      if (AUDIO_EXTS.includes(ext)) {
+        previewAudio(path);
+      } else {
+        opener_open(path);
+      }
+    }
+  } else if (e.key === 'ArrowLeft' || e.key === 'h') {
+    // Left arrow: go to parent directory
+    e.preventDefault();
+    if (_fileBrowserPath && _fileBrowserPath !== '/') {
+      const parent = _fileBrowserPath.replace(/\/[^/]+\/?$/, '') || '/';
+      loadDirectory(parent).then(() => {
+        _fileNavIdx = -1;
+        fileNavSelect(0);
+      });
+    }
+  } else if (e.key === ' ') {
+    // Space: preview audio if selected
+    e.preventDefault();
+    if (_fileNavIdx < 0 || _fileNavIdx >= rows.length) return;
+    const row = rows[_fileNavIdx];
+    const path = row.dataset.filePath;
+    const ext = path.split('.').pop().toLowerCase();
+    if (AUDIO_EXTS.includes(ext)) {
+      previewAudio(path);
+    }
+  }
+});
