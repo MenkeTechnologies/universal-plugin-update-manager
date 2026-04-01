@@ -1764,17 +1764,17 @@ fn export_pdf(
         }
         *y -= header_row_h;
 
-        // Cyan line under headers
+        // Gray line under column headers
         stroke_line(
             layer_ref,
             margin_x,
             *y + 1.0,
             page_w.0 - margin_x,
             *y + 1.0,
-            0.02,
-            0.85,
-            0.91,
             0.8,
+            0.8,
+            0.8,
+            0.5,
         );
     };
 
