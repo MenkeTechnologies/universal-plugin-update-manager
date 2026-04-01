@@ -1096,11 +1096,13 @@ function collapsePlayer() {
   document.getElementById('audioNowPlaying').classList.remove('expanded');
 }
 
+let _playerWasExpanded = false;
+
 function hidePlayer() {
   const np = document.getElementById('audioNowPlaying');
+  _playerWasExpanded = np.classList.contains('expanded');
   np.classList.remove('active');
-  np.classList.remove('expanded');
-  // Show restore pill if audio is still playing
+  // Don't remove 'expanded' — preserve state for restore
   const pill = document.getElementById('audioRestorePill');
   if (pill && audioPlayerPath && !audioPlayer.paused) {
     pill.classList.add('active');
@@ -1113,6 +1115,7 @@ function showPlayer() {
   if (audioPlayerPath) {
     const np = document.getElementById('audioNowPlaying');
     np.classList.add('active');
+    if (_playerWasExpanded) np.classList.add('expanded');
   }
 }
 
