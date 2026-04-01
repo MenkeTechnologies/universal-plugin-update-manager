@@ -1606,3 +1606,181 @@ function updateMetaLine() {
   if (savedW) np.style.width = savedW;
   if (savedH) np.style.height = savedH;
 })();
+
+// ── Parametric EQ Visualization ──
+(function initParametricEQ() {
+  const canvas = document.getElementById('npEqCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Band definitions: { filter, color, label }
+  const bands = [
+    { id: 'low', get filter() { return _eqLow; }, color: '#05d9e8', label: 'LOW' },
+    { id: 'mid', get filter() { return _eqMid; }, color: '#d300c5', label: 'MID' },
+    { id: 'high', get filter() { return _eqHigh; }, color: '#ff2a6d', label: 'HIGH' },
+  ];
+
+  const FREQ_MIN = 20, FREQ_MAX = 20000;
+  const GAIN_MIN = -12, GAIN_MAX = 12;
+
+  function freqToX(freq, w) {
+    return (Math.log10(freq / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * w;
+  }
+  function xToFreq(x, w) {
+    return FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, x / w);
+  }
+  function gainToY(gain, h) {
+    return h / 2 - (gain / GAIN_MAX) * (h / 2 - 10);
+  }
+  function yToGain(y, h) {
+    return -((y - h / 2) / (h / 2 - 10)) * GAIN_MAX;
+  }
+
+  function draw() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    // Frequency grid: 100, 1k, 10k
+    for (const f of [100, 1000, 10000]) {
+      const x = freqToX(f, w);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.font = '9px sans-serif';
+      ctx.fillText(f >= 1000 ? (f/1000) + 'k' : f, x + 2, h - 3);
+    }
+    // 0dB line
+    const zeroY = gainToY(0, h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(w, zeroY); ctx.stroke();
+
+    // Draw frequency response curve
+    if (_eqLow && _eqMid && _eqHigh) {
+      const nPoints = 200;
+      const freqs = new Float32Array(nPoints);
+      for (let i = 0; i < nPoints; i++) {
+        freqs[i] = FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, i / (nPoints - 1));
+      }
+      const magLow = new Float32Array(nPoints), phaseLow = new Float32Array(nPoints);
+      const magMid = new Float32Array(nPoints), phaseMid = new Float32Array(nPoints);
+      const magHigh = new Float32Array(nPoints), phaseHigh = new Float32Array(nPoints);
+      _eqLow.getFrequencyResponse(freqs, magLow, phaseLow);
+      _eqMid.getFrequencyResponse(freqs, magMid, phaseMid);
+      _eqHigh.getFrequencyResponse(freqs, magHigh, phaseHigh);
+
+      // Combined response
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(5,217,232,0.6)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < nPoints; i++) {
+        const totalDb = 20 * Math.log10(magLow[i] * magMid[i] * magHigh[i]);
+        const x = freqToX(freqs[i], w);
+        const y = gainToY(Math.max(GAIN_MIN, Math.min(GAIN_MAX, totalDb)), h);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Fill under curve
+      const lastX = freqToX(freqs[nPoints - 1], w);
+      ctx.lineTo(lastX, zeroY);
+      ctx.lineTo(freqToX(freqs[0], w), zeroY);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(5,217,232,0.05)';
+      ctx.fill();
+    }
+
+    // Draw band nodes
+    for (const band of bands) {
+      if (!band.filter) continue;
+      const x = freqToX(band.filter.frequency.value, w);
+      const y = gainToY(band.filter.gain.value, h);
+
+      // Glow
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, Math.PI * 2);
+      ctx.fillStyle = band.color + '15';
+      ctx.fill();
+
+      // Node circle
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = band.color;
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = band.color;
+      ctx.font = 'bold 8px Orbitron, sans-serif';
+      ctx.fillText(band.label, x + 10, y - 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '8px sans-serif';
+      ctx.fillText(Math.round(band.filter.frequency.value) + 'Hz ' + band.filter.gain.value.toFixed(1) + 'dB', x + 10, y + 8);
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  // Start drawing when EQ section is visible
+  const observer = new MutationObserver(() => {
+    const section = document.getElementById('npEqSection');
+    if (section && section.classList.contains('visible')) {
+      ensureAudioGraph();
+      draw();
+      observer.disconnect();
+    }
+  });
+  observer.observe(document.getElementById('npEqSection') || document.body, { attributes: true, attributeFilter: ['class'] });
+
+  // Drag bands
+  let _dragBand = null;
+  canvas.addEventListener('mousedown', (e) => {
+    ensureAudioGraph();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const w = rect.width, h = rect.height;
+    for (const band of bands) {
+      if (!band.filter) continue;
+      const bx = freqToX(band.filter.frequency.value, w);
+      const by = gainToY(band.filter.gain.value, h);
+      if (Math.hypot(mx - bx, my - by) < 14) {
+        _dragBand = band;
+        e.preventDefault();
+        return;
+      }
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!_dragBand) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const w = rect.width, h = rect.height;
+    const freq = Math.max(FREQ_MIN, Math.min(FREQ_MAX, xToFreq(mx, w)));
+    const gain = Math.max(GAIN_MIN, Math.min(GAIN_MAX, yToGain(my, h)));
+    _dragBand.filter.frequency.value = freq;
+    _dragBand.filter.gain.value = Math.round(gain * 10) / 10;
+    // Sync sliders
+    if (_dragBand.id === 'low') {
+      document.getElementById('npEqLow').value = Math.round(gain);
+      document.getElementById('npEqLowVal').textContent = Math.round(gain) + ' dB';
+    } else if (_dragBand.id === 'mid') {
+      document.getElementById('npEqMid').value = Math.round(gain);
+      document.getElementById('npEqMidVal').textContent = Math.round(gain) + ' dB';
+    } else if (_dragBand.id === 'high') {
+      document.getElementById('npEqHigh').value = Math.round(gain);
+      document.getElementById('npEqHighVal').textContent = Math.round(gain) + ' dB';
+    }
+  });
+
+  document.addEventListener('mouseup', () => { _dragBand = null; });
+})();
