@@ -12,6 +12,17 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+fn normalize_macos_path(p: PathBuf) -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        let s = p.to_string_lossy();
+        if s.starts_with("/System/Volumes/Data/") {
+            return PathBuf::from(&s["/System/Volumes/Data".len()..]);
+        }
+    }
+    p
+}
+
 const PRESET_EXTENSIONS: &[&str] = &[
     ".fxp",       // VST2 preset
     ".fxb",       // VST2 bank
@@ -152,11 +163,11 @@ fn walk_dir_parallel(
     }
 
     let real_dir = match fs::canonicalize(dir) {
-        Ok(p) => p,
+        Ok(p) => normalize_macos_path(p),
         Err(_) => return,
     };
     {
-        let mut vis = visited.lock().unwrap();
+        let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
         if !vis.insert(real_dir) {
             return;
         }
