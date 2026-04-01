@@ -5,6 +5,18 @@ const XREF_FORMATS = new Set(['ALS', 'RPP', 'RPP-BAK']);
 // Cache: project path → PluginRef[]
 const _xrefCache = {};
 
+// Load persisted xref cache from prefs on startup
+(function loadXrefCache() {
+  const saved = prefs.getObject('xrefCache', null);
+  if (saved && typeof saved === 'object') {
+    Object.assign(_xrefCache, saved);
+  }
+})();
+
+function saveXrefCache() {
+  prefs.setItem('xrefCache', _xrefCache);
+}
+
 function isXrefSupported(format) {
   return XREF_FORMATS.has(format);
 }
@@ -14,6 +26,7 @@ async function getProjectPlugins(projectPath) {
   try {
     const plugins = await window.vstUpdater.extractProjectPlugins(projectPath);
     _xrefCache[projectPath] = plugins;
+    saveXrefCache();
     return plugins;
   } catch {
     return [];
@@ -150,6 +163,7 @@ async function buildXrefIndex() {
       showToast(`Indexing plugins: ${scanned}/${supported.length}...`, 1500);
     }
   }
+  saveXrefCache();
   showToast(`Plugin index built: ${supported.length} projects scanned`);
 }
 
