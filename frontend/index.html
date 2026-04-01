@@ -3082,6 +3082,8 @@
       position: fixed;
       z-index: 9999;
       width: 360px;
+      min-width: 280px;
+      max-width: 90vw;
       background: var(--bg-primary);
       border: 1px solid var(--cyan);
       border-radius: 2px;
@@ -3089,6 +3091,8 @@
       flex-direction: column;
       font-size: 11px;
       -webkit-app-region: no-drag;
+      resize: both;
+      overflow: auto;
     }
     .audio-now-playing.active { display: flex; }
 
@@ -3152,7 +3156,8 @@
     /* Expanded player — larger, stays bottom-right, with history */
     .audio-now-playing.expanded {
       width: 560px;
-      max-height: 80vh;
+      min-height: 300px;
+      max-height: 90vh;
       padding: 0;
       box-shadow: 0 0 40px var(--cyan-glow), 0 8px 40px rgba(0,0,0,0.7);
       animation: none;
