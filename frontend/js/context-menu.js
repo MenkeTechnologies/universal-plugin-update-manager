@@ -66,12 +66,19 @@ function copyToClipboard(text) {
 
 // ── Right-click handlers ──
 document.addEventListener('contextmenu', (e) => {
+  // Always suppress default browser menu on app content
+  if (e.target.closest('.app, .audio-now-playing, .header, .stats-bar, .tab-nav')) {
+    e.preventDefault();
+  }
+
+  try {
 
   // ── Plugin cards ──
   const pluginCard = e.target.closest('#pluginList .plugin-card');
   // Helper: build quick-tag menu items for a path
   function quickTagItems(path, name) {
     const items = [];
+    if (typeof getNote !== 'function' || typeof getAllTags !== 'function') return items;
     const note = getNote(path);
     const currentTags = note?.tags || [];
     const allTags = getAllTags();
@@ -88,6 +95,7 @@ document.addEventListener('contextmenu', (e) => {
   }
 
   if (pluginCard) {
+    e.preventDefault();
     const name = pluginCard.querySelector('h3')?.textContent || '';
     const path = pluginCard.dataset.path || '';
     const kvrBtn = pluginCard.querySelector('[data-action="openKvr"]');
@@ -595,4 +603,6 @@ document.addEventListener('contextmenu', (e) => {
     showContextMenu(e, items);
     return;
   }
+
+  } catch (err) { console.error('Context menu error:', err); }
 });
