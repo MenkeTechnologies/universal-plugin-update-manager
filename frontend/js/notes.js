@@ -298,6 +298,80 @@ function renderNotesTab() {
   }).join('');
 }
 
+function exportNotes() {
+  const notes = getNotes();
+  const tags = getStandaloneTags();
+  const entries = Object.entries(notes);
+  if (entries.length === 0 && tags.length === 0) { showToast('No notes or tags to export'); return; }
+  const data = { notes, standaloneTags: tags };
+  const count = entries.length + tags.length;
+  _exportCtx = {
+    title: 'Notes & Tags',
+    defaultName: exportFileName('notes', count),
+    exportFn: async (fmt, filePath) => {
+      if (fmt === 'pdf') {
+        const headers = ['Path', 'Note', 'Tags', 'Updated'];
+        const rows = entries.map(([path, n]) => [path, n.note || '', (n.tags || []).join(', '), n.updatedAt || '']);
+        if (tags.length > 0) rows.push(['[Standalone Tags]', tags.join(', '), '', '']);
+        await window.vstUpdater.exportPdf('Notes & Tags', headers, rows, filePath);
+      } else if (fmt === 'csv' || fmt === 'tsv') {
+        const sep = fmt === 'tsv' ? '\t' : ',';
+        const esc = (v) => { const s = String(v || ''); return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s; };
+        const lines = ['Path' + sep + 'Note' + sep + 'Tags' + sep + 'Updated'];
+        for (const [path, n] of entries) lines.push([path, n.note || '', (n.tags || []).join(', '), n.updatedAt || ''].map(esc).join(sep));
+        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: lines.join('\n') });
+      } else if (fmt === 'toml') {
+        await window.vstUpdater.exportToml(data, filePath);
+      } else {
+        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: JSON.stringify(data, null, 2) });
+      }
+    }
+  };
+  showExportModal('notes', 'Notes & Tags', count);
+}
+
+async function importNotes() {
+  const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+  if (!dialogApi) return;
+  const selected = await dialogApi.open({ title: 'Import Notes & Tags', multiple: false, filters: ALL_IMPORT_FILTERS });
+  if (!selected) return;
+  const filePath = typeof selected === 'string' ? selected : selected.path;
+  if (!filePath) return;
+  try {
+    let imported;
+    if (filePath.endsWith('.toml')) {
+      imported = await window.vstUpdater.importToml(filePath);
+    } else {
+      const text = await window.__TAURI__.core.invoke('plugin:fs|read_text_file', { path: filePath });
+      imported = JSON.parse(text);
+    }
+    // Merge notes
+    const existing = getNotes();
+    let added = 0;
+    if (imported.notes && typeof imported.notes === 'object') {
+      for (const [path, note] of Object.entries(imported.notes)) {
+        if (!existing[path]) { existing[path] = note; added++; }
+      }
+      prefs.setItem('itemNotes', existing);
+    }
+    // Merge standalone tags
+    if (Array.isArray(imported.standaloneTags)) {
+      const current = new Set(getStandaloneTags());
+      let tagAdded = 0;
+      for (const t of imported.standaloneTags) {
+        if (!current.has(t)) { current.add(t); tagAdded++; }
+      }
+      setStandaloneTags([...current]);
+      added += tagAdded;
+    }
+    renderNotesTab();
+    renderGlobalTagBar();
+    showToast(`Imported ${added} notes/tags`);
+  } catch (e) {
+    showToast(`Import failed: ${e.message || e}`, 4000, 'error');
+  }
+}
+
 function clearAllNotes() {
   if (!confirm('Delete all notes and tags?')) return;
   prefs.setItem('itemNotes', {});

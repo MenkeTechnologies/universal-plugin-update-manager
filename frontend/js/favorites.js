@@ -31,6 +31,68 @@ function removeFavorite(path) {
   renderFavorites();
 }
 
+function exportFavorites() {
+  const favs = getFavorites();
+  if (favs.length === 0) { showToast('No favorites to export'); return; }
+  _exportCtx = {
+    title: 'Favorites',
+    defaultName: exportFileName('favorites', favs.length),
+    exportFn: async (fmt, filePath) => {
+      if (fmt === 'pdf') {
+        const headers = ['Name', 'Type', 'Format', 'Path'];
+        const rows = favs.map(f => [f.name, f.type, f.format || f.daw || '', f.path]);
+        await window.vstUpdater.exportPdf('Favorites', headers, rows, filePath);
+      } else if (fmt === 'csv' || fmt === 'tsv') {
+        const sep = fmt === 'tsv' ? '\t' : ',';
+        const esc = (v) => { const s = String(v || ''); return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s; };
+        const lines = ['Name' + sep + 'Type' + sep + 'Format' + sep + 'Path'];
+        for (const f of favs) lines.push([f.name, f.type, f.format || f.daw || '', f.path].map(esc).join(sep));
+        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: lines.join('\n') });
+      } else if (fmt === 'toml') {
+        await window.vstUpdater.exportToml({ favorites: favs }, filePath);
+      } else {
+        await window.__TAURI__.core.invoke('plugin:fs|write_text_file', { path: filePath, contents: JSON.stringify(favs, null, 2) });
+      }
+    }
+  };
+  showExportModal('favorites', 'Favorites', favs.length);
+}
+
+async function importFavorites() {
+  const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+  if (!dialogApi) return;
+  const selected = await dialogApi.open({ title: 'Import Favorites', multiple: false, filters: ALL_IMPORT_FILTERS });
+  if (!selected) return;
+  const filePath = typeof selected === 'string' ? selected : selected.path;
+  if (!filePath) return;
+  try {
+    let imported;
+    if (filePath.endsWith('.toml')) {
+      const data = await window.vstUpdater.importToml(filePath);
+      imported = data.favorites || data;
+    } else {
+      const text = await window.__TAURI__.core.invoke('plugin:fs|read_text_file', { path: filePath });
+      imported = JSON.parse(text);
+    }
+    if (!Array.isArray(imported)) throw new Error('Expected an array');
+    const favs = getFavorites();
+    const existing = new Set(favs.map(f => f.path));
+    let added = 0;
+    for (const item of imported) {
+      if (item.path && !existing.has(item.path)) {
+        favs.push(item);
+        existing.add(item.path);
+        added++;
+      }
+    }
+    saveFavorites(favs);
+    renderFavorites();
+    showToast(`Imported ${added} favorites (${imported.length - added} duplicates skipped)`);
+  } catch (e) {
+    showToast(`Import failed: ${e.message || e}`, 4000, 'error');
+  }
+}
+
 function clearFavorites() {
   if (!confirm('Remove all favorites?')) return;
   saveFavorites([]);

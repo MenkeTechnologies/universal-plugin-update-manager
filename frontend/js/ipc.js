@@ -137,6 +137,10 @@ document.addEventListener('click', (e) => {
     case 'settingToggleTheme': settingToggleTheme(); break;
     case 'settingToggleCrt': settingToggleCrt(); break;
     case 'clearFavorites': clearFavorites(); break;
+    case 'exportFavorites': exportFavorites(); break;
+    case 'importFavorites': importFavorites(); break;
+    case 'exportNotes': exportNotes(); break;
+    case 'importNotes': importNotes(); break;
     case 'clearAllNotes': clearAllNotes(); break;
     case 'clearGlobalTag': clearGlobalTag(); break;
     case 'settingResetColumns': settingResetColumns(); break;

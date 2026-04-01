@@ -22,10 +22,10 @@ const ALL_IMPORT_FILTERS = [
 
 // ── Export Modal ──
 
-function exportFileName(label, count) {
+function exportFileName(label) {
   const now = new Date();
   const ts = now.toISOString().slice(0, 19).replace(/[T:]/g, '-');
-  return `audiohaxor-${label}-${count}items-${ts}`;
+  return `audiohaxor-${label}-${ts}`;
 }
 
 const EXPORT_FORMATS = [
