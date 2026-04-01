@@ -105,7 +105,7 @@ pub fn walk_for_audio(
     let stop2 = stop.clone();
     let found2 = found.clone();
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads((num_cpus::get() / 4).max(2))
+        .num_threads(num_cpus::get().max(2))
         .build()
         .unwrap();
     std::thread::spawn(move || {
