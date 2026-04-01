@@ -213,7 +213,7 @@ async function updateHeaderInfo() {
       if (active.length > 0) {
         badge.style.display = 'flex';
         badge.innerHTML = active.map(s =>
-          `<span class="scan-status-item"><span class="spinner" style="width:12px;height:12px;"></span> ${s}</span>`
+          `<span class="scan-status-item"><span class="spinner" style="width:18px;height:18px;"></span> ${s}</span>`
         ).join('');
       } else {
         badge.style.display = 'none';
