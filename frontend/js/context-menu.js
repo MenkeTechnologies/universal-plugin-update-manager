@@ -604,5 +604,5 @@ document.addEventListener('contextmenu', (e) => {
     return;
   }
 
-  } catch (err) { console.error('Context menu error:', err); }
+  } catch (err) { console.error('Context menu error:', err, err.stack); showToast('Context menu error: ' + (err.message || err), 4000, 'error'); }
 });
