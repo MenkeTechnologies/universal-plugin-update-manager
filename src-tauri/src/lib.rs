@@ -1764,18 +1764,6 @@ fn export_pdf(
         }
         *y -= header_row_h;
 
-        // Gray line under column headers
-        stroke_line(
-            layer_ref,
-            margin_x,
-            *y + 1.0,
-            page_w.0 - margin_x,
-            *y + 1.0,
-            0.8,
-            0.8,
-            0.8,
-            0.5,
-        );
     };
 
     // ── Render footer ──
