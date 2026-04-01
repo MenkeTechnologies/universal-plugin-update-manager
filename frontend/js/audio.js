@@ -299,19 +299,7 @@ audioPlayer.addEventListener('ended', () => {
 });
 audioPlayer.addEventListener('timeupdate', updatePlaybackTime);
 
-function formatAudioSize(bytes) {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
-}
-
-function formatTime(sec) {
-  if (!sec || !isFinite(sec)) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return m + ':' + String(s).padStart(2, '0');
-}
+// formatAudioSize and formatTime moved to utils.js
 
 function getFormatClass(format) {
   const f = format.toLowerCase();

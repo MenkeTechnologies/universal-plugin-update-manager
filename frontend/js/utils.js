@@ -359,6 +359,21 @@ async function confirmAction(message, title = 'Confirm') {
   return Promise.resolve(confirm(message));
 }
 
+// ── Shared formatters (used across multiple modules) ──
+function formatAudioSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
+
+function formatTime(sec) {
+  if (!sec || !isFinite(sec)) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+
 // ── Loading helpers ──
 function showGlobalProgress() {
   document.getElementById('globalProgress')?.classList.add('active');
