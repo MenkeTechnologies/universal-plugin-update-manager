@@ -1777,8 +1777,9 @@ function updateMetaLine() {
   canvas.addEventListener('mousedown', (e) => {
     ensureAudioGraph();
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    const w = rect.width, h = rect.height;
+    const scaleX = 800 / rect.width, scaleY = 120 / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX, my = (e.clientY - rect.top) * scaleY;
+    const w = 800, h = 120;
     for (const band of bands) {
       if (!band.filter) continue;
       const bx = freqToX(band.filter.frequency.value, w);
@@ -1794,8 +1795,9 @@ function updateMetaLine() {
   document.addEventListener('mousemove', (e) => {
     if (!_dragBand) return;
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    const w = rect.width, h = rect.height;
+    const scaleX = 800 / rect.width, scaleY = 120 / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX, my = (e.clientY - rect.top) * scaleY;
+    const w = 800, h = 120;
     const freq = Math.max(FREQ_MIN, Math.min(FREQ_MAX, xToFreq(mx, w)));
     const gain = Math.max(GAIN_MIN, Math.min(GAIN_MAX, yToGain(my, h)));
     _dragBand.filter.frequency.value = freq;
