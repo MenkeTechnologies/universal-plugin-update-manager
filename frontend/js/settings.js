@@ -765,12 +765,20 @@ function refreshSettingsUI() {
         const s = secs % 60;
         return (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + s + 's';
       };
+      const perScannerThreads = parseInt(cpus) * 2;
+      const flushInt = getSettingValue('flushInterval', '100');
+      const pluginCount = typeof allPlugins !== 'undefined' ? allPlugins.length : 0;
+      const sampleCount = typeof allAudioSamples !== 'undefined' ? allAudioSamples.length : 0;
+      const dawCount = typeof allDawProjects !== 'undefined' ? allDawProjects.length : 0;
+      const presetCount = typeof allPresets !== 'undefined' ? allPresets.length : 0;
       perfInfo.innerHTML = [
-        `<b>CPU:</b> ${cpus} cores | ${scanThreads} scan threads | rayon pool: ${stats.rayonThreads}`,
+        `<b>CPU:</b> ${cpus} cores | CPU ${(stats.cpuPercent || 0).toFixed(1)}%`,
         `<b>Memory:</b> RSS ${fmtMem(stats.rssBytes)} | Virtual ${fmtMem(stats.virtualBytes)}`,
-        `<b>Process:</b> PID ${stats.pid} | ${stats.threads} threads | ${stats.openFds} open FDs | CPU ${(stats.cpuPercent || 0).toFixed(1)}%`,
+        `<b>Process:</b> PID ${stats.pid} | ${stats.threads} threads | ${stats.openFds} open FDs`,
         `<b>Uptime:</b> ${fmtUptime(stats.uptimeSecs)}`,
-        `<b>Scan:</b> buf ${chanBuf} | batch ${batchSz} | multiplier ${threadMult}x`,
+        `<b>Thread Pools:</b> global rayon: ${stats.rayonThreads} | per-scanner: ${perScannerThreads} | multiplier: ${threadMult}x`,
+        `<b>Scanner Config:</b> channel buf: ${chanBuf} | batch size: ${batchSz} | flush: ${flushInt}ms`,
+        `<b>Scan Results:</b> ${pluginCount} plugins | ${sampleCount} samples | ${dawCount} DAW projects | ${presetCount} presets`,
       ].join('<br>');
     }).catch(() => {
       const cpus = navigator.hardwareConcurrency || '?';

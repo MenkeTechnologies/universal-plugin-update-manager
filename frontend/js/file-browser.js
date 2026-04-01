@@ -350,8 +350,8 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'End') {
     e.preventDefault();
     fileNavSelect(rows.length - 1);
-  } else if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === 'l') {
-    // Right arrow / Enter: open directory or play/open file
+  } else if (e.key === 'ArrowRight' || e.key === 'l') {
+    // Right arrow: navigate into directory or play audio
     e.preventDefault();
     if (_fileNavIdx < 0 || _fileNavIdx >= rows.length) return;
     const row = rows[_fileNavIdx];
@@ -369,6 +369,18 @@ document.addEventListener('keydown', (e) => {
       } else {
         opener_open(path);
       }
+    }
+  } else if (e.key === 'Enter') {
+    // Enter: open in Finder (dir) or open with default app (file)
+    e.preventDefault();
+    if (_fileNavIdx < 0 || _fileNavIdx >= rows.length) return;
+    const row = rows[_fileNavIdx];
+    const path = row.dataset.filePath;
+    const isDir = row.dataset.fileDir === 'true';
+    if (isDir) {
+      openFolder(path);
+    } else {
+      opener_open(path);
     }
   } else if (e.key === 'ArrowLeft' || e.key === 'h') {
     // Left arrow: go to parent directory
