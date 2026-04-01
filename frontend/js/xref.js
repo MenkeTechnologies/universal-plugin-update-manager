@@ -79,12 +79,23 @@ async function showProjectPlugins(projectPath, projectName) {
   showXrefModal(projectName, plugins);
 }
 
+// Normalize a plugin name for matching: lowercase, strip arch/platform suffixes, collapse whitespace.
+// Mirrors normalize_plugin_name() in xref.rs.
+function normalizePluginName(name) {
+  let s = name.trim();
+  const bracketRe = /\s*[\(\[](x64|x86_64|x86|arm64|aarch64|64-?bit|32-?bit|intel|apple silicon|universal|stereo|mono|vst3?|au|aax)[\)\]]$/i;
+  let prev;
+  do { prev = s; s = s.replace(bracketRe, ''); } while (s !== prev);
+  s = s.replace(/\s+(x64|x86_64|x86|64bit|32bit)$/i, '');
+  return s.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 // Reverse lookup: find all loaded DAW projects that use a given plugin name
 function findProjectsUsingPlugin(pluginName) {
-  const name = pluginName.toLowerCase();
+  const normalized = normalizePluginName(pluginName);
   const matches = [];
   for (const [path, plugins] of Object.entries(_xrefCache)) {
-    if (plugins.some(p => p.name.toLowerCase() === name)) {
+    if (plugins.some(p => (p.normalizedName || p.name.toLowerCase()) === normalized)) {
       const project = allDawProjects.find(d => d.path === path);
       if (project) matches.push(project);
     }

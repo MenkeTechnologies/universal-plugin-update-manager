@@ -11,13 +11,44 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
+use std::sync::LazyLock;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct PluginRef {
     pub name: String,
+    #[serde(rename = "normalizedName")]
+    pub normalized_name: String,
     pub manufacturer: String,
     #[serde(rename = "pluginType")]
     pub plugin_type: String, // "VST2", "VST3", "AU"
+}
+
+/// Regex to strip architecture/platform suffixes from plugin names.
+static ARCH_SUFFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\s*[\(\[](x64|x86_64|x86|arm64|aarch64|64[- ]?bit|32[- ]?bit|intel|apple silicon|universal|stereo|mono|vst3?|au|aax)[\)\]]$").unwrap()
+});
+
+/// Normalize a plugin name for matching: lowercase, strip arch suffixes,
+/// collapse whitespace, trim.
+pub fn normalize_plugin_name(name: &str) -> String {
+    let mut s = name.trim().to_string();
+    // Strip trailing arch/platform suffixes repeatedly (e.g. "Serum (x64) (VST3)")
+    loop {
+        let before = s.len();
+        s = ARCH_SUFFIX_RE.replace(&s, "").to_string();
+        if s.len() == before {
+            break;
+        }
+    }
+    // Strip standalone trailing " x64", " x86" etc. without parens
+    static BARE_SUFFIX_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)\s+(x64|x86_64|x86|64bit|32bit)$").unwrap());
+    s = BARE_SUFFIX_RE.replace(&s, "").to_string();
+    // Collapse internal whitespace and lowercase
+    s.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 /// Extract plugin references from a DAW project file.
@@ -45,10 +76,10 @@ pub fn extract_plugins(project_path: &str) -> Vec<PluginRef> {
         _ => vec![],
     };
 
-    // Deduplicate by (name, plugin_type)
+    // Deduplicate by (normalized_name, plugin_type)
     let mut seen = HashSet::new();
-    plugins.retain(|p| seen.insert((p.name.clone(), p.plugin_type.clone())));
-    plugins.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    plugins.retain(|p| seen.insert((p.normalized_name.clone(), p.plugin_type.clone())));
+    plugins.sort_by(|a, b| a.normalized_name.cmp(&b.normalized_name));
     plugins
 }
 
@@ -90,8 +121,10 @@ fn parse_ableton(path: &Path) -> Vec<PluginRef> {
             .map(|m| m.as_str().to_string())
             .unwrap_or_default();
         if !name.is_empty() {
+            let normalized_name = normalize_plugin_name(&name);
             plugins.push(PluginRef {
                 name,
+                normalized_name,
                 manufacturer: mfg,
                 plugin_type: "VST2".into(),
             });
@@ -116,8 +149,10 @@ fn parse_ableton(path: &Path) -> Vec<PluginRef> {
             .map(|m| m.as_str().to_string())
             .unwrap_or_default();
         if !name.is_empty() {
+            let normalized_name = normalize_plugin_name(&name);
             plugins.push(PluginRef {
                 name,
+                normalized_name,
                 manufacturer: mfg,
                 plugin_type: "VST3".into(),
             });
@@ -142,8 +177,10 @@ fn parse_ableton(path: &Path) -> Vec<PluginRef> {
             .map(|m| m.as_str().to_string())
             .unwrap_or_default();
         if !name.is_empty() {
+            let normalized_name = normalize_plugin_name(&name);
             plugins.push(PluginRef {
                 name,
+                normalized_name,
                 manufacturer: mfg,
                 plugin_type: "AU".into(),
             });
@@ -193,8 +230,10 @@ fn parse_reaper(path: &Path) -> Vec<PluginRef> {
             }
             .to_string();
 
+            let normalized_name = normalize_plugin_name(&name);
             plugins.push(PluginRef {
                 name,
+                normalized_name,
                 manufacturer: mfg,
                 plugin_type,
             });
@@ -551,6 +590,101 @@ mod tests {
         assert_eq!(result.len(), 1, ".rpp-bak should be treated as REAPER");
         assert_eq!(result[0].name, "Vital");
         assert_eq!(result[0].plugin_type, "VST2");
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_normalize_plugin_name_basic() {
+        assert_eq!(normalize_plugin_name("Serum"), "serum");
+        assert_eq!(normalize_plugin_name("Pro-Q 3"), "pro-q 3");
+        assert_eq!(normalize_plugin_name("  Diva  "), "diva");
+    }
+
+    #[test]
+    fn test_normalize_strips_arch_suffixes() {
+        assert_eq!(normalize_plugin_name("Serum (x64)"), "serum");
+        assert_eq!(normalize_plugin_name("Kontakt (x86_64)"), "kontakt");
+        assert_eq!(normalize_plugin_name("Massive (64-bit)"), "massive");
+        assert_eq!(normalize_plugin_name("Sylenth1 (32-bit)"), "sylenth1");
+        assert_eq!(normalize_plugin_name("Reaktor (ARM64)"), "reaktor");
+        assert_eq!(
+            normalize_plugin_name("Omnisphere (Universal)"),
+            "omnisphere"
+        );
+        assert_eq!(normalize_plugin_name("Pigments [x64]"), "pigments");
+        assert_eq!(normalize_plugin_name("Vital (Stereo)"), "vital");
+    }
+
+    #[test]
+    fn test_normalize_strips_bare_arch_suffix() {
+        assert_eq!(normalize_plugin_name("Serum x64"), "serum");
+        assert_eq!(normalize_plugin_name("Kontakt x86_64"), "kontakt");
+        assert_eq!(normalize_plugin_name("Massive x86"), "massive");
+    }
+
+    #[test]
+    fn test_normalize_strips_multiple_suffixes() {
+        assert_eq!(normalize_plugin_name("Serum (x64) (VST3)"), "serum");
+        assert_eq!(normalize_plugin_name("Kontakt (Stereo) (x64)"), "kontakt");
+    }
+
+    #[test]
+    fn test_normalize_preserves_inner_parens() {
+        assert_eq!(normalize_plugin_name("EQ (3-band)"), "eq (3-band)");
+        assert_eq!(
+            normalize_plugin_name("Compressor (Legacy)"),
+            "compressor (legacy)"
+        );
+    }
+
+    #[test]
+    fn test_normalize_collapses_whitespace() {
+        assert_eq!(normalize_plugin_name("Pro   Q  3"), "pro q 3");
+    }
+
+    #[test]
+    fn test_dedup_case_insensitive() {
+        let rpp = r#"<REAPER_PROJECT
+  <TRACK
+    <FXCHAIN
+      <VST "VST: Serum (Xfer Records)" Serum.dll 0 "" 123
+      >
+      <VST "VST: SERUM (Xfer Records)" Serum.dll 0 "" 456
+      >
+      <VST "VST: serum (Xfer)" Serum.dll 0 "" 789
+      >
+    >
+  >
+>"#;
+        let tmp = std::env::temp_dir().join("test_xref_rpp_case_dedup.rpp");
+        fs::write(&tmp, rpp).unwrap();
+
+        let result = extract_plugins(tmp.to_str().unwrap());
+        assert_eq!(result.len(), 1, "case variants should dedup to one");
+        assert_eq!(result[0].normalized_name, "serum");
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_dedup_arch_suffix_variants() {
+        let rpp = r#"<REAPER_PROJECT
+  <TRACK
+    <FXCHAIN
+      <VST "VST: Serum (Xfer)" Serum.dll 0 "" 1
+      >
+      <VST "VST: Serum x64 (Xfer)" Serum_x64.dll 0 "" 2
+      >
+    >
+  >
+>"#;
+        let tmp = std::env::temp_dir().join("test_xref_rpp_arch_dedup.rpp");
+        fs::write(&tmp, rpp).unwrap();
+
+        let result = extract_plugins(tmp.to_str().unwrap());
+        assert_eq!(result.len(), 1, "arch suffix variants should dedup");
+        assert_eq!(result[0].normalized_name, "serum");
 
         let _ = fs::remove_file(&tmp);
     }

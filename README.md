@@ -140,7 +140,7 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (217 tests)
+### Rust tests (225 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -150,15 +150,15 @@ node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 | **scanner** | 26 | Plugin type mapping, file size formatting, directory size calculation, plugin discovery, VST directory enumeration, architecture detection, edge cases |
 | **audio_scanner** | 20 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories, batching |
 | **daw_scanner** | 19 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
-| **xref** | 17 | Ableton .als gzip XML parsing (VST2/VST3/AU), REAPER .rpp plaintext parsing (VST/VST3/AU/CLAP), deduplication, sorting, error handling, empty projects, .rpp-bak support |
+| **xref** | 25 | Ableton .als gzip XML parsing (VST2/VST3/AU), REAPER .rpp plaintext parsing (VST/VST3/AU/CLAP), plugin name normalization (arch/platform suffix stripping, case folding, whitespace collapse), case-insensitive deduplication, sorting, error handling, empty projects, .rpp-bak support |
 | **bpm** | 16 | WAV/AIFF PCM reading, onset-strength autocorrelation, click track detection (90/120/140/174 BPM), silence rejection, short file handling, 8/16/24-bit decode, stereo mixdown, extra chunk handling, AIFF parsing |
 | **preset_scanner** | 6 | Preset discovery, directory walking, stop signal, format detection, batching |
 
-### JavaScript tests (256 tests)
+### JavaScript tests (265 tests)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
-| **ui** | 119 | `escapeHtml` (null, numeric, double-escaping), `escapePath` (spaces, quotes, unicode), `slugify` (camelCase, numbers, special chars), `buildKvrUrl` (spaces, parens, empty manufacturer), `formatAudioSize`, `formatTime` (0s, 60s, 3661s, negative), `getFormatClass` (all formats), `timeAgo` (seconds, minutes, hours, days), `kvrCacheKey` (special chars, unicode), `buildDirsTable`, `applyKvrCache`, `metaItem`, `buildPluginCardHtml` |
+| **ui** | 208 | `escapeHtml` (null, numeric, double-escaping), `escapePath` (spaces, quotes, unicode), `slugify` (camelCase, numbers, special chars), `buildKvrUrl` (spaces, parens, empty manufacturer), `formatAudioSize`, `formatTime` (0s, 60s, 3661s, negative), `getFormatClass` (all formats), `timeAgo` (seconds, minutes, hours, days), `kvrCacheKey` (special chars, unicode), `buildDirsTable`, `applyKvrCache`, `metaItem`, `buildPluginCardHtml`, `normalizePluginName` (case folding, arch suffix stripping, whitespace collapse, bracket/bare variants) |
 | **scanner** | 110 | Plugin type mapping (`.vst`/`.vst3`/`.component`/`.dll`/`.aaxplugin`/`.clap`), file size formatting (0B, 1B, 1023B, 1TB), DAW type mapping (all 14+ formats), audio format detection (WAV, MP3, FLAC, M4A, AAC, OPUS, REX) |
 | **update-worker** | 27 | Version parsing (pre-release, leading v, multi-part), version comparison (identical, long versions), KVR URL builder (slug generation, manufacturer suffix) |
 

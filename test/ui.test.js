@@ -1518,6 +1518,67 @@ describe('custom scheme var generation', () => {
   });
 });
 
+// ── normalizePluginName (replicated from frontend/js/xref.js) ──
+function normalizePluginName(name) {
+  let s = name.trim();
+  const bracketRe = /\s*[\(\[](x64|x86_64|x86|arm64|aarch64|64-?bit|32-?bit|intel|apple silicon|universal|stereo|mono|vst3?|au|aax)[\)\]]$/i;
+  let prev;
+  do { prev = s; s = s.replace(bracketRe, ''); } while (s !== prev);
+  s = s.replace(/\s+(x64|x86_64|x86|64bit|32bit)$/i, '');
+  return s.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+describe('normalizePluginName', () => {
+  it('lowercases names', () => {
+    assert.strictEqual(normalizePluginName('Serum'), 'serum');
+    assert.strictEqual(normalizePluginName('Pro-Q 3'), 'pro-q 3');
+  });
+
+  it('trims whitespace', () => {
+    assert.strictEqual(normalizePluginName('  Diva  '), 'diva');
+  });
+
+  it('strips bracketed arch suffixes', () => {
+    assert.strictEqual(normalizePluginName('Serum (x64)'), 'serum');
+    assert.strictEqual(normalizePluginName('Kontakt (x86_64)'), 'kontakt');
+    assert.strictEqual(normalizePluginName('Massive (64-bit)'), 'massive');
+    assert.strictEqual(normalizePluginName('Pigments [x64]'), 'pigments');
+    assert.strictEqual(normalizePluginName('Vital (Stereo)'), 'vital');
+    assert.strictEqual(normalizePluginName('Reaktor (ARM64)'), 'reaktor');
+  });
+
+  it('strips bare arch suffixes', () => {
+    assert.strictEqual(normalizePluginName('Serum x64'), 'serum');
+    assert.strictEqual(normalizePluginName('Kontakt x86_64'), 'kontakt');
+  });
+
+  it('strips multiple suffixes', () => {
+    assert.strictEqual(normalizePluginName('Serum (x64) (VST3)'), 'serum');
+    assert.strictEqual(normalizePluginName('Kontakt (Stereo) (x64)'), 'kontakt');
+  });
+
+  it('preserves non-arch parens', () => {
+    assert.strictEqual(normalizePluginName('EQ (3-band)'), 'eq (3-band)');
+    assert.strictEqual(normalizePluginName('Compressor (Legacy)'), 'compressor (legacy)');
+  });
+
+  it('collapses internal whitespace', () => {
+    assert.strictEqual(normalizePluginName('Pro   Q  3'), 'pro q 3');
+  });
+
+  it('handles identical names with different casing', () => {
+    assert.strictEqual(normalizePluginName('SERUM'), normalizePluginName('serum'));
+    assert.strictEqual(normalizePluginName('Serum'), normalizePluginName('SERUM'));
+  });
+
+  it('matches arch variants to base name', () => {
+    const base = normalizePluginName('Serum');
+    assert.strictEqual(normalizePluginName('Serum x64'), base);
+    assert.strictEqual(normalizePluginName('Serum (x64)'), base);
+    assert.strictEqual(normalizePluginName('SERUM (X64)'), base);
+  });
+});
+
 describe('page size parsing', () => {
   it('parses valid page size', () => {
     assert.strictEqual(parseInt('500', 10), 500);
