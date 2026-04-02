@@ -233,6 +233,8 @@ fn walk_dir_parallel(
                     })
                     .unwrap_or_default();
 
+                // Read audio header for duration/channels (fast — no full decode)
+                let audio_meta = get_audio_metadata(path.to_str().unwrap_or(""));
                 batch.push(AudioSample {
                     name: sample_name,
                     path: path.to_string_lossy().to_string(),
@@ -241,6 +243,10 @@ fn walk_dir_parallel(
                     size: meta.len(),
                     size_formatted: format_size(meta.len()),
                     modified,
+                    duration: audio_meta.duration,
+                    channels: audio_meta.channels,
+                    sample_rate: audio_meta.sample_rate,
+                    bits_per_sample: audio_meta.bits_per_sample,
                 });
                 found.fetch_add(1, Ordering::Relaxed);
 

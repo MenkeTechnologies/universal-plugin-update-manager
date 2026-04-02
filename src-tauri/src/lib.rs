@@ -2446,6 +2446,10 @@ mod tests {
             size: 1024,
             size_formatted: "1.0 KB".into(),
             modified: "2025-01-01".into(),
+            duration: None,
+            channels: None,
+            sample_rate: None,
+            bits_per_sample: None,
         }
     }
 

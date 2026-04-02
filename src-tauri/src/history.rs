@@ -149,6 +149,14 @@ pub struct AudioSample {
     #[serde(rename = "sizeFormatted")]
     pub size_formatted: String,
     pub modified: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channels: Option<u16>,
+    #[serde(rename = "sampleRate", skip_serializing_if = "Option::is_none")]
+    pub sample_rate: Option<u32>,
+    #[serde(rename = "bitsPerSample", skip_serializing_if = "Option::is_none")]
+    pub bits_per_sample: Option<u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1267,6 +1275,10 @@ mod tests {
             size: 1024,
             size_formatted: "1.0 KB".into(),
             modified: "2024-01-01".into(),
+            duration: None,
+            channels: None,
+            sample_rate: None,
+            bits_per_sample: None,
         }
     }
 

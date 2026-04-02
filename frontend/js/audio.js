@@ -855,10 +855,10 @@ function buildAudioRow(s) {
   const isPlaying = audioPlayerPath === s.path;
   const rowClass = isPlaying ? ' class="row-playing"' : '';
   const checked = batchSelected.has(s.path) ? ' checked' : '';
-  const bpm = typeof _bpmCache !== 'undefined' && _bpmCache[s.path] ? _bpmCache[s.path] : '';
-  const key = typeof _keyCache !== 'undefined' && _keyCache[s.path] ? _keyCache[s.path] : '';
-  const dur = s.duration ? (typeof formatTime === 'function' ? formatTime(s.duration) : s.duration.toFixed(1)) : '';
-  const ch = s.channels ? (s.channels === 1 ? 'M' : s.channels === 2 ? 'S' : s.channels + '') : '';
+  const bpm = (typeof _bpmCache !== 'undefined' && _bpmCache[s.path]) ? _bpmCache[s.path] : '';
+  const key = (typeof _keyCache !== 'undefined' && _keyCache[s.path]) ? _keyCache[s.path] : '';
+  const dur = s.duration ? (typeof formatTime === 'function' ? formatTime(s.duration) : s.duration.toFixed(1) + 's') : '';
+  const ch = s.channels ? (s.channels === 1 ? 'M' : s.channels === 2 ? 'S' : s.channels + 'ch') : (s.sampleRate ? '?' : '');
   return `<tr${rowClass} data-audio-path="${hp}" data-action="toggleMetadata" data-path="${hp}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(s.name)}">${typeof noteIndicator === 'function' ? noteIndicator(s.path) : ''}${highlightMatch(s.name, _lastAudioSearch, _lastAudioMode)}</td>
@@ -1871,8 +1871,8 @@ function updateMetaLine() {
   if (!body) return;
   initDragReorder(body, '.np-section', 'playerSectionOrder', {
     getKey: (el) => el.dataset.npSection,
+    handleSelector: '.np-history-title, .np-meta-line, .np-expand-hint, .np-eq-toggle, .now-playing-header',
     onReorder: () => {
-      // Keep EQ section panel after EQ toggle
       const eqPanel = document.getElementById('npEqSection');
       if (eqPanel) body.appendChild(eqPanel);
     },
