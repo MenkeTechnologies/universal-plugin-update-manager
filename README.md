@@ -131,9 +131,12 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Error Logging** | Global JS error handler logs uncaught errors and unhandled rejections to `app.log` in the data directory. Export/clear via Settings → Data. Includes timestamps |
 | **Sortable Analysis Columns** | BPM, Key, Duration, Channels, LUFS columns in sample table are all clickable to sort ascending/descending. All column headers have tooltips |
 | **Settings Export** | Export all preferences and keyboard shortcuts to a text file. Export app error log for debugging. Clear log button |
-| **Sample Table Columns** | 11 columns: checkbox, Name, Format, Size, BPM, Key, Duration, Channels, Modified, Path, Actions. BPM/Key from cache, Duration/Channels from scan headers. All columns draggable to reorder |
+| **Sample Table Columns** | 12 columns: checkbox, Name, Format, Size, BPM, Key, Duration, Channels, LUFS, Modified, Path, Actions. All sortable, all with tooltips. BPM/Key/LUFS from background analysis, Duration/Channels from scan headers. All columns draggable to reorder |
 | **Paginated History** | Scan detail views render in batches of 200 with scroll-to-load-more. No more UI freeze on 40,000+ sample scans |
 | **Scan Button Mobility** | Scan All/Stop/Resume button group draggable between header, stats bar, and tab nav. Dashboard button same. Position persisted |
+| **Cache File Manager** | Settings → Data shows all data directory files in a table with name, size, modified date. Click to reveal in Finder, delete individual files, Clear All Caches button. Total size shown. Auto-refreshes on Settings tab open |
+| **Background Analysis** | Sequential BPM/Key/LUFS/metadata analysis starts as samples arrive during scan. Auto-pauses on user interaction, 50ms yield, saves every 50 samples. Cached to 6 separate JSON files across reboots. Progress badge in header |
+| **Resizable Recent List** | Audio player recently played list is vertically resizable via CSS resize handle (min 80px) |
 
 ---
 
