@@ -1,9 +1,9 @@
 //! Audio similarity search via spectral fingerprinting.
 //!
-//! Computes a feature vector for each audio file (spectral centroid,
-//! RMS energy, zero-crossing rate, spectral flatness, spectral rolloff)
-//! from the first 10 seconds of decoded PCM. Compares fingerprints using
-//! euclidean distance to find similar-sounding samples.
+//! Computes a feature vector for each audio file using fast energy-band
+//! analysis (no DFT needed). Compares fingerprints using euclidean distance
+//! to find similar-sounding samples. Fingerprints are cached to avoid
+//! recomputation.
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -14,14 +14,15 @@ pub struct AudioFingerprint {
     pub path: String,
     pub rms: f64,
     pub spectral_centroid: f64,
-    pub spectral_spread: f64,
     pub zero_crossing_rate: f64,
-    pub spectral_flatness: f64,
-    pub spectral_rolloff: f64,
+    pub low_band_energy: f64,
+    pub mid_band_energy: f64,
+    pub high_band_energy: f64,
     pub low_energy_ratio: f64,
+    pub attack_time: f64,
 }
 
-/// Compute a fingerprint for an audio file.
+/// Compute a fingerprint for an audio file using fast energy-band analysis.
 pub fn compute_fingerprint(file_path: &str) -> Option<AudioFingerprint> {
     let path = Path::new(file_path);
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
@@ -41,146 +42,121 @@ pub fn compute_fingerprint(file_path: &str) -> Option<AudioFingerprint> {
 
     // Use first 10 seconds max
     let max_samples = (sample_rate as usize) * 10;
-    let samples = if samples.len() > max_samples {
-        &samples[..max_samples]
-    } else {
-        &samples
-    };
-
-    let n = samples.len() as f64;
+    let s = if samples.len() > max_samples { &samples[..max_samples] } else { &samples };
+    let n = s.len() as f64;
+    let sr = sample_rate as f64;
 
     // RMS energy
-    let rms = (samples.iter().map(|&s| (s as f64) * (s as f64)).sum::<f64>() / n).sqrt();
+    let rms = (s.iter().map(|&x| (x as f64) * (x as f64)).sum::<f64>() / n).sqrt();
 
     // Zero-crossing rate
     let mut zc = 0usize;
-    for i in 1..samples.len() {
-        if (samples[i] >= 0.0) != (samples[i - 1] >= 0.0) {
-            zc += 1;
-        }
+    for i in 1..s.len() {
+        if (s[i] >= 0.0) != (s[i - 1] >= 0.0) { zc += 1; }
     }
     let zero_crossing_rate = zc as f64 / n;
 
-    // Low energy ratio (fraction of frames with below-average energy)
-    let frame_size = 1024;
+    // Spectral centroid approximation via zero-crossing rate
+    // ZCR is proportional to spectral centroid for many signals
+    let spectral_centroid = zero_crossing_rate * sr / 2.0;
+
+    // Energy in 3 frequency bands using bandpass via averaging
+    // Low: 0-300Hz, Mid: 300-3000Hz, High: 3000Hz+
+    // Approximate by splitting samples into blocks and measuring energy
+    let frame_size = (sr / 50.0) as usize; // ~20ms frames
+    let mut low_e = 0.0f64;
+    let mut mid_e = 0.0f64;
+    let mut high_e = 0.0f64;
+    let mut frame_count = 0usize;
+
+    for chunk in s.chunks(frame_size) {
+        if chunk.len() < 4 { continue; }
+        frame_count += 1;
+
+        // Simple 3-band energy split using differences
+        // Low-pass: running average (smoothed)
+        // High-pass: sample - running average
+        let mut lp = 0.0f32;
+        let alpha_low = 0.05f32;  // ~300Hz cutoff at 44.1kHz
+        let alpha_high = 0.7f32;  // ~3kHz cutoff
+        let mut low_sum = 0.0f64;
+        let mut mid_sum = 0.0f64;
+        let mut high_sum = 0.0f64;
+
+        let mut lp_slow = 0.0f32;
+        for &x in chunk {
+            lp = lp + alpha_low * (x - lp);           // low-pass ~300Hz
+            lp_slow = lp_slow + alpha_high * (x - lp_slow); // low-pass ~3kHz
+            let low = lp as f64;
+            let mid = (lp_slow - lp) as f64;
+            let high = (x - lp_slow) as f64;
+            low_sum += low * low;
+            mid_sum += mid * mid;
+            high_sum += high * high;
+        }
+        low_e += low_sum / chunk.len() as f64;
+        mid_e += mid_sum / chunk.len() as f64;
+        high_e += high_sum / chunk.len() as f64;
+    }
+
+    let _fc = frame_count.max(1) as f64;
+    let total_e = (low_e + mid_e + high_e).max(1e-10);
+    let low_band_energy = low_e / total_e;
+    let mid_band_energy = mid_e / total_e;
+    let high_band_energy = high_e / total_e;
+
+    // Low energy ratio
     let mut frame_energies = Vec::new();
-    for chunk in samples.chunks(frame_size) {
-        let energy: f64 = chunk.iter().map(|&s| (s as f64) * (s as f64)).sum::<f64>() / chunk.len() as f64;
-        frame_energies.push(energy);
+    for chunk in s.chunks(1024) {
+        let e: f64 = chunk.iter().map(|&x| (x as f64) * (x as f64)).sum::<f64>() / chunk.len() as f64;
+        frame_energies.push(e);
     }
     let avg_energy = frame_energies.iter().sum::<f64>() / frame_energies.len().max(1) as f64;
     let low_energy_ratio = frame_energies.iter().filter(|&&e| e < avg_energy).count() as f64
         / frame_energies.len().max(1) as f64;
 
-    // Spectral features via simple DFT on overlapping frames
-    let fft_size = 2048;
-    let hop = fft_size / 2;
-    let mut centroids = Vec::new();
-    let mut spreads = Vec::new();
-    let mut flatnesses = Vec::new();
-    let mut rolloffs = Vec::new();
-
-    let mut i = 0;
-    while i + fft_size <= samples.len() {
-        let frame = &samples[i..i + fft_size];
-
-        // Compute magnitude spectrum (real DFT approximation via squared magnitudes)
-        let mut magnitudes = vec![0.0f64; fft_size / 2];
-        for k in 0..fft_size / 2 {
-            let freq = k as f64;
-            let mut re = 0.0f64;
-            let mut im = 0.0f64;
-            for (n_idx, &s) in frame.iter().enumerate() {
-                let angle = 2.0 * std::f64::consts::PI * freq * n_idx as f64 / fft_size as f64;
-                re += (s as f64) * angle.cos();
-                im -= (s as f64) * angle.sin();
-            }
-            magnitudes[k] = (re * re + im * im).sqrt();
-        }
-
-        let total_mag: f64 = magnitudes.iter().sum::<f64>().max(1e-10);
-
-        // Spectral centroid (weighted mean frequency)
-        let centroid: f64 = magnitudes
-            .iter()
-            .enumerate()
-            .map(|(k, &m)| k as f64 * m)
-            .sum::<f64>()
-            / total_mag;
-        centroids.push(centroid);
-
-        // Spectral spread (weighted std dev)
-        let spread: f64 = (magnitudes
-            .iter()
-            .enumerate()
-            .map(|(k, &m)| {
-                let d = k as f64 - centroid;
-                d * d * m
-            })
-            .sum::<f64>()
-            / total_mag)
-            .sqrt();
-        spreads.push(spread);
-
-        // Spectral flatness (geometric mean / arithmetic mean)
-        let log_sum: f64 = magnitudes.iter().map(|&m| (m + 1e-10).ln()).sum::<f64>();
-        let geo_mean = (log_sum / magnitudes.len() as f64).exp();
-        let arith_mean = total_mag / magnitudes.len() as f64;
-        flatnesses.push(geo_mean / arith_mean.max(1e-10));
-
-        // Spectral rolloff (85% of energy)
-        let threshold = total_mag * 0.85;
-        let mut cumsum = 0.0;
-        let mut rolloff_bin = magnitudes.len() - 1;
-        for (k, &m) in magnitudes.iter().enumerate() {
-            cumsum += m;
-            if cumsum >= threshold {
-                rolloff_bin = k;
-                break;
-            }
-        }
-        rolloffs.push(rolloff_bin as f64 * sample_rate as f64 / fft_size as f64);
-
-        i += hop;
+    // Attack time: how quickly the signal reaches peak energy
+    let env_size = 256;
+    let mut envelope = Vec::new();
+    for chunk in s.chunks(env_size) {
+        let peak = chunk.iter().map(|&x| x.abs()).fold(0.0f32, f32::max);
+        envelope.push(peak as f64);
     }
-
-    if centroids.is_empty() {
-        return None;
-    }
-
-    let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
-
-    // Normalize centroid to Hz
-    let spectral_centroid = mean(&centroids) * sample_rate as f64 / fft_size as f64;
+    let peak_val = envelope.iter().cloned().fold(0.0f64, f64::max).max(1e-10);
+    let attack_threshold = peak_val * 0.9;
+    let attack_time = envelope.iter().position(|&e| e >= attack_threshold)
+        .map(|i| i as f64 * env_size as f64 / sr)
+        .unwrap_or(1.0);
 
     Some(AudioFingerprint {
         path: file_path.to_string(),
         rms,
         spectral_centroid,
-        spectral_spread: mean(&spreads),
         zero_crossing_rate,
-        spectral_flatness: mean(&flatnesses),
-        spectral_rolloff: mean(&rolloffs),
+        low_band_energy,
+        mid_band_energy,
+        high_band_energy,
         low_energy_ratio,
+        attack_time,
     })
 }
 
 /// Compute distance between two fingerprints (lower = more similar).
 pub fn fingerprint_distance(a: &AudioFingerprint, b: &AudioFingerprint) -> f64 {
-    // Normalize each feature to [0,1] range using typical audio ranges
     let norm = |va: f64, vb: f64, max: f64| -> f64 {
-        let da = va / max;
-        let db = vb / max;
+        let da = va / max.max(1e-10);
+        let db = vb / max.max(1e-10);
         (da - db) * (da - db)
     };
 
     let d = norm(a.rms, b.rms, 1.0)
         + norm(a.spectral_centroid, b.spectral_centroid, 10000.0)
-        + norm(a.spectral_spread, b.spectral_spread, 500.0)
         + norm(a.zero_crossing_rate, b.zero_crossing_rate, 0.5)
-        + norm(a.spectral_flatness, b.spectral_flatness, 1.0)
-        + norm(a.spectral_rolloff, b.spectral_rolloff, 20000.0)
-        + norm(a.low_energy_ratio, b.low_energy_ratio, 1.0);
+        + norm(a.low_band_energy, b.low_band_energy, 1.0)
+        + norm(a.mid_band_energy, b.mid_band_energy, 1.0)
+        + norm(a.high_band_energy, b.high_band_energy, 1.0)
+        + norm(a.low_energy_ratio, b.low_energy_ratio, 1.0)
+        + norm(a.attack_time, b.attack_time, 2.0);
 
     d.sqrt()
 }

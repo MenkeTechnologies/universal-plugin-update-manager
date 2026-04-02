@@ -934,21 +934,62 @@ async fn compute_fingerprint(file_path: String) -> Result<Option<similarity::Aud
 
 #[tauri::command]
 async fn find_similar_samples(
+    app: AppHandle,
     file_path: String,
     candidate_paths: Vec<String>,
     max_results: usize,
 ) -> Result<Vec<serde_json::Value>, String> {
     Ok(tokio::task::spawn_blocking(move || {
-        let reference = match similarity::compute_fingerprint(&file_path) {
-            Some(fp) => fp,
-            None => return vec![],
+        // Load cached fingerprints
+        let cache_file = history::get_data_dir().join("fingerprint-cache.json");
+        let mut cache: std::collections::HashMap<String, similarity::AudioFingerprint> =
+            std::fs::read_to_string(&cache_file)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+
+        // Compute reference fingerprint (use cache if available)
+        let reference = if let Some(fp) = cache.get(&file_path) {
+            fp.clone()
+        } else {
+            match similarity::compute_fingerprint(&file_path) {
+                Some(fp) => { cache.insert(file_path.clone(), fp.clone()); fp }
+                None => return vec![],
+            }
         };
 
-        // Compute fingerprints for all candidates in parallel
+        // Compute missing fingerprints in parallel
         use rayon::prelude::*;
+        let uncached: Vec<&String> = candidate_paths.iter()
+            .filter(|p| !cache.contains_key(p.as_str()))
+            .collect();
+
+        if !uncached.is_empty() {
+            // Emit progress
+            let total = uncached.len();
+            let _ = app.emit("similarity-progress", serde_json::json!({
+                "phase": "computing", "total": total, "cached": candidate_paths.len() - total
+            }));
+
+            let new_fps: Vec<similarity::AudioFingerprint> = uncached
+                .par_iter()
+                .filter_map(|p| similarity::compute_fingerprint(p))
+                .collect();
+
+            for fp in new_fps {
+                cache.insert(fp.path.clone(), fp);
+            }
+
+            // Save cache to disk
+            if let Ok(json) = serde_json::to_string(&cache) {
+                let _ = std::fs::write(&cache_file, json);
+            }
+        }
+
+        // Collect cached fingerprints for candidates
         let candidates: Vec<similarity::AudioFingerprint> = candidate_paths
-            .par_iter()
-            .filter_map(|p| similarity::compute_fingerprint(p))
+            .iter()
+            .filter_map(|p| cache.get(p).cloned())
             .collect();
 
         similarity::find_similar(&reference, &candidates, max_results)
