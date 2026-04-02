@@ -3843,6 +3843,16 @@
       color: var(--text-muted);
       margin-bottom: 6px;
     }
+    /* Walker status tab */
+    .walker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; height: 100%; }
+    .walker-tile { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; display: flex; flex-direction: column; overflow: hidden; }
+    .walker-tile-header { font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    .walker-tile-status { font-size: 10px; color: var(--text-dim); padding: 4px 14px; border-bottom: 1px solid rgba(26,26,62,0.3); }
+    .walker-tile-body { flex: 1; overflow-y: auto; padding: 6px 10px; font-family: 'Share Tech Mono', monospace; font-size: 10px; line-height: 1.6; }
+    .walker-dir { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 0; border-bottom: 1px solid rgba(26,26,62,0.15); }
+    .walker-dir-active { color: var(--text); animation: walkerPulse 1s ease-in-out infinite alternate; }
+    @keyframes walkerPulse { from { opacity: 0.7; } to { opacity: 1; } }
+
     .scan-btns-group { display: inline-flex; gap: 6px; align-items: center; cursor: grab; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; transition: border-color 0.15s; }
     .scan-btns-group:hover { border-color: rgba(5,217,232,0.2); }
 
@@ -4737,6 +4747,7 @@
       <button class="tab-btn" data-action="switchTab" data-tab="tags" title="Tag manager (Cmd+7)">&#127991; Tags</button>
       <button class="tab-btn" data-action="switchTab" data-tab="files" title="File browser (Cmd+8)">&#128193; Files</button>
       <button class="tab-btn" data-action="switchTab" data-tab="history" title="Scan history and diffs (Cmd+9)">History</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="walkers" title="Live directory walker status">&#128270; Walkers</button>
       <button class="tab-btn" data-action="switchTab" data-tab="settings" title="App settings (Cmd+0)">&#9881; Settings</button>
     </div>
 
@@ -5068,6 +5079,31 @@
             <h2>Scan for Presets</h2>
             <p>Click <strong>"Scan Presets"</strong> to discover VST/AU/DAW presets on your system.</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tabWalkers">
+      <div class="walker-grid" id="walkerGrid">
+        <div class="walker-tile" id="walkerTilePlugin">
+          <div class="walker-tile-header" style="color:var(--cyan);">&#9889; Plugin Walker</div>
+          <div class="walker-tile-status">idle</div>
+          <div class="walker-tile-body" id="walkerPluginBody"></div>
+        </div>
+        <div class="walker-tile" id="walkerTileAudio">
+          <div class="walker-tile-header" style="color:var(--yellow);">&#127925; Audio Walker</div>
+          <div class="walker-tile-status">idle</div>
+          <div class="walker-tile-body" id="walkerAudioBody"></div>
+        </div>
+        <div class="walker-tile" id="walkerTileDaw">
+          <div class="walker-tile-header" style="color:var(--magenta);">&#127911; DAW Walker</div>
+          <div class="walker-tile-status">idle</div>
+          <div class="walker-tile-body" id="walkerDawBody"></div>
+        </div>
+        <div class="walker-tile" id="walkerTilePreset">
+          <div class="walker-tile-header" style="color:var(--orange);">&#127926; Preset Walker</div>
+          <div class="walker-tile-status">idle</div>
+          <div class="walker-tile-body" id="walkerPresetBody"></div>
         </div>
       </div>
     </div>
@@ -5506,6 +5542,15 @@
           <h2 class="settings-heading">&#9776; Data</h2>
           <div class="settings-row">
             <div class="settings-label">
+              <span class="settings-title">Reset All UI Layout</span>
+              <span class="settings-desc">Reset ALL sizing, positioning, ordering, and layout to factory defaults. Clears tab order, column order/widths, section order, modal positions, player dock, stat bar order, toolbar order, dashboard card order, and all drag-reorder prefs. Requires reload.</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-stop btn-settings-action" data-action="settingResetAllUI" title="Reset every UI layout preference to factory defaults">&#9888; Reset All UI</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
               <span class="settings-title">Reset Tab Order</span>
               <span class="settings-desc">Restore the default tab order (drag tabs to rearrange)</span>
             </div>
@@ -5599,6 +5644,7 @@
   <script src="js/utils.js?v=153"></script>
   <script src="js/drag-reorder.js?v=153"></script>
   <script src="js/modal-drag.js?v=153"></script>
+  <script src="js/columns.js?v=153"></script>
   <script src="js/notes.js?v=153"></script>
   <script src="js/favorites.js?v=153"></script>
   <script src="js/export.js?v=153"></script>
@@ -5620,11 +5666,11 @@
   <script src="js/dep-graph.js?v=153"></script>
   <script src="js/smart-playlists.js?v=153"></script>
   <script src="js/heatmap-dashboard.js?v=153"></script>
+  <script src="js/walker-status.js?v=153"></script>
   <script src="js/context-menu.js?v=153"></script>
   <script src="js/help-overlay.js?v=153"></script>
   <script src="js/shortcuts.js?v=153"></script>
   <script src="js/keyboard-nav.js?v=153"></script>
-  <script src="js/columns.js?v=153"></script>
   <script src="js/app.js?v=153"></script>
 </body>
 </html>

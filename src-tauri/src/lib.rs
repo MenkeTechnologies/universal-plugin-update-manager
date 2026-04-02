@@ -40,6 +40,7 @@ use scanner::PluginInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
 // ── Export / Import types ──
@@ -95,6 +96,14 @@ struct PresetScanState {
     stop_scan: AtomicBool,
 }
 
+/// Tracks active directory paths being walked by each scanner for live status display.
+struct WalkerStatus {
+    plugin_dirs: Arc<std::sync::Mutex<Vec<String>>>,
+    audio_dirs: Arc<std::sync::Mutex<Vec<String>>>,
+    daw_dirs: Arc<std::sync::Mutex<Vec<String>>>,
+    preset_dirs: Arc<std::sync::Mutex<Vec<String>>>,
+}
+
 // ── Plugin update types ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,6 +130,21 @@ struct UpdatedPlugin {
 #[tauri::command]
 fn get_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
+}
+
+#[tauri::command]
+fn get_walker_status(app: AppHandle) -> serde_json::Value {
+    let ws = app.state::<WalkerStatus>();
+    let plugin = ws.plugin_dirs.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let audio = ws.audio_dirs.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let daw = ws.daw_dirs.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let preset = ws.preset_dirs.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    serde_json::json!({
+        "plugin": plugin,
+        "audio": audio,
+        "daw": daw,
+        "preset": preset,
+    })
 }
 
 #[tauri::command]
@@ -201,6 +225,7 @@ async fn scan_plugins(
         // Share stop flag directly with rayon workers for immediate cancellation
         let stop_flag = std::sync::Arc::new(AtomicBool::new(false));
         let stop_flag2 = stop_flag.clone();
+        let plugin_dirs = Arc::clone(&app_handle.state::<WalkerStatus>().plugin_dirs);
 
         // Dedicated thread pool so plugin scanning doesn't starve other scanners
         let pool = rayon::ThreadPoolBuilder::new()
@@ -216,6 +241,12 @@ async fn scan_plugins(
                 unique_paths.par_iter().for_each(|p| {
                     if stop_flag2.load(Ordering::Relaxed) {
                         return;
+                    }
+                    // Track plugin path
+                    {
+                        let mut ad = plugin_dirs.lock().unwrap_or_else(|e| e.into_inner());
+                        ad.push(p.to_string_lossy().to_string());
+                        if ad.len() > 30 { let excess = ad.len() - 30; ad.drain(..excess); }
                     }
                     if let Some(info) = scanner::get_plugin_info(p) {
                         if stop_flag2.load(Ordering::Relaxed) {
@@ -288,6 +319,7 @@ async fn scan_plugins(
     .await;
 
     state.scanning.store(false, Ordering::SeqCst);
+    { let ws = app.state::<WalkerStatus>(); let mut ad = ws.plugin_dirs.lock().unwrap_or_else(|e| e.into_inner()); ad.clear(); }
     result.map_err(|e| e.to_string())
 }
 
@@ -550,7 +582,11 @@ async fn scan_audio_samples(
             },
             &|| audio_state.stop_scan.load(Ordering::SeqCst),
             exclude_set,
+            Some(Arc::clone(&app_handle.state::<WalkerStatus>().audio_dirs)),
         );
+
+        // Clear walker status
+        { let ws = app_handle.state::<WalkerStatus>(); let mut ad = ws.audio_dirs.lock().unwrap_or_else(|e| e.into_inner()); ad.clear(); }
 
         let root_strs: Vec<String> = roots
             .iter()
@@ -681,8 +717,10 @@ async fn scan_daw_projects(
                     .map(|s| s == "on")
                     .unwrap_or(false)
             },
+            Some(Arc::clone(&app_handle.state::<WalkerStatus>().daw_dirs)),
         );
 
+        { let ws = app_handle.state::<WalkerStatus>(); let mut ad = ws.daw_dirs.lock().unwrap_or_else(|e| e.into_inner()); ad.clear(); }
         let root_strs: Vec<String> = roots
             .iter()
             .map(|r| r.to_string_lossy().to_string())
@@ -799,8 +837,10 @@ async fn scan_presets(
             },
             &|| preset_state.stop_scan.load(Ordering::SeqCst),
             exclude_set,
+            Some(Arc::clone(&app_handle.state::<WalkerStatus>().preset_dirs)),
         );
 
+        { let ws = app_handle.state::<WalkerStatus>(); let mut ad = ws.preset_dirs.lock().unwrap_or_else(|e| e.into_inner()); ad.clear(); }
         let was_stopped = preset_state.stop_scan.load(Ordering::Relaxed);
         let root_strs: Vec<String> = roots
             .iter()
@@ -2937,8 +2977,15 @@ pub fn run() {
             scanning: AtomicBool::new(false),
             stop_scan: AtomicBool::new(false),
         })
+        .manage(WalkerStatus {
+            plugin_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            audio_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            daw_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            preset_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
+        })
         .invoke_handler(tauri::generate_handler![
             get_version,
+            get_walker_status,
             scan_plugins,
             stop_scan,
             check_updates,

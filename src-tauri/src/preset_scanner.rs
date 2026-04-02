@@ -95,10 +95,12 @@ pub fn walk_for_presets(
     on_batch: &mut dyn FnMut(&[PresetFile], usize),
     should_stop: &(dyn Fn() -> bool + Sync),
     exclude: Option<HashSet<String>>,
+    active_dirs: Option<Arc<Mutex<Vec<String>>>>,
 ) {
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
+    let active = active_dirs.unwrap_or_else(|| Arc::new(Mutex::new(Vec::new())));
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<PresetFile>>(256);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
@@ -117,7 +119,7 @@ pub fn walk_for_presets(
                     return;
                 }
                 walk_dir_parallel(
-                    root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude,
+                    root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude, &active,
                 );
             });
         });
@@ -152,6 +154,7 @@ fn walk_dir_parallel(
     batch_size: usize,
     stop: &Arc<AtomicBool>,
     exclude: &Arc<HashSet<String>>,
+    active_dirs: &Arc<Mutex<Vec<String>>>,
 ) {
     if depth > 30 || stop.load(Ordering::Relaxed) {
         return;
@@ -166,6 +169,13 @@ fn walk_dir_parallel(
         if !vis.insert(real_dir) {
             return;
         }
+    }
+
+    let dir_str = dir.to_string_lossy().to_string();
+    {
+        let mut ad = active_dirs.lock().unwrap_or_else(|e| e.into_inner());
+        ad.push(dir_str.clone());
+        if ad.len() > 30 { let excess = ad.len() - 30; ad.drain(..excess); }
     }
 
     let entries: Vec<_> = match fs::read_dir(dir) {
@@ -248,6 +258,7 @@ fn walk_dir_parallel(
             batch_size,
             stop,
             exclude,
+            active_dirs,
         );
     });
 }
@@ -310,6 +321,7 @@ mod tests {
             },
             &|| false,
             None,
+        None,
         );
         assert!(found.is_empty());
         let _ = fs::remove_dir_all(&tmp);
@@ -333,6 +345,7 @@ mod tests {
             },
             &|| false,
             None,
+        None,
         );
         assert_eq!(found.len(), 3);
         let formats: Vec<&str> = found.iter().map(|p| p.format.as_str()).collect();
@@ -364,6 +377,7 @@ mod tests {
             },
             &|| stop_after.load(std::sync::atomic::Ordering::Relaxed),
             None,
+        None,
         );
         // Should have stopped — may have found some but scan should terminate
         let _ = fs::remove_dir_all(&tmp);
@@ -390,6 +404,7 @@ mod tests {
             },
             &|| false,
             Some(exclude),
+            None,
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("keep.fxp"));
@@ -413,6 +428,7 @@ mod tests {
             &mut |batch, _count| found.extend_from_slice(batch),
             &|| false,
             None,
+            None,
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("normal"));
@@ -434,6 +450,7 @@ mod tests {
                 &[tmp.join("real"), tmp.join("link")],
                 &mut |batch, _count| found.extend_from_slice(batch),
                 &|| false,
+                None,
                 None,
             );
             assert_eq!(found.len(), 1, "Symlinked duplicate should be deduped");
@@ -458,6 +475,7 @@ mod tests {
                 total = count;
             },
             &|| false,
+            None,
             None,
         );
         assert_eq!(total, 5);

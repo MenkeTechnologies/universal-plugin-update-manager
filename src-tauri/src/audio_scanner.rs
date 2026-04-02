@@ -100,10 +100,12 @@ pub fn walk_for_audio(
     on_batch: &mut dyn FnMut(&[AudioSample], usize),
     should_stop: &(dyn Fn() -> bool + Sync),
     exclude: Option<HashSet<String>>,
+    active_dirs: Option<Arc<Mutex<Vec<String>>>>,
 ) {
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
+    let active = active_dirs.unwrap_or_else(|| Arc::new(Mutex::new(Vec::new())));
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<AudioSample>>(256);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
@@ -123,7 +125,7 @@ pub fn walk_for_audio(
                     return;
                 }
                 walk_dir_parallel(
-                    root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude,
+                    root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude, &active,
                 );
             });
         });
@@ -159,6 +161,7 @@ fn walk_dir_parallel(
     batch_size: usize,
     stop: &Arc<AtomicBool>,
     exclude: &Arc<HashSet<String>>,
+    active_dirs: &Arc<Mutex<Vec<String>>>,
 ) {
     if depth > 30 || stop.load(Ordering::Relaxed) {
         return;
@@ -174,6 +177,14 @@ fn walk_dir_parallel(
         if !vis.insert(real_dir) {
             return;
         }
+    }
+
+    // Track active directory (rolling window of last 30 visited)
+    let dir_str = dir.to_string_lossy().to_string();
+    {
+        let mut ad = active_dirs.lock().unwrap_or_else(|e| e.into_inner());
+        ad.push(dir_str.clone());
+        if ad.len() > 30 { let excess = ad.len() - 30; ad.drain(..excess); }
     }
 
     let entries: Vec<_> = match fs::read_dir(dir) {
@@ -272,8 +283,11 @@ fn walk_dir_parallel(
             batch_size,
             stop,
             exclude,
+            active_dirs,
         );
     });
+
+    // Remove dir from active list
 }
 
 // Audio metadata extraction
@@ -377,10 +391,55 @@ pub fn get_audio_metadata(file_path: &str) -> AudioMetadata {
         ".wav" => parse_wav(path, &mut result),
         ".aiff" | ".aif" => parse_aiff(path, &mut result),
         ".flac" => parse_flac(path, &mut result),
+        ".mp3" | ".ogg" | ".m4a" | ".aac" | ".opus" | ".wma" => probe_with_symphonia(path, &mut result),
         _ => {}
     }
 
     result
+}
+
+/// Fast metadata probe using symphonia — reads codec params without decoding.
+fn probe_with_symphonia(path: &Path, meta: &mut AudioMetadata) {
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+
+    let file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return,
+    };
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    let mut hint = Hint::new();
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
+
+    let probed = match symphonia::default::get_probe()
+        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+    {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+
+    if let Some(track) = probed.format.default_track() {
+        let params = &track.codec_params;
+        if let Some(sr) = params.sample_rate {
+            meta.sample_rate = Some(sr);
+        }
+        if let Some(ch) = params.channels {
+            meta.channels = Some(ch.count() as u16);
+        }
+        if let Some(bps) = params.bits_per_sample {
+            meta.bits_per_sample = Some(bps as u16);
+        }
+        // Duration from time base + n_frames
+        if let (Some(tb), Some(n_frames)) = (params.time_base, params.n_frames) {
+            let time = tb.calc_time(n_frames);
+            meta.duration = Some(time.seconds as f64 + time.frac);
+        }
+    }
 }
 
 fn parse_wav(path: &Path, meta: &mut AudioMetadata) {
@@ -555,6 +614,7 @@ mod tests {
             },
             &|| false,
             None,
+            None,
         );
         assert_eq!(total, 0);
         let _ = fs::remove_dir_all(&tmp);
@@ -576,6 +636,7 @@ mod tests {
             },
             &|| false,
             None,
+            None,
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("test.wav"));
@@ -596,6 +657,7 @@ mod tests {
                 found.extend_from_slice(batch);
             },
             &|| true,
+            None,
             None,
         );
         assert_eq!(found.len(), 0);
@@ -619,6 +681,7 @@ mod tests {
             },
             &|| false,
             None,
+            None,
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("visible"));
@@ -641,6 +704,7 @@ mod tests {
                 found.extend_from_slice(batch);
             },
             &|| false,
+            None,
             None,
         );
         assert_eq!(found.len(), 1);
@@ -771,6 +835,7 @@ mod tests {
             },
             &|| false,
             None,
+            None,
         );
         assert!(
             !found.iter().any(|s| s.name == "deep"),
@@ -796,6 +861,7 @@ mod tests {
                 batch_call_count += 1;
             },
             &|| false,
+            None,
             None,
         );
         assert!(
@@ -827,6 +893,7 @@ mod tests {
                     found.extend_from_slice(batch);
                 },
                 &|| false,
+            None,
                 None,
             );
             let wav_count = found.iter().filter(|s| s.name == "test").count();

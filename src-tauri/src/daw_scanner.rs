@@ -221,10 +221,12 @@ pub fn walk_for_daw(
     should_stop: &(dyn Fn() -> bool + Sync),
     exclude: Option<HashSet<String>>,
     include_backups: bool,
+    active_dirs: Option<Arc<Mutex<Vec<String>>>>,
 ) {
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
+    let active = active_dirs.unwrap_or_else(|| Arc::new(Mutex::new(Vec::new())));
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(256);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
@@ -252,6 +254,7 @@ pub fn walk_for_daw(
                     &stop2,
                     &exclude,
                     include_backups,
+                    &active,
                 );
             });
         });
@@ -287,6 +290,7 @@ fn walk_dir_parallel(
     stop: &Arc<AtomicBool>,
     exclude: &Arc<HashSet<String>>,
     include_backups: bool,
+    active_dirs: &Arc<Mutex<Vec<String>>>,
 ) {
     if depth > 30 || stop.load(Ordering::Relaxed) {
         return;
@@ -301,6 +305,13 @@ fn walk_dir_parallel(
         if !vis.insert(real_dir) {
             return;
         }
+    }
+
+    let dir_str = dir.to_string_lossy().to_string();
+    {
+        let mut ad = active_dirs.lock().unwrap_or_else(|e| e.into_inner());
+        ad.push(dir_str.clone());
+        if ad.len() > 30 { let excess = ad.len() - 30; ad.drain(..excess); }
     }
 
     let entries: Vec<_> = match fs::read_dir(dir) {
@@ -414,6 +425,7 @@ fn walk_dir_parallel(
             stop,
             exclude,
             include_backups,
+            active_dirs,
         );
     });
 }
@@ -512,6 +524,7 @@ mod tests {
             &|| false,
             None,
             false,
+            None,
         );
         assert_eq!(total, 0);
         let _ = fs::remove_dir_all(&tmp);
@@ -534,6 +547,7 @@ mod tests {
             &|| false,
             None,
             false,
+            None,
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("mysong.als"));
@@ -560,6 +574,7 @@ mod tests {
             &|| false,
             None,
             false,
+            None,
         );
         assert_eq!(found.len(), 3);
         let formats: Vec<&str> = found.iter().map(|d| d.format.as_str()).collect();
@@ -585,6 +600,7 @@ mod tests {
             &|| true,
             None,
             false,
+            None,
         );
         assert_eq!(found.len(), 0);
         let _ = fs::remove_dir_all(&tmp);
@@ -608,6 +624,7 @@ mod tests {
             &|| false,
             None,
             false,
+            None,
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("visible"));
@@ -638,6 +655,7 @@ mod tests {
             &|| false,
             None,
             false,
+            None,
         );
         assert_eq!(found.len(), 2);
         let formats: Vec<&str> = found.iter().map(|d| d.format.as_str()).collect();
@@ -665,6 +683,7 @@ mod tests {
             &|| false,
             None,
             false,
+            None,
         );
         assert!(
             batch_call_count >= 2,
@@ -696,6 +715,7 @@ mod tests {
                 &|| false,
                 None,
                 false,
+                None,
             );
             let count = found.iter().filter(|d| d.name == "test").count();
             assert_eq!(
@@ -726,6 +746,7 @@ mod tests {
             &|| false,
             None,
             false, // include_backups = false
+            None,
         );
         // Should only find main.als, not backup or crash
         assert_eq!(
@@ -756,6 +777,7 @@ mod tests {
             &|| false,
             None,
             true, // include_backups = true
+            None,
         );
         assert_eq!(found.len(), 2);
         let _ = fs::remove_dir_all(&tmp);
@@ -784,6 +806,7 @@ mod tests {
             &|| false,
             None,
             false,
+            None,
         );
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].name, "real");
@@ -807,6 +830,7 @@ mod tests {
             &|| false,
             None,
             false,
+            None,
         );
         assert_eq!(found.len(), 0, "Plain .band file should be rejected");
         let _ = fs::remove_dir_all(&tmp);

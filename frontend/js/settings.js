@@ -431,6 +431,33 @@ function applyCrtSetting(on) {
   }
 }
 
+function settingResetAllUI() {
+  // All layout/ordering/sizing prefs keys
+  const uiKeys = [
+    'tabOrder', 'settingsSectionOrder', 'columnWidths',
+    'playerSectionOrder', 'playerDock', 'playerWidth', 'playerHeight', 'playerExpanded',
+    'headerStatsOrder', 'statsBarOrder', 'audioStatsOrder', 'dawStatsOrder', 'presetStatsOrder',
+    'audioColumnOrder', 'dawColumnOrder', 'presetColumnOrder',
+    'favItemOrder', 'fileFavOrder', 'noteCardOrder', 'tagCardOrder', 'presetChipOrder',
+    'hmCardOrder', 'fzfParamOrder', 'shortcutOrder',
+    'scanBtnsParent', 'dashBtnParent',
+    'similarDock', 'similarWidth', 'similarHeight',
+    'expandOnClick',
+  ];
+  // Modal geometry keys
+  const allKeys = Object.keys(prefs._cache || {});
+  for (const key of allKeys) {
+    if (key.startsWith('modal_') || key.startsWith('settingsRows_') || key.endsWith('BtnOrder')) {
+      uiKeys.push(key);
+    }
+  }
+  for (const key of uiKeys) {
+    prefs.removeItem(key);
+  }
+  showToast('All UI layout reset to factory defaults — reloading...');
+  setTimeout(() => location.reload(), 1000);
+}
+
 function settingResetColumns() {
   prefs.removeItem('columnWidths');
   // Re-init tables if they exist

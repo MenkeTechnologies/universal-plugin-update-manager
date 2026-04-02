@@ -155,6 +155,7 @@ document.addEventListener('click', (e) => {
     case 'importNotes': importNotes(); break;
     case 'clearAllNotes': clearAllNotes(); break;
     case 'clearGlobalTag': clearGlobalTag(); break;
+    case 'settingResetAllUI': settingResetAllUI(); break;
     case 'settingResetColumns': settingResetColumns(); break;
     case 'settingResetSectionOrder': resetSettingsSectionOrder(); break;
     case 'settingResetTabOrder': settingResetTabOrder(); break;
@@ -396,6 +397,7 @@ window.vstUpdater = {
   extractProjectPlugins: (path) => invoke('extract_project_plugins', { filePath: path }),
   estimateBpm: (path) => invoke('estimate_bpm', { filePath: path }),
   detectAudioKey: (path) => invoke('detect_audio_key', { filePath: path }),
+  getWalkerStatus: () => invoke('get_walker_status'),
   // DAW history
   saveDawScan: (projects, roots) => invoke('daw_history_save', { projects, roots: roots || null }),
   getDawScans: () => invoke('daw_history_get_scans'),

@@ -755,7 +755,9 @@ function switchTab(tab) {
   document.getElementById('tabNotes').classList.toggle('active', tab === 'notes');
   document.getElementById('tabTags').classList.toggle('active', tab === 'tags');
   document.getElementById('tabFiles').classList.toggle('active', tab === 'files');
+  document.getElementById('tabWalkers')?.classList.toggle('active', tab === 'walkers');
   document.getElementById('tabSettings').classList.toggle('active', tab === 'settings');
+  if (tab === 'walkers' && typeof startWalkerPolling === 'function') startWalkerPolling();
   if (tab === 'history') loadHistory();
   if (tab === 'favorites') renderFavorites();
   if (tab === 'notes') renderNotesTab();
