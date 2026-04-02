@@ -3844,6 +3844,22 @@
       color: var(--text-muted);
       margin-bottom: 6px;
     }
+    /* Visualizer tab */
+    .viz-container { position: relative; height: 100%; display: flex; flex-direction: column; padding: 8px; }
+    .viz-container.viz-fullscreen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 30000; background: #05050a; padding: 8px; }
+    .viz-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-shrink: 0; flex-wrap: wrap; gap: 4px; }
+    .viz-mode-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+    .viz-mode-btn { padding: 5px 12px; font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; border-radius: 2px; transition: all 0.15s; }
+    .viz-mode-btn:hover { color: var(--text); border-color: var(--text-muted); }
+    .viz-mode-btn.active { color: var(--cyan); border-color: var(--cyan); background: rgba(5,217,232,0.08); box-shadow: 0 0 8px rgba(5,217,232,0.15); }
+    .viz-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; flex: 1; min-height: 0; }
+    .viz-grid.viz-single { grid-template-columns: 1fr; }
+    .viz-grid.viz-single .viz-tile { display: none; }
+    .viz-grid.viz-single .viz-tile.viz-tile-active { display: flex; }
+    .viz-tile { display: flex; flex-direction: column; background: #05050a; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; position: relative; min-height: 0; }
+    .viz-tile-label { font-family: 'Orbitron', sans-serif; font-size: 8px; letter-spacing: 2px; color: var(--cyan); padding: 4px 8px; flex-shrink: 0; opacity: 0.6; cursor: grab; }
+    .viz-tile-canvas { flex: 1; width: 100%; min-height: 0; }
+
     /* Walker status tab */
     .walker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; height: 100%; }
     .walker-tile { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; display: flex; flex-direction: column; overflow: hidden; }
@@ -4749,6 +4765,7 @@
       <button class="tab-btn" data-action="switchTab" data-tab="tags" title="Tag manager (Cmd+7)">&#127991; Tags</button>
       <button class="tab-btn" data-action="switchTab" data-tab="files" title="File browser (Cmd+8)">&#128193; Files</button>
       <button class="tab-btn" data-action="switchTab" data-tab="history" title="Scan history and diffs (Cmd+9)">History</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="visualizer" title="Real-time audio analyzer and visualizer">&#127911; Visualizer</button>
       <button class="tab-btn" data-action="switchTab" data-tab="walkers" title="Live directory walker status">&#128270; Walkers</button>
       <button class="tab-btn" data-action="switchTab" data-tab="settings" title="App settings (Cmd+0)">&#9881; Settings</button>
     </div>
@@ -5081,6 +5098,55 @@
             <h2>Scan for Presets</h2>
             <p>Click <strong>"Scan Presets"</strong> to discover VST/AU/DAW presets on your system.</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tabVisualizer">
+      <div class="viz-container" id="vizContainer">
+        <div class="viz-toolbar">
+          <div class="viz-mode-btns" id="vizModeBtns">
+            <button class="viz-mode-btn" data-viz-mode="fft" title="FFT Spectrum Analyzer — show only this">FFT</button>
+            <button class="viz-mode-btn" data-viz-mode="waveform" title="Oscilloscope — show only this">Waveform</button>
+            <button class="viz-mode-btn" data-viz-mode="spectrogram" title="Scrolling spectrogram — show only this">Spectrogram</button>
+            <button class="viz-mode-btn" data-viz-mode="stereo" title="Stereo field — show only this">Stereo</button>
+            <button class="viz-mode-btn" data-viz-mode="levels" title="Level meters — show only this">Levels</button>
+            <button class="viz-mode-btn" data-viz-mode="bands" title="Octave bands — show only this">Bands</button>
+            <button class="viz-mode-btn active" data-viz-mode="all" title="Show all visualizers in a grid">All</button>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="viz-mode-btn" data-action="vizFullscreen" title="Toggle fullscreen visualizer">&#9974; Fullscreen</button>
+            <div class="viz-info" id="vizInfo" style="font-size:10px;color:var(--text-dim);line-height:28px;"></div>
+          </div>
+        </div>
+        <div class="viz-grid" id="vizGrid">
+          <div class="viz-tile" data-viz-tile="fft" title="FFT Spectrum Analyzer — right-click for options">
+            <div class="viz-tile-label">FFT SPECTRUM</div>
+            <canvas class="viz-tile-canvas" data-viz="fft" width="600" height="250"></canvas>
+          </div>
+          <div class="viz-tile" data-viz-tile="waveform" title="Oscilloscope waveform — right-click for options">
+            <div class="viz-tile-label">WAVEFORM</div>
+            <canvas class="viz-tile-canvas" data-viz="waveform" width="600" height="250"></canvas>
+          </div>
+          <div class="viz-tile" data-viz-tile="spectrogram" title="Scrolling spectrogram — right-click for options">
+            <div class="viz-tile-label">SPECTROGRAM</div>
+            <canvas class="viz-tile-canvas" data-viz="spectrogram" width="600" height="250"></canvas>
+          </div>
+          <div class="viz-tile" data-viz-tile="stereo" title="Stereo field / Lissajous — right-click for options">
+            <div class="viz-tile-label">STEREO FIELD</div>
+            <canvas class="viz-tile-canvas" data-viz="stereo" width="600" height="250"></canvas>
+          </div>
+          <div class="viz-tile" data-viz-tile="levels" title="Peak / RMS level meters — right-click for options">
+            <div class="viz-tile-label">LEVELS</div>
+            <canvas class="viz-tile-canvas" data-viz="levels" width="600" height="250"></canvas>
+          </div>
+          <div class="viz-tile" data-viz-tile="bands" title="Octave band analyzer — right-click for options">
+            <div class="viz-tile-label">OCTAVE BANDS</div>
+            <canvas class="viz-tile-canvas" data-viz="bands" width="600" height="250"></canvas>
+          </div>
+        </div>
+        <div class="viz-empty" id="vizEmpty" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-dim);font-size:13px;text-align:center;pointer-events:none;">
+          Play an audio file to see the visualizer
         </div>
       </div>
     </div>
@@ -5668,6 +5734,7 @@
   <script src="js/dep-graph.js?v=154"></script>
   <script src="js/smart-playlists.js?v=154"></script>
   <script src="js/heatmap-dashboard.js?v=154"></script>
+  <script src="js/visualizer.js?v=154"></script>
   <script src="js/walker-status.js?v=154"></script>
   <script src="js/context-menu.js?v=154"></script>
   <script src="js/help-overlay.js?v=154"></script>

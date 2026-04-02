@@ -64,12 +64,25 @@ function ensureAudioGraph() {
   _analyser.fftSize = 4096;
   _analyser.smoothingTimeConstant = 0.8;
 
+  // Stereo split analysers for Lissajous/stereo field
+  window._splitter = _playbackCtx.createChannelSplitter(2);
+  window._analyserL = _playbackCtx.createAnalyser();
+  window._analyserR = _playbackCtx.createAnalyser();
+  window._analyserL.fftSize = 2048;
+  window._analyserR.fftSize = 2048;
+  window._analyserL.smoothingTimeConstant = 0.5;
+  window._analyserR.smoothingTimeConstant = 0.5;
+
   // Chain: source → eqLow → eqMid → eqHigh → gain → analyser → pan → destination
+  //                                                  ↘ splitter → analyserL/R
   _sourceNode.connect(_eqLow);
   _eqLow.connect(_eqMid);
   _eqMid.connect(_eqHigh);
   _eqHigh.connect(_gainNode);
   _gainNode.connect(_analyser);
+  _gainNode.connect(window._splitter);
+  window._splitter.connect(window._analyserL, 0);
+  window._splitter.connect(window._analyserR, 1);
   _analyser.connect(_panNode);
   _panNode.connect(_playbackCtx.destination);
 }
