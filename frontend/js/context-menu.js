@@ -118,6 +118,8 @@ document.addEventListener('contextmenu', (e) => {
       items.push({ icon: '&#128221;', label: 'Add Note / Tags', action: () => showNoteEditor(path, name) });
     }
     items.push(...quickTagItems(path, name));
+    items.push('---');
+    items.push({ icon: '&#128270;', label: 'Find Similar Samples', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
     showContextMenu(e, items);
     return;
   }
@@ -208,6 +210,8 @@ document.addEventListener('contextmenu', (e) => {
         action: () => f ? removeFavorite(path) : addFavorite('sample', path, name, { format: audioRow.querySelector('.format-badge')?.textContent }) }; })()],
       { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
       ...quickTagItems(path, name),
+      '---',
+      { icon: '&#128270;', label: 'Find Similar Samples', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) },
     ];
     showContextMenu(e, items);
     return;

@@ -323,6 +323,95 @@ audioPlayer.addEventListener('seeked', updatePlaybackTime);
 
 // formatAudioSize and formatTime moved to utils.js
 
+// ── Audio Similarity Search ──
+async function findSimilarSamples(filePath) {
+  const name = filePath.split('/').pop().replace(/\.[^.]+$/, '');
+  let existing = document.getElementById('similarModal');
+  if (existing) existing.remove();
+
+  // Show loading modal
+  const loadHtml = `<div class="modal-overlay" id="similarModal" data-action-modal="closeSimilar">
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2>Samples Similar to "${escapeHtml(name)}"</h2>
+        <button class="modal-close" data-action-modal="closeSimilar" title="Close">&#10005;</button>
+      </div>
+      <div class="modal-body" style="text-align:center;padding:32px;">
+        <div class="spinner" style="width:24px;height:24px;margin:0 auto 12px;"></div>
+        <div style="color:var(--text-muted);font-size:12px;">Analyzing audio fingerprints...</div>
+        <div style="color:var(--text-dim);font-size:10px;margin-top:6px;">This may take a moment for large libraries</div>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', loadHtml);
+
+  try {
+    const candidates = (typeof allAudioSamples !== 'undefined' ? allAudioSamples : []).map(s => s.path);
+    const results = await window.vstUpdater.findSimilarSamples(filePath, candidates, 20);
+
+    const modal = document.getElementById('similarModal');
+    if (!modal) return;
+    const body = modal.querySelector('.modal-body');
+
+    if (results.length === 0) {
+      body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:24px;">No similar samples found. Try scanning more samples first.</div>';
+      return;
+    }
+
+    body.innerHTML = `<div style="margin-bottom:8px;color:var(--text-muted);font-size:11px;">${results.length} similar samples found</div>` +
+      results.map(r => {
+        const sampleName = r.path.split('/').pop().replace(/\.[^.]+$/, '');
+        const ext = r.path.split('.').pop().toUpperCase();
+        const sim = Math.round(r.similarity);
+        const barColor = sim > 70 ? 'var(--green)' : sim > 40 ? 'var(--yellow)' : 'var(--red)';
+        return `<div class="dep-plugin-row" style="cursor:pointer;" data-similar-path="${escapeHtml(r.path)}" title="${escapeHtml(r.path)}">
+          <div style="flex:1;min-width:0;">
+            <span style="color:var(--text);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">${escapeHtml(sampleName)}</span>
+          </div>
+          <span style="font-size:9px;color:var(--text-muted);margin:0 8px;">${ext}</span>
+          <div style="width:100px;display:flex;align-items:center;gap:6px;">
+            <div style="flex:1;height:6px;background:var(--bg-card);border-radius:3px;overflow:hidden;">
+              <div style="width:${sim}%;height:100%;background:${barColor};border-radius:3px;"></div>
+            </div>
+            <span style="font-family:Orbitron,sans-serif;font-size:10px;font-weight:700;color:${barColor};min-width:30px;text-align:right;">${sim}%</span>
+          </div>
+        </div>`;
+      }).join('');
+  } catch (err) {
+    const modal = document.getElementById('similarModal');
+    if (modal) {
+      modal.querySelector('.modal-body').innerHTML = `<div style="padding:24px;color:var(--red);">Error: ${escapeHtml(err.message || String(err))}</div>`;
+    }
+  }
+}
+
+function closeSimilarModal() {
+  const modal = document.getElementById('similarModal');
+  if (modal) modal.remove();
+}
+
+// Similar modal event delegation
+document.addEventListener('click', (e) => {
+  const closeAction = e.target.closest('[data-action-modal="closeSimilar"]');
+  if (closeAction) {
+    if (e.target === closeAction || closeAction.classList.contains('modal-close')) {
+      closeSimilarModal();
+    }
+  }
+  // Click result to play
+  const row = e.target.closest('[data-similar-path]');
+  if (row && document.getElementById('similarModal')) {
+    const path = row.dataset.similarPath;
+    if (path && typeof previewAudio === 'function') previewAudio(path);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('similarModal')) {
+    closeSimilarModal();
+  }
+});
+
 function closeMetaRow() {
   const meta = document.getElementById('audioMetaRow');
   if (meta) meta.remove();

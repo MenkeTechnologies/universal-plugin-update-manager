@@ -31,6 +31,11 @@ pub fn estimate_bpm(file_path: &str) -> Option<f64> {
     detect_tempo(&samples, sample_rate)
 }
 
+// Public wrappers for use by similarity module
+pub fn read_wav_pcm_pub(path: &Path) -> Option<(Vec<f32>, u32)> { read_wav_pcm(path) }
+pub fn read_aiff_pcm_pub(path: &Path) -> Option<(Vec<f32>, u32)> { read_aiff_pcm(path) }
+pub fn decode_with_symphonia_pub(path: &Path) -> Option<(Vec<f32>, u32)> { decode_with_symphonia(path) }
+
 /// Read WAV file and return mono f32 samples + sample rate.
 fn read_wav_pcm(path: &Path) -> Option<(Vec<f32>, u32)> {
     let data = fs::read(path).ok()?;

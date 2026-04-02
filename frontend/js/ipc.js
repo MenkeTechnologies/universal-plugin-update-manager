@@ -422,6 +422,8 @@ window.vstUpdater = {
   deleteFile: (filePath) => invoke('delete_file', { filePath }),
   renameFile: (oldPath, newPath) => invoke('rename_file', { oldPath, newPath }),
   getHomeDir: () => invoke('get_home_dir'),
+  // Similarity
+  findSimilarSamples: (filePath, candidatePaths, maxResults) => invoke('find_similar_samples', { filePath, candidatePaths, maxResults: maxResults || 20 }),
   readAlsXml: (filePath) => invoke('read_als_xml', { filePath }),
   // Preferences (file-backed)
   getProcessStats: () => invoke('get_process_stats'),

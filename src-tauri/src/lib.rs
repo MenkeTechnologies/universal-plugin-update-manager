@@ -16,6 +16,7 @@
 pub mod audio_scanner;
 pub mod bpm;
 pub mod daw_scanner;
+pub mod similarity;
 pub mod history;
 pub mod kvr;
 pub mod preset_scanner;
@@ -922,6 +923,45 @@ fn read_als_xml(file_path: String) -> Result<String, String> {
 #[tauri::command]
 async fn estimate_bpm(file_path: String) -> Result<Option<f64>, String> {
     Ok(bpm::estimate_bpm(&file_path))
+}
+
+#[tauri::command]
+async fn compute_fingerprint(file_path: String) -> Result<Option<similarity::AudioFingerprint>, String> {
+    Ok(tokio::task::spawn_blocking(move || {
+        similarity::compute_fingerprint(&file_path)
+    }).await.map_err(|e| e.to_string())?)
+}
+
+#[tauri::command]
+async fn find_similar_samples(
+    file_path: String,
+    candidate_paths: Vec<String>,
+    max_results: usize,
+) -> Result<Vec<serde_json::Value>, String> {
+    Ok(tokio::task::spawn_blocking(move || {
+        let reference = match similarity::compute_fingerprint(&file_path) {
+            Some(fp) => fp,
+            None => return vec![],
+        };
+
+        // Compute fingerprints for all candidates in parallel
+        use rayon::prelude::*;
+        let candidates: Vec<similarity::AudioFingerprint> = candidate_paths
+            .par_iter()
+            .filter_map(|p| similarity::compute_fingerprint(p))
+            .collect();
+
+        similarity::find_similar(&reference, &candidates, max_results)
+            .into_iter()
+            .map(|(path, distance)| {
+                serde_json::json!({
+                    "path": path,
+                    "distance": distance,
+                    "similarity": (1.0 - distance.min(1.0)) * 100.0
+                })
+            })
+            .collect()
+    }).await.map_err(|e| e.to_string())?)
 }
 
 #[tauri::command]
@@ -2846,6 +2886,8 @@ pub fn run() {
             extract_project_plugins,
             read_als_xml,
             estimate_bpm,
+            compute_fingerprint,
+            find_similar_samples,
             open_update_url,
             open_plugin_folder,
             open_audio_folder,
