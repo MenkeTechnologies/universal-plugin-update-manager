@@ -5,6 +5,7 @@
 let _vizMode = 'all';
 let _vizRAF = null;
 let _vizSpectrogramData = [];
+let _vizSpectrogramIdx = 0; // ring buffer write index
 let _vizLastFrame = 0;
 const _VIZ_FPS = 30;
 const _VIZ_INTERVAL = 1000 / _VIZ_FPS;
@@ -95,14 +96,14 @@ function stopVisualizer() {
 
 // ── Main render loop ──
 function _vizLoop(timestamp) {
+  const tab = document.getElementById('tabVisualizer');
+  if (!tab || !tab.classList.contains('active')) { _vizRAF = null; return; }
+
   _vizRAF = requestAnimationFrame(_vizLoop);
 
   // Throttle to target FPS
   if (timestamp - _vizLastFrame < _VIZ_INTERVAL) return;
   _vizLastFrame = timestamp;
-
-  const tab = document.getElementById('tabVisualizer');
-  if (!tab || !tab.classList.contains('active')) return;
 
   const analyser = typeof _analyser !== 'undefined' ? _analyser : null;
   const isPlaying = typeof audioPlayer !== 'undefined' && !audioPlayer.paused;
@@ -225,16 +226,24 @@ function _drawSpectrogram(ctx, w, h, analyser) {
   if (_vizMode !== 'all') { if (!_vizFreqData || _vizFreqData.length !== bufLen) _vizFreqData = new Uint8Array(bufLen); analyser.getByteFrequencyData(_vizFreqData); }
   const data = _vizFreqData;
 
-  _vizSpectrogramData.push(Array.from(data));
   const maxCols = Math.floor(w / _vizParams.spectrogramSpeed);
-  if (_vizSpectrogramData.length > maxCols) _vizSpectrogramData.splice(0, _vizSpectrogramData.length - maxCols);
+
+  // Ring buffer: pre-allocate Uint8Arrays, overwrite in-place (no Array.from)
+  if (_vizSpectrogramData.length !== maxCols) {
+    _vizSpectrogramData = new Array(maxCols);
+    for (let i = 0; i < maxCols; i++) _vizSpectrogramData[i] = new Uint8Array(bufLen);
+    _vizSpectrogramIdx = 0;
+  }
+  _vizSpectrogramData[_vizSpectrogramIdx].set(data);
+  _vizSpectrogramIdx = (_vizSpectrogramIdx + 1) % maxCols;
 
   ctx.clearRect(0, 0, w, h);
-  const cols = _vizSpectrogramData.length;
   const colW = w / maxCols;
-  for (let col = 0; col < cols; col++) {
-    const cd = _vizSpectrogramData[col];
-    const x = (maxCols - cols + col) * colW;
+  for (let col = 0; col < maxCols; col++) {
+    const ringIdx = (_vizSpectrogramIdx + col) % maxCols;
+    const cd = _vizSpectrogramData[ringIdx];
+    if (!cd) continue;
+    const x = col * colW;
     for (let bin = 0; bin < bufLen; bin++) {
       const mag = cd[bin] / 255;
       if (mag < 0.015) continue;

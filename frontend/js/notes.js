@@ -253,35 +253,26 @@ function rowBadges(path) {
 function refreshRowBadges(path) {
   if (!path) return;
   const badges = rowBadges(path);
+  const escaped = CSS.escape(path);
+
+  // Helper: update name cell badges
+  function updateCell(cell) {
+    if (!cell) return;
+    cell.querySelectorAll('.row-badge').forEach(b => b.remove());
+    cell.insertAdjacentHTML('beforeend', badges);
+  }
+
   // Audio table
-  const audioRow = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`);
-  if (audioRow) {
-    const nameCell = audioRow.querySelector('.col-name');
-    if (nameCell) {
-      nameCell.querySelectorAll('.row-badge').forEach(b => b.remove());
-      nameCell.insertAdjacentHTML('beforeend', badges);
-    }
-  }
+  const audioRow = document.getElementById('audioTableBody')?.querySelector(`tr[data-audio-path="${escaped}"]`);
+  if (audioRow) updateCell(audioRow.querySelector('.col-name'));
   // DAW table
-  const dawRow = document.querySelector(`#dawTableBody tr[data-daw-path="${CSS.escape(path)}"]`);
-  if (dawRow) {
-    const nameCell = dawRow.querySelector('.col-name') || dawRow.cells[1];
-    if (nameCell) {
-      nameCell.querySelectorAll('.row-badge').forEach(b => b.remove());
-      nameCell.insertAdjacentHTML('beforeend', badges);
-    }
-  }
+  const dawRow = document.getElementById('dawTableBody')?.querySelector(`tr[data-daw-path="${escaped}"]`);
+  if (dawRow) updateCell(dawRow.querySelector('.col-name') || dawRow.cells[1]);
   // Preset table
-  const presetRow = document.querySelector(`#presetTableBody tr[data-preset-path="${CSS.escape(path)}"]`);
-  if (presetRow) {
-    const nameCell = presetRow.cells[1];
-    if (nameCell) {
-      nameCell.querySelectorAll('.row-badge').forEach(b => b.remove());
-      nameCell.insertAdjacentHTML('beforeend', badges);
-    }
-  }
-  // Plugin card — update badges after name in h3
-  const pluginCard = document.querySelector(`.plugin-card[data-path="${CSS.escape(path)}"]`);
+  const presetRow = document.getElementById('presetTableBody')?.querySelector(`tr[data-preset-path="${escaped}"]`);
+  if (presetRow) updateCell(presetRow.cells?.[1]);
+  // Plugin card
+  const pluginCard = document.querySelector(`.plugin-card[data-path="${escaped}"]`);
   if (pluginCard) {
     const h3 = pluginCard.querySelector('h3');
     if (h3) {

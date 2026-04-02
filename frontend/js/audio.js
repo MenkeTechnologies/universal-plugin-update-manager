@@ -612,8 +612,9 @@ async function scanAudioSamples(resume = false) {
 
     allAudioSamples.push(...toAdd);
     accumulateAudioStats(toAdd);
-    // Queue for background BPM/Key/LUFS analysis (runs sequentially with pauses)
+    // Queue for background BPM/Key/LUFS analysis (cap at 50K to prevent unbounded growth)
     _bgQueue.push(...toAdd);
+    if (_bgQueue.length > 50000) _bgQueue.length = 50000;
     if (!_bgAnalysisRunning) startBackgroundAnalysis();
     const audioElapsed = audioEta.elapsed();
     btn.innerHTML = `&#8635; ${pendingFound} found${audioElapsed ? ' — ' + audioElapsed : ''}`;
@@ -889,7 +890,7 @@ function buildAudioRow(s) {
     <td class="col-key" title="${key || 'Click to analyze'}">${escapeHtml(key)}</td>
     <td class="col-dur" title="${dur || ''}">${dur}</td>
     <td class="col-ch" title="${ch === 'M' ? 'Mono' : ch === 'S' ? 'Stereo' : ch}">${ch}</td>
-    <td class="col-lufs" title="${lufs ? lufs + ' LUFS' : 'Click to analyze'}">${lufs}</td>
+    <td class="col-lufs${lufs !== '' && lufs < -25 ? ' lufs-low' : ''}" title="${lufs ? lufs + ' LUFS' + (lufs < -25 ? ' ⚠ abnormally quiet' : '') : 'Click to analyze'}">${lufs}</td>
     <td class="col-date">${s.modified}</td>
     <td class="col-path" title="${hp}">${escapeHtml(s.directory)}</td>
     <td class="col-actions" data-action-stop>
@@ -1445,7 +1446,13 @@ async function startBackgroundAnalysis() {
       if (_lufsCache[s.path] === undefined) {
         try { _lufsCache[s.path] = await window.vstUpdater.measureLufs(s.path); } catch { _lufsCache[s.path] = null; }
         const row = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(s.path)}"]`);
-        if (row) { const cell = row.querySelector('.col-lufs'); if (cell) cell.textContent = _lufsCache[s.path] != null ? _lufsCache[s.path] : ''; }
+        if (row) {
+          const cell = row.querySelector('.col-lufs');
+          if (cell) {
+            cell.textContent = _lufsCache[s.path] != null ? _lufsCache[s.path] : '';
+            cell.classList.toggle('lufs-low', _lufsCache[s.path] != null && _lufsCache[s.path] < -40);
+          }
+        }
       }
 
       _bgDone++;
@@ -1735,15 +1742,16 @@ async function loadWaveformCache() {
   try { _spectrogramCache = await window.vstUpdater.readCacheFile('spectrogram-cache.json'); } catch { _spectrogramCache = {}; }
 }
 
+function _evictCache(cache) {
+  const keys = Object.keys(cache);
+  if (keys.length > _WF_CACHE_MAX) {
+    for (const k of keys.slice(0, keys.length - _WF_CACHE_MAX)) delete cache[k];
+  }
+}
+
 function _saveWaveformCache() {
-  const wfKeys = Object.keys(_waveformCache);
-  if (wfKeys.length > _WF_CACHE_MAX) {
-    for (const k of wfKeys.slice(0, wfKeys.length - _WF_CACHE_MAX)) delete _waveformCache[k];
-  }
-  const sgKeys = Object.keys(_spectrogramCache);
-  if (sgKeys.length > _WF_CACHE_MAX) {
-    for (const k of sgKeys.slice(0, sgKeys.length - _WF_CACHE_MAX)) delete _spectrogramCache[k];
-  }
+  _evictCache(_waveformCache);
+  _evictCache(_spectrogramCache);
   window.vstUpdater.writeCacheFile('waveform-cache.json', _waveformCache).catch(() => {});
   window.vstUpdater.writeCacheFile('spectrogram-cache.json', _spectrogramCache).catch(() => {});
 }
@@ -1791,6 +1799,7 @@ async function drawWaveform(filePath) {
     }
 
     _waveformCache[filePath] = peaks;
+    _evictCache(_waveformCache);
     _debounceWfSave();
     renderWaveformData(ctx, canvas, peaks);
   } catch {
@@ -1910,6 +1919,7 @@ async function drawMetaWaveform(filePath) {
     }
 
     _waveformCache[filePath] = peaks;
+    _evictCache(_waveformCache);
     _debounceWfSave();
     renderWaveformData(ctx, canvas, peaks);
   } catch {

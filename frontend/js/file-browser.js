@@ -217,11 +217,16 @@ function _processWfQueue() {
   }
 }
 
+let _fbWfObserver = null;
+
 function initFileBrowserWaveforms() {
   const container = document.getElementById('fileList');
   if (!container) return;
   const canvases = container.querySelectorAll('canvas.file-waveform');
   if (canvases.length === 0) return;
+
+  // Disconnect previous observer to prevent leak
+  if (_fbWfObserver) { _fbWfObserver.disconnect(); _fbWfObserver = null; }
 
   const observer = new IntersectionObserver((entries) => {
     for (const entry of entries) {
@@ -235,6 +240,7 @@ function initFileBrowserWaveforms() {
     _processWfQueue();
   }, { root: container.closest('.tab-content'), threshold: 0.1 });
 
+  _fbWfObserver = observer;
   canvases.forEach(c => observer.observe(c));
 }
 

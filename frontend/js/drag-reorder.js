@@ -235,9 +235,15 @@ function initFloatingElement(elementId, prefsKey) {
       if (dropTarget) dropTarget.style.outline = '2px dashed var(--cyan)';
     };
 
-    const onUp = (ev) => {
+    const cleanup = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('contextmenu', cleanup);
+      window.removeEventListener('blur', cleanup);
+    };
+
+    const onUp = (ev) => {
+      cleanup();
       if (!dragging) return;
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
@@ -264,6 +270,8 @@ function initFloatingElement(elementId, prefsKey) {
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
+    document.addEventListener('contextmenu', cleanup);
+    window.addEventListener('blur', cleanup);
   });
 }
 

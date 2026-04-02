@@ -4,7 +4,8 @@
 let _walkerInterval = null;
 
 function startWalkerPolling() {
-  if (_walkerInterval) return;
+  stopWalkerPolling();
+  _walkerIdleCount = 0;
   _updateWalkerTiles();
   _walkerInterval = setInterval(_updateWalkerTiles, 500);
 }
@@ -22,6 +23,8 @@ document.addEventListener('click', (e) => {
   }
 });
 
+let _walkerIdleCount = 0;
+
 async function _updateWalkerTiles() {
   // Only poll if tab is visible
   const tab = document.getElementById('tabWalkers');
@@ -33,6 +36,11 @@ async function _updateWalkerTiles() {
     _renderTile('walkerAudioBody', 'walkerTileAudio', status.audio, 'var(--yellow)', status.poolThreads, status.audioScanning);
     _renderTile('walkerDawBody', 'walkerTileDaw', status.daw, 'var(--magenta)', status.poolThreads, status.dawScanning);
     _renderTile('walkerPresetBody', 'walkerTilePreset', status.preset, 'var(--orange)', status.poolThreads, status.presetScanning);
+
+    // Stop polling after 10 consecutive idle checks (5 seconds)
+    const allIdle = !status.pluginScanning && !status.audioScanning && !status.dawScanning && !status.presetScanning;
+    if (allIdle) { _walkerIdleCount++; if (_walkerIdleCount >= 10) stopWalkerPolling(); }
+    else { _walkerIdleCount = 0; }
   } catch (err) {
     const body = document.getElementById('walkerAudioBody');
     if (body) body.innerHTML = `<div style="color:var(--red);padding:8px;">Error: ${err?.message || err}</div>`;
