@@ -723,4 +723,96 @@ mod tests {
 
         let _ = fs::remove_file(&tmp);
     }
+
+    #[test]
+    fn test_decode_symphonia_nonexistent() {
+        let result = decode_with_symphonia(Path::new("/nonexistent/file.mp3"));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_decode_symphonia_invalid_data() {
+        let tmp = std::env::temp_dir().join("bpm_test_invalid.mp3");
+        fs::write(&tmp, b"this is not an mp3 file").unwrap();
+        let result = decode_with_symphonia(&tmp);
+        assert!(result.is_none(), "garbage data should return None");
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_decode_symphonia_wav_fallback() {
+        // symphonia should be able to decode a valid WAV too
+        let tmp = std::env::temp_dir().join("bpm_test_sym_wav.wav");
+        let sr = 44100u32;
+        let n = 4410usize; // 0.1s
+        let mut buf = Vec::new();
+        let data_size = (n * 2) as u32;
+        buf.extend_from_slice(b"RIFF");
+        buf.extend_from_slice(&(36 + data_size).to_le_bytes());
+        buf.extend_from_slice(b"WAVE");
+        buf.extend_from_slice(b"fmt ");
+        buf.extend_from_slice(&16u32.to_le_bytes());
+        buf.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        buf.extend_from_slice(&1u16.to_le_bytes()); // mono
+        buf.extend_from_slice(&sr.to_le_bytes());
+        buf.extend_from_slice(&(sr * 2).to_le_bytes());
+        buf.extend_from_slice(&2u16.to_le_bytes());
+        buf.extend_from_slice(&16u16.to_le_bytes());
+        buf.extend_from_slice(b"data");
+        buf.extend_from_slice(&data_size.to_le_bytes());
+        for i in 0..n {
+            let t = i as f64 / sr as f64;
+            let s = ((t * 440.0 * 2.0 * std::f64::consts::PI).sin() * 16000.0) as i16;
+            buf.extend_from_slice(&s.to_le_bytes());
+        }
+        fs::write(&tmp, &buf).unwrap();
+
+        let result = decode_with_symphonia(&tmp);
+        assert!(result.is_some(), "symphonia should decode valid WAV");
+        let (samples, rate) = result.unwrap();
+        assert_eq!(rate, 44100);
+        assert!(!samples.is_empty());
+
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_estimate_bpm_zero_length() {
+        // WAV with zero data samples
+        let tmp = std::env::temp_dir().join("bpm_test_zero.wav");
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"RIFF");
+        buf.extend_from_slice(&36u32.to_le_bytes());
+        buf.extend_from_slice(b"WAVE");
+        buf.extend_from_slice(b"fmt ");
+        buf.extend_from_slice(&16u32.to_le_bytes());
+        buf.extend_from_slice(&1u16.to_le_bytes());
+        buf.extend_from_slice(&1u16.to_le_bytes());
+        buf.extend_from_slice(&44100u32.to_le_bytes());
+        buf.extend_from_slice(&(44100u32 * 2).to_le_bytes());
+        buf.extend_from_slice(&2u16.to_le_bytes());
+        buf.extend_from_slice(&16u16.to_le_bytes());
+        buf.extend_from_slice(b"data");
+        buf.extend_from_slice(&0u32.to_le_bytes());
+        fs::write(&tmp, &buf).unwrap();
+
+        let bpm = estimate_bpm(tmp.to_str().unwrap());
+        assert!(bpm.is_none(), "zero-length audio should not estimate BPM");
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_read_aiff_nonexistent() {
+        let result = read_aiff_pcm(Path::new("/nonexistent/file.aiff"));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_read_aiff_invalid_header() {
+        let tmp = std::env::temp_dir().join("bpm_test_bad_aiff.aiff");
+        fs::write(&tmp, b"not an aiff file at all").unwrap();
+        let result = read_aiff_pcm(&tmp);
+        assert!(result.is_none());
+        let _ = fs::remove_file(&tmp);
+    }
 }

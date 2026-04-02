@@ -54,6 +54,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   if (typeof loadXrefCache === 'function') loadXrefCache();
   if (typeof restoreFilterStates === 'function') restoreFilterStates();
   if (typeof loadFzfParams === 'function') loadFzfParams();
+  if (typeof initSmartPlaylists === 'function') initSmartPlaylists();
 
   // Show player on startup if enabled and there's play history
   if (prefs.getItem('showPlayerOnStartup') === 'on' && typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 0) {

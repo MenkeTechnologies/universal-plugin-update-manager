@@ -305,4 +305,106 @@ mod tests {
 
         let _ = std::fs::remove_file(&tmp);
     }
+
+    #[test]
+    fn test_fingerprint_all_zeros() {
+        // All-zero features should produce valid fingerprint with zero distance to itself
+        let a = make_fp("z.wav", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        let b = make_fp("z2.wav", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        let d = fingerprint_distance(&a, &b);
+        assert!(d < 0.001, "all-zero fingerprints should have ~0 distance, got {}", d);
+    }
+
+    #[test]
+    fn test_fingerprint_distance_symmetric() {
+        let a = make_fp("a.wav", 0.8, 200.0, 0.05, 0.9, 0.08, 0.02);
+        let b = make_fp("b.wav", 0.3, 8000.0, 0.4, 0.05, 0.15, 0.8);
+        let d_ab = fingerprint_distance(&a, &b);
+        let d_ba = fingerprint_distance(&b, &a);
+        assert!((d_ab - d_ba).abs() < 1e-10, "distance should be symmetric");
+    }
+
+    #[test]
+    fn test_find_similar_empty_candidates() {
+        let reference = make_fp("ref.wav", 0.5, 1000.0, 0.1, 0.5, 0.3, 0.2);
+        let results = find_similar(&reference, &[], 10);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_find_similar_single_candidate() {
+        let reference = make_fp("ref.wav", 0.5, 1000.0, 0.1, 0.5, 0.3, 0.2);
+        let candidate = make_fp("c.wav", 0.6, 1200.0, 0.12, 0.45, 0.35, 0.2);
+        let results = find_similar(&reference, &[candidate], 10);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "c.wav");
+    }
+
+    #[test]
+    fn test_compute_fingerprint_silence_wav() {
+        // Create a silent WAV (all zero samples)
+        let tmp = std::env::temp_dir().join("sim_test_silence.wav");
+        let sample_rate = 44100u32;
+        let num_samples = sample_rate as usize;
+        let mut data = vec![0u8; 44 + num_samples * 2];
+        data[0..4].copy_from_slice(b"RIFF");
+        let file_size = (36 + num_samples * 2) as u32;
+        data[4..8].copy_from_slice(&file_size.to_le_bytes());
+        data[8..12].copy_from_slice(b"WAVE");
+        data[12..16].copy_from_slice(b"fmt ");
+        data[16..20].copy_from_slice(&16u32.to_le_bytes());
+        data[20..22].copy_from_slice(&1u16.to_le_bytes());
+        data[22..24].copy_from_slice(&1u16.to_le_bytes());
+        data[24..28].copy_from_slice(&sample_rate.to_le_bytes());
+        data[28..32].copy_from_slice(&(sample_rate * 2).to_le_bytes());
+        data[32..34].copy_from_slice(&2u16.to_le_bytes());
+        data[34..36].copy_from_slice(&16u16.to_le_bytes());
+        data[36..40].copy_from_slice(b"data");
+        data[40..44].copy_from_slice(&(num_samples as u32 * 2).to_le_bytes());
+        // All samples are zero (silence)
+        std::fs::write(&tmp, &data).unwrap();
+
+        let fp = compute_fingerprint(tmp.to_str().unwrap());
+        assert!(fp.is_some(), "should handle silent WAV");
+        let fp = fp.unwrap();
+        assert!(fp.rms < 0.001, "silent file should have near-zero RMS");
+
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_compute_fingerprint_very_short_wav() {
+        // WAV with only 100 samples — below 1024 frame threshold
+        let tmp = std::env::temp_dir().join("sim_test_short.wav");
+        let sample_rate = 44100u32;
+        let num_samples = 100usize;
+        let mut data = vec![0u8; 44 + num_samples * 2];
+        data[0..4].copy_from_slice(b"RIFF");
+        let file_size = (36 + num_samples * 2) as u32;
+        data[4..8].copy_from_slice(&file_size.to_le_bytes());
+        data[8..12].copy_from_slice(b"WAVE");
+        data[12..16].copy_from_slice(b"fmt ");
+        data[16..20].copy_from_slice(&16u32.to_le_bytes());
+        data[20..22].copy_from_slice(&1u16.to_le_bytes());
+        data[22..24].copy_from_slice(&1u16.to_le_bytes());
+        data[24..28].copy_from_slice(&sample_rate.to_le_bytes());
+        data[28..32].copy_from_slice(&(sample_rate * 2).to_le_bytes());
+        data[32..34].copy_from_slice(&2u16.to_le_bytes());
+        data[34..36].copy_from_slice(&16u16.to_le_bytes());
+        data[36..40].copy_from_slice(b"data");
+        data[40..44].copy_from_slice(&(num_samples as u32 * 2).to_le_bytes());
+        for i in 0..num_samples {
+            let s = (i as i16).wrapping_mul(100);
+            let offset = 44 + i * 2;
+            data[offset..offset + 2].copy_from_slice(&s.to_le_bytes());
+        }
+        std::fs::write(&tmp, &data).unwrap();
+
+        // Very short files should still return a fingerprint (we handle gracefully)
+        let fp = compute_fingerprint(tmp.to_str().unwrap());
+        // May be None or Some depending on min sample threshold — either is acceptable
+        let _ = std::fs::remove_file(&tmp);
+        // Just ensure no panic
+        let _ = fp;
+    }
 }

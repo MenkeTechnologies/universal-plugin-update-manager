@@ -39,6 +39,12 @@ const DEFAULT_SHORTCUTS = {
   'nextTab': { key: 'Tab', mod: true, label: 'Next tab' },
   'prevTab': { key: 'Tab', mod: false, label: 'Previous tab (Shift held)' },
   'findSimilar': { key: 'w', mod: false, label: 'Find similar samples' },
+  'togglePlayerExpand': { key: 'e', mod: false, label: 'Expand / collapse player' },
+  'toggleEq': { key: 'q', mod: false, label: 'Toggle EQ panel' },
+  'toggleMono': { key: 'u', mod: false, label: 'Toggle mono playback' },
+  'newSmartPlaylist': { key: 'p', mod: true, label: 'New smart playlist' },
+  'deselectAll': { key: 'Escape', mod: true, label: 'Deselect all' },
+  'toggleABLoop': { key: 'b', mod: false, label: 'Set / clear A-B loop' },
 };
 
 const TAB_MAP = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'history', 'settings'];
@@ -232,6 +238,23 @@ function executeShortcut(id) {
   } else if (id === 'findSimilar') {
     const path = _getSelectedPath();
     if (path && typeof findSimilarSamples === 'function') findSimilarSamples(path);
+  } else if (id === 'togglePlayerExpand') {
+    if (typeof togglePlayerExpanded === 'function') togglePlayerExpanded();
+  } else if (id === 'toggleEq') {
+    if (typeof toggleEqSection === 'function') toggleEqSection();
+  } else if (id === 'toggleMono') {
+    if (typeof toggleMono === 'function') toggleMono();
+  } else if (id === 'newSmartPlaylist') {
+    if (typeof showSmartPlaylistEditor === 'function') showSmartPlaylistEditor(null);
+  } else if (id === 'deselectAll') {
+    if (typeof deselectAll === 'function') deselectAll();
+  } else if (id === 'toggleABLoop') {
+    // Cycle: no loop → set A → set B → clear
+    if (typeof _abLoop !== 'undefined' && _abLoop) {
+      if (typeof clearAbLoop === 'function') clearAbLoop();
+    } else {
+      if (typeof setAbLoopStart === 'function') setAbLoopStart();
+    }
   }
 }
 

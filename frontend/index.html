@@ -3731,6 +3731,16 @@
       color: var(--text-muted);
       margin-bottom: 6px;
     }
+    .np-smart-playlists-section { margin-bottom: 8px; padding-top: 4px; border-top: 1px solid var(--border); }
+    .sp-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; border-radius: 3px; font-size: 11px; color: var(--text-muted); transition: background 0.15s, color 0.15s; }
+    .sp-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .sp-item.active { background: var(--accent-bg, rgba(0,255,255,0.1)); color: var(--accent, cyan); }
+    .sp-icon { font-size: 12px; }
+    .sp-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sp-count { font-size: 9px; background: var(--bg-hover); padding: 1px 5px; border-radius: 8px; color: var(--text-dim); }
+    .sp-rule-row { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+    .sp-rule-type, .sp-rule-value { flex: 1; padding: 4px 6px; font-size: 11px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); border-radius: 3px; font-family: inherit; }
+    .sp-rule-value { flex: 1.5; }
     .np-search-input {
       width: 100%;
       padding: 5px 8px;
@@ -4379,6 +4389,12 @@
         </div>
         <div id="npHistoryList"></div>
       </div>
+      <div class="np-smart-playlists-section">
+        <div class="np-history-title" style="display:flex;align-items:center;gap:6px;">Smart Playlists
+          <button class="btn-small btn-secondary" data-action="createSmartPlaylist" title="Create a new rule-based smart playlist" style="font-size:8px;padding:2px 6px;vertical-align:middle;">+ New</button>
+        </div>
+        <div id="npSmartPlaylists"></div>
+      </div>
       <div style="text-align: center; padding: 6px 0;">
         <button class="np-eq-toggle" id="npEqToggle" data-action="toggleEqSection" title="Toggle EQ and effects panel">EQ &amp; FX</button>
       </div>
@@ -4910,71 +4926,71 @@
               <div class="custom-color-grid">
                 <label class="custom-color-item">
                   <span class="custom-color-label">Accent</span>
-                  <input type="color" class="custom-color-input" data-var="--accent" value="#ff2a6d">
+                  <input type="color" class="custom-color-input" data-var="--accent" value="#ff2a6d" title="Primary accent color (--accent)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Accent Light</span>
-                  <input type="color" class="custom-color-input" data-var="--accent-light" value="#ff6b9d">
+                  <input type="color" class="custom-color-input" data-var="--accent-light" value="#ff6b9d" title="Light accent for hover states (--accent-light)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Cyan</span>
-                  <input type="color" class="custom-color-input" data-var="--cyan" value="#05d9e8">
+                  <input type="color" class="custom-color-input" data-var="--cyan" value="#05d9e8" title="Cyan highlight color (--cyan)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Magenta</span>
-                  <input type="color" class="custom-color-input" data-var="--magenta" value="#d300c5">
+                  <input type="color" class="custom-color-input" data-var="--magenta" value="#d300c5" title="Magenta highlight color (--magenta)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Green</span>
-                  <input type="color" class="custom-color-input" data-var="--green" value="#39ff14">
+                  <input type="color" class="custom-color-input" data-var="--green" value="#39ff14" title="Success/green color (--green)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Yellow</span>
-                  <input type="color" class="custom-color-input" data-var="--yellow" value="#f9f002">
+                  <input type="color" class="custom-color-input" data-var="--yellow" value="#f9f002" title="Warning/yellow color (--yellow)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Orange</span>
-                  <input type="color" class="custom-color-input" data-var="--orange" value="#ff6b35">
+                  <input type="color" class="custom-color-input" data-var="--orange" value="#ff6b35" title="Orange accent color (--orange)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Red</span>
-                  <input type="color" class="custom-color-input" data-var="--red" value="#ff073a">
+                  <input type="color" class="custom-color-input" data-var="--red" value="#ff073a" title="Error/red color (--red)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Text</span>
-                  <input type="color" class="custom-color-input" data-var="--text" value="#e0f0ff">
+                  <input type="color" class="custom-color-input" data-var="--text" value="#e0f0ff" title="Primary text color (--text)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Text Dim</span>
-                  <input type="color" class="custom-color-input" data-var="--text-dim" value="#7a8ba8">
+                  <input type="color" class="custom-color-input" data-var="--text-dim" value="#7a8ba8" title="Dimmed text color (--text-dim)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Text Muted</span>
-                  <input type="color" class="custom-color-input" data-var="--text-muted" value="#3d4f6a">
+                  <input type="color" class="custom-color-input" data-var="--text-muted" value="#3d4f6a" title="Muted text color (--text-muted)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Background</span>
-                  <input type="color" class="custom-color-input" data-var="--bg-primary" value="#05050a">
+                  <input type="color" class="custom-color-input" data-var="--bg-primary" value="#05050a" title="Primary background color (--bg-primary)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">BG Secondary</span>
-                  <input type="color" class="custom-color-input" data-var="--bg-secondary" value="#0a0a14">
+                  <input type="color" class="custom-color-input" data-var="--bg-secondary" value="#0a0a14" title="Secondary background color (--bg-secondary)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Card BG</span>
-                  <input type="color" class="custom-color-input" data-var="--bg-card" value="#0d0d1a">
+                  <input type="color" class="custom-color-input" data-var="--bg-card" value="#0d0d1a" title="Card/panel background color (--bg-card)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">BG Hover</span>
-                  <input type="color" class="custom-color-input" data-var="--bg-hover" value="#12122a">
+                  <input type="color" class="custom-color-input" data-var="--bg-hover" value="#12122a" title="Hover background color (--bg-hover)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Border</span>
-                  <input type="color" class="custom-color-input" data-var="--border" value="#1a1a3e">
+                  <input type="color" class="custom-color-input" data-var="--border" value="#1a1a3e" title="Border color (--border)">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Border Glow</span>
-                  <input type="color" class="custom-color-input" data-var="--border-glow" value="#2a1a4e">
+                  <input type="color" class="custom-color-input" data-var="--border-glow" value="#2a1a4e" title="Border glow/accent color (--border-glow)">
                 </label>
               </div>
               <div class="custom-scheme-actions">
@@ -5000,7 +5016,7 @@
               <span class="settings-desc">Additional directories to scan for plugins (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for VST/AU plugins, one path per line"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingCustomDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="saveCustomDirs" style="margin-top: 6px;" title="Save custom plugin scan directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgCustomDirs"></span>
@@ -5012,7 +5028,7 @@
               <span class="settings-desc">Additional directories to scan for audio samples (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for audio samples, one path per line"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingAudioScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="saveAudioScanDirs" style="margin-top: 6px;" title="Save custom audio sample scan directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgAudioScanDirs"></span>
@@ -5024,7 +5040,7 @@
               <span class="settings-desc">Additional directories to scan for DAW project files (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for DAW project files, one path per line"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingDawScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="saveDawScanDirs" style="margin-top: 6px;" title="Save custom DAW project scan directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgDawScanDirs"></span>
@@ -5036,7 +5052,7 @@
               <span class="settings-desc">Additional directories to scan for plugin presets (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for plugin presets, one path per line"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPresetScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="savePresetScanDirs" style="margin-top: 6px;" title="Save custom preset scan directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgPresetScanDirs"></span>
@@ -5362,7 +5378,7 @@
               <span class="settings-desc">
                 Version <span id="settingsVersion"></span><br>
                 by MenkeTechnologies<br>
-                <a href="#" data-action="openUpdate" data-url="https://github.com/MenkeTechnologies/universal-plugin-update-manager" style="color: var(--cyan); text-decoration: none;">&#128279; GitHub Repository</a>
+                <a href="#" data-action="openUpdate" data-url="https://github.com/MenkeTechnologies/universal-plugin-update-manager" style="color: var(--cyan); text-decoration: none;" title="Open AUDIO_HAXOR GitHub repository in browser">&#128279; GitHub Repository</a>
               </span>
             </div>
           </div>
@@ -5379,32 +5395,33 @@
     </div>
   </div>
 
-  <script src="js/ipc.js?v=152"></script>
-  <script src="js/utils.js?v=152"></script>
-  <script src="js/notes.js?v=152"></script>
-  <script src="js/favorites.js?v=152"></script>
-  <script src="js/export.js?v=152"></script>
-  <script src="js/plugins.js?v=152"></script>
-  <script src="js/settings.js?v=152"></script>
-  <script src="js/history.js?v=152"></script>
-  <script src="js/kvr.js?v=152"></script>
-  <script src="js/audio.js?v=152"></script>
-  <script src="js/daw.js?v=152"></script>
-  <script src="js/presets.js?v=152"></script>
+  <script src="js/ipc.js?v=153"></script>
+  <script src="js/utils.js?v=153"></script>
+  <script src="js/notes.js?v=153"></script>
+  <script src="js/favorites.js?v=153"></script>
+  <script src="js/export.js?v=153"></script>
+  <script src="js/plugins.js?v=153"></script>
+  <script src="js/settings.js?v=153"></script>
+  <script src="js/history.js?v=153"></script>
+  <script src="js/kvr.js?v=153"></script>
+  <script src="js/audio.js?v=153"></script>
+  <script src="js/daw.js?v=153"></script>
+  <script src="js/presets.js?v=153"></script>
   <script src="js/disk-usage.js"></script>
   <script src="js/batch-select.js"></script>
   <script src="js/sort-persist.js"></script>
   <script src="js/multi-filter.js"></script>
   <script src="js/file-browser.js"></script>
-  <script src="js/duplicates.js?v=152"></script>
+  <script src="js/duplicates.js?v=153"></script>
   <script src="js/command-palette.js"></script>
-  <script src="js/xref.js?v=152"></script>
+  <script src="js/xref.js?v=153"></script>
   <script src="js/dep-graph.js"></script>
+  <script src="js/smart-playlists.js?v=153"></script>
   <script src="js/context-menu.js"></script>
   <script src="js/help-overlay.js"></script>
-  <script src="js/shortcuts.js?v=152"></script>
+  <script src="js/shortcuts.js?v=153"></script>
   <script src="js/keyboard-nav.js"></script>
-  <script src="js/columns.js?v=152"></script>
-  <script src="js/app.js?v=152"></script>
+  <script src="js/columns.js?v=153"></script>
+  <script src="js/app.js?v=153"></script>
 </body>
 </html>

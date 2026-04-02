@@ -796,5 +796,28 @@ document.addEventListener('contextmenu', (e) => {
     return;
   }
 
+  // Smart playlists section
+  const spSection = e.target.closest('.np-smart-playlists-section');
+  if (spSection && !e.target.closest('.sp-item')) {
+    const items = [
+      { icon: '&#127926;', label: 'New Smart Playlist', action: () => typeof showSmartPlaylistEditor === 'function' && showSmartPlaylistEditor(null) },
+      '---',
+    ];
+    if (typeof getSmartPlaylistPresets === 'function') {
+      for (const preset of getSmartPlaylistPresets()) {
+        items.push({ icon: '&#127925;', label: `Add: ${preset.name}`, action: () => {
+          if (typeof createSmartPlaylist === 'function') {
+            const pl = createSmartPlaylist(preset.name, preset.rules);
+            pl.matchMode = preset.matchMode;
+            if (typeof saveSmartPlaylists === 'function') saveSmartPlaylists();
+            showToast(`Created "${preset.name}"`);
+          }
+        }});
+      }
+    }
+    showContextMenu(e, items);
+    return;
+  }
+
   } catch (err) { console.error('Context menu error:', err, err.stack); showToast('Context menu error: ' + (err.message || err), 4000, 'error'); }
 });

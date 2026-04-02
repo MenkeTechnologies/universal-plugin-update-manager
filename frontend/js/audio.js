@@ -1051,12 +1051,17 @@ async function toggleMetadata(filePath, event) {
       <div class="waveform-progress-fill"></div>
       <div class="waveform-cursor" style="left:0;"></div>
       <div class="waveform-time-label">${meta.duration ? formatTime(meta.duration) : ''}</div>
+    </div>
+    <div class="meta-item-wide" style="position:relative;height:80px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
+      <canvas id="metaSpectrogramCanvas" width="800" height="80" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+      <span style="position:absolute;top:2px;left:4px;font-size:8px;color:var(--text-dim);pointer-events:none;">SPECTROGRAM</span>
     </div>`;
 
     metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel"><span class="meta-close-btn" data-action="closeMetaRow" title="Close metadata panel">&#10005;</span>${waveformHtml}${items}</div></td>`;
 
-    // Draw waveform on the meta canvas
+    // Draw waveform and spectrogram on the meta canvases
     drawMetaWaveform(filePath);
+    drawSpectrogram(filePath);
 
     // Sync cursor if already playing this track
     if (audioPlayerPath === filePath && audioPlayer.duration > 0) {
@@ -1480,6 +1485,90 @@ async function drawMetaWaveform(filePath) {
     ctx.moveTo(0, canvas.height / 2);
     ctx.lineTo(canvas.width, canvas.height / 2);
     ctx.stroke();
+  }
+}
+
+async function drawSpectrogram(filePath) {
+  const canvas = document.getElementById('metaSpectrogramCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = 800, h = 80;
+  ctx.clearRect(0, 0, w, h);
+
+  try {
+    if (!_audioCtx) _audioCtx = new AudioContext();
+    const src = convertFileSrc(filePath);
+    const resp = await fetch(src);
+    const buf = await resp.arrayBuffer();
+    const audioBuf = await _audioCtx.decodeAudioData(buf);
+    const raw = audioBuf.getChannelData(0);
+
+    const fftSize = 1024;
+    const hop = fftSize / 2;
+    const numFrames = Math.floor((raw.length - fftSize) / hop);
+    const numBins = fftSize / 2;
+    if (numFrames <= 0) return;
+
+    // Offline analyser
+    const offline = new OfflineAudioContext(1, raw.length, audioBuf.sampleRate);
+    const source = offline.createBufferSource();
+    const offBuf = offline.createBuffer(1, raw.length, audioBuf.sampleRate);
+    offBuf.getChannelData(0).set(raw);
+    source.buffer = offBuf;
+    const analyser = offline.createAnalyser();
+    analyser.fftSize = fftSize;
+    analyser.smoothingTimeConstant = 0;
+    source.connect(analyser);
+    analyser.connect(offline.destination);
+    source.start();
+
+    // Can't use OfflineAudioContext with getByteFrequencyData in real-time
+    // So compute a simple DFT manually for the spectrogram
+    const cols = Math.min(w, numFrames);
+    const frameStep = Math.max(1, Math.floor(numFrames / cols));
+    const freqBins = 64; // vertical resolution
+
+    for (let col = 0; col < cols; col++) {
+      const frameIdx = col * frameStep;
+      const offset = frameIdx * hop;
+      if (offset + fftSize > raw.length) break;
+
+      // Compute magnitude spectrum for this frame (simplified — use energy in frequency bands)
+      const magnitudes = new Float32Array(freqBins);
+      for (let bin = 0; bin < freqBins; bin++) {
+        const lo = Math.floor(bin * (fftSize / 2) / freqBins);
+        const hi = Math.floor((bin + 1) * (fftSize / 2) / freqBins);
+        let energy = 0;
+        for (let k = lo; k < hi && k < fftSize / 2; k++) {
+          // Quick energy estimate: sum of squared samples in band
+          const centerSample = offset + k;
+          if (centerSample < raw.length) {
+            energy += raw[centerSample] * raw[centerSample];
+          }
+        }
+        magnitudes[bin] = Math.sqrt(energy / Math.max(1, hi - lo));
+      }
+
+      // Draw column
+      const x = (col / cols) * w;
+      const colWidth = Math.ceil(w / cols);
+      for (let bin = 0; bin < freqBins; bin++) {
+        const mag = Math.min(1, magnitudes[bin] * 8); // amplify
+        const y = h - (bin / freqBins) * h;
+        const binH = Math.ceil(h / freqBins);
+        // Cyan → magenta → white color map
+        const r = Math.floor(mag * 211 + (1 - mag) * 5);
+        const g = Math.floor(mag * mag * 50);
+        const b = Math.floor(mag * 197 + (1 - mag) * 20);
+        const a = mag * 0.9 + 0.05;
+        ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+        ctx.fillRect(x, y - binH, colWidth, binH);
+      }
+    }
+  } catch {
+    ctx.fillStyle = 'var(--text-dim)';
+    ctx.font = '9px sans-serif';
+    ctx.fillText('Spectrogram unavailable', 10, 40);
   }
 }
 

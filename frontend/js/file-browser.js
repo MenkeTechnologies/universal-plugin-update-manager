@@ -62,7 +62,7 @@ function updateBookmarkBtn() {
   btn.title = fav ? 'Remove current directory from bookmarks' : 'Bookmark current directory';
 }
 
-const AUDIO_EXTS = ['wav', 'mp3', 'aiff', 'aif', 'flac', 'ogg', 'm4a', 'aac'];
+const AUDIO_EXTS = ['wav', 'mp3', 'aiff', 'aif', 'flac', 'ogg', 'm4a', 'aac', 'opus', 'wma'];
 const DAW_EXTS = ['als', 'logicx', 'flp', 'rpp', 'cpr', 'npr', 'ptx', 'ptf', 'song', 'reason', 'aup', 'aup3', 'band', 'ardour', 'dawproject', 'bwproject'];
 const PLUGIN_EXTS = ['vst', 'vst3', 'component', 'aaxplugin'];
 

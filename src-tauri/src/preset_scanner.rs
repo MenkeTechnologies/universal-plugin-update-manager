@@ -340,4 +340,126 @@ mod tests {
         assert!(formats.contains(&"VSTPRESET"));
         let _ = fs::remove_dir_all(&tmp);
     }
+
+    #[test]
+    fn test_walk_for_presets_stop_signal() {
+        let tmp = std::env::temp_dir().join("upum_test_preset_stop");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        for i in 0..20 {
+            fs::write(tmp.join(format!("preset{}.fxp", i)), b"fake").unwrap();
+        }
+
+        let counter = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let c2 = counter.clone();
+        let stop_after = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let s2 = stop_after.clone();
+
+        walk_for_presets(
+            &[tmp.clone()],
+            &mut |batch, _count| {
+                c2.fetch_add(batch.len(), std::sync::atomic::Ordering::Relaxed);
+                s2.store(true, std::sync::atomic::Ordering::Relaxed);
+            },
+            &|| stop_after.load(std::sync::atomic::Ordering::Relaxed),
+            None,
+        );
+        // Should have stopped — may have found some but scan should terminate
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_for_presets_exclude_set() {
+        let tmp = std::env::temp_dir().join("upum_test_preset_exclude");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let included = tmp.join("keep.fxp");
+        let excluded = tmp.join("skip.fxp");
+        fs::write(&included, b"keep").unwrap();
+        fs::write(&excluded, b"skip").unwrap();
+
+        let mut exclude = HashSet::new();
+        exclude.insert(excluded.to_string_lossy().to_string());
+
+        let mut found = Vec::new();
+        walk_for_presets(
+            &[tmp.clone()],
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+            },
+            &|| false,
+            Some(exclude),
+        );
+        assert_eq!(found.len(), 1);
+        assert!(found[0].path.contains("keep.fxp"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_for_presets_skips_hidden_and_blacklisted_dirs() {
+        let tmp = std::env::temp_dir().join("upum_test_preset_skip");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join(".hidden_dir")).unwrap();
+        fs::create_dir_all(tmp.join("node_modules")).unwrap();
+        fs::create_dir_all(tmp.join("normal")).unwrap();
+        fs::write(tmp.join(".hidden_dir/a.fxp"), b"h").unwrap();
+        fs::write(tmp.join("node_modules/b.fxp"), b"n").unwrap();
+        fs::write(tmp.join("normal/c.fxp"), b"ok").unwrap();
+
+        let mut found = Vec::new();
+        walk_for_presets(
+            &[tmp.clone()],
+            &mut |batch, _count| found.extend_from_slice(batch),
+            &|| false,
+            None,
+        );
+        assert_eq!(found.len(), 1);
+        assert!(found[0].path.contains("normal"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_for_presets_deduplicates_symlinks() {
+        let tmp = std::env::temp_dir().join("upum_test_preset_symlink");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("real")).unwrap();
+        fs::write(tmp.join("real/a.fxp"), b"preset").unwrap();
+
+        #[cfg(unix)]
+        {
+            let _ = std::os::unix::fs::symlink(tmp.join("real"), tmp.join("link"));
+            let mut found = Vec::new();
+            walk_for_presets(
+                &[tmp.join("real"), tmp.join("link")],
+                &mut |batch, _count| found.extend_from_slice(batch),
+                &|| false,
+                None,
+            );
+            assert_eq!(found.len(), 1, "Symlinked duplicate should be deduped");
+        }
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_for_presets_batching() {
+        let tmp = std::env::temp_dir().join("upum_test_preset_batch");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        for i in 0..5 {
+            fs::write(tmp.join(format!("p{}.fxp", i)), b"fake").unwrap();
+        }
+
+        let mut total = 0usize;
+        walk_for_presets(
+            &[tmp.clone()],
+            &mut |batch, count| {
+                assert!(!batch.is_empty());
+                total = count;
+            },
+            &|| false,
+            None,
+        );
+        assert_eq!(total, 5);
+        let _ = fs::remove_dir_all(&tmp);
+    }
 }
