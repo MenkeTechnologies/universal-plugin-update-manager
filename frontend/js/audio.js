@@ -296,8 +296,8 @@ async function importRecentlyPlayed() {
 
 audioPlayer.addEventListener('ended', () => {
   if (!audioLooping) {
-    if (filteredAudioSamples.length > 1) {
-      nextTrack(); // auto-advance
+    if (filteredAudioSamples.length > 1 && prefs.getItem('autoplayNext') !== 'off') {
+      nextTrack();
     } else {
       updatePlayBtnStates();
       updateNowPlayingBtn();

@@ -529,6 +529,12 @@ function settingToggleSingleClickPlay() {
   refreshSettingsUI();
 }
 
+function settingToggleAutoplayNext() {
+  const current = prefs.getItem('autoplayNext');
+  prefs.setItem('autoplayNext', current === 'off' ? 'on' : 'off');
+  refreshSettingsUI();
+}
+
 function settingToggleShowPlayerOnStartup() {
   const current = prefs.getItem('showPlayerOnStartup') === 'on';
   prefs.setItem('showPlayerOnStartup', current ? 'off' : 'on');
@@ -705,6 +711,15 @@ function refreshSettingsUI() {
   if (showPlayerBtn) {
     showPlayerBtn.classList.toggle('active', showPlayer);
     showPlayerLabel.textContent = showPlayer ? 'On' : 'Off';
+  }
+
+  // Autoplay next
+  const autoplay = prefs.getItem('autoplayNext') !== 'off';
+  const autoplayBtn = document.getElementById('settingAutoplayNext');
+  const autoplayLabel = document.getElementById('settingAutoplayNextLabel');
+  if (autoplayBtn) {
+    autoplayBtn.classList.toggle('active', autoplay);
+    autoplayLabel.textContent = autoplay ? 'On' : 'Off';
   }
 
   // Include Ableton backups
