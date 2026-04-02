@@ -55,6 +55,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   initSortPersistence();
   initSettingsSectionDrag();
   loadRecentlyPlayed();
+  if (typeof loadBpmKeyCache === 'function') loadBpmKeyCache();
   renderGlobalTagBar();
   if (typeof loadXrefCache === 'function') loadXrefCache();
   if (typeof restoreFilterStates === 'function') restoreFilterStates();
