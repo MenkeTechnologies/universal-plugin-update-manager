@@ -677,6 +677,14 @@ async function previewAudio(filePath) {
     return;
   }
 
+  // Non-playable formats — skip silently
+  const ext = filePath.split('.').pop().toLowerCase();
+  const UNPLAYABLE = ['sf2', 'sfz', 'rex', 'rx2', 'wma'];
+  if (UNPLAYABLE.includes(ext)) {
+    showToast(`${ext.toUpperCase()} format is not playable in browser`, 3000);
+    return;
+  }
+
   // New file
   try {
     ensureAudioGraph();
@@ -684,7 +692,13 @@ async function previewAudio(filePath) {
     audioPlayer.src = convertFileSrc(filePath);
     audioPlayer.loop = audioLooping;
     audioPlayerPath = filePath;
-    await audioPlayer.play();
+    try {
+      await audioPlayer.play();
+    } catch (playErr) {
+      // Retry once after resuming context
+      if (_playbackCtx.state === 'suspended') await _playbackCtx.resume().catch(() => {});
+      await audioPlayer.play();
+    }
 
     // Show now-playing bar, restore expanded state from prefs
     const np = document.getElementById('audioNowPlaying');
@@ -934,7 +948,7 @@ async function toggleMetadata(filePath, event) {
       <div class="waveform-time-label">${meta.duration ? formatTime(meta.duration) : ''}</div>
     </div>`;
 
-    metaRow.innerHTML = `<td colspan="7"><div style="position:relative;"><span class="meta-close-btn" data-action="closeMetaRow" title="Close metadata panel">&#10005;</span><div class="audio-meta-panel">${waveformHtml}${items}</div></div></td>`;
+    metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel"><span class="meta-close-btn" data-action="closeMetaRow" title="Close metadata panel">&#10005;</span>${waveformHtml}${items}</div></td>`;
 
     // Draw waveform on the meta canvas
     drawMetaWaveform(filePath);
