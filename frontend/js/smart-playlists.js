@@ -205,8 +205,8 @@ function showSmartPlaylistEditor(existingId) {
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="btn-small btn-secondary sp-add-rule" style="font-size:10px;padding:4px 10px;" title="Add another rule">+ Add Rule</button>
         <span style="flex:1"></span>
-        <button class="btn-small btn-secondary sp-cancel" style="font-size:10px;padding:4px 12px;">Cancel</button>
-        <button class="btn-small btn-play sp-save" style="font-size:10px;padding:4px 12px;">${existing ? 'Update' : 'Create'}</button>
+        <button class="btn-small btn-secondary sp-cancel" style="font-size:10px;padding:4px 12px;" title="Cancel without saving">Cancel</button>
+        <button class="btn-small btn-play sp-save" style="font-size:10px;padding:4px 12px;" title="${existing ? 'Update playlist rules' : 'Create new smart playlist'}">${existing ? 'Update' : 'Create'}</button>
       </div>
       <div class="sp-preview" style="margin-top:10px;font-size:10px;color:var(--text-dim);border-top:1px solid var(--border);padding-top:8px;"></div>
     `;

@@ -129,10 +129,18 @@ function renderBreadcrumb(dirPath) {
 function renderFileList() {
   const list = document.getElementById('fileList');
   if (!list) return;
-  const search = (document.getElementById('fileSearchInput')?.value || '').toLowerCase();
-  const filtered = search
-    ? _fileBrowserEntries.filter(e => e.name.toLowerCase().includes(search))
-    : _fileBrowserEntries;
+  const search = (document.getElementById('fileSearchInput')?.value || '').trim();
+  let filtered;
+  if (search) {
+    const scored = _fileBrowserEntries.map(e => {
+      const score = typeof searchScore === 'function' ? searchScore(search, [e.name, e.ext], 'fuzzy') : (e.name.toLowerCase().includes(search.toLowerCase()) ? 1 : 0);
+      return { entry: e, score };
+    }).filter(s => s.score > 0);
+    scored.sort((a, b) => b.score - a.score);
+    filtered = scored.map(s => s.entry);
+  } else {
+    filtered = _fileBrowserEntries;
+  }
 
   if (filtered.length === 0) {
     list.innerHTML = '<div class="state-message"><div class="state-icon">&#128193;</div><h2>Empty Directory</h2></div>';
@@ -142,14 +150,255 @@ function renderFileList() {
   list.innerHTML = filtered.map(e => {
     const note = typeof noteIndicator === 'function' ? noteIndicator(e.path) : '';
     const cls = e.isDir ? ' file-dir' : '';
+    const isAudio = !e.isDir && AUDIO_EXTS.includes(e.ext);
+
+    // Extra metadata for audio files
+    let extras = '';
+    if (isAudio) {
+      const parts = [];
+      // BPM from cache
+      if (typeof _bpmCache !== 'undefined' && _bpmCache[e.path]) {
+        parts.push(`<span class="file-meta-tag file-meta-bpm" title="BPM">${_bpmCache[e.path]}</span>`);
+      }
+      // Key from cache
+      if (typeof _keyCache !== 'undefined' && _keyCache[e.path]) {
+        parts.push(`<span class="file-meta-tag file-meta-key" title="Musical key">${escapeHtml(_keyCache[e.path])}</span>`);
+      }
+      // Favorite
+      if (typeof isFavorite === 'function' && isFavorite(e.path)) {
+        parts.push('<span class="file-meta-tag file-meta-fav" title="Favorited">&#9733;</span>');
+      }
+      // Tags from notes
+      if (typeof getNote === 'function') {
+        const n = getNote(e.path);
+        if (n && n.tags && n.tags.length > 0) {
+          parts.push(`<span class="file-meta-tag file-meta-tags" title="Tags: ${escapeHtml(n.tags.join(', '))}">${escapeHtml(n.tags.slice(0, 2).join(', '))}${n.tags.length > 2 ? '…' : ''}</span>`);
+        }
+      }
+      // Duration from sample data
+      if (typeof allAudioSamples !== 'undefined') {
+        const sample = allAudioSamples.find(s => s.path === e.path);
+        if (sample && sample.duration) {
+          parts.push(`<span class="file-meta-tag file-meta-dur" title="Duration">${typeof formatTime === 'function' ? formatTime(sample.duration) : sample.duration.toFixed(1) + 's'}</span>`);
+        }
+      }
+      if (parts.length > 0) extras = `<span class="file-meta-tags-row">${parts.join('')}</span>`;
+    }
+
+    const waveformHtml = isAudio ? `<canvas class="file-waveform" data-wf-path="${escapeHtml(e.path)}" width="120" height="24" title="Waveform preview"></canvas>` : '';
     return `<div class="file-row${cls}" data-file-path="${escapeHtml(e.path)}" data-file-dir="${e.isDir}">
       <span class="file-icon">${fileIcon(e)}</span>
-      <span class="file-name">${note}${escapeHtml(e.name)}</span>
+      <span class="file-name">${note}${search && typeof highlightMatch === 'function' ? highlightMatch(e.name, search, 'fuzzy') : escapeHtml(e.name)}${extras}</span>
+      ${waveformHtml}
       <span class="file-ext">${e.isDir ? 'DIR' : e.ext}</span>
       <span class="file-size">${e.isDir ? '' : e.sizeFormatted}</span>
       <span class="file-date">${e.modified}</span>
     </div>`;
   }).join('');
+
+  // Lazy-load waveforms for visible audio files
+  requestAnimationFrame(() => initFileBrowserWaveforms());
+}
+
+// ── Lazy waveform rendering for file browser audio rows ──
+function initFileBrowserWaveforms() {
+  const container = document.getElementById('fileList');
+  if (!container) return;
+  const canvases = container.querySelectorAll('canvas.file-waveform');
+  if (canvases.length === 0) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const canvas = entry.target;
+      if (canvas._wfDrawn) continue;
+      canvas._wfDrawn = true;
+      observer.unobserve(canvas);
+      drawMiniWaveform(canvas, canvas.dataset.wfPath);
+    }
+  }, { root: container.closest('.tab-content'), threshold: 0.1 });
+
+  canvases.forEach(c => observer.observe(c));
+}
+
+async function drawMiniWaveform(canvas, filePath) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+
+  // Check cache first
+  if (typeof _waveformCache !== 'undefined' && _waveformCache[filePath]) {
+    renderMiniWf(ctx, w, h, _waveformCache[filePath]);
+    return;
+  }
+
+  try {
+    if (!window._fbAudioCtx) window._fbAudioCtx = new AudioContext();
+    const src = typeof convertFileSrc === 'function' ? convertFileSrc(filePath) : filePath;
+    const resp = await fetch(src);
+    const buf = await resp.arrayBuffer();
+    const audioBuf = await window._fbAudioCtx.decodeAudioData(buf);
+    const raw = audioBuf.getChannelData(0);
+
+    const bars = w;
+    const step = Math.floor(raw.length / bars);
+    const peaks = [];
+    for (let i = 0; i < bars; i++) {
+      let max = 0, min = 0;
+      const start = i * step;
+      for (let j = start; j < start + step && j < raw.length; j++) {
+        if (raw[j] > max) max = raw[j];
+        if (raw[j] < min) min = raw[j];
+      }
+      peaks.push({ max, min });
+    }
+
+    if (typeof _waveformCache !== 'undefined') _waveformCache[filePath] = peaks;
+    renderMiniWf(ctx, w, h, peaks);
+  } catch {
+    // Draw flat line
+    ctx.strokeStyle = 'rgba(5,217,232,0.2)';
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    ctx.lineTo(w, h / 2);
+    ctx.stroke();
+  }
+}
+
+function renderMiniWf(ctx, w, h, peaks) {
+  const mid = h / 2;
+  const isNew = peaks.length > 0 && typeof peaks[0] === 'object';
+  ctx.clearRect(0, 0, w, h);
+
+  if (isNew) {
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    for (let i = 0; i < peaks.length; i++) {
+      ctx.lineTo(i, mid - peaks[i].max * mid * 0.9);
+    }
+    for (let i = peaks.length - 1; i >= 0; i--) {
+      ctx.lineTo(i, mid - peaks[i].min * mid * 0.9);
+    }
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, 'rgba(5,217,232,0.4)');
+    grad.addColorStop(1, 'rgba(211,0,197,0.4)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+  } else {
+    for (let i = 0; i < peaks.length; i++) {
+      const barH = (typeof peaks[i] === 'number' ? peaks[i] : 0) * mid * 0.9;
+      ctx.fillStyle = 'rgba(5,217,232,0.4)';
+      ctx.fillRect(i, mid - barH, 1, barH * 2);
+    }
+  }
+}
+
+// ── Expandable metadata panel for audio files in file browser ──
+let _fbExpandedPath = null;
+
+async function toggleFileBrowserMeta(filePath) {
+  const list = document.getElementById('fileList');
+  if (!list) return;
+  const existing = document.getElementById('fbMetaPanel');
+  if (existing) {
+    const wasPath = existing.dataset.metaPath;
+    existing.remove();
+    if (wasPath === filePath) { _fbExpandedPath = null; return; }
+  }
+
+  _fbExpandedPath = filePath;
+  const row = list.querySelector(`.file-row[data-file-path="${CSS.escape(filePath)}"]`);
+  if (!row) return;
+
+  // Insert loading panel
+  const panel = document.createElement('div');
+  panel.id = 'fbMetaPanel';
+  panel.dataset.metaPath = filePath;
+  panel.className = 'fb-meta-panel';
+  panel.innerHTML = '<div style="text-align:center;padding:12px;"><div class="spinner" style="width:14px;height:14px;margin:0 auto;"></div></div>';
+  row.after(panel);
+
+  try {
+    const meta = await window.vstUpdater.getAudioMetadata(filePath);
+    if (_fbExpandedPath !== filePath) return;
+    const p = document.getElementById('fbMetaPanel');
+    if (!p) return;
+
+    const mi = (label, value) => value ? `<div class="fb-meta-item" title="${escapeHtml(label)}: ${escapeHtml(String(value))}"><span class="fb-meta-label">${label}</span><span class="fb-meta-val">${escapeHtml(String(value))}</span></div>` : '';
+
+    let html = '<div class="fb-meta-grid">';
+    html += mi('Format', meta.format);
+    html += mi('Size', typeof formatAudioSize === 'function' ? formatAudioSize(meta.sizeBytes) : meta.sizeBytes);
+    if (meta.sampleRate) html += mi('Sample Rate', meta.sampleRate.toLocaleString() + ' Hz');
+    if (meta.bitsPerSample) html += mi('Bit Depth', meta.bitsPerSample + '-bit');
+    if (meta.channels) html += mi('Channels', meta.channels === 1 ? 'Mono' : meta.channels === 2 ? 'Stereo' : meta.channels + ' ch');
+    if (meta.duration) html += mi('Duration', typeof formatTime === 'function' ? formatTime(meta.duration) : meta.duration.toFixed(1) + 's');
+    if (meta.byteRate) html += mi('Byte Rate', (typeof formatAudioSize === 'function' ? formatAudioSize(meta.byteRate) : meta.byteRate) + '/s');
+
+    // BPM
+    html += `<div class="fb-meta-item" title="BPM"><span class="fb-meta-label">BPM</span><span class="fb-meta-val" id="fbBpmVal"><span class="spinner" style="width:8px;height:8px;"></span></span></div>`;
+    // Key
+    html += `<div class="fb-meta-item" title="Musical Key"><span class="fb-meta-label">Key</span><span class="fb-meta-val" id="fbKeyVal"><span class="spinner" style="width:8px;height:8px;"></span></span></div>`;
+
+    const fmtDate = (v) => { if (!v) return '—'; const d = new Date(v); return isNaN(d) ? '—' : d.toLocaleString(); };
+    html += mi('Created', fmtDate(meta.created));
+    html += mi('Modified', fmtDate(meta.modified));
+    html += mi('Permissions', meta.permissions);
+    html += mi('Path', meta.fullPath);
+    html += '</div>';
+
+    // Favorite, Notes, Tags as grid items
+    const isFav = typeof isFavorite === 'function' && isFavorite(filePath);
+    html += mi('Favorite', isFav ? '★ Yes' : '☆ No');
+    const noteData = typeof getNote === 'function' ? getNote(filePath) : null;
+    const tags = noteData?.tags?.length ? noteData.tags.join(', ') : '';
+    html += mi('Tags', tags || '—');
+    const noteText = noteData?.note || '';
+    if (noteText) html += mi('Note', noteText);
+
+    p.innerHTML = html;
+
+    // Async BPM + Key
+    const bpmFormats = ['wav', 'aiff', 'aif', 'mp3', 'flac', 'ogg', 'm4a', 'aac', 'opus'];
+    if (bpmFormats.includes(meta.format?.toLowerCase() || '')) {
+      // BPM
+      (async () => {
+        try {
+          if (typeof _bpmCache !== 'undefined' && _bpmCache[filePath] !== undefined) {
+            const el = document.getElementById('fbBpmVal');
+            if (el) el.textContent = _bpmCache[filePath] ? _bpmCache[filePath] + ' BPM' : '—';
+            return;
+          }
+          const bpm = await window.vstUpdater.estimateBpm(filePath);
+          if (typeof _bpmCache !== 'undefined') _bpmCache[filePath] = bpm;
+          const el = document.getElementById('fbBpmVal');
+          if (el && _fbExpandedPath === filePath) el.textContent = bpm ? bpm + ' BPM' : '—';
+        } catch { const el = document.getElementById('fbBpmVal'); if (el) el.textContent = '—'; }
+      })();
+      // Key
+      (async () => {
+        try {
+          if (typeof _keyCache !== 'undefined' && _keyCache[filePath] !== undefined) {
+            const el = document.getElementById('fbKeyVal');
+            if (el) el.textContent = _keyCache[filePath] || '—';
+            return;
+          }
+          const key = await window.vstUpdater.detectAudioKey(filePath);
+          if (typeof _keyCache !== 'undefined') _keyCache[filePath] = key;
+          const el = document.getElementById('fbKeyVal');
+          if (el && _fbExpandedPath === filePath) el.textContent = key || '—';
+        } catch { const el = document.getElementById('fbKeyVal'); if (el) el.textContent = '—'; }
+      })();
+    } else {
+      const bEl = document.getElementById('fbBpmVal');
+      const kEl = document.getElementById('fbKeyVal');
+      if (bEl) bEl.textContent = '—';
+      if (kEl) kEl.textContent = '—';
+    }
+  } catch (err) {
+    const p = document.getElementById('fbMetaPanel');
+    if (p) p.innerHTML = `<div style="padding:8px;color:var(--red);font-size:11px;">Failed: ${escapeHtml(err.message || String(err))}</div>`;
+  }
 }
 
 // Click to navigate dirs or play/open files
@@ -161,7 +410,7 @@ document.addEventListener('click', (e) => {
   }
 
   const row = e.target.closest('.file-row');
-  if (row) {
+  if (row && !e.target.closest('.fb-meta-panel')) {
     const path = row.dataset.filePath;
     const isDir = row.dataset.fileDir === 'true';
     if (isDir) {
@@ -170,6 +419,7 @@ document.addEventListener('click', (e) => {
       const ext = path.split('.').pop().toLowerCase();
       if (AUDIO_EXTS.includes(ext)) {
         previewAudio(path);
+        toggleFileBrowserMeta(path);
       } else {
         opener_open(path);
       }

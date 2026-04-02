@@ -137,7 +137,7 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); typeof loadDirectory === 'function' && loadDirectory(path.replace(/\/[^/]+$/, '')); } },
       '---',
       { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
-      { icon: '&#128270;', label: 'Find Similar to This', action: () => { typeof closeSimilarModal === 'function' && closeSimilarModal(); typeof findSimilarSamples === 'function' && findSimilarSamples(path); } },
+      { icon: '&#128270;', label: 'Find Similar to This', action: () => { typeof closeSimilarPanel === 'function' && closeSimilarPanel(); typeof findSimilarSamples === 'function' && findSimilarSamples(path); } },
     ];
     if (typeof isFavorite === 'function') {
       const fav = isFavorite(path);
@@ -236,6 +236,28 @@ document.addEventListener('contextmenu', (e) => {
       ...quickTagItems(path, name),
       '---',
       { icon: '&#128270;', label: 'Find Similar Samples', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) },
+      '---',
+      ...[(() => { const on = prefs.getItem('expandOnClick') !== 'off'; return { icon: on ? '&#9660;' : '&#9654;', label: on ? 'Disable Row Expand' : 'Enable Row Expand',
+        action: () => {
+          if (on) {
+            // Disable: close any expanded row
+            prefs.setItem('expandOnClick', 'off');
+            const meta = document.getElementById('audioMetaRow');
+            if (meta) { meta.remove(); expandedMetaPath = null; }
+            const exp = document.querySelector('#audioTableBody tr.row-expanded');
+            if (exp) exp.classList.remove('row-expanded');
+          } else {
+            // Enable, play, and expand the right-clicked row
+            prefs.setItem('expandOnClick', 'on');
+            if (typeof previewAudio === 'function') previewAudio(path);
+            const row = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`);
+            if (row) row.click();
+          }
+          if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
+          showToast(on ? 'Row expand disabled' : 'Row expand enabled');
+        } }; })()],
+      ...[(() => { const ap = prefs.getItem('autoplayNext') !== 'off'; return { icon: ap ? '&#9209;' : '&#9654;', label: ap ? 'Disable Autoplay Next' : 'Enable Autoplay Next',
+        action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? 'Autoplay next disabled' : 'Autoplay next enabled'); } }; })()],
     ];
     showContextMenu(e, items);
     return;
@@ -414,6 +436,9 @@ document.addEventListener('contextmenu', (e) => {
       return;
     }
     const items = [
+      { icon: '&#128202;', label: 'Heatmap Dashboard', action: () => { if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard(); } },
+      { icon: '&#128200;', label: 'Dependency Graph', action: () => { if (typeof showDepGraph === 'function') showDepGraph(); } },
+      '---',
       { icon: '&#127760;', label: 'Open GitHub Repository', action: () => openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager') },
       { icon: '&#9881;', label: 'Settings', action: () => switchTab('settings') },
       '---',
@@ -730,6 +755,85 @@ document.addEventListener('contextmenu', (e) => {
     return;
   }
 
+  // ── File browser rows ──
+  const fileRow = e.target.closest('.file-row');
+  if (fileRow && !e.target.closest('.fb-meta-panel')) {
+    const path = fileRow.dataset.filePath;
+    const isDir = fileRow.dataset.fileDir === 'true';
+    const name = path.split('/').pop();
+    const ext = name.split('.').pop().toLowerCase();
+    const isAudio = !isDir && typeof AUDIO_EXTS !== 'undefined' && AUDIO_EXTS.includes(ext);
+    const items = [];
+    if (isAudio) {
+      items.push({ icon: '&#9654;', label: 'Play', action: () => typeof previewAudio === 'function' && previewAudio(path) });
+      items.push({ icon: '&#128269;', label: 'Show in Samples Tab', action: async () => {
+        // If not in allAudioSamples, add it
+        if (typeof allAudioSamples !== 'undefined' && !allAudioSamples.some(s => s.path === path)) {
+          try {
+            const meta = await window.vstUpdater.getAudioMetadata(path);
+            allAudioSamples.push({
+              name: meta.fileName.replace(/\.[^.]+$/, ''),
+              path: meta.fullPath,
+              directory: meta.directory || path.replace(/\/[^/]+$/, ''),
+              format: meta.format,
+              size: meta.sizeBytes,
+              sizeBytes: meta.sizeBytes,
+              sizeFormatted: typeof formatAudioSize === 'function' ? formatAudioSize(meta.sizeBytes) : '',
+              modified: meta.modified || '',
+              duration: meta.duration || null,
+              sampleRate: meta.sampleRate || null,
+              channels: meta.channels || null,
+              bitsPerSample: meta.bitsPerSample || null,
+            });
+          } catch {}
+        }
+        switchTab('samples');
+        // Clear any existing search filter so the row is visible
+        const searchInput = document.getElementById('audioSearchInput');
+        if (searchInput && searchInput.value) { searchInput.value = ''; }
+        if (typeof filterAudioSamples === 'function') filterAudioSamples();
+        // Scroll to and highlight the row
+        setTimeout(() => {
+          const row = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`);
+          if (row) {
+            row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            row.classList.add('row-playing');
+            setTimeout(() => row.classList.remove('row-playing'), 2000);
+          }
+        }, 100);
+      }});
+      items.push({ icon: '&#128270;', label: 'Find Similar', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
+      items.push('---');
+    }
+    if (isDir) {
+      items.push({ icon: '&#128193;', label: 'Open Directory', action: () => typeof loadDirectory === 'function' && loadDirectory(path) });
+    }
+    items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => {
+      const dir = isDir ? path : path.replace(/\/[^/]+$/, '');
+      if (typeof openFolder === 'function') openFolder(dir);
+      else if (typeof openAudioFolder === 'function') openAudioFolder(path);
+    }});
+    items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) });
+    items.push({ icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) });
+    if (!isDir) {
+      items.push('---');
+      if (typeof isFavorite === 'function') {
+        const fav = isFavorite(path);
+        items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? 'Remove from Favorites' : 'Add to Favorites',
+          action: () => { fav ? removeFavorite(path) : addFavorite('file', path, name); if (typeof renderFileList === 'function') renderFileList(); } });
+      }
+      items.push({ icon: '&#128221;', label: 'Add Note', action: () => { if (typeof showNoteEditor === 'function') showNoteEditor(path, name); } });
+    }
+    if (isAudio) {
+      items.push('---');
+      const ap = prefs.getItem('autoplayNext') !== 'off';
+      items.push({ icon: ap ? '&#9209;' : '&#9654;', label: ap ? 'Disable Autoplay Next' : 'Enable Autoplay Next',
+        action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? 'Autoplay next disabled' : 'Autoplay next enabled'); } });
+    }
+    showContextMenu(e, items);
+    return;
+  }
+
   // ── Disk usage segments ──
   const diskSeg = e.target.closest('.disk-segment, .disk-legend-item');
   if (diskSeg) {
@@ -749,6 +853,38 @@ document.addEventListener('contextmenu', (e) => {
     ];
     showContextMenu(e, items);
     return;
+  }
+
+  // ── Expanded metadata panel ──
+  const metaPanel = e.target.closest('.audio-meta-panel');
+  if (metaPanel && !e.target.closest('.meta-waveform')) {
+    const metaRow = metaPanel.closest('#audioMetaRow');
+    const path = metaRow?.getAttribute('data-meta-path') || '';
+    const metaValue = e.target.closest('.meta-item');
+    const items = [];
+    // Copy the specific value if clicking a meta-item
+    if (metaValue) {
+      const label = metaValue.querySelector('.meta-label')?.textContent || '';
+      const val = metaValue.querySelector('.meta-value')?.textContent || '';
+      items.push({ icon: '&#128203;', label: `Copy ${label}`, action: () => copyToClipboard(val) });
+    }
+    if (path) {
+      items.push({ icon: '&#128203;', label: 'Copy File Path', action: () => copyToClipboard(path) });
+      items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) });
+      items.push('---');
+      items.push({ icon: '&#9654;', label: 'Play', action: () => typeof previewAudio === 'function' && previewAudio(path) });
+      if (typeof isFavorite === 'function') {
+        const fav = isFavorite(path);
+        const name = metaPanel.querySelector('.meta-value')?.textContent || '';
+        items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? 'Remove from Favorites' : 'Add to Favorites',
+          action: () => fav ? removeFavorite(path) : addFavorite('sample', path, name) });
+      }
+      items.push({ icon: '&#128221;', label: 'Add Note', action: () => { const name = metaPanel.querySelector('.meta-value')?.textContent || ''; typeof showNoteEditor === 'function' && showNoteEditor(path, name); } });
+      items.push({ icon: '&#128270;', label: 'Find Similar', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
+      items.push('---');
+      items.push({ icon: '&#10005;', label: 'Close Panel', action: () => { const mr = document.getElementById('audioMetaRow'); if (mr) mr.remove(); expandedMetaPath = null; } });
+    }
+    if (items.length > 0) { showContextMenu(e, items); return; }
   }
 
   // ── Waveform ──
@@ -815,6 +951,46 @@ document.addEventListener('contextmenu', (e) => {
         }});
       }
     }
+    showContextMenu(e, items);
+    return;
+  }
+
+  // ── Similar panel ──
+  const simPanel = e.target.closest('.similar-panel');
+  if (simPanel && !e.target.closest('[data-similar-path]')) {
+    const items = [
+      { icon: '&#9866;', label: 'Minimize', action: () => typeof minimizeSimilarPanel === 'function' && minimizeSimilarPanel() },
+      { icon: '&#10005;', label: 'Close', action: () => typeof closeSimilarPanel === 'function' && closeSimilarPanel() },
+    ];
+    showContextMenu(e, items);
+    return;
+  }
+
+  // ── Heatmap dashboard ──
+  const hmDash = e.target.closest('#heatmapDashModal');
+  if (hmDash) {
+    const card = e.target.closest('.hm-card');
+    const barRow = e.target.closest('.hm-bar-row');
+    const items = [];
+    if (barRow) {
+      const label = barRow.querySelector('.hm-bar-label')?.textContent || '';
+      const val = barRow.querySelector('.hm-bar-val')?.textContent || '';
+      items.push({ icon: '&#128203;', label: `Copy "${label}: ${val}"`, action: () => copyToClipboard(`${label}: ${val}`) });
+    }
+    if (card) {
+      const title = card.querySelector('.hm-card-title')?.textContent || '';
+      items.push({ icon: '&#128203;', label: `Copy ${title} Data`, action: () => {
+        const rows = [...card.querySelectorAll('.hm-bar-row')].map(r => {
+          const l = r.querySelector('.hm-bar-label')?.textContent || '';
+          const v = r.querySelector('.hm-bar-val')?.textContent || '';
+          return `${l}\t${v}`;
+        }).join('\n');
+        copyToClipboard(rows || title);
+      }});
+    }
+    items.push('---');
+    items.push({ icon: '&#8634;', label: 'Refresh Dashboard', action: () => { if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard(); } });
+    items.push({ icon: '&#10005;', label: 'Close Dashboard', action: () => { if (typeof closeHeatmapDash === 'function') closeHeatmapDash(); } });
     showContextMenu(e, items);
     return;
   }

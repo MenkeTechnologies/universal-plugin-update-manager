@@ -427,6 +427,80 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_goertzel_near_zero_for_absent_frequency() {
+        // Pure 440Hz sine should have near-zero energy at 261.63Hz (C4)
+        let sr = 44100.0;
+        let n = 4096;
+        let samples: Vec<f64> = (0..n)
+            .map(|i| (2.0 * std::f64::consts::PI * 440.0 * i as f64 / sr).sin())
+            .collect();
+
+        let power_440 = goertzel(&samples, 440.0, sr);
+        let power_261 = goertzel(&samples, 261.63, sr);
+        assert!(
+            power_261 < power_440 * 0.01,
+            "261Hz should have <1% of 440Hz energy: 261={}, 440={}",
+            power_261,
+            power_440
+        );
+    }
+
+    #[test]
+    fn test_chromagram_chord_c_major() {
+        // C major chord: C4 + E4 + G4 — should light up bins 0 (C), 4 (E), 7 (G)
+        let sr = 44100u32;
+        let n = sr as usize * 2;
+        let samples: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                let c = (2.0 * std::f32::consts::PI * 261.63 * t).sin();
+                let e = (2.0 * std::f32::consts::PI * 329.63 * t).sin();
+                let g = (2.0 * std::f32::consts::PI * 392.00 * t).sin();
+                (c + e + g) * 0.3
+            })
+            .collect();
+
+        let chroma = compute_chromagram(&samples, sr);
+        // C(0), E(4), G(7) should be the top 3 bins
+        let mut indexed: Vec<(usize, f64)> = chroma.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+        indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let top3: Vec<usize> = indexed[..3].iter().map(|&(i, _)| i).collect();
+        assert!(top3.contains(&0), "C should be in top 3, got {:?}", top3);
+        assert!(top3.contains(&4), "E should be in top 3, got {:?}", top3);
+        assert!(top3.contains(&7), "G should be in top 3, got {:?}", top3);
+    }
+
+    #[test]
+    fn test_detect_key_high_sample_rate() {
+        // 96kHz sample rate should still work
+        let tmp = std::env::temp_dir().join("key_test_96k.wav");
+        let sr = 96000u32;
+        let n = sr as usize * 2;
+        let samples: Vec<f32> = (0..n)
+            .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sr as f32).sin() * 0.8)
+            .collect();
+        write_test_wav(&tmp, &samples, sr);
+        let key = detect_key(tmp.to_str().unwrap());
+        assert!(key.is_some(), "should detect key at 96kHz");
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_detect_key_low_sample_rate() {
+        // 8kHz — very few frequency bins, may return None but should not panic
+        let tmp = std::env::temp_dir().join("key_test_8k.wav");
+        let sr = 8000u32;
+        let n = sr as usize * 2;
+        let samples: Vec<f32> = (0..n)
+            .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sr as f32).sin() * 0.8)
+            .collect();
+        write_test_wav(&tmp, &samples, sr);
+        // Should not panic regardless of result
+        let _ = detect_key(tmp.to_str().unwrap());
+        let _ = std::fs::remove_file(&tmp);
+    }
+
     fn write_test_wav(path: &Path, samples: &[f32], sample_rate: u32) {
         let n = samples.len() as u32;
         let data_size = n * 2;

@@ -7,8 +7,10 @@ const DEFAULT_SHORTCUTS = {
   'tab4': { key: '4', mod: true, label: 'Presets tab' },
   'tab5': { key: '5', mod: true, label: 'Favorites tab' },
   'tab6': { key: '6', mod: true, label: 'Notes tab' },
-  'tab7': { key: '7', mod: true, label: 'History tab' },
-  'tab8': { key: '8', mod: true, label: 'Settings tab' },
+  'tab7': { key: '7', mod: true, label: 'Tags tab' },
+  'tab8': { key: '8', mod: true, label: 'Files tab' },
+  'tab9': { key: '9', mod: true, label: 'History tab' },
+  'tab10': { key: '0', mod: true, label: 'Settings tab' },
   'search': { key: 'f', mod: true, label: 'Focus search' },
   'help': { key: '?', mod: false, label: 'Help overlay' },
   'playPause': { key: ' ', mod: false, label: 'Play / Pause' },
@@ -45,9 +47,10 @@ const DEFAULT_SHORTCUTS = {
   'newSmartPlaylist': { key: 'p', mod: true, label: 'New smart playlist' },
   'deselectAll': { key: 'Escape', mod: true, label: 'Deselect all' },
   'toggleABLoop': { key: 'b', mod: false, label: 'Set / clear A-B loop' },
+  'heatmapDash': { key: 'd', mod: false, label: 'Heatmap dashboard' },
 };
 
-const TAB_MAP = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'history', 'settings'];
+const TAB_MAP = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'tags', 'files', 'history', 'settings'];
 
 function getShortcuts() {
   const saved = prefs.getObject('customShortcuts', null);
@@ -173,8 +176,9 @@ document.addEventListener('keydown', (e) => {
 }, true); // capture phase to override other handlers
 
 function executeShortcut(id) {
-  if (id.startsWith('tab') && id.length === 4) {
-    const idx = parseInt(id[3]) - 1;
+  if (id.startsWith('tab') && id.length >= 4 && id.length <= 5) {
+    const num = parseInt(id.slice(3));
+    const idx = (num === 10 ? 9 : num - 1);
     if (idx >= 0 && idx < TAB_MAP.length) switchTab(TAB_MAP[idx]);
   } else if (id === 'search') {
     const activeTab = document.querySelector('.tab-content.active');
@@ -256,6 +260,8 @@ function executeShortcut(id) {
     } else {
       if (typeof setAbLoopStart === 'function') setAbLoopStart();
     }
+  } else if (id === 'heatmapDash') {
+    if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard();
   }
 }
 

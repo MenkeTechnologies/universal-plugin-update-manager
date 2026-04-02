@@ -412,7 +412,14 @@ fn detect_tempo(samples: &[f32], sample_rate: u32) -> Option<f64> {
         final_bpm
     };
 
-    Some((refined_bpm * 10.0).round() / 10.0)
+    // Round to nearest whole number if within 0.15, otherwise keep 1 decimal
+    let rounded = (refined_bpm * 10.0).round() / 10.0;
+    let nearest_int = rounded.round();
+    if (rounded - nearest_int).abs() < 0.15 {
+        Some(nearest_int)
+    } else {
+        Some(rounded)
+    }
 }
 
 #[cfg(test)]

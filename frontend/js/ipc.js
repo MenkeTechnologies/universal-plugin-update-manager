@@ -124,6 +124,7 @@ document.addEventListener('click', (e) => {
     case 'stopDawScan': stopDawScan(); break;
     case 'buildXrefIndex': buildXrefIndex().then(() => filterDawProjects()); break;
     case 'showDepGraph': showDepGraph(); break;
+    case 'showHeatmapDash': if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard(); break;
     case 'scanPresets': scanPresets(); break;
     case 'resumePresetScan': scanPresets(true); break;
     case 'stopPresetScan': stopPresetScan(); break;

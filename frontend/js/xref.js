@@ -212,6 +212,77 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ── ALS XML Tree Builder ──
+function buildXmlTree(node, depth) {
+  const el = document.createElement('div');
+  el.className = 'xml-node';
+  el.style.paddingLeft = (depth * 16) + 'px';
+
+  if (node.nodeType === 3) {
+    // Text node
+    const text = node.textContent.trim();
+    if (text) {
+      el.innerHTML = `<span class="xml-text">${escapeHtml(text)}</span>`;
+    }
+    return el;
+  }
+
+  if (node.nodeType !== 1) return el; // skip non-element nodes
+
+  const tagName = node.tagName;
+  const childElements = [...node.childNodes].filter(c =>
+    (c.nodeType === 1) || (c.nodeType === 3 && c.textContent.trim())
+  );
+  const hasChildren = childElements.length > 0;
+
+  // Build attributes string
+  let attrsHtml = '';
+  if (node.attributes.length > 0) {
+    const attrs = [...node.attributes].map(a =>
+      ` <span class="xml-attr-name">${escapeHtml(a.name)}</span>=<span class="xml-attr-val">"${escapeHtml(a.value)}"</span>`
+    ).join('');
+    attrsHtml = `<span class="xml-attrs">${attrs}</span>`;
+  }
+
+  if (hasChildren) {
+    const childCount = [...node.children].length;
+    const summary = childCount > 0 ? `<span class="xml-collapsed-summary" style="display:none;color:var(--text-dim);font-size:10px;"> ...${childCount} children</span>` : '';
+    el.innerHTML = `<span class="xml-toggle" title="Click to collapse/expand" style="cursor:pointer;color:var(--cyan);display:inline-block;width:14px;text-align:center;user-select:none;">▼</span><span class="xml-tag" style="color:var(--cyan);">&lt;${escapeHtml(tagName)}</span>${attrsHtml}<span style="color:var(--cyan);">&gt;</span>${summary}`;
+
+    const childContainer = document.createElement('div');
+    childContainer.className = 'xml-children';
+    for (const child of childElements) {
+      childContainer.appendChild(buildXmlTree(child, depth + 1));
+    }
+    el.appendChild(childContainer);
+
+    // Closing tag
+    const closeTag = document.createElement('div');
+    closeTag.style.paddingLeft = (depth * 16) + 'px';
+    closeTag.innerHTML = `<span style="display:inline-block;width:14px;"></span><span style="color:var(--cyan);">&lt;/${escapeHtml(tagName)}&gt;</span>`;
+    closeTag.className = 'xml-close-tag';
+    childContainer.appendChild(closeTag);
+
+    // Auto-collapse deep nodes (depth > 2) to keep initial view manageable
+    if (depth > 2) {
+      childContainer.style.display = 'none';
+      el.querySelector('.xml-toggle').textContent = '▶';
+      const sm = el.querySelector('.xml-collapsed-summary');
+      if (sm) sm.style.display = '';
+    }
+  } else {
+    // Self-closing or text-only
+    const textContent = node.textContent.trim();
+    if (textContent && !node.children.length) {
+      el.innerHTML = `<span style="display:inline-block;width:14px;"></span><span class="xml-tag" style="color:var(--cyan);">&lt;${escapeHtml(tagName)}</span>${attrsHtml}<span style="color:var(--cyan);">&gt;</span><span class="xml-text">${escapeHtml(textContent)}</span><span style="color:var(--cyan);">&lt;/${escapeHtml(tagName)}&gt;</span>`;
+    } else {
+      el.innerHTML = `<span style="display:inline-block;width:14px;"></span><span class="xml-tag" style="color:var(--cyan);">&lt;${escapeHtml(tagName)}</span>${attrsHtml}<span style="color:var(--cyan);"> /&gt;</span>`;
+    }
+  }
+
+  return el;
+}
+
 // ── ALS XML Viewer ──
 async function showAlsViewer(filePath, projectName) {
   let existing = document.getElementById('alsViewerModal');
@@ -236,39 +307,81 @@ async function showAlsViewer(filePath, projectName) {
     if (!modal) return;
     const body = modal.querySelector('.modal-body');
 
-    // Format XML with indentation highlighting
-    const escaped = escapeHtml(xml);
-    const lines = escaped.split('\n');
-    const lineCount = lines.length;
+    const lineCount = xml.split('\n').length;
 
     body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
       <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
-        <span style="font-size:11px;color:var(--text-muted);">${lineCount.toLocaleString()} lines | ${formatAudioSize(xml.length)} uncompressed</span>
+        <span style="font-size:11px;color:var(--text-muted);">${lineCount.toLocaleString()} lines | ${typeof formatAudioSize === 'function' ? formatAudioSize(xml.length) : Math.round(xml.length/1024) + ' KB'} uncompressed</span>
         <input type="text" class="np-search-input" id="alsSearchInput" placeholder="Search XML..." style="flex:1;max-width:300px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Search within XML content">
-        <button class="btn btn-secondary" id="alsExportBtn" style="padding:4px 10px;font-size:10px;" title="Save decompressed XML to file">&#8615; Export XML</button>
+        <button class="btn btn-secondary" id="alsCollapseAllBtn" style="padding:4px 10px;font-size:10px;" title="Collapse all XML nodes">Collapse All</button>
+        <button class="btn btn-secondary" id="alsExpandAllBtn" style="padding:4px 10px;font-size:10px;" title="Expand all XML nodes">Expand All</button>
+        <button class="btn btn-secondary" id="alsExportBtn" style="padding:4px 10px;font-size:10px;" title="Save decompressed XML to file">&#8615; Export</button>
       </div>
-      <pre id="alsXmlContent" style="flex:1;overflow:auto;margin:0;padding:12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.5;color:var(--text);background:var(--bg-primary);white-space:pre-wrap;word-break:break-all;tab-size:2;">${escaped}</pre>
+      <div id="alsXmlTree" style="flex:1;overflow:auto;margin:0;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);background:var(--bg-primary);"></div>
     </div>`;
 
-    // Search — fzf fuzzy match with highlighted characters, show only matching lines
+    // Parse XML to DOM and render collapsible tree
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    const treeContainer = document.getElementById('alsXmlTree');
+    if (doc.documentElement) {
+      treeContainer.appendChild(buildXmlTree(doc.documentElement, 0));
+    }
+
+    // Collapse/expand click handler
+    treeContainer.addEventListener('click', (ev) => {
+      const toggle = ev.target.closest('.xml-toggle');
+      if (!toggle) return;
+      const node = toggle.closest('.xml-node');
+      if (!node) return;
+      const children = node.querySelector('.xml-children');
+      if (!children) return;
+      const collapsed = children.style.display === 'none';
+      children.style.display = collapsed ? '' : 'none';
+      toggle.textContent = collapsed ? '▼' : '▶';
+      // Show/hide the inline collapsed summary
+      const summary = node.querySelector('.xml-collapsed-summary');
+      if (summary) summary.style.display = collapsed ? 'none' : '';
+    });
+
+    // Collapse All / Expand All
+    document.getElementById('alsCollapseAllBtn')?.addEventListener('click', () => {
+      treeContainer.querySelectorAll('.xml-children').forEach(c => c.style.display = 'none');
+      treeContainer.querySelectorAll('.xml-toggle').forEach(t => t.textContent = '▶');
+      treeContainer.querySelectorAll('.xml-collapsed-summary').forEach(s => s.style.display = '');
+    });
+    document.getElementById('alsExpandAllBtn')?.addEventListener('click', () => {
+      treeContainer.querySelectorAll('.xml-children').forEach(c => c.style.display = '');
+      treeContainer.querySelectorAll('.xml-toggle').forEach(t => t.textContent = '▼');
+      treeContainer.querySelectorAll('.xml-collapsed-summary').forEach(s => s.style.display = 'none');
+    });
+
+    // Search — filter tree nodes
     const rawLines = xml.split('\n');
     document.getElementById('alsSearchInput')?.addEventListener('input', (e) => {
-      const q = e.target.value.trim();
-      const pre = document.getElementById('alsXmlContent');
-      if (!pre) return;
-      if (!q) { pre.innerHTML = escaped; return; }
-      const matched = [];
-      for (let i = 0; i < rawLines.length; i++) {
-        const line = rawLines[i];
-        const score = typeof searchScore === 'function' ? searchScore(q, [line], 'fuzzy') : (line.toLowerCase().includes(q.toLowerCase()) ? 1 : 0);
-        if (score > 0) {
-          const highlighted = typeof highlightMatch === 'function' ? highlightMatch(line, q, 'fuzzy') : escapeHtml(line);
-          matched.push(`<span style="color:var(--text-dim);user-select:none;">${String(i + 1).padStart(5)}</span>  ${highlighted}`);
+      const q = e.target.value.trim().toLowerCase();
+      treeContainer.querySelectorAll('.xml-node').forEach(node => {
+        if (!q) { node.style.display = ''; return; }
+        const tag = node.querySelector('.xml-tag')?.textContent || '';
+        const attrs = node.querySelector('.xml-attrs')?.textContent || '';
+        const text = node.querySelector('.xml-text')?.textContent || '';
+        const match = tag.toLowerCase().includes(q) || attrs.toLowerCase().includes(q) || text.toLowerCase().includes(q);
+        node.style.display = match ? '' : 'none';
+        // Expand parent chain for matches
+        if (match) {
+          let parent = node.parentElement?.closest('.xml-node');
+          while (parent) {
+            parent.style.display = '';
+            const ch = parent.querySelector('.xml-children');
+            if (ch) ch.style.display = '';
+            const tg = parent.querySelector('.xml-toggle');
+            if (tg) tg.textContent = '▼';
+            const sm = parent.querySelector('.xml-collapsed-summary');
+            if (sm) sm.style.display = 'none';
+            parent = parent.parentElement?.closest('.xml-node');
+          }
         }
-      }
-      pre.innerHTML = matched.length > 0
-        ? matched.join('\n')
-        : '<span style="color:var(--text-dim);">No matches</span>';
+      });
     });
 
     // Export

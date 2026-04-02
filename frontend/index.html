@@ -2235,8 +2235,11 @@
       max-width: 700px;
       width: 90%;
       max-height: 80vh;
-      overflow-y: auto;
+      overflow: hidden;
       border-radius: 2px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
     }
     .modal-small { max-width: 480px; }
     .modal-header {
@@ -2263,10 +2266,28 @@
       border-radius: 2px;
     }
     .modal-close:hover { color: var(--red); border-color: var(--red); }
-    .modal-body { padding: 20px; }
+    .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .modal-resize { position: absolute; z-index: 10; }
+    .modal-resize-n { top: -3px; left: 8px; right: 8px; height: 6px; cursor: n-resize; }
+    .modal-resize-s { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: s-resize; }
+    .modal-resize-e { top: 8px; right: -3px; bottom: 8px; width: 6px; cursor: e-resize; }
+    .modal-resize-w { top: 8px; left: -3px; bottom: 8px; width: 6px; cursor: w-resize; }
+    .modal-resize-ne { top: -3px; right: -3px; width: 12px; height: 12px; cursor: ne-resize; }
+    .modal-resize-nw { top: -3px; left: -3px; width: 12px; height: 12px; cursor: nw-resize; }
+    .modal-resize-se { bottom: -3px; right: -3px; width: 12px; height: 12px; cursor: se-resize; }
+    .modal-resize-sw { bottom: -3px; left: -3px; width: 12px; height: 12px; cursor: sw-resize; }
     .modal-wide { max-width: 640px; }
 
     /* Plugin xref */
+    /* XML tree viewer */
+    .xml-node { line-height: 1.5; word-wrap: break-word; overflow-wrap: break-word; }
+    .xml-toggle:hover { color: var(--accent) !important; }
+    .xml-attr-name { color: var(--yellow); }
+    .xml-attr-val { color: var(--green); }
+    .xml-text { color: var(--text); }
+    .xml-collapsed-summary { cursor: pointer; }
+    .xml-close-tag { color: var(--cyan); opacity: 0.7; }
+
     .xref-badge {
       display: inline-flex;
       align-items: center;
@@ -2368,6 +2389,27 @@
     .dep-insight { display: flex; flex-direction: column; align-items: center; padding: 8px 14px; background: var(--bg-hover); border-radius: 6px; border: 1px solid var(--border); min-width: 80px; }
     .dep-insight-val { font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 700; color: var(--cyan); }
     .dep-insight-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-top: 2px; text-align: center; }
+
+    /* Heatmap Dashboard */
+    .hm-overview { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; justify-content: center; }
+    .hm-stat { display: flex; flex-direction: column; align-items: center; padding: 10px 18px; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; min-width: 90px; }
+    .hm-stat-val { font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 700; color: var(--cyan); }
+    .hm-stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-top: 3px; }
+    .hm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .hm-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .hm-card-wide { grid-column: 1 / -1; }
+    .hm-card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--cyan); margin: 0 0 10px 0; font-weight: 600; }
+    .hm-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; font-size: 11px; }
+    .hm-bar-label { min-width: 70px; color: var(--text-muted); text-align: right; font-size: 10px; }
+    .hm-bar-track { flex: 1; height: 10px; background: rgba(26,26,62,0.4); border-radius: 2px; overflow: hidden; }
+    .hm-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+    .hm-bar-cyan { background: linear-gradient(90deg, var(--cyan), rgba(5,217,232,0.3)); }
+    .hm-bar-magenta { background: linear-gradient(90deg, var(--magenta), rgba(211,0,197,0.3)); }
+    .hm-bar-green { background: linear-gradient(90deg, var(--green), rgba(57,255,20,0.3)); }
+    .hm-bar-yellow { background: linear-gradient(90deg, var(--yellow), rgba(249,240,2,0.3)); }
+    .hm-bar-orange { background: linear-gradient(90deg, var(--orange), rgba(255,107,53,0.3)); }
+    .hm-bar-val { min-width: 60px; color: var(--text-dim); font-size: 10px; font-family: 'Orbitron', sans-serif; }
+    .hm-empty { color: var(--text-dim); font-size: 11px; font-style: italic; }
     .dep-bar-count {
       font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 600;
       color: var(--cyan); min-width: 24px; text-align: right;
@@ -2696,6 +2738,20 @@
       width: 50px;
       flex-shrink: 0;
     }
+    .file-waveform { flex-shrink: 0; width: 120px; height: 24px; border-radius: 2px; background: rgba(5,10,20,0.3); }
+    .fb-meta-panel { padding: 10px 14px 10px 44px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); animation: tabSlideIn 0.15s ease-out; }
+    .fb-meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 4px 12px; }
+    .fb-meta-item { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; padding: 2px 0; border-bottom: 1px solid rgba(26,26,62,0.2); }
+    .fb-meta-label { color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; font-size: 9px; flex-shrink: 0; }
+    .fb-meta-val { color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fb-meta-extras { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .file-meta-tags-row { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; }
+    .file-meta-tag { font-size: 9px; padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
+    .file-meta-bpm { background: rgba(5,217,232,0.15); color: var(--cyan); }
+    .file-meta-key { background: rgba(211,0,197,0.15); color: var(--magenta); }
+    .file-meta-fav { background: rgba(249,240,2,0.15); color: var(--yellow); font-size: 10px; }
+    .file-meta-tags { background: rgba(57,255,20,0.12); color: var(--green); }
+    .file-meta-dur { background: rgba(122,139,168,0.15); color: var(--text-dim); font-family: 'Courier New', monospace; }
     .file-favs {
       padding: 12px 24px 0;
     }
@@ -3245,6 +3301,11 @@
       color: var(--text-dim);
     }
 
+    .audio-table .col-bpm { font-family: 'Orbitron', sans-serif; font-size: 10px; color: var(--cyan); text-align: center; }
+    .audio-table .col-key { font-size: 10px; color: var(--magenta); text-align: center; white-space: nowrap; }
+    .audio-table .col-dur { font-family: 'Courier New', monospace; font-size: 10px; color: var(--text-dim); text-align: center; }
+    .audio-table .col-ch { font-size: 10px; color: var(--text-dim); text-align: center; }
+
     .audio-table .col-date {
       color: var(--text-muted);
     }
@@ -3361,6 +3422,42 @@
     }
 
     /* Now-playing bar */
+    /* Similar Samples Panel (floating, like audio player) */
+    .similar-panel {
+      position: fixed; z-index: 9998; width: 600px; min-width: 300px; max-width: 90vw;
+      max-height: 85vh; background: var(--bg-primary); border: 1px solid var(--magenta);
+      border-radius: 2px; box-shadow: 0 0 20px rgba(211,0,197,0.2), 0 4px 24px rgba(0,0,0,0.5);
+      display: flex; flex-direction: column; font-size: 11px; overflow: visible;
+    }
+    .similar-panel.dock-tl { top: 24px; left: 24px; }
+    .similar-panel.dock-tr { top: 24px; right: 24px; }
+    .similar-panel.dock-bl { bottom: 24px; left: 24px; }
+    .similar-panel.dock-br { bottom: 24px; right: 24px; }
+    .similar-panel.dragging { opacity: 0.85; box-shadow: 0 0 40px rgba(211,0,197,0.4); }
+    .sim-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(211,0,197,0.08); border-bottom: 1px solid var(--border); cursor: move; flex-shrink: 0; }
+    .sim-toolbar-title { font-size: 10px; font-weight: 600; color: var(--magenta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .sim-toolbar-actions { display: flex; gap: 4px; }
+    .sim-toolbar-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); width: 22px; height: 22px; cursor: pointer; border-radius: 2px; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+    .sim-toolbar-btn:hover { color: var(--text); border-color: var(--text-muted); }
+    .sim-toolbar-btn.btn-close:hover { color: var(--red); border-color: var(--red); }
+    .sim-body { flex: 1; overflow-y: auto; max-height: 60vh; }
+    .sim-result-row { display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer; border-bottom: 1px solid rgba(26,26,62,0.3); transition: background 0.1s; }
+    .sim-result-row:hover { background: rgba(211,0,197,0.06); }
+    .sim-result-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 11px; }
+    .sim-result-ext { font-size: 9px; color: var(--text-muted); min-width: 28px; }
+    .sim-result-bar { width: 60px; height: 5px; background: var(--bg-card); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+    .sim-result-bar-fill { height: 100%; border-radius: 3px; }
+    .sim-result-pct { font-family: 'Orbitron', sans-serif; font-size: 9px; font-weight: 700; min-width: 28px; text-align: right; }
+    .sim-resize { position: absolute; z-index: 10; }
+    .sim-resize-n { top: -3px; left: 8px; right: 8px; height: 6px; cursor: n-resize; }
+    .sim-resize-s { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: s-resize; }
+    .sim-resize-e { top: 8px; right: -3px; bottom: 8px; width: 6px; cursor: e-resize; }
+    .sim-resize-w { top: 8px; left: -3px; bottom: 8px; width: 6px; cursor: w-resize; }
+    .sim-resize-ne { top: -3px; right: -3px; width: 12px; height: 12px; cursor: ne-resize; }
+    .sim-resize-nw { top: -3px; left: -3px; width: 12px; height: 12px; cursor: nw-resize; }
+    .sim-resize-se { bottom: -3px; right: -3px; width: 12px; height: 12px; cursor: se-resize; }
+    .sim-resize-sw { bottom: -3px; left: -3px; width: 12px; height: 12px; cursor: sw-resize; }
+
     .audio-now-playing {
       display: none;
       position: fixed;
@@ -4498,6 +4595,7 @@
             <div class="header-info-item" title="DAW projects scanned">DAW <span class="header-info-value" id="headerDaw">0</span></div>
             <div class="header-info-item" title="Presets scanned">PRE <span class="header-info-value" id="headerPresets">0</span></div>
           </div>
+          <button class="btn btn-secondary" data-action="showHeatmapDash" title="Audio heatmap dashboard — overview of your entire library">&#128202; Dashboard</button>
           <button class="btn btn-primary" id="btnScanAll" data-action="scanAll" title="Scan all plugins, samples, DAW projects, and presets">&#9889; Scan All</button>
           <button class="btn btn-stop" id="btnStopAll" data-action="stopAll" style="display:none;" title="Stop all running scans">&#9632; Stop All</button>
           <button class="btn btn-secondary" id="btnResumeAll" data-action="resumeAll" style="display:none;" title="Resume all paused scans">&#9654; Resume All</button>
@@ -4553,11 +4651,11 @@
       <button class="tab-btn" data-action="switchTab" data-tab="daw" title="DAW project files (Cmd+3)">DAW Projects</button>
       <button class="tab-btn" data-action="switchTab" data-tab="presets" title="Plugin presets (Cmd+4)">Presets</button>
       <button class="tab-btn" data-action="switchTab" data-tab="favorites" title="Favorited items (Cmd+5)">&#9733; Favorites</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="notes" title="Notes &amp; tags">&#128221; Notes</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="tags" title="Tag manager">&#127991; Tags</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="files" title="File browser">&#128193; Files</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="history" title="Scan history and diffs (Cmd+6)">History</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="settings" title="App settings (Cmd+7)">&#9881; Settings</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="notes" title="Notes &amp; tags (Cmd+6)">&#128221; Notes</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="tags" title="Tag manager (Cmd+7)">&#127991; Tags</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="files" title="File browser (Cmd+8)">&#128193; Files</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="history" title="Scan history and diffs (Cmd+9)">History</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="settings" title="App settings (Cmd+0)">&#9881; Settings</button>
     </div>
 
     <div class="tab-content active" id="tabPlugins">
@@ -5118,11 +5216,11 @@
           </div>
           <div class="settings-row">
             <div class="settings-label">
-              <span class="settings-title">Expand Sample on Click</span>
-              <span class="settings-desc">Show metadata panel when clicking a sample row. Disable to only play without expanding</span>
+              <span class="settings-title">Expand Sample Row</span>
+              <span class="settings-desc">Double-click a sample row to expand/collapse metadata. Setting is toggled automatically by double-click</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingExpandOnClick" data-action="settingToggleExpandOnClick" title="Toggle metadata expansion on sample row click">
+              <button class="settings-toggle" id="settingExpandOnClick" data-action="settingToggleExpandOnClick" title="Toggle metadata expansion on double-click">
                 <span class="settings-toggle-label" id="settingExpandOnClickLabel">On</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5424,7 +5522,9 @@
   <script src="js/command-palette.js"></script>
   <script src="js/xref.js?v=153"></script>
   <script src="js/dep-graph.js"></script>
+  <script src="js/modal-drag.js?v=153"></script>
   <script src="js/smart-playlists.js?v=153"></script>
+  <script src="js/heatmap-dashboard.js?v=153"></script>
   <script src="js/context-menu.js"></script>
   <script src="js/help-overlay.js"></script>
   <script src="js/shortcuts.js?v=153"></script>

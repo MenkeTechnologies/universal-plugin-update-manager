@@ -328,24 +328,40 @@ audioPlayer.addEventListener('seeked', updatePlaybackTime);
 // ── Audio Similarity Search ──
 async function findSimilarSamples(filePath) {
   const name = filePath.split('/').pop().replace(/\.[^.]+$/, '');
-  let existing = document.getElementById('similarModal');
+  let existing = document.getElementById('similarPanel');
   if (existing) existing.remove();
 
-  // Show loading modal
-  const loadHtml = `<div class="modal-overlay" id="similarModal" data-action-modal="closeSimilar">
-    <div class="modal-content modal-wide">
-      <div class="modal-header">
-        <h2>Samples Similar to "${escapeHtml(name)}"</h2>
-        <button class="modal-close" data-action-modal="closeSimilar" title="Close">&#10005;</button>
+  // Show floating panel (non-blocking, like audio player)
+  const simDock = prefs.getItem('similarDock') || 'dock-bl';
+  const simW = prefs.getItem('similarWidth');
+  const simH = prefs.getItem('similarHeight');
+  const simSizeStyle = (simW && simH) ? ` style="width:${simW}px;height:${simH}px;"` : '';
+  const loadHtml = `<div class="similar-panel ${simDock}" id="similarPanel"${simSizeStyle}>
+    <div class="sim-resize sim-resize-n" data-sim-resize="n"></div>
+    <div class="sim-resize sim-resize-s" data-sim-resize="s"></div>
+    <div class="sim-resize sim-resize-e" data-sim-resize="e"></div>
+    <div class="sim-resize sim-resize-w" data-sim-resize="w"></div>
+    <div class="sim-resize sim-resize-se" data-sim-resize="se"></div>
+    <div class="sim-resize sim-resize-sw" data-sim-resize="sw"></div>
+    <div class="sim-resize sim-resize-ne" data-sim-resize="ne"></div>
+    <div class="sim-resize sim-resize-nw" data-sim-resize="nw"></div>
+    <div class="sim-toolbar" id="simToolbar">
+      <span class="sim-toolbar-title" title="Find Similar Samples">&#128270; Similar to "${escapeHtml(name)}"</span>
+      <div class="sim-toolbar-actions">
+        <button class="sim-toolbar-btn" data-action="minimizeSimilar" title="Minimize">&#9866;</button>
+        <button class="sim-toolbar-btn btn-close" data-action="closeSimilar" title="Close">&#10005;</button>
       </div>
-      <div class="modal-body" style="text-align:center;padding:32px;">
-        <div class="spinner" style="width:24px;height:24px;margin:0 auto 12px;"></div>
-        <div id="similarStatusText" style="color:var(--text-muted);font-size:12px;">Analyzing audio fingerprints...</div>
-        <div id="similarStatusDetail" style="color:var(--text-dim);font-size:10px;margin-top:6px;">Checking fingerprint cache...</div>
+    </div>
+    <div class="sim-body" id="simBody">
+      <div style="text-align:center;padding:24px;">
+        <div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>
+        <div id="similarStatusText" style="color:var(--text-muted);font-size:11px;">Analyzing fingerprints...</div>
+        <div id="similarStatusDetail" style="color:var(--text-dim);font-size:9px;margin-top:4px;">Checking cache...</div>
       </div>
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', loadHtml);
+  initSimilarPanelDrag();
 
   // Listen for progress events
   let progressCleanup = null;
@@ -366,67 +382,154 @@ async function findSimilarSamples(filePath) {
     const results = await window.vstUpdater.findSimilarSamples(filePath, candidates, 20);
     if (progressCleanup) progressCleanup();
 
-    const modal = document.getElementById('similarModal');
-    if (!modal) return;
-    const body = modal.querySelector('.modal-body');
+    const panel = document.getElementById('similarPanel');
+    if (!panel) return;
+    const body = document.getElementById('simBody');
 
     if (results.length === 0) {
-      body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:24px;">No similar samples found. Try scanning more samples first.</div>';
+      body.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:16px;font-size:11px;">No similar samples found. Scan more samples first.</div>';
       return;
     }
 
-    body.innerHTML = `<div style="margin-bottom:8px;color:var(--text-muted);font-size:11px;">${results.length} similar samples found</div>` +
+    body.innerHTML = `<div style="margin-bottom:6px;color:var(--text-muted);font-size:10px;padding:0 8px;">${results.length} similar samples</div>` +
       results.map(r => {
         const sampleName = r.path.split('/').pop().replace(/\.[^.]+$/, '');
         const ext = r.path.split('.').pop().toUpperCase();
         const sim = Math.round(r.similarity);
         const barColor = sim > 70 ? 'var(--green)' : sim > 40 ? 'var(--yellow)' : 'var(--red)';
-        return `<div class="dep-plugin-row" style="cursor:pointer;" data-similar-path="${escapeHtml(r.path)}" title="${escapeHtml(r.path)}">
-          <div style="flex:1;min-width:0;">
-            <span style="color:var(--text);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">${escapeHtml(sampleName)}</span>
+        return `<div class="sim-result-row" data-similar-path="${escapeHtml(r.path)}" title="${escapeHtml(r.path)}">
+          <span class="sim-result-name">${escapeHtml(sampleName)}</span>
+          <span class="sim-result-ext">${ext}</span>
+          <div class="sim-result-bar">
+            <div class="sim-result-bar-fill" style="width:${sim}%;background:${barColor};"></div>
           </div>
-          <span style="font-size:9px;color:var(--text-muted);margin:0 8px;">${ext}</span>
-          <div style="width:100px;display:flex;align-items:center;gap:6px;">
-            <div style="flex:1;height:6px;background:var(--bg-card);border-radius:3px;overflow:hidden;">
-              <div style="width:${sim}%;height:100%;background:${barColor};border-radius:3px;"></div>
-            </div>
-            <span style="font-family:Orbitron,sans-serif;font-size:10px;font-weight:700;color:${barColor};min-width:30px;text-align:right;">${sim}%</span>
-          </div>
+          <span class="sim-result-pct" style="color:${barColor};">${sim}%</span>
         </div>`;
       }).join('');
   } catch (err) {
     if (progressCleanup) progressCleanup();
-    const modal = document.getElementById('similarModal');
-    if (modal) {
-      modal.querySelector('.modal-body').innerHTML = `<div style="padding:24px;color:var(--red);">Error: ${escapeHtml(err.message || String(err))}</div>`;
-    }
+    const body = document.getElementById('simBody');
+    if (body) body.innerHTML = `<div style="padding:16px;color:var(--red);font-size:11px;">Error: ${escapeHtml(err.message || String(err))}</div>`;
   }
 }
 
-function closeSimilarModal() {
-  const modal = document.getElementById('similarModal');
-  if (modal) modal.remove();
+function closeSimilarPanel() {
+  const panel = document.getElementById('similarPanel');
+  if (panel) panel.remove();
 }
 
-// Similar modal event delegation
+function minimizeSimilarPanel() {
+  const panel = document.getElementById('similarPanel');
+  if (!panel) return;
+  const body = document.getElementById('simBody');
+  if (!body) return;
+  body.style.display = body.style.display === 'none' ? '' : 'none';
+}
+
+// Similar panel drag + resize + snap (same pattern as audio player)
+function initSimilarPanelDrag() {
+  const panel = document.getElementById('similarPanel');
+  if (!panel) return;
+  const toolbar = document.getElementById('simToolbar');
+  let dragging = false, startX, startY, origX, origY;
+
+  function nearestDock(x, y) {
+    const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+    if (x < cx && y < cy) return 'dock-tl';
+    if (x >= cx && y < cy) return 'dock-tr';
+    if (x < cx && y >= cy) return 'dock-bl';
+    return 'dock-br';
+  }
+
+  toolbar.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.sim-toolbar-actions')) return;
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragging = true;
+    const rect = panel.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    origX = rect.left; origY = rect.top;
+    panel.classList.remove('dock-tl', 'dock-tr', 'dock-bl', 'dock-br');
+    panel.style.left = origX + 'px';
+    panel.style.top = origY + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+    panel.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    panel.style.left = (origX + e.clientX - startX) + 'px';
+    panel.style.top = (origY + e.clientY - startY) + 'px';
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    const dock = nearestDock(e.clientX, e.clientY);
+    panel.style.left = ''; panel.style.top = '';
+    panel.style.right = ''; panel.style.bottom = '';
+    panel.classList.add(dock);
+    prefs.setItem('similarDock', dock);
+  });
+
+  // Resize via edge handles
+  let resizing = null;
+  panel.addEventListener('mousedown', (e) => {
+    const handle = e.target.closest('[data-sim-resize]');
+    if (!handle) return;
+    e.preventDefault(); e.stopPropagation();
+    const rect = panel.getBoundingClientRect();
+    panel.classList.remove('dock-tl', 'dock-tr', 'dock-bl', 'dock-br');
+    panel.style.left = rect.left + 'px';
+    panel.style.top = rect.top + 'px';
+    panel.style.right = 'auto'; panel.style.bottom = 'auto';
+    panel.style.width = rect.width + 'px';
+    panel.style.height = rect.height + 'px';
+    document.body.style.userSelect = 'none';
+    resizing = { edge: handle.dataset.simResize, startX: e.clientX, startY: e.clientY, origLeft: rect.left, origTop: rect.top, origW: rect.width, origH: rect.height };
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!resizing) return;
+    const s = resizing, dx = e.clientX - s.startX, dy = e.clientY - s.startY;
+    let l = s.origLeft, t = s.origTop, w = s.origW, h = s.origH;
+    if (s.edge.includes('e')) w = Math.max(240, s.origW + dx);
+    if (s.edge.includes('w')) { w = Math.max(240, s.origW - dx); l = s.origLeft + s.origW - w; }
+    if (s.edge.includes('s')) h = Math.max(150, s.origH + dy);
+    if (s.edge.includes('n')) { h = Math.max(150, s.origH - dy); t = s.origTop + s.origH - h; }
+    panel.style.left = l + 'px'; panel.style.top = t + 'px';
+    panel.style.width = w + 'px'; panel.style.height = h + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (resizing) {
+      const rect = panel.getBoundingClientRect();
+      prefs.setItem('similarWidth', Math.round(rect.width));
+      prefs.setItem('similarHeight', Math.round(rect.height));
+      resizing = null;
+      document.body.style.userSelect = '';
+    }
+  });
+}
+
+// Similar panel event delegation
 document.addEventListener('click', (e) => {
-  const closeAction = e.target.closest('[data-action-modal="closeSimilar"]');
-  if (closeAction) {
-    if (e.target === closeAction || closeAction.classList.contains('modal-close')) {
-      closeSimilarModal();
-    }
-  }
-  // Click result to play
+  if (e.target.closest('[data-action="closeSimilar"]')) { closeSimilarPanel(); return; }
+  if (e.target.closest('[data-action="minimizeSimilar"]')) { minimizeSimilarPanel(); return; }
   const row = e.target.closest('[data-similar-path]');
-  if (row && document.getElementById('similarModal')) {
+  if (row && document.getElementById('similarPanel')) {
     const path = row.dataset.similarPath;
     if (path && typeof previewAudio === 'function') previewAudio(path);
   }
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('similarModal')) {
-    closeSimilarModal();
+  if (e.key === 'Escape' && document.getElementById('similarPanel')) {
+    closeSimilarPanel();
   }
 });
 
@@ -628,11 +731,15 @@ function initAudioTable() {
     <thead>
       <tr>
         <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="Select all"></th>
-        <th data-action="sortAudio" data-key="name" style="width: 26%;">Name <span class="sort-arrow" id="sortArrowName">&#9660;</span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="format" class="col-format" style="width: 70px;">Format <span class="sort-arrow" id="sortArrowFormat"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="size" class="col-size" style="width: 90px;">Size <span class="sort-arrow" id="sortArrowSize"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="modified" class="col-date" style="width: 100px;">Modified <span class="sort-arrow" id="sortArrowModified"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="directory" style="width: 30%;">Path <span class="sort-arrow" id="sortArrowDirectory"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="name" style="width: 22%;">Name <span class="sort-arrow" id="sortArrowName">&#9660;</span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="format" class="col-format" style="width: 60px;">Format <span class="sort-arrow" id="sortArrowFormat"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="size" class="col-size" style="width: 75px;">Size <span class="sort-arrow" id="sortArrowSize"></span><span class="col-resize"></span></th>
+        <th class="col-bpm" style="width: 55px;" title="BPM — click a row to analyze">BPM<span class="col-resize"></span></th>
+        <th class="col-key" style="width: 75px;" title="Musical key — click a row to analyze">Key<span class="col-resize"></span></th>
+        <th class="col-dur" style="width: 55px;" title="Duration">Dur<span class="col-resize"></span></th>
+        <th class="col-ch" style="width: 40px;" title="Channels">Ch<span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="modified" class="col-date" style="width: 90px;">Modified <span class="sort-arrow" id="sortArrowModified"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="directory" style="width: 22%;">Path <span class="sort-arrow" id="sortArrowDirectory"></span><span class="col-resize"></span></th>
         <th class="col-actions" style="width: 130px;"></th>
       </tr>
     </thead>
@@ -721,7 +828,7 @@ function renderAudioTable() {
 
 function appendLoadMore(tbody) {
   tbody.insertAdjacentHTML('beforeend',
-    `<tr id="audioLoadMore"><td colspan="7" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" data-action="loadMoreAudio">
+    `<tr id="audioLoadMore"><td colspan="11" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" data-action="loadMoreAudio">
       Showing ${audioRenderCount} of ${filteredAudioSamples.length} &#8212; click to load more
     </td></tr>`);
 }
@@ -744,11 +851,19 @@ function buildAudioRow(s) {
   const isPlaying = audioPlayerPath === s.path;
   const rowClass = isPlaying ? ' class="row-playing"' : '';
   const checked = batchSelected.has(s.path) ? ' checked' : '';
+  const bpm = typeof _bpmCache !== 'undefined' && _bpmCache[s.path] ? _bpmCache[s.path] : '';
+  const key = typeof _keyCache !== 'undefined' && _keyCache[s.path] ? _keyCache[s.path] : '';
+  const dur = s.duration ? (typeof formatTime === 'function' ? formatTime(s.duration) : s.duration.toFixed(1)) : '';
+  const ch = s.channels ? (s.channels === 1 ? 'M' : s.channels === 2 ? 'S' : s.channels + '') : '';
   return `<tr${rowClass} data-audio-path="${hp}" data-action="toggleMetadata" data-path="${hp}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(s.name)}">${typeof noteIndicator === 'function' ? noteIndicator(s.path) : ''}${highlightMatch(s.name, _lastAudioSearch, _lastAudioMode)}</td>
     <td class="col-format"><span class="format-badge ${fmtClass}">${s.format}</span></td>
     <td class="col-size">${s.sizeFormatted}</td>
+    <td class="col-bpm" title="${bpm ? bpm + ' BPM' : 'Click to analyze'}">${bpm}</td>
+    <td class="col-key" title="${key || 'Click to analyze'}">${escapeHtml(key)}</td>
+    <td class="col-dur" title="${dur || ''}">${dur}</td>
+    <td class="col-ch" title="${ch === 'M' ? 'Mono' : ch === 'S' ? 'Stereo' : ch}">${ch}</td>
     <td class="col-date">${s.modified}</td>
     <td class="col-path" title="${hp}">${escapeHtml(s.directory)}</td>
     <td class="col-actions" data-action-stop>
@@ -981,10 +1096,9 @@ async function toggleMetadata(filePath, event) {
   // Don't toggle if clicking buttons
   if (event.target.closest('.col-actions')) return;
 
-  // Single-click starts playback
+  // Single-click: play audio, and expand/transfer panel if setting is on
   previewAudio(filePath);
 
-  // If expand-on-click is disabled, stop here (play only, no metadata)
   if (prefs.getItem('expandOnClick') === 'off') return;
 
   const tbody = document.getElementById('audioTableBody');
@@ -996,7 +1110,6 @@ async function toggleMetadata(filePath, event) {
   if (existingMeta) {
     const wasPath = existingMeta.getAttribute('data-meta-path');
     existingMeta.remove();
-    // Un-mark the expanded row
     const prevRow = tbody.querySelector(`tr.row-expanded`);
     if (prevRow) prevRow.classList.remove('row-expanded');
 
@@ -1018,7 +1131,7 @@ async function toggleMetadata(filePath, event) {
   metaRow.id = 'audioMetaRow';
   metaRow.className = 'audio-meta-row';
   metaRow.setAttribute('data-meta-path', filePath);
-  metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel" style="justify-items: center;"><div class="spinner" style="width: 18px; height: 18px;"></div></div></td>`;
+  metaRow.innerHTML = `<td colspan="11"><div class="audio-meta-panel" style="justify-items: center;"><div class="spinner" style="width: 18px; height: 18px;"></div></div></td>`;
   row.after(metaRow);
 
   // Fetch metadata
@@ -1039,8 +1152,8 @@ async function toggleMetadata(filePath, event) {
     if (meta.byteRate) items += metaItem('Byte Rate', formatAudioSize(meta.byteRate) + '/s');
 
     // BPM and Key placeholders — filled async
-    items += `<div class="meta-item" id="metaBpmItem"><span class="meta-label">BPM</span><span class="meta-value" id="metaBpmValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
-    items += `<div class="meta-item" id="metaKeyItem"><span class="meta-label">KEY</span><span class="meta-value" id="metaKeyValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
+    items += `<div class="meta-item" id="metaBpmItem" title="Estimated tempo via onset-strength autocorrelation"><span class="meta-label">BPM</span><span class="meta-value" id="metaBpmValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
+    items += `<div class="meta-item" id="metaKeyItem" title="Musical key detected via chromagram analysis"><span class="meta-label">KEY</span><span class="meta-value" id="metaKeyValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
 
     const fmtDate = (v) => { if (!v) return '—'; const d = new Date(v); return isNaN(d) ? '—' : d.toLocaleString(); };
     items += metaItem('Created', fmtDate(meta.created));
@@ -1049,18 +1162,18 @@ async function toggleMetadata(filePath, event) {
     items += metaItem('Permissions', meta.permissions);
 
     // Waveform preview with seek support
-    const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" data-action="seekMetaWaveform">
-      <canvas id="metaWaveformCanvas"></canvas>
+    const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" data-action="seekMetaWaveform" title="Click to seek playback position">
+      <canvas id="metaWaveformCanvas" title="Waveform — click to seek"></canvas>
       <div class="waveform-progress-fill"></div>
       <div class="waveform-cursor" style="left:0;"></div>
       <div class="waveform-time-label">${meta.duration ? formatTime(meta.duration) : ''}</div>
     </div>
-    <div class="meta-item-wide" style="position:relative;height:80px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
-      <canvas id="metaSpectrogramCanvas" width="800" height="80" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+    <div class="meta-waveform" style="height:80px;cursor:default;" title="Spectrogram — frequency content over time (FFT)">
+      <canvas id="metaSpectrogramCanvas" width="800" height="80" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="Spectrogram — low frequencies at bottom, high at top"></canvas>
       <span style="position:absolute;top:2px;left:4px;font-size:8px;color:var(--text-dim);pointer-events:none;">SPECTROGRAM</span>
     </div>`;
 
-    metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel"><span class="meta-close-btn" data-action="closeMetaRow" title="Close metadata panel">&#10005;</span>${waveformHtml}${items}</div></td>`;
+    metaRow.innerHTML = `<td colspan="11"><div class="audio-meta-panel"><span class="meta-close-btn" data-action="closeMetaRow" title="Close metadata panel">&#10005;</span>${waveformHtml}${items}</div></td>`;
 
     // Draw waveform and spectrogram on the meta canvases
     drawMetaWaveform(filePath);
@@ -1092,7 +1205,7 @@ async function toggleMetadata(filePath, event) {
       if (keyEl) keyEl.textContent = '—';
     }
   } catch (err) {
-    metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel"><span style="color: var(--red);">Failed to load metadata</span></div></td>`;
+    metaRow.innerHTML = `<td colspan="11"><div class="audio-meta-panel"><span style="color: var(--red);">Failed to load metadata</span></div></td>`;
   }
 }
 
@@ -1148,7 +1261,8 @@ async function detectKeyForMeta(filePath) {
 
 function metaItem(label, value, wide) {
   const cls = wide ? 'meta-item meta-item-wide' : 'meta-item';
-  return `<div class="${cls}"><span class="meta-label">${label}</span><span class="meta-value">${escapeHtml(String(value || '—'))}</span></div>`;
+  const val = String(value || '—');
+  return `<div class="${cls}" title="${escapeHtml(label)}: ${escapeHtml(val)}"><span class="meta-label">${label}</span><span class="meta-value">${escapeHtml(val)}</span></div>`;
 }
 
 function openAudioFolder(filePath) {
@@ -1424,18 +1538,18 @@ async function drawWaveform(filePath) {
     const audioBuf = await _audioCtx.decodeAudioData(buf);
     const raw = audioBuf.getChannelData(0);
 
-    // Downsample to canvas width
-    const bars = Math.min(canvas.width, 200);
+    // Downsample to canvas width — use full resolution
+    const bars = Math.min(Math.floor(canvas.width), 800);
     const step = Math.floor(raw.length / bars);
     const peaks = [];
     for (let i = 0; i < bars; i++) {
-      let max = 0;
+      let max = 0, min = 0;
       const start = i * step;
       for (let j = start; j < start + step && j < raw.length; j++) {
-        const abs = Math.abs(raw[j]);
-        if (abs > max) max = abs;
+        if (raw[j] > max) max = raw[j];
+        if (raw[j] < min) min = raw[j];
       }
-      peaks.push(max);
+      peaks.push({ max, min });
     }
 
     _waveformCache[filePath] = peaks;
@@ -1454,20 +1568,70 @@ async function drawWaveform(filePath) {
 function renderWaveformData(ctx, canvas, peaks) {
   const w = canvas.width;
   const h = canvas.height;
-  const barW = w / peaks.length;
   const mid = h / 2;
 
   ctx.clearRect(0, 0, w, h);
-  for (let i = 0; i < peaks.length; i++) {
-    const barH = peaks[i] * mid * 0.9;
-    const x = i * barW;
-    // Gradient from cyan to magenta
-    const t = i / peaks.length;
-    const r = Math.round(5 + t * 250);
-    const g = Math.round(217 - t * 175);
-    const b = Math.round(232 - t * 23);
-    ctx.fillStyle = `rgba(${r},${g},${b},0.6)`;
-    ctx.fillRect(x, mid - barH, barW - 0.5, barH * 2);
+
+  // Support both old format (number[]) and new format ({max,min}[])
+  const isNewFormat = peaks.length > 0 && typeof peaks[0] === 'object';
+
+  if (isNewFormat) {
+    // Draw filled waveform shape using min/max envelope
+    const barW = w / peaks.length;
+
+    // Top half (positive)
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    for (let i = 0; i < peaks.length; i++) {
+      const x = (i + 0.5) * barW;
+      const y = mid - peaks[i].max * mid * 0.92;
+      if (i === 0) ctx.lineTo(x, y); else ctx.lineTo(x, y);
+    }
+    // Bottom half (negative) — trace back
+    for (let i = peaks.length - 1; i >= 0; i--) {
+      const x = (i + 0.5) * barW;
+      const y = mid - peaks[i].min * mid * 0.92;
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, 'rgba(5,217,232,0.5)');
+    grad.addColorStop(0.5, 'rgba(108,108,232,0.5)');
+    grad.addColorStop(1, 'rgba(211,0,197,0.5)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Brighter center line for detail
+    ctx.beginPath();
+    for (let i = 0; i < peaks.length; i++) {
+      const x = (i + 0.5) * barW;
+      const rms = (peaks[i].max - peaks[i].min) * 0.35;
+      const y1 = mid - rms * mid;
+      const y2 = mid + rms * mid;
+      ctx.moveTo(x, y1);
+      ctx.lineTo(x, y2);
+    }
+    const grad2 = ctx.createLinearGradient(0, 0, w, 0);
+    grad2.addColorStop(0, 'rgba(5,217,232,0.8)');
+    grad2.addColorStop(1, 'rgba(211,0,197,0.8)');
+    ctx.strokeStyle = grad2;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  } else {
+    // Legacy format: simple bars
+    const barW = w / peaks.length;
+    for (let i = 0; i < peaks.length; i++) {
+      const barH = peaks[i] * mid * 0.9;
+      const x = i * barW;
+      const t = i / peaks.length;
+      const r = Math.round(5 + t * 250);
+      const g = Math.round(217 - t * 175);
+      const b = Math.round(232 - t * 23);
+      ctx.fillStyle = `rgba(${r},${g},${b},0.6)`;
+      ctx.fillRect(x, mid - barH, barW - 0.5, barH * 2);
+    }
   }
 }
 
@@ -1493,17 +1657,17 @@ async function drawMetaWaveform(filePath) {
     const audioBuf = await _audioCtx.decodeAudioData(buf);
     const raw = audioBuf.getChannelData(0);
 
-    const bars = Math.min(canvas.width, 300);
+    const bars = Math.min(Math.floor(canvas.width), 800);
     const step = Math.floor(raw.length / bars);
     const peaks = [];
     for (let i = 0; i < bars; i++) {
-      let max = 0;
+      let max = 0, min = 0;
       const start = i * step;
       for (let j = start; j < start + step && j < raw.length; j++) {
-        const abs = Math.abs(raw[j]);
-        if (abs > max) max = abs;
+        if (raw[j] > max) max = raw[j];
+        if (raw[j] < min) min = raw[j];
       }
-      peaks.push(max);
+      peaks.push({ max, min });
     }
 
     _waveformCache[filePath] = peaks;
