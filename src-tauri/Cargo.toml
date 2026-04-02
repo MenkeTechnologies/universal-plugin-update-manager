@@ -27,6 +27,7 @@ libc = "0.2"
 num_cpus = "1"
 printpdf = "0.7"
 flate2 = "1"
+symphonia = { version = "0.5", features = ["mp3", "aac", "flac", "ogg", "pcm"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

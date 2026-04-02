@@ -20,6 +20,7 @@ pub fn estimate_bpm(file_path: &str) -> Option<f64> {
     let (samples, sample_rate) = match ext.as_str() {
         "wav" => read_wav_pcm(path)?,
         "aiff" | "aif" => read_aiff_pcm(path)?,
+        "mp3" | "flac" | "ogg" | "m4a" | "aac" | "opus" => decode_with_symphonia(path)?,
         _ => return None,
     };
 
@@ -183,6 +184,83 @@ fn decode_pcm(data: &[u8], bits: u16, channels: usize, little_endian: bool) -> V
     }
 
     samples
+}
+
+/// Decode compressed audio (MP3, FLAC, OGG, M4A, AAC) via symphonia.
+/// Returns mono f32 samples + sample rate, or None on failure.
+fn decode_with_symphonia(path: &Path) -> Option<(Vec<f32>, u32)> {
+    use symphonia::core::audio::SampleBuffer;
+    use symphonia::core::codecs::DecoderOptions;
+    use symphonia::core::formats::FormatOptions;
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+    use symphonia::core::probe::Hint;
+
+    let file = std::fs::File::open(path).ok()?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    let mut hint = Hint::new();
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
+
+    let probed = symphonia::default::get_probe()
+        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .ok()?;
+
+    let mut format = probed.format;
+    let track = format.default_track()?;
+    let sample_rate = track.codec_params.sample_rate?;
+    let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(1);
+    let track_id = track.id;
+
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .ok()?;
+
+    let mut all_samples: Vec<f32> = Vec::new();
+    // Limit to ~30 seconds for BPM detection (avoid decoding huge files)
+    let max_samples = sample_rate as usize * 30 * channels;
+
+    loop {
+        let packet = match format.next_packet() {
+            Ok(p) => p,
+            Err(_) => break,
+        };
+        if packet.track_id() != track_id {
+            continue;
+        }
+        let decoded = match decoder.decode(&packet) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+
+        let spec = *decoded.spec();
+        let duration = decoded.capacity();
+        let mut sample_buf = SampleBuffer::<f32>::new(duration as u64, spec);
+        sample_buf.copy_interleaved_ref(decoded);
+
+        let buf = sample_buf.samples();
+        // Mix to mono
+        if channels > 1 {
+            for chunk in buf.chunks(channels) {
+                let mono: f32 = chunk.iter().sum::<f32>() / channels as f32;
+                all_samples.push(mono);
+            }
+        } else {
+            all_samples.extend_from_slice(buf);
+        }
+
+        if all_samples.len() >= max_samples {
+            break;
+        }
+    }
+
+    if all_samples.is_empty() {
+        return None;
+    }
+
+    Some((all_samples, sample_rate))
 }
 
 /// Detect tempo using onset-strength autocorrelation.

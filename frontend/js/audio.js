@@ -967,13 +967,13 @@ async function toggleMetadata(filePath, event) {
       }
     }
 
-    // Estimate BPM async (WAV/AIFF only)
-    const bpmFormats = ['WAV', 'AIFF', 'AIF'];
+    // Estimate BPM async (all playable formats)
+    const bpmFormats = ['WAV', 'AIFF', 'AIF', 'MP3', 'FLAC', 'OGG', 'M4A', 'AAC', 'OPUS'];
     if (bpmFormats.includes(meta.format)) {
       estimateBpmForMeta(filePath);
     } else {
       const bpmEl = document.getElementById('metaBpmValue');
-      if (bpmEl) bpmEl.textContent = 'N/A (format not supported)';
+      if (bpmEl) bpmEl.textContent = '—';
     }
   } catch (err) {
     metaRow.innerHTML = `<td colspan="7"><div class="audio-meta-panel"><span style="color: var(--red);">Failed to load metadata</span></div></td>`;
