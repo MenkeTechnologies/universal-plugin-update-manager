@@ -299,6 +299,11 @@ function renderPlugins(plugins) {
   list.innerHTML = plugins.map(p => buildPluginCardHtml(p)).join('');
   list.classList.add('fade-in');
   if (typeof updatePluginDiskUsage === 'function') updatePluginDiskUsage();
+  if (typeof initDragReorder === 'function') {
+    initDragReorder(list, '.plugin-card', null, {
+      getKey: (el) => el.dataset.path || '',
+    });
+  }
 }
 
 // Debounce helper — fires immediately on first call, then debounces

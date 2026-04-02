@@ -88,12 +88,17 @@ pub fn get_plugin_type(ext: &str) -> &str {
 }
 
 fn get_directory_size(dir: &Path) -> u64 {
+    get_directory_size_depth(dir, 0)
+}
+
+fn get_directory_size_depth(dir: &Path, depth: u32) -> u64 {
+    if depth > 10 { return 0; }
     let mut size = 0u64;
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                size += get_directory_size(&path);
+                size += get_directory_size_depth(&path, depth + 1);
             } else if let Ok(meta) = fs::metadata(&path) {
                 size += meta.len();
             }
@@ -705,5 +710,29 @@ mod tests {
         let json = r#"{"name":"Old","path":"/old","type":"VST3","version":"1.0","manufacturer":"Co","size":"1 MB","modified":"2024"}"#;
         let info: PluginInfo = serde_json::from_str(json).unwrap();
         assert_eq!(info.architectures.len(), 0);
+    }
+
+    #[test]
+    fn test_get_directory_size_depth_limit() {
+        // Create nested dirs deeper than 10 levels
+        let tmp = std::env::temp_dir().join("upum_test_depth_limit");
+        let _ = fs::remove_dir_all(&tmp);
+        let mut deep = tmp.clone();
+        for i in 0..15 {
+            deep = deep.join(format!("d{}", i));
+        }
+        fs::create_dir_all(&deep).unwrap();
+        fs::write(deep.join("deep.txt"), b"deep file").unwrap();
+        // Also put a file at level 5
+        let shallow = tmp.join("d0/d1/d2/d3/d4");
+        fs::write(shallow.join("shallow.txt"), b"shallow file").unwrap();
+
+        let size = get_directory_size(&tmp);
+        // Should count shallow.txt but NOT deep.txt (beyond depth 10)
+        assert!(size > 0, "should count at least the shallow file");
+        // deep.txt is at depth 15, which exceeds limit of 10
+        assert!(size < 100, "should not count the deeply nested file, got {}", size);
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

@@ -746,6 +746,7 @@ function initAudioTable() {
     <tbody id="audioTableBody"></tbody>
   </table>`;
   initColumnResize(document.getElementById('audioTable'));
+  if (typeof initTableColumnReorder === 'function') initTableColumnReorder('audioTable', 'audioColumnOrder');
 }
 
 let _lastAudioSearch = '';
@@ -1066,6 +1067,16 @@ function updatePlaybackTime() {
       if (cursor) cursor.style.left = pct + '%';
       if (timeLabel) timeLabel.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
     }
+    // Playback cursor — file browser waveforms
+    const fbRow = document.querySelector(`.file-row[data-wf-file="${CSS.escape(audioPlayerPath)}"]`);
+    if (fbRow) {
+      const fbCursor = fbRow.querySelector('.file-wf-cursor');
+      if (fbCursor) { fbCursor.style.display = ''; fbCursor.style.left = pct + '%'; }
+    }
+    // Hide cursors on other file browser rows
+    document.querySelectorAll('.file-row .file-wf-cursor').forEach(c => {
+      if (c.closest('.file-row')?.dataset.wfFile !== audioPlayerPath) c.style.display = 'none';
+    });
   }
 }
 
@@ -1331,6 +1342,7 @@ function renderRecentlyPlayed() {
       ${r.size ? `<span class="np-h-dur">${r.size}</span>` : ''}
     </div>`;
   }).join('');
+  if (typeof initRecentlyPlayedDragReorder === 'function') requestAnimationFrame(initRecentlyPlayedDragReorder);
 }
 
 // Search input in player — renders to mini search results or expanded history list
@@ -1846,6 +1858,20 @@ function updateMetaLine() {
     bar.style.animationDelay = delay + 's';
     viz.appendChild(bar);
   }
+})();
+
+// ── Player section drag-to-reorder (Trello-style) ──
+(function initPlayerSectionDrag() {
+  const body = document.querySelector('.np-body');
+  if (!body) return;
+  initDragReorder(body, '.np-section', 'playerSectionOrder', {
+    getKey: (el) => el.dataset.npSection,
+    onReorder: () => {
+      // Keep EQ section panel after EQ toggle
+      const eqPanel = document.getElementById('npEqSection');
+      if (eqPanel) body.appendChild(eqPanel);
+    },
+  });
 })();
 
 // ── Drag-to-dock ──

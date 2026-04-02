@@ -300,6 +300,13 @@ function renderNotesTab() {
       ${tags ? `<div class="note-card-tags">${tags}</div>` : ''}
     </div>`;
   }).join('');
+  if (typeof initDragReorder === 'function') {
+    requestAnimationFrame(() => {
+      initDragReorder(list, '.note-card', 'noteCardOrder', {
+        getKey: (el) => el.dataset.path || '',
+      });
+    });
+  }
 }
 
 function exportNotes() {
@@ -443,6 +450,11 @@ function renderTagsManager() {
   }).join('');
 
   container.innerHTML = html;
+  if (typeof initDragReorder === 'function') {
+    initDragReorder(container, '.tag-manager-card', 'tagCardOrder', {
+      getKey: (el) => el.querySelector('.tag-manager-name')?.textContent?.trim() || '',
+    });
+  }
 }
 
 // ── Tag Wizard Modal ──

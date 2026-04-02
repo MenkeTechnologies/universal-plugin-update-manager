@@ -157,6 +157,7 @@ function renderFavorites() {
       </span>
     </div>`;
   }).join('');
+  if (typeof initFavDragReorder === 'function') requestAnimationFrame(initFavDragReorder);
 }
 
 // Wire up fav actions via delegation

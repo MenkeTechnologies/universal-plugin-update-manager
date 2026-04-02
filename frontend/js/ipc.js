@@ -272,6 +272,7 @@ document.addEventListener('input', (e) => {
   else if (action === 'settingThreadMultiplier') settingUpdateThreadMultiplier(e.target.value);
   else if (action === 'settingChannelBuffer') settingUpdateChannelBuffer(e.target.value);
   else if (action === 'settingBatchSize') settingUpdateBatchSize(e.target.value);
+  else if (action === 'settingFdLimit') settingUpdateFdLimit(e.target.value);
 });
 document.addEventListener('change', (e) => {
   const action = e.target.dataset.action;

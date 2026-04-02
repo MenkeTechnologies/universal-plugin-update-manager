@@ -195,8 +195,8 @@ async fn scan_plugins(
                     .and_then(|s| s.parse::<usize>().ok())
                     .or(v.as_u64().map(|n| n as usize))
             })
-            .unwrap_or(2048)
-            .clamp(64, 8192);
+            .unwrap_or(256)
+            .clamp(64, 512);
         let (tx, rx) = std::sync::mpsc::sync_channel::<scanner::PluginInfo>(chan_buf);
         // Share stop flag directly with rayon workers for immediate cancellation
         let stop_flag = std::sync::Arc::new(AtomicBool::new(false));
@@ -204,7 +204,7 @@ async fn scan_plugins(
 
         // Dedicated thread pool so plugin scanning doesn't starve other scanners
         let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads((num_cpus::get() * 2).max(4))
+            .num_threads(num_cpus::get().max(4))
             .build()
             .unwrap_or_else(|e| {
                 eprintln!("Thread pool creation failed ({e}), retrying with 2 threads");
@@ -2856,6 +2856,27 @@ mod tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Raise file descriptor limit for intensive directory walking
+    #[cfg(unix)]
+    {
+        let prefs_fd = history::load_preferences();
+        let fd_target: u64 = prefs_fd
+            .get("fdLimit")
+            .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or(v.as_u64()))
+            .unwrap_or(10240)
+            .clamp(256, 65536);
+        let mut rlim = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+        unsafe {
+            if libc::getrlimit(libc::RLIMIT_NOFILE, &mut rlim) == 0 {
+                let target = (rlim.rlim_max).min(fd_target);
+                if rlim.rlim_cur < target {
+                    rlim.rlim_cur = target;
+                    libc::setrlimit(libc::RLIMIT_NOFILE, &rlim);
+                }
+            }
+        }
+    }
+
     // Initialize app start time for uptime tracking
     APP_START.get_or_init(Instant::now);
 

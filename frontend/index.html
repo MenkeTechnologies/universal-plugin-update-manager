@@ -2738,7 +2738,9 @@
       width: 50px;
       flex-shrink: 0;
     }
-    .file-waveform { flex-shrink: 0; width: 120px; height: 24px; border-radius: 2px; background: rgba(5,10,20,0.3); }
+    .file-row.file-audio { position: relative; }
+    .file-waveform { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.35; }
+    .file-wf-cursor { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--cyan); display: none; pointer-events: none; box-shadow: 0 0 4px var(--cyan); z-index: 2; }
     .fb-meta-panel { padding: 10px 14px 10px 44px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); animation: tabSlideIn 0.15s ease-out; }
     .fb-meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 4px 12px; }
     .fb-meta-item { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; padding: 2px 0; border-bottom: 1px solid rgba(26,26,62,0.2); }
@@ -3836,6 +3838,14 @@
       color: var(--text-muted);
       margin-bottom: 6px;
     }
+    /* Trello-style drag-reorder */
+    .trello-placeholder { border: 2px dashed var(--cyan) !important; border-radius: 4px; background: rgba(5,217,232,0.04); box-sizing: border-box; }
+    .trello-ghost { transition: none !important; }
+
+    .np-section { position: relative; cursor: grab; border: 1px solid transparent; border-radius: 2px; transition: border-color 0.15s; }
+    .np-section:hover { border-color: rgba(5,217,232,0.15); }
+    .np-section.np-dragging { opacity: 0.5; cursor: grabbing; }
+    .np-section.np-drag-over { border-color: var(--cyan); border-style: dashed; }
     .np-smart-playlists-section { margin-bottom: 8px; padding-top: 4px; border-top: 1px solid var(--border); }
     .sp-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; border-radius: 3px; font-size: 11px; color: var(--text-muted); transition: background 0.15s, color 0.15s; }
     .sp-item:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -4440,68 +4450,88 @@
       </div>
     </div>
     <div class="np-body">
-      <div class="now-playing-header">
-        <span class="now-playing-name" id="npName"></span>
-        <button class="btn-small btn-secondary" id="npHideBtn" data-action="hidePlayer" style="font-size: 10px; padding: 4px 8px;" title="Hide player">&#9868;</button>
-        <button class="btn-small btn-stop" id="npCloseBtn" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;" title="Stop &amp; close">&#10005;</button>
-      </div>
-      <div class="now-playing-transport">
-        <div class="now-playing-controls">
-          <button class="btn-small btn-secondary" id="npBtnPrev" data-action="prevTrack" title="Previous track (Cmd+Left)" style="padding:4px 6px;font-size:10px;">&#9198;</button>
-          <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause (Space)">&#9654;</button>
-          <button class="btn-small btn-secondary" id="npBtnNext" data-action="nextTrack" title="Next track (Cmd+Right)" style="padding:4px 6px;font-size:10px;">&#9197;</button>
-          <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Toggle loop (L)">&#8634;</button>
-          <button class="btn-small btn-loop" id="npBtnShuffle" data-action="toggleShuffle" title="Shuffle">&#128256;</button>
-          <button class="btn-small btn-secondary" id="npBtnFav" data-action="favCurrentTrack" title="Add/remove current track from favorites (F)" style="padding:4px 6px;font-size:10px;">&#9733;</button>
-          <button class="btn-small btn-secondary" id="npBtnTag" data-action="tagCurrentTrack" title="Add note/tags to current track (N)" style="padding:4px 6px;font-size:10px;">&#127991;</button>
-        </div>
-        <div class="now-playing-waveform" id="npWaveform" data-action="seekAudio">
-          <canvas class="waveform-canvas" id="npWaveformCanvas"></canvas>
-          <div class="now-playing-progress" id="npProgress"></div>
-          <div class="waveform-cursor" id="npCursor" style="left:0;display:none;"></div>
-        </div>
-        <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
-      </div>
-      <div class="np-meta-line" id="npMetaLine"></div>
-      <div class="np-visualizer" id="npVisualizer"></div>
-      <div class="now-playing-transport">
-        <div class="now-playing-volume">
-          <button class="btn-small" id="npBtnMute" data-action="toggleMute" title="Mute/Unmute (M)" style="padding:3px 5px;font-size:12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">&#128264;</button>
-          <input type="range" class="volume-slider" id="npVolume" min="0" max="100" value="100" data-action="setVolume" title="Volume (Cmd+Up/Down)">
-          <span class="volume-pct" id="npVolumePct">100%</span>
-        </div>
-        <div class="now-playing-speed">
-          <label>Speed</label>
-          <select class="speed-select" id="npSpeed" data-action="setPlaybackSpeed" title="Playback speed">
-            <option value="0.25">0.25x</option>
-            <option value="0.5">0.5x</option>
-            <option value="0.75">0.75x</option>
-            <option value="1" selected>1x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2x</option>
-          </select>
+      <div class="np-section" data-np-section="header">
+        <div class="now-playing-header">
+          <span class="now-playing-name" id="npName"></span>
+          <button class="btn-small btn-secondary" id="npHideBtn" data-action="hidePlayer" style="font-size: 10px; padding: 4px 8px;" title="Hide player">&#9868;</button>
+          <button class="btn-small btn-stop" id="npCloseBtn" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;" title="Stop &amp; close">&#10005;</button>
         </div>
       </div>
-      <input type="text" class="np-search-input" id="npSearchInput" placeholder="Search songs..." title="Search recently played and sample library" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-      <div class="np-search-results" id="npSearchResults"></div>
-      <div class="np-expand-hint">double-click to expand</div>
-      <div class="np-history" id="npHistory">
-        <div class="np-history-title">Recently Played
-          <button class="btn-small btn-secondary" data-action="exportRecentlyPlayed" title="Export play history as JSON" style="font-size:8px;padding:2px 6px;margin-left:6px;vertical-align:middle;">Export</button>
-          <button class="btn-small btn-secondary" data-action="importRecentlyPlayed" title="Import play history from JSON" style="font-size:8px;padding:2px 6px;vertical-align:middle;">Import</button>
-          <button class="btn-small btn-stop" data-action="clearRecentlyPlayed" title="Clear play history" style="font-size:8px;padding:2px 6px;vertical-align:middle;">Clear</button>
+      <div class="np-section" data-np-section="transport">
+        <div class="now-playing-transport">
+          <div class="now-playing-controls">
+            <button class="btn-small btn-secondary" id="npBtnPrev" data-action="prevTrack" title="Previous track (Cmd+Left)" style="padding:4px 6px;font-size:10px;">&#9198;</button>
+            <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause (Space)">&#9654;</button>
+            <button class="btn-small btn-secondary" id="npBtnNext" data-action="nextTrack" title="Next track (Cmd+Right)" style="padding:4px 6px;font-size:10px;">&#9197;</button>
+            <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Toggle loop (L)">&#8634;</button>
+            <button class="btn-small btn-loop" id="npBtnShuffle" data-action="toggleShuffle" title="Shuffle">&#128256;</button>
+            <button class="btn-small btn-secondary" id="npBtnFav" data-action="favCurrentTrack" title="Add/remove current track from favorites (F)" style="padding:4px 6px;font-size:10px;">&#9733;</button>
+            <button class="btn-small btn-secondary" id="npBtnTag" data-action="tagCurrentTrack" title="Add note/tags to current track (N)" style="padding:4px 6px;font-size:10px;">&#127991;</button>
+          </div>
+          <div class="now-playing-waveform" id="npWaveform" data-action="seekAudio">
+            <canvas class="waveform-canvas" id="npWaveformCanvas"></canvas>
+            <div class="now-playing-progress" id="npProgress"></div>
+            <div class="waveform-cursor" id="npCursor" style="left:0;display:none;"></div>
+          </div>
+          <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
         </div>
-        <div id="npHistoryList"></div>
       </div>
-      <div class="np-smart-playlists-section">
-        <div class="np-history-title" style="display:flex;align-items:center;gap:6px;">Smart Playlists
-          <button class="btn-small btn-secondary" data-action="createSmartPlaylist" title="Create a new rule-based smart playlist" style="font-size:8px;padding:2px 6px;vertical-align:middle;">+ New</button>
+      <div class="np-section" data-np-section="meta">
+        <div class="np-meta-line" id="npMetaLine"></div>
+      </div>
+      <div class="np-section" data-np-section="visualizer">
+        <div class="np-visualizer" id="npVisualizer"></div>
+      </div>
+      <div class="np-section" data-np-section="volume">
+        <div class="now-playing-transport">
+          <div class="now-playing-volume">
+            <button class="btn-small" id="npBtnMute" data-action="toggleMute" title="Mute/Unmute (M)" style="padding:3px 5px;font-size:12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">&#128264;</button>
+            <input type="range" class="volume-slider" id="npVolume" min="0" max="100" value="100" data-action="setVolume" title="Volume (Cmd+Up/Down)">
+            <span class="volume-pct" id="npVolumePct">100%</span>
+          </div>
+          <div class="now-playing-speed">
+            <label>Speed</label>
+            <select class="speed-select" id="npSpeed" data-action="setPlaybackSpeed" title="Playback speed">
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+          </div>
         </div>
-        <div id="npSmartPlaylists"></div>
       </div>
-      <div style="text-align: center; padding: 6px 0;">
-        <button class="np-eq-toggle" id="npEqToggle" data-action="toggleEqSection" title="Toggle EQ and effects panel">EQ &amp; FX</button>
+      <div class="np-section" data-np-section="search">
+        <input type="text" class="np-search-input" id="npSearchInput" placeholder="Search songs..." title="Search recently played and sample library" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <div class="np-search-results" id="npSearchResults"></div>
+      </div>
+      <div class="np-section" data-np-section="hint">
+        <div class="np-expand-hint">double-click to expand</div>
+      </div>
+      <div class="np-section" data-np-section="history">
+        <div class="np-history" id="npHistory">
+          <div class="np-history-title">Recently Played
+            <button class="btn-small btn-secondary" data-action="exportRecentlyPlayed" title="Export play history as JSON" style="font-size:8px;padding:2px 6px;margin-left:6px;vertical-align:middle;">Export</button>
+            <button class="btn-small btn-secondary" data-action="importRecentlyPlayed" title="Import play history from JSON" style="font-size:8px;padding:2px 6px;vertical-align:middle;">Import</button>
+            <button class="btn-small btn-stop" data-action="clearRecentlyPlayed" title="Clear play history" style="font-size:8px;padding:2px 6px;vertical-align:middle;">Clear</button>
+          </div>
+          <div id="npHistoryList"></div>
+        </div>
+      </div>
+      <div class="np-section" data-np-section="playlists">
+        <div class="np-smart-playlists-section">
+          <div class="np-history-title" style="display:flex;align-items:center;gap:6px;">Smart Playlists
+            <button class="btn-small btn-secondary" data-action="createSmartPlaylist" title="Create a new rule-based smart playlist" style="font-size:8px;padding:2px 6px;vertical-align:middle;">+ New</button>
+          </div>
+          <div id="npSmartPlaylists"></div>
+        </div>
+      </div>
+      <div class="np-section" data-np-section="eq">
+        <div style="text-align: center; padding: 6px 0;">
+          <button class="np-eq-toggle" id="npEqToggle" data-action="toggleEqSection" title="Toggle EQ and effects panel">EQ &amp; FX</button>
+        </div>
       </div>
       <div class="np-eq-section" id="npEqSection">
         <div class="np-eq-header">
@@ -5328,6 +5358,18 @@
           </div>
           <div class="settings-row">
             <div class="settings-label">
+              <span class="settings-title">File Descriptor Limit</span>
+              <span class="settings-desc">Max open files per process. Raise if scans abort on large libraries or network shares. Restart required.</span>
+            </div>
+            <div class="settings-control">
+              <div class="settings-range-wrap">
+                <input type="range" class="settings-range" id="settingFdLimit" min="256" max="65536" step="256" value="10240" data-action="settingFdLimit" title="Maximum file descriptors (open files) for the process">
+                <span class="settings-range-value" id="settingFdLimitValue">10240</span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
               <span class="settings-title">System Info</span>
               <span class="settings-desc">Current runtime configuration (read-only)</span>
             </div>
@@ -5522,6 +5564,7 @@
   <script src="js/command-palette.js"></script>
   <script src="js/xref.js?v=153"></script>
   <script src="js/dep-graph.js"></script>
+  <script src="js/drag-reorder.js?v=153"></script>
   <script src="js/modal-drag.js?v=153"></script>
   <script src="js/smart-playlists.js?v=153"></script>
   <script src="js/heatmap-dashboard.js?v=153"></script>

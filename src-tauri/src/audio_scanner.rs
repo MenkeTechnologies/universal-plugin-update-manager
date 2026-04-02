@@ -104,16 +104,16 @@ pub fn walk_for_audio(
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<AudioSample>>(2048);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<AudioSample>>(256);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
 
-    // Dedicated pool so scanners don't starve each other (~quarter of cores each)
+    // Dedicated pool — limit threads to avoid FD exhaustion with parallel scans
     let roots_owned: Vec<PathBuf> = roots.to_vec();
     let stop2 = stop.clone();
     let found2 = found.clone();
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads((num_cpus::get() * 2).max(4))
+        .num_threads(num_cpus::get().max(4))
         .build()
         .unwrap();
     std::thread::spawn(move || {
@@ -127,6 +127,7 @@ pub fn walk_for_audio(
                 );
             });
         });
+        drop(pool); // Release thread pool resources immediately
     });
 
     // Stream results to callback as they arrive, checking stop frequently
@@ -163,9 +164,10 @@ fn walk_dir_parallel(
         return;
     }
 
+    // Canonicalize for visited-set dedup (resolves symlinks), normalize for macOS firmlinks
     let real_dir = match fs::canonicalize(dir) {
         Ok(p) => normalize_macos_path(p),
-        Err(_) => return,
+        Err(_) => normalize_macos_path(dir.to_path_buf()),
     };
     {
         let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());

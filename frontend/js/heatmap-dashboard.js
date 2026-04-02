@@ -93,11 +93,11 @@ function buildFormatCard(samples) {
   const total = samples.length || 1;
 
   const bars = sorted.slice(0, 10).map(([fmt, count]) => {
-    const pct = Math.round((count / max) * 100);
-    const share = ((count / total) * 100).toFixed(1);
+    const barPct = (count / max) * 100; // visual: relative to largest
+    const share = ((count / total) * 100).toFixed(1); // label: percentage of total
     return `<div class="hm-bar-row">
       <span class="hm-bar-label">${escapeHtml(fmt)}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-cyan" style="width:${pct}%"></div></div>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-cyan" style="width:${barPct.toFixed(1)}%"></div></div>
       <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
@@ -121,13 +121,15 @@ function buildSizeCard(samples) {
       if (sz < buckets[i].max || i === buckets.length - 1) { counts[i]++; break; }
     }
   }
-  const max = Math.max(...counts, 1);
+  const total = samples.length || 1;
+  const maxBucket = Math.max(...counts, 1);
   const bars = buckets.map((b, i) => {
-    const pct = Math.round((counts[i] / max) * 100);
+    const barPct = (counts[i] / maxBucket) * 100;
+    const share = ((counts[i] / total) * 100).toFixed(1);
     return `<div class="hm-bar-row">
       <span class="hm-bar-label">${b.label}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-magenta" style="width:${pct}%"></div></div>
-      <span class="hm-bar-val">${counts[i].toLocaleString()}</span>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-magenta" style="width:${barPct.toFixed(1)}%"></div></div>
+      <span class="hm-bar-val">${counts[i].toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
 
@@ -144,15 +146,17 @@ function buildFolderCard(samples) {
     dirs[key] = (dirs[key] || 0) + 1;
   }
   const sorted = Object.entries(dirs).sort((a, b) => b[1] - a[1]).slice(0, 12);
-  const max = sorted.length > 0 ? sorted[0][1] : 1;
+  const total = samples.length || 1;
+  const maxFolder = sorted.length > 0 ? sorted[0][1] : 1;
 
   const bars = sorted.map(([dir, count]) => {
-    const pct = Math.round((count / max) * 100);
+    const barPct = (count / maxFolder) * 100;
+    const share = ((count / total) * 100).toFixed(1);
     const name = dir.split('/').pop() || dir;
     return `<div class="hm-bar-row" title="${escapeHtml(dir)}">
       <span class="hm-bar-label" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-green" style="width:${pct}%"></div></div>
-      <span class="hm-bar-val">${count.toLocaleString()}</span>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-green" style="width:${barPct.toFixed(1)}%"></div></div>
+      <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
 
@@ -185,13 +189,15 @@ function buildPluginTypeCard(plugins) {
   const types = {};
   for (const p of plugins) types[p.type || 'Unknown'] = (types[p.type || 'Unknown'] || 0) + 1;
   const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]);
-  const max = sorted[0]?.[1] || 1;
+  const total = plugins.length || 1;
+  const maxType = sorted[0]?.[1] || 1;
   const bars = sorted.map(([type, count]) => {
-    const pct = Math.round((count / max) * 100);
+    const barPct = (count / maxType) * 100;
+    const share = ((count / total) * 100).toFixed(1);
     return `<div class="hm-bar-row">
       <span class="hm-bar-label">${escapeHtml(type)}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-yellow" style="width:${pct}%"></div></div>
-      <span class="hm-bar-val">${count.toLocaleString()}</span>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-yellow" style="width:${barPct.toFixed(1)}%"></div></div>
+      <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
   return `<div class="hm-card"><h3 class="hm-card-title">Plugin Types</h3>${bars}</div>`;
@@ -205,13 +211,15 @@ function buildDawFormatCard(projects) {
     fmts[fmt] = (fmts[fmt] || 0) + 1;
   }
   const sorted = Object.entries(fmts).sort((a, b) => b[1] - a[1]);
-  const max = sorted[0]?.[1] || 1;
+  const total = projects.length || 1;
+  const maxFmt = sorted[0]?.[1] || 1;
   const bars = sorted.map(([fmt, count]) => {
-    const pct = Math.round((count / max) * 100);
+    const barPct = (count / maxFmt) * 100;
+    const share = ((count / total) * 100).toFixed(1);
     return `<div class="hm-bar-row">
       <span class="hm-bar-label">${escapeHtml(fmt)}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-orange" style="width:${pct}%"></div></div>
-      <span class="hm-bar-val">${count.toLocaleString()}</span>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-orange" style="width:${barPct.toFixed(1)}%"></div></div>
+      <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
   return `<div class="hm-card"><h3 class="hm-card-title">DAW Formats</h3>${bars}</div>`;
@@ -301,10 +309,12 @@ function renderKeyWheel() {
     ctx.textAlign = 'right';
     ctx.fillText(key, 75, y + barH - 3);
 
-    // Count
+    // Count + percentage
+    const keyTotal = keys.length || 1;
+    const keyShare = ((count / keyTotal) * 100).toFixed(0);
     ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(122,139,168,0.8)';
-    ctx.fillText(count.toString(), 82 + barW + 4, y + barH - 3);
+    ctx.fillText(`${count} (${keyShare}%)`, 82 + barW + 4, y + barH - 3);
   }
 }
 
@@ -344,7 +354,8 @@ function renderTimelineChart(samples) {
   ctx.fillStyle = 'rgba(122,139,168,0.8)';
   ctx.font = '8px sans-serif';
   ctx.textAlign = 'center';
-  for (let i = 0; i < recent.length; i += Math.max(1, Math.floor(recent.length / 8))) {
+  const labelStep = Math.max(1, Math.ceil(recent.length / 8));
+  for (let i = 0; i < recent.length; i += labelStep) {
     const label = recent[i][0].slice(2); // "YY-MM"
     ctx.fillText(label, i * barW + barW / 2, h - 2);
   }

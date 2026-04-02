@@ -374,6 +374,23 @@ function refreshCustomPresetUI() {
       ${escapeHtml(p.name)}
     </button>`;
   }).join('');
+  if (typeof initDragReorder === 'function') {
+    initDragReorder(container, '.custom-preset-chip', 'presetChipOrder', {
+      direction: 'horizontal',
+      getKey: (el) => el.textContent.trim(),
+      onReorder: () => {
+        // Reorder the presets array to match
+        const chips = [...container.querySelectorAll('.custom-preset-chip')];
+        const oldPresets = prefs.getObject('customSchemePresets', []);
+        const newPresets = [];
+        for (const chip of chips) {
+          const idx = parseInt(chip.dataset.idx);
+          if (oldPresets[idx]) newPresets.push(oldPresets[idx]);
+        }
+        prefs.setItem('customSchemePresets', newPresets);
+      },
+    });
+  }
 }
 
 function settingToggleTheme() {
@@ -583,6 +600,12 @@ function settingUpdateBatchSize(val) {
   showToast('Batch size set to ' + val + ' — restart to apply');
 }
 
+function settingUpdateFdLimit(val) {
+  document.getElementById('settingFdLimitValue').textContent = val;
+  prefs.setItem('fdLimit', val);
+  showToast('FD limit set to ' + val + ' — restart to apply');
+}
+
 function settingSaveSelect(key, value) {
   prefs.setItem(key, value);
 }
@@ -774,6 +797,15 @@ function refreshSettingsUI() {
   if (batchSzEl) {
     batchSzEl.value = batchSz;
     batchSzValEl.textContent = batchSz;
+  }
+
+  // FD limit
+  const fdLimit = getSettingValue('fdLimit', '10240');
+  const fdEl = document.getElementById('settingFdLimit');
+  const fdValEl = document.getElementById('settingFdLimitValue');
+  if (fdEl) {
+    fdEl.value = fdLimit;
+    fdValEl.textContent = fdLimit;
   }
 
   // System perf info — get real stats from Rust backend

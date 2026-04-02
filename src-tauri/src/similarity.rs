@@ -302,6 +302,9 @@ mod tests {
         let fp = fp.unwrap();
         assert!(fp.rms > 0.0, "RMS should be positive");
         assert!(fp.spectral_centroid > 0.0, "centroid should be positive");
+        assert!(fp.spectral_centroid <= 1.0, "centroid should be normalized to [0,1], got {}", fp.spectral_centroid);
+        assert!(fp.zero_crossing_rate <= 1.0, "ZCR should be <= 1.0");
+        assert!(fp.low_band_energy >= 0.0 && fp.low_band_energy <= 1.0, "band energy should be [0,1]");
 
         let _ = std::fs::remove_file(&tmp);
     }

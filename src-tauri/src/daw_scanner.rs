@@ -86,12 +86,17 @@ pub fn format_size(bytes: u64) -> String {
 }
 
 fn get_directory_size(path: &Path) -> u64 {
+    get_directory_size_depth(path, 0)
+}
+
+fn get_directory_size_depth(path: &Path, depth: u32) -> u64 {
+    if depth > 10 { return 0; } // cap recursion to limit FD usage
     let mut total = 0u64;
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries.flatten() {
             let p = entry.path();
             if p.is_dir() {
-                total += get_directory_size(&p);
+                total += get_directory_size_depth(&p, depth + 1);
             } else if let Ok(meta) = fs::metadata(&p) {
                 total += meta.len();
             }
@@ -220,7 +225,7 @@ pub fn walk_for_daw(
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(2048);
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(256);
     let visited = Arc::new(Mutex::new(HashSet::new()));
     let exclude = Arc::new(exclude.unwrap_or_default());
 
@@ -228,7 +233,7 @@ pub fn walk_for_daw(
     let stop2 = stop.clone();
     let found2 = found.clone();
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads((num_cpus::get() * 2).max(4))
+        .num_threads(num_cpus::get().max(4))
         .build()
         .unwrap();
     std::thread::spawn(move || {
@@ -250,6 +255,7 @@ pub fn walk_for_daw(
                 );
             });
         });
+        drop(pool);
     });
 
     // Stream results to callback as they arrive, checking stop frequently
@@ -288,7 +294,7 @@ fn walk_dir_parallel(
 
     let real_dir = match fs::canonicalize(dir) {
         Ok(p) => normalize_macos_path(p),
-        Err(_) => return,
+        Err(_) => normalize_macos_path(dir.to_path_buf()),
     };
     {
         let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());

@@ -60,6 +60,7 @@ function initDawTable() {
     <tbody id="dawTableBody"></tbody>
   </table>`;
   initColumnResize(document.getElementById('dawTable'));
+  if (typeof initTableColumnReorder === 'function') initTableColumnReorder('dawTable', 'dawColumnOrder');
 }
 
 function getDawBadgeClass(daw) {

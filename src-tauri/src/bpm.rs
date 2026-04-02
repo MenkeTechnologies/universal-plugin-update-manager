@@ -822,4 +822,22 @@ mod tests {
         assert!(result.is_none());
         let _ = fs::remove_file(&tmp);
     }
+
+    #[test]
+    fn test_bpm_rounding_snaps_to_integer() {
+        // Values within 0.15 of integer should snap
+        let round = |v: f64| -> f64 {
+            let rounded = (v * 10.0).round() / 10.0;
+            let nearest = rounded.round();
+            if (rounded - nearest).abs() < 0.15 { nearest } else { rounded }
+        };
+        assert_eq!(round(120.08), 120.0);
+        assert_eq!(round(119.92), 120.0);
+        assert_eq!(round(128.14), 128.0);
+        assert_eq!(round(128.0), 128.0);
+        // Values beyond 0.15 keep decimal
+        assert_eq!(round(127.5), 127.5);
+        assert_eq!(round(135.3), 135.3);
+        assert_eq!(round(99.8), 99.8);
+    }
 }

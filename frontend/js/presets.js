@@ -211,6 +211,7 @@ async function scanPresets(resume = false) {
         <tbody id="presetTableBody"></tbody>
       </table>`;
       document.getElementById('presetStats').style.display = 'flex';
+      if (typeof initTableColumnReorder === 'function') initTableColumnReorder('presetTable', 'presetColumnOrder');
     }
 
     allPresets.push(...batch);

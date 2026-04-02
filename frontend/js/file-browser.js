@@ -185,11 +185,11 @@ function renderFileList() {
       if (parts.length > 0) extras = `<span class="file-meta-tags-row">${parts.join('')}</span>`;
     }
 
-    const waveformHtml = isAudio ? `<canvas class="file-waveform" data-wf-path="${escapeHtml(e.path)}" width="120" height="24" title="Waveform preview"></canvas>` : '';
-    return `<div class="file-row${cls}" data-file-path="${escapeHtml(e.path)}" data-file-dir="${e.isDir}">
+    const wfBg = isAudio ? `<canvas class="file-waveform" data-wf-path="${escapeHtml(e.path)}" height="36" title="Waveform"></canvas><span class="file-wf-cursor"></span>` : '';
+    return `<div class="file-row${cls}${isAudio ? ' file-audio' : ''}" data-file-path="${escapeHtml(e.path)}" data-file-dir="${e.isDir}" ${isAudio ? `data-wf-file="${escapeHtml(e.path)}"` : ''}>
+      ${wfBg}
       <span class="file-icon">${fileIcon(e)}</span>
       <span class="file-name">${note}${search && typeof highlightMatch === 'function' ? highlightMatch(e.name, search, 'fuzzy') : escapeHtml(e.name)}${extras}</span>
-      ${waveformHtml}
       <span class="file-ext">${e.isDir ? 'DIR' : e.ext}</span>
       <span class="file-size">${e.isDir ? '' : e.sizeFormatted}</span>
       <span class="file-date">${e.modified}</span>
@@ -222,6 +222,9 @@ function initFileBrowserWaveforms() {
 }
 
 async function drawMiniWaveform(canvas, filePath) {
+  // Size canvas to parent row width
+  const row = canvas.closest('.file-row');
+  if (row) canvas.width = row.offsetWidth;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
 
