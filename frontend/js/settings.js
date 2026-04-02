@@ -435,31 +435,44 @@ async function exportSettingsPdf() {
   const shortcuts = typeof getShortcuts === 'function' ? getShortcuts() : {};
   const allPrefs = prefs._cache || {};
 
-  let text = 'AUDIO_HAXOR — Settings & Keybindings Export\n';
-  text += '='.repeat(50) + '\n\n';
-  text += `Generated: ${new Date().toLocaleString()}\n\n`;
-
-  text += '── KEYBOARD SHORTCUTS ──\n\n';
-  for (const [id, sc] of Object.entries(shortcuts)) {
-    const key = sc.mod ? `Cmd+${sc.key}` : sc.key;
-    text += `  ${sc.label.padEnd(35)} ${key}\n`;
-  }
-
-  text += '\n── PREFERENCES ──\n\n';
-  for (const [k, v] of Object.entries(allPrefs)) {
-    if (typeof v === 'object') continue; // skip large objects
-    text += `  ${k.padEnd(35)} ${v}\n`;
-  }
-
-  // Export as text file (PDF generation would need a library)
   const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
   if (!dialogApi) return;
   const savePath = await dialogApi.save({
     title: 'Export Settings & Keybindings',
-    defaultPath: 'audio-haxor-settings.txt',
-    filters: [{ name: 'Text', extensions: ['txt'] }],
+    defaultPath: 'audio-haxor-settings.pdf',
+    filters: [{ name: 'PDF', extensions: ['pdf'] }, { name: 'Text', extensions: ['txt'] }],
   });
-  if (savePath) {
+  if (!savePath) return;
+
+  if (savePath.endsWith('.pdf')) {
+    // PDF export via Rust
+    const headers = ['Setting / Shortcut', 'Value'];
+    const rows = [];
+    rows.push(['── KEYBOARD SHORTCUTS ──', '']);
+    for (const [id, sc] of Object.entries(shortcuts)) {
+      rows.push([sc.label, sc.mod ? `Cmd+${sc.key}` : sc.key]);
+    }
+    rows.push(['── PREFERENCES ──', '']);
+    for (const [k, v] of Object.entries(allPrefs)) {
+      if (typeof v === 'object') continue;
+      rows.push([k, String(v)]);
+    }
+    try {
+      await window.vstUpdater.exportPdf('AUDIO_HAXOR Settings & Keybindings', headers, rows, savePath);
+      showToast('Settings PDF exported');
+    } catch (e) { showToast('PDF export failed: ' + (e.message || e), 4000, 'error'); }
+  } else {
+    // Text export
+    let text = 'AUDIO_HAXOR — Settings & Keybindings\n' + '='.repeat(50) + '\n\n';
+    text += `Generated: ${new Date().toLocaleString()}\n\n── KEYBOARD SHORTCUTS ──\n\n`;
+    for (const [id, sc] of Object.entries(shortcuts)) {
+      text += `  ${sc.label.padEnd(35)} ${sc.mod ? 'Cmd+' + sc.key : sc.key}\n`;
+    }
+    text += '\n── PREFERENCES ──\n\n';
+    for (const [k, v] of Object.entries(allPrefs)) {
+      if (typeof v === 'object') continue;
+      text += `  ${k.padEnd(35)} ${v}\n`;
+    }
     await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: text });
     showToast('Settings exported');
   }
@@ -468,15 +481,29 @@ async function exportSettingsPdf() {
 async function exportLogPdf() {
   try {
     const log = await window.vstUpdater.readLog();
+    if (!log || !log.trim()) { showToast('Log is empty', 3000, 'warning'); return; }
+
     const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
     if (!dialogApi) return;
     const savePath = await dialogApi.save({
       title: 'Export App Log',
-      defaultPath: 'audio-haxor-log.txt',
-      filters: [{ name: 'Text', extensions: ['txt'] }],
+      defaultPath: 'audio-haxor-log.pdf',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }, { name: 'Text', extensions: ['txt'] }],
     });
-    if (savePath) {
-      await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: log || '(empty log)' });
+    if (!savePath) return;
+
+    if (savePath.endsWith('.pdf')) {
+      const headers = ['Timestamp', 'Message'];
+      const rows = log.split('\n').filter(Boolean).map(line => {
+        const match = line.match(/^\[(.+?)\] (.+)$/);
+        return match ? [match[1], match[2]] : ['', line];
+      });
+      try {
+        await window.vstUpdater.exportPdf('AUDIO_HAXOR Error Log', headers, rows, savePath);
+        showToast('Log PDF exported');
+      } catch (e) { showToast('PDF export failed: ' + (e.message || e), 4000, 'error'); }
+    } else {
+      await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: log });
       showToast('Log exported');
     }
   } catch (e) {

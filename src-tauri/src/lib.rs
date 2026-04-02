@@ -2851,6 +2851,41 @@ mod tests {
         assert!(std::path::Path::new(&home).exists());
     }
 
+    // ── Cache file tests ──
+
+    #[test]
+    fn test_cache_file_roundtrip() {
+        let data = serde_json::json!({"hello": "world", "count": 42});
+        write_cache_file("test-cache-roundtrip.json".into(), data.clone()).unwrap();
+        let result = read_cache_file("test-cache-roundtrip.json".into()).unwrap();
+        assert_eq!(result["hello"], "world");
+        assert_eq!(result["count"], 42);
+        let _ = std::fs::remove_file(history::get_data_dir().join("test-cache-roundtrip.json"));
+    }
+
+    #[test]
+    fn test_cache_file_nonexistent() {
+        let result = read_cache_file("nonexistent-cache-xyz.json".into()).unwrap();
+        assert_eq!(result, serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_append_and_read_log() {
+        append_log("test log entry 1".into());
+        append_log("test log entry 2".into());
+        let log = read_log().unwrap();
+        assert!(log.contains("test log entry 1"));
+        assert!(log.contains("test log entry 2"));
+    }
+
+    #[test]
+    fn test_clear_log() {
+        append_log("before clear".into());
+        clear_log().unwrap();
+        let log = read_log().unwrap();
+        assert!(!log.contains("before clear"));
+    }
+
     // ── TOML export/import tests ──
 
     #[test]
