@@ -4233,6 +4233,17 @@ pub fn run() {
     // Initialize global SQLite database
     db::init_global().expect("Failed to initialize database");
 
+    // Log DB stats at startup
+    if let Ok(counts) = db::global().table_counts() {
+        let m = counts.as_object().unwrap();
+        let get = |k: &str| m.get(k).and_then(|v| v.as_u64()).unwrap_or(0);
+        append_log(format!(
+            "DB STATS — {} plugins | {} samples | {} DAW projects | {} presets | {} KVR cache | {} waveforms | {} spectrograms | {} xref | {} fingerprints",
+            get("plugins"), get("audio_samples"), get("daw_projects"), get("presets"),
+            get("kvr_cache"), get("waveform_cache"), get("spectrogram_cache"), get("xref_cache"), get("fingerprint_cache"),
+        ));
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
