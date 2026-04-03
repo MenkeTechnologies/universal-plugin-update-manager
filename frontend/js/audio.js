@@ -1651,13 +1651,12 @@ function collapsePlayer() {
 function hidePlayer() {
   const np = document.getElementById('audioNowPlaying');
   prefs.setItem('playerExpanded', np.classList.contains('expanded') ? 'on' : 'off');
-  // Stop playback and clear state
-  audioPlayer.pause();
-  np.classList.remove('active', 'np-playing');
+  // Hide player but keep audio playing
+  np.classList.remove('active');
   const pill = document.getElementById('audioRestorePill');
-  if (pill) pill.classList.remove('active');
-  updatePlayBtnStates();
-  updateNowPlayingBtn();
+  if (pill && audioPlayerPath && !audioPlayer.paused) {
+    pill.classList.add('active');
+  }
 }
 
 function showPlayer() {

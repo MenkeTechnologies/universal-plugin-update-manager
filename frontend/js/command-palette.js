@@ -144,49 +144,9 @@ function collectPaletteItems() {
     items.push({ type: 'action', name: 'Toggle Neon Glow', icon: '&#10024;', action: () => settingToggleNeonGlow() });
   }
 
-  // Plugins
-  if (typeof allPlugins !== 'undefined') {
-    for (const p of allPlugins) {
-      items.push({
-        type: 'plugin', name: p.name, detail: p.type + (p.manufacturer ? ' · ' + p.manufacturer : ''),
-        icon: '&#9889;', fields: [p.name, p.type, p.manufacturer || '', p.path],
-        action: () => { switchTab('plugins'); setTimeout(() => { document.getElementById('pluginSearchInput').value = p.name; filterPlugins(); }, 100); }
-      });
-    }
-  }
-
-  // Samples
-  if (typeof allAudioSamples !== 'undefined') {
-    for (const s of allAudioSamples) {
-      items.push({
-        type: 'sample', name: s.name, detail: s.format + ' · ' + s.sizeFormatted,
-        icon: '&#127925;', fields: [s.name, s.format, s.path],
-        action: () => { switchTab('samples'); previewAudio(s.path); }
-      });
-    }
-  }
-
-  // DAW Projects
-  if (typeof allDawProjects !== 'undefined') {
-    for (const d of allDawProjects) {
-      items.push({
-        type: 'daw', name: d.name, detail: d.daw + ' · ' + d.sizeFormatted,
-        icon: '&#127911;', fields: [d.name, d.daw, d.format, d.path],
-        action: () => { switchTab('daw'); setTimeout(() => { document.getElementById('dawSearchInput').value = d.name; filterDawProjects(); }, 100); }
-      });
-    }
-  }
-
-  // Presets
-  if (typeof allPresets !== 'undefined') {
-    for (const p of allPresets) {
-      items.push({
-        type: 'preset', name: p.name, detail: p.format,
-        icon: '&#127924;', fields: [p.name, p.format, p.path],
-        action: () => { switchTab('presets'); setTimeout(() => { document.getElementById('presetSearchInput').value = p.name; filterPresets(); }, 100); }
-      });
-    }
-  }
+  // Data items (plugins, samples, DAW, presets) are searched lazily
+  // in filterPaletteResults to avoid blocking UI on palette open.
+  // See _searchDataItems() below.
 
   // Bookmarked dirs
   if (typeof getFavDirs === 'function') {
@@ -215,7 +175,6 @@ function collectPaletteItems() {
 
 function filterPaletteItems(query, items) {
   if (!query) {
-    // Show tabs and actions when empty
     return items.filter(i => i.type === 'tab' || i.type === 'action');
   }
   const scored = [];
@@ -223,6 +182,22 @@ function filterPaletteItems(query, items) {
     const fields = item.fields || [item.name];
     const score = searchScore(query, fields, 'fuzzy');
     if (score > 0) scored.push({ item, score });
+  }
+  // Lazy search data items only when query is 2+ chars (avoids blocking on single char)
+  if (query.length >= 2) {
+    const dataSearch = (arr, type, icon, mkItem) => {
+      if (!arr) return;
+      const limit = 20; let count = 0;
+      for (const item of arr) {
+        if (count >= limit) break;
+        const built = mkItem(item);
+        const score = searchScore(query, built.fields, 'fuzzy');
+        if (score > 0) { scored.push({ item: { ...built, type, icon }, score }); count++; }
+      }
+    };
+    if (typeof allPlugins !== 'undefined') dataSearch(allPlugins, 'plugin', '&#9889;', p => ({ name: p.name, detail: p.type + (p.manufacturer ? ' · ' + p.manufacturer : ''), fields: [p.name, p.type, p.manufacturer || ''], action: () => { switchTab('plugins'); setTimeout(() => { const el = document.getElementById('pluginSearchInput'); if (el) { el.value = p.name; filterPlugins(); } }, 100); } }));
+    if (typeof allDawProjects !== 'undefined') dataSearch(allDawProjects, 'daw', '&#127911;', d => ({ name: d.name, detail: d.daw + ' · ' + d.sizeFormatted, fields: [d.name, d.daw, d.format], action: () => { switchTab('daw'); setTimeout(() => { const el = document.getElementById('dawSearchInput'); if (el) { el.value = d.name; filterDawProjects(); } }, 100); } }));
+    if (typeof allPresets !== 'undefined') dataSearch(allPresets.slice(0, 5000), 'preset', '&#127924;', p => ({ name: p.name, detail: p.format, fields: [p.name, p.format], action: () => { switchTab('presets'); setTimeout(() => { const el = document.getElementById('presetSearchInput'); if (el) { el.value = p.name; filterPresets(); } }, 100); } }));
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, PALETTE_MAX).map(s => s.item);
