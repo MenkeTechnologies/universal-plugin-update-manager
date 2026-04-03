@@ -4162,6 +4162,11 @@
     body.no-neon-glow .modal-content { box-shadow: 0 0 20px var(--cyan-glow); }
     body.no-neon-glow .audio-now-playing.np-playing { box-shadow: 0 0 20px var(--cyan-glow), 0 4px 24px rgba(0,0,0,0.5); }
 
+    /* Pause animations on hidden tabs to save GPU */
+    .tab-content:not(.active) * { animation-play-state: paused !important; }
+    /* Reduce animation during scans */
+    body.scanning .neon-border-glow { animation-duration: 6s !important; }
+
     .audio-now-playing.expanded .np-visualizer {
       height: 48px;
     }
