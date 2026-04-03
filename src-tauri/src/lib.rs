@@ -569,7 +569,7 @@ fn history_delete(id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn history_clear() -> Result<(), String> {
-    append_log("HISTORY CLEAR — plugins (all scan history deleted)".into());
+    #[cfg(not(test))] append_log("HISTORY CLEAR — plugins (all scan history deleted)".into());
     db::global().clear_plugin_history()
 }
 
@@ -732,7 +732,7 @@ fn audio_history_delete(id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn audio_history_clear() -> Result<(), String> {
-    append_log("HISTORY CLEAR — audio samples (all scan history deleted)".into());
+    #[cfg(not(test))] append_log("HISTORY CLEAR — audio samples (all scan history deleted)".into());
     db::global().clear_audio_history()
 }
 
@@ -885,7 +885,7 @@ fn daw_history_delete(id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn daw_history_clear() -> Result<(), String> {
-    append_log("HISTORY CLEAR — DAW projects".into());
+    #[cfg(not(test))] append_log("HISTORY CLEAR — DAW projects".into());
     db::global().clear_daw_history()
 }
 
@@ -1030,7 +1030,7 @@ fn preset_history_delete(id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn preset_history_clear() -> Result<(), String> {
-    append_log("HISTORY CLEAR — presets".into());
+    #[cfg(not(test))] append_log("HISTORY CLEAR — presets".into());
     db::global().clear_preset_history()
 }
 
@@ -1106,7 +1106,7 @@ async fn open_daw_project(file_path: String) -> Result<(), String> {
 #[tauri::command]
 async fn extract_project_plugins(file_path: String) -> Result<Vec<xref::PluginRef>, String> {
     let result = xref::extract_plugins(&file_path);
-    append_log(format!("XREF EXTRACT — {} | {} plugins found", file_path, result.len()));
+    #[cfg(not(test))] append_log(format!("XREF EXTRACT — {} | {} plugins found", file_path, result.len()));
     Ok(result)
 }
 
@@ -2439,7 +2439,7 @@ fn export_pdf(
     rows: Vec<Vec<String>>,
     file_path: String,
 ) -> Result<(), String> {
-    append_log(format!("EXPORT PDF — \"{}\" | {} rows | {} columns → {}", title, rows.len(), headers.len(), file_path));
+    #[cfg(not(test))] append_log(format!("EXPORT PDF — \"{}\" | {} rows | {} columns → {}", title, rows.len(), headers.len(), file_path));
     use printpdf::path::{PaintMode, WindingOrder};
     use printpdf::*;
 
@@ -2968,7 +2968,7 @@ fn fs_list_dir(dir_path: String) -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 fn delete_file(file_path: String) -> Result<(), String> {
-    append_log(format!("FILE DELETE — {}", file_path));
+    #[cfg(not(test))] append_log(format!("FILE DELETE — {}", file_path));
     let path = std::path::Path::new(&file_path);
     if !path.exists() {
         return Err("File not found".into());
@@ -2982,7 +2982,7 @@ fn delete_file(file_path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
-    append_log(format!("FILE RENAME — {} → {}", old_path, new_path));
+    #[cfg(not(test))] append_log(format!("FILE RENAME — {} → {}", old_path, new_path));
     std::fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
 }
 
