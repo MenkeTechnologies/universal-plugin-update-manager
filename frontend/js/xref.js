@@ -377,8 +377,37 @@ async function showTextProjectViewer(filePath, projectName) {
 }
 
 async function showBinaryProjectViewer(filePath, projectName) {
-  // For binary formats without a dedicated viewer, use the same tree approach as Bitwig
-  showBwViewer(filePath, projectName);
+  let existing = document.getElementById('bwViewerModal');
+  if (existing) existing.remove();
+  const loadHtml = `<div class="modal-overlay" id="bwViewerModal" data-action-modal="closeBwViewer">
+    <div class="modal-content" style="max-width:90vw;max-height:90vh;width:900px;">
+      <div class="modal-header"><h2>${escapeHtml(projectName)}</h2><button class="modal-close" data-action-modal="closeBwViewer" title="Close">&#10005;</button></div>
+      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>Parsing binary data...</div></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend', loadHtml);
+  try {
+    const data = await window.vstUpdater.readProjectFile(filePath);
+    const modal = document.getElementById('bwViewerModal');
+    if (!modal) return;
+    // Update title with format
+    const h2 = modal.querySelector('h2');
+    if (h2 && data._format) h2.textContent = `${projectName} — ${data._format}`;
+    const body = modal.querySelector('.modal-body');
+    const treeData = data.type === 'xml' || data.type === 'text' ? data : data;
+    body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
+      <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
+        <span style="font-size:11px;color:var(--text-muted);">${treeData._format || 'Binary'} | ${treeData.plugins ? treeData.plugins.length : 0} plugins | ${treeData.pluginStateCount || 0} preset states | ${treeData._size || '?'}</span>
+        <input type="text" class="np-search-input" id="bwSearchInput" placeholder="Search..." style="flex:1;max-width:300px;" autocomplete="off">
+        <button class="btn btn-secondary" id="bwCollapseAllBtn" style="padding:4px 10px;font-size:10px;">Collapse All</button>
+        <button class="btn btn-secondary" id="bwExpandAllBtn" style="padding:4px 10px;font-size:10px;">Expand All</button>
+      </div>
+      <div id="bwJsonTree" style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);background:var(--bg-primary);"></div>
+    </div>`;
+    document.getElementById('bwJsonTree').appendChild(typeof buildJsonTree === 'function' ? buildJsonTree(treeData, 0) : document.createTextNode(JSON.stringify(treeData, null, 2)));
+  } catch (e) {
+    const modal = document.getElementById('bwViewerModal');
+    if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">Error: ' + escapeHtml(String(e)) + '</div>';
+  }
 }
 
 // ── ALS XML Viewer ──
