@@ -1705,6 +1705,7 @@ function showPlayer() {
   const np = document.getElementById('audioNowPlaying');
   np.classList.add('active');
   if (prefs.getItem('playerExpanded') === 'on') np.classList.add('expanded');
+  renderRecentlyPlayed();
 }
 
 // Double-click to expand/collapse player
