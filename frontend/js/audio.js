@@ -1070,13 +1070,9 @@ function toggleRowLoop(filePath, event) {
 }
 
 function updateLoopBtnStates() {
-  document.querySelectorAll('.audio-table .btn-loop').forEach(btn => {
-    const row = btn.closest('tr');
-    if (!row) return;
-    const rowPath = row.getAttribute('data-audio-path');
-    const isThis = rowPath === audioPlayerPath;
-    btn.classList.toggle('active', isThis && audioLooping);
-  });
+  if (!audioPlayerPath) return;
+  const row = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(audioPlayerPath)}"]`);
+  if (row) { const btn = row.querySelector('.btn-loop'); if (btn) btn.classList.toggle('active', audioLooping); }
 }
 
 function stopAudioPlayback() {

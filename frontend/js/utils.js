@@ -1,7 +1,7 @@
+const _escDiv = document.createElement('div');
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str || '';
-  return div.innerHTML;
+  _escDiv.textContent = str || '';
+  return _escDiv.innerHTML;
 }
 
 // ── fzf-style fuzzy matching with scoring ──
