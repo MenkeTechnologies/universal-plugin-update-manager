@@ -3656,6 +3656,82 @@ mod tests {
         let _ = fs::remove_dir_all(&tmp);
     }
 
+    #[test]
+    fn test_log_entries_have_timestamp() {
+        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
+        let _ = std::fs::create_dir_all(history::get_data_dir());
+        clear_log().unwrap();
+        append_log("timestamp-check".into());
+        let log = read_log().unwrap();
+        // Timestamp format: [YYYY-MM-DD HH:MM:SS]
+        let re = regex::Regex::new(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] timestamp-check").unwrap();
+        assert!(re.is_match(&log), "log entry missing timestamp: {}", log);
+    }
+
+    #[test]
+    fn test_log_appends_not_overwrites() {
+        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
+        let _ = std::fs::create_dir_all(history::get_data_dir());
+        clear_log().unwrap();
+        append_log("first".into());
+        append_log("second".into());
+        append_log("third".into());
+        let log = read_log().unwrap();
+        let lines: Vec<&str> = log.lines().collect();
+        assert!(lines.len() >= 3, "expected at least 3 lines, got {}", lines.len());
+        assert!(lines.iter().any(|l| l.contains("first")));
+        assert!(lines.iter().any(|l| l.contains("second")));
+        assert!(lines.iter().any(|l| l.contains("third")));
+        // Verify order: first appears before second
+        let first_pos = log.find("first").unwrap();
+        let second_pos = log.find("second").unwrap();
+        let third_pos = log.find("third").unwrap();
+        assert!(first_pos < second_pos && second_pos < third_pos, "log entries out of order");
+    }
+
+    #[test]
+    fn test_log_handles_special_characters() {
+        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
+        let _ = std::fs::create_dir_all(history::get_data_dir());
+        clear_log().unwrap();
+        append_log("unicode: 日本語テスト 🎵 emoji".into());
+        append_log("newlines: line1\nline2".into());
+        append_log("path: /Users/test/my file (1).vst3".into());
+        let log = read_log().unwrap();
+        assert!(log.contains("日本語テスト"));
+        assert!(log.contains("🎵"));
+        assert!(log.contains("my file (1).vst3"));
+    }
+
+    #[test]
+    fn test_log_concurrent_appends() {
+        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
+        let _ = std::fs::create_dir_all(history::get_data_dir());
+        clear_log().unwrap();
+        let handles: Vec<_> = (0..10).map(|i| {
+            std::thread::spawn(move || {
+                append_log(format!("concurrent-{i}"));
+            })
+        }).collect();
+        for h in handles { h.join().unwrap(); }
+        let log = read_log().unwrap();
+        for i in 0..10 {
+            assert!(log.contains(&format!("concurrent-{i}")), "missing concurrent-{i}");
+        }
+    }
+
+    #[test]
+    fn test_clear_log_then_append_works() {
+        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
+        let _ = std::fs::create_dir_all(history::get_data_dir());
+        append_log("before".into());
+        clear_log().unwrap();
+        append_log("after".into());
+        let log = read_log().unwrap();
+        assert!(!log.contains("before"), "cleared content should be gone");
+        assert!(log.contains("after"), "new content should be present");
+    }
+
     // ── TOML export/import tests ──
 
     #[test]
