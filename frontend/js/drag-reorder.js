@@ -12,7 +12,7 @@
     const dx = e.clientX - d.startX;
     const dy = e.clientY - d.startY;
 
-    if (!d.isDragging && Math.abs(d.direction === 'horizontal' ? dx : dy) > 5) {
+    if (!d.isDragging && Math.abs(d.direction === 'horizontal' ? dx : dy) > 3) {
       d.isDragging = true;
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'grabbing';

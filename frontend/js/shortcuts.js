@@ -132,7 +132,7 @@ function renderShortcutSettings(filter) {
   if (!q && typeof initDragReorder === 'function') {
     initDragReorder(list, '.shortcut-row', 'shortcutOrder', {
       getKey: (el) => el.dataset.scId || '',
-      handleSelector: '.shortcut-name',
+      // Drag from anywhere on the row (skip list handles buttons)
     });
   }
 }

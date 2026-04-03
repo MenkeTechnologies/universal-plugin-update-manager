@@ -2131,7 +2131,7 @@ function updateMetaLine() {
   if (!body) return;
   initDragReorder(body, '.np-section', 'playerSectionOrder', {
     getKey: (el) => el.dataset.npSection,
-    handleSelector: '.np-history-title, .np-expand-hint, .np-eq-toggle',
+    handleSelector: '.np-history-title, .np-expand-hint, .np-eq-toggle, .np-section-header, h4, h3',
     onReorder: () => {
       const eqPanel = document.getElementById('npEqSection');
       if (eqPanel) body.appendChild(eqPanel);

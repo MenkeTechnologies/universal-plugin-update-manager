@@ -125,7 +125,7 @@ function renderSmartPlaylists() {
   if (typeof initDragReorder === 'function') {
     initDragReorder(container, '.sp-item', 'smartPlaylistOrder', {
       getKey: (el) => el.dataset.spId || '',
-      handleSelector: '.sp-icon',
+      handleSelector: '.sp-icon, .sp-name, .sp-rules-count',
       onReorder: (keys) => {
         const reordered = keys.map(k => _smartPlaylists.find(p => p.id === k)).filter(Boolean);
         if (reordered.length === _smartPlaylists.length) {
