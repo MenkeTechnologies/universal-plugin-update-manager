@@ -185,6 +185,8 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
       rebuildPresetStats();
       filterPresets();
       document.getElementById('btnExportPresets').style.display = '';
+      // Load MIDI tab from preset data
+      if (typeof loadMidiFiles === 'function') loadMidiFiles();
     }
   } catch (err) {
     showToast(`Failed to load preset scan — ${err.message || err}`, 4000, 'error');
