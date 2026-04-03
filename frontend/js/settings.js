@@ -1460,23 +1460,29 @@ function initSettingsSectionDrag() {
     ghost.style.pointerEvents = '';
     const target = el?.closest('.settings-section');
 
-    container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
-    // Show destination box at drop position
+    // Show destination box at drop position — skip if target+side unchanged
     if (target && target !== dragged) {
-      target.classList.add('section-drag-over');
-      if (!placeholder) {
-        placeholder = document.createElement('div');
-        placeholder.className = 'section-placeholder';
-        placeholder.style.height = dragged._dragH + 'px';
-      }
       const targetRect = target.getBoundingClientRect();
-      const midY = targetRect.top + targetRect.height / 2;
-      if (e.clientY < midY) {
-        if (placeholder.nextSibling !== target) container.insertBefore(placeholder, target);
-      } else {
-        if (target.nextSibling !== placeholder) container.insertBefore(placeholder, target.nextSibling);
+      const before = e.clientY < targetRect.top + targetRect.height / 2;
+      const dropKey = target.dataset.section + (before ? ':before' : ':after');
+      if (dropKey !== container._lastDropKey) {
+        container._lastDropKey = dropKey;
+        container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
+        target.classList.add('section-drag-over');
+        if (!placeholder) {
+          placeholder = document.createElement('div');
+          placeholder.className = 'section-placeholder';
+          placeholder.style.height = dragged._dragH + 'px';
+        }
+        if (before) {
+          container.insertBefore(placeholder, target);
+        } else {
+          container.insertBefore(placeholder, target.nextSibling);
+        }
       }
     } else if (placeholder && placeholder.parentNode) {
+      container._lastDropKey = null;
+      container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
       placeholder.remove();
     }
   });
@@ -1485,6 +1491,7 @@ function initSettingsSectionDrag() {
     if (!dragged) return;
     if (isDragging) {
       container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
+      container._lastDropKey = null;
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
 
