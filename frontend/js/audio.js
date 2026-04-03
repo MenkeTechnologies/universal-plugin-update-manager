@@ -744,8 +744,9 @@ function resetAudioStats() {
 
 function accumulateAudioStats(samples) {
   for (const s of samples) {
+    if (!s) continue;
     audioStatCounts[s.format] = (audioStatCounts[s.format] || 0) + 1;
-    audioStatBytes += s.size;
+    audioStatBytes += s.size || 0;
   }
 }
 
@@ -775,8 +776,7 @@ async function rebuildAudioStats() {
     audioStatCounts = stats.formatCounts || {};
     audioStatBytes = stats.totalBytes || 0;
     audioTotalUnfiltered = stats.sampleCount || 0;
-    // Keep allAudioSamples.length in sync for export/compatibility
-    allAudioSamples.length = audioTotalUnfiltered;
+    // Don't set array length — creates undefined slots that crash iterators
     updateAudioStats();
   } catch {
     // Fallback for when DB not ready
