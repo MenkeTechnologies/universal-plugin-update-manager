@@ -10,29 +10,18 @@ let midiSortAsc = true;
 
 async function loadMidiFiles() {
   try {
-    const result = await window.vstUpdater.dbQueryAudio({
-      format_filter: 'MID',
-      sort_key: 'name',
-      sort_asc: true,
-      offset: 0,
-      limit: 100000,
-    });
-    allMidiFiles = result.samples || [];
-    // Also check MIDI extension
-    const result2 = await window.vstUpdater.dbQueryAudio({
-      format_filter: 'MIDI',
-      sort_key: 'name',
-      sort_asc: true,
-      offset: 0,
-      limit: 100000,
-    });
-    if (result2.samples && result2.samples.length > 0) {
-      const paths = new Set(allMidiFiles.map(s => s.path));
-      for (const s of result2.samples) {
-        if (!paths.has(s.path)) allMidiFiles.push(s);
+    // MIDI files are in the presets table (scanned by preset/MIDI walker)
+    const midiFormats = new Set(['MID', 'MIDI']);
+    if (typeof allPresets !== 'undefined' && allPresets.length > 0) {
+      allMidiFiles = allPresets.filter(p => midiFormats.has(p.format));
+    } else {
+      // Fallback: load from latest preset scan
+      const latest = await window.vstUpdater.getLatestPresetScan();
+      if (latest && latest.presets) {
+        allMidiFiles = latest.presets.filter(p => midiFormats.has(p.format));
       }
     }
-    filteredMidi = allMidiFiles;
+    filteredMidi = allMidiFiles.slice();
     _midiLoaded = true;
     sortMidiArray();
     renderMidiTable();

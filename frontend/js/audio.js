@@ -667,14 +667,7 @@ async function scanAudioSamples(resume = false) {
     } else if (data.phase === 'scanning') {
       pendingSamples.push(...data.samples);
       pendingFound = data.found;
-      // Split count: audio vs MIDI
-      const midiFormats = new Set(['MID', 'MIDI']);
-      const midiInBatch = data.samples ? data.samples.filter(s => midiFormats.has(s.format)).length : 0;
-      _midiScanCount = (_midiScanCount || 0) + midiInBatch;
-      const audioOnly = pendingFound - (_midiScanCount || 0);
-      document.getElementById('sampleCount').textContent = audioOnly;
-      const midiEl = document.getElementById('midiScanCount');
-      if (midiEl) midiEl.textContent = _midiScanCount || 0;
+      document.getElementById('sampleCount').textContent = pendingFound;
       scheduleFlush();
     }
   });

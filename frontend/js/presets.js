@@ -185,6 +185,7 @@ async function scanPresets(resume = false) {
 
   let firstBatch = true;
   let pendingPresets = [];
+  if (typeof _midiScanCount !== 'undefined') _midiScanCount = 0;
   let pendingFound = 0;
   let flushScheduled = false;
   const presetEta = createETA();
@@ -248,8 +249,14 @@ async function scanPresets(resume = false) {
     } else if (data.phase === 'scanning') {
       pendingPresets.push(...data.presets);
       pendingFound = data.found;
-      // Immediately update header counter
-      document.getElementById('presetCountHeader').textContent = pendingFound;
+      // Split count: presets vs MIDI
+      const midiFormats = new Set(['MID', 'MIDI']);
+      const midiInBatch = data.presets ? data.presets.filter(p => midiFormats.has(p.format)).length : 0;
+      if (typeof _midiScanCount !== 'undefined') _midiScanCount += midiInBatch;
+      const presetOnly = pendingFound - (typeof _midiScanCount !== 'undefined' ? _midiScanCount : 0);
+      document.getElementById('presetCountHeader').textContent = presetOnly;
+      const midiEl = document.getElementById('midiScanCount');
+      if (midiEl) midiEl.textContent = typeof _midiScanCount !== 'undefined' ? _midiScanCount : 0;
       scheduleFlush();
     }
   });
@@ -266,6 +273,8 @@ async function scanPresets(resume = false) {
     }
     rebuildPresetStats();
     filterPresets();
+    // Reload MIDI tab from preset data
+    if (typeof loadMidiFiles === 'function') { _midiLoaded = false; loadMidiFiles(); }
     try { await window.vstUpdater.savePresetScan(allPresets, result.roots); } catch (e) { showToast(`Failed to save preset history — ${e.message || e}`, 4000, 'error'); }
     if (result.stopped && allPresets.length > 0) {
       resumeBtn.style.display = '';
