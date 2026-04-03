@@ -297,10 +297,8 @@ async function showProjectViewer(filePath, projectName) {
     showXmlProjectViewer(filePath, projectName);
   } else if (textFormats.includes(ext)) {
     showTextProjectViewer(filePath, projectName);
-  } else if (ext === 'bwproject') {
-    showBwViewer(filePath, projectName);
   } else {
-    // Binary formats: use read_bwproject which does string extraction
+    // All binary formats: Bitwig, FLP, Logic, Cubase, Pro Tools, Reason
     showBinaryProjectViewer(filePath, projectName);
   }
 }

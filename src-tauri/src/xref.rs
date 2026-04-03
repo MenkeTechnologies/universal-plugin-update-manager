@@ -383,25 +383,70 @@ fn parse_flp(path: &Path) -> Vec<PluginRef> {
 /// Parse Logic Pro .logicx package (contains binary plists with plugin info).
 fn parse_logic(path: &Path) -> Vec<PluginRef> {
     // .logicx is a macOS package directory
-    let alt_path = path.join("Alternatives/000/ProjectData");
-    let plist_path = if alt_path.exists() { alt_path } else { path.join("ProjectData") };
-    let data = match fs::read(&plist_path) {
-        Ok(d) => d,
-        Err(_) => {
-            // Fallback: string extraction from any binary files in the package
-            return extract_plugins_from_dir(path);
-        }
-    };
-    // Try plist parsing first
-    if let Ok(val) = plist::from_bytes::<plist::Value>(&data) {
-        let mut plugins = Vec::new();
-        extract_plugins_from_plist(&val, &mut plugins);
-        if !plugins.is_empty() {
-            return plugins;
+    // Try multiple known paths for the project data
+    let candidates = [
+        path.join("Alternatives/000/ProjectData"),
+        path.join("ProjectData"),
+    ];
+    let mut all_plugins = Vec::new();
+
+    for plist_path in &candidates {
+        if let Ok(data) = fs::read(plist_path) {
+            // Try plist parsing
+            if let Ok(val) = plist::from_bytes::<plist::Value>(&data) {
+                extract_plugins_from_plist(&val, &mut all_plugins);
+            }
+            // Also do binary string extraction on the same data
+            all_plugins.extend(extract_plugins_from_binary(&data));
+            // Extract AU component identifiers (aufx:XXXX:YYYY pattern)
+            all_plugins.extend(extract_au_identifiers(&data));
         }
     }
-    // Fallback: string extraction from binary data
-    extract_plugins_from_binary(&data)
+
+    if all_plugins.is_empty() {
+        // Fallback: scan all files in the package directory
+        all_plugins = extract_plugins_from_dir(path);
+    }
+
+    all_plugins
+}
+
+/// Extract Audio Unit identifiers from binary data.
+/// Logic stores AU plugins as 4-char codes like "aufx", "aumu", "aumf" followed by subtype and manufacturer.
+fn extract_au_identifiers(data: &[u8]) -> Vec<PluginRef> {
+    let mut plugins = Vec::new();
+    let mut current = Vec::new();
+    // Look for readable strings that could be AU plugin names
+    for &byte in data {
+        if byte >= 0x20 && byte <= 0x7E {
+            current.push(byte);
+        } else {
+            if current.len() >= 4 {
+                let s = String::from_utf8_lossy(&current).to_string();
+                // Match common AU plugin name patterns
+                // Logic stores plugin names as readable strings near AU type codes
+                if !s.contains('/') && !s.contains('\\') && !s.contains("com.apple")
+                    && s.len() >= 4 && s.len() <= 64
+                    && (s.ends_with(".component") || s.contains("AUPlugin") || s.contains("AudioUnit"))
+                {
+                    let name = s.trim_end_matches(".component").trim();
+                    if name.len() >= 3 {
+                        let normalized = normalize_plugin_name(name);
+                        if !normalized.is_empty() {
+                            plugins.push(PluginRef {
+                                name: name.to_string(),
+                                normalized_name: normalized,
+                                manufacturer: String::new(),
+                                plugin_type: "AU".into(),
+                            });
+                        }
+                    }
+                }
+            }
+            current.clear();
+        }
+    }
+    plugins
 }
 
 /// Parse Cubase/Nuendo .cpr file (binary — string extraction).
