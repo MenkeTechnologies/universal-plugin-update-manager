@@ -1435,12 +1435,11 @@ function initSettingsSectionDrag() {
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'grabbing';
 
-      // Capture dimensions BEFORE column collapse
+      // Capture dimensions in current column layout
       const origW = dragged.offsetWidth;
       const origH = dragged.offsetHeight;
-      const origRect = dragged.getBoundingClientRect();
 
-      // Create ghost at original multi-column size
+      // Create ghost at original size
       ghost = dragged.cloneNode(true);
       ghost.className = 'settings-section section-ghost';
       ghost.style.width = origW + 'px';
@@ -1448,18 +1447,8 @@ function initSettingsSectionDrag() {
       ghost.style.top = (e.clientY - offsetY) + 'px';
       document.body.appendChild(ghost);
 
-      // Hide original immediately so user doesn't see resize
-      dragged.style.visibility = 'hidden';
-      dragged.style.opacity = '0';
-
-      // Now collapse to single column for correct insertBefore
-      container.classList.add('dragging-section');
-
-      // Create placeholder at original size
-      placeholder = document.createElement('div');
-      placeholder.className = 'section-placeholder';
-      placeholder.style.height = origH + 'px';
-      dragged.parentNode.insertBefore(placeholder, dragged);
+      // Remove original from flow — no column collapse needed
+      dragged.style.display = 'none';
     }
     if (!isDragging || !ghost) return;
 
@@ -1474,15 +1463,7 @@ function initSettingsSectionDrag() {
     const target = el?.closest('.settings-section');
 
     container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
-    if (target && target !== dragged && target !== placeholder) {
-      // Move placeholder to show where the section will land
-      const targetRect = target.getBoundingClientRect();
-      const midY = targetRect.top + targetRect.height / 2;
-      if (e.clientY < midY) {
-        container.insertBefore(placeholder, target);
-      } else {
-        container.insertBefore(placeholder, target.nextSibling);
-      }
+    if (target && target !== dragged) {
       target.classList.add('section-drag-over');
     }
   });
@@ -1494,18 +1475,26 @@ function initSettingsSectionDrag() {
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
 
-      // Move dragged section to placeholder position
-      if (placeholder && placeholder.parentNode) {
-        placeholder.parentNode.insertBefore(dragged, placeholder);
-        placeholder.remove();
+      // Find drop target under cursor
+      if (ghost) ghost.style.display = 'none';
+      const dropEl = document.elementFromPoint(e.clientX, e.clientY);
+      if (ghost) ghost.style.display = '';
+      const dropTarget = dropEl?.closest('.settings-section');
+
+      // Insert before/after drop target
+      if (dropTarget && dropTarget !== dragged) {
+        const dropRect = dropTarget.getBoundingClientRect();
+        const midY = dropRect.top + dropRect.height / 2;
+        if (e.clientY < midY) {
+          container.insertBefore(dragged, dropTarget);
+        } else if (dropTarget.nextSibling) {
+          container.insertBefore(dragged, dropTarget.nextSibling);
+        } else {
+          container.appendChild(dragged);
+        }
       }
-      dragged.style.visibility = '';
-      dragged.style.opacity = '';
       dragged.style.display = '';
       if (ghost) { ghost.remove(); ghost = null; }
-      placeholder = null;
-      // Restore multi-column layout after drag
-      container.classList.remove('dragging-section');
       saveSettingsSectionOrder();
 
       const suppress = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
