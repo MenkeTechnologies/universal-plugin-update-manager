@@ -2,6 +2,55 @@
 
 const XREF_FORMATS = new Set(['ALS', 'RPP', 'RPP-BAK', 'BWPROJECT', 'SONG', 'DAWPROJECT', 'FLP', 'LOGICX', 'CPR', 'NPR', 'PTX', 'PTF', 'REASON']);
 
+// Shared fzf tree search for all DAW content viewers (ALS XML, Bitwig JSON, project viewer)
+function _searchTreeNodes(container, query) {
+  const nodes = container.querySelectorAll('.xml-node');
+  if (!query) {
+    nodes.forEach(n => { n.style.display = ''; });
+    // Remove highlights
+    container.querySelectorAll('.search-hl').forEach(hl => {
+      hl.replaceWith(document.createTextNode(hl.textContent));
+    });
+    return;
+  }
+  // Use fzf scoring if available, fall back to includes
+  const useFzf = typeof fzfMatch === 'function';
+  nodes.forEach(node => {
+    const textEls = node.querySelectorAll('.xml-tag, .xml-attrs, .xml-text, .json-key, .json-string, .json-number');
+    const directText = textEls.length > 0 ? [...textEls].map(e => e.textContent).join(' ') : node.firstChild?.textContent || '';
+    let match = false;
+    if (useFzf) {
+      const m = fzfMatch(query, directText);
+      match = m && m.score > 0;
+    } else {
+      match = directText.toLowerCase().includes(query.toLowerCase());
+    }
+    node.style.display = match ? '' : 'none';
+    // Highlight matching text
+    if (match && textEls.length > 0) {
+      textEls.forEach(el => {
+        if (typeof highlightMatch === 'function') {
+          el.innerHTML = highlightMatch(el.textContent, query, 'fuzzy');
+        }
+      });
+    }
+    // Expand parent chain
+    if (match) {
+      let parent = node.parentElement?.closest('.xml-node');
+      while (parent) {
+        parent.style.display = '';
+        const ch = parent.querySelector('.xml-children');
+        if (ch) ch.style.display = '';
+        const tg = parent.querySelector('.xml-toggle');
+        if (tg) tg.textContent = '▼';
+        const sm = parent.querySelector('.xml-collapsed-summary');
+        if (sm) sm.style.display = 'none';
+        parent = parent.parentElement?.closest('.xml-node');
+      }
+    }
+  });
+}
+
 // Cache: project path → PluginRef[]
 const _xrefCache = {};
 
@@ -366,22 +415,7 @@ async function showXmlProjectViewer(filePath, projectName) {
     });
     // Search
     document.getElementById('projSearchInput')?.addEventListener('input', (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      treeContainer.querySelectorAll('.xml-node').forEach(n => {
-        const text = n.textContent.toLowerCase();
-        const match = !q || text.includes(q);
-        n.style.display = match ? '' : 'none';
-        if (match && q) {
-          // Expand parent chain
-          let p = n.parentElement;
-          while (p && p !== treeContainer) {
-            if (p.classList?.contains('xml-children')) p.style.display = '';
-            const t = p.parentElement?.querySelector('.xml-toggle');
-            if (t) t.textContent = '▼';
-            p = p.parentElement;
-          }
-        }
-      });
+      _searchTreeNodes(treeContainer, e.target.value.trim());
     });
     // Export
     document.getElementById('projExportBtn')?.addEventListener('click', async () => {
@@ -535,29 +569,7 @@ async function showAlsViewer(filePath, projectName) {
     // Search — filter tree nodes
     const rawLines = xml.split('\n');
     document.getElementById('alsSearchInput')?.addEventListener('input', (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      treeContainer.querySelectorAll('.xml-node').forEach(node => {
-        if (!q) { node.style.display = ''; return; }
-        const tag = node.querySelector('.xml-tag')?.textContent || '';
-        const attrs = node.querySelector('.xml-attrs')?.textContent || '';
-        const text = node.querySelector('.xml-text')?.textContent || '';
-        const match = tag.toLowerCase().includes(q) || attrs.toLowerCase().includes(q) || text.toLowerCase().includes(q);
-        node.style.display = match ? '' : 'none';
-        // Expand parent chain for matches
-        if (match) {
-          let parent = node.parentElement?.closest('.xml-node');
-          while (parent) {
-            parent.style.display = '';
-            const ch = parent.querySelector('.xml-children');
-            if (ch) ch.style.display = '';
-            const tg = parent.querySelector('.xml-toggle');
-            if (tg) tg.textContent = '▼';
-            const sm = parent.querySelector('.xml-collapsed-summary');
-            if (sm) sm.style.display = 'none';
-            parent = parent.parentElement?.closest('.xml-node');
-          }
-        }
-      });
+      _searchTreeNodes(treeContainer, e.target.value.trim());
     });
 
     // Export
@@ -754,24 +766,7 @@ async function showBwViewer(filePath, projectName) {
 
     // Search
     document.getElementById('bwSearchInput')?.addEventListener('input', (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      treeContainer.querySelectorAll('.xml-node').forEach(node => {
-        if (!q) { node.style.display = ''; return; }
-        const text = node.textContent.toLowerCase();
-        const match = text.includes(q);
-        node.style.display = match ? '' : 'none';
-        if (match) {
-          let parent = node.parentElement?.closest('.xml-node');
-          while (parent) {
-            parent.style.display = '';
-            const ch = parent.querySelector('.xml-children');
-            if (ch) ch.style.display = '';
-            const tg = parent.querySelector('.xml-toggle');
-            if (tg) tg.textContent = '▼';
-            parent = parent.parentElement?.closest('.xml-node');
-          }
-        }
-      });
+      _searchTreeNodes(treeContainer, e.target.value.trim());
     });
 
     // Export JSON
