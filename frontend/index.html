@@ -344,13 +344,11 @@
       box-shadow: 0 0 15px rgba(255, 7, 58, 0.4);
     }
 
-    /* Settings page — responsive grid layout */
+    /* Settings page — masonry/Tetris layout via CSS columns */
     .settings-container {
       padding: 24px 16px 160px;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-      align-items: start;
+      columns: 1;
+      column-gap: 12px;
     }
 
     @media (min-width: 600px) {
@@ -358,7 +356,7 @@
     }
 
     @media (min-width: 1100px) {
-      .settings-container { grid-template-columns: 1fr 1fr; }
+      .settings-container { columns: 2; }
     }
 
     @media (min-width: 1700px) {
@@ -368,6 +366,8 @@
     .settings-section {
       overflow: hidden;
       transition: opacity 0.2s;
+      break-inside: avoid;
+      margin-bottom: 12px;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 12px;
