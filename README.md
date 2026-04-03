@@ -283,7 +283,7 @@ Unit tests live in `src/**/*.rs` inside `#[cfg(test)]` modules. Integration test
 
 **Handcrafted table suites** (`tests/handcrafted_tables_*.rs`): many small `#[test]` functions generated from declarative macros, each row an explicit input/expected pair for pure helpers — `kvr::parse_version` (split across `handcrafted_tables_kvr`, `handcrafted_tables_kvr_parse_many`, and `handcrafted_tables_kvr_parse_batch2`), `kvr::compare_versions` (strict chain + 50 pairs), `kvr::extract_version` (HTML snippets), `format_size`, `history::radix_string`, `similarity::fingerprint_distance`, DAW `ext_matches` / `daw_name_for_format`, and scanner/xref normalization. **`handcrafted_tables_massive`** adds thousands of one-function-per-row checks for `parse_version`, `compare_versions` on a sorted semver-like grid, and `format_size` (powers of two, linear byte ranges, and 1 MiB boundary). **`handcrafted_tables_normalize_generated`** is emitted by `cargo run --manifest-path src-tauri/Cargo.toml --example norm_gen` — one test per plugin-name × arch-suffix combination against the real `xref::normalize_plugin_name`. **`handcrafted_tables_fingerprint_grid`** pins `fingerprint_distance` to reference values on RMS and spectral-centroid grids (symmetry + explicit distance). **`handcrafted_tables_radix_grid`** covers `radix_string` for bases 2–36 and `n ∈ [0, 119)`. **`handcrafted_tables_daw_path_bulk`** exercises `ext_matches` across every registered DAW suffix × path prefix × file stem. Run e.g. `cargo test --manifest-path src-tauri/Cargo.toml --test handcrafted_tables_massive`.
 
-### JavaScript tests (5930 tests, `node:test`)
+### JavaScript tests (`node:test`)
 
 | Suite | Tests | What runs |
 |-------|-------|-----------|
