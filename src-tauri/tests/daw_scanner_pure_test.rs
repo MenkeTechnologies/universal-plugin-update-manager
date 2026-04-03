@@ -117,3 +117,22 @@ fn daw_name_for_format_covers_remaining_branches() {
     assert_eq!(daw_name_for_format("BAND"), "GarageBand");
     assert_eq!(daw_name_for_format("ARDOUR"), "Ardour");
 }
+
+#[test]
+fn ext_matches_empty_path_returns_none() {
+    assert_eq!(ext_matches(Path::new("")), None);
+}
+
+#[test]
+fn is_package_ext_case_insensitive() {
+    assert!(is_package_ext(Path::new("/Music/Beat.LOGICX")));
+    assert!(is_package_ext(Path::new("/Music/Song.BAND")));
+}
+
+#[test]
+fn ext_matches_accepts_dotdot_before_extension() {
+    assert_eq!(
+        ext_matches(Path::new("/tmp/foo..als")).as_deref(),
+        Some("ALS")
+    );
+}

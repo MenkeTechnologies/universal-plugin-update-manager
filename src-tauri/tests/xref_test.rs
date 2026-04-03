@@ -9,6 +9,22 @@ fn test_xref_extract_plugins_nonexistent_returns_empty() {
 }
 
 #[test]
+fn test_xref_extract_plugins_unsupported_extension_returns_empty() {
+    assert!(app_lib::xref::extract_plugins("/any/path/sample.wav").is_empty());
+    assert!(app_lib::xref::extract_plugins("/any/path/readme.txt").is_empty());
+}
+
+#[test]
+fn test_xref_extract_plugins_no_file_extension_returns_empty() {
+    assert!(app_lib::xref::extract_plugins("/usr/bin/cc").is_empty());
+}
+
+#[test]
+fn test_xref_extract_plugins_rpp_bak_nonexistent_returns_empty() {
+    assert!(app_lib::xref::extract_plugins("/nonexistent/audio_haxor/backup.rpp-bak").is_empty());
+}
+
+#[test]
 fn test_xref_plugin_ref_struct() {
     let ref_info = app_lib::xref::PluginRef {
         name: "Test Plugin".to_string(),
