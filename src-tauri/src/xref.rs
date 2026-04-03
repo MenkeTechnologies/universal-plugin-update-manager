@@ -263,7 +263,7 @@ fn parse_reaper(path: &Path) -> Vec<PluginRef> {
 /// Bitwig files have a `BtWg` magic header followed by binary-serialized
 /// project data. Plugin references are stored as DLL/VST3/component paths
 /// in plain text within the binary. We extract them via string scanning.
-/// Parse Studio One .song file (ZIP containing song.xml).
+/// Parse Studio One .song file (ZIP containing song.xml + Devices/*.xml).
 fn parse_studio_one(path: &Path) -> Vec<PluginRef> {
     let file = match fs::File::open(path) {
         Ok(f) => f,
@@ -273,23 +273,28 @@ fn parse_studio_one(path: &Path) -> Vec<PluginRef> {
         Ok(a) => a,
         Err(_) => return vec![],
     };
-    // Look for song.xml or Song/song.xml
-    let xml = ["song.xml", "Song/song.xml", "metainfo.xml"]
-        .iter()
-        .find_map(|name| {
-            let mut entry = archive.by_name(name).ok()?;
+    let mut all_xml = String::new();
+    // Read all XML files in the archive
+    let names: Vec<String> = (0..archive.len())
+        .filter_map(|i| archive.by_index(i).ok().map(|e| e.name().to_string()))
+        .filter(|n| n.ends_with(".xml"))
+        .collect();
+    for name in &names {
+        if let Ok(mut entry) = archive.by_name(name) {
             let mut s = String::new();
-            entry.read_to_string(&mut s).ok()?;
-            Some(s)
-        })
-        .unwrap_or_default();
-    if xml.is_empty() {
+            if entry.read_to_string(&mut s).is_ok() {
+                all_xml.push_str(&s);
+                all_xml.push('\n');
+            }
+        }
+    }
+    if all_xml.is_empty() {
         return vec![];
     }
-    extract_plugins_from_xml(&xml, &[
-        (r#"classID="([^"]+)""#, "", "VST"),
+    extract_plugins_from_xml(&all_xml, &[
         (r#"plugName="([^"]+)""#, "", "VST"),
         (r#"deviceName="([^"]+)""#, "", "VST"),
+        (r#"label="([^"]+)""#, "", "VST"),
     ])
 }
 
@@ -513,13 +518,20 @@ fn parse_cubase(path: &Path) -> Vec<PluginRef> {
     plugins
 }
 
-/// Parse Pro Tools .ptx/.ptf file (binary — string extraction).
+/// Parse Pro Tools .ptx/.ptf file.
+/// Note: .ptf files (Pro Tools 7-10) are XOR-encrypted and require decryption.
+/// .ptx files (Pro Tools 10+) use a different format.
+/// Both are attempted via string extraction; encrypted files will yield 0 results.
 fn parse_protools(path: &Path) -> Vec<PluginRef> {
     let data = match fs::read(path) {
         Ok(d) => d,
         Err(_) => return vec![],
     };
-    extract_plugins_from_binary(&data)
+    let mut plugins = extract_plugins_from_binary(&data);
+    // Pro Tools also stores plugin names near specific markers
+    plugins.extend(extract_named_plugins(&data, b"PlugIn Name"));
+    plugins.extend(extract_named_plugins(&data, b"Insert Name"));
+    plugins
 }
 
 /// Parse Reason .reason file (binary — string extraction).
@@ -1346,6 +1358,36 @@ mod tests {
         for p in &result {
             println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name);
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_protools_ptf_real_file() {
+        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/BEAT/workshops/Beatstation Demotracks/Beatstation Demotracks/Pro Tools/Club/Toontrack Beatstation Club - Viggoproductions.se.ptf";
+        if !std::path::Path::new(path).exists() { println!("PTF not found"); return; }
+        let result = extract_plugins(path);
+        println!("Pro Tools PTF plugins found: {} (PTF is XOR-encrypted, 0 is expected)", result.len());
+        for p in &result { println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name); }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_protools_ptx_real_file() {
+        let path = "/Users/wizard/mnt/production/MusicProduction/templates/Ex_Files_RemixTech_SongForm/Ex_Files_RemixTech_SongForm/Exercise Files/Ch 02/Session Files/Radio Mix_07.ptx";
+        if !std::path::Path::new(path).exists() { println!("PTX not found"); return; }
+        let result = extract_plugins(path);
+        println!("Pro Tools PTX plugins found: {}", result.len());
+        for p in &result { println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name); }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_studio_one_real_file() {
+        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/myloops/myloops-reloaded-volume-2-demo-projects-only-95154/MRE2 Demo Projects/Studio One/Myloops Reloaded Volume 2 Demo Project.song";
+        if !std::path::Path::new(path).exists() { println!("Studio One not found"); return; }
+        let result = extract_plugins(path);
+        println!("Studio One plugins found: {}", result.len());
+        for p in &result { println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name); }
     }
 
     #[test]
