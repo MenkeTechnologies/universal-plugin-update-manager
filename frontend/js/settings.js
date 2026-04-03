@@ -1422,6 +1422,12 @@ function initSettingsSectionDrag() {
       shortest.height += s.offsetHeight;
     }
     for (const col of cols) for (const s of col.items) container.appendChild(s);
+    // Re-render dynamic content that lost state after DOM reorder
+    requestAnimationFrame(() => {
+      if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
+      if (typeof renderCacheStats === 'function') renderCacheStats();
+      if (typeof renderShortcutSettings === 'function') renderShortcutSettings();
+    });
   }
   // Hook into switchTab — balance when settings becomes visible
   const _origSwitchTabBalance = window.switchTab;
