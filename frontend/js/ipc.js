@@ -598,17 +598,20 @@ const KVR_MANUFACTURER_MAP = {
 // Display app version in header
 window.vstUpdater.getVersion().then(v => {
   const vStr = 'v' + v;
-  document.getElementById('appVersion').textContent = vStr;
+  const el = document.getElementById('appVersion');
+  if (el) el.textContent = vStr;
   const sv = document.getElementById('settingsVersion');
   if (sv) sv.textContent = vStr;
-});
+}).catch(() => {});
 
 function showStopButton() {
-  document.getElementById('btnStop').style.display = '';
+  const btn = document.getElementById('btnStop') || document.getElementById('btnStopAll');
+  if (btn) btn.style.display = '';
 }
 
 function hideStopButton() {
-  document.getElementById('btnStop').style.display = 'none';
+  const btn = document.getElementById('btnStop') || document.getElementById('btnStopAll');
+  if (btn) btn.style.display = 'none';
   currentOperation = null;
 }
 

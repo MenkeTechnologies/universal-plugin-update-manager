@@ -50,8 +50,6 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   if (_stopAll) _stopAll.style.display = 'none';
   if (_resumeAll) _resumeAll.style.display = 'none';
   restoreSettings();
-  const savedTab = prefs.getItem('activeTab');
-  if (savedTab) switchTab(savedTab);
   initTabDragReorder();
   initMultiFilters();
   initSortPersistence();
@@ -111,6 +109,10 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
     splash.classList.add('fade-out');
     setTimeout(() => splash.remove(), 600);
   }
+
+  // Restore last active tab after splash
+  const savedTab = prefs.getItem('activeTab');
+  if (savedTab) switchTab(savedTab);
 
   // Load plugins lazily on first tab view to avoid blocking startup
   loadPluginsFromDb();

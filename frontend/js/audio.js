@@ -1499,11 +1499,14 @@ async function startBackgroundAnalysis() {
     try { paths = await window.vstUpdater.dbUnanalyzedPaths(BATCH); } catch { break; }
     if (!paths || paths.length === 0) break;
 
-    // Single IPC call → Rust processes all 10 in parallel (rayon) → saves to SQLite
+    // Single IPC call → Rust processes all in parallel (rayon) → saves to SQLite
     try {
       const count = await window.vstUpdater.batchAnalyze(paths);
       _bgDone += count;
-    } catch { _bgDone += paths.length; }
+    } catch (e) {
+      if (typeof showToast === 'function') showToast('Analysis batch failed: ' + (e.message || e), 4000, 'error');
+      break; // Stop loop on persistent failure
+    }
 
     // Update visible rows
     for (const path of paths) {
@@ -1517,7 +1520,7 @@ async function startBackgroundAnalysis() {
           if (bpmCell && a.bpm) bpmCell.textContent = a.bpm;
           if (keyCell && a.key) keyCell.textContent = a.key;
           if (lufsCell && a.lufs != null) { lufsCell.textContent = a.lufs; lufsCell.classList.toggle('lufs-low', a.lufs < -25); }
-        } catch {}
+        } catch (e) { if (typeof showToast === 'function') showToast('Analysis read failed: ' + (e.message || e), 4000, 'error'); }
       }
     }
 
