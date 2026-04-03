@@ -1438,11 +1438,12 @@ function initSettingsSectionDrag() {
       container.classList.add('dragging-section');
       container.offsetHeight; // force reflow so rect reflects single-column layout
 
-      // Create placeholder — sized to section's single-column dimensions
-      const rect = dragged.getBoundingClientRect();
+      // Create placeholder — match exact section dimensions
       placeholder = document.createElement('div');
       placeholder.className = 'section-placeholder';
       placeholder.style.height = dragged.offsetHeight + 'px';
+      placeholder.style.width = dragged.offsetWidth + 'px';
+      placeholder.style.boxSizing = 'border-box';
       dragged.parentNode.insertBefore(placeholder, dragged);
 
       // Create floating ghost — match section width
