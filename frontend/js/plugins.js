@@ -3,6 +3,11 @@ let _pluginsLoaded = false;
 
 async function loadPluginsFromDb() {
   if (_pluginsLoaded) return;
+  // Show loading state immediately
+  const list = document.getElementById('pluginList');
+  if (list && list.querySelector('#emptyState')) {
+    list.innerHTML = '<div class="state-message"><div class="spinner"></div><h2>Loading plugins...</h2></div>';
+  }
   try {
     const latest = await window.vstUpdater.getLatestScan();
     if (latest && latest.plugins && latest.plugins.length > 0) {
