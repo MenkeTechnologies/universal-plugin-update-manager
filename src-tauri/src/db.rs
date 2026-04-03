@@ -2,12 +2,28 @@
 //! and scan metadata. Replaces JSON file persistence for data that can grow to
 //! millions of rows.
 
-use crate::history::{self, AudioHistory, AudioSample,
-    DawHistory, KvrCacheEntry, PresetHistory, ScanHistory};
+use crate::history::{self, AudioHistory, AudioSample, AudioScanSnapshot,
+    DawHistory, DawProject, DawScanSnapshot, KvrCacheEntry,
+    PresetFile, PresetHistory, PresetScanSnapshot,
+    ScanHistory, ScanSnapshot};
+use crate::scanner::PluginInfo;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
+
+static GLOBAL_DB: OnceLock<Database> = OnceLock::new();
+
+/// Initialize the global database. Call once at startup.
+pub fn init_global() -> Result<(), String> {
+    let db = Database::open()?;
+    GLOBAL_DB.set(db).map_err(|_| "Database already initialized".to_string())
+}
+
+/// Get the global database reference.
+pub fn global() -> &'static Database {
+    GLOBAL_DB.get().expect("Database not initialized")
+}
 
 /// Wraps a SQLite connection with WAL mode for concurrent reads.
 pub struct Database {
@@ -801,6 +817,437 @@ impl Database {
         )
         .map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    // ── Plugin scan CRUD ──
+
+    pub fn save_plugin_scan(&self, snap: &ScanSnapshot) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let dirs_json = serde_json::to_string(&snap.directories).unwrap_or_default();
+        let roots_json = serde_json::to_string(&snap.roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO plugin_scans (id, timestamp, plugin_count, directories, roots) VALUES (?1,?2,?3,?4,?5)",
+            params![snap.id, snap.timestamp, snap.plugin_count, dirs_json, roots_json],
+        ).map_err(|e| e.to_string())?;
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            // Delete old plugins for this scan_id first
+            tx.execute("DELETE FROM plugins WHERE scan_id = ?1", params![snap.id]).map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached(
+                "INSERT INTO plugins (name, path, plugin_type, version, manufacturer, manufacturer_url, size, size_bytes, modified, architectures, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)"
+            ).map_err(|e| e.to_string())?;
+            for p in &snap.plugins {
+                let arch_json = serde_json::to_string(&p.architectures).unwrap_or_default();
+                stmt.execute(params![p.name, p.path, p.plugin_type, p.version, p.manufacturer, p.manufacturer_url, p.size, p.size_bytes, p.modified, arch_json, snap.id]).map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
+    pub fn get_plugin_scans(&self) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, timestamp, plugin_count, roots FROM plugin_scans ORDER BY timestamp DESC").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            let roots_str: String = row.get(3)?;
+            Ok(serde_json::json!({
+                "id": row.get::<_,String>(0)?,
+                "timestamp": row.get::<_,String>(1)?,
+                "pluginCount": row.get::<_,u64>(2)?,
+                "roots": serde_json::from_str::<Vec<String>>(&roots_str).unwrap_or_default(),
+            }))
+        }).map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>,_>>().map_err(|e| e.to_string())
+    }
+
+    pub fn get_plugin_scan_detail(&self, id: &str) -> Result<ScanSnapshot, String> {
+        let conn = self.conn.lock().unwrap();
+        let (ts, pc, dirs_json, roots_json): (String, usize, String, String) = conn.query_row(
+            "SELECT timestamp, plugin_count, directories, roots FROM plugin_scans WHERE id = ?1",
+            params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        ).map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT name, path, plugin_type, version, manufacturer, manufacturer_url, size, size_bytes, modified, architectures FROM plugins WHERE scan_id = ?1").map_err(|e| e.to_string())?;
+        let plugins = stmt.query_map(params![id], |row| {
+            let arch_str: String = row.get(9)?;
+            Ok(PluginInfo {
+                name: row.get(0)?, path: row.get(1)?, plugin_type: row.get(2)?,
+                version: row.get(3)?, manufacturer: row.get(4)?, manufacturer_url: row.get(5)?,
+                size: row.get(6)?, size_bytes: row.get::<_,i64>(7).unwrap_or(0) as u64,
+                modified: row.get(8)?,
+                architectures: serde_json::from_str(&arch_str).unwrap_or_default(),
+            })
+        }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e| e.to_string())?;
+        Ok(ScanSnapshot {
+            id: id.to_string(), timestamp: ts, plugin_count: pc, plugins,
+            directories: serde_json::from_str(&dirs_json).unwrap_or_default(),
+            roots: serde_json::from_str(&roots_json).unwrap_or_default(),
+        })
+    }
+
+    pub fn get_latest_plugin_scan(&self) -> Result<Option<ScanSnapshot>, String> {
+        let conn = self.conn.lock().unwrap();
+        let id: Option<String> = conn.query_row("SELECT id FROM plugin_scans ORDER BY timestamp DESC LIMIT 1", [], |r| r.get(0)).optional().map_err(|e| e.to_string())?;
+        drop(conn);
+        match id { Some(id) => self.get_plugin_scan_detail(&id).map(Some), None => Ok(None) }
+    }
+
+    pub fn delete_plugin_scan(&self, id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM plugins WHERE scan_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM plugin_scans WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn clear_plugin_history(&self) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("DELETE FROM plugins; DELETE FROM plugin_scans;").map_err(|e| e.to_string())
+    }
+
+    // ── Audio scan full CRUD (using existing tables) ──
+
+    pub fn save_audio_scan_full(&self, snap: &AudioScanSnapshot) -> Result<(), String> {
+        self.save_scan(&snap.id, &snap.timestamp, snap.sample_count as u64, snap.total_bytes, &snap.format_counts, &snap.roots)?;
+        self.insert_audio_batch(&snap.id, &snap.samples)
+    }
+
+    pub fn get_audio_scans_list(&self) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, timestamp, sample_count, total_bytes, format_counts, roots FROM audio_scans ORDER BY timestamp DESC").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            let fc_str: String = row.get(4)?;
+            let roots_str: String = row.get(5)?;
+            Ok(serde_json::json!({
+                "id": row.get::<_,String>(0)?,
+                "timestamp": row.get::<_,String>(1)?,
+                "sampleCount": row.get::<_,u64>(2)?,
+                "totalBytes": row.get::<_,u64>(3)?,
+                "formatCounts": serde_json::from_str::<HashMap<String,usize>>(&fc_str).unwrap_or_default(),
+                "roots": serde_json::from_str::<Vec<String>>(&roots_str).unwrap_or_default(),
+            }))
+        }).map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>,_>>().map_err(|e| e.to_string())
+    }
+
+    pub fn get_audio_scan_detail(&self, id: &str) -> Result<AudioScanSnapshot, String> {
+        let conn = self.conn.lock().unwrap();
+        let (ts, sc, tb, fc_str, roots_str): (String, usize, u64, String, String) = conn.query_row(
+            "SELECT timestamp, sample_count, total_bytes, format_counts, roots FROM audio_scans WHERE id = ?1",
+            params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+        ).map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT name, path, directory, format, size, size_formatted, modified, duration, channels, sample_rate, bits_per_sample FROM audio_samples WHERE scan_id = ?1").map_err(|e| e.to_string())?;
+        let samples = stmt.query_map(params![id], |row| {
+            Ok(AudioSample {
+                name: row.get(0)?, path: row.get(1)?, directory: row.get(2)?,
+                format: row.get(3)?, size: row.get::<_,i64>(4).unwrap_or(0) as u64,
+                size_formatted: row.get(5)?, modified: row.get(6)?,
+                duration: row.get(7).ok(), channels: row.get::<_,Option<i32>>(8).ok().flatten().map(|v| v as u16),
+                sample_rate: row.get::<_,Option<i32>>(9).ok().flatten().map(|v| v as u32),
+                bits_per_sample: row.get::<_,Option<i32>>(10).ok().flatten().map(|v| v as u16),
+            })
+        }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e| e.to_string())?;
+        Ok(AudioScanSnapshot {
+            id: id.to_string(), timestamp: ts, sample_count: sc, total_bytes: tb,
+            format_counts: serde_json::from_str(&fc_str).unwrap_or_default(),
+            samples, roots: serde_json::from_str(&roots_str).unwrap_or_default(),
+        })
+    }
+
+    pub fn get_latest_audio_scan(&self) -> Result<Option<AudioScanSnapshot>, String> {
+        let conn = self.conn.lock().unwrap();
+        let id: Option<String> = conn.query_row("SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1", [], |r| r.get(0)).optional().map_err(|e| e.to_string())?;
+        drop(conn);
+        match id { Some(id) => self.get_audio_scan_detail(&id).map(Some), None => Ok(None) }
+    }
+
+    pub fn delete_audio_scan(&self, id: &str) -> Result<(), String> {
+        self.delete_scan(id)
+    }
+
+    pub fn clear_audio_history(&self) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("DELETE FROM audio_samples; DELETE FROM audio_scans;").map_err(|e| e.to_string())
+    }
+
+    // ── DAW scan CRUD ──
+
+    pub fn save_daw_scan(&self, snap: &DawScanSnapshot) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let daw_json = serde_json::to_string(&snap.daw_counts).unwrap_or_default();
+        let roots_json = serde_json::to_string(&snap.roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots) VALUES (?1,?2,?3,?4,?5,?6)",
+            params![snap.id, snap.timestamp, snap.project_count, snap.total_bytes, daw_json, roots_json],
+        ).map_err(|e| e.to_string())?;
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            tx.execute("DELETE FROM daw_projects WHERE scan_id = ?1", params![snap.id]).map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT INTO daw_projects (name, path, directory, format, daw, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").map_err(|e| e.to_string())?;
+            for p in &snap.projects {
+                stmt.execute(params![p.name, p.path, p.directory, p.format, p.daw, p.size, p.size_formatted, p.modified, snap.id]).map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
+    pub fn get_daw_scans(&self) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, timestamp, project_count, total_bytes, daw_counts, roots FROM daw_scans ORDER BY timestamp DESC").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            let dc_str: String = row.get(4)?;
+            let roots_str: String = row.get(5)?;
+            Ok(serde_json::json!({
+                "id": row.get::<_,String>(0)?,
+                "timestamp": row.get::<_,String>(1)?,
+                "projectCount": row.get::<_,u64>(2)?,
+                "totalBytes": row.get::<_,u64>(3)?,
+                "dawCounts": serde_json::from_str::<HashMap<String,usize>>(&dc_str).unwrap_or_default(),
+                "roots": serde_json::from_str::<Vec<String>>(&roots_str).unwrap_or_default(),
+            }))
+        }).map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>,_>>().map_err(|e| e.to_string())
+    }
+
+    pub fn get_daw_scan_detail(&self, id: &str) -> Result<DawScanSnapshot, String> {
+        let conn = self.conn.lock().unwrap();
+        let (ts, pc, tb, dc_str, roots_str): (String, usize, u64, String, String) = conn.query_row(
+            "SELECT timestamp, project_count, total_bytes, daw_counts, roots FROM daw_scans WHERE id = ?1",
+            params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+        ).map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT name, path, directory, format, daw, size, size_formatted, modified FROM daw_projects WHERE scan_id = ?1").map_err(|e| e.to_string())?;
+        let projects = stmt.query_map(params![id], |row| {
+            Ok(DawProject { name: row.get(0)?, path: row.get(1)?, directory: row.get(2)?, format: row.get(3)?, daw: row.get(4)?, size: row.get::<_,i64>(5).unwrap_or(0) as u64, size_formatted: row.get(6)?, modified: row.get(7)? })
+        }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e| e.to_string())?;
+        Ok(DawScanSnapshot {
+            id: id.to_string(), timestamp: ts, project_count: pc, total_bytes: tb,
+            daw_counts: serde_json::from_str(&dc_str).unwrap_or_default(),
+            projects, roots: serde_json::from_str(&roots_str).unwrap_or_default(),
+        })
+    }
+
+    pub fn get_latest_daw_scan(&self) -> Result<Option<DawScanSnapshot>, String> {
+        let conn = self.conn.lock().unwrap();
+        let id: Option<String> = conn.query_row("SELECT id FROM daw_scans ORDER BY timestamp DESC LIMIT 1", [], |r| r.get(0)).optional().map_err(|e| e.to_string())?;
+        drop(conn);
+        match id { Some(id) => self.get_daw_scan_detail(&id).map(Some), None => Ok(None) }
+    }
+
+    pub fn delete_daw_scan(&self, id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM daw_projects WHERE scan_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM daw_scans WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn clear_daw_history(&self) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("DELETE FROM daw_projects; DELETE FROM daw_scans;").map_err(|e| e.to_string())
+    }
+
+    // ── Preset scan CRUD ──
+
+    pub fn save_preset_scan(&self, snap: &PresetScanSnapshot) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
+        let roots_json = serde_json::to_string(&snap.roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots) VALUES (?1,?2,?3,?4,?5,?6)",
+            params![snap.id, snap.timestamp, snap.preset_count, snap.total_bytes, fc_json, roots_json],
+        ).map_err(|e| e.to_string())?;
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            tx.execute("DELETE FROM presets WHERE scan_id = ?1", params![snap.id]).map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT INTO presets (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            for p in &snap.presets {
+                stmt.execute(params![p.name, p.path, p.directory, p.format, p.size, p.size_formatted, p.modified, snap.id]).map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
+    pub fn get_preset_scans(&self) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, timestamp, preset_count, total_bytes, format_counts, roots FROM preset_scans ORDER BY timestamp DESC").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            let fc_str: String = row.get(4)?;
+            let roots_str: String = row.get(5)?;
+            Ok(serde_json::json!({
+                "id": row.get::<_,String>(0)?,
+                "timestamp": row.get::<_,String>(1)?,
+                "presetCount": row.get::<_,u64>(2)?,
+                "totalBytes": row.get::<_,u64>(3)?,
+                "formatCounts": serde_json::from_str::<HashMap<String,usize>>(&fc_str).unwrap_or_default(),
+                "roots": serde_json::from_str::<Vec<String>>(&roots_str).unwrap_or_default(),
+            }))
+        }).map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>,_>>().map_err(|e| e.to_string())
+    }
+
+    pub fn get_preset_scan_detail(&self, id: &str) -> Result<PresetScanSnapshot, String> {
+        let conn = self.conn.lock().unwrap();
+        let (ts, pc, tb, fc_str, roots_str): (String, usize, u64, String, String) = conn.query_row(
+            "SELECT timestamp, preset_count, total_bytes, format_counts, roots FROM preset_scans WHERE id = ?1",
+            params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+        ).map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT name, path, directory, format, size, size_formatted, modified FROM presets WHERE scan_id = ?1").map_err(|e| e.to_string())?;
+        let presets = stmt.query_map(params![id], |row| {
+            Ok(PresetFile { name: row.get(0)?, path: row.get(1)?, directory: row.get(2)?, format: row.get(3)?, size: row.get::<_,i64>(4).unwrap_or(0) as u64, size_formatted: row.get(5)?, modified: row.get(6)? })
+        }).map_err(|e| e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e| e.to_string())?;
+        Ok(PresetScanSnapshot {
+            id: id.to_string(), timestamp: ts, preset_count: pc, total_bytes: tb,
+            format_counts: serde_json::from_str(&fc_str).unwrap_or_default(),
+            presets, roots: serde_json::from_str(&roots_str).unwrap_or_default(),
+        })
+    }
+
+    pub fn get_latest_preset_scan(&self) -> Result<Option<PresetScanSnapshot>, String> {
+        let conn = self.conn.lock().unwrap();
+        let id: Option<String> = conn.query_row("SELECT id FROM preset_scans ORDER BY timestamp DESC LIMIT 1", [], |r| r.get(0)).optional().map_err(|e| e.to_string())?;
+        drop(conn);
+        match id { Some(id) => self.get_preset_scan_detail(&id).map(Some), None => Ok(None) }
+    }
+
+    pub fn delete_preset_scan(&self, id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM presets WHERE scan_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM preset_scans WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn clear_preset_history(&self) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("DELETE FROM presets; DELETE FROM preset_scans;").map_err(|e| e.to_string())
+    }
+
+    // ── KVR cache ──
+
+    pub fn load_kvr_cache(&self) -> Result<HashMap<String, KvrCacheEntry>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT plugin_key, kvr_url, update_url, latest_version, has_update, source, timestamp FROM kvr_cache").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_,String>(0)?, KvrCacheEntry {
+                kvr_url: row.get(1)?, update_url: row.get(2)?, latest_version: row.get(3)?,
+                has_update: row.get::<_,i32>(4).unwrap_or(0) != 0,
+                source: row.get(5)?, timestamp: row.get(6)?,
+            }))
+        }).map_err(|e| e.to_string())?;
+        let mut map = HashMap::new();
+        for r in rows { if let Ok((k, v)) = r { map.insert(k, v); } }
+        Ok(map)
+    }
+
+    pub fn update_kvr_cache(&self, entries: &[crate::history::KvrCacheUpdateEntry]) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            let mut stmt = tx.prepare_cached(
+                "INSERT OR REPLACE INTO kvr_cache (plugin_key, kvr_url, update_url, latest_version, has_update, source, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))"
+            ).map_err(|e| e.to_string())?;
+            for e in entries {
+                stmt.execute(params![e.key, e.kvr_url, e.update_url, e.latest_version, e.has_update.unwrap_or(false) as i32, e.source.as_deref().unwrap_or("")]).map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
+    // ── Generic cache read/write (replaces read_cache_file/write_cache_file) ──
+
+    pub fn read_cache(&self, name: &str) -> Result<serde_json::Value, String> {
+        match name {
+            "bpm-cache.json" => self.read_analysis_as_cache("bpm"),
+            "key-cache.json" => self.read_analysis_as_cache("key"),
+            "lufs-cache.json" => self.read_analysis_as_cache("lufs"),
+            _ => self.read_kv_cache(name),
+        }
+    }
+
+    pub fn write_cache(&self, name: &str, data: &serde_json::Value) -> Result<(), String> {
+        match name {
+            "bpm-cache.json" => self.write_analysis_from_cache(data, "bpm"),
+            "key-cache.json" => self.write_analysis_from_cache(data, "key"),
+            "lufs-cache.json" => self.write_analysis_from_cache(data, "lufs"),
+            _ => self.write_kv_cache(name, data),
+        }
+    }
+
+    fn read_analysis_as_cache(&self, field: &str) -> Result<serde_json::Value, String> {
+        let conn = self.conn.lock().unwrap();
+        let col = match field { "bpm" => "bpm", "key" => "key_name", "lufs" => "lufs", _ => return Ok(serde_json::json!({})) };
+        let sql = format!("SELECT path, {col} FROM audio_samples WHERE {col} IS NOT NULL AND scan_id = (SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1)");
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut map = serde_json::Map::new();
+        let mut rows = stmt.raw_query();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            let path: String = row.get(0).unwrap_or_default();
+            let val: serde_json::Value = if field == "key" {
+                serde_json::Value::String(row.get::<_,String>(1).unwrap_or_default())
+            } else {
+                serde_json::json!(row.get::<_,f64>(1).unwrap_or(0.0))
+            };
+            map.insert(path, val);
+        }
+        Ok(serde_json::Value::Object(map))
+    }
+
+    fn write_analysis_from_cache(&self, data: &serde_json::Value, field: &str) -> Result<(), String> {
+        let obj = data.as_object().ok_or("expected object")?;
+        if obj.is_empty() { return Ok(()); }
+        let conn = self.conn.lock().unwrap();
+        let col = match field { "bpm" => "bpm", "key" => "key_name", "lufs" => "lufs", _ => return Ok(()) };
+        let sql = format!("UPDATE audio_samples SET {col} = ?1 WHERE path = ?2 AND scan_id = (SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1)");
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            let mut stmt = tx.prepare_cached(&sql).map_err(|e| e.to_string())?;
+            for (path, val) in obj {
+                if field == "key" {
+                    if let Some(s) = val.as_str() { let _ = stmt.execute(params![s, path]); }
+                } else {
+                    if let Some(v) = val.as_f64() { let _ = stmt.execute(params![v, path]); }
+                }
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
+    fn read_kv_cache(&self, name: &str) -> Result<serde_json::Value, String> {
+        let (table, key_col, val_col) = self.cache_table_for(name);
+        let conn = self.conn.lock().unwrap();
+        let sql = format!("SELECT {key_col}, {val_col} FROM {table}");
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut map = serde_json::Map::new();
+        let mut rows = stmt.raw_query();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            let k: String = row.get(0).unwrap_or_default();
+            let v: String = row.get(1).unwrap_or_default();
+            // Try to parse as JSON, fall back to string
+            let val = serde_json::from_str(&v).unwrap_or(serde_json::Value::String(v));
+            map.insert(k, val);
+        }
+        Ok(serde_json::Value::Object(map))
+    }
+
+    fn write_kv_cache(&self, name: &str, data: &serde_json::Value) -> Result<(), String> {
+        let obj = data.as_object().ok_or("expected object")?;
+        let (table, key_col, val_col) = self.cache_table_for(name);
+        let conn = self.conn.lock().unwrap();
+        let sql = format!("INSERT OR REPLACE INTO {table} ({key_col}, {val_col}) VALUES (?1, ?2)");
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            let mut stmt = tx.prepare_cached(&sql).map_err(|e| e.to_string())?;
+            for (k, v) in obj {
+                let val_str = if v.is_string() { v.as_str().unwrap_or("").to_string() } else { v.to_string() };
+                let _ = stmt.execute(params![k, val_str]);
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
+    fn cache_table_for(&self, name: &str) -> (&str, &str, &str) {
+        match name {
+            "waveform-cache.json" => ("waveform_cache", "path", "data"),
+            "spectrogram-cache.json" => ("spectrogram_cache", "path", "data"),
+            "xref-cache.json" => ("xref_cache", "project_path", "plugins_json"),
+            "fingerprint-cache.json" => ("fingerprint_cache", "path", "fingerprint"),
+            _ => ("waveform_cache", "path", "data"), // fallback
+        }
     }
 
     /// One-time migration of ALL JSON history/cache files to SQLite.

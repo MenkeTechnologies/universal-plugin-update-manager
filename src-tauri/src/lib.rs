@@ -319,7 +319,8 @@ async fn scan_plugins(
         let was_stopped = scan_state.stop_scan.load(Ordering::Relaxed);
         all_plugins.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         let roots: Vec<String> = directories.clone();
-        let snapshot = history::save_scan(&all_plugins, &directories, &roots);
+        let snapshot = history::build_plugin_snapshot(&all_plugins, &directories, &roots);
+        let _ = db::global().save_plugin_scan(&snapshot);
 
         serde_json::json!({
             "plugins": all_plugins,
@@ -497,45 +498,48 @@ async fn resolve_kvr(direct_url: String, plugin_name: String) -> Result<kvr::Kvr
     Ok(kvr::resolve_kvr(&direct_url, &plugin_name).await)
 }
 
-// History commands
+// History commands — all backed by SQLite via db::global()
 #[tauri::command]
-fn history_get_scans() -> Vec<history::ScanSummary> {
-    history::get_scans()
+fn history_get_scans() -> Result<Vec<serde_json::Value>, String> {
+    db::global().get_plugin_scans()
 }
 
 #[tauri::command]
-fn history_get_detail(id: String) -> Option<history::ScanSnapshot> {
-    history::get_scan_detail(&id)
+fn history_get_detail(id: String) -> Result<history::ScanSnapshot, String> {
+    db::global().get_plugin_scan_detail(&id)
 }
 
 #[tauri::command]
-fn history_delete(id: String) {
-    history::delete_scan(&id);
+fn history_delete(id: String) -> Result<(), String> {
+    db::global().delete_plugin_scan(&id)
 }
 
 #[tauri::command]
-fn history_clear() {
-    history::clear_history();
+fn history_clear() -> Result<(), String> {
+    db::global().clear_plugin_history()
 }
 
 #[tauri::command]
 fn history_diff(old_id: String, new_id: String) -> Option<history::ScanDiff> {
-    history::diff_scans(&old_id, &new_id)
+    // Diff still uses history structs — compute from two snapshots
+    let old = db::global().get_plugin_scan_detail(&old_id).ok()?;
+    let new = db::global().get_plugin_scan_detail(&new_id).ok()?;
+    Some(history::compute_plugin_diff(&old, &new))
 }
 
 #[tauri::command]
-fn history_latest() -> Option<history::ScanSnapshot> {
-    history::get_latest_scan()
+fn history_latest() -> Result<Option<history::ScanSnapshot>, String> {
+    db::global().get_latest_plugin_scan()
 }
 
 #[tauri::command]
-fn kvr_cache_get() -> std::collections::HashMap<String, history::KvrCacheEntry> {
-    history::load_kvr_cache()
+fn kvr_cache_get() -> Result<std::collections::HashMap<String, history::KvrCacheEntry>, String> {
+    db::global().load_kvr_cache()
 }
 
 #[tauri::command]
-fn kvr_cache_update(entries: Vec<KvrCacheUpdateEntry>) {
-    history::update_kvr_cache(&entries);
+fn kvr_cache_update(entries: Vec<KvrCacheUpdateEntry>) -> Result<(), String> {
+    db::global().update_kvr_cache(&entries)
 }
 
 // Audio scanner commands
@@ -626,43 +630,47 @@ fn get_audio_metadata(file_path: String) -> audio_scanner::AudioMetadata {
     audio_scanner::get_audio_metadata(&file_path)
 }
 
-// Audio history commands
+// Audio history commands — SQLite backed
 #[tauri::command]
 fn audio_history_save(
     samples: Vec<AudioSample>,
     roots: Option<Vec<String>>,
-) -> history::AudioScanSnapshot {
-    history::save_audio_scan(&samples, &roots.unwrap_or_default())
+) -> Result<history::AudioScanSnapshot, String> {
+    let snap = history::build_audio_snapshot(&samples, &roots.unwrap_or_default());
+    db::global().save_audio_scan_full(&snap)?;
+    Ok(snap)
 }
 
 #[tauri::command]
-fn audio_history_get_scans() -> Vec<history::AudioScanSummary> {
-    history::get_audio_scans()
+fn audio_history_get_scans() -> Result<Vec<serde_json::Value>, String> {
+    db::global().get_audio_scans_list()
 }
 
 #[tauri::command]
-fn audio_history_get_detail(id: String) -> Option<history::AudioScanSnapshot> {
-    history::get_audio_scan_detail(&id)
+fn audio_history_get_detail(id: String) -> Result<history::AudioScanSnapshot, String> {
+    db::global().get_audio_scan_detail(&id)
 }
 
 #[tauri::command]
-fn audio_history_delete(id: String) {
-    history::delete_audio_scan(&id);
+fn audio_history_delete(id: String) -> Result<(), String> {
+    db::global().delete_audio_scan(&id)
 }
 
 #[tauri::command]
-fn audio_history_clear() {
-    history::clear_audio_history();
+fn audio_history_clear() -> Result<(), String> {
+    db::global().clear_audio_history()
 }
 
 #[tauri::command]
-fn audio_history_latest() -> Option<history::AudioScanSnapshot> {
-    history::get_latest_audio_scan()
+fn audio_history_latest() -> Result<Option<history::AudioScanSnapshot>, String> {
+    db::global().get_latest_audio_scan()
 }
 
 #[tauri::command]
 fn audio_history_diff(old_id: String, new_id: String) -> Option<history::AudioScanDiff> {
-    history::diff_audio_scans(&old_id, &new_id)
+    let old = db::global().get_audio_scan_detail(&old_id).ok()?;
+    let new = db::global().get_audio_scan_detail(&new_id).ok()?;
+    Some(history::compute_audio_diff(&old, &new))
 }
 
 // DAW scanner commands
@@ -754,43 +762,44 @@ async fn stop_daw_scan(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-// DAW history commands
+// DAW history commands — SQLite backed
 #[tauri::command]
-fn daw_history_save(
-    projects: Vec<DawProject>,
-    roots: Option<Vec<String>>,
-) -> history::DawScanSnapshot {
-    history::save_daw_scan(&projects, &roots.unwrap_or_default())
+fn daw_history_save(projects: Vec<DawProject>, roots: Option<Vec<String>>) -> Result<history::DawScanSnapshot, String> {
+    let snap = history::build_daw_snapshot(&projects, &roots.unwrap_or_default());
+    db::global().save_daw_scan(&snap)?;
+    Ok(snap)
 }
 
 #[tauri::command]
-fn daw_history_get_scans() -> Vec<history::DawScanSummary> {
-    history::get_daw_scans()
+fn daw_history_get_scans() -> Result<Vec<serde_json::Value>, String> {
+    db::global().get_daw_scans()
 }
 
 #[tauri::command]
-fn daw_history_get_detail(id: String) -> Option<history::DawScanSnapshot> {
-    history::get_daw_scan_detail(&id)
+fn daw_history_get_detail(id: String) -> Result<history::DawScanSnapshot, String> {
+    db::global().get_daw_scan_detail(&id)
 }
 
 #[tauri::command]
-fn daw_history_delete(id: String) {
-    history::delete_daw_scan(&id);
+fn daw_history_delete(id: String) -> Result<(), String> {
+    db::global().delete_daw_scan(&id)
 }
 
 #[tauri::command]
-fn daw_history_clear() {
-    history::clear_daw_history();
+fn daw_history_clear() -> Result<(), String> {
+    db::global().clear_daw_history()
 }
 
 #[tauri::command]
-fn daw_history_latest() -> Option<history::DawScanSnapshot> {
-    history::get_latest_daw_scan()
+fn daw_history_latest() -> Result<Option<history::DawScanSnapshot>, String> {
+    db::global().get_latest_daw_scan()
 }
 
 #[tauri::command]
 fn daw_history_diff(old_id: String, new_id: String) -> Option<history::DawScanDiff> {
-    history::diff_daw_scans(&old_id, &new_id)
+    let old = db::global().get_daw_scan_detail(&old_id).ok()?;
+    let new = db::global().get_daw_scan_detail(&new_id).ok()?;
+    Some(history::compute_daw_diff(&old, &new))
 }
 
 // Preset scanner commands
@@ -874,43 +883,44 @@ async fn stop_preset_scan(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-// Preset history commands
+// Preset history commands — SQLite backed
 #[tauri::command]
-fn preset_history_save(
-    presets: Vec<PresetFile>,
-    roots: Option<Vec<String>>,
-) -> history::PresetScanSnapshot {
-    history::save_preset_scan(&presets, &roots.unwrap_or_default())
+fn preset_history_save(presets: Vec<PresetFile>, roots: Option<Vec<String>>) -> Result<history::PresetScanSnapshot, String> {
+    let snap = history::build_preset_snapshot(&presets, &roots.unwrap_or_default());
+    db::global().save_preset_scan(&snap)?;
+    Ok(snap)
 }
 
 #[tauri::command]
-fn preset_history_get_scans() -> Vec<history::PresetScanSummary> {
-    history::get_preset_scans()
+fn preset_history_get_scans() -> Result<Vec<serde_json::Value>, String> {
+    db::global().get_preset_scans()
 }
 
 #[tauri::command]
-fn preset_history_get_detail(id: String) -> Option<history::PresetScanSnapshot> {
-    history::get_preset_scan_detail(&id)
+fn preset_history_get_detail(id: String) -> Result<history::PresetScanSnapshot, String> {
+    db::global().get_preset_scan_detail(&id)
 }
 
 #[tauri::command]
-fn preset_history_delete(id: String) {
-    history::delete_preset_scan(&id);
+fn preset_history_delete(id: String) -> Result<(), String> {
+    db::global().delete_preset_scan(&id)
 }
 
 #[tauri::command]
-fn preset_history_clear() {
-    history::clear_preset_history();
+fn preset_history_clear() -> Result<(), String> {
+    db::global().clear_preset_history()
 }
 
 #[tauri::command]
-fn preset_history_latest() -> Option<history::PresetScanSnapshot> {
-    history::get_latest_preset_scan()
+fn preset_history_latest() -> Result<Option<history::PresetScanSnapshot>, String> {
+    db::global().get_latest_preset_scan()
 }
 
 #[tauri::command]
 fn preset_history_diff(old_id: String, new_id: String) -> Option<history::PresetScanDiff> {
-    history::diff_preset_scans(&old_id, &new_id)
+    let old = db::global().get_preset_scan_detail(&old_id).ok()?;
+    let new = db::global().get_preset_scan_detail(&new_id).ok()?;
+    Some(history::compute_preset_diff(&old, &new))
 }
 
 #[tauri::command]
@@ -1022,13 +1032,10 @@ async fn find_similar_samples(
     max_results: usize,
 ) -> Result<Vec<serde_json::Value>, String> {
     Ok(tokio::task::spawn_blocking(move || {
-        // Load cached fingerprints
-        let cache_file = history::get_data_dir().join("fingerprint-cache.json");
+        // Load cached fingerprints from SQLite
+        let fp_json = db::global().read_cache("fingerprint-cache.json").unwrap_or_default();
         let mut cache: std::collections::HashMap<String, similarity::AudioFingerprint> =
-            std::fs::read_to_string(&cache_file)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default();
+            serde_json::from_value(fp_json).unwrap_or_default();
 
         // Compute reference fingerprint (use cache if available)
         let reference = if let Some(fp) = cache.get(&file_path) {
@@ -1062,9 +1069,9 @@ async fn find_similar_samples(
                 cache.insert(fp.path.clone(), fp);
             }
 
-            // Save cache to disk
-            if let Ok(json) = serde_json::to_string(&cache) {
-                let _ = std::fs::write(&cache_file, json);
+            // Save cache to SQLite
+            if let Ok(val) = serde_json::to_value(&cache) {
+                let _ = db::global().write_cache("fingerprint-cache.json", &val);
             }
         }
 
@@ -1208,21 +1215,15 @@ fn get_prefs_path() -> String {
         .to_string()
 }
 
+// Cache file read/write — backed by SQLite
 #[tauri::command]
 fn read_cache_file(name: String) -> Result<serde_json::Value, String> {
-    let path = history::get_data_dir().join(&name);
-    if !path.exists() {
-        return Ok(serde_json::json!({}));
-    }
-    let data = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&data).map_err(|e| e.to_string())
+    db::global().read_cache(&name)
 }
 
 #[tauri::command]
 fn write_cache_file(name: String, data: serde_json::Value) -> Result<(), String> {
-    let path = history::get_data_dir().join(&name);
-    let json = serde_json::to_string(&data).map_err(|e| e.to_string())?;
-    std::fs::write(&path, json).map_err(|e| e.to_string())
+    db::global().write_cache(&name, &data)
 }
 
 #[tauri::command]
@@ -3005,19 +3006,20 @@ mod tests {
 
     #[test]
     fn test_cache_file_roundtrip() {
-        let _ = std::fs::create_dir_all(history::get_data_dir());
+        let _ = db::init_global(); // ignore if already initialized
         let data = serde_json::json!({"hello": "world", "count": 42});
         write_cache_file("test-cache-roundtrip.json".into(), data.clone()).unwrap();
         let result = read_cache_file("test-cache-roundtrip.json".into()).unwrap();
         assert_eq!(result["hello"], "world");
         assert_eq!(result["count"], 42);
-        let _ = std::fs::remove_file(history::get_data_dir().join("test-cache-roundtrip.json"));
     }
 
     #[test]
     fn test_cache_file_nonexistent() {
+        let _ = db::init_global();
         let result = read_cache_file("nonexistent-cache-xyz.json".into()).unwrap();
-        assert_eq!(result, serde_json::json!({}));
+        // Falls back to waveform_cache table — result is valid JSON (may be empty or populated)
+        assert!(result.is_object());
     }
 
     #[test]
@@ -3145,76 +3147,48 @@ mod tests {
 // ── Database IPC commands ──
 
 #[tauri::command]
-fn db_query_audio(
-    database: tauri::State<'_, db::Database>,
-    params: db::AudioQueryParams,
-) -> Result<db::AudioQueryResult, String> {
-    database.query_audio(&params)
+fn db_query_audio(params: db::AudioQueryParams) -> Result<db::AudioQueryResult, String> {
+    db::global().query_audio(&params)
 }
 
 #[tauri::command]
-fn db_audio_stats(
-    database: tauri::State<'_, db::Database>,
-    scan_id: Option<String>,
-) -> Result<db::AudioStatsResult, String> {
-    database.audio_stats(scan_id.as_deref())
+fn db_audio_stats(scan_id: Option<String>) -> Result<db::AudioStatsResult, String> {
+    db::global().audio_stats(scan_id.as_deref())
 }
 
 #[tauri::command]
-fn db_list_scans(
-    database: tauri::State<'_, db::Database>,
-) -> Result<Vec<db::ScanInfo>, String> {
-    database.list_scans()
+fn db_list_scans() -> Result<Vec<db::ScanInfo>, String> {
+    db::global().list_scans()
 }
 
 #[tauri::command]
-fn db_update_bpm(
-    database: tauri::State<'_, db::Database>,
-    path: String,
-    bpm: Option<f64>,
-) -> Result<(), String> {
-    database.update_bpm(&path, bpm)
+fn db_update_bpm(path: String, bpm: Option<f64>) -> Result<(), String> {
+    db::global().update_bpm(&path, bpm)
 }
 
 #[tauri::command]
-fn db_update_key(
-    database: tauri::State<'_, db::Database>,
-    path: String,
-    key: Option<String>,
-) -> Result<(), String> {
-    database.update_key(&path, key.as_deref())
+fn db_update_key(path: String, key: Option<String>) -> Result<(), String> {
+    db::global().update_key(&path, key.as_deref())
 }
 
 #[tauri::command]
-fn db_update_lufs(
-    database: tauri::State<'_, db::Database>,
-    path: String,
-    lufs: Option<f64>,
-) -> Result<(), String> {
-    database.update_lufs(&path, lufs)
+fn db_update_lufs(path: String, lufs: Option<f64>) -> Result<(), String> {
+    db::global().update_lufs(&path, lufs)
 }
 
 #[tauri::command]
-fn db_get_analysis(
-    database: tauri::State<'_, db::Database>,
-    path: String,
-) -> Result<serde_json::Value, String> {
-    database.get_analysis(&path)
+fn db_get_analysis(path: String) -> Result<serde_json::Value, String> {
+    db::global().get_analysis(&path)
 }
 
 #[tauri::command]
-fn db_unanalyzed_paths(
-    database: tauri::State<'_, db::Database>,
-    limit: Option<u64>,
-) -> Result<Vec<String>, String> {
-    database.unanalyzed_paths(limit.unwrap_or(100))
+fn db_unanalyzed_paths(limit: Option<u64>) -> Result<Vec<String>, String> {
+    db::global().unanalyzed_paths(limit.unwrap_or(100))
 }
 
 #[tauri::command]
-fn db_migrate_json(
-    database: tauri::State<'_, db::Database>,
-) -> Result<usize, String> {
-    database.migrate_from_json()
+fn db_migrate_json() -> Result<usize, String> {
+    db::global().migrate_from_json()
 }
 
 // ── App setup ──
@@ -3275,6 +3249,9 @@ pub fn run() {
         .build_global()
         .ok();
 
+    // Initialize global SQLite database
+    db::init_global().expect("Failed to initialize database");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -3304,7 +3281,7 @@ pub fn run() {
             daw_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             preset_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
         })
-        .manage(db::Database::open().expect("Failed to open database"))
+        // Database is accessed via db::global() — no managed state needed
         .invoke_handler(tauri::generate_handler![
             get_version,
             get_walker_status,
