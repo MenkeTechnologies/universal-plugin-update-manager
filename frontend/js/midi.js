@@ -49,7 +49,16 @@ function getMidiCount() {
 
 function updateMidiCount() {
   const count = document.getElementById('midiCount');
-  if (count) count.textContent = `${filteredMidi.length}${filteredMidi.length !== allMidiFiles.length ? ' of ' + allMidiFiles.length : ''} MIDI files`;
+  if (count) count.textContent = filteredMidi.length;
+  const total = document.getElementById('midiTotalCount');
+  if (total) total.textContent = allMidiFiles.length;
+  const sizeEl = document.getElementById('midiTotalSize');
+  if (sizeEl) {
+    const bytes = allMidiFiles.reduce((s, f) => s + (f.size || 0), 0);
+    sizeEl.textContent = typeof formatAudioSize === 'function' ? formatAudioSize(bytes) : Math.round(bytes / 1024) + ' KB';
+  }
+  const statsBar = document.getElementById('midiStats');
+  if (statsBar && allMidiFiles.length > 0) statsBar.style.display = '';
 }
 
 function updateMidiHeaderCount() {
