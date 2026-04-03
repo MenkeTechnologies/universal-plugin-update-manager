@@ -408,7 +408,7 @@ async fn check_updates(
     let kvr_cache = history::load_kvr_cache();
 
     let total = plugins.len();
-    append_log(format!("UPDATE CHECK — {} plugins", total));
+    #[cfg(not(test))] append_log(format!("UPDATE CHECK — {} plugins", total));
     let _ = app.emit(
         "update-progress",
         serde_json::json!({
@@ -1383,7 +1383,9 @@ fn write_cache_file(name: String, data: serde_json::Value) -> Result<(), String>
 
 #[tauri::command]
 fn append_log(msg: String) {
-    let path = history::ensure_data_dir().join("app.log");
+    let path = history::get_data_dir().join("app.log");
+    // Ensure dir exists
+    if let Some(parent) = path.parent() { let _ = std::fs::create_dir_all(parent); }
     // Rotate if > 5MB — rename to app.log.1, truncate
     const MAX_LOG_SIZE: u64 = 5 * 1024 * 1024;
     if let Ok(meta) = std::fs::metadata(&path) {
@@ -1685,7 +1687,7 @@ fn plugins_to_export(plugins: &[PluginInfo]) -> Vec<ExportPlugin> {
 
 #[tauri::command]
 fn export_plugins_json(plugins: Vec<PluginInfo>, file_path: String) -> Result<(), String> {
-    append_log(format!("EXPORT — {} plugins → {}", plugins.len(), file_path));
+    #[cfg(not(test))] append_log(format!("EXPORT — {} plugins → {}", plugins.len(), file_path));
     let payload = ExportPayload {
         version: env!("CARGO_PKG_VERSION").into(),
         exported_at: chrono::Utc::now().to_rfc3339(),
@@ -1697,7 +1699,7 @@ fn export_plugins_json(plugins: Vec<PluginInfo>, file_path: String) -> Result<()
 
 #[tauri::command]
 fn export_plugins_csv(plugins: Vec<PluginInfo>, file_path: String) -> Result<(), String> {
-    append_log(format!("EXPORT — {} plugins → {}", plugins.len(), file_path));
+    #[cfg(not(test))] append_log(format!("EXPORT — {} plugins → {}", plugins.len(), file_path));
     let sep = detect_separator(&file_path);
     let mut out = format!(
         "Name{s}Type{s}Version{s}Manufacturer{s}Manufacturer URL{s}Path{s}Size{s}Modified\n",
@@ -1815,7 +1817,7 @@ fn export_daw_dsv(projects: Vec<history::DawProject>, file_path: String) -> Resu
 
 #[tauri::command]
 fn import_plugins_json(file_path: String) -> Result<Vec<PluginInfo>, String> {
-    append_log(format!("IMPORT — plugins ← {}", file_path));
+    #[cfg(not(test))] append_log(format!("IMPORT — plugins ← {}", file_path));
     let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
     let payload: ExportPayload = serde_json::from_str(&data).map_err(|e| e.to_string())?;
     Ok(payload
