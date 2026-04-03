@@ -114,7 +114,8 @@
       const child = e.target.closest(childSelector);
       if (!child || !container.contains(child)) return;
       if (handleSelector && !e.target.closest(handleSelector)) return;
-      if (e.target.closest('input, button, select, textarea, a, .btn-small, .col-resize')) return;
+      const skipSelector = direction === 'horizontal' ? 'input, select, textarea, .col-resize' : 'input, button, select, textarea, a, .btn-small, .col-resize';
+      if (e.target.closest(skipSelector)) return;
       e.preventDefault();
       const rect = child.getBoundingClientRect();
       _drag = {
