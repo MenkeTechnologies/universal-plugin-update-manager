@@ -14,7 +14,7 @@ src-tauri/Cargo.lock
 .vscode/
 
 # Rust build artifacts
-src-tauri/rust_out/
+src-tauri/rust_out
 
 # Generated docs
 docs/api/
