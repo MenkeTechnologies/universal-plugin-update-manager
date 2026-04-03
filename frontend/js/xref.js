@@ -326,18 +326,69 @@ async function showXmlProjectViewer(filePath, projectName) {
         <input type="text" class="np-search-input" id="projSearchInput" placeholder="Search XML..." style="flex:1;max-width:300px;" autocomplete="off">
         <button class="btn btn-secondary" id="projCollapseAllBtn" style="padding:4px 10px;font-size:10px;">Collapse All</button>
         <button class="btn btn-secondary" id="projExpandAllBtn" style="padding:4px 10px;font-size:10px;">Expand All</button>
+        <button class="btn btn-secondary" id="projExportBtn" style="padding:4px 10px;font-size:10px;">&#8615; Export</button>
       </div>
-      <pre id="projXmlContent" style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);margin:0;white-space:pre-wrap;tab-size:2;background:var(--bg-primary);"></pre>
+      <div id="projXmlTree" style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);background:var(--bg-primary);"></div>
     </div>`;
-    const pre = document.getElementById('projXmlContent');
-    pre.textContent = xml;
+    // Parse XML and render collapsible tree
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xml, 'text/xml');
+    const treeContainer = document.getElementById('projXmlTree');
+    if (xmlDoc.documentElement && typeof buildXmlTree === 'function') {
+      treeContainer.appendChild(buildXmlTree(xmlDoc.documentElement, 0));
+    } else {
+      treeContainer.textContent = xml; // fallback to raw text
+    }
+    // Collapse/expand click handler
+    treeContainer.addEventListener('click', (ev) => {
+      const toggle = ev.target.closest('.xml-toggle');
+      if (!toggle) return;
+      const node = toggle.closest('.xml-node');
+      if (!node) return;
+      const children = node.querySelector('.xml-children');
+      if (!children) return;
+      const collapsed = children.style.display === 'none';
+      children.style.display = collapsed ? '' : 'none';
+      toggle.textContent = collapsed ? '▼' : '▶';
+      const summary = node.querySelector('.xml-collapsed-summary');
+      if (summary) summary.style.display = collapsed ? 'none' : '';
+    });
+    // Collapse All / Expand All
+    document.getElementById('projCollapseAllBtn')?.addEventListener('click', () => {
+      treeContainer.querySelectorAll('.xml-children').forEach(c => { c.style.display = 'none'; });
+      treeContainer.querySelectorAll('.xml-toggle').forEach(t => { t.textContent = '▶'; });
+      treeContainer.querySelectorAll('.xml-collapsed-summary').forEach(s => { s.style.display = ''; });
+    });
+    document.getElementById('projExpandAllBtn')?.addEventListener('click', () => {
+      treeContainer.querySelectorAll('.xml-children').forEach(c => { c.style.display = ''; });
+      treeContainer.querySelectorAll('.xml-toggle').forEach(t => { t.textContent = '▼'; });
+      treeContainer.querySelectorAll('.xml-collapsed-summary').forEach(s => { s.style.display = 'none'; });
+    });
     // Search
     document.getElementById('projSearchInput')?.addEventListener('input', (e) => {
       const q = e.target.value.trim().toLowerCase();
-      if (!q) { pre.innerHTML = ''; pre.textContent = xml; return; }
-      const escaped = escapeHtml(xml);
-      const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      pre.innerHTML = escaped.replace(re, m => '<mark style="background:var(--yellow);color:#000;">' + m + '</mark>');
+      treeContainer.querySelectorAll('.xml-node').forEach(n => {
+        const text = n.textContent.toLowerCase();
+        const match = !q || text.includes(q);
+        n.style.display = match ? '' : 'none';
+        if (match && q) {
+          // Expand parent chain
+          let p = n.parentElement;
+          while (p && p !== treeContainer) {
+            if (p.classList?.contains('xml-children')) p.style.display = '';
+            const t = p.parentElement?.querySelector('.xml-toggle');
+            if (t) t.textContent = '▼';
+            p = p.parentElement;
+          }
+        }
+      });
+    });
+    // Export
+    document.getElementById('projExportBtn')?.addEventListener('click', async () => {
+      const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+      if (!dialogApi) return;
+      const savePath = await dialogApi.save({ title: 'Export XML', defaultPath: projectName + '.xml', filters: [{ name: 'XML', extensions: ['xml'] }] });
+      if (savePath) { await window.vstUpdater.writeTextFile(savePath, xml); showToast('XML exported'); }
     });
   } catch (e) {
     const modal = document.getElementById('projectViewerModal');
