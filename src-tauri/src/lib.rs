@@ -3922,6 +3922,25 @@ fn get_file_watcher_status(app: AppHandle) -> serde_json::Value {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Panic hook — write crash info to app.log before dying
+    std::panic::set_hook(Box::new(|info| {
+        let path = history::ensure_data_dir().join("app.log");
+        let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let location = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column())).unwrap_or_default();
+        let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "unknown panic".into()
+        };
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        let msg = format!("[{timestamp}] PANIC at {location}: {payload}\n{backtrace}\n");
+        eprintln!("{msg}");
+        let _ = std::fs::OpenOptions::new().create(true).append(true).open(&path)
+            .and_then(|mut f| { use std::io::Write; f.write_all(msg.as_bytes()) });
+    }));
+
     // Initialize app start time for uptime tracking
     APP_START.get_or_init(Instant::now);
 
