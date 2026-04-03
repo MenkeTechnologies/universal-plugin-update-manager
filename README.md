@@ -63,14 +63,14 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Plugin Scanner** | Detects VST2, VST3, and AU plugins from platform-specific directories on macOS, Windows, and Linux. Shows architecture badges (ARM64, x86_64, Universal) per plugin via direct Mach-O/PE header parsing. Tracks raw byte sizes for accurate disk usage charts. Runs in a background worker thread -- UI stays fully responsive |
 | **Audio Scanner** | Discovers audio samples (WAV, FLAC, AIFF, MP3, OGG, etc.) with metadata extraction including duration, channels, sample rate, bit depth from file headers. Symlink deduplication via canonicalize with string-based fallback. Double-click any sample row to start playback (or single-click with the setting enabled). Floating music player with volume, playback speed, seek bar, and loop controls persists across all tabs |
 | **DAW Scanner** | Finds DAW project files across 14+ formats -- Ableton (.als), Logic (.logicx), FL Studio (.flp), REAPER (.rpp), Cubase/Nuendo (.cpr/.npr), Pro Tools (.ptx/.ptf), Bitwig (.bwproject), Studio One (.song), Reason (.reason), Audacity (.aup/.aup3), GarageBand (.band), Ardour (.ardour), and dawproject (.dawproject). Double-click any project row to open it directly in its DAW |
-| **Plugin Cross-Reference** | Parses Ableton Live (.als), REAPER (.rpp), and Bitwig Studio (.bwproject) project files to extract plugin references (VST2, VST3, AU, CLAP). Bitwig binary format parsed via string scanning of DLL/vst3/component/clap paths. Shows plugin count badges on DAW rows. Click to see full plugin list. Reverse lookup: right-click any plugin to find which projects use it. Build full index across all supported projects with one click |
+| **Plugin Cross-Reference** | Extracts plugin references from 11 DAW formats: Ableton (.als — gzip XML), REAPER (.rpp — plaintext), Bitwig (.bwproject — binary scan), FL Studio (.flp — ASCII + UTF-16LE), Logic Pro (.logicx — plist + AU name matching), Cubase/Nuendo (.cpr — Plugin Name markers), Studio One (.song — ZIP XML), DAWproject (ZIP XML), Pro Tools (.ptx/.ptf — binary scan), Reason (.reason — binary scan). Detects VST2/VST3/AU/CLAP/AAX. Shows plugin count badges on DAW rows. Click to see full plugin list. Reverse lookup: right-click any plugin to find which projects use it. Build full index across all supported projects with one click |
 | **Version Intel** | Reads version, manufacturer, and website URL from macOS bundle plists (`CFBundleShortVersionString`, `CFBundleIdentifier`, `NSHumanReadableCopyright`) |
 | **Update Checker** | Searches [KVR Audio](https://www.kvraudio.com) for each plugin's latest version. Falls back to DuckDuckGo site-restricted KVR search. Runs in a worker thread with rate limiting and streams results back incrementally |
 | **KVR Integration** | Yellow KVR button on every plugin links directly to its KVR Audio product page. Double-click any plugin card to open it on KVR. URL is constructed from plugin name + manufacturer with smart slug generation (camelCase splitting, manufacturer lookup table). Falls back to KVR search if the direct URL doesn't exist |
-| **KVR Cache** | Resolved KVR data (product URLs, download links, versions) is persisted to `kvr-cache.json`. On restart, cached results are restored instantly and the background resolver resumes from where it left off |
+| **KVR Cache** | Resolved KVR data (product URLs, download links, versions) persisted to SQLite. On restart, cached results are restored instantly and the background resolver resumes from where it left off |
 | **Download Button** | Green download button appears on plugins with a confirmed newer version and a KVR download link (platform-specific when available) |
 | **Export/Import** | Export all tabs (plugins, samples, DAW projects, presets) to JSON, TOML, CSV, or TSV via native file dialogs. Import from JSON or TOML. Format auto-detected from file extension |
-| **Scan History** | Stores up to 50 scan snapshots locally (plugins, audio, and DAW scans merged) with full diff support between any two scans |
+| **Scan History** | Stores up to 50 scan snapshots in SQLite (plugins, audio, DAW, and preset scans merged) with full diff support between any two scans |
 | **Batch Updater** | Walk through all outdated plugins one by one with skip/open controls |
 | **Manufacturer Link** | Globe button on each plugin opens the manufacturer's website directly (derived from bundle ID). Shows a disabled icon when no website is available |
 | **Reveal in Finder** | Folder button opens the plugin's filesystem location. Double-click any preset row to reveal it in Finder. Tooltip shows the full path on hover |
@@ -85,7 +85,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Floating Player** | Draggable audio player that docks to any corner with quadrant zone UI. Resizable from all 8 edges/corners. Play/pause, loop, shuffle, seek bar, volume, speed (0.25x-2x), recently played (50 tracks), song search with fzf matching, favorite/tag buttons. Expanded mode adds 3-band EQ, preamp gain, stereo pan, mono toggle, A-B loop. 60fps waveform playhead via requestAnimationFrame. Player state/size/dock persisted across sessions |
 | **Waveform Preview** | 800-subdivision min/max envelope waveform with gradient fill (cyan→magenta) and RMS center detail line. Seekable — click anywhere to jump. 60fps playhead cursor. Right-click to toggle expand setting. File browser shows full-width waveform background behind each audio row with live playback cursor |
 | **Dependency Graph** | Visual plugin dependency map with search, 4 tabs (Most Used, By Project with inline drill-down + back button, Orphaned, Analytics). Analytics tab shows format breakdown, top manufacturers, key insights (avg plugins/project, single-use, go-to plugins). Prompts to build plugin index if empty. Persisted xref cache |
-| **ALS XML Viewer** | Right-click any .als file to decompress and view as collapsible XML tree. Click ▼/▶ to collapse/expand nodes. Auto-collapses deep nodes. Collapse All/Expand All buttons. fzf search auto-expands parent chain. Export decompressed XML. Color-coded: tags cyan, attributes yellow, values green |
+| **Project Viewer** | Right-click any DAW project → "Explore Project Contents". XML formats (ALS, Studio One, DAWproject) show collapsible XML tree with search. Text formats (REAPER) show plaintext with search. Binary formats (Bitwig, FLP, Logic, Cubase, Pro Tools, Reason) show JSON tree of extracted metadata, plugins, and preset states. Collapse All/Expand All buttons. Color-coded: tags cyan, attributes yellow, values green |
 | **Context Menus** | 40+ right-click context menus on every interactive element — plugins, samples, DAW projects, presets, favorites, notes, tags, history entries, audio player songs, dep graph rows, file browser rows, breadcrumbs, waveforms, spectrograms, EQ sliders, color schemes, shortcut keys, progress bars, metadata panels, similar panel, heatmap dashboard, header stats |
 | **Toast Notifications** | Slide-in notifications for actions like opening DAW projects or revealing files in Finder |
 | **Disk Usage** | Stacked bar charts showing space breakdown by format/type per tab. Visual representation of storage usage with color-coded legends |
@@ -107,7 +107,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **BPM Estimation** | Estimates tempo for all audio formats (WAV, AIFF, MP3, FLAC, OGG, M4A, AAC, OPUS) using symphonia decoder + onset-strength autocorrelation. Compressed formats decoded to PCM (30s max). Shown in metadata panel and table column. Cached to prefs across reboots. Background batch analysis starts as samples arrive |
 | **LUFS Loudness** | Integrated loudness measurement (dBFS) per sample. Shown in metadata panel, table column (orange), and player meta line. Background analysis alongside BPM/Key. 8 tests: silence floor, sine wave levels, 6dB amplitude relationship, short files |
 | **Visualizer Tab** | 6 real-time audio displays in 3×2 grid or single mode: FFT spectrum (log/linear), oscilloscope waveform (color picker), scrolling spectrogram (speed control), true stereo Lissajous (ChannelSplitter + dual AnalyserNodes), peak/RMS level meters (hold indicator), 10-band octave analyzer. 30fps throttle, pre-allocated buffers, zero CPU when tab hidden. Fullscreen mode (Escape to exit). Trello drag tiles. Context menus for per-tile params |
-| **Separate Cache Files** | BPM, Key, LUFS, waveform, spectrogram, and xref caches stored in individual JSON files in the data directory — not in the prefs TOML. Keeps prefs file small. Clear Analysis Cache button in Settings wipes all 6 files |
+| **SQLite Backend** | All data stored in a single `audio_haxor.db` SQLite database (WAL mode, 64MB cache). 13 tables: audio samples, plugins, DAW projects, presets, 4 scan history tables, KVR cache, waveform/spectrogram/xref/fingerprint caches. Designed for 6M+ samples without OOM. Paginated queries with server-side sort/filter/search. Per-cache clear buttons in Settings (BPM, Key, LUFS, Waveform, Spectrogram, Xref, Fingerprint, KVR) |
 | **Walker Status Tab** | 4-tile live view of scanner threads: Plugin (cyan), Audio (yellow), DAW (magenta), Preset (orange). Shows thread count, dirs in buffer, full directory paths. Polls 500ms, auto-start/stop on tab switch. Right-click to copy paths |
 | **Parametric EQ** | Visual frequency response curve with draggable band nodes (Low/Mid/High). Real-time FFT spectrum overlay at 60fps via Web Audio AnalyserNode. Log frequency axis (20Hz-20kHz), drag to change frequency and gain simultaneously |
 | **Audio Similarity Search** | Right-click any sample → "Find Similar" to find samples that sound alike. Non-blocking floating panel (docked bottom-left, draggable, resizable, minimizable). Spectral fingerprinting: RMS energy, spectral centroid (normalized), zero-crossing rate, 3-band energy split, attack time. Parallel computation via rayon. Click results to play. Shortcut: W key |
@@ -122,7 +122,8 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Quick Nav Buttons** | File browser toolbar has Desktop, Downloads, Music, Documents, and Root (/) buttons for instant navigation |
 | **Splash Screen** | Cyberpunk boot sequence with animated gradient title sweep, progress bar, version display. Fades out after init before data loads |
 | **Cyberpunk Animations** | 30 CSS animations: neon focus pulse, button hover glow, modal zoom-in, context menu scale, format badge shimmer, toast glow pulse, neon gradient scrollbars, tactile depth shadows on every interactive element |
-| **System Info** | Real-time display of CPU cores/usage, memory RSS/VIRT, PID, threads, FDs, uptime, thread pool sizes, scanner config, active scan states with green dots, data file sizes, data directory path |
+| **System Info** | Real-time display in 7 sections: System (OS, arch, hostname, CPU, disk), Process (PID, version, memory, threads, FD limits, uptime), Thread Pools (rayon, per-scanner, channel buffers), Scanner State (live dots), Scan Results (counts), Database (SQLite size, 13 table row counts), Storage (data dir) |
+| **App Info** | Architecture and feature reference: build details (version, Tauri version, target, profile), supported formats (10 audio, 5 plugin, 13 DAW, 14 preset), plugin extraction (12 DAW formats), analysis engines (BPM, Key, LUFS, Fingerprint), visualizers (6 types), export formats (5 types), storage backend, UI framework, search engine |
 | **fzf Tuning** | 8 configurable fuzzy search parameters (match score, gap penalties, boundary/camelCase/consecutive bonuses) in Settings with live preview and reset to defaults |
 | **Filter Persistence** | All 6 filter dropdowns (plugin type, status, favorite type, audio format, DAW, preset format) saved to prefs and restored on startup. Multi-select values preserved |
 | **Plugin Name Normalization** | Cross-reference matching normalizes plugin names: strips arch suffixes (x64, ARM64, Stereo), case-folds, collapses whitespace. "Serum", "SERUM (x64)", "serum" all match |
@@ -134,8 +135,9 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Sample Table Columns** | 12 columns: checkbox, Name, Format, Size, BPM, Key, Duration, Channels, LUFS, Modified, Path, Actions. All sortable, all with tooltips. BPM/Key/LUFS from background analysis, Duration/Channels from scan headers. All columns draggable to reorder |
 | **Paginated History** | Scan detail views render in batches of 200 with scroll-to-load-more. No more UI freeze on 40,000+ sample scans |
 | **Scan Button Mobility** | Scan All/Stop/Resume button group draggable between header, stats bar, and tab nav. Dashboard button same. Position persisted |
-| **Cache File Manager** | Settings → Data shows all data directory files in a table with name, size, modified date. Click to reveal in Finder, delete individual files, Clear All Caches button. Total size shown. Auto-refreshes on Settings tab open |
-| **Background Analysis** | Sequential BPM/Key/LUFS/metadata analysis starts as samples arrive during scan. Auto-pauses on user interaction, 50ms yield, saves every 50 samples. Cached to 6 separate JSON files across reboots. Progress badge in header |
+| **Cache Manager** | Settings → Data shows 8 individual cache clear buttons (BPM, Key, LUFS, Waveform, Spectrogram, Xref, Fingerprint, KVR) plus Clear All. All caches stored in SQLite |
+| **Background Analysis** | Sequential BPM/Key/LUFS/metadata analysis starts as samples arrive during scan. Auto-pauses on user interaction, 50ms yield, saves every 50 samples. Cached to SQLite across reboots. Progress badge in header |
+| **Neon Glow Animations** | Animated pulsing neon borders on all modals, panels, walker tiles, visualizer tiles, heatmap cards, context menus, and command palette. Staggered delays create wave effects. Toggle on/off in Settings → Appearance |
 | **Resizable Recent List** | Audio player recently played list is vertically resizable via CSS resize handle (min 80px) |
 
 ---
@@ -216,11 +218,22 @@ cargo clean --manifest-path src-tauri/Cargo.toml --release && pnpm tauri build
 
 ### Data Location
 
-All preferences, scan history, and KVR cache persist at:
+All data persists at:
 ```
 ~/Library/Application Support/com.menketechnologies.audio-haxor/
+  audio_haxor.db        -- SQLite database (all scans, caches, history)
+  preferences.toml      -- User preferences (human-readable config)
+  app.log               -- Error log
 ```
 This directory survives app reinstalls. Never deleted by builds.
+
+### NPM Scripts
+
+```bash
+pnpm run clean      # Remove src-tauri/target, dist, node_modules/.cache
+pnpm run rebuild    # Clean + full release build
+pnpm test           # JS + Rust tests
+```
 
 ---
 
@@ -237,7 +250,7 @@ cd src-tauri && cargo test
 node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
 
-### Rust tests (288 tests across 13 modules)
+### Rust tests (320 tests across 14 modules)
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -247,7 +260,8 @@ node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 | **scanner** | 27 | Plugin type mapping, file size formatting, directory size calculation with depth limit, plugin discovery, VST directory enumeration, architecture detection, edge cases |
 | **audio_scanner** | 28 | Audio file discovery, metadata extraction (WAV/FLAC/AIFF), format size formatting, symlink deduplication, directory walking, stop signal, skip directories, batching, scan completeness, deep nesting, simulated SMB/NFS, concurrent scan isolation |
 | **daw_scanner** | 19 | DAW project discovery, extension-to-DAW mapping (14 DAW types), file size formatting, directory walking, stop signal, skip directories |
-| **xref** | 33 | Ableton .als gzip XML parsing (VST2/VST3/AU), REAPER .rpp plaintext parsing (VST/VST3/AU/CLAP), Bitwig .bwproject binary string scanning (DLL/vst3/component/clap), plugin name normalization (arch suffix stripping, case folding, whitespace collapse, all-suffix fallback), case-insensitive deduplication, sorting, error handling |
+| **xref** | 52 | Ableton .als gzip XML (VST2/VST3/AU), REAPER .rpp plaintext (VST/VST3/AU/CLAP), Bitwig binary scan, FL Studio ASCII+UTF-16LE, Cubase Plugin Name markers, Logic AU name matching, Studio One ZIP+XML, DAWproject ZIP+XML, Pro Tools AAX paths+markers, Reason binary scan, all 5 plugin types (VST2/VST3/AU/CLAP/AAX), cross-format dedup, trailing junk handling, name normalization, 3 real-file tests (FLP=7, CPR=2, LOGICX=13 plugins verified) |
+| **db** | 9 | SQLite insert/query roundtrip, fzf subsequence search, format filter, pagination (offset/limit), sort ascending/descending, BPM/key/LUFS update+retrieval, unanalyzed path query, aggregate stats, scan delete cascade |
 | **bpm** | 23 | WAV/AIFF PCM reading, onset-strength autocorrelation, click track detection (90/120/140/174 BPM), silence rejection, short file handling, 8/16/24-bit decode, stereo mixdown (chunks_exact), symphonia decoder (invalid data, WAV fallback), BPM rounding (integer snap within 0.15), zero-length WAV, AIFF error handling |
 | **key_detect** | 17 | Goertzel algorithm (440Hz detection, near-zero for absent frequencies), chromagram (pure A, pure C, C major chord, multi-octave A, bins bounded [0,1]), key profile matching (C major triad, A minor triad, perfect correlation, shifted profile), detect_key (WAV, silence, 96kHz, 8kHz, nonexistent, unsupported) |
 | **lufs** | 8 | Silence floor (-70 LUFS), sine wave levels, full-scale loudness, 6dB amplitude relationship, short file handling, louder-is-higher ordering, nonexistent/unsupported file handling |
@@ -336,8 +350,8 @@ Built packages land in `src-tauri/target/release/bundle/`:
                 duplicate queries. Cards update in-place as results arrive.
                 Status bar shows current plugin and live tallies.
 
-[5] HISTORY --> Each scan is persisted to disk as JSON. Plugin, audio, and
-                DAW scans are merged in the history timeline. Diff any two
+[5] HISTORY --> Each scan is persisted to SQLite. Plugin, audio, DAW, and
+                preset scans are merged in the history timeline. Diff any two
                 snapshots to see what was added, removed, or version-bumped.
                 Last scan auto-restores on startup.
 

@@ -1,6 +1,9 @@
-// ── Audio Samples ──
-let allAudioSamples = [];
-let filteredAudioSamples = [];
+// ── Audio Samples (paginated via SQLite) ──
+let allAudioSamples = []; // kept for export/compatibility — lazily populated
+let filteredAudioSamples = []; // current visible page from DB
+let audioTotalCount = 0; // total matching rows in DB
+let audioTotalUnfiltered = 0; // total rows in scan
+let audioCurrentOffset = 0; // pagination offset
 let audioSortKey = 'name';
 let audioSortAsc = true;
 let audioScanProgressCleanup = null;
@@ -776,33 +779,39 @@ let _lastAudioMode = 'fuzzy';
 
 function filterAudioSamples() {
   if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
-  const search = document.getElementById('audioSearchInput').value || '';
+  const search = document.getElementById('audioSearchInput')?.value || '';
   const formatEl = document.getElementById('audioFormatFilter');
-  autoSelectDropdown(formatEl, search);
+  if (formatEl) autoSelectDropdown(formatEl, search);
   const fmtSet = getMultiFilterValues('audioFormatFilter');
   const mode = getSearchMode('regexAudio');
   _lastAudioSearch = search;
   _lastAudioMode = mode;
+  audioCurrentOffset = 0;
+  fetchAudioPage();
+}
 
-  if (search) {
-    const scored = [];
-    for (const s of allAudioSamples) {
-      if (typeof passesGlobalTagFilter === 'function' && !passesGlobalTagFilter(s.path)) continue;
-      if (fmtSet && !fmtSet.has(s.format)) continue;
-      const score = searchScore(search, [s.name, s.path, s.format], mode);
-      if (score > 0) scored.push({ item: s, score });
-    }
-    scored.sort((a, b) => b.score - a.score);
-    filteredAudioSamples = scored.map(s => s.item);
-  } else {
-    filteredAudioSamples = allAudioSamples.filter(s => {
-      if (typeof passesGlobalTagFilter === 'function' && !passesGlobalTagFilter(s.path)) return false;
-      if (fmtSet && !fmtSet.has(s.format)) return false;
-      return true;
+async function fetchAudioPage() {
+  const search = _lastAudioSearch || '';
+  const fmtSet = getMultiFilterValues('audioFormatFilter');
+  const formatFilter = fmtSet && fmtSet.size === 1 ? [...fmtSet][0] : null;
+  try {
+    const result = await window.vstUpdater.dbQueryAudio({
+      search: search || null,
+      format_filter: formatFilter,
+      sort_key: audioSortKey,
+      sort_asc: audioSortAsc,
+      offset: audioCurrentOffset,
+      limit: AUDIO_PAGE_SIZE,
     });
-    sortAudioArray();
+    filteredAudioSamples = result.samples || [];
+    audioTotalCount = result.totalCount || 0;
+    audioTotalUnfiltered = result.totalUnfiltered || 0;
+    renderAudioTable();
+    // Update stats from DB
+    rebuildAudioStats();
+  } catch (e) {
+    console.error('fetchAudioPage failed:', e);
   }
-  renderAudioTable();
 }
 
 function sortAudio(key) {

@@ -1197,6 +1197,28 @@ function refreshSettingsUI() {
           `<b>Data Dir:</b> <code style="font-size:10px;word-break:break-all;">${escapeHtml(stats.dataDir || '?')}</code>`,
         ]),
       ].join('');
+      // App Info pane
+      const appInfo = document.getElementById('settingAppInfo');
+      if (appInfo) {
+        const app = stats.app || {};
+        const tag = (items) => (items || []).map(i => `<span style="display:inline-block;background:var(--bg-card);border:1px solid var(--border);border-radius:2px;padding:1px 6px;margin:1px 2px;font-size:10px;">${i}</span>`).join('');
+        appInfo.innerHTML = [
+          section('Build', [
+            `<b>Version:</b> v${stats.appVersion || '?'} | <b>Tauri:</b> v${stats.tauriVersion || '?'}`,
+            `<b>Target:</b> ${stats.rustcTarget || '?'} | <b>Profile:</b> ${stats.buildProfile || '?'}`,
+            `<b>UI:</b> ${app.uiFramework || '?'} | <b>Storage:</b> ${app.storageBackend || '?'}`,
+            `<b>Search:</b> ${app.searchEngine || '?'}`,
+          ]),
+          section('Audio Formats', [tag(app.audioFormats)]),
+          section('Plugin Formats', [tag(app.pluginFormats)]),
+          section('DAW Projects', [`${(app.dawFormats||[]).length} formats supported`, tag(app.dawFormats)]),
+          section('Preset Formats', [tag(app.presetFormats)]),
+          section('Plugin Extraction', [`${(app.xrefFormats||[]).length} DAW formats with plugin cross-reference`, tag(app.xrefFormats)]),
+          section('Analysis Engines', [tag(app.analysisEngines)]),
+          section('Visualizers', [tag(app.visualizers)]),
+          section('Export Formats', [tag(app.exportFormats)]),
+        ].join('');
+      }
     }).catch((err) => {
       const cpus = navigator.hardwareConcurrency || '?';
       perfInfo.textContent = `${cpus} cores | error: ${err}`;
