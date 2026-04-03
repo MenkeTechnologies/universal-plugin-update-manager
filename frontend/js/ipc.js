@@ -116,6 +116,7 @@ document.addEventListener('click', (e) => {
     case 'deleteAudioScanEntry': deleteAudioScanEntry(el.dataset.id); break;
     case 'sortAudio': sortAudio(el.dataset.key); break;
     case 'loadMoreAudio': loadMoreAudio(); break;
+    case 'loadMorePlugins': if (typeof loadMorePlugins === 'function') loadMorePlugins(); break;
     case 'toggleMetadata': toggleMetadata(el.dataset.path, e); break;
     case 'previewAudio': previewAudio(el.dataset.path); break;
     case 'toggleRowLoop': toggleRowLoop(el.dataset.path, e); break;

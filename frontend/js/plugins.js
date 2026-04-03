@@ -286,8 +286,14 @@ async function checkUpdates() {
   }, 400);
 }
 
+const PLUGIN_PAGE_SIZE = 200;
+let _pluginRenderCount = 0;
+let _renderedPlugins = [];
+
 function renderPlugins(plugins) {
   updateExportButton();
+  _renderedPlugins = plugins;
+  _pluginRenderCount = 0;
   const list = document.getElementById('pluginList');
 
   if (plugins.length === 0) {
@@ -295,13 +301,33 @@ function renderPlugins(plugins) {
     return;
   }
 
-  list.innerHTML = plugins.map(p => buildPluginCardHtml(p)).join('');
+  const batch = plugins.slice(0, PLUGIN_PAGE_SIZE);
+  list.innerHTML = batch.map(p => buildPluginCardHtml(p)).join('');
+  _pluginRenderCount = batch.length;
+
+  if (plugins.length > PLUGIN_PAGE_SIZE) {
+    list.insertAdjacentHTML('beforeend',
+      `<div class="plugin-load-more" id="pluginLoadMore" data-action="loadMorePlugins" style="text-align:center;padding:16px;color:var(--text-muted);cursor:pointer;font-size:12px;">
+        Showing ${_pluginRenderCount} of ${plugins.length} — click to load more
+      </div>`);
+  }
+
   list.classList.add('fade-in');
   if (typeof updatePluginDiskUsage === 'function') updatePluginDiskUsage();
-  if (typeof initDragReorder === 'function') {
-    initDragReorder(list, '.plugin-card', null, {
-      getKey: (el) => el.dataset.path || '',
-    });
+}
+
+function loadMorePlugins() {
+  const list = document.getElementById('pluginList');
+  const more = document.getElementById('pluginLoadMore');
+  if (more) more.remove();
+  const next = _renderedPlugins.slice(_pluginRenderCount, _pluginRenderCount + PLUGIN_PAGE_SIZE);
+  list.insertAdjacentHTML('beforeend', next.map(p => buildPluginCardHtml(p)).join(''));
+  _pluginRenderCount += next.length;
+  if (_pluginRenderCount < _renderedPlugins.length) {
+    list.insertAdjacentHTML('beforeend',
+      `<div class="plugin-load-more" id="pluginLoadMore" data-action="loadMorePlugins" style="text-align:center;padding:16px;color:var(--text-muted);cursor:pointer;font-size:12px;">
+        Showing ${_pluginRenderCount} of ${_renderedPlugins.length} — click to load more
+      </div>`);
   }
 }
 
