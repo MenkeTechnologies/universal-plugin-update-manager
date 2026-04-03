@@ -96,15 +96,32 @@ function renderShortcutSettings(filter) {
   const list = document.getElementById('shortcutsList');
   if (!list) return;
   const shortcuts = getShortcuts();
-  const q = (filter || '').toLowerCase();
-  const entries = Object.entries(shortcuts).filter(([id, sc]) => {
-    if (!q) return true;
-    return sc.label.toLowerCase().includes(q) || id.toLowerCase().includes(q) || formatKey(sc).toLowerCase().includes(q);
-  });
+  const q = (filter || '').trim();
+  let entries;
+  if (!q) {
+    entries = Object.entries(shortcuts).map(([id, sc]) => [id, sc, 0]);
+  } else if (typeof fzfMatch === 'function') {
+    entries = [];
+    for (const [id, sc] of Object.entries(shortcuts)) {
+      const labelMatch = fzfMatch(q, sc.label);
+      const keyMatch = fzfMatch(q, formatKey(sc));
+      const best = Math.max(labelMatch.score, keyMatch.score);
+      if (best > 0) entries.push([id, sc, best]);
+    }
+    entries.sort((a, b) => b[2] - a[2]);
+  } else {
+    const ql = q.toLowerCase();
+    entries = Object.entries(shortcuts)
+      .filter(([id, sc]) => sc.label.toLowerCase().includes(ql) || formatKey(sc).toLowerCase().includes(ql))
+      .map(([id, sc]) => [id, sc, 0]);
+  }
+  const hl = typeof highlightMatch === 'function' && q
+    ? (text) => highlightMatch(text, q, 'fuzzy')
+    : (text) => (typeof escapeHtml === 'function' ? escapeHtml(text) : text);
   list.innerHTML = entries.map(([id, sc]) =>
     `<div class="shortcut-row" data-sc-id="${id}">
-      <span class="shortcut-name">${sc.label}</span>
-      <span class="shortcut-key" data-shortcut-id="${id}" title="Click to rebind">${formatKey(sc)}</span>
+      <span class="shortcut-name">${hl(sc.label)}</span>
+      <span class="shortcut-key" data-shortcut-id="${id}" title="Click to rebind">${q ? hl(formatKey(sc)) : formatKey(sc)}</span>
     </div>`
   ).join('');
   if (!q && typeof initDragReorder === 'function') {
