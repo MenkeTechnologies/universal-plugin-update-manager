@@ -1923,32 +1923,39 @@ fn export_pdf(
     let col_count = headers.len();
     let usable_w = page_w.0 - margin_x * 2.0;
 
-    // Calculate column widths based on 90th percentile content length
+    // Cap at 10 000 rows to prevent OOM — printpdf holds all pages in memory
+    const MAX_PDF_ROWS: usize = 10_000;
+    let total_row_count = rows.len();
+    let capped = total_row_count > MAX_PDF_ROWS;
+    let export_rows = if capped { &rows[..MAX_PDF_ROWS] } else { &rows[..] };
+
+    // Calculate column widths by sampling up to 500 rows (avoids allocating len vectors for all rows)
     let col_widths: Vec<f32> = if col_count > 0 {
-        // Collect all cell lengths per column
-        let mut col_lens: Vec<Vec<usize>> = headers.iter().map(|h| vec![h.len()]).collect();
-        for row in &rows {
+        let sample_step = (export_rows.len() / 500).max(1);
+        let mut col_maxes: Vec<usize> = headers.iter().map(|h| h.len()).collect();
+        // Track sorted lengths for p90 via reservoir: just use max of sampled rows
+        let mut col_sums: Vec<usize> = vec![0; col_count];
+        let mut sample_count = 0_usize;
+        for (idx, row) in export_rows.iter().enumerate() {
+            if idx % sample_step != 0 { continue; }
+            sample_count += 1;
             for (i, cell) in row.iter().enumerate() {
-                if i < col_lens.len() {
-                    col_lens[i].push(cell.len());
+                if i < col_count {
+                    let l = cell.len().min(120);
+                    if l > col_maxes[i] { col_maxes[i] = l; }
+                    col_sums[i] += l;
                 }
             }
         }
-        // Use 90th percentile length (not max) to avoid outlier skew
-        let p90_lens: Vec<usize> = col_lens
-            .iter()
-            .map(|lens| {
-                let mut sorted = lens.clone();
-                sorted.sort();
-                let idx = (sorted.len() as f32 * 0.9).ceil() as usize;
-                sorted[idx.min(sorted.len() - 1)].min(120)
-            })
-            .collect();
-        // Ensure minimum representation for short columns (header len * 2)
-        let effective: Vec<usize> = p90_lens
+        // Use average * 1.3 (approximates p90 without sorting)
+        let effective: Vec<usize> = col_sums
             .iter()
             .enumerate()
-            .map(|(i, &l)| l.max(headers[i].len() * 2).max(6))
+            .map(|(i, &s)| {
+                let avg = if sample_count > 0 { s / sample_count } else { 6 };
+                let p90_approx = (avg as f32 * 1.3) as usize;
+                p90_approx.max(headers[i].len() * 2).max(6).min(col_maxes[i])
+            })
             .collect();
         let total_len: usize = effective.iter().sum::<usize>().max(1);
         let min_col = 12.0_f32;
@@ -1956,7 +1963,6 @@ fn export_pdf(
             .iter()
             .map(|&l| (l as f32 / total_len as f32 * usable_w).max(min_col))
             .collect();
-        // Normalize to fit usable_w exactly
         let sum: f32 = widths.iter().sum();
         let scale = usable_w / sum;
         for w in &mut widths {
@@ -2108,11 +2114,20 @@ fn export_pdf(
         // Subtitle (only on first page)
         if page == 1 {
             layer_ref.set_fill_color(rgb(0.55, 0.55, 0.55));
-            let sub = format!(
-                "{} items  |  Exported {}  |  by MenkeTechnologies",
-                rows.len(),
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-            );
+            let sub = if capped {
+                format!(
+                    "Showing {} of {} items (capped)  |  Exported {}  |  by MenkeTechnologies",
+                    export_rows.len(),
+                    total_row_count,
+                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+                )
+            } else {
+                format!(
+                    "{} items  |  Exported {}  |  by MenkeTechnologies",
+                    total_row_count,
+                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+                )
+            };
             layer_ref.use_text(&sub, 8.0, Mm(margin_x), Mm(*y), &font_italic);
             *y -= 6.0;
         }
@@ -2183,7 +2198,7 @@ fn export_pdf(
     y -= 1.0;
 
     // ── Data rows ──
-    for row in &rows {
+    for row in export_rows {
         if y < margin_bottom + 5.0 {
             render_footer(&layer!(), page_num);
             let (new_page, new_layer) = doc.add_page(page_w, page_h, "Layer 1");
@@ -2221,17 +2236,33 @@ fn export_pdf(
             };
             // At 7pt Helvetica, avg char width ~1.2mm
             let max_chars = (w / 1.2) as usize;
-            let text = if cell.len() > max_chars && max_chars > 3 {
-                format!("{}...", &cell[..max_chars - 3])
+            if cell.len() > max_chars && max_chars > 3 {
+                let truncated = format!("{}...", &cell[..max_chars - 3]);
+                layer!().use_text(&truncated, 7.0, Mm(x), Mm(y), &font);
             } else {
-                cell.clone()
-            };
-            layer!().use_text(&text, 7.0, Mm(x), Mm(y), &font);
+                layer!().use_text(cell, 7.0, Mm(x), Mm(y), &font);
+            }
             x += w;
         }
 
         y -= row_height;
         row_idx += 1;
+    }
+
+    // Capped notice
+    if capped {
+        y -= 3.0;
+        layer!().set_fill_color(rgb(0.85, 0.3, 0.15));
+        layer!().use_text(
+            &format!(
+                "Export capped at {} of {} rows. Use CSV/JSON for the full dataset.",
+                MAX_PDF_ROWS, total_row_count
+            ),
+            8.0,
+            Mm(margin_x),
+            Mm(y),
+            &font_bold,
+        );
     }
 
     // Final page footer
