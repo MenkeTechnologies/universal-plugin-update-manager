@@ -408,6 +408,7 @@ async fn check_updates(
     let kvr_cache = history::load_kvr_cache();
 
     let total = plugins.len();
+    append_log(format!("UPDATE CHECK — {} plugins", total));
     let _ = app.emit(
         "update-progress",
         serde_json::json!({
@@ -1383,6 +1384,14 @@ fn write_cache_file(name: String, data: serde_json::Value) -> Result<(), String>
 #[tauri::command]
 fn append_log(msg: String) {
     let path = history::ensure_data_dir().join("app.log");
+    // Rotate if > 5MB — rename to app.log.1, truncate
+    const MAX_LOG_SIZE: u64 = 5 * 1024 * 1024;
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > MAX_LOG_SIZE {
+            let backup = path.with_extension("log.1");
+            let _ = std::fs::rename(&path, &backup);
+        }
+    }
     let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let line = format!("[{}] {}\n", timestamp, msg);
     let _ = std::fs::OpenOptions::new()
@@ -1676,6 +1685,7 @@ fn plugins_to_export(plugins: &[PluginInfo]) -> Vec<ExportPlugin> {
 
 #[tauri::command]
 fn export_plugins_json(plugins: Vec<PluginInfo>, file_path: String) -> Result<(), String> {
+    append_log(format!("EXPORT — {} plugins → {}", plugins.len(), file_path));
     let payload = ExportPayload {
         version: env!("CARGO_PKG_VERSION").into(),
         exported_at: chrono::Utc::now().to_rfc3339(),
@@ -1687,6 +1697,7 @@ fn export_plugins_json(plugins: Vec<PluginInfo>, file_path: String) -> Result<()
 
 #[tauri::command]
 fn export_plugins_csv(plugins: Vec<PluginInfo>, file_path: String) -> Result<(), String> {
+    append_log(format!("EXPORT — {} plugins → {}", plugins.len(), file_path));
     let sep = detect_separator(&file_path);
     let mut out = format!(
         "Name{s}Type{s}Version{s}Manufacturer{s}Manufacturer URL{s}Path{s}Size{s}Modified\n",
@@ -1804,6 +1815,7 @@ fn export_daw_dsv(projects: Vec<history::DawProject>, file_path: String) -> Resu
 
 #[tauri::command]
 fn import_plugins_json(file_path: String) -> Result<Vec<PluginInfo>, String> {
+    append_log(format!("IMPORT — plugins ← {}", file_path));
     let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
     let payload: ExportPayload = serde_json::from_str(&data).map_err(|e| e.to_string())?;
     Ok(payload
@@ -3019,6 +3031,36 @@ mod tests {
     /// Serialize tests that read/write `app.log` (parallel test runs would race otherwise).
     static APP_LOG_TEST_LOCK: Mutex<()> = Mutex::new(());
 
+    fn app_log_lock() -> std::sync::MutexGuard<'static, ()> {
+        APP_LOG_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Isolated temp data dir for log tests; cleared on drop.
+    struct LogTestGuard(std::path::PathBuf);
+    impl Drop for LogTestGuard {
+        fn drop(&mut self) {
+            history::clear_test_data_dir_path();
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn log_test_dir() -> LogTestGuard {
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_log_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        history::set_test_data_dir_path(tmp.clone());
+        LogTestGuard(tmp)
+    }
+
     fn make_plugin(name: &str, plugin_type: &str) -> PluginInfo {
         PluginInfo {
             name: name.into(),
@@ -3669,8 +3711,8 @@ mod tests {
 
     #[test]
     fn test_append_and_read_log() {
-        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
-        let _ = std::fs::create_dir_all(history::get_data_dir());
+        let _guard = app_log_lock();
+        let _tmp = log_test_dir();
         clear_log().unwrap();
         let token = format!(
             "log-test-{}",
@@ -3696,8 +3738,9 @@ mod tests {
 
     #[test]
     fn test_clear_log() {
-        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
-        let _ = std::fs::create_dir_all(history::get_data_dir());
+        let _guard = app_log_lock();
+        let _tmp = log_test_dir();
+        clear_log().unwrap();
         append_log("before clear".into());
         clear_log().unwrap();
         let log = read_log().unwrap();
@@ -3706,28 +3749,16 @@ mod tests {
 
     #[test]
     fn test_read_log_missing_file_returns_empty() {
-        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
-        let tmp = std::env::temp_dir().join(format!(
-            "ah_read_log_missing_{}_{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
-        let _ = fs::remove_dir_all(&tmp);
-        fs::create_dir_all(&tmp).unwrap();
-        history::set_test_data_dir_path(tmp.clone());
-        let _ = fs::remove_file(tmp.join("app.log"));
+        let _guard = app_log_lock();
+        let tmp = log_test_dir();
+        let _ = fs::remove_file(tmp.0.join("app.log"));
         assert_eq!(read_log().unwrap(), "");
-        history::clear_test_data_dir_path();
-        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]
     fn test_log_entries_have_timestamp() {
-        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
-        let _ = std::fs::create_dir_all(history::get_data_dir());
+        let _guard = app_log_lock();
+        let _tmp = log_test_dir();
         clear_log().unwrap();
         append_log("timestamp-check".into());
         let log = read_log().unwrap();
@@ -3738,8 +3769,8 @@ mod tests {
 
     #[test]
     fn test_log_appends_not_overwrites() {
-        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
-        let _ = std::fs::create_dir_all(history::get_data_dir());
+        let _guard = app_log_lock();
+        let _tmp = log_test_dir();
         clear_log().unwrap();
         append_log("first".into());
         append_log("second".into());
@@ -3759,8 +3790,8 @@ mod tests {
 
     #[test]
     fn test_log_handles_special_characters() {
-        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
-        let _ = std::fs::create_dir_all(history::get_data_dir());
+        let _guard = app_log_lock();
+        let _tmp = log_test_dir();
         clear_log().unwrap();
         append_log("unicode: 日本語テスト 🎵 emoji".into());
         append_log("newlines: line1\nline2".into());
@@ -3773,15 +3804,22 @@ mod tests {
 
     #[test]
     fn test_log_concurrent_appends() {
-        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
-        let _ = std::fs::create_dir_all(history::get_data_dir());
+        let _guard = app_log_lock();
+        let tmp = log_test_dir();
         clear_log().unwrap();
-        let handles: Vec<_> = (0..10).map(|i| {
-            std::thread::spawn(move || {
-                append_log(format!("concurrent-{i}"));
+        let path = tmp.0.clone();
+        let handles: Vec<_> = (0..10)
+            .map(|i| {
+                let path = path.clone();
+                std::thread::spawn(move || {
+                    history::set_test_data_dir_path(path);
+                    append_log(format!("concurrent-{i}"));
+                })
             })
-        }).collect();
-        for h in handles { h.join().unwrap(); }
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
         let log = read_log().unwrap();
         for i in 0..10 {
             assert!(log.contains(&format!("concurrent-{i}")), "missing concurrent-{i}");
@@ -3790,8 +3828,9 @@ mod tests {
 
     #[test]
     fn test_clear_log_then_append_works() {
-        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
-        let _ = std::fs::create_dir_all(history::get_data_dir());
+        let _guard = app_log_lock();
+        let _tmp = log_test_dir();
+        clear_log().unwrap();
         append_log("before".into());
         clear_log().unwrap();
         append_log("after".into());
