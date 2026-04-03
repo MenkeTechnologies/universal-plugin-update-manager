@@ -327,7 +327,7 @@
       </div>
       <div class="feature-card">
         <h3><span class="icon">&#9889;</span> Plugin Cross-Reference</h3>
-        <p>Parses Ableton (.als) and REAPER (.rpp) projects to extract plugin references. See which plugins each project uses, or find which projects use a given plugin.</p>
+        <p>Extracts plugin references from 11 DAW formats: Ableton, REAPER, Bitwig, FL Studio (UTF-16LE), Logic Pro (plist + AU matching), Cubase (Plugin Name markers), Studio One, DAWproject, Pro Tools, Reason. Detects VST2/VST3/AU/CLAP/AAX.</p>
       </div>
       <div class="feature-card">
         <h3><span class="icon">&#128278;</span> Directory Bookmarks</h3>
@@ -386,8 +386,8 @@
         <p>Slide-in notifications for actions like opening DAW projects, revealing files, bookmarking directories, and export confirmations.</p>
       </div>
       <div class="feature-card">
-        <h3><span class="icon">&#128190;</span> KVR Cache & Auto-Restore</h3>
-        <p>Resolved KVR data persisted to kvr-cache.json. Last scan results + cache auto-load on startup — no re-scanning needed. Background resolver resumes from where it left off.</p>
+        <h3><span class="icon">&#128190;</span> SQLite Backend</h3>
+        <p>All data in a single audio_haxor.db SQLite database (WAL mode, 64MB cache). 13 tables. Paginated queries for 6M+ samples without OOM. Per-cache clear buttons in Settings.</p>
       </div>
       <div class="feature-card">
         <h3><span class="icon">&#128187;</span> Architecture Detection</h3>
@@ -398,8 +398,8 @@
         <p>Visual plugin dependency map with Most Used, By Project (drill-down), and Orphaned tabs. Search, bar charts, and context menus on all rows.</p>
       </div>
       <div class="feature-card">
-        <h3><span class="icon">&#128196;</span> ALS XML Viewer</h3>
-        <p>Right-click any Ableton .als file to decompress and view raw XML. fzf search with highlighted matches and line numbers. Export to .xml.</p>
+        <h3><span class="icon">&#128196;</span> Project Viewer</h3>
+        <p>Right-click any DAW project to explore contents. XML formats (ALS, Studio One, DAWproject) show collapsible XML tree. Binary formats (FLP, Logic, Cubase, Pro Tools, Reason, Bitwig) show extracted metadata tree. Search and collapse/expand all.</p>
       </div>
       <div class="feature-card">
         <h3><span class="icon">&#127925;</span> Song Search</h3>
@@ -427,7 +427,59 @@
       </div>
       <div class="feature-card">
         <h3><span class="icon">&#9000;</span> Full Vim</h3>
-        <p>38 customizable keybindings. j/k, gg/G, Ctrl+D/U, /search, o reveal, y yank, p play, x fav, v select. All rebindable in Settings.</p>
+        <p>49 customizable keybindings. j/k, gg/G, Ctrl+D/U, /search, o reveal, y yank, p play, x fav, v select. All rebindable in Settings. fzf filter on keybindings pane.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#127926;</span> Musical Key Detection</h3>
+        <p>Detects musical key (C Major, F# Minor, etc.) via Goertzel algorithm chromagram across 7 octaves. Krumhansl-Kessler profile matching. Shown in table column, metadata panel, and player.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128266;</span> LUFS Loudness</h3>
+        <p>Integrated loudness measurement per sample. LUFS column in sample table with orange warning for abnormally quiet files (&lt;-25 LUFS). Background analysis alongside BPM/Key.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#127916;</span> Visualizer Tab</h3>
+        <p>6 real-time audio displays: FFT spectrum, oscilloscope, scrolling spectrogram, true stereo Lissajous, peak/RMS levels, 10-band analyzer. Grid or single mode. 30fps throttle. Fullscreen. Context menus per tile.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128202;</span> Heatmap Dashboard</h3>
+        <p>Full-screen analytics: format distribution, size histogram, top folders, BPM histogram, key distribution, activity timeline, plugin types, DAW formats. 8 cards, all draggable.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#127926;</span> Smart Playlists</h3>
+        <p>Rule-based auto-playlists: 10 rule types (format, BPM range, tag, favorite, key, name/path, size). AND/OR modes. 6 built-in presets. Drag to reorder.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128065;</span> Walker Status Tab</h3>
+        <p>4-tile live view of scanner threads showing directory paths being walked. Thread count, buffer status. Auto-starts on tab switch, stops after idle.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128270;</span> Audio Similarity</h3>
+        <p>Spectral fingerprinting: RMS energy, spectral centroid, zero-crossing rate, 3-band energy, attack time. Parallel computation via rayon. Floating results panel.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128229;</span> Folder Watch</h3>
+        <p>Watch scan directories for new/changed files via native OS events (FSEvents, inotify, ReadDirectoryChangesW). 2-second debounce. Auto-triggers targeted re-scan per file type.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#127760;</span> Cross-Platform</h3>
+        <p>Fully portable: macOS, Linux, Windows. Process stats via sysinfo crate. File watcher uses native OS events. Scanner directories auto-detected per platform.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128196;</span> PDF with Icon</h3>
+        <p>All PDF exports embed the app icon at top-left of every page header. A4 landscape, auto-sized columns, 10K row cap with CSV/JSON fallback notice.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128161;</span> Neon Glow Toggle</h3>
+        <p>Animated pulsing neon borders on all modals, panels, tiles. Staggered wave effects. Toggle on/off in Settings → Appearance. Per-element animation delays.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#9881;</span> System Info</h3>
+        <p>7-section dashboard: OS/arch/hostname, process stats (PID, RSS, threads, FDs), thread pools, scanner state, scan results, database table counts, storage.</p>
+      </div>
+      <div class="feature-card">
+        <h3><span class="icon">&#128203;</span> 354 Tests</h3>
+        <p>Comprehensive Rust test suite across 16 modules. SQLite roundtrips, parser verification, filesystem watcher, audio analysis, export/import, BPM/key/LUFS.</p>
       </div>
     </div>
   </div>
@@ -966,7 +1018,7 @@
     <div class="feature-grid">
       <div class="feature-card">
         <h3>Rust Backend</h3>
-        <p>All scanning, version checking, and file operations run in Rust. Plugin scanning uses Rayon for parallel directory traversal. KVR scraping uses async Tokio tasks with rate limiting. History and preferences persisted as JSON on disk.</p>
+        <p>16 modules. All scanning, analysis, and file operations in Rust. Rayon thread pools for parallel traversal. SQLite for all persistence (WAL mode, 64MB cache). Symphonia for audio decoding. Cross-platform via sysinfo + notify crates.</p>
       </div>
       <div class="feature-card">
         <h3>Tauri v2 Bridge</h3>
@@ -978,7 +1030,7 @@
       </div>
       <div class="feature-card">
         <h3>Testing</h3>
-        <p>217 Rust tests (lib, history, KVR, scanner, DAW, audio, bpm, xref, presets) + 207 JavaScript tests (UI helpers, version parsing, type mapping). 424 total. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
+        <p>354 Rust tests across 16 modules + 265 JavaScript tests. 619 total. SQLite roundtrips, parser verification, filesystem watcher, audio analysis. Criterion benchmarks for hot paths. CI via GitHub Actions.</p>
       </div>
     </div>
     <pre style="margin-top: 32px;">
@@ -990,11 +1042,16 @@ src-tauri/src/
   audio_scanner.rs   -- Audio sample discovery + metadata extraction
   daw_scanner.rs     -- DAW project scanner (14+ formats)
   preset_scanner.rs  -- Plugin preset discovery
-  xref.rs            -- Plugin ↔ DAW cross-reference engine
+  xref.rs            -- Plugin ↔ DAW cross-reference engine (11 formats)
+  db.rs              -- SQLite database layer (paginated, 6M+ scale)
+  file_watcher.rs    -- Filesystem watcher (FSEvents/inotify/ReadDirectoryChangesW)
+  key_detect.rs      -- Musical key detection via Goertzel chromagram
+  lufs.rs            -- LUFS loudness measurement
+  similarity.rs      -- Audio similarity via spectral fingerprinting
   history.rs         -- Scan history persistence + diff engine
   kvr.rs             -- KVR Audio scraper + version checker
 
-frontend/js/  (26 modules)
+frontend/js/  (28 modules)
   app.js             -- Startup, auto-load, preferences
   audio.js           -- Sample scanning, playback, visualizer, player dock
   batch-select.js    -- Checkbox selection + batch operations
