@@ -1461,8 +1461,23 @@ function initSettingsSectionDrag() {
     const target = el?.closest('.settings-section');
 
     container.querySelectorAll('.settings-section').forEach(s => s.classList.remove('section-drag-over'));
+    // Show destination box at drop position
     if (target && target !== dragged) {
       target.classList.add('section-drag-over');
+      if (!placeholder) {
+        placeholder = document.createElement('div');
+        placeholder.className = 'section-placeholder';
+        placeholder.style.height = dragged._dragH + 'px';
+      }
+      const targetRect = target.getBoundingClientRect();
+      const midY = targetRect.top + targetRect.height / 2;
+      if (e.clientY < midY) {
+        if (placeholder.nextSibling !== target) container.insertBefore(placeholder, target);
+      } else {
+        if (target.nextSibling !== placeholder) container.insertBefore(placeholder, target.nextSibling);
+      }
+    } else if (placeholder && placeholder.parentNode) {
+      placeholder.remove();
     }
   });
 
@@ -1473,24 +1488,12 @@ function initSettingsSectionDrag() {
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
 
-      // Find drop target under cursor
-      if (ghost) ghost.style.display = 'none';
-      const dropEl = document.elementFromPoint(e.clientX, e.clientY);
-      if (ghost) ghost.style.display = '';
-      const dropTarget = dropEl?.closest('.settings-section');
-
-      // Insert before/after drop target
-      if (dropTarget && dropTarget !== dragged) {
-        const dropRect = dropTarget.getBoundingClientRect();
-        const midY = dropRect.top + dropRect.height / 2;
-        if (e.clientY < midY) {
-          container.insertBefore(dragged, dropTarget);
-        } else if (dropTarget.nextSibling) {
-          container.insertBefore(dragged, dropTarget.nextSibling);
-        } else {
-          container.appendChild(dragged);
-        }
+      // Insert at placeholder position
+      if (placeholder && placeholder.parentNode) {
+        container.insertBefore(dragged, placeholder);
+        placeholder.remove();
       }
+      placeholder = null;
       dragged.style.display = '';
       if (ghost) { ghost.remove(); ghost = null; }
       saveSettingsSectionOrder();
