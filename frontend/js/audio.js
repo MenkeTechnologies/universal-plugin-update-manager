@@ -7,6 +7,7 @@ let audioCurrentOffset = 0; // pagination offset
 let audioSortKey = 'name';
 let audioSortAsc = true;
 let audioScanProgressCleanup = null;
+let _midiScanCount = 0;
 
 // Playback state
 let audioPlayer = new Audio();
@@ -594,6 +595,7 @@ async function scanAudioSamples(resume = false) {
   let firstAudioBatch = true;
   let pendingSamples = [];
   let pendingFound = 0;
+  _midiScanCount = 0;
   let flushScheduled = false;
   const audioEta = createETA();
   audioEta.start();
@@ -665,8 +667,14 @@ async function scanAudioSamples(resume = false) {
     } else if (data.phase === 'scanning') {
       pendingSamples.push(...data.samples);
       pendingFound = data.found;
-      // Immediately update header counter
-      document.getElementById('sampleCount').textContent = pendingFound;
+      // Split count: audio vs MIDI
+      const midiFormats = new Set(['MID', 'MIDI']);
+      const midiInBatch = data.samples ? data.samples.filter(s => midiFormats.has(s.format)).length : 0;
+      _midiScanCount = (_midiScanCount || 0) + midiInBatch;
+      const audioOnly = pendingFound - (_midiScanCount || 0);
+      document.getElementById('sampleCount').textContent = audioOnly;
+      const midiEl = document.getElementById('midiScanCount');
+      if (midiEl) midiEl.textContent = _midiScanCount || 0;
       scheduleFlush();
     }
   });
