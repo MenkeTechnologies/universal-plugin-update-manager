@@ -1460,7 +1460,7 @@ function initSettingsSectionDrag() {
     ghost.style.pointerEvents = '';
     const target = el?.closest('.settings-section');
 
-    // Highlight drop target — no DOM insertion (causes column reflow flicker)
+    // Show fixed-position destination box over target (no DOM insertion = no column reflow)
     if (target && target !== dragged) {
       const targetRect = target.getBoundingClientRect();
       const before = e.clientY < targetRect.top + targetRect.height / 2;
@@ -1469,18 +1469,24 @@ function initSettingsSectionDrag() {
         container._lastDropKey = dropKey;
         container._dropTarget = target;
         container._dropBefore = before;
-        container.querySelectorAll('.settings-section').forEach(s => {
-          s.classList.remove('section-drag-over-top', 'section-drag-over-bottom');
-        });
-        target.classList.add(before ? 'section-drag-over-top' : 'section-drag-over-bottom');
+        if (!placeholder) {
+          placeholder = document.createElement('div');
+          placeholder.className = 'section-drop-indicator';
+          document.body.appendChild(placeholder);
+        }
+        placeholder.style.left = targetRect.left + 'px';
+        placeholder.style.width = targetRect.width + 'px';
+        if (before) {
+          placeholder.style.top = (targetRect.top - 6) + 'px';
+        } else {
+          placeholder.style.top = (targetRect.bottom + 2) + 'px';
+        }
       }
     } else {
       if (container._lastDropKey) {
         container._lastDropKey = null;
         container._dropTarget = null;
-        container.querySelectorAll('.settings-section').forEach(s => {
-          s.classList.remove('section-drag-over-top', 'section-drag-over-bottom');
-        });
+        if (placeholder) { placeholder.remove(); placeholder = null; }
       }
     }
   });
@@ -1488,9 +1494,7 @@ function initSettingsSectionDrag() {
   document.addEventListener('mouseup', (e) => {
     if (!dragged) return;
     if (isDragging) {
-      container.querySelectorAll('.settings-section').forEach(s => {
-        s.classList.remove('section-drag-over-top', 'section-drag-over-bottom');
-      });
+      if (placeholder) { placeholder.remove(); placeholder = null; }
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
 
