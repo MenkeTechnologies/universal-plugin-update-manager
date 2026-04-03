@@ -3,9 +3,6 @@ src-tauri/target/
 dist/
 node_modules/
 
-# Lock files
-src-tauri/Cargo.lock
-
 # macOS
 .DS_Store
 
