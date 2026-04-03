@@ -323,6 +323,27 @@ document.addEventListener('contextmenu', (e) => {
       ...(typeof showProjectViewer === 'function'
         ? [{ icon: '&#128196;', label: 'Explore Project Contents', action: () => showProjectViewer(path, name) }]
         : []),
+      { icon: '&#128221;', label: 'Open in Text Editor', action: () => {
+        const ext = path.split('.').pop().toLowerCase();
+        const xmlFormats = ['als', 'rpp', 'song', 'dawproject'];
+        if (xmlFormats.includes(ext)) {
+          // Decompress ALS first, others open directly
+          if (ext === 'als') {
+            window.vstUpdater.readAlsXml(path).then(xml => {
+              const tmp = path.replace(/\.als$/i, '_decompressed.xml');
+              window.vstUpdater.writeTextFile(tmp, xml).then(() => {
+                window.vstUpdater.openWithApp(tmp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
+                showToast('Decompressed XML opened in TextEdit');
+              });
+            }).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
+          } else {
+            window.vstUpdater.openWithApp(path, 'TextEdit').catch(() => window.vstUpdater.openDawProject(path).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }));
+          }
+        } else {
+          // Binary — open with hex editor or default
+          window.vstUpdater.openDawProject(path).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
+        }
+      }},
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
       { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
