@@ -69,9 +69,13 @@
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
+  window.initModalDragResize = initModalDragResize;
   function initModalDragResize(modal) {
     modal._dragInit = true;
-    modal.style.position = 'relative';
+    // Don't override position for elements already using fixed positioning (like audio player)
+    if (getComputedStyle(modal).position !== 'fixed') {
+      modal.style.position = 'relative';
+    }
 
     // Add resize handles
     const edges = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
@@ -90,7 +94,7 @@
     if (header) {
       header.style.cursor = 'move';
       header.addEventListener('mousedown', (e) => {
-        if (e.target.closest('.modal-close')) return;
+        if (e.target.closest('.modal-close, button, input, select')) return;
         if (e.button !== 0) return;
         e.preventDefault();
         const rect = modal.getBoundingClientRect();

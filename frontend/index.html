@@ -3622,6 +3622,8 @@
       border-bottom: 1px solid var(--border);
       cursor: grab;
     }
+    /* Override modal-header padding when used on player toolbar */
+    .np-toolbar.modal-header { padding: 6px 12px; }
     .np-toolbar:active { cursor: grabbing; }
     .audio-now-playing.expanded .np-drag-handle {
       display: none;
@@ -4541,16 +4543,8 @@
     <div class="dock-zone" id="dockBR" style="bottom:4px;right:4px;width:calc(50% - 6px);height:calc(50% - 6px);">BOTTOM RIGHT &#8600;</div>
   </div>
   <div class="audio-now-playing dock-br" id="audioNowPlaying">
-    <div class="np-resize np-resize-tl" data-resize="tl"></div>
-    <div class="np-resize np-resize-tr" data-resize="tr"></div>
-    <div class="np-resize np-resize-bl" data-resize="bl"></div>
-    <div class="np-resize np-resize-br" data-resize="br"></div>
-    <div class="np-resize np-resize-t" data-resize="t"></div>
-    <div class="np-resize np-resize-b" data-resize="b"></div>
-    <div class="np-resize np-resize-l" data-resize="l"></div>
-    <div class="np-resize np-resize-r" data-resize="r"></div>
     <div class="np-drag-handle" id="npDragHandle"><span class="np-drag-dots"></span></div>
-    <div class="np-toolbar">
+    <div class="np-toolbar modal-header">
       <span class="np-toolbar-title">&#9835; Audio Player</span>
       <div class="np-toolbar-actions">
         <button class="np-toolbar-btn" data-action="collapsePlayer" title="Minimize">&#9866;</button>
