@@ -88,7 +88,7 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#127908;', label: 'Open in Audacity', action: () => typeof openWithApp === 'function' && openWithApp(path, 'Audacity') },
       '---',
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); typeof loadDirectory === 'function' && loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
       { icon: '&#127925;', label: 'Show in Samples Tab', action: () => {
         switchTab('samples');
         setTimeout(() => {
@@ -152,7 +152,7 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#8634;', label: 'Loop', action: () => typeof toggleRowLoop === 'function' && toggleRowLoop(path, new MouseEvent('click')) },
       '---',
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); typeof loadDirectory === 'function' && loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
       '---',
       { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
       { icon: '&#128270;', label: 'Find Similar to This', action: () => { typeof closeSimilarPanel === 'function' && closeSimilarPanel(); typeof findSimilarSamples === 'function' && findSimilarSamples(path); } },
@@ -202,7 +202,7 @@ document.addEventListener('contextmenu', (e) => {
       items.push({ icon: '&#127760;', label: 'Open Manufacturer Site', action: () => openUpdate(mfgBtn.dataset.url) });
     }
     items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => folderBtn && openFolder(folderBtn.dataset.path) });
-    items.push({ icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } });
+    items.push({ icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } });
     items.push('---');
     items.push({ icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) });
     items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) });
@@ -243,7 +243,7 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#9889;', label: 'Open in Default App', action: () => window.vstUpdater.openDawProject(path).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }) },
       '---',
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => openAudioFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
       { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
@@ -293,7 +293,7 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#9889;', label: 'Open with Default App', action: () => window.vstUpdater.openDawProject(path).catch(e => showToast('No MIDI handler: ' + e, 4000, 'error')) },
       '---',
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => typeof copyToClipboard === 'function' && copyToClipboard(name) },
       { icon: '&#128203;', label: 'Copy Path', action: () => typeof copyToClipboard === 'function' && copyToClipboard(path) },
@@ -316,7 +316,7 @@ document.addEventListener('contextmenu', (e) => {
     const items = [
       { icon: '&#9654;', label: `Open in ${dawName}`, action: () => { showToast(`Opening "${name}" in ${dawName}...`); window.vstUpdater.openDawProject(path).catch(err => showToast(`${dawName} not installed — ${err}`, 4000, 'error')); } },
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => openDawFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       ...(typeof isXrefSupported === 'function' && isXrefSupported(dawRow.querySelector('.format-badge.format-default')?.textContent || '')
         ? [{ icon: '&#9889;', label: 'Show Plugins Used', action: () => showProjectPlugins(path, name) }]
         : []),
@@ -364,7 +364,7 @@ document.addEventListener('contextmenu', (e) => {
     const name = presetRow.querySelector('td')?.textContent || '';
     const items = [
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => openPresetFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
       { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
@@ -601,7 +601,7 @@ document.addEventListener('contextmenu', (e) => {
       else if (type === 'preset') openPresetFolder(path);
       else openFolder(path);
     }});
-    items.push({ icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } });
+    items.push({ icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } });
     items.push('---');
     items.push({ icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) });
     items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) });
@@ -623,7 +623,7 @@ document.addEventListener('contextmenu', (e) => {
     const items = [
       { icon: '&#128221;', label: 'Edit Note', action: () => showNoteEditor(path, name) },
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => openFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
       { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
@@ -661,7 +661,7 @@ document.addEventListener('contextmenu', (e) => {
     const items = [
       { icon: '&#128221;', label: 'Edit Note', action: () => { if (editBtn) editBtn.click(); else if (typeof showNoteEditor === 'function') showNoteEditor(path, name); } },
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => openFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
       { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
