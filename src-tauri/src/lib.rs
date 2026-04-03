@@ -4022,6 +4022,15 @@ pub fn run() {
     // Initialize app start time for uptime tracking
     APP_START.get_or_init(Instant::now);
 
+    // Log startup
+    append_log(format!(
+        "APP START — v{} | {} | {} cores | pid {}",
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+        num_cpus::get(),
+        std::process::id(),
+    ));
+
     // Load preferences once for all startup config
     let prefs = history::load_preferences();
 
@@ -4791,6 +4800,12 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                let uptime = APP_START.get().map(|s| s.elapsed().as_secs()).unwrap_or(0);
+                append_log(format!("APP SHUTDOWN — uptime {}m {}s", uptime / 60, uptime % 60));
+            }
+        });
 }
