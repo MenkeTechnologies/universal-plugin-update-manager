@@ -268,7 +268,9 @@ async fn scan_plugins(
             .num_threads(num_cpus::get().max(4))
             .build()
             .unwrap_or_else(|e| {
-                eprintln!("Thread pool creation failed ({e}), retrying with 2 threads");
+                let msg = format!("Thread pool creation failed ({e}), retrying with 2 threads");
+                eprintln!("{msg}");
+                append_log(msg);
                 rayon::ThreadPoolBuilder::new()
                     .num_threads(2)
                     .build()
@@ -3993,7 +3995,9 @@ pub fn run() {
         .num_threads(pool_size)
         .stack_size(8 * 1024 * 1024)
         .panic_handler(|panic_info| {
-            eprintln!("Rayon thread panicked: {:?}", panic_info);
+            let msg = format!("Rayon thread panicked: {:?}", panic_info);
+            eprintln!("{msg}");
+            append_log(msg);
         })
         .build_global()
         .ok();
