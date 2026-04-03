@@ -23,6 +23,7 @@ function collectPaletteItems() {
     { type: 'tab', name: 'Files', icon: '&#128193;', action: () => switchTab('files') },
     { type: 'tab', name: 'Visualizer', icon: '&#127911;', action: () => switchTab('visualizer') },
     { type: 'tab', name: 'Walkers', icon: '&#128270;', action: () => switchTab('walkers') },
+    { type: 'tab', name: 'MIDI', icon: '&#127924;', action: () => switchTab('midi') },
     { type: 'tab', name: 'Settings', icon: '&#9881;', action: () => switchTab('settings') },
   ];
   items.push(...tabs);
@@ -82,6 +83,12 @@ function collectPaletteItems() {
   }
   items.push({ type: 'action', name: 'Scan All', icon: '&#9889;', action: () => typeof scanAll === 'function' && scanAll() });
   items.push({ type: 'action', name: 'Stop All Scans', icon: '&#9632;', action: () => typeof stopAll === 'function' && stopAll() });
+  items.push({ type: 'action', name: 'Export Current Tab', icon: '&#8615;', action: () => typeof _exportCurrentTab === 'function' && _exportCurrentTab() });
+  items.push({ type: 'action', name: 'Import to Current Tab', icon: '&#8613;', action: () => typeof _importCurrentTab === 'function' && _importCurrentTab() });
+  items.push({ type: 'action', name: 'Help / Keyboard Shortcuts', icon: '&#10068;', action: () => typeof toggleHelpOverlay === 'function' && toggleHelpOverlay() });
+  items.push({ type: 'action', name: 'Open Log File', icon: '&#128196;', action: () => window.vstUpdater.getPrefsPath().then(p => { const lp = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(lp, 'TextEdit').catch(() => {}); }) });
+  items.push({ type: 'action', name: 'Open Preferences File', icon: '&#128196;', action: () => typeof window.vstUpdater.openPrefsFile === 'function' && window.vstUpdater.openPrefsFile() });
+  items.push({ type: 'action', name: 'Focus Search', icon: '&#128269;', action: () => { const tab = document.querySelector('.tab-content.active'); const input = tab?.querySelector('input[type="text"]'); if (input) { input.focus(); input.select(); } } });
 
   // Player controls
   if (typeof toggleAudioPlayback === 'function') {
