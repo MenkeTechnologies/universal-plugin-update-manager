@@ -1450,8 +1450,9 @@ function initSettingsSectionDrag() {
       ghost.style.top = (e.clientY - offsetY) + 'px';
       document.body.appendChild(ghost);
 
-      // Hide original
-      dragged.style.display = 'none';
+      // Hide original — use visibility to keep it in column flow (display:none causes reflow collapse)
+      dragged.style.visibility = 'hidden';
+      dragged.style.opacity = '0';
     }
     if (!isDragging || !ghost) return;
 
@@ -1491,6 +1492,8 @@ function initSettingsSectionDrag() {
         placeholder.parentNode.insertBefore(dragged, placeholder);
         placeholder.remove();
       }
+      dragged.style.visibility = '';
+      dragged.style.opacity = '';
       dragged.style.display = '';
       if (ghost) { ghost.remove(); ghost = null; }
       placeholder = null;
