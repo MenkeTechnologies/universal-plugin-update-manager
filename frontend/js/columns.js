@@ -60,15 +60,20 @@ function initColumnResize(table) {
   });
 }
 
+// Column layout version — bump when columns change to discard stale saved widths
+const COL_LAYOUT_VERSION = 2;
+
 function saveColumnWidths(tableId) {
   const table = document.getElementById(tableId);
   if (!table) return;
   const tableWidth = table.offsetWidth;
   if (tableWidth <= 0) return;
-  const pcts = Array.from(table.querySelectorAll('thead th')).map(th => +(th.offsetWidth / tableWidth * 100).toFixed(2));
+  const ths = Array.from(table.querySelectorAll('thead th'));
+  const keys = ths.map(th => th.dataset?.key || th.className || '');
+  const pcts = ths.map(th => +(th.offsetWidth / tableWidth * 100).toFixed(2));
   try {
     const allWidths = prefs.getObject('columnWidths', {});
-    allWidths[tableId] = pcts;
+    allWidths[tableId] = { v: COL_LAYOUT_VERSION, keys, pcts };
     prefs.setItem('columnWidths', allWidths);
   } catch {}
 }
@@ -76,6 +81,12 @@ function saveColumnWidths(tableId) {
 function loadColumnWidths(tableId) {
   try {
     const allWidths = prefs.getObject('columnWidths', {});
-    return allWidths[tableId] || null;
+    const entry = allWidths[tableId];
+    if (!entry) return null;
+    // Support old format (plain array) — discard it
+    if (Array.isArray(entry)) return null;
+    // Version mismatch — discard
+    if (entry.v !== COL_LAYOUT_VERSION) return null;
+    return entry.pcts || null;
   } catch { return null; }
 }
