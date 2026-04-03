@@ -2,6 +2,10 @@
 /**
  * Run all `test/*.test.js` files via `node --test` without shell glob expansion
  * (Windows `cmd` / PowerShell do not expand `test/*.test.js` the same as bash).
+ *
+ * Spawns in batches: the full argv list (~8.4k chars for 295 files) exceeds
+ * Windows CreateProcess command-line limit (~8191), so CI would fail on
+ * windows-latest without chunking.
  */
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
@@ -12,8 +16,17 @@ const files = readdirSync('test', { withFileTypes: true })
   .map((d) => join('test', d.name))
   .sort();
 
-const r = spawnSync(process.execPath, ['--test', ...files], {
-  stdio: 'inherit',
-  shell: false,
-});
-process.exit(r.status === null ? 1 : r.status);
+/** Stay well under Windows ~8191 char limit for the full command line. */
+const BATCH_SIZE = 28;
+
+for (let i = 0; i < files.length; i += BATCH_SIZE) {
+  const batch = files.slice(i, i + BATCH_SIZE);
+  const r = spawnSync(process.execPath, ['--test', ...batch], {
+    stdio: 'inherit',
+    shell: false,
+  });
+  const code = r.status === null ? 1 : r.status;
+  if (code !== 0) {
+    process.exit(code);
+  }
+}

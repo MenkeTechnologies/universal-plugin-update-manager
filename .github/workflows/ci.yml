@@ -44,8 +44,11 @@ jobs:
       - name: Run JS tests
         run: node scripts/run-js-tests.mjs
 
-      - name: Run Rust tests
+      - name: Run Rust tests (library)
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+      - name: Run Rust tests (behavioral_ultra integration)
+        run: cargo test --manifest-path src-tauri/Cargo.toml --test behavioral_ultra
 
   build:
     needs: test

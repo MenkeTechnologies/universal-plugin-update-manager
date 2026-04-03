@@ -7,7 +7,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:ci": "tauri build --ci --no-sign",
-    "test": "node scripts/run-js-tests.mjs && cargo test --manifest-path src-tauri/Cargo.toml --lib",
+    "test": "node scripts/run-js-tests.mjs && cargo test --manifest-path src-tauri/Cargo.toml --lib && cargo test --manifest-path src-tauri/Cargo.toml --test behavioral_ultra",
     "test:js": "node scripts/run-js-tests.mjs",
     "doc": "cargo doc --manifest-path src-tauri/Cargo.toml --no-deps --document-private-items",
     "doc:open": "cargo doc --manifest-path src-tauri/Cargo.toml --no-deps --document-private-items --open",
