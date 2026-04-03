@@ -3717,7 +3717,7 @@ mod tests {
 
     #[test]
     fn test_cache_file_roundtrip() {
-        let _ = db::init_global(); // ignore if already initialized
+        db::init_global().expect("init_global for cache roundtrip");
         let data = serde_json::json!({"hello": "world", "count": 42});
         write_cache_file("test-cache-roundtrip.json".into(), data.clone()).unwrap();
         let result = read_cache_file("test-cache-roundtrip.json".into()).unwrap();
@@ -3727,7 +3727,7 @@ mod tests {
 
     #[test]
     fn test_cache_file_nonexistent() {
-        let _ = db::init_global();
+        db::init_global().expect("init_global for cache read");
         let result = read_cache_file("nonexistent-cache-xyz.json".into()).unwrap();
         // Falls back to waveform_cache table — result is valid JSON (may be empty or populated)
         assert!(result.is_object());

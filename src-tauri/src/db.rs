@@ -15,11 +15,24 @@ use std::sync::{Mutex, OnceLock};
 static GLOBAL_DB: OnceLock<Database> = OnceLock::new();
 
 /// Initialize the global database. Call once at startup.
+///
+/// Safe under parallel `cargo test`: if another thread wins the `OnceLock` race, we return `Ok`
+/// after dropping a redundant connection. Callers should not treat `Err` as "already init" unless
+/// they also verify [`global_initialized`].
 pub fn init_global() -> Result<(), String> {
+    if GLOBAL_DB.get().is_some() {
+        return Ok(());
+    }
     let db = Database::open()?;
-    GLOBAL_DB
-        .set(db)
-        .map_err(|_| "Database already initialized".to_string())
+    match GLOBAL_DB.set(db) {
+        Ok(()) => Ok(()),
+        Err(_redundant) => Ok(()),
+    }
+}
+
+/// Returns true after a successful [`init_global`] (including concurrent test runners).
+pub fn global_initialized() -> bool {
+    GLOBAL_DB.get().is_some()
 }
 
 /// Get the global database reference.
@@ -3187,6 +3200,23 @@ mod tests {
         assert_eq!(obj["plugin_scans"], 1);
         assert_eq!(obj["daw_projects"], 1);
         assert_eq!(obj["daw_scans"], 1);
+    }
+
+    /// Many lib tests call `init_global()` in parallel; this locks in idempotent init.
+    #[test]
+    fn init_global_concurrent_ok() {
+        let threads: Vec<_> = (0..32)
+            .map(|_| {
+                std::thread::spawn(|| {
+                    init_global().expect("init_global");
+                    assert!(global_initialized());
+                    let _ = global().read_cache("concurrent-init-smoke.json");
+                })
+            })
+            .collect();
+        for t in threads {
+            t.join().expect("thread join");
+        }
     }
 
     /// Run this to migrate real JSON caches to SQLite.

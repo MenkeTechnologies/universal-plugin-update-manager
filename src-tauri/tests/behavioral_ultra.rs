@@ -970,3 +970,273 @@ fn is_package_ext_logicx() {
 fn ext_matches_band_dir_style() {
     assert_eq!(ext_matches(Path::new("/proj.band")).as_deref(), Some("BAND"));
 }
+
+// ── Extra scenario batch (CI stress + regression net) ─────────────────────────
+
+#[test]
+fn kvr_cmp_equal_strings() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.3", "1.2.3"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn kvr_extract_version_from_meta_content() {
+    let html = r#"<meta name="version" content="9.8.7">"#;
+    assert_eq!(
+        app_lib::kvr::extract_version(html).as_deref(),
+        Some("9.8.7")
+    );
+}
+
+#[test]
+fn format_size_zero_bytes() {
+    let s = app_lib::format_size(0);
+    assert!(s.contains('0'), "{s}");
+}
+
+#[test]
+fn format_size_exact_one_gib() {
+    let s = app_lib::format_size(1024u64 * 1024 * 1024);
+    assert!(s.contains("GB") || s.contains("GiB"), "{s}");
+}
+
+#[test]
+fn radix_base_16_deadbeef() {
+    assert_eq!(radix_string(0xdeadbeefu64, 16), "deadbeef");
+}
+
+#[test]
+fn radix_base_3_twentyseven() {
+    assert_eq!(radix_string(27, 3), "1000");
+}
+
+#[test]
+fn daw_name_garageband_from_band() {
+    assert_eq!(daw_name_for_format("BAND"), "GarageBand");
+}
+
+#[test]
+fn ext_matches_ptx_uppercase() {
+    assert_eq!(
+        ext_matches(Path::new("/s.PTX")).as_deref(),
+        Some("PTX")
+    );
+}
+
+#[test]
+fn get_plugin_type_vst2() {
+    assert_eq!(get_plugin_type(".dll"), "VST2");
+}
+
+#[test]
+fn get_plugin_type_au_component() {
+    assert_eq!(get_plugin_type(".component"), "AU");
+}
+
+#[test]
+fn fingerprint_distance_ordering() {
+    let a = fp("/a.wav");
+    let mut far = fp("/far.wav");
+    far.rms = 1.0;
+    let mut near = fp("/near.wav");
+    near.rms = a.rms + 0.0001;
+    let d_near = fingerprint_distance(&a, &near);
+    let d_far = fingerprint_distance(&a, &far);
+    assert!(d_near < d_far);
+}
+
+#[test]
+fn find_similar_candidates_empty_returns_empty() {
+    let r = fp("/r.wav");
+    assert!(find_similar(&r, &[], 10).is_empty());
+}
+
+#[test]
+fn compute_plugin_diff_identical_empty() {
+    let s = build_plugin_snapshot(&[plug("/p.vst3", "1")], &[], &[]);
+    let d = compute_plugin_diff(&s, &s);
+    assert!(d.added.is_empty() && d.removed.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn compute_audio_diff_both_empty_roots() {
+    let a = build_audio_snapshot(&[], &[]);
+    let d = compute_audio_diff(&a, &a);
+    assert!(d.added.is_empty() && d.removed.is_empty());
+}
+
+#[test]
+fn compute_daw_diff_identical() {
+    let s = build_daw_snapshot(&[dawproj("/x.dawproject")], &[]);
+    let d = compute_daw_diff(&s, &s);
+    assert!(d.added.is_empty() && d.removed.is_empty());
+}
+
+#[test]
+fn normalize_plugin_name_lowercase_trim() {
+    let n = normalize_plugin_name("  MySynth  ");
+    assert_eq!(n, "mysynth");
+}
+
+#[test]
+fn extract_plugins_whitespace_only_empty() {
+    assert!(extract_plugins("   \n\t").is_empty());
+}
+
+#[test]
+fn plugin_ref_roundtrip_with_unicode_name() {
+    let p = PluginRef {
+        name: "插件".into(),
+        normalized_name: "x".into(),
+        manufacturer: "M".into(),
+        plugin_type: "VST3".into(),
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: PluginRef = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.name, "插件");
+}
+
+#[test]
+fn export_payload_roundtrip_version_field() {
+    let p = ExportPayload {
+        version: "2".into(),
+        exported_at: "now".into(),
+        plugins: vec![],
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: ExportPayload = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.version, "2");
+}
+
+#[test]
+fn kvr_cache_entry_serde_has_update_true() {
+    let e = KvrCacheEntry {
+        kvr_url: Some("https://k".into()),
+        update_url: None,
+        latest_version: Some("3".into()),
+        has_update: true,
+        source: "kvr".into(),
+        timestamp: "1".into(),
+    };
+    let j = serde_json::to_string(&e).unwrap();
+    assert!(j.contains("true"));
+}
+
+#[test]
+fn kvr_cmp_patch_bump() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.1", "1.0.2"),
+        Ordering::Less
+    );
+}
+
+#[test]
+fn radix_string_base_2_one() {
+    assert_eq!(radix_string(1, 2), "1");
+}
+
+#[test]
+fn format_size_kib_boundary() {
+    let s = app_lib::format_size(1024);
+    assert!(s.contains("KB") || s.contains("KiB"), "{s}");
+}
+
+#[test]
+fn daw_name_pro_tools_from_ptx() {
+    assert_eq!(daw_name_for_format("PTX"), "Pro Tools");
+}
+
+#[test]
+fn is_package_ext_not_a_package_wav() {
+    assert!(!is_package_ext(Path::new("/x.wav")));
+}
+
+#[test]
+fn compute_preset_diff_same_file_twice_no_dup_added() {
+    let p = preset("/one.fxp");
+    let s = build_preset_snapshot(&[p.clone()], &[]);
+    let d = compute_preset_diff(&s, &s);
+    assert!(d.added.is_empty() && d.removed.is_empty());
+}
+
+#[test]
+fn audio_sample_serde_roundtrip_minimal() {
+    let s = sample("/t.wav");
+    let j = serde_json::to_string(&s).unwrap();
+    let back: AudioSample = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.path, "/t.wav");
+}
+
+#[test]
+fn daw_project_serde_roundtrip() {
+    let d = dawproj("/z.dawproject");
+    let j = serde_json::to_string(&d).unwrap();
+    let back: DawProject = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.format, "dawproject");
+}
+
+#[test]
+fn fingerprint_all_zero_still_finite_distance() {
+    let mut a = fp("/z.wav");
+    a.rms = 0.0;
+    a.spectral_centroid = 0.0;
+    a.zero_crossing_rate = 0.0;
+    a.low_band_energy = 0.0;
+    a.mid_band_energy = 0.0;
+    a.high_band_energy = 0.0;
+    a.low_energy_ratio = 0.0;
+    a.attack_time = 0.0;
+    let mut b = a.clone();
+    b.path = "/y.wav".into();
+    let d = fingerprint_distance(&a, &b);
+    assert!(d.is_finite() && d >= 0.0);
+}
+
+#[test]
+fn find_similar_sorts_by_distance() {
+    let r = fp("/ref.wav");
+    let mut c1 = fp("/c1.wav");
+    c1.rms = r.rms + 0.5;
+    let mut c2 = fp("/c2.wav");
+    c2.rms = r.rms + 0.01;
+    let out = find_similar(&r, &[c1, c2], 2);
+    assert_eq!(out.len(), 2);
+    assert!(out[0].0.contains("c2"));
+}
+
+#[test]
+fn kvr_parse_version_with_trailing_nonnumeric_stripped() {
+    let v = app_lib::kvr::parse_version("2.0beta");
+    assert!(v.len() >= 1);
+    assert_eq!(v[0], 2);
+}
+
+#[test]
+fn normalize_removes_vst2_suffix_parens() {
+    let n = normalize_plugin_name("Gain (VST)");
+    assert!(!n.contains("vst"));
+}
+
+#[test]
+fn radix_base_8_sixtyfour() {
+    assert_eq!(radix_string(64, 8), "100");
+}
+
+#[test]
+fn compute_plugin_diff_path_added() {
+    let old = build_plugin_snapshot(&[], &[], &[]);
+    let new = build_plugin_snapshot(&[plug("/new.vst3", "1")], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.added.len(), 1);
+}
+
+#[test]
+fn kvr_extract_version_from_td_cell() {
+    let html = r#"<td>Version 12.34.56</td>"#;
+    assert_eq!(
+        app_lib::kvr::extract_version(html).as_deref(),
+        Some("12.34.56")
+    );
+}
