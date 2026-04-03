@@ -93,6 +93,14 @@ function renderDashboard(samples, plugins, projects, presets) {
   renderBpmHistogram();
   renderKeyWheel();
   renderTimelineChart(samples);
+
+  // Apply bar widths after layout resolves (flex containers need a frame to get correct widths)
+  requestAnimationFrame(() => {
+    grid.querySelectorAll('[data-bar-pct]').forEach(el => {
+      el.style.width = el.dataset.barPct + '%';
+      el.style.transition = 'width 0.3s ease-out';
+    });
+  });
 }
 
 // ── Card Builders ──
@@ -107,11 +115,11 @@ function buildFormatCard(samples) {
   const total = sorted.reduce((sum, [, c]) => sum + c, 0) || 1;
 
   const bars = sorted.slice(0, 10).map(([fmt, count]) => {
-    const barPct = (count / max) * 100; // visual: relative to largest
-    const share = ((count / total) * 100).toFixed(1); // label: percentage of total
+    const barPct = (count / max) * 100;
+    const share = ((count / total) * 100).toFixed(1);
     return `<div class="hm-bar-row">
       <span class="hm-bar-label">${escapeHtml(fmt)}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-cyan" style="width:${barPct.toFixed(1)}%"></div></div>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-cyan" data-bar-pct="${barPct.toFixed(1)}" style="width:0"></div></div>
       <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
@@ -142,7 +150,7 @@ function buildSizeCard(samples) {
     const share = ((counts[i] / total) * 100).toFixed(1);
     return `<div class="hm-bar-row">
       <span class="hm-bar-label">${b.label}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-magenta" style="width:${barPct.toFixed(1)}%"></div></div>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-magenta" data-bar-pct="${barPct.toFixed(1)}" style="width:0"></div></div>
       <span class="hm-bar-val">${counts[i].toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
@@ -169,7 +177,7 @@ function buildFolderCard(samples) {
     const name = dir.split('/').pop() || dir;
     return `<div class="hm-bar-row" title="${escapeHtml(dir)}">
       <span class="hm-bar-label" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-green" style="width:${barPct.toFixed(1)}%"></div></div>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-green" data-bar-pct="${barPct.toFixed(1)}" style="width:0"></div></div>
       <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
@@ -210,7 +218,7 @@ function buildPluginTypeCard(plugins) {
     const share = ((count / total) * 100).toFixed(1);
     return `<div class="hm-bar-row">
       <span class="hm-bar-label">${escapeHtml(type)}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-yellow" style="width:${barPct.toFixed(1)}%"></div></div>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-yellow" data-bar-pct="${barPct.toFixed(1)}" style="width:0"></div></div>
       <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
@@ -232,7 +240,7 @@ function buildDawFormatCard(projects) {
     const share = ((count / total) * 100).toFixed(1);
     return `<div class="hm-bar-row">
       <span class="hm-bar-label">${escapeHtml(fmt)}</span>
-      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-orange" style="width:${barPct.toFixed(1)}%"></div></div>
+      <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-orange" data-bar-pct="${barPct.toFixed(1)}" style="width:0"></div></div>
       <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
