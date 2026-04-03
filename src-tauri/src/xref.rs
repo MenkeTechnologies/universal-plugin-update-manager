@@ -1279,126 +1279,350 @@ mod tests {
         let _ = fs::remove_file(&tmp);
     }
 
+    // ── Shared extraction tests ──
+
     #[test]
-    fn test_binary_extraction_finds_all_plugin_types() {
-        // Simulate binary data with embedded plugin paths
+    fn test_binary_extraction_all_plugin_types() {
         let mut data = vec![0u8; 100];
-        data.extend_from_slice(b"C:\\VSTPlugins\\Massive.dll");
+        for (path, expected_type) in [
+            ("C:\\VSTPlugins\\Massive.dll", "VST2"),
+            ("/Library/Audio/Plug-Ins/VST3/Serum.vst3", "VST3"),
+            ("/Library/Audio/Plug-Ins/Components/Kontakt.component", "AU"),
+            ("/Library/Audio/Plug-Ins/CLAP/Vital.clap", "CLAP"),
+            ("C:\\AAX\\Pro-Q 3.aaxplugin", "AAX"),
+        ] {
+            data.extend_from_slice(path.as_bytes());
+            data.extend_from_slice(&[0; 50]);
+            let _ = expected_type;
+        }
+        let result = extract_plugins_from_binary(&data);
+        let types: Vec<&str> = result.iter().map(|p| p.plugin_type.as_str()).collect();
+        assert!(types.contains(&"VST2"), "missing VST2");
+        assert!(types.contains(&"VST3"), "missing VST3");
+        assert!(types.contains(&"AU"), "missing AU");
+        assert!(types.contains(&"CLAP"), "missing CLAP");
+        assert!(types.contains(&"AAX"), "missing AAX");
+    }
+
+    #[test]
+    fn test_extract_plugin_with_trailing_junk() {
+        // FLP-style: plugin path followed by chunk byte
+        let p = extract_plugin_from_string("F:\\VSTPlugins\\Serum_x64.dll8");
+        assert!(p.is_some(), "should extract despite trailing '8'");
+        assert_eq!(p.unwrap().name, "Serum_x64");
+    }
+
+    #[test]
+    fn test_extract_plugin_embedded_in_longer_string() {
+        let p = extract_plugin_from_string("some_prefix/Sylenth1.dll/some_suffix");
+        assert!(p.is_some());
+        assert_eq!(p.unwrap().name, "Sylenth1");
+    }
+
+    // ── FLP tests ──
+
+    #[test]
+    fn test_flp_ascii_extraction() {
+        let mut data = vec![0u8; 100];
+        data.extend_from_slice(b"C:\\Program Files\\VSTPlugins\\Sylenth1.dll");
+        data.extend_from_slice(&[0; 50]);
+        data.extend_from_slice(b"C:\\VST3\\FabFilter Pro-Q 3.vst3");
+        data.extend_from_slice(&[0; 50]);
+        let result = extract_plugins_from_binary(&data);
+        let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Sylenth1"), "missing Sylenth1: {:?}", names);
+        assert!(names.contains(&"FabFilter Pro-Q 3"), "missing Pro-Q 3: {:?}", names);
+    }
+
+    #[test]
+    fn test_flp_utf16le_extraction() {
+        let mut data = vec![0u8; 50];
+        // "Serum_x64.dll" as UTF-16LE
+        for c in "Serum_x64.dll".chars() {
+            data.push(c as u8);
+            data.push(0);
+        }
+        data.extend_from_slice(&[0; 50]);
+        let result = extract_plugins_utf16le(&data);
+        assert!(!result.is_empty(), "UTF-16LE extraction failed");
+        assert_eq!(result[0].name, "Serum_x64");
+    }
+
+    #[test]
+    fn test_flp_combined_ascii_and_utf16() {
+        let tmp = std::env::temp_dir().join("test_xref_flp_combined.flp");
+        let mut data = vec![0u8; 100];
+        data.extend_from_slice(b"C:\\Plugins\\OTT.dll");
+        data.extend_from_slice(&[0; 30]);
+        for c in "F:\\VSTPlugins\\Massive.dll".chars() {
+            data.push(c as u8);
+            data.push(0);
+        }
+        data.extend_from_slice(&[0; 50]);
+        fs::write(&tmp, &data).unwrap();
+        let result = parse_flp(&tmp);
+        let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.iter().any(|n| n.contains("OTT")), "missing OTT: {:?}", names);
+        assert!(names.iter().any(|n| n.contains("Massive")), "missing Massive: {:?}", names);
+        let _ = fs::remove_file(&tmp);
+    }
+
+    // ── Cubase tests ──
+
+    #[test]
+    fn test_cubase_plugin_name_markers() {
+        let mut data = vec![0u8; 50];
+        data.extend_from_slice(b"Plugin Name");
+        data.push(0);
+        data.extend_from_slice(b"Spire-1.5");
+        data.extend_from_slice(&[0; 30]);
+        data.extend_from_slice(b"Plugin Name");
+        data.push(0);
+        data.extend_from_slice(b"LFOTool");
+        data.extend_from_slice(&[0; 30]);
+        // Should skip builtin
+        data.extend_from_slice(b"Plugin Name");
+        data.push(0);
+        data.extend_from_slice(b"Standard Panner");
+        data.extend_from_slice(&[0; 30]);
+        let result = extract_named_plugins(&data, b"Plugin Name");
+        let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Spire-1.5"), "missing Spire: {:?}", names);
+        assert!(names.contains(&"LFOTool"), "missing LFOTool: {:?}", names);
+        assert!(!names.contains(&"Standard Panner"), "should filter Standard Panner");
+    }
+
+    #[test]
+    fn test_cubase_binary_paths_plus_markers() {
+        let mut data = vec![0u8; 50];
+        data.extend_from_slice(b"C:\\VST3\\Serum.vst3");
+        data.extend_from_slice(&[0; 30]);
+        data.extend_from_slice(b"Plugin Name");
+        data.push(0);
+        data.extend_from_slice(b"LFOTool");
+        data.extend_from_slice(&[0; 30]);
+        let tmp = std::env::temp_dir().join("test_xref_cubase.cpr");
+        fs::write(&tmp, &data).unwrap();
+        let result = extract_plugins(tmp.to_str().unwrap());
+        let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Serum"), "missing Serum from binary: {:?}", names);
+        assert!(names.contains(&"LFOTool"), "missing LFOTool from marker: {:?}", names);
+        let _ = fs::remove_file(&tmp);
+    }
+
+    // ── Logic tests ──
+
+    #[test]
+    fn test_logic_known_plugins_extraction() {
+        let mut data = vec![0u8; 50];
+        // Embed known plugin names as standalone strings
+        for name in ["Sylenth1", "Channel EQ", "Compressor", "Alchemy", "Hive"] {
+            data.extend_from_slice(name.as_bytes());
+            data.extend_from_slice(&[0; 10]);
+        }
+        let result = extract_logic_plugin_names(&data);
+        let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Sylenth1"), "missing Sylenth1: {:?}", names);
+        assert!(names.contains(&"Channel EQ"), "missing Channel EQ: {:?}", names);
+        assert!(names.contains(&"Compressor"), "missing Compressor: {:?}", names);
+        assert!(names.contains(&"Alchemy"), "missing Alchemy: {:?}", names);
+        assert!(names.contains(&"Hive"), "missing Hive: {:?}", names);
+    }
+
+    #[test]
+    fn test_logic_filters_false_positives() {
+        let mut data = vec![0u8; 50];
+        for name in ["Output 1", "Output 5-6H", "Automatic-Generic Audio 12", "com.apple.foo"] {
+            data.extend_from_slice(name.as_bytes());
+            data.extend_from_slice(&[0; 10]);
+        }
+        let result = extract_logic_plugin_names(&data);
+        assert!(result.is_empty(), "should filter all false positives, got: {:?}", result.iter().map(|p| &p.name).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_logic_stock_vs_thirdparty_type() {
+        let mut data = vec![0u8; 50];
+        data.extend_from_slice(b"Channel EQ");
+        data.extend_from_slice(&[0; 10]);
+        data.extend_from_slice(b"Sylenth1");
+        data.extend_from_slice(&[0; 10]);
+        let result = extract_logic_plugin_names(&data);
+        let stock = result.iter().find(|p| p.name == "Channel EQ").unwrap();
+        let third = result.iter().find(|p| p.name == "Sylenth1").unwrap();
+        assert_eq!(stock.plugin_type, "AU (Stock)");
+        assert_eq!(third.plugin_type, "AU");
+    }
+
+    #[test]
+    fn test_logic_component_path_extraction() {
+        let mut data = vec![0u8; 50];
+        data.extend_from_slice(b"/Library/Audio/Plug-Ins/Components/FabFilter Pro-Q 3.component");
+        data.extend_from_slice(&[0; 50]);
+        let result = extract_plugins_from_binary(&data);
+        assert!(!result.is_empty());
+        assert_eq!(result[0].name, "FabFilter Pro-Q 3");
+        assert_eq!(result[0].plugin_type, "AU");
+    }
+
+    // ── Studio One tests ──
+
+    #[test]
+    fn test_studio_one_zip_xml() {
+        use std::io::Write;
+        let tmp = std::env::temp_dir().join("test_xref_s1.song");
+        let file = fs::File::create(&tmp).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file::<_, ()>("Song/song.xml", Default::default()).unwrap();
+        zip.write_all(b"<Song><MediaTrack name=\"Bass\"/></Song>").unwrap();
+        zip.start_file::<_, ()>("Devices/audiomixer.xml", Default::default()).unwrap();
+        zip.write_all(b"<AudioMixer><Insert plugName=\"Pro-Q 3\" deviceName=\"FabFilter\"/></AudioMixer>").unwrap();
+        zip.finish().unwrap();
+        let result = extract_plugins(tmp.to_str().unwrap());
+        let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Pro-Q 3"), "missing Pro-Q 3: {:?}", names);
+        let _ = fs::remove_file(&tmp);
+    }
+
+    // ── DAWproject tests ──
+
+    #[test]
+    fn test_dawproject_zip_xml() {
+        use std::io::Write;
+        let tmp = std::env::temp_dir().join("test_xref.dawproject");
+        let file = fs::File::create(&tmp).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file::<_, ()>("project.xml", Default::default()).unwrap();
+        zip.write_all(b"<Project><Plugin name=\"Serum\" deviceName=\"Xfer Records\"/><Plugin name=\"Diva\" deviceName=\"u-he\"/></Project>").unwrap();
+        zip.finish().unwrap();
+        let result = extract_plugins(tmp.to_str().unwrap());
+        let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Serum"), "missing Serum: {:?}", names);
+        assert!(names.contains(&"Diva"), "missing Diva: {:?}", names);
+        let _ = fs::remove_file(&tmp);
+    }
+
+    // ── Pro Tools tests ──
+
+    #[test]
+    fn test_protools_binary_extraction() {
+        // PTX with embedded .aaxplugin paths
+        let mut data = vec![0u8; 100];
+        data.extend_from_slice(b"/Library/Application Support/Avid/Audio/Plug-Ins/EQ III.aaxplugin");
+        data.extend_from_slice(&[0; 50]);
+        let result = extract_plugins_from_binary(&data);
+        assert!(!result.is_empty(), "should find AAX plugin");
+        assert_eq!(result[0].name, "EQ III");
+        assert_eq!(result[0].plugin_type, "AAX");
+    }
+
+    #[test]
+    fn test_protools_named_markers() {
+        let mut data = vec![0u8; 50];
+        data.extend_from_slice(b"PlugIn Name");
+        data.push(0);
+        data.extend_from_slice(b"Channel Strip");
+        data.extend_from_slice(&[0; 30]);
+        data.extend_from_slice(b"Insert Name");
+        data.push(0);
+        data.extend_from_slice(b"D-Verb");
+        data.extend_from_slice(&[0; 30]);
+        let result = extract_named_plugins(&data, b"PlugIn Name");
+        let result2 = extract_named_plugins(&data, b"Insert Name");
+        assert!(!result.is_empty() || !result2.is_empty(), "should find named plugins");
+    }
+
+    // ── Reason tests ──
+
+    #[test]
+    fn test_reason_binary_extraction() {
+        let mut data = vec![0u8; 100];
+        data.extend_from_slice(b"C:\\VST\\Massive.dll");
         data.extend_from_slice(&[0; 50]);
         data.extend_from_slice(b"/Library/Audio/Plug-Ins/VST3/Serum.vst3");
         data.extend_from_slice(&[0; 50]);
-        data.extend_from_slice(b"/Library/Audio/Plug-Ins/Components/Kontakt.component");
-        data.extend_from_slice(&[0; 50]);
-        data.extend_from_slice(b"/Library/Audio/Plug-Ins/CLAP/Vital.clap");
-        data.extend_from_slice(&[0; 50]);
-        data.extend_from_slice(b"C:\\AAX\\Pro-Q 3.aaxplugin");
-        data.extend_from_slice(&[0; 50]);
-
-        let result = extract_plugins_from_binary(&data);
-        assert!(result.len() >= 5, "should find 5 plugins, got {}: {:?}", result.len(), result.iter().map(|p| &p.name).collect::<Vec<_>>());
-        let types: Vec<&str> = result.iter().map(|p| p.plugin_type.as_str()).collect();
-        assert!(types.contains(&"VST2"));
-        assert!(types.contains(&"VST3"));
-        assert!(types.contains(&"AU"));
-        assert!(types.contains(&"CLAP"));
-        assert!(types.contains(&"AAX"));
+        let tmp = std::env::temp_dir().join("test_xref.reason");
+        fs::write(&tmp, &data).unwrap();
+        let result = extract_plugins(tmp.to_str().unwrap());
+        let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Massive"), "missing Massive: {:?}", names);
+        assert!(names.contains(&"Serum"), "missing Serum: {:?}", names);
+        let _ = fs::remove_file(&tmp);
     }
 
+    // ── Bitwig tests ──
+
     #[test]
-    fn test_utf16le_extraction() {
-        // Simulate FL Studio UTF-16LE plugin path
+    fn test_bitwig_all_plugin_types() {
+        let tmp = std::env::temp_dir().join("test_xref_bw_types.bwproject");
+        let mut data = vec![0u8; 100];
+        data.extend_from_slice(b"/VST3/Serum.vst3");
+        data.extend_from_slice(&[0; 20]);
+        data.extend_from_slice(b"C:\\Plugins\\Massive.dll");
+        data.extend_from_slice(&[0; 20]);
+        data.extend_from_slice(b"/Components/Kontakt.component");
+        data.extend_from_slice(&[0; 20]);
+        data.extend_from_slice(b"/CLAP/Vital.clap");
+        data.extend_from_slice(&[0; 20]);
+        fs::write(&tmp, &data).unwrap();
+        let result = extract_plugins(tmp.to_str().unwrap());
+        assert!(result.len() >= 4, "should find 4+ plugins, got {}", result.len());
+        let _ = fs::remove_file(&tmp);
+    }
+
+    // ── Cross-format dedup test ──
+
+    #[test]
+    fn test_dedup_across_extraction_methods() {
+        // Same plugin found via both binary and UTF-16LE should dedup
         let mut data = vec![0u8; 50];
-        let path = "Serum.dll";
-        for c in path.chars() {
+        data.extend_from_slice(b"C:\\Plugins\\Serum.dll");
+        data.extend_from_slice(&[0; 30]);
+        for c in "C:\\Plugins\\Serum.dll".chars() {
             data.push(c as u8);
-            data.push(0); // UTF-16LE high byte
+            data.push(0);
         }
         data.extend_from_slice(&[0; 50]);
-
-        let result = extract_plugins_utf16le(&data);
-        assert!(!result.is_empty(), "should find UTF-16LE plugin, got empty");
-        assert_eq!(result[0].name, "Serum");
+        let tmp = std::env::temp_dir().join("test_xref_dedup.flp");
+        fs::write(&tmp, &data).unwrap();
+        let result = extract_plugins(tmp.to_str().unwrap());
+        let serum_count = result.iter().filter(|p| p.normalized_name == "serum").count();
+        assert_eq!(serum_count, 1, "duplicate Serum should be deduped, got {}", serum_count);
+        let _ = fs::remove_file(&tmp);
     }
 
-    #[test]
-    fn test_flp_extraction() {
-        // Create minimal FLP-like data with embedded plugin paths
-        let mut data = vec![0u8; 200];
-        // Embed ASCII plugin path
-        let offset = 100;
-        let path = b"C:\\Program Files\\VSTPlugins\\Sylenth1.dll";
-        data[offset..offset + path.len()].copy_from_slice(path);
+    // ── Real file tests (ignored, run manually) ──
 
-        let result = extract_plugins_from_binary(&data);
-        assert!(!result.is_empty(), "should find plugin in FLP-like binary");
-        assert_eq!(result[0].name, "Sylenth1");
-    }
-
-    /// Test FLP parser on a real file
     #[test]
     #[ignore]
-    fn test_flp_real_file() {
+    fn test_real_flp() {
         let path = "/Users/wizard/mnt/production/MusicProduction/Samples/Producer loops/2021/prototypesamples_RAGE - PROJECT/RAGE PROJECT/_RAGE.flp";
-        if !std::path::Path::new(path).exists() { println!("FLP not found, skipping"); return; }
+        if !std::path::Path::new(path).exists() { return; }
         let result = extract_plugins(path);
-        println!("FLP plugins found: {}", result.len());
-        for p in &result {
-            println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name);
-        }
-        assert!(!result.is_empty(), "Real FLP should have plugins");
+        println!("FLP: {} plugins", result.len());
+        for p in &result { println!("  {} ({})", p.name, p.plugin_type); }
+        assert!(result.len() >= 5, "Real FLP should have 5+ plugins");
     }
 
     #[test]
     #[ignore]
-    fn test_logic_real_file() {
-        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/mettaglyde/Alex Di Stefano Logic Pro Tech-Trance Template Vol One/Alex Di Stefano Logic Pro Tech-Trance Template Vol One.logicx";
-        if !std::path::Path::new(path).exists() { println!("Logic file not found"); return; }
-        let result = extract_plugins(path);
-        println!("Logic plugins found: {}", result.len());
-        for p in &result {
-            println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name);
-        }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_protools_ptf_real_file() {
-        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/BEAT/workshops/Beatstation Demotracks/Beatstation Demotracks/Pro Tools/Club/Toontrack Beatstation Club - Viggoproductions.se.ptf";
-        if !std::path::Path::new(path).exists() { println!("PTF not found"); return; }
-        let result = extract_plugins(path);
-        println!("Pro Tools PTF plugins found: {} (PTF is XOR-encrypted, 0 is expected)", result.len());
-        for p in &result { println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name); }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_protools_ptx_real_file() {
-        let path = "/Users/wizard/mnt/production/MusicProduction/templates/Ex_Files_RemixTech_SongForm/Ex_Files_RemixTech_SongForm/Exercise Files/Ch 02/Session Files/Radio Mix_07.ptx";
-        if !std::path::Path::new(path).exists() { println!("PTX not found"); return; }
-        let result = extract_plugins(path);
-        println!("Pro Tools PTX plugins found: {}", result.len());
-        for p in &result { println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name); }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_studio_one_real_file() {
-        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/myloops/myloops-reloaded-volume-2-demo-projects-only-95154/MRE2 Demo Projects/Studio One/Myloops Reloaded Volume 2 Demo Project.song";
-        if !std::path::Path::new(path).exists() { println!("Studio One not found"); return; }
-        let result = extract_plugins(path);
-        println!("Studio One plugins found: {}", result.len());
-        for p in &result { println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name); }
-    }
-
-    #[test]
-    #[ignore]
-    fn test_cubase_real_file() {
+    fn test_real_cubase() {
         let path = "/Users/wizard/mnt/production/MusicProduction/Samples/Producer loops/2021/OST Audio - Trance Collection/Collection/Powerful Trance For Spire/Templates/Cubase/0_1 By OST_Audio/0_1 By OST_Audio.cpr";
-        if !std::path::Path::new(path).exists() { println!("Cubase file not found"); return; }
+        if !std::path::Path::new(path).exists() { return; }
         let result = extract_plugins(path);
-        println!("Cubase plugins found: {}", result.len());
-        for p in &result {
-            println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name);
-        }
+        println!("Cubase: {} plugins", result.len());
+        for p in &result { println!("  {} ({})", p.name, p.plugin_type); }
+        assert!(result.len() >= 2, "Real Cubase should have 2+ plugins");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_real_logic() {
+        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/mettaglyde/Alex Di Stefano Logic Pro Tech-Trance Template Vol One/Alex Di Stefano Logic Pro Tech-Trance Template Vol One.logicx";
+        if !std::path::Path::new(path).exists() { return; }
+        let result = extract_plugins(path);
+        println!("Logic: {} plugins", result.len());
+        for p in &result { println!("  {} ({})", p.name, p.plugin_type); }
+        assert!(result.len() >= 5, "Real Logic should have 5+ plugins");
     }
 }
