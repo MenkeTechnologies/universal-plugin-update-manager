@@ -48,6 +48,7 @@ const DEFAULT_SHORTCUTS = {
   'deselectAll': { key: 'Escape', mod: true, label: 'Deselect all' },
   'toggleABLoop': { key: 'b', mod: false, label: 'Set / clear A-B loop' },
   'heatmapDash': { key: 'd', mod: false, label: 'Heatmap dashboard' },
+  'togglePlayer': { key: 'p', mod: false, label: 'Show / hide player' },
 };
 
 const TAB_MAP = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'tags', 'files', 'history', 'visualizer', 'settings'];
@@ -91,23 +92,35 @@ function formatKey(shortcut) {
   return parts.join('+');
 }
 
-function renderShortcutSettings() {
+function renderShortcutSettings(filter) {
   const list = document.getElementById('shortcutsList');
   if (!list) return;
   const shortcuts = getShortcuts();
-  list.innerHTML = Object.entries(shortcuts).map(([id, sc]) =>
+  const q = (filter || '').toLowerCase();
+  const entries = Object.entries(shortcuts).filter(([id, sc]) => {
+    if (!q) return true;
+    return sc.label.toLowerCase().includes(q) || id.toLowerCase().includes(q) || formatKey(sc).toLowerCase().includes(q);
+  });
+  list.innerHTML = entries.map(([id, sc]) =>
     `<div class="shortcut-row" data-sc-id="${id}">
       <span class="shortcut-name">${sc.label}</span>
       <span class="shortcut-key" data-shortcut-id="${id}" title="Click to rebind">${formatKey(sc)}</span>
     </div>`
   ).join('');
-  if (typeof initDragReorder === 'function') {
+  if (!q && typeof initDragReorder === 'function') {
     initDragReorder(list, '.shortcut-row', 'shortcutOrder', {
       getKey: (el) => el.dataset.scId || '',
       handleSelector: '.shortcut-name',
     });
   }
 }
+
+// Filter input for keybindings
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'shortcutsFilter') {
+    renderShortcutSettings(e.target.value);
+  }
+});
 
 // Recording state
 let _recordingId = null;
@@ -268,6 +281,13 @@ function executeShortcut(id) {
     }
   } else if (id === 'heatmapDash') {
     if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard();
+  } else if (id === 'togglePlayer') {
+    const np = document.getElementById('audioNowPlaying');
+    if (np && np.classList.contains('active')) {
+      if (typeof hidePlayer === 'function') hidePlayer();
+    } else {
+      if (typeof showPlayer === 'function') showPlayer();
+    }
   }
 }
 
