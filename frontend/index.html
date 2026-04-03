@@ -419,13 +419,14 @@
     }
     .btn-stop:active { transform: translateY(1px) scale(0.98); }
 
-    /* Settings page — CSS grid (not CSS columns, which breaks drag reorder) */
+    /* Settings page — CSS columns for Tetris masonry, disabled during drag */
     .settings-container {
       padding: 24px 16px 160px;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-      align-items: start;
+      columns: 1;
+      column-gap: 12px;
+    }
+    .settings-container.dragging-section {
+      columns: 1 !important;
     }
 
     @media (min-width: 600px) {
@@ -433,7 +434,11 @@
     }
 
     @media (min-width: 1100px) {
-      .settings-container { grid-template-columns: 1fr 1fr; }
+      .settings-container { columns: 2; }
+    }
+
+    @media (min-width: 1700px) {
+      .settings-container { columns: 3; }
     }
 
     @media (min-width: 1700px) {
@@ -443,6 +448,7 @@
     .settings-section {
       overflow: hidden;
       transition: opacity 0.2s;
+      break-inside: avoid;
       margin-bottom: 12px;
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -6057,39 +6063,39 @@
     </div>
   </div>
 
-  <script src="js/ipc.js?v=35100"></script>
-  <script src="js/utils.js?v=35100"></script>
-  <script src="js/drag-reorder.js?v=35100"></script>
-  <script src="js/modal-drag.js?v=35100"></script>
-  <script src="js/columns.js?v=35100"></script>
-  <script src="js/notes.js?v=35100"></script>
-  <script src="js/favorites.js?v=35100"></script>
-  <script src="js/export.js?v=35100"></script>
-  <script src="js/plugins.js?v=35100"></script>
-  <script src="js/settings.js?v=35100"></script>
-  <script src="js/history.js?v=35100"></script>
-  <script src="js/kvr.js?v=35100"></script>
-  <script src="js/audio.js?v=35100"></script>
-  <script src="js/daw.js?v=35100"></script>
-  <script src="js/presets.js?v=35100"></script>
-  <script src="js/disk-usage.js?v=35100"></script>
-  <script src="js/batch-select.js?v=35100"></script>
-  <script src="js/sort-persist.js?v=35100"></script>
-  <script src="js/multi-filter.js?v=35100"></script>
-  <script src="js/file-browser.js?v=35100"></script>
-  <script src="js/duplicates.js?v=35100"></script>
-  <script src="js/command-palette.js?v=35100"></script>
-  <script src="js/xref.js?v=35100"></script>
-  <script src="js/dep-graph.js?v=35100"></script>
-  <script src="js/smart-playlists.js?v=35100"></script>
-  <script src="js/heatmap-dashboard.js?v=35100"></script>
-  <script src="js/midi.js?v=35100"></script>
-  <script src="js/visualizer.js?v=35100"></script>
-  <script src="js/walker-status.js?v=35100"></script>
-  <script src="js/context-menu.js?v=35100"></script>
-  <script src="js/help-overlay.js?v=35100"></script>
-  <script src="js/shortcuts.js?v=35100"></script>
-  <script src="js/keyboard-nav.js?v=35100"></script>
-  <script src="js/app.js?v=35100"></script>
+  <script src="js/ipc.js?v=93248"></script>
+  <script src="js/utils.js?v=93248"></script>
+  <script src="js/drag-reorder.js?v=93248"></script>
+  <script src="js/modal-drag.js?v=93248"></script>
+  <script src="js/columns.js?v=93248"></script>
+  <script src="js/notes.js?v=93248"></script>
+  <script src="js/favorites.js?v=93248"></script>
+  <script src="js/export.js?v=93248"></script>
+  <script src="js/plugins.js?v=93248"></script>
+  <script src="js/settings.js?v=93248"></script>
+  <script src="js/history.js?v=93248"></script>
+  <script src="js/kvr.js?v=93248"></script>
+  <script src="js/audio.js?v=93248"></script>
+  <script src="js/daw.js?v=93248"></script>
+  <script src="js/presets.js?v=93248"></script>
+  <script src="js/disk-usage.js?v=93248"></script>
+  <script src="js/batch-select.js?v=93248"></script>
+  <script src="js/sort-persist.js?v=93248"></script>
+  <script src="js/multi-filter.js?v=93248"></script>
+  <script src="js/file-browser.js?v=93248"></script>
+  <script src="js/duplicates.js?v=93248"></script>
+  <script src="js/command-palette.js?v=93248"></script>
+  <script src="js/xref.js?v=93248"></script>
+  <script src="js/dep-graph.js?v=93248"></script>
+  <script src="js/smart-playlists.js?v=93248"></script>
+  <script src="js/heatmap-dashboard.js?v=93248"></script>
+  <script src="js/midi.js?v=93248"></script>
+  <script src="js/visualizer.js?v=93248"></script>
+  <script src="js/walker-status.js?v=93248"></script>
+  <script src="js/context-menu.js?v=93248"></script>
+  <script src="js/help-overlay.js?v=93248"></script>
+  <script src="js/shortcuts.js?v=93248"></script>
+  <script src="js/keyboard-nav.js?v=93248"></script>
+  <script src="js/app.js?v=93248"></script>
 </body>
 </html>

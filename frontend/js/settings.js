@@ -1434,6 +1434,8 @@ function initSettingsSectionDrag() {
       isDragging = true;
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'grabbing';
+      // Collapse to single column during drag (CSS columns breaks insertBefore)
+      container.classList.add('dragging-section');
 
       // Create placeholder
       const rect = dragged.getBoundingClientRect();
@@ -1497,6 +1499,8 @@ function initSettingsSectionDrag() {
       dragged.style.display = '';
       if (ghost) { ghost.remove(); ghost = null; }
       placeholder = null;
+      // Restore multi-column layout after drag
+      container.classList.remove('dragging-section');
       saveSettingsSectionOrder();
 
       const suppress = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
