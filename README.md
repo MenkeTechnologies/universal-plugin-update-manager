@@ -383,6 +383,7 @@ src-tauri/
     preset_scanner.rs  -- Plugin preset discovery
     similarity.rs      -- Audio similarity search via spectral fingerprinting
     xref.rs            -- Plugin ↔ DAW cross-reference engine
+    db.rs              -- SQLite database layer (paginated queries, 6M+ sample scale)
     history.rs         -- Scan history persistence + diff engine
     kvr.rs             -- KVR Audio scraper + version checker
   Cargo.toml           -- Rust dependencies

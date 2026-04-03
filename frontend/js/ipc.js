@@ -455,6 +455,16 @@ window.vstUpdater = {
   prefsSet: (key, value) => invoke('prefs_set', { key, value }),
   prefsRemove: (key) => invoke('prefs_remove', { key }),
   prefsSaveAll: (prefs) => invoke('prefs_save_all', { prefs }),
+  // Database-backed queries (SQLite)
+  dbQueryAudio: (params) => invoke('db_query_audio', { params }),
+  dbAudioStats: (scanId) => invoke('db_audio_stats', { scanId: scanId || null }),
+  dbListScans: () => invoke('db_list_scans'),
+  dbUpdateBpm: (path, bpm) => invoke('db_update_bpm', { path, bpm }),
+  dbUpdateKey: (path, key) => invoke('db_update_key', { path, key }),
+  dbUpdateLufs: (path, lufs) => invoke('db_update_lufs', { path, lufs }),
+  dbGetAnalysis: (path) => invoke('db_get_analysis', { path }),
+  dbUnanalyzedPaths: (limit) => invoke('db_unanalyzed_paths', { limit: limit || 100 }),
+  dbMigrateJson: () => invoke('db_migrate_json'),
 };
 
 // ── Preferences layer (file-backed, survives reboots) ──

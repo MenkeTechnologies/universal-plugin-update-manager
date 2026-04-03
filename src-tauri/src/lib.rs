@@ -16,6 +16,7 @@
 pub mod audio_scanner;
 pub mod bpm;
 pub mod daw_scanner;
+pub mod db;
 pub mod similarity;
 pub mod history;
 pub mod key_detect;
@@ -3141,6 +3142,81 @@ mod tests {
     }
 }
 
+// ── Database IPC commands ──
+
+#[tauri::command]
+fn db_query_audio(
+    database: tauri::State<'_, db::Database>,
+    params: db::AudioQueryParams,
+) -> Result<db::AudioQueryResult, String> {
+    database.query_audio(&params)
+}
+
+#[tauri::command]
+fn db_audio_stats(
+    database: tauri::State<'_, db::Database>,
+    scan_id: Option<String>,
+) -> Result<db::AudioStatsResult, String> {
+    database.audio_stats(scan_id.as_deref())
+}
+
+#[tauri::command]
+fn db_list_scans(
+    database: tauri::State<'_, db::Database>,
+) -> Result<Vec<db::ScanInfo>, String> {
+    database.list_scans()
+}
+
+#[tauri::command]
+fn db_update_bpm(
+    database: tauri::State<'_, db::Database>,
+    path: String,
+    bpm: Option<f64>,
+) -> Result<(), String> {
+    database.update_bpm(&path, bpm)
+}
+
+#[tauri::command]
+fn db_update_key(
+    database: tauri::State<'_, db::Database>,
+    path: String,
+    key: Option<String>,
+) -> Result<(), String> {
+    database.update_key(&path, key.as_deref())
+}
+
+#[tauri::command]
+fn db_update_lufs(
+    database: tauri::State<'_, db::Database>,
+    path: String,
+    lufs: Option<f64>,
+) -> Result<(), String> {
+    database.update_lufs(&path, lufs)
+}
+
+#[tauri::command]
+fn db_get_analysis(
+    database: tauri::State<'_, db::Database>,
+    path: String,
+) -> Result<serde_json::Value, String> {
+    database.get_analysis(&path)
+}
+
+#[tauri::command]
+fn db_unanalyzed_paths(
+    database: tauri::State<'_, db::Database>,
+    limit: Option<u64>,
+) -> Result<Vec<String>, String> {
+    database.unanalyzed_paths(limit.unwrap_or(100))
+}
+
+#[tauri::command]
+fn db_migrate_json(
+    database: tauri::State<'_, db::Database>,
+) -> Result<usize, String> {
+    database.migrate_from_json()
+}
+
 // ── App setup ──
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -3228,6 +3304,7 @@ pub fn run() {
             daw_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             preset_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
         })
+        .manage(db::Database::open().expect("Failed to open database"))
         .invoke_handler(tauri::generate_handler![
             get_version,
             get_walker_status,
@@ -3322,6 +3399,15 @@ pub fn run() {
             get_process_stats,
             open_prefs_file,
             get_prefs_path,
+            db_query_audio,
+            db_audio_stats,
+            db_list_scans,
+            db_update_bpm,
+            db_update_key,
+            db_update_lufs,
+            db_get_analysis,
+            db_unanalyzed_paths,
+            db_migrate_json,
         ])
         .setup(|app| {
             // Restore window size/position
