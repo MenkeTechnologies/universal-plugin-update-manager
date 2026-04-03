@@ -419,33 +419,21 @@
     }
     .btn-stop:active { transform: translateY(1px) scale(0.98); }
 
-    /* Settings page — CSS columns for Tetris masonry packing */
+    /* Settings page — flexbox single column for consistent drag behavior */
     .settings-container {
       padding: 24px 16px 160px;
-      columns: 1;
-      column-gap: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 900px;
     }
 
     @media (min-width: 600px) {
       .settings-container { padding: 24px 24px 160px; }
     }
 
-    @media (min-width: 1100px) {
-      .settings-container { columns: 2; }
-    }
-
-    @media (min-width: 1700px) {
-      .settings-container { columns: 3; }
-    }
-
-    @media (min-width: 1700px) {
-      .settings-container { grid-template-columns: 1fr 1fr 1fr; }
-    }
-
     .settings-section {
       overflow: hidden;
-      break-inside: avoid;
-      margin-bottom: 12px;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 12px;
@@ -467,37 +455,6 @@
       user-select: none;
     }
     .settings-heading:active { cursor: grabbing; }
-    .section-ghost {
-      position: fixed;
-      z-index: 20000;
-      opacity: 0.9;
-      transform: rotate(2deg) scale(1.05);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px var(--cyan-glow);
-      border: 1px solid var(--cyan);
-      border-radius: 6px;
-      pointer-events: none;
-      background: var(--bg-card);
-      box-sizing: border-box;
-      overflow: hidden;
-    }
-    .section-placeholder {
-      border: 2px dashed var(--cyan);
-      border-radius: 4px;
-      background: rgba(5,217,232,0.08);
-      box-sizing: border-box;
-      margin-bottom: 12px;
-    }
-    .section-drop-indicator {
-      position: fixed;
-      height: 4px;
-      border: 2px dashed var(--cyan);
-      border-radius: 4px;
-      background: rgba(5,217,232,0.08);
-      box-shadow: 0 0 12px var(--cyan-glow);
-      z-index: 19999;
-      pointer-events: none;
-      box-sizing: border-box;
-    }
 
     .settings-row {
       display: flex;

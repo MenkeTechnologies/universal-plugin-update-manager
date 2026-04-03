@@ -1404,134 +1404,22 @@ document.addEventListener('input', (e) => {
 function initSettingsSectionDrag() {
   const container = document.querySelector('.settings-container');
   if (!container) return;
-  let dragged = null;
-  let ghost = null;
-  let placeholder = null;
-  let startY = 0;
-  let startX = 0;
-  let offsetY = 0;
-  let offsetX = 0;
-  let isDragging = false;
-
-  container.addEventListener('mousedown', (e) => {
-    const heading = e.target.closest('.settings-heading');
-    if (!heading || e.button !== 0) return;
-    const section = heading.closest('.settings-section');
-    if (!section) return;
-    e.preventDefault();
-    dragged = section;
-    const rect = section.getBoundingClientRect();
-    dragged._dragW = rect.width;
-    dragged._dragH = rect.height;
-    startY = e.clientY;
-    startX = e.clientX;
-    offsetY = e.clientY - rect.top;
-    offsetX = e.clientX - rect.left;
-    isDragging = false;
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!dragged) return;
-    if (!isDragging && Math.abs(e.clientY - startY) > 8) {
-      isDragging = true;
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'grabbing';
-
-      // Create ghost at original column size (captured on mousedown)
-      ghost = dragged.cloneNode(true);
-      ghost.className = 'settings-section section-ghost';
-      ghost.style.width = dragged._dragW + 'px';
-      ghost.style.left = (e.clientX - offsetX) + 'px';
-      ghost.style.top = (e.clientY - offsetY) + 'px';
-      document.body.appendChild(ghost);
-
-      // Remove original from flow — no column collapse needed
-      dragged.style.display = 'none';
-    }
-    if (!isDragging || !ghost) return;
-
-    // Move ghost with cursor
-    ghost.style.left = (e.clientX - offsetX) + 'px';
-    ghost.style.top = (e.clientY - offsetY) + 'px';
-
-    // Find drop target — temporarily hide ghost to get element underneath
-    ghost.style.pointerEvents = 'none';
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    ghost.style.pointerEvents = '';
-    const target = el?.closest('.settings-section');
-
-    // Show fixed-position destination box over target (no DOM insertion = no column reflow)
-    if (target && target !== dragged) {
-      const targetRect = target.getBoundingClientRect();
-      const before = e.clientY < targetRect.top + targetRect.height / 2;
-      const dropKey = target.dataset.section + (before ? ':before' : ':after');
-      if (dropKey !== container._lastDropKey) {
-        container._lastDropKey = dropKey;
-        container._dropTarget = target;
-        container._dropBefore = before;
-        if (!placeholder) {
-          placeholder = document.createElement('div');
-          placeholder.className = 'section-drop-indicator';
-          document.body.appendChild(placeholder);
-        }
-        placeholder.style.left = targetRect.left + 'px';
-        placeholder.style.width = targetRect.width + 'px';
-        if (before) {
-          placeholder.style.top = (targetRect.top - 6) + 'px';
-        } else {
-          placeholder.style.top = (targetRect.bottom + 2) + 'px';
-        }
-      }
-    } else {
-      if (container._lastDropKey) {
-        container._lastDropKey = null;
-        container._dropTarget = null;
-        if (placeholder) { placeholder.remove(); placeholder = null; }
-      }
-    }
-  });
-
-  document.addEventListener('mouseup', (e) => {
-    if (!dragged) return;
-    if (isDragging) {
-      if (placeholder) { placeholder.remove(); placeholder = null; }
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-
-      // Insert at drop target position
-      const dropTarget = container._dropTarget;
-      if (dropTarget && dropTarget !== dragged) {
-        if (container._dropBefore) {
-          container.insertBefore(dragged, dropTarget);
-        } else if (dropTarget.nextSibling) {
-          container.insertBefore(dragged, dropTarget.nextSibling);
-        } else {
-          container.appendChild(dragged);
-        }
-      }
-      container._dropTarget = null;
-      container._lastDropKey = null;
-      dragged.style.display = '';
-      if (ghost) { ghost.remove(); ghost = null; }
-      saveSettingsSectionOrder();
-
-      const suppress = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
-      container.addEventListener('click', suppress, { capture: true, once: true });
-    }
-    dragged = null;
-    isDragging = false;
-    document.body.style.userSelect = '';
-    document.body.style.cursor = '';
-  });
 
   restoreSettingsSectionOrder();
 
-  // Make individual settings rows draggable within each section
+  // Use the same drag-reorder system as every other draggable in the app
   if (typeof initDragReorder === 'function') {
+    initDragReorder(container, '.settings-section', 'settingsSectionOrder', {
+      getKey: (el) => el.dataset.section || '',
+      handleSelector: '.settings-heading',
+      onReorder: () => saveSettingsSectionOrder(),
+    });
+
+    // Make individual settings rows draggable within each section
     container.querySelectorAll('.settings-section[data-section]').forEach(section => {
       initDragReorder(section, '.settings-row', 'settingsRows_' + section.dataset.section, {
         getKey: (el) => el.querySelector('.settings-title')?.textContent?.trim() || '',
-        });
+      });
     });
   }
 }
