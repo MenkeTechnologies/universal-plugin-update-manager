@@ -33,9 +33,6 @@ const AUDIO_EXTENSIONS: &[&str] = &[
     ".rx2", ".sf2", ".sfz",
 ];
 
-/// MIDI files are scanned separately from audio — they appear in the MIDI tab.
-pub const MIDI_EXTENSIONS: &[&str] = &[".mid", ".midi"];
-
 const SKIP_DIRS: &[&str] = &[
     "node_modules",
     ".git",
@@ -220,7 +217,7 @@ fn walk_dir_parallel(
             .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
             .unwrap_or_default();
 
-        if AUDIO_EXTENSIONS.contains(&ext.as_str()) || MIDI_EXTENSIONS.contains(&ext.as_str()) {
+        if AUDIO_EXTENSIONS.contains(&ext.as_str()) {
             let path_str = path.to_string_lossy().to_string();
             if exclude.contains(&path_str) {
                 continue;

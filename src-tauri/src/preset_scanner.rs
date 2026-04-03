@@ -36,6 +36,8 @@ const PRESET_EXTENSIONS: &[&str] = &[
     ".syx",       // MIDI SysEx dump
     ".tfx",       // Tone2 preset
     ".pjunoxl",   // TAL preset
+    ".mid",       // Standard MIDI file
+    ".midi",      // Standard MIDI file
 ];
 
 const SKIP_DIRS: &[&str] = &[
