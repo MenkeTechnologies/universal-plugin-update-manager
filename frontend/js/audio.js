@@ -121,6 +121,7 @@ function setPan(value) {
     else if (p < 0) label.textContent = Math.round(Math.abs(p) * 100) + 'L';
     else label.textContent = Math.round(p * 100) + 'R';
   }
+  prefs.setItem('audioPan', String(value));
 }
 
 function toggleEqSection() {
@@ -138,6 +139,7 @@ function toggleMono() {
   // so we use a ChannelMerger approach. Simpler: just set pan to center
   // and note the state. Full mono requires a splitter/merger which is
   // heavy — for a preview player, center-pan is the practical equivalent.
+  prefs.setItem('audioMono', _monoMode ? 'on' : 'off');
   if (_monoMode) {
     setPan(0);
     const slider = document.getElementById('npPanSlider');
@@ -236,11 +238,25 @@ function updateAbLoopUI() {
 
 function loadRecentlyPlayed() {
   recentlyPlayed = prefs.getObject('recentlyPlayed', []);
-  // Restore loop setting
+  // Restore playback settings
   audioLooping = prefs.getItem('audioLoop') === 'on';
   audioPlayer.loop = audioLooping;
   const loopBtn = document.getElementById('npBtnLoop');
   if (loopBtn) loopBtn.classList.toggle('active', audioLooping);
+
+  audioShuffling = prefs.getItem('shuffleMode') === 'on';
+  const shuffleBtn = document.getElementById('npBtnShuffle');
+  if (shuffleBtn) shuffleBtn.classList.toggle('active', audioShuffling);
+
+  const savedVol = prefs.getItem('audioVolume');
+  if (savedVol) { const slider = document.getElementById('npVolume'); if (slider) { slider.value = savedVol; setAudioVolume(savedVol); } }
+
+  const savedSpeed = prefs.getItem('audioSpeed');
+  if (savedSpeed) { const slider = document.getElementById('npSpeedSlider'); if (slider) { slider.value = savedSpeed; setPlaybackSpeed(savedSpeed); } }
+
+  _monoMode = prefs.getItem('audioMono') === 'on';
+  const monoBtn = document.getElementById('npBtnMono');
+  if (monoBtn) monoBtn.classList.toggle('active', _monoMode);
 }
 function saveRecentlyPlayed() {
   prefs.setItem('recentlyPlayed', recentlyPlayed);
@@ -1147,15 +1163,16 @@ function seekAudio(event) {
 function setAudioVolume(value) {
   const vol = parseInt(value, 10) / 100;
   audioPlayer.volume = Math.max(0, Math.min(1, vol));
-  // Also set via gain node for Web Audio API path
   if (_gainNode) {
     _gainNode.gain.value = vol * parseFloat(document.getElementById('npGainSlider')?.value || '1');
   }
   document.getElementById('npVolumePct').textContent = value + '%';
+  prefs.setItem('audioVolume', value);
 }
 
 function setPlaybackSpeed(value) {
   audioPlayer.playbackRate = parseFloat(value);
+  prefs.setItem('audioSpeed', value);
 }
 
 // ── Metadata Panel ──
@@ -1725,6 +1742,7 @@ function nextTrack() {
 
 function toggleShuffle() {
   audioShuffling = !audioShuffling;
+  prefs.setItem('shuffleMode', audioShuffling ? 'on' : 'off');
   const btn = document.getElementById('npBtnShuffle');
   if (btn) btn.classList.toggle('active', audioShuffling);
 }
