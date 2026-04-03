@@ -419,18 +419,11 @@
     }
     .btn-stop:active { transform: translateY(1px) scale(0.98); }
 
-    /* Settings page — flexbox wrap for multi-column with consistent drag */
+    /* Settings page — CSS columns Tetris masonry (no drag reorder) */
     .settings-container {
       padding: 16px 12px 120px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: flex-start;
-    }
-
-    .settings-section {
-      flex: 1 1 100%;
-      min-width: 0;
+      columns: 1;
+      column-gap: 8px;
     }
 
     @media (min-width: 600px) {
@@ -438,18 +431,20 @@
     }
 
     @media (min-width: 1100px) {
-      .settings-section { flex: 1 1 calc(50% - 4px); }
+      .settings-container { columns: 2; }
     }
 
     @media (min-width: 1700px) {
-      .settings-section { flex: 1 1 calc(33.33% - 6px); }
+      .settings-container { columns: 3; }
     }
 
     .settings-section {
       overflow: hidden;
+      break-inside: avoid;
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 8px;
+      margin-bottom: 8px;
       background: var(--bg-card);
     }
 
@@ -464,10 +459,7 @@
       margin-bottom: 6px;
       padding-bottom: 4px;
       border-bottom: 1px solid var(--border);
-      cursor: grab;
-      user-select: none;
     }
-    .settings-heading:active { cursor: grabbing; }
 
     .settings-row {
       display: flex;

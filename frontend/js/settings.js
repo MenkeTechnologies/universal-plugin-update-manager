@@ -1402,26 +1402,15 @@ document.addEventListener('input', (e) => {
 
 // ── Settings Section Drag Reorder (Trello-style) ──
 function initSettingsSectionDrag() {
+  // No section drag — CSS columns handles layout (drag breaks column reflow)
+  // Individual rows within sections are still draggable
   const container = document.querySelector('.settings-container');
-  if (!container) return;
-
-  restoreSettingsSectionOrder();
-
-  // Use the same drag-reorder system as every other draggable in the app
-  if (typeof initDragReorder === 'function') {
-    initDragReorder(container, '.settings-section', 'settingsSectionOrder', {
-      getKey: (el) => el.dataset.section || '',
-      handleSelector: '.settings-heading',
-      onReorder: () => saveSettingsSectionOrder(),
+  if (!container || typeof initDragReorder !== 'function') return;
+  container.querySelectorAll('.settings-section[data-section]').forEach(section => {
+    initDragReorder(section, '.settings-row', 'settingsRows_' + section.dataset.section, {
+      getKey: (el) => el.querySelector('.settings-title')?.textContent?.trim() || '',
     });
-
-    // Make individual settings rows draggable within each section
-    container.querySelectorAll('.settings-section[data-section]').forEach(section => {
-      initDragReorder(section, '.settings-row', 'settingsRows_' + section.dataset.section, {
-        getKey: (el) => el.querySelector('.settings-title')?.textContent?.trim() || '',
-      });
-    });
-  }
+  });
 }
 
 function saveSettingsSectionOrder() {
