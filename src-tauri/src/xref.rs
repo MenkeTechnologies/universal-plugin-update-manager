@@ -367,8 +367,6 @@ fn extract_plugins_utf16le(data: &[u8]) -> Vec<PluginRef> {
 
 /// Parse Logic Pro .logicx package (contains binary plists with plugin info).
 fn parse_logic(path: &Path) -> Vec<PluginRef> {
-    // .logicx is a macOS package directory
-    // Try multiple known paths for the project data
     let candidates = [
         path.join("Alternatives/000/ProjectData"),
         path.join("ProjectData"),
@@ -381,19 +379,88 @@ fn parse_logic(path: &Path) -> Vec<PluginRef> {
             if let Ok(val) = plist::from_bytes::<plist::Value>(&data) {
                 extract_plugins_from_plist(&val, &mut all_plugins);
             }
-            // Also do binary string extraction on the same data
+            // Binary string extraction for file paths (.component, .vst3, etc.)
             all_plugins.extend(extract_plugins_from_binary(&data));
-            // Extract AU component identifiers (aufx:XXXX:YYYY pattern)
+            // Extract AU identifiers
             all_plugins.extend(extract_au_identifiers(&data));
+            // Extract known Logic plugin names by scanning for standalone strings
+            all_plugins.extend(extract_logic_plugin_names(&data));
         }
     }
 
     if all_plugins.is_empty() {
-        // Fallback: scan all files in the package directory
         all_plugins = extract_plugins_from_dir(path);
     }
 
     all_plugins
+}
+
+/// Extract Logic Pro plugin names from binary data.
+/// Logic stores plugin names as standalone readable strings in the ProjectData binary.
+fn extract_logic_plugin_names(data: &[u8]) -> Vec<PluginRef> {
+    let mut plugins = Vec::new();
+    // Known third-party plugins and Logic stock effects to look for
+    let stock_effects = [
+        "Channel EQ", "Compressor", "Adaptive Limiter", "Multipressor",
+        "Space Designer", "Tape Delay", "Stereo Delay", "ChromaVerb",
+        "Exciter", "Overdrive", "AutoFilter", "Direction Mixer",
+        "Gain", "Stereo Spread", "Limiter", "Noise Gate", "DeEsser",
+        "Tremolo", "Phaser", "Flanger", "Chorus", "Ringshifter",
+        "Pitch Correction", "Pitch Shifter", "Vocal Transformer",
+    ];
+    // Extract all readable strings and check for known plugin names
+    let mut current = Vec::new();
+    let mut found_names = std::collections::HashSet::new();
+    for &byte in data {
+        if byte >= 0x20 && byte <= 0x7E {
+            current.push(byte);
+        } else {
+            if current.len() >= 3 && current.len() <= 64 {
+                let s = String::from_utf8_lossy(&current).to_string();
+                // Skip common non-plugin strings
+                if !s.contains('/') && !s.contains('\\') && !s.starts_with("com.")
+                    && !s.starts_with("kD") && !s.starts_with("0x") && !s.starts_with("Aco")
+                    && !s.starts_with("Output ") && !s.starts_with("Input ")
+                    && !s.starts_with("Automatic-") && !s.contains("KeyLab")
+                    && !s.ends_with(".pst") && !s.ends_with(".aif") && !s.ends_with(".wav")
+                    && !s.ends_with(".cst") && !s.ends_with(".exs")
+                    && !found_names.contains(&s)
+                {
+                    let is_stock = stock_effects.contains(&s.as_str());
+                    let known_third_party = ["Sylenth1", "Spire", "Serum", "Massive", "Kontakt",
+                        "Omnisphere", "Nexus", "Diva", "Hive", "Vital", "Phase Plant",
+                        "Pro-Q", "Pro-L", "Pro-R", "Pro-C", "Pro-G", "Pro-MB",
+                        "Ozone", "Neutron", "Trash", "VocalSynth", "Iris",
+                        "Valhalla", "FabFilter", "iZotope", "Waves", "Soundtoys",
+                        "LFOTool", "CamelCrusher", "OTT", "Sausage Fattener",
+                        "Saturn", "Volcano", "Timeless", "Decapitator", "EchoBoy",
+                        "Radiator", "Devil-Loc", "PanMan", "FilterFreak", "PhaseMistress",
+                        "RC-20", "Kickstart", "Cableguys", "Portal", "Output",
+                        "Arturia", "u-he", "Xfer", "Native Instruments", "Spectrasonics",
+                        "Alchemy", "ES2", "EXS24", "Retro Synth", "Drum Kit Designer"];
+                    let is_known = known_third_party.iter().any(|&kp| s.starts_with(kp) || s == kp);
+
+                    if is_stock || is_known {
+                        // Trim trailing non-alphanumeric junk (binary artifacts)
+                        let s = s.trim_end_matches(|c: char| !c.is_alphanumeric() && c != ')' && c != ']').to_string();
+                        if s.len() < 2 { current.clear(); continue; }
+                        found_names.insert(s.clone());
+                        let normalized = normalize_plugin_name(&s);
+                        if !normalized.is_empty() {
+                            plugins.push(PluginRef {
+                                name: s,
+                                normalized_name: normalized,
+                                manufacturer: String::new(),
+                                plugin_type: if is_stock { "AU (Stock)".into() } else { "AU".into() },
+                            });
+                        }
+                    }
+                }
+            }
+            current.clear();
+        }
+    }
+    plugins
 }
 
 /// Extract Audio Unit identifiers from binary data.
@@ -434,13 +501,16 @@ fn extract_au_identifiers(data: &[u8]) -> Vec<PluginRef> {
     plugins
 }
 
-/// Parse Cubase/Nuendo .cpr file (binary — string extraction).
+/// Parse Cubase/Nuendo .cpr file (binary — string extraction + Plugin Name markers).
 fn parse_cubase(path: &Path) -> Vec<PluginRef> {
     let data = match fs::read(path) {
         Ok(d) => d,
         Err(_) => return vec![],
     };
-    extract_plugins_from_binary(&data)
+    let mut plugins = extract_plugins_from_binary(&data);
+    // Cubase stores plugin names after "Plugin Name" markers
+    plugins.extend(extract_named_plugins(&data, b"Plugin Name"));
+    plugins
 }
 
 /// Parse Pro Tools .ptx/.ptf file (binary — string extraction).
@@ -567,14 +637,19 @@ fn extract_plugins_from_plist(val: &plist::Value, plugins: &mut Vec<PluginRef>) 
 }
 
 /// Try to extract a plugin reference from a single string (path or name).
+/// Handles both exact suffix match and embedded paths (e.g. "Serum.dll8" in FLP chunks).
 fn extract_plugin_from_string(s: &str) -> Option<PluginRef> {
     let exts = [(".dll", "VST2"), (".vst3", "VST3"), (".component", "AU"), (".clap", "CLAP"), (".aaxplugin", "AAX")];
     for (ext, ptype) in &exts {
-        if s.ends_with(ext) {
-            let name = s.rsplit(['\\', '/']).next()?.trim_end_matches(ext).trim();
-            if name.is_empty() || name.contains("VstPlugins") || name.contains("Program Files") { return None; }
+        // Find the extension anywhere in the string (not just at the end)
+        if let Some(pos) = s.find(ext) {
+            // Extract the substring up to and including the extension
+            let path_part = &s[..pos + ext.len()];
+            let name = path_part.rsplit(['\\', '/']).next()?.trim_end_matches(ext).trim();
+            if name.is_empty() || name.len() < 2 { continue; }
+            if name.contains("VstPlugins") || name.contains("Program Files") || name.contains("CommonFiles") { continue; }
             let normalized = normalize_plugin_name(name);
-            if normalized.is_empty() { return None; }
+            if normalized.is_empty() { continue; }
             return Some(PluginRef {
                 name: name.to_string(),
                 normalized_name: normalized,
@@ -584,6 +659,48 @@ fn extract_plugin_from_string(s: &str) -> Option<PluginRef> {
         }
     }
     None
+}
+
+/// Extract plugin names that follow a marker string in binary data.
+/// Used by Cubase (.cpr) where plugins appear as "Plugin Name" followed by the name.
+fn extract_named_plugins(data: &[u8], marker: &[u8]) -> Vec<PluginRef> {
+    let mut plugins = Vec::new();
+    let builtin = ["Standard Panner", "Stereo Combined Panner", "Mono", "Stereo", "No Bus"];
+    let mut pos = 0;
+    while pos + marker.len() < data.len() {
+        if let Some(idx) = data[pos..].windows(marker.len()).position(|w| w == marker) {
+            let after = pos + idx + marker.len();
+            // Skip non-printable bytes to find the next readable string
+            let mut start = after;
+            while start < data.len() && (data[start] < 0x20 || data[start] > 0x7E) {
+                start += 1;
+            }
+            if start < data.len() {
+                let mut end = start;
+                while end < data.len() && data[end] >= 0x20 && data[end] <= 0x7E {
+                    end += 1;
+                }
+                if end - start >= 3 && end - start <= 100 {
+                    let name = String::from_utf8_lossy(&data[start..end]).to_string();
+                    if !builtin.contains(&name.as_str()) && !name.starts_with("VST") && !name.contains("Plugin") {
+                        let normalized = normalize_plugin_name(&name);
+                        if !normalized.is_empty() {
+                            plugins.push(PluginRef {
+                                name: name.clone(),
+                                normalized_name: normalized,
+                                manufacturer: String::new(),
+                                plugin_type: "VST".into(),
+                            });
+                        }
+                    }
+                }
+            }
+            pos = after + 1;
+        } else {
+            break;
+        }
+    }
+    plugins
 }
 
 /// Parse Bitwig .bwproject file (binary — reuses shared string extraction).
@@ -1148,5 +1265,98 @@ mod tests {
         assert!(names.contains(&"Kontakt"), "should find Kontakt, got {:?}", names);
 
         let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_binary_extraction_finds_all_plugin_types() {
+        // Simulate binary data with embedded plugin paths
+        let mut data = vec![0u8; 100];
+        data.extend_from_slice(b"C:\\VSTPlugins\\Massive.dll");
+        data.extend_from_slice(&[0; 50]);
+        data.extend_from_slice(b"/Library/Audio/Plug-Ins/VST3/Serum.vst3");
+        data.extend_from_slice(&[0; 50]);
+        data.extend_from_slice(b"/Library/Audio/Plug-Ins/Components/Kontakt.component");
+        data.extend_from_slice(&[0; 50]);
+        data.extend_from_slice(b"/Library/Audio/Plug-Ins/CLAP/Vital.clap");
+        data.extend_from_slice(&[0; 50]);
+        data.extend_from_slice(b"C:\\AAX\\Pro-Q 3.aaxplugin");
+        data.extend_from_slice(&[0; 50]);
+
+        let result = extract_plugins_from_binary(&data);
+        assert!(result.len() >= 5, "should find 5 plugins, got {}: {:?}", result.len(), result.iter().map(|p| &p.name).collect::<Vec<_>>());
+        let types: Vec<&str> = result.iter().map(|p| p.plugin_type.as_str()).collect();
+        assert!(types.contains(&"VST2"));
+        assert!(types.contains(&"VST3"));
+        assert!(types.contains(&"AU"));
+        assert!(types.contains(&"CLAP"));
+        assert!(types.contains(&"AAX"));
+    }
+
+    #[test]
+    fn test_utf16le_extraction() {
+        // Simulate FL Studio UTF-16LE plugin path
+        let mut data = vec![0u8; 50];
+        let path = "Serum.dll";
+        for c in path.chars() {
+            data.push(c as u8);
+            data.push(0); // UTF-16LE high byte
+        }
+        data.extend_from_slice(&[0; 50]);
+
+        let result = extract_plugins_utf16le(&data);
+        assert!(!result.is_empty(), "should find UTF-16LE plugin, got empty");
+        assert_eq!(result[0].name, "Serum");
+    }
+
+    #[test]
+    fn test_flp_extraction() {
+        // Create minimal FLP-like data with embedded plugin paths
+        let mut data = vec![0u8; 200];
+        // Embed ASCII plugin path
+        let offset = 100;
+        let path = b"C:\\Program Files\\VSTPlugins\\Sylenth1.dll";
+        data[offset..offset + path.len()].copy_from_slice(path);
+
+        let result = extract_plugins_from_binary(&data);
+        assert!(!result.is_empty(), "should find plugin in FLP-like binary");
+        assert_eq!(result[0].name, "Sylenth1");
+    }
+
+    /// Test FLP parser on a real file
+    #[test]
+    #[ignore]
+    fn test_flp_real_file() {
+        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/Producer loops/2021/prototypesamples_RAGE - PROJECT/RAGE PROJECT/_RAGE.flp";
+        if !std::path::Path::new(path).exists() { println!("FLP not found, skipping"); return; }
+        let result = extract_plugins(path);
+        println!("FLP plugins found: {}", result.len());
+        for p in &result {
+            println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name);
+        }
+        assert!(!result.is_empty(), "Real FLP should have plugins");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_logic_real_file() {
+        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/mettaglyde/Alex Di Stefano Logic Pro Tech-Trance Template Vol One/Alex Di Stefano Logic Pro Tech-Trance Template Vol One.logicx";
+        if !std::path::Path::new(path).exists() { println!("Logic file not found"); return; }
+        let result = extract_plugins(path);
+        println!("Logic plugins found: {}", result.len());
+        for p in &result {
+            println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_cubase_real_file() {
+        let path = "/Users/wizard/mnt/production/MusicProduction/Samples/Producer loops/2021/OST Audio - Trance Collection/Collection/Powerful Trance For Spire/Templates/Cubase/0_1 By OST_Audio/0_1 By OST_Audio.cpr";
+        if !std::path::Path::new(path).exists() { println!("Cubase file not found"); return; }
+        let result = extract_plugins(path);
+        println!("Cubase plugins found: {}", result.len());
+        for p in &result {
+            println!("  {} ({}) [{}]", p.name, p.plugin_type, p.normalized_name);
+        }
     }
 }
