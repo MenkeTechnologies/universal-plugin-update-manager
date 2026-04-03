@@ -276,11 +276,8 @@ document.addEventListener('contextmenu', (e) => {
       ...(typeof isXrefSupported === 'function' && isXrefSupported(dawRow.querySelector('.format-badge.format-default')?.textContent || '')
         ? [{ icon: '&#9889;', label: 'Show Plugins Used', action: () => showProjectPlugins(path, name) }]
         : []),
-      ...(path.toLowerCase().endsWith('.als') && typeof showAlsViewer === 'function'
-        ? [{ icon: '&#128196;', label: 'Explore XML Contents', action: () => showAlsViewer(path, name) }]
-        : []),
-      ...(path.toLowerCase().endsWith('.bwproject') && typeof showBwViewer === 'function'
-        ? [{ icon: '&#128196;', label: 'Explore Bitwig Contents', action: () => showBwViewer(path, name) }]
+      ...(typeof showProjectViewer === 'function'
+        ? [{ icon: '&#128196;', label: 'Explore Project Contents', action: () => showProjectViewer(path, name) }]
         : []),
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },

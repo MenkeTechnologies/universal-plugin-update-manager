@@ -1,8 +1,9 @@
 //! Cross-reference engine: extract plugin references from DAW project files.
 //!
-//! Parses Ableton Live (.als — gzip XML) and REAPER (.rpp — plaintext) project
-//! files to discover which plugins each project uses. Returns deduplicated lists
-//! of plugin names, manufacturers, and types.
+//! Parses 11 DAW formats: Ableton (.als), REAPER (.rpp), Bitwig (.bwproject),
+//! Studio One (.song), DAWproject, FL Studio (.flp), Logic Pro (.logicx),
+//! Cubase/Nuendo (.cpr), Pro Tools (.ptx/.ptf), and Reason (.reason).
+//! Returns deduplicated lists of plugin names, manufacturers, and types.
 
 use flate2::read::GzDecoder;
 use regex::Regex;
@@ -80,6 +81,13 @@ pub fn extract_plugins(project_path: &str) -> Vec<PluginRef> {
         "als" => parse_ableton(path),
         "rpp" | "rpp-bak" => parse_reaper(path),
         "bwproject" => parse_bitwig(path),
+        "song" => parse_studio_one(path),
+        "dawproject" => parse_dawproject(path),
+        "flp" => parse_flp(path),
+        "logicx" => parse_logic(path),
+        "cpr" | "npr" => parse_cubase(path),
+        "ptx" | "ptf" => parse_protools(path),
+        "reason" => parse_reason(path),
         _ => vec![],
     };
 
@@ -255,115 +263,306 @@ fn parse_reaper(path: &Path) -> Vec<PluginRef> {
 /// Bitwig files have a `BtWg` magic header followed by binary-serialized
 /// project data. Plugin references are stored as DLL/VST3/component paths
 /// in plain text within the binary. We extract them via string scanning.
-fn parse_bitwig(path: &Path) -> Vec<PluginRef> {
+/// Parse Studio One .song file (ZIP containing song.xml).
+fn parse_studio_one(path: &Path) -> Vec<PluginRef> {
+    let file = match fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return vec![],
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(_) => return vec![],
+    };
+    // Look for song.xml or Song/song.xml
+    let xml = ["song.xml", "Song/song.xml", "metainfo.xml"]
+        .iter()
+        .find_map(|name| {
+            let mut entry = archive.by_name(name).ok()?;
+            let mut s = String::new();
+            entry.read_to_string(&mut s).ok()?;
+            Some(s)
+        })
+        .unwrap_or_default();
+    if xml.is_empty() {
+        return vec![];
+    }
+    extract_plugins_from_xml(&xml, &[
+        (r#"classID="([^"]+)""#, "", "VST"),
+        (r#"plugName="([^"]+)""#, "", "VST"),
+        (r#"deviceName="([^"]+)""#, "", "VST"),
+    ])
+}
+
+/// Parse .dawproject file (ZIP containing project.xml — open standard).
+fn parse_dawproject(path: &Path) -> Vec<PluginRef> {
+    let file = match fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return vec![],
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(_) => return vec![],
+    };
+    let xml = match archive.by_name("project.xml") {
+        Ok(mut entry) => {
+            let mut s = String::new();
+            entry.read_to_string(&mut s).ok();
+            s
+        }
+        Err(_) => return vec![],
+    };
+    extract_plugins_from_xml(&xml, &[
+        (r#"<Plugin\s+name="([^"]+)""#, "", "VST"),
+        (r#"deviceName="([^"]+)""#, "", "VST"),
+    ])
+}
+
+/// Parse FL Studio .flp file (binary chunk format).
+/// Plugin names appear as UTF-16LE or ASCII strings in specific event types.
+fn parse_flp(path: &Path) -> Vec<PluginRef> {
     let data = match fs::read(path) {
         Ok(d) => d,
         Err(_) => return vec![],
     };
-
+    // Verify FLP header: "FLhd"
+    if data.len() < 16 || &data[0..4] != b"FLhd" {
+        return vec![];
+    }
+    // Skip to data chunk "FLdt"
+    let dt_pos = data.windows(4).position(|w| w == b"FLdt");
+    let start = match dt_pos {
+        Some(p) => p + 8, // skip "FLdt" + 4-byte size
+        None => return vec![],
+    };
     let mut plugins = Vec::new();
+    let mut i = start;
+    while i < data.len() {
+        if i + 1 >= data.len() { break; }
+        let event_id = data[i];
+        i += 1;
+        if event_id < 192 {
+            // Simple events: 1-4 bytes of data
+            let skip = if event_id < 64 { 1 } else if event_id < 128 { 2 } else { 4 };
+            i += skip;
+        } else {
+            // Text/data events: variable length
+            if i >= data.len() { break; }
+            let mut len = 0usize;
+            let mut shift = 0;
+            loop {
+                if i >= data.len() { break; }
+                let b = data[i] as usize;
+                i += 1;
+                len |= (b & 0x7F) << shift;
+                shift += 7;
+                if b & 0x80 == 0 { break; }
+            }
+            if i + len > data.len() { break; }
+            let chunk = &data[i..i + len];
+            i += len;
+            // Event IDs 201 (plugin name) and 212 (plugin filename) contain plugin references
+            if (event_id == 201 || event_id == 212 || event_id == 203) && len >= 2 {
+                // Try UTF-16LE first, then ASCII
+                let s = if chunk.iter().step_by(2).all(|&b| b >= 0x20 || b == 0) && chunk.len() % 2 == 0 {
+                    let u16s: Vec<u16> = chunk.chunks(2).map(|c| u16::from_le_bytes([c[0], c.get(1).copied().unwrap_or(0)])).collect();
+                    String::from_utf16_lossy(&u16s).trim_matches('\0').to_string()
+                } else {
+                    String::from_utf8_lossy(chunk).trim_matches('\0').to_string()
+                };
+                if !s.is_empty() && s.len() > 2 {
+                    if let Some(p) = extract_plugin_from_string(&s) {
+                        plugins.push(p);
+                    }
+                }
+            }
+        }
+    }
+    plugins
+}
 
-    // Extract all printable ASCII strings >= 8 chars from the binary
+/// Parse Logic Pro .logicx package (contains binary plists with plugin info).
+fn parse_logic(path: &Path) -> Vec<PluginRef> {
+    // .logicx is a macOS package directory
+    let alt_path = path.join("Alternatives/000/ProjectData");
+    let plist_path = if alt_path.exists() { alt_path } else { path.join("ProjectData") };
+    let data = match fs::read(&plist_path) {
+        Ok(d) => d,
+        Err(_) => {
+            // Fallback: string extraction from any binary files in the package
+            return extract_plugins_from_dir(path);
+        }
+    };
+    // Try plist parsing first
+    if let Ok(val) = plist::from_bytes::<plist::Value>(&data) {
+        let mut plugins = Vec::new();
+        extract_plugins_from_plist(&val, &mut plugins);
+        if !plugins.is_empty() {
+            return plugins;
+        }
+    }
+    // Fallback: string extraction from binary data
+    extract_plugins_from_binary(&data)
+}
+
+/// Parse Cubase/Nuendo .cpr file (binary — string extraction).
+fn parse_cubase(path: &Path) -> Vec<PluginRef> {
+    let data = match fs::read(path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    extract_plugins_from_binary(&data)
+}
+
+/// Parse Pro Tools .ptx/.ptf file (binary — string extraction).
+fn parse_protools(path: &Path) -> Vec<PluginRef> {
+    let data = match fs::read(path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    extract_plugins_from_binary(&data)
+}
+
+/// Parse Reason .reason file (binary — string extraction).
+fn parse_reason(path: &Path) -> Vec<PluginRef> {
+    let data = match fs::read(path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    extract_plugins_from_binary(&data)
+}
+
+// ── Shared extraction helpers ──
+
+/// Extract plugin names from XML using regex patterns.
+fn extract_plugins_from_xml(xml: &str, patterns: &[(&str, &str, &str)]) -> Vec<PluginRef> {
+    let mut plugins = Vec::new();
+    for &(pattern, manufacturer_default, type_default) in patterns {
+        if let Ok(re) = Regex::new(pattern) {
+            for cap in re.captures_iter(xml) {
+                if let Some(name) = cap.get(1) {
+                    let n = name.as_str().trim();
+                    if n.is_empty() || n.len() < 2 { continue; }
+                    let normalized = normalize_plugin_name(n);
+                    if normalized.is_empty() { continue; }
+                    plugins.push(PluginRef {
+                        name: n.to_string(),
+                        normalized_name: normalized,
+                        manufacturer: manufacturer_default.to_string(),
+                        plugin_type: type_default.to_string(),
+                    });
+                }
+            }
+        }
+    }
+    plugins
+}
+
+/// Extract plugin references from a binary file via string scanning.
+/// Looks for paths ending in .dll, .vst3, .component, .clap, .aaxplugin
+fn extract_plugins_from_binary(data: &[u8]) -> Vec<PluginRef> {
+    let mut plugins = Vec::new();
     let mut current = Vec::new();
-    for &byte in &data {
+    for &byte in data {
         if byte >= 0x20 && byte <= 0x7E {
             current.push(byte);
         } else {
-            if current.len() >= 8 {
+            if current.len() >= 6 {
                 let s = String::from_utf8_lossy(&current).to_string();
-                // Match plugin DLL/VST3/component paths
-                if let Some(plugin) = extract_bitwig_plugin(&s) {
-                    plugins.push(plugin);
+                if let Some(p) = extract_plugin_from_string(&s) {
+                    plugins.push(p);
                 }
             }
             current.clear();
         }
     }
-    // Final string
-    if current.len() >= 8 {
+    if current.len() >= 6 {
         let s = String::from_utf8_lossy(&current).to_string();
-        if let Some(plugin) = extract_bitwig_plugin(&s) {
-            plugins.push(plugin);
+        if let Some(p) = extract_plugin_from_string(&s) {
+            plugins.push(p);
         }
     }
-
     plugins
 }
 
-fn extract_bitwig_plugin(s: &str) -> Option<PluginRef> {
-    // Match DLL paths (VST2): "Name.dll" or "path\to\Name.dll"
-    if s.ends_with(".dll") {
-        let name = s
-            .rsplit(['\\', '/'])
-            .next()?
-            .trim_end_matches(".dll")
-            .trim();
-        if name.is_empty() || name.contains("VstPlugins") { return None; }
-        let normalized_name = normalize_plugin_name(name);
-        if normalized_name.is_empty() { return None; }
-        return Some(PluginRef {
-            name: name.to_string(),
-            normalized_name,
-            manufacturer: String::new(),
-            plugin_type: "VST2".into(),
-        });
+/// Extract plugins from all files in a directory (for .logicx packages).
+fn extract_plugins_from_dir(dir: &Path) -> Vec<PluginRef> {
+    let mut plugins = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_file() {
+                if let Ok(data) = fs::read(&p) {
+                    plugins.extend(extract_plugins_from_binary(&data));
+                }
+            } else if p.is_dir() && plugins.len() < 500 {
+                plugins.extend(extract_plugins_from_dir(&p));
+            }
+        }
     }
+    plugins
+}
 
-    // Match VST3 paths: "Name.vst3"
-    if s.ends_with(".vst3") {
-        let name = s
-            .rsplit(['\\', '/'])
-            .next()?
-            .trim_end_matches(".vst3")
-            .trim();
-        if name.is_empty() { return None; }
-        let normalized_name = normalize_plugin_name(name);
-        if normalized_name.is_empty() { return None; }
-        return Some(PluginRef {
-            name: name.to_string(),
-            normalized_name,
-            manufacturer: String::new(),
-            plugin_type: "VST3".into(),
-        });
+/// Extract plugin names from a Logic Pro plist structure.
+fn extract_plugins_from_plist(val: &plist::Value, plugins: &mut Vec<PluginRef>) {
+    match val {
+        plist::Value::Dictionary(dict) => {
+            // Look for plugin name keys
+            for key in ["pluginName", "PluginName", "name", "Name", "plugName"] {
+                if let Some(plist::Value::String(name)) = dict.get(key) {
+                    let n = name.trim();
+                    if n.len() >= 2 {
+                        let normalized = normalize_plugin_name(n);
+                        if !normalized.is_empty() {
+                            plugins.push(PluginRef {
+                                name: n.to_string(),
+                                normalized_name: normalized,
+                                manufacturer: dict.get("manufacturer").and_then(|v| v.as_string()).unwrap_or("").to_string(),
+                                plugin_type: dict.get("pluginType").and_then(|v| v.as_string()).map(|s| s.to_string()).unwrap_or_else(|| "AU".into()),
+                            });
+                        }
+                    }
+                }
+            }
+            for (_, v) in dict.iter() {
+                extract_plugins_from_plist(v, plugins);
+            }
+        }
+        plist::Value::Array(arr) => {
+            for v in arr {
+                extract_plugins_from_plist(v, plugins);
+            }
+        }
+        _ => {}
     }
+}
 
-    // Match AU paths: "Name.component"
-    if s.ends_with(".component") {
-        let name = s
-            .rsplit(['\\', '/'])
-            .next()?
-            .trim_end_matches(".component")
-            .trim();
-        if name.is_empty() { return None; }
-        let normalized_name = normalize_plugin_name(name);
-        if normalized_name.is_empty() { return None; }
-        return Some(PluginRef {
-            name: name.to_string(),
-            normalized_name,
-            manufacturer: String::new(),
-            plugin_type: "AU".into(),
-        });
+/// Try to extract a plugin reference from a single string (path or name).
+fn extract_plugin_from_string(s: &str) -> Option<PluginRef> {
+    let exts = [(".dll", "VST2"), (".vst3", "VST3"), (".component", "AU"), (".clap", "CLAP"), (".aaxplugin", "AAX")];
+    for (ext, ptype) in &exts {
+        if s.ends_with(ext) {
+            let name = s.rsplit(['\\', '/']).next()?.trim_end_matches(ext).trim();
+            if name.is_empty() || name.contains("VstPlugins") || name.contains("Program Files") { return None; }
+            let normalized = normalize_plugin_name(name);
+            if normalized.is_empty() { return None; }
+            return Some(PluginRef {
+                name: name.to_string(),
+                normalized_name: normalized,
+                manufacturer: String::new(),
+                plugin_type: ptype.to_string(),
+            });
+        }
     }
-
-    // Match CLAP: "Name.clap"
-    if s.ends_with(".clap") {
-        let name = s
-            .rsplit(['\\', '/'])
-            .next()?
-            .trim_end_matches(".clap")
-            .trim();
-        if name.is_empty() { return None; }
-        let normalized_name = normalize_plugin_name(name);
-        if normalized_name.is_empty() { return None; }
-        return Some(PluginRef {
-            name: name.to_string(),
-            normalized_name,
-            manufacturer: String::new(),
-            plugin_type: "CLAP".into(),
-        });
-    }
-
     None
+}
+
+/// Parse Bitwig .bwproject file (binary — reuses shared string extraction).
+fn parse_bitwig(path: &Path) -> Vec<PluginRef> {
+    let data = match fs::read(path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    extract_plugins_from_binary(&data)
 }
 
 #[cfg(test)]
@@ -850,7 +1049,7 @@ mod tests {
 
     #[test]
     fn test_extract_bitwig_plugin_dll() {
-        let p = extract_bitwig_plugin(r"C:\Program Files\Steinberg\VstPlugins\Serum.dll");
+        let p = extract_plugin_from_string(r"C:\Program Files\Steinberg\VstPlugins\Serum.dll");
         assert!(p.is_some());
         let p = p.unwrap();
         assert_eq!(p.name, "Serum");
@@ -859,7 +1058,7 @@ mod tests {
 
     #[test]
     fn test_extract_bitwig_plugin_vst3() {
-        let p = extract_bitwig_plugin("/Library/Audio/Plug-Ins/VST3/FabFilter Pro-Q 3.vst3");
+        let p = extract_plugin_from_string("/Library/Audio/Plug-Ins/VST3/FabFilter Pro-Q 3.vst3");
         assert!(p.is_some());
         let p = p.unwrap();
         assert_eq!(p.name, "FabFilter Pro-Q 3");
@@ -868,7 +1067,7 @@ mod tests {
 
     #[test]
     fn test_extract_bitwig_plugin_au() {
-        let p = extract_bitwig_plugin("/Library/Audio/Plug-Ins/Components/Massive.component");
+        let p = extract_plugin_from_string("/Library/Audio/Plug-Ins/Components/Massive.component");
         assert!(p.is_some());
         let p = p.unwrap();
         assert_eq!(p.name, "Massive");
@@ -877,7 +1076,7 @@ mod tests {
 
     #[test]
     fn test_extract_bitwig_plugin_clap() {
-        let p = extract_bitwig_plugin("/Library/Audio/Plug-Ins/CLAP/Vital.clap");
+        let p = extract_plugin_from_string("/Library/Audio/Plug-Ins/CLAP/Vital.clap");
         assert!(p.is_some());
         let p = p.unwrap();
         assert_eq!(p.name, "Vital");
@@ -887,12 +1086,12 @@ mod tests {
     #[test]
     fn test_extract_bitwig_plugin_rejects_dir() {
         // VstPlugins directory path should not be extracted as a plugin
-        assert!(extract_bitwig_plugin(r"C:\Program Files\Steinberg\VstPlugins").is_none());
+        assert!(extract_plugin_from_string(r"C:\Program Files\Steinberg\VstPlugins").is_none());
     }
 
     #[test]
     fn test_extract_bitwig_plugin_strips_path() {
-        let p = extract_bitwig_plugin(r"MeldaProduction\Modulation\MFlanger.dll");
+        let p = extract_plugin_from_string(r"MeldaProduction\Modulation\MFlanger.dll");
         assert!(p.is_some());
         assert_eq!(p.unwrap().name, "MFlanger");
     }

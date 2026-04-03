@@ -448,6 +448,7 @@ window.vstUpdater = {
   // Similarity
   findSimilarSamples: (filePath, candidatePaths, maxResults) => invoke('find_similar_samples', { filePath, candidatePaths, maxResults: maxResults || 20 }),
   readAlsXml: (filePath) => invoke('read_als_xml', { filePath }),
+  readProjectFile: (filePath) => invoke('read_project_file', { filePath }),
   // Preferences (file-backed)
   getProcessStats: () => invoke('get_process_stats'),
   openPrefsFile: () => invoke('open_prefs_file'),
@@ -466,6 +467,7 @@ window.vstUpdater = {
   dbGetAnalysis: (path) => invoke('db_get_analysis', { path }),
   dbUnanalyzedPaths: (limit) => invoke('db_unanalyzed_paths', { limit: limit || 100 }),
   dbMigrateJson: () => invoke('db_migrate_json'),
+  dbCacheStats: () => invoke('db_cache_stats'),
   dbClearCaches: () => invoke('db_clear_caches'),
   dbClearCacheTable: (table) => invoke('db_clear_cache_table', { table }),
 };

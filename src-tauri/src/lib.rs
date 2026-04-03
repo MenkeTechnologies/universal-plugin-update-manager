@@ -1249,6 +1249,64 @@ fn clear_log() -> Result<(), String> {
     std::fs::write(&path, "").map_err(|e| e.to_string())
 }
 
+/// Generic project file reader: returns {type: "xml"|"tree", content: ...}
+/// XML formats get raw XML string, binary formats get structured JSON tree.
+#[tauri::command]
+fn read_project_file(file_path: String) -> Result<serde_json::Value, String> {
+    let path = std::path::Path::new(&file_path);
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    match ext.as_str() {
+        "als" => {
+            let xml = read_als_xml(file_path.clone())?;
+            Ok(serde_json::json!({"type": "xml", "format": "Ableton Live Set", "content": xml, "path": file_path}))
+        }
+        "song" => {
+            let xml = read_zip_xml(&file_path, &["song.xml", "Song/song.xml", "metainfo.xml"])?;
+            Ok(serde_json::json!({"type": "xml", "format": "Studio One Song", "content": xml, "path": file_path}))
+        }
+        "dawproject" => {
+            let xml = read_zip_xml(&file_path, &["project.xml", "metadata.xml"])?;
+            Ok(serde_json::json!({"type": "xml", "format": "DAWproject", "content": xml, "path": file_path}))
+        }
+        "rpp" | "rpp-bak" => {
+            let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({"type": "text", "format": "REAPER Project", "content": content, "path": file_path}))
+        }
+        _ => read_bwproject(file_path), // binary tree for everything else
+    }
+}
+
+/// Read XML from a ZIP archive (Studio One, DAWproject).
+fn read_zip_xml(file_path: &str, names: &[&str]) -> Result<String, String> {
+    use std::io::Read;
+    let file = std::fs::File::open(file_path).map_err(|e| e.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Not a valid ZIP: {e}"))?;
+    for name in names {
+        if let Ok(mut entry) = archive.by_name(name) {
+            let mut s = String::new();
+            entry.read_to_string(&mut s).map_err(|e| e.to_string())?;
+            if !s.is_empty() { return Ok(s); }
+        }
+    }
+    // List all files and return the first XML found
+    let mut xml_name = None;
+    for i in 0..archive.len() {
+        if let Ok(entry) = archive.by_index(i) {
+            if entry.name().ends_with(".xml") {
+                xml_name = Some(entry.name().to_string());
+                break;
+            }
+        }
+    }
+    if let Some(name) = xml_name {
+        let mut entry = archive.by_name(&name).map_err(|e| e.to_string())?;
+        let mut s = String::new();
+        entry.read_to_string(&mut s).map_err(|e| e.to_string())?;
+        return Ok(s);
+    }
+    Err("No XML found in archive".into())
+}
+
 #[tauri::command]
 fn read_bwproject(file_path: String) -> Result<serde_json::Value, String> {
     let data = std::fs::read(&file_path).map_err(|e| e.to_string())?;
@@ -3192,6 +3250,11 @@ fn db_migrate_json() -> Result<usize, String> {
 }
 
 #[tauri::command]
+fn db_cache_stats() -> Result<Vec<db::CacheStat>, String> {
+    db::global().cache_stats()
+}
+
+#[tauri::command]
 fn db_clear_caches() -> Result<(), String> {
     db::global().clear_all_caches()
 }
@@ -3342,6 +3405,7 @@ pub fn run() {
             list_data_files,
             delete_data_file,
             read_bwproject,
+            read_project_file,
             compute_fingerprint,
             find_similar_samples,
             open_update_url,
@@ -3395,6 +3459,7 @@ pub fn run() {
             db_get_analysis,
             db_unanalyzed_paths,
             db_migrate_json,
+            db_cache_stats,
             db_clear_caches,
             db_clear_cache_table,
         ])

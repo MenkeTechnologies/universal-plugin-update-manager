@@ -1,6 +1,6 @@
 // ── Plugin ↔ DAW Cross-Reference ──
 
-const XREF_FORMATS = new Set(['ALS', 'RPP', 'RPP-BAK', 'BWPROJECT']);
+const XREF_FORMATS = new Set(['ALS', 'RPP', 'RPP-BAK', 'BWPROJECT', 'SONG', 'DAWPROJECT', 'FLP', 'LOGICX', 'CPR', 'NPR', 'PTX', 'PTF', 'REASON']);
 
 // Cache: project path → PluginRef[]
 const _xrefCache = {};
@@ -287,6 +287,100 @@ function buildXmlTree(node, depth) {
   return el;
 }
 
+// ── Generic Project Viewer (routes to XML or Tree) ──
+async function showProjectViewer(filePath, projectName) {
+  const ext = filePath.split('.').pop().toLowerCase();
+  // XML-based formats: use readProjectFile which returns {type, format, content}
+  const xmlFormats = ['als', 'song', 'dawproject'];
+  const textFormats = ['rpp', 'rpp-bak'];
+  if (xmlFormats.includes(ext)) {
+    showXmlProjectViewer(filePath, projectName);
+  } else if (textFormats.includes(ext)) {
+    showTextProjectViewer(filePath, projectName);
+  } else if (ext === 'bwproject') {
+    showBwViewer(filePath, projectName);
+  } else {
+    // Binary formats: use read_bwproject which does string extraction
+    showBinaryProjectViewer(filePath, projectName);
+  }
+}
+
+async function showXmlProjectViewer(filePath, projectName) {
+  let existing = document.getElementById('projectViewerModal');
+  if (existing) existing.remove();
+  const loadHtml = `<div class="modal-overlay" id="projectViewerModal" data-action-modal="closeProjectViewer">
+    <div class="modal-content" style="max-width:90vw;max-height:90vh;width:900px;">
+      <div class="modal-header"><h2>${escapeHtml(projectName)} — XML</h2><button class="modal-close" data-action-modal="closeProjectViewer" title="Close">&#10005;</button></div>
+      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>Loading...</div></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend', loadHtml);
+  try {
+    const result = await window.vstUpdater.readProjectFile(filePath);
+    const modal = document.getElementById('projectViewerModal');
+    if (!modal) return;
+    const body = modal.querySelector('.modal-body');
+    const xml = result.content || '';
+    const lineCount = xml.split('\n').length;
+    // Reuse the ALS viewer rendering
+    body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
+      <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
+        <span style="font-size:11px;color:var(--text-muted);">${result.format || 'XML'} | ${lineCount.toLocaleString()} lines</span>
+        <input type="text" class="np-search-input" id="projSearchInput" placeholder="Search XML..." style="flex:1;max-width:300px;" autocomplete="off">
+        <button class="btn btn-secondary" id="projCollapseAllBtn" style="padding:4px 10px;font-size:10px;">Collapse All</button>
+        <button class="btn btn-secondary" id="projExpandAllBtn" style="padding:4px 10px;font-size:10px;">Expand All</button>
+      </div>
+      <pre id="projXmlContent" style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);margin:0;white-space:pre-wrap;tab-size:2;background:var(--bg-primary);"></pre>
+    </div>`;
+    const pre = document.getElementById('projXmlContent');
+    pre.textContent = xml;
+    // Search
+    document.getElementById('projSearchInput')?.addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) { pre.innerHTML = ''; pre.textContent = xml; return; }
+      const escaped = escapeHtml(xml);
+      const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      pre.innerHTML = escaped.replace(re, m => '<mark style="background:var(--yellow);color:#000;">' + m + '</mark>');
+    });
+  } catch (e) {
+    const modal = document.getElementById('projectViewerModal');
+    if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">Error: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+async function showTextProjectViewer(filePath, projectName) {
+  let existing = document.getElementById('projectViewerModal');
+  if (existing) existing.remove();
+  const loadHtml = `<div class="modal-overlay" id="projectViewerModal" data-action-modal="closeProjectViewer">
+    <div class="modal-content" style="max-width:90vw;max-height:90vh;width:900px;">
+      <div class="modal-header"><h2>${escapeHtml(projectName)} — REAPER</h2><button class="modal-close" data-action-modal="closeProjectViewer" title="Close">&#10005;</button></div>
+      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>Loading...</div></div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend', loadHtml);
+  try {
+    const result = await window.vstUpdater.readProjectFile(filePath);
+    const modal = document.getElementById('projectViewerModal');
+    if (!modal) return;
+    const body = modal.querySelector('.modal-body');
+    const text = result.content || '';
+    body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
+      <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
+        <span style="font-size:11px;color:var(--text-muted);">REAPER Project | ${text.split('\\n').length.toLocaleString()} lines</span>
+        <input type="text" class="np-search-input" id="projSearchInput" placeholder="Search..." style="flex:1;max-width:300px;" autocomplete="off">
+      </div>
+      <pre style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);margin:0;white-space:pre-wrap;tab-size:2;background:var(--bg-primary);" id="projTextContent"></pre>
+    </div>`;
+    document.getElementById('projTextContent').textContent = text;
+  } catch (e) {
+    const modal = document.getElementById('projectViewerModal');
+    if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">Error: ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+async function showBinaryProjectViewer(filePath, projectName) {
+  // For binary formats without a dedicated viewer, use the same tree approach as Bitwig
+  showBwViewer(filePath, projectName);
+}
+
 // ── ALS XML Viewer ──
 async function showAlsViewer(filePath, projectName) {
   let existing = document.getElementById('alsViewerModal');
@@ -426,6 +520,13 @@ document.addEventListener('click', (e) => {
   if (bwAction) {
     if (e.target === bwAction || bwAction.classList.contains('modal-close')) {
       const modal = document.getElementById('bwViewerModal');
+      if (modal) modal.remove();
+    }
+  }
+  const projAction = e.target.closest('[data-action-modal="closeProjectViewer"]');
+  if (projAction) {
+    if (e.target === projAction || projAction.classList.contains('modal-close')) {
+      const modal = document.getElementById('projectViewerModal');
       if (modal) modal.remove();
     }
   }
