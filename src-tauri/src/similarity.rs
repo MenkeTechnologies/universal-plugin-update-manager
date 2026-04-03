@@ -335,12 +335,30 @@ mod tests {
     }
 
     #[test]
+    fn test_find_similar_max_results_zero() {
+        let reference = make_fp("ref.wav", 0.5, 0.1, 0.1, 0.5, 0.3, 0.2);
+        let close = make_fp("close.wav", 0.48, 0.11, 0.11, 0.48, 0.32, 0.2);
+        let results = find_similar(&reference, &[close], 0);
+        assert!(results.is_empty());
+    }
+
+    #[test]
     fn test_find_similar_single_candidate() {
         let reference = make_fp("ref.wav", 0.5, 0.1, 0.1, 0.5, 0.3, 0.2);
         let candidate = make_fp("c.wav", 0.6, 0.12, 0.12, 0.45, 0.35, 0.2);
         let results = find_similar(&reference, &[candidate], 10);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].0, "c.wav");
+    }
+
+    #[test]
+    fn test_find_similar_keeps_duplicate_candidate_paths() {
+        let reference = make_fp("ref.wav", 0.5, 0.1, 0.1, 0.5, 0.3, 0.2);
+        let c = make_fp("dup.wav", 0.55, 0.11, 0.11, 0.48, 0.32, 0.2);
+        let results = find_similar(&reference, &[c.clone(), c], 10);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].0, "dup.wav");
+        assert_eq!(results[1].0, "dup.wav");
     }
 
     #[test]

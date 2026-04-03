@@ -1135,6 +1135,26 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_strips_au_vst_aax_brackets() {
+        assert_eq!(normalize_plugin_name("Pro-Q 3 (AU)"), "pro-q 3");
+        assert_eq!(normalize_plugin_name("Serum (VST3)"), "serum");
+        assert_eq!(normalize_plugin_name("Tune (AAX)"), "tune");
+    }
+
+    #[test]
+    fn test_normalize_intel_bracket() {
+        assert_eq!(normalize_plugin_name("Legacy (Intel)"), "legacy");
+    }
+
+    #[test]
+    fn test_normalize_equivalent_after_strip() {
+        assert_eq!(
+            normalize_plugin_name("Massive (x64)"),
+            normalize_plugin_name("Massive x64")
+        );
+    }
+
+    #[test]
     fn test_dedup_case_insensitive() {
         let rpp = r#"<REAPER_PROJECT
   <TRACK

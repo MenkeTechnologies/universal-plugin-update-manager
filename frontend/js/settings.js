@@ -555,7 +555,7 @@ async function exportLogPdf() {
       showToast('Log exported');
     }
   } catch (e) {
-    showToast('No log file found', 3000, 'warning');
+    showToast('Could not read log: ' + (e?.message || e), 4000, 'error');
   }
 }
 

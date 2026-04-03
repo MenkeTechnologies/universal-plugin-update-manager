@@ -299,6 +299,38 @@ mod tests {
     }
 
     #[test]
+    fn test_preset_extensions_includes_midi() {
+        for ext in &[".mid", ".midi"] {
+            assert!(
+                PRESET_EXTENSIONS.contains(ext),
+                "PRESET_EXTENSIONS should list MIDI {}",
+                ext
+            );
+        }
+    }
+
+    #[test]
+    fn test_preset_extensions_includes_ableton_kontakt_extras() {
+        for ext in &[".adv", ".adg", ".nksn", ".syx", ".pjunoxl"] {
+            assert!(
+                PRESET_EXTENSIONS.contains(ext),
+                "PRESET_EXTENSIONS should contain {}",
+                ext
+            );
+        }
+    }
+
+    #[test]
+    fn test_normalize_macos_path() {
+        let p = PathBuf::from("/System/Volumes/Data/Users/example");
+        let n = normalize_macos_path(p);
+        #[cfg(target_os = "macos")]
+        assert_eq!(n, PathBuf::from("/Users/example"));
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(n, PathBuf::from("/System/Volumes/Data/Users/example"));
+    }
+
+    #[test]
     fn test_preset_roots_exist() {
         let roots = get_preset_roots();
         assert!(

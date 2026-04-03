@@ -239,6 +239,54 @@ mod tests {
     }
 
     #[test]
+    fn test_read_var_len_single_byte() {
+        let data = [0x40u8];
+        assert_eq!(read_var_len(&data, 0), (0x40, 1));
+    }
+
+    #[test]
+    fn test_read_var_len_empty_slice() {
+        let data: [u8; 0] = [];
+        assert_eq!(read_var_len(&data, 0), (0, 0));
+    }
+
+    #[test]
+    fn test_read_var_len_128_two_bytes() {
+        let data = [0x81u8, 0x00];
+        assert_eq!(read_var_len(&data, 0), (128, 2));
+    }
+
+    #[test]
+    fn test_read_var_len_offset() {
+        let data = [0x00u8, 0x81, 0x00];
+        assert_eq!(read_var_len(&data, 1), (128, 2));
+    }
+
+    #[test]
+    fn test_read_var_len_incomplete_uses_partial() {
+        let data = [0x81u8]; // continuation without next byte
+        let (v, n) = read_var_len(&data, 0);
+        assert_eq!(n, 1);
+        assert_eq!(v, 1); // only first 7 bits
+    }
+
+    #[test]
+    fn test_read_var_len_large_value() {
+        // 8192 = 0x2000: first group 0x40 (64), second 0x00 → (64<<7)|0 = 8192
+        let data = [0xC0u8, 0x00];
+        assert_eq!(read_var_len(&data, 0), (0x2000, 2));
+    }
+
+    #[test]
+    fn test_read_var_len_fifth_byte_triggers_safety_break() {
+        // Four continuation bytes then a final byte — 5 bytes total consumed before break
+        let data = [0xFFu8, 0xFF, 0xFF, 0xFF, 0x7F];
+        let (v, n) = read_var_len(&data, 0);
+        assert_eq!(n, 5);
+        assert!(v > 0);
+    }
+
+    #[test]
     fn test_parse_empty_midi() {
         // Single track with just end-of-track
         let track = vec![0x00, 0xFF, 0x2F, 0x00]; // delta=0, meta end-of-track

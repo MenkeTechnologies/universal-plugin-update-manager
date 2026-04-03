@@ -355,6 +355,8 @@ mod tests {
         assert_eq!(get_plugin_type(".component"), "AU");
         assert_eq!(get_plugin_type(".dll"), "VST2");
         assert_eq!(get_plugin_type(".exe"), "Unknown");
+        assert_eq!(get_plugin_type(".clap"), "Unknown");
+        assert_eq!(get_plugin_type(".aaxplugin"), "Unknown");
     }
 
     #[test]

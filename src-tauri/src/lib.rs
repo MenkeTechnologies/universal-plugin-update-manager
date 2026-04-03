@@ -1262,7 +1262,7 @@ fn write_cache_file(name: String, data: serde_json::Value) -> Result<(), String>
 
 #[tauri::command]
 fn append_log(msg: String) {
-    let path = history::get_data_dir().join("app.log");
+    let path = history::ensure_data_dir().join("app.log");
     let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let line = format!("[{}] {}\n", timestamp, msg);
     let _ = std::fs::OpenOptions::new().create(true).append(true).open(&path).and_then(|mut f| {
@@ -1274,12 +1274,16 @@ fn append_log(msg: String) {
 #[tauri::command]
 fn read_log() -> Result<String, String> {
     let path = history::get_data_dir().join("app.log");
-    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+    match std::fs::read_to_string(&path) {
+        Ok(s) => Ok(s),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 #[tauri::command]
 fn clear_log() -> Result<(), String> {
-    let path = history::get_data_dir().join("app.log");
+    let path = history::ensure_data_dir().join("app.log");
     std::fs::write(&path, "").map_err(|e| e.to_string())
 }
 
@@ -1646,8 +1650,91 @@ fn import_plugins_json(file_path: String) -> Result<Vec<PluginInfo>, String> {
 
 // ── Process stats ──
 
-use std::time::Instant;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
+/// Disk + DB file sizes + `table_counts` are expensive; the UI polls ~1 Hz.
+struct SlowStatsSnapshot {
+    at: Instant,
+    dir_key: String,
+    disk_total: u64,
+    disk_free: u64,
+    db_bytes: u64,
+    prefs_bytes: u64,
+    table_counts: serde_json::Value,
+}
+
+static SLOW_STATS_CACHE: Mutex<Option<SlowStatsSnapshot>> = Mutex::new(None);
+const SLOW_STATS_TTL: Duration = Duration::from_secs(4);
+
+fn compute_slow_stats(data_dir: &std::path::Path) -> (u64, u64, u64, u64, serde_json::Value) {
+    let file_size = |name: &str| -> u64 {
+        std::fs::metadata(data_dir.join(name))
+            .map(|m| m.len())
+            .unwrap_or(0)
+    };
+    let (disk_total, disk_free) = {
+        use sysinfo::Disks;
+        let disks = Disks::new_with_refreshed_list();
+        let data_str = data_dir.to_string_lossy().to_string();
+        let data_path = std::path::Path::new(&data_str);
+        disks
+            .iter()
+            .filter(|d| data_path.starts_with(d.mount_point()))
+            .max_by_key(|d| d.mount_point().as_os_str().len())
+            .map(|d| (d.total_space(), d.available_space()))
+            .unwrap_or((0, 0))
+    };
+    let db_bytes =
+        file_size("audio_haxor.db") + file_size("audio_haxor.db-wal") + file_size("audio_haxor.db-shm");
+    let prefs_bytes = file_size("preferences.toml");
+    let table_counts = db::global().table_counts().unwrap_or_default();
+    (
+        disk_total,
+        disk_free,
+        db_bytes,
+        prefs_bytes,
+        table_counts,
+    )
+}
+
+fn cached_slow_stats(data_dir: &std::path::Path) -> (u64, u64, u64, u64, serde_json::Value) {
+    let now = Instant::now();
+    let dir_key = data_dir.to_string_lossy().to_string();
+    if let Ok(guard) = SLOW_STATS_CACHE.lock() {
+        if let Some(s) = guard.as_ref() {
+            if s.dir_key == dir_key && now.saturating_duration_since(s.at) < SLOW_STATS_TTL {
+                return (
+                    s.disk_total,
+                    s.disk_free,
+                    s.db_bytes,
+                    s.prefs_bytes,
+                    s.table_counts.clone(),
+                );
+            }
+        }
+    }
+    let (disk_total, disk_free, db_bytes, prefs_bytes, table_counts) =
+        compute_slow_stats(data_dir);
+    if let Ok(mut guard) = SLOW_STATS_CACHE.lock() {
+        *guard = Some(SlowStatsSnapshot {
+            at: now,
+            dir_key,
+            disk_total,
+            disk_free,
+            db_bytes,
+            prefs_bytes,
+            table_counts: table_counts.clone(),
+        });
+    }
+    (
+        disk_total,
+        disk_free,
+        db_bytes,
+        prefs_bytes,
+        table_counts,
+    )
+}
 
 #[tauri::command]
 fn get_process_stats(app: AppHandle) -> serde_json::Value {
@@ -1711,35 +1798,14 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
         })
         .unwrap_or(500);
 
-    // Data file sizes
     let data_dir = history::get_data_dir();
-    let file_size = |name: &str| -> u64 {
-        std::fs::metadata(data_dir.join(name))
-            .map(|m| m.len())
-            .unwrap_or(0)
-    };
+    let (disk_total, disk_free, db_bytes, prefs_bytes, db_table_counts) =
+        cached_slow_stats(&data_dir);
 
     // OS info
     let os_name = std::env::consts::OS;
     let os_arch = std::env::consts::ARCH;
     let hostname = gethostname();
-
-    // Disk space via sysinfo
-    let (disk_total, disk_free) = {
-        use sysinfo::Disks;
-        let disks = Disks::new_with_refreshed_list();
-        let data_str = data_dir.to_string_lossy().to_string();
-        let data_path = std::path::Path::new(&data_str);
-        disks.iter()
-            .filter(|d| data_path.starts_with(d.mount_point()))
-            .max_by_key(|d| d.mount_point().as_os_str().len())
-            .map(|d| (d.total_space(), d.available_space()))
-            .unwrap_or((0, 0))
-    };
-
-    // SQLite database stats
-    let db_bytes = file_size("audio_haxor.db") + file_size("audio_haxor.db-wal") + file_size("audio_haxor.db-shm");
-    let db_table_counts = db::global().table_counts().unwrap_or_default();
 
     // FD limits
     #[cfg(unix)]
@@ -1825,7 +1891,7 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
             "tables": db_table_counts,
         },
         "dataFiles": {
-            "preferencesBytes": file_size("preferences.toml"),
+            "preferencesBytes": prefs_bytes,
         },
         "dataDir": data_dir.to_string_lossy(),
     })
@@ -2636,6 +2702,10 @@ fn import_daw_json(file_path: String) -> Result<Vec<DawProject>, String> {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::Mutex;
+
+    /// Serialize tests that read/write `app.log` (parallel test runs would race otherwise).
+    static APP_LOG_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn make_plugin(name: &str, plugin_type: &str) -> PluginInfo {
         PluginInfo {
@@ -2680,6 +2750,38 @@ mod tests {
     #[test]
     fn test_csv_escape_comma_and_quotes() {
         assert_eq!(csv_escape("a,\"b\""), "\"a,\"\"b\"\"\"");
+    }
+
+    #[test]
+    fn test_format_size_shared_tb() {
+        assert_eq!(format_size(0), "0 B");
+        assert_eq!(format_size(1024_u64.pow(4)), "1.0 TB");
+        // Above max unit index: clamp to TB (e.g. 1 PiB → 1024.0 TB)
+        assert_eq!(format_size(1024_u64.pow(5)), "1024.0 TB");
+    }
+
+    #[test]
+    fn test_format_size_fractional_kb() {
+        assert_eq!(format_size(2048 + 512), "2.5 KB");
+    }
+
+    #[test]
+    fn test_dsv_escape_tab_in_field() {
+        assert_eq!(dsv_escape("a\tb", ','), "a\tb");
+        assert_eq!(dsv_escape("a\tb", '\t'), "\"a\tb\"");
+    }
+
+    #[test]
+    fn test_dsv_escape_quote_only() {
+        assert_eq!(dsv_escape("\"", ','), "\"\"\"\"");
+    }
+
+    #[test]
+    fn test_detect_separator() {
+        assert_eq!(detect_separator("x.csv"), ',');
+        assert_eq!(detect_separator("/path/to/out.tsv"), '\t');
+        assert_eq!(detect_separator("nested/dir/report.csv"), ',');
+        assert_eq!(detect_separator("sheet.tsv"), '\t');
     }
 
     #[test]
@@ -3243,21 +3345,59 @@ mod tests {
 
     #[test]
     fn test_append_and_read_log() {
+        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
         let _ = std::fs::create_dir_all(history::get_data_dir());
-        append_log("test log entry 1".into());
-        append_log("test log entry 2".into());
+        clear_log().unwrap();
+        let token = format!(
+            "log-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        );
+        append_log(format!("{token} entry1"));
+        append_log(format!("{token} entry2"));
         let log = read_log().unwrap();
-        assert!(log.contains("test log entry 1"));
-        assert!(log.contains("test log entry 2"));
+        assert!(
+            log.contains(&format!("{token} entry1")),
+            "missing first line in log (len {})",
+            log.len()
+        );
+        assert!(
+            log.contains(&format!("{token} entry2")),
+            "missing second line in log (len {})",
+            log.len()
+        );
     }
 
     #[test]
     fn test_clear_log() {
+        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
         let _ = std::fs::create_dir_all(history::get_data_dir());
         append_log("before clear".into());
         clear_log().unwrap();
         let log = read_log().unwrap();
         assert!(!log.contains("before clear"));
+    }
+
+    #[test]
+    fn test_read_log_missing_file_returns_empty() {
+        let _guard = APP_LOG_TEST_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_read_log_missing_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        history::set_test_data_dir_path(tmp.clone());
+        let _ = fs::remove_file(tmp.join("app.log"));
+        assert_eq!(read_log().unwrap(), "");
+        history::clear_test_data_dir_path();
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     // ── TOML export/import tests ──
@@ -3360,6 +3500,15 @@ mod tests {
         let result = rt.block_on(open_daw_project("/nonexistent/project.als".into()));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn bulk_format_size_non_empty() {
+        for i in 0..12_000u32 {
+            let b = i as u64 * 17 + (i as u64 % 1024);
+            let s = format_size(b);
+            assert!(!s.is_empty(), "format_size({b})");
+        }
     }
 }
 

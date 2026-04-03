@@ -583,13 +583,38 @@ mod tests {
 
     #[test]
     fn test_audio_extensions_complete() {
-        for ext in &[".wav", ".mp3", ".flac", ".aiff", ".ogg", ".m4a"] {
+        for ext in &[
+            ".wav",
+            ".mp3",
+            ".flac",
+            ".aiff",
+            ".ogg",
+            ".m4a",
+            ".opus",
+            ".aac",
+            ".wma",
+            ".aif",
+            ".rex",
+            ".rx2",
+            ".sf2",
+            ".sfz",
+        ] {
             assert!(
                 AUDIO_EXTENSIONS.contains(ext),
                 "AUDIO_EXTENSIONS should contain {}",
                 ext
             );
         }
+    }
+
+    #[test]
+    fn test_normalize_macos_path_audio_scanner() {
+        let p = PathBuf::from("/System/Volumes/Data/tmp/audio");
+        let n = normalize_macos_path(p);
+        #[cfg(target_os = "macos")]
+        assert_eq!(n, PathBuf::from("/tmp/audio"));
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(n, PathBuf::from("/System/Volumes/Data/tmp/audio"));
     }
 
     #[test]

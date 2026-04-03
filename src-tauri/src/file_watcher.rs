@@ -187,7 +187,10 @@ mod tests {
 
     #[test]
     fn test_classify_daw() {
-        for ext in &["als", "rpp", "flp", "cpr", "npr", "song", "dawproject", "bwproject"] {
+        for ext in &[
+            "als", "rpp", "flp", "cpr", "npr", "song", "dawproject", "bwproject", "logicx",
+            "band", "ptx", "ptf", "reason",
+        ] {
             let name = format!("project.{ext}");
             assert_eq!(classify(Path::new(&name)), Some("daw"), "expected daw for .{ext}");
         }
@@ -195,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_classify_preset() {
-        for ext in &["fxp", "fxb", "vstpreset", "aupreset", "nmsv", "nki"] {
+        for ext in &["fxp", "fxb", "vstpreset", "aupreset", "nmsv", "nki", "adg", "adv"] {
             let name = format!("preset.{ext}");
             assert_eq!(classify(Path::new(&name)), Some("preset"), "expected preset for .{ext}");
         }
@@ -215,6 +218,22 @@ mod tests {
         assert_eq!(classify(Path::new("photo.png")), None);
         assert_eq!(classify(Path::new("data.json")), None);
         assert_eq!(classify(Path::new("noext")), None);
+    }
+
+    #[test]
+    fn test_classify_preset_nmsv_extension() {
+        // Multi-dot names: std::path::extension is the final segment only — .nmsv matches PRESET_EXTS
+        assert_eq!(classify(Path::new("preset.nmsv")), Some("preset"));
+    }
+
+    #[test]
+    fn test_classify_audio_opus() {
+        assert_eq!(classify(Path::new("track.opus")), Some("audio"));
+    }
+
+    #[test]
+    fn test_classify_daw_bwproject() {
+        assert_eq!(classify(Path::new("song.bwproject")), Some("daw"));
     }
 
     #[test]

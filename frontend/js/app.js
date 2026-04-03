@@ -210,6 +210,7 @@ function formatUptime(secs) {
 }
 
 async function updateHeaderInfo() {
+  if (typeof document !== 'undefined' && document.hidden) return;
   try {
     const s = await window.vstUpdater.getProcessStats();
     const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
@@ -249,6 +250,12 @@ async function updateHeaderInfo() {
       }
     }
   } catch (err) { console.error('updateHeaderInfo:', err); }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) updateHeaderInfo();
+  });
 }
 
 let scanAllRunning = false;

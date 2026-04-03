@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::scanner::PluginInfo;
 
@@ -277,7 +279,19 @@ pub fn get_data_dir() -> PathBuf {
         .join("com.menketechnologies.audio-haxor")
 }
 
-fn ensure_data_dir() -> PathBuf {
+/// Redirect [`get_data_dir`] for unit tests (e.g. `lib.rs` log tests). Clear when done.
+#[cfg(test)]
+pub fn set_test_data_dir_path(path: PathBuf) {
+    TEST_DATA_DIR.with(|d| *d.borrow_mut() = Some(path));
+}
+
+#[cfg(test)]
+pub fn clear_test_data_dir_path() {
+    TEST_DATA_DIR.with(|d| *d.borrow_mut() = None);
+}
+
+/// Creates `get_data_dir()` if needed; safe to call before writing files there.
+pub fn ensure_data_dir() -> PathBuf {
     let dir = get_data_dir();
     let _ = fs::create_dir_all(&dir);
     dir
@@ -312,6 +326,23 @@ pub fn get_preferences_path() -> PathBuf {
 }
 
 pub type PrefsMap = serde_json::Map<String, serde_json::Value>;
+
+/// Avoid re-reading preferences.toml on every hot path (e.g. `get_process_stats` once per second).
+static PREF_CACHE: Mutex<Option<(u64, PrefsMap)>> = Mutex::new(None);
+const PREF_CACHE_TTL_MS: u64 = 2000;
+
+fn prefs_cache_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+fn invalidate_prefs_cache() {
+    if let Ok(mut g) = PREF_CACHE.lock() {
+        *g = None;
+    }
+}
 
 // Maps flat pref keys to TOML sections for organized file layout.
 // Keys not listed here go under [general].
@@ -528,7 +559,7 @@ fn flat_to_toml(prefs: &PrefsMap) -> String {
     toml::to_string_pretty(&root).unwrap_or_default()
 }
 
-pub fn load_preferences() -> PrefsMap {
+fn load_preferences_from_disk() -> PrefsMap {
     let path = preferences_file();
 
     // Migrate from legacy JSON if TOML doesn't exist yet
@@ -559,6 +590,24 @@ pub fn load_preferences() -> PrefsMap {
     defaults
 }
 
+pub fn load_preferences() -> PrefsMap {
+    let now = prefs_cache_now_ms();
+    {
+        if let Ok(guard) = PREF_CACHE.lock() {
+            if let Some((t, p)) = guard.as_ref() {
+                if now.saturating_sub(*t) < PREF_CACHE_TTL_MS {
+                    return p.clone();
+                }
+            }
+        }
+    }
+    let loaded = load_preferences_from_disk();
+    if let Ok(mut guard) = PREF_CACHE.lock() {
+        *guard = Some((now, loaded.clone()));
+    }
+    loaded
+}
+
 fn merge_prefs(defaults: &PrefsMap, user: &PrefsMap) -> PrefsMap {
     let mut merged = PrefsMap::new();
     for (k, v) in defaults {
@@ -576,6 +625,7 @@ pub fn save_preferences(prefs: &PrefsMap) {
     let path = preferences_file();
     let toml_str = flat_to_toml(prefs);
     let _ = fs::write(&path, toml_str);
+    invalidate_prefs_cache();
 }
 
 pub fn set_preference(key: &str, value: serde_json::Value) {

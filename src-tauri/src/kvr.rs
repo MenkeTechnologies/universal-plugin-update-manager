@@ -396,6 +396,12 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_version_non_numeric_segment_becomes_zero() {
+        // "v2" does not parse as i32 — first component becomes 0
+        assert_eq!(parse_version("v2.3.4"), vec![0, 3, 4]);
+    }
+
+    #[test]
     fn test_parse_version_unknown() {
         assert_eq!(parse_version("Unknown"), vec![0, 0, 0]);
         assert_eq!(parse_version(""), vec![0, 0, 0]);
@@ -604,5 +610,31 @@ mod tests {
         assert!(result.is_some(), "Should find 'buy' link");
         let (url, _) = result.unwrap();
         assert_eq!(url, "https://example.com/buy/plugin");
+    }
+
+    #[test]
+    fn test_parse_version_non_numeric_segment_zero() {
+        assert_eq!(parse_version("1.x.3"), vec![1, 0, 3]);
+    }
+
+    #[test]
+    fn test_compare_versions_patch_vs_shorter() {
+        assert_eq!(
+            compare_versions("1.0.0.1", "1.0.0"),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    /// Many assertions in one test: compare_versions(x, x) is always Equal.
+    #[test]
+    fn bulk_compare_versions_reflexive() {
+        for i in 0..25_000 {
+            let s = format!("{}.{}.{}", i % 10_000, (i / 10) % 500, i % 20);
+            assert_eq!(
+                compare_versions(&s, &s),
+                std::cmp::Ordering::Equal,
+                "reflexive failed for {s}"
+            );
+        }
     }
 }
