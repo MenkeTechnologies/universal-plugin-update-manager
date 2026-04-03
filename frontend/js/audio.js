@@ -1697,6 +1697,15 @@ function showPlayer() {
   const np = document.getElementById('audioNowPlaying');
   np.classList.add('active');
   if (prefs.getItem('playerExpanded') === 'on') np.classList.add('expanded');
+  // Restore saved size
+  const saved = prefs.getItem('modal_audioNowPlaying');
+  if (saved) {
+    try {
+      const geo = JSON.parse(saved);
+      if (geo.width > 200) np.style.width = geo.width + 'px';
+      if (geo.height > 100) np.style.height = geo.height + 'px';
+    } catch {}
+  }
   renderRecentlyPlayed();
   updateNowPlayingBtn();
 }
