@@ -3078,6 +3078,18 @@ mod tests {
     }
 
     #[test]
+    fn test_format_size_single_byte_and_sub_kb() {
+        assert_eq!(format_size(1), "1.0 B");
+        assert_eq!(format_size(1023), "1023.0 B");
+    }
+
+    #[test]
+    fn test_format_size_mb_boundary() {
+        assert_eq!(format_size(1024 * 1024), "1.0 MB");
+        assert_eq!(format_size(1024 * 1024 + 512 * 1024), "1.5 MB");
+    }
+
+    #[test]
     fn test_dsv_escape_tab_in_field() {
         assert_eq!(dsv_escape("a\tb", ','), "a\tb");
         assert_eq!(dsv_escape("a\tb", '\t'), "\"a\tb\"");
