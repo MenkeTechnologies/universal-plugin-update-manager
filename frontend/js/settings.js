@@ -1058,9 +1058,16 @@ function refreshSettingsUI() {
     backupsLabel.textContent = includeBackups ? 'On' : 'Off';
   }
 
-  // Blacklist
+  // Blacklist — prepopulate with defaults if empty
   const blacklistEl = document.getElementById('settingBlacklist');
-  if (blacklistEl) blacklistEl.value = prefs.getItem('blacklistDirs') || '';
+  if (blacklistEl) {
+    const saved = prefs.getItem('blacklistDirs');
+    if (saved) {
+      blacklistEl.value = saved;
+    } else {
+      blacklistEl.value = '#recycle\n@eaDir\n.Spotlight-V100\n$RECYCLE.BIN\nSystem Volume Information\nnode_modules\n.git\n.Trash\n__pycache__\n.cache';
+    }
+  }
 
   // Page size
   const pageSize = getSettingValue('pageSize', '500');
@@ -1370,13 +1377,7 @@ function renderFzfSettings() {
   }
 }
 
-// Blacklist auto-save on change
-document.addEventListener('change', (e) => {
-  if (e.target.id === 'settingBlacklist') {
-    prefs.setItem('blacklistDirs', e.target.value);
-    showToast('Directory blacklist saved');
-  }
-});
+// Blacklist saved via Save button (data-action="saveBlacklist")
 
 document.addEventListener('input', (e) => {
   const input = e.target.closest('[data-fzf-param]');

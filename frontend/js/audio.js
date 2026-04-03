@@ -988,7 +988,13 @@ async function previewAudio(filePath) {
 }
 
 function toggleAudioPlayback() {
-  if (!audioPlayerPath) return;
+  if (!audioPlayerPath) {
+    // No track loaded — play most recent from history
+    if (typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 0) {
+      previewAudio(recentlyPlayed[0].path);
+    }
+    return;
+  }
   if (audioPlayer.paused) {
     audioPlayer.play();
   } else {
