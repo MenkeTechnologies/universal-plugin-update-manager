@@ -136,7 +136,7 @@ pub struct CacheStat {
 
 /// Current schema version — bump when adding migrations.
 #[allow(dead_code)]
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 impl Database {
     /// Open or create the database in the app data directory.
@@ -351,6 +351,22 @@ impl Database {
             .map_err(|e| format!("Migration v2 failed: {e}"))?;
         }
 
+        if current < 3 {
+            conn.execute_batch(
+                "-- Composite indexes for common query patterns
+                CREATE INDEX IF NOT EXISTS idx_samples_scan_format
+                    ON audio_samples(scan_id, format);
+                CREATE INDEX IF NOT EXISTS idx_samples_scan_name
+                    ON audio_samples(scan_id, name COLLATE NOCASE);
+                CREATE INDEX IF NOT EXISTS idx_daw_scan_format
+                    ON daw_projects(scan_id, format);
+                CREATE INDEX IF NOT EXISTS idx_presets_scan_format
+                    ON presets(scan_id, format);
+                INSERT INTO schema_version (version) VALUES (3);",
+            )
+            .map_err(|e| format!("Migration v3 failed: {e}"))?;
+        }
+
         Ok(())
     }
 
@@ -545,7 +561,7 @@ impl Database {
         let sort_dir = if params.sort_asc { "ASC" } else { "DESC" };
         let nulls = "NULLS LAST";
 
-        // Count total unfiltered
+        // Total unfiltered count (cached per scan_id — cheap indexed lookup)
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM audio_samples WHERE scan_id = ?1",
@@ -554,46 +570,17 @@ impl Database {
             )
             .map_err(|e| e.to_string())?;
 
-        // Count filtered
-        let count_sql = format!("SELECT COUNT(*) FROM audio_samples WHERE {where_clause}");
-        let total_count: u64 = {
-            let mut stmt = conn.prepare(&count_sql).map_err(|e| e.to_string())?;
-            let mut idx = 1;
-            stmt.raw_bind_parameter(idx, &scan_id)
-                .map_err(|e| e.to_string())?;
-            idx += 1;
-            if let Some(ref pat) = search_pattern {
-                stmt.raw_bind_parameter(idx, pat)
-                    .map_err(|e| e.to_string())?;
-                idx += 1;
-            }
-            if let Some(ref fmt) = params.format_filter {
-                if !fmt.is_empty() && fmt != "all" {
-                    stmt.raw_bind_parameter(idx, fmt)
-                        .map_err(|e| e.to_string())?;
-                }
-            }
-            let mut rows = stmt.raw_query();
-            rows.next()
-                .map_err(|e| e.to_string())?
-                .map(|r| r.get::<_, u64>(0).unwrap_or(0))
-                .unwrap_or(0)
-        };
-
-        // Fetch page
+        // Single query: fetch page + filtered count via COUNT(*) OVER()
         let query_sql = format!(
             "SELECT name, path, directory, format, size, size_formatted, modified,
-                    duration, channels, sample_rate, bits_per_sample, bpm, key_name, lufs
+                    duration, channels, sample_rate, bits_per_sample, bpm, key_name, lufs,
+                    COUNT(*) OVER() AS _total
              FROM audio_samples
              WHERE {where_clause}
              ORDER BY {sort_col} {sort_dir} {nulls}
              LIMIT ?{limit_idx} OFFSET ?{offset_idx}",
             limit_idx = bind_idx,
             offset_idx = bind_idx + 1,
-            where_clause = where_clause,
-            sort_col = sort_col,
-            sort_dir = sort_dir,
-            nulls = nulls,
         );
 
         let mut stmt = conn.prepare(&query_sql).map_err(|e| e.to_string())?;
@@ -619,8 +606,12 @@ impl Database {
             .map_err(|e| e.to_string())?;
 
         let mut samples = Vec::new();
+        let mut total_count = 0u64;
         let mut rows = stmt.raw_query();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            if total_count == 0 {
+                total_count = row.get::<_, i64>(14).unwrap_or(0) as u64;
+            }
             samples.push(AudioSampleRow {
                 name: row.get(0).unwrap_or_default(),
                 path: row.get(1).unwrap_or_default(),
@@ -1176,8 +1167,13 @@ impl Database {
     fn read_analysis_as_cache(&self, field: &str) -> Result<serde_json::Value, String> {
         let conn = self.conn.lock().unwrap();
         let col = match field { "bpm" => "bpm", "key" => "key_name", "lufs" => "lufs", _ => return Ok(serde_json::json!({})) };
-        let sql = format!("SELECT path, {col} FROM audio_samples WHERE {col} IS NOT NULL AND scan_id = (SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1)");
+        // Pre-resolve scan_id to avoid subquery on every row
+        let sid: String = conn.query_row("SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1", [], |r| r.get(0))
+            .unwrap_or_default();
+        if sid.is_empty() { return Ok(serde_json::json!({})); }
+        let sql = format!("SELECT path, {col} FROM audio_samples WHERE {col} IS NOT NULL AND scan_id = ?1");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(1, &sid).map_err(|e| e.to_string())?;
         let mut map = serde_json::Map::new();
         let mut rows = stmt.raw_query();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
@@ -1197,15 +1193,17 @@ impl Database {
         if obj.is_empty() { return Ok(()); }
         let conn = self.conn.lock().unwrap();
         let col = match field { "bpm" => "bpm", "key" => "key_name", "lufs" => "lufs", _ => return Ok(()) };
-        let sql = format!("UPDATE audio_samples SET {col} = ?1 WHERE path = ?2 AND scan_id = (SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1)");
+        let sid: String = conn.query_row("SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1", [], |r| r.get(0)).unwrap_or_default();
+        if sid.is_empty() { return Ok(()); }
+        let sql = format!("UPDATE audio_samples SET {col} = ?1 WHERE path = ?2 AND scan_id = ?3");
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
             let mut stmt = tx.prepare_cached(&sql).map_err(|e| e.to_string())?;
             for (path, val) in obj {
                 if field == "key" {
-                    if let Some(s) = val.as_str() { let _ = stmt.execute(params![s, path]); }
+                    if let Some(s) = val.as_str() { let _ = stmt.execute(params![s, path, sid]); }
                 } else {
-                    if let Some(v) = val.as_f64() { let _ = stmt.execute(params![v, path]); }
+                    if let Some(v) = val.as_f64() { let _ = stmt.execute(params![v, path, sid]); }
                 }
             }
         }

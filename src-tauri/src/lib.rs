@@ -1712,6 +1712,13 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
     #[cfg(not(unix))]
     let (fd_soft, fd_hard) = (0u64, 0u64);
 
+    // Supported formats
+    let audio_formats = ["WAV", "FLAC", "MP3", "OGG", "M4A", "AIF", "AIFF", "WMA", "APE", "OPUS"];
+    let plugin_formats = ["VST2", "VST3", "AU", "CLAP", "AAX"];
+    let daw_formats = ["ALS", "RPP", "BWPROJECT", "FLP", "LOGICX", "CPR", "NPR", "SONG", "DAWPROJECT", "PTX", "PTF", "REASON", "BAND"];
+    let preset_formats = ["fxp", "fxb", "vstpreset", "aupreset", "tfx", "nmsv", "pjunoxl", "h2p", "vital", "nkm", "nki", "adg", "adv", "als"];
+    let xref_formats = ["ALS", "RPP", "BWPROJECT", "FLP", "LOGICX", "CPR", "NPR", "SONG", "DAWPROJECT", "PTX", "PTF", "REASON"];
+
     serde_json::json!({
         "pid": pid,
         "rssBytes": rss,
@@ -1727,10 +1734,25 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
         "os": os_name,
         "arch": os_arch,
         "hostname": hostname,
-        "rustVersion": env!("CARGO_PKG_RUST_VERSION", "unknown"),
         "appVersion": env!("CARGO_PKG_VERSION"),
+        "tauriVersion": tauri::VERSION,
+        "rustcTarget": option_env!("TARGET").unwrap_or("unknown"),
+        "buildProfile": if cfg!(debug_assertions) { "debug" } else { "release" },
         "diskTotalBytes": disk_total,
         "diskFreeBytes": disk_free,
+        "app": {
+            "audioFormats": audio_formats,
+            "pluginFormats": plugin_formats,
+            "dawFormats": daw_formats,
+            "presetFormats": preset_formats,
+            "xrefFormats": xref_formats,
+            "analysisEngines": ["BPM (autocorrelation)", "Key (Goertzel chromagram)", "LUFS (RMS dBFS)", "Fingerprint (spectral)"],
+            "visualizers": ["FFT spectrum", "Waveform", "Spectrogram", "Stereo Lissajous", "Level meters", "Frequency bands"],
+            "exportFormats": ["JSON", "TOML", "CSV", "TSV", "PDF"],
+            "storageBackend": "SQLite (WAL mode)",
+            "uiFramework": "Tauri v2 + vanilla JS",
+            "searchEngine": "fzf-style fuzzy matching",
+        },
         "scanner": {
             "pluginScanning": scan_state.scanning.load(Ordering::Relaxed),
             "pluginStopped": scan_state.stop_scan.load(Ordering::Relaxed),
