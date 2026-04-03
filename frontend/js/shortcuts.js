@@ -105,7 +105,7 @@ function renderShortcutSettings(filter) {
     for (const [id, sc] of Object.entries(shortcuts)) {
       const labelMatch = fzfMatch(q, sc.label);
       const keyMatch = fzfMatch(q, formatKey(sc));
-      const best = Math.max(labelMatch.score, keyMatch.score);
+      const best = Math.max(labelMatch ? labelMatch.score : 0, keyMatch ? keyMatch.score : 0);
       if (best > 0) entries.push([id, sc, best]);
     }
     entries.sort((a, b) => b[2] - a[2]);

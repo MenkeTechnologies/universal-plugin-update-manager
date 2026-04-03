@@ -44,6 +44,11 @@ function collectPaletteItems() {
   if (typeof findSimilarSamples === 'function' && typeof audioPlayerPath !== 'undefined' && audioPlayerPath) {
     items.push({ type: 'action', name: 'Find Similar to Current Track', icon: '&#128270;', action: () => findSimilarSamples(audioPlayerPath) });
   }
+  if (typeof showPlayer === 'function') {
+    const np = document.getElementById('audioNowPlaying');
+    const visible = np && np.classList.contains('active');
+    items.push({ type: 'action', name: visible ? 'Hide Audio Player' : 'Show Audio Player', icon: '&#9835;', action: () => { visible ? hidePlayer() : showPlayer(); } });
+  }
   if (typeof showHeatmapDashboard === 'function') {
     items.push({ type: 'action', name: 'Heatmap Dashboard', icon: '&#128202;', action: () => showHeatmapDashboard() });
   }
