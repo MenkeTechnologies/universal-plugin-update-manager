@@ -1050,6 +1050,7 @@ function clearAudioPlaybackUI() {
   const pill = document.getElementById('audioRestorePill');
   if (pill) pill.classList.remove('active');
   updatePlayBtnStates();
+  updateNowPlayingBtn();
 }
 
 function updatePlayBtnStates() {
@@ -1666,6 +1667,7 @@ function showPlayer() {
   np.classList.add('active');
   if (prefs.getItem('playerExpanded') === 'on') np.classList.add('expanded');
   renderRecentlyPlayed();
+  updateNowPlayingBtn();
 }
 
 // Double-click to expand/collapse player
