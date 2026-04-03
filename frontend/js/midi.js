@@ -148,10 +148,34 @@ function renderMidiTable() {
     if (typeof initColumnResize === 'function') initColumnResize(document.getElementById('midiTable'));
     if (typeof initTableColumnReorder === 'function') initTableColumnReorder('midiTable', 'midiColumnOrder');
   }
+  const MIDI_PAGE = 200;
   const tbody = document.getElementById('midiTableBody');
   if (!tbody) return;
-  tbody.innerHTML = filteredMidi.slice(0, 2000).map(buildMidiRow).join('');
-  _midiRenderCount = Math.min(filteredMidi.length, 2000);
+  tbody.innerHTML = filteredMidi.slice(0, MIDI_PAGE).map(buildMidiRow).join('');
+  _midiRenderCount = Math.min(filteredMidi.length, MIDI_PAGE);
+  if (_midiRenderCount < filteredMidi.length) {
+    tbody.insertAdjacentHTML('beforeend',
+      `<tr id="midiLoadMore"><td colspan="12" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMoreMidi">
+        Showing ${_midiRenderCount} of ${filteredMidi.length} — click to load more
+      </td></tr>`);
+  }
+  if (!_midiMetadataRunning) loadMidiMetadata();
+}
+
+function loadMoreMidi() {
+  const MIDI_PAGE = 200;
+  const tbody = document.getElementById('midiTableBody');
+  const more = document.getElementById('midiLoadMore');
+  if (more) more.remove();
+  const next = filteredMidi.slice(_midiRenderCount, _midiRenderCount + MIDI_PAGE);
+  tbody.insertAdjacentHTML('beforeend', next.map(buildMidiRow).join(''));
+  _midiRenderCount += next.length;
+  if (_midiRenderCount < filteredMidi.length) {
+    tbody.insertAdjacentHTML('beforeend',
+      `<tr id="midiLoadMore"><td colspan="12" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMoreMidi">
+        Showing ${_midiRenderCount} of ${filteredMidi.length} — click to load more
+      </td></tr>`);
+  }
   if (!_midiMetadataRunning) loadMidiMetadata();
 }
 

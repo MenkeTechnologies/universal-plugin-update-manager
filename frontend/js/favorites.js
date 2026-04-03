@@ -133,7 +133,11 @@ function renderFavorites() {
   }
   if (empty) empty.style.display = 'none';
 
-  list.innerHTML = filtered.map(f => {
+  const FAV_PAGE = 200;
+  _favFiltered = filtered;
+  _favRenderCount = 0;
+  const page = filtered.slice(0, FAV_PAGE);
+  list.innerHTML = page.map(f => {
     const typeLabel = { plugin: 'Plugin', sample: 'Sample', daw: 'DAW Project', preset: 'Preset', folder: 'Folder', file: 'File' }[f.type] || f.type;
     const typeClass = { plugin: 'type-vst3', sample: 'format-wav', daw: 'daw-ableton-live', preset: 'format-default', folder: 'format-default', file: 'format-default' }[f.type] || 'format-default';
     const extra = f.format ? `<span class="format-badge format-default">${escapeHtml(f.format)}</span>` : '';
@@ -159,7 +163,46 @@ function renderFavorites() {
       </span>
     </div>`;
   }).join('');
+  _favRenderCount = page.length;
+  if (_favRenderCount < filtered.length) {
+    list.insertAdjacentHTML('beforeend',
+      `<div id="favLoadMore" data-action="loadMoreFavs" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;font-size:12px;">
+        Showing ${_favRenderCount} of ${filtered.length} — click to load more
+      </div>`);
+  }
   if (typeof initFavDragReorder === 'function') requestAnimationFrame(initFavDragReorder);
+}
+let _favFiltered = [];
+let _favRenderCount = 0;
+function loadMoreFavs() {
+  const FAV_PAGE = 200;
+  const list = document.getElementById('favList');
+  const more = document.getElementById('favLoadMore');
+  if (more) more.remove();
+  const next = _favFiltered.slice(_favRenderCount, _favRenderCount + FAV_PAGE);
+  // Reuse the same rendering from renderFavorites — inline here
+  list.insertAdjacentHTML('beforeend', next.map(f => {
+    const typeLabel = { plugin: 'Plugin', sample: 'Sample', daw: 'DAW Project', preset: 'Preset', folder: 'Folder', file: 'File' }[f.type] || f.type;
+    const typeClass = { plugin: 'type-vst3', sample: 'format-wav', daw: 'daw-ableton-live', preset: 'format-default', folder: 'format-default', file: 'format-default' }[f.type] || 'format-default';
+    const extra = f.format ? `<span class="format-badge format-default">${escapeHtml(f.format)}</span>` : '';
+    const hp = escapeHtml(f.path);
+    return `<div class="fav-item" data-path="${hp}" data-type="${f.type}" data-name="${escapeHtml(f.name)}">
+      <span class="fav-star">&#9733;</span>
+      <span class="fav-type"><span class="format-badge ${typeClass}">${typeLabel}</span></span>
+      <span class="fav-name" title="${hp}">${escapeHtml(f.name)}</span>${extra}
+      <span class="fav-actions">
+        <button class="btn-small btn-folder" data-action="openFavFolder" data-path="${hp}" data-type="${f.type}" title="Reveal in Finder">&#128193;</button>
+        <button class="btn-small btn-stop" data-action="removeFav" data-path="${hp}" title="Remove">&#10005;</button>
+      </span>
+    </div>`;
+  }).join(''));
+  _favRenderCount += next.length;
+  if (_favRenderCount < _favFiltered.length) {
+    list.insertAdjacentHTML('beforeend',
+      `<div id="favLoadMore" data-action="loadMoreFavs" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;font-size:12px;">
+        Showing ${_favRenderCount} of ${_favFiltered.length} — click to load more
+      </div>`);
+  }
 }
 
 // Wire up fav actions via delegation

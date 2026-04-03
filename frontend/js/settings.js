@@ -804,6 +804,7 @@ function settingUpdatePageSize(val) {
   prefs.setItem('pageSize', val);
   AUDIO_PAGE_SIZE = parseInt(val, 10);
   DAW_PAGE_SIZE = parseInt(val, 10);
+  PRESET_PAGE_SIZE = parseInt(val, 10);
 }
 
 function settingUpdateFlushInterval(val) {
@@ -1311,6 +1312,7 @@ function restoreSettings() {
   const pageSize = parseInt(prefs.getItem('pageSize') || '500', 10);
   AUDIO_PAGE_SIZE = pageSize;
   DAW_PAGE_SIZE = pageSize;
+  PRESET_PAGE_SIZE = pageSize;
 }
 // restoreSettings is called from loadLastScan after prefs.load()
 

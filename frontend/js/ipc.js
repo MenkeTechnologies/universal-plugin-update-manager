@@ -117,6 +117,8 @@ document.addEventListener('click', (e) => {
     case 'sortAudio': sortAudio(el.dataset.key); break;
     case 'loadMoreAudio': loadMoreAudio(); break;
     case 'loadMorePlugins': if (typeof loadMorePlugins === 'function') loadMorePlugins(); break;
+    case 'loadMoreMidi': if (typeof loadMoreMidi === 'function') loadMoreMidi(); break;
+    case 'loadMoreFavs': if (typeof loadMoreFavs === 'function') loadMoreFavs(); break;
     case 'toggleMetadata': toggleMetadata(el.dataset.path, e); break;
     case 'previewAudio': previewAudio(el.dataset.path); break;
     case 'toggleRowLoop': toggleRowLoop(el.dataset.path, e); break;

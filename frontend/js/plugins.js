@@ -286,7 +286,7 @@ async function checkUpdates() {
   }, 400);
 }
 
-const PLUGIN_PAGE_SIZE = 200;
+// Uses global page size from settings (AUDIO_PAGE_SIZE)
 let _pluginRenderCount = 0;
 let _renderedPlugins = [];
 
@@ -301,11 +301,11 @@ function renderPlugins(plugins) {
     return;
   }
 
-  const batch = plugins.slice(0, PLUGIN_PAGE_SIZE);
+  const batch = plugins.slice(0, AUDIO_PAGE_SIZE);
   list.innerHTML = batch.map(p => buildPluginCardHtml(p)).join('');
   _pluginRenderCount = batch.length;
 
-  if (plugins.length > PLUGIN_PAGE_SIZE) {
+  if (plugins.length > AUDIO_PAGE_SIZE) {
     list.insertAdjacentHTML('beforeend',
       `<div class="plugin-load-more" id="pluginLoadMore" data-action="loadMorePlugins" style="text-align:center;padding:16px;color:var(--text-muted);cursor:pointer;font-size:12px;">
         Showing ${_pluginRenderCount} of ${plugins.length} — click to load more
@@ -320,7 +320,7 @@ function loadMorePlugins() {
   const list = document.getElementById('pluginList');
   const more = document.getElementById('pluginLoadMore');
   if (more) more.remove();
-  const next = _renderedPlugins.slice(_pluginRenderCount, _pluginRenderCount + PLUGIN_PAGE_SIZE);
+  const next = _renderedPlugins.slice(_pluginRenderCount, _pluginRenderCount + AUDIO_PAGE_SIZE);
   list.insertAdjacentHTML('beforeend', next.map(p => buildPluginCardHtml(p)).join(''));
   _pluginRenderCount += next.length;
   if (_pluginRenderCount < _renderedPlugins.length) {
