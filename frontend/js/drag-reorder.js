@@ -52,10 +52,13 @@
     const target = el?.closest(d.childSelector);
 
     if (target && target !== d.dragged && target !== d.placeholder && d.container.contains(target)) {
-      const r = target.getBoundingClientRect();
-      const mid = d.direction === 'horizontal' ? r.left + r.width / 2 : r.top + r.height / 2;
-      const pos = d.direction === 'horizontal' ? e.clientX : e.clientY;
-      d.container.insertBefore(d.placeholder, pos < mid ? target : target.nextSibling);
+      try {
+        const r = target.getBoundingClientRect();
+        const mid = d.direction === 'horizontal' ? r.left + r.width / 2 : r.top + r.height / 2;
+        const pos = d.direction === 'horizontal' ? e.clientX : e.clientY;
+        const ref = pos < mid ? target : target.nextSibling;
+        if (ref === null || d.container.contains(ref)) d.container.insertBefore(d.placeholder, ref);
+      } catch {}
     }
   });
 
@@ -264,9 +267,12 @@ function initFloatingElement(elementId, prefsKey) {
         // Find the sibling element nearest to cursor for position-aware insertion
         const sibling = under?.closest('.stat, .header-info-item, .tab-btn, .btn, .scan-btns-group');
         if (sibling && sibling !== el && dropTarget.contains(sibling)) {
-          const r = sibling.getBoundingClientRect();
-          const mid = r.left + r.width / 2;
-          dropTarget.insertBefore(el, ev.clientX < mid ? sibling : sibling.nextSibling);
+          try {
+            const r = sibling.getBoundingClientRect();
+            const mid = r.left + r.width / 2;
+            const ref = ev.clientX < mid ? sibling : sibling.nextSibling;
+            if (ref === null || dropTarget.contains(ref)) dropTarget.insertBefore(el, ref);
+          } catch {}
         } else {
           dropTarget.appendChild(el);
         }
@@ -335,8 +341,11 @@ function initRecentlyPlayedDragReorder() {
     c.ghost.style.display = '';
     const target = el?.closest('th');
     if (target && target !== c.th && target !== c.placeholder && c.thead.contains(target)) {
-      const r = target.getBoundingClientRect();
-      c.thead.insertBefore(c.placeholder, e.clientX < r.left + r.width / 2 ? target : target.nextSibling);
+      try {
+        const r = target.getBoundingClientRect();
+        const ref = e.clientX < r.left + r.width / 2 ? target : target.nextSibling;
+        if (ref === null || c.thead.contains(ref)) c.thead.insertBefore(c.placeholder, ref);
+      } catch {}
     }
   });
 
@@ -358,7 +367,7 @@ function initRecentlyPlayedDragReorder() {
             if (c.origIdx < cells.length && newIdx < cells.length) {
               const cell = cells[c.origIdx];
               const ref = cells[newIdx];
-              row.insertBefore(cell, c.origIdx < newIdx ? ref.nextSibling : ref);
+              try { row.insertBefore(cell, c.origIdx < newIdx ? ref.nextSibling : ref); } catch {}
             }
           }
         }
