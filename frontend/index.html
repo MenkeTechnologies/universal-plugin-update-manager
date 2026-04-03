@@ -5589,7 +5589,10 @@
 
         <div class="settings-section" data-section="shortcuts">
           <h2 class="settings-heading">&#9776; Keyboard Shortcuts</h2>
-          <input type="text" id="shortcutsFilter" class="search-input" placeholder="Filter shortcuts..." style="margin-bottom:8px;width:100%;max-width:400px;">
+          <div class="search-box" style="max-width:400px;margin-bottom:8px;">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" id="shortcutsFilter" placeholder="Filter shortcuts..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
           <div id="shortcutsList"></div>
           <div class="settings-row">
             <div class="settings-label">
