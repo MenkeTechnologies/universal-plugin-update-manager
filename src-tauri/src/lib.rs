@@ -195,6 +195,8 @@ async fn scan_plugins(
         return Err("Scan already in progress".into());
     }
     state.stop_scan.store(false, Ordering::SeqCst);
+    let scan_start = Instant::now();
+    append_log(format!("SCAN START — plugins | roots: {:?}", custom_roots.as_deref().unwrap_or(&[])));
 
     let app_handle = app.clone();
     let result = tokio::task::spawn_blocking(move || {
@@ -368,6 +370,18 @@ async fn scan_plugins(
         let ws = app.state::<WalkerStatus>();
         let mut ad = ws.plugin_dirs.lock().unwrap_or_else(|e| e.into_inner());
         ad.clear();
+    }
+    let elapsed = scan_start.elapsed();
+    match &result {
+        Ok(v) => append_log(format!(
+            "SCAN END — plugins | {}s | {} found",
+            elapsed.as_secs(),
+            v.get("plugins")
+                .and_then(|p| p.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0)
+        )),
+        Err(e) => append_log(format!("SCAN ERROR — plugins | {}s | {}", elapsed.as_secs(), e)),
     }
     result.map_err(|e| e.to_string())
 }
@@ -586,6 +600,8 @@ async fn scan_audio_samples(
     exclude_paths: Option<Vec<String>>,
 ) -> Result<serde_json::Value, String> {
     let state = app.state::<AudioScanState>();
+    let scan_start = Instant::now();
+    append_log(format!("SCAN START — audio | roots: {:?}", custom_roots.as_deref().unwrap_or(&[])));
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("Audio scan already in progress".into());
     }
@@ -655,6 +671,18 @@ async fn scan_audio_samples(
     .await;
 
     state.scanning.store(false, Ordering::SeqCst);
+    let elapsed = scan_start.elapsed();
+    match &result {
+        Ok(v) => append_log(format!(
+            "SCAN END — audio | {}s | {} found",
+            elapsed.as_secs(),
+            v.get("samples")
+                .and_then(|p| p.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0)
+        )),
+        Err(e) => append_log(format!("SCAN ERROR — audio | {}s | {}", elapsed.as_secs(), e)),
+    }
     result.map_err(|e| e.to_string())
 }
 
@@ -722,6 +750,8 @@ async fn scan_daw_projects(
     exclude_paths: Option<Vec<String>>,
 ) -> Result<serde_json::Value, String> {
     let state = app.state::<DawScanState>();
+    let scan_start = Instant::now();
+    append_log(format!("SCAN START — daw | roots: {:?}", custom_roots.as_deref().unwrap_or(&[])));
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("DAW scan already in progress".into());
     }
@@ -797,6 +827,18 @@ async fn scan_daw_projects(
     .await;
 
     state.scanning.store(false, Ordering::SeqCst);
+    let elapsed = scan_start.elapsed();
+    match &result {
+        Ok(v) => append_log(format!(
+            "SCAN END — daw | {}s | {} found",
+            elapsed.as_secs(),
+            v.get("projects")
+                .and_then(|p| p.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0)
+        )),
+        Err(e) => append_log(format!("SCAN ERROR — daw | {}s | {}", elapsed.as_secs(), e)),
+    }
     result.map_err(|e| e.to_string())
 }
 
@@ -859,6 +901,8 @@ async fn scan_presets(
     exclude_paths: Option<Vec<String>>,
 ) -> Result<serde_json::Value, String> {
     let state = app.state::<PresetScanState>();
+    let scan_start = Instant::now();
+    append_log(format!("SCAN START — presets | roots: {:?}", custom_roots.as_deref().unwrap_or(&[])));
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("Preset scan already in progress".into());
     }
@@ -926,6 +970,18 @@ async fn scan_presets(
     .await;
 
     state.scanning.store(false, Ordering::SeqCst);
+    let elapsed = scan_start.elapsed();
+    match &result {
+        Ok(v) => append_log(format!(
+            "SCAN END — presets | {}s | {} found",
+            elapsed.as_secs(),
+            v.get("presets")
+                .and_then(|p| p.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0)
+        )),
+        Err(e) => append_log(format!("SCAN ERROR — presets | {}s | {}", elapsed.as_secs(), e)),
+    }
     result.map_err(|e| e.to_string())
 }
 
