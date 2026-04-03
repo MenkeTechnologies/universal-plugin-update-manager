@@ -146,15 +146,17 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
     showToast(`Failed to load plugin scan — ${err.message || err}`, 4000, 'error');
   }
 
-  // Auto-load last audio scan
+  // Auto-load last audio scan from SQLite (paginated — no full array in memory)
   try {
-    const latestAudio = await window.vstUpdater.getLatestAudioScan();
-    if (latestAudio && latestAudio.samples && latestAudio.samples.length > 0) {
-      allAudioSamples = latestAudio.samples;
-      rebuildAudioStats();
-      filterAudioSamples();
-      // Queue all samples for background BPM/Key analysis
-      if (typeof _bgQueue !== 'undefined') { _bgQueue.push(...allAudioSamples); }
+    const stats = await window.vstUpdater.dbAudioStats();
+    if (stats && stats.sampleCount > 0) {
+      audioTotalUnfiltered = stats.sampleCount;
+      audioStatCounts = stats.formatCounts || {};
+      audioStatBytes = stats.totalBytes || 0;
+      allAudioSamples.length = stats.sampleCount; // for export compat
+      updateAudioStats();
+      audioCurrentOffset = 0;
+      await fetchAudioPage();
       if (typeof startBackgroundAnalysis === 'function') startBackgroundAnalysis();
     }
   } catch (err) {
