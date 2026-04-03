@@ -2284,3 +2284,240 @@ fn audio_sample_clone_eq_path() {
     let s = sample("/x.wav");
     assert_eq!(s.path, "/x.wav");
 }
+
+// ── Wave 8: batch adds, KVR/radix, normalize stereo/mono, serde ──────────────
+
+#[test]
+fn kvr_cmp_quadruple_identical() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.3.4", "1.2.3.4"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn kvr_cmp_four_vs_three_components() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.0.1", "1.0.0"),
+        Ordering::Greater
+    );
+}
+
+#[test]
+fn radix_base_21_four_four_one() {
+    assert_eq!(radix_string(441, 21), "100");
+}
+
+#[test]
+fn radix_base_22_four_eight_four() {
+    assert_eq!(radix_string(484, 22), "100");
+}
+
+#[test]
+fn radix_base_23_five_two_nine() {
+    assert_eq!(radix_string(529, 23), "100");
+}
+
+#[test]
+fn format_size_exactly_one_mebibyte() {
+    let s = app_lib::format_size(1024 * 1024);
+    assert!(s.contains("MB") || s.contains("MiB"), "{s}");
+}
+
+#[test]
+fn compute_daw_diff_two_added_projects() {
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(
+        &[dawproj("/first.dawproject"), dawproj("/second.dawproject")],
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 2);
+}
+
+#[test]
+fn compute_plugin_diff_two_added_plugins() {
+    let old = build_plugin_snapshot(&[], &[], &[]);
+    let new = build_plugin_snapshot(
+        &[plug("/one.vst3", "1"), plug("/two.vst3", "2")],
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.added.len(), 2);
+}
+
+#[test]
+fn ext_matches_als_uppercase_ext() {
+    assert_eq!(
+        ext_matches(Path::new("/LiveSet.ALS")).as_deref(),
+        Some("ALS")
+    );
+}
+
+#[test]
+fn normalize_strips_mono_brackets() {
+    let n = normalize_plugin_name("Bus (Mono)");
+    assert!(!n.contains("mono"));
+}
+
+#[test]
+fn normalize_strips_stereo_brackets() {
+    let n = normalize_plugin_name("Bus (Stereo)");
+    assert!(!n.contains("stereo"));
+}
+
+#[test]
+fn plugin_info_serde_manufacturer_url_roundtrip() {
+    let p = PluginInfo {
+        name: "N".into(),
+        path: "/p.vst3".into(),
+        plugin_type: "VST3".into(),
+        version: "1".into(),
+        manufacturer: "M".into(),
+        manufacturer_url: Some("https://mfg.example".into()),
+        size: "1 B".into(),
+        size_bytes: 1,
+        modified: "t".into(),
+        architectures: vec![],
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    assert!(j.contains("manufacturerUrl"));
+    let back: PluginInfo = serde_json::from_str(&j).unwrap();
+    assert_eq!(
+        back.manufacturer_url.as_deref(),
+        Some("https://mfg.example")
+    );
+}
+
+#[test]
+fn kvr_extract_version_after_word_version_plain() {
+    let html = r#"Installer — Version 4.5.6 — ready"#;
+    assert_eq!(
+        app_lib::kvr::extract_version(html).as_deref(),
+        Some("4.5.6")
+    );
+}
+
+#[test]
+fn export_payload_exported_at_preserved() {
+    let p = ExportPayload {
+        version: "1".into(),
+        exported_at: "2026-01-02T00:00:00Z".into(),
+        plugins: vec![],
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: ExportPayload = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.exported_at, "2026-01-02T00:00:00Z");
+}
+
+#[test]
+fn find_similar_two_candidates_both_scored() {
+    let r = fp("/ref.wav");
+    let mut a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    a.rms = r.rms + 0.01;
+    b.rms = r.rms + 0.5;
+    let out = find_similar(&r, &[a, b], 2);
+    assert_eq!(out.len(), 2);
+    assert!(out[0].1 <= out[1].1);
+}
+
+#[test]
+fn fingerprint_distance_non_negative() {
+    let a = fp("/a.wav");
+    let b = fp("/b.wav");
+    let d = fingerprint_distance(&a, &b);
+    assert!(d >= 0.0 && d.is_finite());
+}
+
+#[test]
+fn compute_audio_diff_no_overlap_paths() {
+    let old = build_audio_snapshot(&[sample("/only.wav")], &[]);
+    let new = build_audio_snapshot(&[sample("/other.wav")], &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 1);
+    assert_eq!(d.removed.len(), 1);
+}
+
+#[test]
+fn compute_preset_diff_two_removed() {
+    let old = build_preset_snapshot(&[preset("/a.fxp"), preset("/b.fxp")], &[]);
+    let new = build_preset_snapshot(&[], &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.removed.len(), 2);
+}
+
+#[test]
+fn kvr_parse_single_huge_component() {
+    let v = app_lib::kvr::parse_version("999999");
+    assert_eq!(v, vec![999999]);
+}
+
+#[test]
+fn kvr_cmp_same_length_lex_numeric() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.0", "1.99.99"),
+        Ordering::Greater
+    );
+}
+
+#[test]
+fn ext_matches_dawproject_deep_lowercase() {
+    assert_eq!(
+        ext_matches(Path::new("/a/b/c/d/project.dawproject")).as_deref(),
+        Some("DAWPROJECT")
+    );
+}
+
+#[test]
+fn daw_name_dawproject_slug() {
+    assert_eq!(daw_name_for_format("DAWPROJECT"), "DAWproject");
+}
+
+#[test]
+fn is_package_ext_not_wav_file() {
+    assert!(!is_package_ext(Path::new("/x.wav")));
+}
+
+#[test]
+fn radix_string_zero_base_35() {
+    assert_eq!(radix_string(0, 35), "0");
+}
+
+#[test]
+fn format_size_2048_bytes() {
+    let s = app_lib::format_size(2048);
+    assert!(s.contains('2') || s.contains("KB") || s.contains("KiB"), "{s}");
+}
+
+#[test]
+fn plugin_ref_normalized_name_distinct() {
+    let p = PluginRef {
+        name: "CamelCase".into(),
+        normalized_name: "camelcase".into(),
+        manufacturer: "M".into(),
+        plugin_type: "VST3".into(),
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    assert!(j.contains("normalizedName"));
+    let back: PluginRef = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.normalized_name, "camelcase");
+}
+
+#[test]
+fn kvr_extract_version_in_paragraph_after_heading() {
+    let html = r#"<h1>Product</h1><p>Version 11.22.33</p>"#;
+    assert_eq!(
+        app_lib::kvr::extract_version(html).as_deref(),
+        Some("11.22.33")
+    );
+}
+
+#[test]
+fn compute_plugin_diff_version_downgrade() {
+    let old = build_plugin_snapshot(&[plug("/p.vst3", "2.0")], &[], &[]);
+    let new = build_plugin_snapshot(&[plug("/p.vst3", "1.0")], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.version_changed.len(), 1);
+}
