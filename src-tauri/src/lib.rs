@@ -1029,6 +1029,34 @@ async fn measure_lufs(file_path: String) -> Result<Option<f64>, String> {
     }).await.map_err(|e| e.to_string())
 }
 
+/// Batch analyze: BPM + Key + LUFS for multiple files in parallel, save to SQLite.
+/// Returns count of successfully analyzed files.
+#[tauri::command]
+async fn batch_analyze(paths: Vec<String>) -> Result<u32, String> {
+    Ok(tokio::task::spawn_blocking(move || {
+        use rayon::prelude::*;
+        let results: Vec<(String, Option<f64>, Option<String>, Option<f64>)> = paths
+            .par_iter()
+            .map(|path| {
+                let bpm_val = bpm::estimate_bpm(path);
+                let key_val = key_detect::detect_key(path);
+                let lufs_val = lufs::measure_lufs(path);
+                (path.clone(), bpm_val, key_val, lufs_val)
+            })
+            .collect();
+        let mut count = 0u32;
+        for (path, bpm_val, key_val, lufs_val) in &results {
+            let _ = db::global().update_bpm(path, *bpm_val);
+            let _ = db::global().update_key(path, key_val.as_deref());
+            let _ = db::global().update_lufs(path, *lufs_val);
+            count += 1;
+        }
+        count
+    })
+    .await
+    .map_err(|e| e.to_string())?)
+}
+
 #[tauri::command]
 async fn compute_fingerprint(file_path: String) -> Result<Option<similarity::AudioFingerprint>, String> {
     tokio::task::spawn_blocking(move || {
@@ -3475,6 +3503,7 @@ pub fn run() {
             estimate_bpm,
             detect_audio_key,
             measure_lufs,
+            batch_analyze,
             read_cache_file,
             write_cache_file,
             append_log,

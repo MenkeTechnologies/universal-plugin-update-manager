@@ -1446,37 +1446,24 @@ async function startBackgroundAnalysis() {
   _bgAnalysisAbort = false;
 
   const badge = document.getElementById('bgAnalysisBadge');
+  const BATCH = 10; // 10 files analyzed in parallel per batch via rayon
 
   while (!_bgAnalysisAbort) {
-    // Fetch batch of unanalyzed paths from SQLite
+    while (_bgPaused && !_bgAnalysisAbort) await new Promise(r => setTimeout(r, 200));
+    if (_bgAnalysisAbort) break;
+
     let paths;
-    try { paths = await window.vstUpdater.dbUnanalyzedPaths(50); } catch { break; }
+    try { paths = await window.vstUpdater.dbUnanalyzedPaths(BATCH); } catch { break; }
     if (!paths || paths.length === 0) break;
 
+    // Single IPC call → Rust processes all 10 in parallel (rayon) → saves to SQLite
+    try {
+      const count = await window.vstUpdater.batchAnalyze(paths);
+      _bgDone += count;
+    } catch { _bgDone += paths.length; }
+
+    // Update visible rows
     for (const path of paths) {
-      if (_bgAnalysisAbort) break;
-      while (_bgPaused && !_bgAnalysisAbort) await new Promise(r => setTimeout(r, 200));
-      if (_bgAnalysisAbort) break;
-
-      // BPM analysis → save to SQLite
-      try {
-        const bpm = await window.vstUpdater.estimateBpm(path);
-        await window.vstUpdater.dbUpdateBpm(path, bpm);
-      } catch { await window.vstUpdater.dbUpdateBpm(path, null).catch(() => showToast('DB update failed', 4000, 'error')); }
-
-      // Key detection → save to SQLite
-      try {
-        const key = await window.vstUpdater.detectAudioKey(path);
-        await window.vstUpdater.dbUpdateKey(path, key);
-      } catch { await window.vstUpdater.dbUpdateKey(path, null).catch(() => showToast('DB update failed', 4000, 'error')); }
-
-      // LUFS → save to SQLite
-      try {
-        const lufs = await window.vstUpdater.measureLufs(path);
-        await window.vstUpdater.dbUpdateLufs(path, lufs);
-      } catch { await window.vstUpdater.dbUpdateLufs(path, null).catch(() => showToast('DB update failed', 4000, 'error')); }
-
-      // Update visible row if present
       const row = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`);
       if (row) {
         try {
@@ -1487,13 +1474,12 @@ async function startBackgroundAnalysis() {
           if (bpmCell && a.bpm) bpmCell.textContent = a.bpm;
           if (keyCell && a.key) keyCell.textContent = a.key;
           if (lufsCell && a.lufs != null) { lufsCell.textContent = a.lufs; lufsCell.classList.toggle('lufs-low', a.lufs < -25); }
-        } catch(e) { if(typeof showToast==='function'&&e) showToast(String(e),4000,'error'); }
+        } catch {}
       }
-
-      _bgDone++;
-      if (badge) badge.textContent = `BPM/Key/LUFS: ${_bgDone} analyzed`;
-      await new Promise(r => setTimeout(r, 50));
     }
+
+    if (badge) badge.textContent = `BPM/Key/LUFS: ${_bgDone} analyzed`;
+    await new Promise(r => setTimeout(r, 100));
   }
 
   _bgAnalysisRunning = false;

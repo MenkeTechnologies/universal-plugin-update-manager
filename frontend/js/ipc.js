@@ -544,6 +544,7 @@ window.vstUpdater = {
   getFileWatcherStatus: () => invoke('get_file_watcher_status'),
   // MIDI
   getMidiInfo: (filePath) => invoke('get_midi_info', { filePath }),
+  batchAnalyze: (paths) => invoke('batch_analyze', { paths }),
 };
 
 // ── Preferences layer (file-backed, survives reboots) ──
