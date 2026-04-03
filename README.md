@@ -431,8 +431,14 @@ frontend/
     shortcuts.js       -- Customizable keyboard shortcuts
     sort-persist.js    -- Sort column/direction persistence per tab
     utils.js           -- fzf search, escaping, slugs, formatting
-    xref.js            -- Plugin ↔ DAW cross-reference UI + index
+    xref.js            -- Plugin ↔ DAW cross-reference UI + project viewer (11 formats)
     dep-graph.js       -- Plugin dependency graph visualization
+    visualizer.js      -- 6 real-time audio displays (FFT, waveform, spectrogram, Lissajous, levels, bands)
+    walker-status.js   -- 4-tile live scanner thread status view
+    heatmap-dashboard.js -- 8-card analytics dashboard
+    smart-playlists.js -- Rule-based auto-playlists (10 rule types)
+    drag-reorder.js    -- Unified Trello-style drag and drop system
+    modal-drag.js      -- Modal drag/resize with geometry persistence
 
 test/
   scanner.test.js      -- Plugin/audio/DAW type mapping, size formatting
