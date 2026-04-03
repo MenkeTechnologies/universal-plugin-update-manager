@@ -98,9 +98,27 @@ document.addEventListener('contextmenu', (e) => {
             row.classList.add('row-playing');
             setTimeout(() => row.classList.remove('row-playing'), 2000);
           } else {
-            // Try searching for it
-            const input = document.getElementById('audioSearchInput');
-            if (input) { input.value = name; input.dispatchEvent(new Event('input')); }
+            // Sample not in table — add it on the spot from recently played data
+            const recent = typeof recentlyPlayed !== 'undefined' ? recentlyPlayed.find(r => r.path === path) : null;
+            if (recent) {
+              const sample = { name: recent.name || name, path, directory: path.replace(/\/[^/]+$/, ''), format: recent.format || path.split('.').pop().toUpperCase(), size: 0, sizeFormatted: recent.size || '?', modified: '' };
+              if (typeof allAudioSamples !== 'undefined') allAudioSamples.push(sample);
+              if (typeof filteredAudioSamples !== 'undefined') filteredAudioSamples.push(sample);
+              const tbody = document.getElementById('audioTableBody');
+              if (tbody && typeof buildAudioRow === 'function') {
+                tbody.insertAdjacentHTML('beforeend', buildAudioRow(sample));
+                const newRow = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`);
+                if (newRow) {
+                  newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  newRow.classList.add('row-playing');
+                  setTimeout(() => newRow.classList.remove('row-playing'), 2000);
+                }
+              }
+              showToast(`Added "${name}" to samples table`);
+            } else {
+              const input = document.getElementById('audioSearchInput');
+              if (input) { input.value = name; input.dispatchEvent(new Event('input')); }
+            }
           }
         }, 200);
       }},
