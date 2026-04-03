@@ -4149,15 +4149,9 @@
     .hm-card:nth-child(8) { animation-delay: 0.2s; }
 
     /* Disable all neon glow animations when setting is off */
-    body.no-neon-glow .modal-content,
-    body.no-neon-glow .palette-box,
-    body.no-neon-glow .ctx-menu.visible,
-    body.no-neon-glow .walker-tile,
-    body.no-neon-glow .viz-tile,
-    body.no-neon-glow .hm-card,
-    body.no-neon-glow .audio-now-playing.np-playing,
-    body.no-neon-glow .toast {
-      animation: none !important;
+    body.no-neon-glow * {
+      animation-name: none !important;
+      animation-duration: 0s !important;
     }
     body.no-neon-glow .modal-content { box-shadow: 0 0 20px var(--cyan-glow); }
     body.no-neon-glow .audio-now-playing.np-playing { box-shadow: 0 0 20px var(--cyan-glow), 0 4px 24px rgba(0,0,0,0.5); }
