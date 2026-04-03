@@ -142,6 +142,7 @@ function sortDaw(key) {
   });
   sortDawArray();
   renderDawTable();
+  if (typeof saveSortState === 'function') saveSortState('daw', dawSortKey, dawSortAsc);
 }
 
 function sortDawArray() {

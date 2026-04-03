@@ -614,7 +614,7 @@ async function scanAudioSamples(resume = false) {
     accumulateAudioStats(toAdd);
     // Queue for background BPM/Key/LUFS analysis (cap at 50K to prevent unbounded growth)
     _bgQueue.push(...toAdd);
-    if (_bgQueue.length > 50000) _bgQueue.length = 50000;
+    if (_bgQueue.length > 50000) _bgQueue = _bgQueue.slice(-50000); // keep newest
     if (!_bgAnalysisRunning) startBackgroundAnalysis();
     const audioElapsed = audioEta.elapsed();
     btn.innerHTML = `&#8635; ${pendingFound} found${audioElapsed ? ' — ' + audioElapsed : ''}`;
@@ -822,6 +822,7 @@ function sortAudio(key) {
   });
   sortAudioArray();
   renderAudioTable();
+  if (typeof saveSortState === 'function') saveSortState('audio', audioSortKey, audioSortAsc);
 }
 
 function sortAudioArray() {

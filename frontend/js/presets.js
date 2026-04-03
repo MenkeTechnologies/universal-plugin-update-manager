@@ -72,6 +72,7 @@ function sortPreset(key) {
     }
   });
   filterPresets();
+  if (typeof saveSortState === 'function') saveSortState('preset', presetSortKey, presetSortAsc);
 }
 
 let _lastPresetSearch = '';
