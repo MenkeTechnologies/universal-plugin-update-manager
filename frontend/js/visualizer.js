@@ -450,7 +450,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (grid && typeof initDragReorder === 'function') {
     initDragReorder(grid, '.viz-tile', 'vizTileOrder', {
       getKey: (el) => el.dataset.vizTile || '',
-      handleSelector: '.viz-tile-label',
     });
   }
 });

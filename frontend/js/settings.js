@@ -1366,7 +1366,6 @@ function renderFzfSettings() {
   if (typeof initDragReorder === 'function') {
     initDragReorder(grid, '.settings-row', 'fzfParamOrder', {
       getKey: (el) => el.querySelector('[data-fzf-param]')?.dataset.fzfParam || '',
-      handleSelector: '.settings-label',
     });
   }
 }
@@ -1512,8 +1511,7 @@ function initSettingsSectionDrag() {
     container.querySelectorAll('.settings-section[data-section]').forEach(section => {
       initDragReorder(section, '.settings-row', 'settingsRows_' + section.dataset.section, {
         getKey: (el) => el.querySelector('.settings-title')?.textContent?.trim() || '',
-        handleSelector: '.settings-label',
-      });
+        });
     });
   }
 }

@@ -79,7 +79,6 @@ function _renderTile(bodyId, tileId, dirs, color, poolThreads, isScanning) {
   if (grid && typeof initDragReorder === 'function') {
     initDragReorder(grid, '.walker-tile', 'walkerTileOrder', {
       getKey: (el) => el.id || '',
-      handleSelector: '.walker-tile-header, .walker-tile-status',
     });
   }
 })();
