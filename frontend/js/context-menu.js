@@ -263,6 +263,27 @@ document.addEventListener('contextmenu', (e) => {
     return;
   }
 
+  // ── MIDI file rows ──
+  const midiRow = e.target.closest('#midiTableBody tr[data-midi-path]');
+  if (midiRow) {
+    const path = midiRow.getAttribute('data-midi-path');
+    const name = midiRow.querySelector('.col-name')?.textContent || '';
+    const items = [
+      { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
+      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); } },
+      '---',
+      { icon: '&#128203;', label: 'Copy Name', action: () => typeof copyToClipboard === 'function' && copyToClipboard(name) },
+      { icon: '&#128203;', label: 'Copy Path', action: () => typeof copyToClipboard === 'function' && copyToClipboard(path) },
+      '---',
+      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
+        action: () => f ? removeFavorite(path) : addFavorite('midi', path, name) }; })()],
+      { icon: '&#128221;', label: 'Add Note', action: () => typeof showNoteEditor === 'function' && showNoteEditor(path, name) },
+      ...(typeof quickTagItems === 'function' ? quickTagItems(path, name) : []),
+    ];
+    showContextMenu(e, items);
+    return;
+  }
+
   // ── DAW project rows ──
   const dawRow = e.target.closest('#dawTableBody tr[data-daw-path]');
   if (dawRow) {

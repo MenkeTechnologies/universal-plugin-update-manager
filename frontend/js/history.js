@@ -596,6 +596,7 @@ async function clearAllHistory() {
   selectedScanType = null;
   document.getElementById('historyDetail').innerHTML = '<div class="empty-history"><div class="empty-history-icon">&#8592;</div><p>Select a scan from the sidebar to view details</p></div>';
   await loadHistory();
+  showToast('All scan history cleared');
 }
 
 function timeAgo(date) {

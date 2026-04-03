@@ -1,30 +1,30 @@
 // ── MIDI Tab ──
-// Shows MIDI files with MIDI-specific metadata (tempo, key, notes, tracks).
-// Queries SQLite directly with format filter for MID/MIDI.
+// Dedicated tab for MIDI files with sortable/draggable columns and MIDI-specific metadata.
 
 let allMidiFiles = [];
 let filteredMidi = [];
 let _midiInfoCache = {};
 let _midiLoaded = false;
+let midiSortKey = 'name';
+let midiSortAsc = true;
 
 async function loadMidiFiles() {
   try {
-    // Query all MIDI files from the database
     const result = await window.vstUpdater.dbQueryAudio({
       format_filter: 'MID',
       sort_key: 'name',
       sort_asc: true,
       offset: 0,
-      limit: 50000,
+      limit: 100000,
     });
     allMidiFiles = result.samples || [];
-    // Also try MIDI extension
+    // Also check MIDI extension
     const result2 = await window.vstUpdater.dbQueryAudio({
       format_filter: 'MIDI',
       sort_key: 'name',
       sort_asc: true,
       offset: 0,
-      limit: 50000,
+      limit: 100000,
     });
     if (result2.samples && result2.samples.length > 0) {
       const paths = new Set(allMidiFiles.map(s => s.path));
@@ -34,11 +34,17 @@ async function loadMidiFiles() {
     }
     filteredMidi = allMidiFiles;
     _midiLoaded = true;
+    sortMidiArray();
     renderMidiTable();
     updateMidiCount();
+    updateMidiHeaderCount();
   } catch (e) {
     console.warn('MIDI load error:', e);
   }
+}
+
+function getMidiCount() {
+  return allMidiFiles.length;
 }
 
 function updateMidiCount() {
@@ -46,19 +52,69 @@ function updateMidiCount() {
   if (count) count.textContent = `${filteredMidi.length}${filteredMidi.length !== allMidiFiles.length ? ' of ' + allMidiFiles.length : ''} MIDI files`;
 }
 
+function updateMidiHeaderCount() {
+  const el = document.getElementById('headerMidi');
+  if (el) el.textContent = allMidiFiles.length;
+}
+
 function filterMidi() {
   const input = document.getElementById('midiSearchInput');
   const q = input ? input.value.trim() : '';
   if (!q) {
-    filteredMidi = allMidiFiles;
+    filteredMidi = allMidiFiles.slice();
   } else if (typeof fzfFilter === 'function') {
     filteredMidi = fzfFilter(allMidiFiles, q, ['name', 'directory'], 'fuzzy');
   } else {
     const ql = q.toLowerCase();
     filteredMidi = allMidiFiles.filter(s => s.name.toLowerCase().includes(ql) || s.directory.toLowerCase().includes(ql));
   }
+  sortMidiArray();
   renderMidiTable();
   updateMidiCount();
+}
+
+function sortMidi(key) {
+  if (midiSortKey === key) {
+    midiSortAsc = !midiSortAsc;
+  } else {
+    midiSortKey = key;
+    midiSortAsc = true;
+  }
+  ['Name', 'Tracks', 'Bpm', 'Time', 'Key', 'Notes', 'Ch', 'Duration', 'Size', 'Path'].forEach(k => {
+    const el = document.getElementById('midiSortArrow' + k);
+    if (el) {
+      const isActive = k.toLowerCase() === midiSortKey;
+      el.innerHTML = isActive ? (midiSortAsc ? '&#9650;' : '&#9660;') : '';
+      el.closest('th')?.classList.toggle('sort-active', isActive);
+    }
+  });
+  sortMidiArray();
+  renderMidiTable();
+  if (typeof saveSortState === 'function') saveSortState('midi', midiSortKey, midiSortAsc);
+}
+
+function sortMidiArray() {
+  filteredMidi.sort((a, b) => {
+    let va, vb;
+    const ai = _midiInfoCache[a.path] || {};
+    const bi = _midiInfoCache[b.path] || {};
+    switch (midiSortKey) {
+      case 'name': va = a.name.toLowerCase(); vb = b.name.toLowerCase(); break;
+      case 'tracks': va = ai.trackCount || 0; vb = bi.trackCount || 0; break;
+      case 'bpm': va = ai.tempo || 0; vb = bi.tempo || 0; break;
+      case 'time': va = ai.timeSignature || ''; vb = bi.timeSignature || ''; break;
+      case 'key': va = ai.keySignature || ''; vb = bi.keySignature || ''; break;
+      case 'notes': va = ai.noteCount || 0; vb = bi.noteCount || 0; break;
+      case 'ch': va = ai.channelsUsed || 0; vb = bi.channelsUsed || 0; break;
+      case 'duration': va = ai.duration || 0; vb = bi.duration || 0; break;
+      case 'size': va = a.size || 0; vb = b.size || 0; break;
+      case 'path': va = a.directory.toLowerCase(); vb = b.directory.toLowerCase(); break;
+      default: va = a.name.toLowerCase(); vb = b.name.toLowerCase();
+    }
+    if (va < vb) return midiSortAsc ? -1 : 1;
+    if (va > vb) return midiSortAsc ? 1 : -1;
+    return 0;
+  });
 }
 
 function renderMidiTable() {
@@ -68,26 +124,27 @@ function renderMidiTable() {
     wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim);">No MIDI files found. Run an audio scan to discover .mid files.</div>';
     return;
   }
+  const arrow = (k) => `<span class="sort-arrow" id="midiSortArrow${k}">${midiSortKey === k.toLowerCase() ? (midiSortAsc ? '&#9650;' : '&#9660;') : ''}</span>`;
   wrap.innerHTML = `<table class="audio-table" id="midiTable">
     <thead>
       <tr>
-        <th style="width:25%;">Name<span class="col-resize"></span></th>
-        <th style="width:55px;">Tracks<span class="col-resize"></span></th>
-        <th style="width:65px;">BPM<span class="col-resize"></span></th>
-        <th style="width:55px;">Time<span class="col-resize"></span></th>
-        <th style="width:80px;">Key<span class="col-resize"></span></th>
-        <th style="width:60px;">Notes<span class="col-resize"></span></th>
-        <th style="width:45px;">Ch<span class="col-resize"></span></th>
-        <th style="width:65px;">Duration<span class="col-resize"></span></th>
-        <th style="width:60px;">Size<span class="col-resize"></span></th>
-        <th style="width:25%;">Path<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="name" style="width:25%;" title="File name">Name ${arrow('Name')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="tracks" style="width:55px;" title="Track count">Tracks ${arrow('Tracks')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="bpm" style="width:65px;" title="Tempo (BPM)">BPM ${arrow('Bpm')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="time" style="width:55px;" title="Time signature">Time ${arrow('Time')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="key" style="width:80px;" title="Key signature">Key ${arrow('Key')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="notes" style="width:60px;" title="Note count">Notes ${arrow('Notes')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="ch" style="width:45px;" title="MIDI channels used">Ch ${arrow('Ch')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="duration" style="width:65px;" title="Duration">Dur ${arrow('Duration')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="size" style="width:60px;" title="File size">Size ${arrow('Size')}<span class="col-resize"></span></th>
+        <th data-action="sortMidi" data-key="path" style="width:25%;" title="Directory path">Path ${arrow('Path')}<span class="col-resize"></span></th>
       </tr>
     </thead>
     <tbody id="midiTableBody"></tbody>
   </table>`;
-  const tbody = document.getElementById('midiTableBody');
-  tbody.innerHTML = filteredMidi.map(buildMidiRow).join('');
+  document.getElementById('midiTableBody').innerHTML = filteredMidi.map(buildMidiRow).join('');
   if (typeof initColumnResize === 'function') initColumnResize(document.getElementById('midiTable'));
+  if (typeof initTableColumnReorder === 'function') initTableColumnReorder('midiTable', 'midiColumnOrder');
   loadMidiMetadata();
 }
 
@@ -95,15 +152,17 @@ function buildMidiRow(s) {
   const hp = typeof escapeHtml === 'function' ? escapeHtml(s.path) : s.path;
   const hn = typeof escapeHtml === 'function' ? escapeHtml(s.name) : s.name;
   const info = _midiInfoCache[s.path];
-  return `<tr data-midi-path="${hp}" data-action="openAudioFolder" data-path="${hp}">
+  const dur = info && info.duration ? (typeof formatTime === 'function' ? formatTime(info.duration) : info.duration.toFixed(1) + 's') : '';
+  const trackNames = info && info.trackNames && info.trackNames.length > 0 ? info.trackNames.join(', ') : '';
+  return `<tr data-midi-path="${hp}" title="${trackNames ? 'Tracks: ' + (typeof escapeHtml === 'function' ? escapeHtml(trackNames) : trackNames) : ''}">
     <td class="col-name" title="${hn}">${hn}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
-    <td style="text-align:center;">${info ? info.trackCount : '<span class="spinner" style="width:10px;height:10px;"></span>'}</td>
+    <td style="text-align:center;">${info ? info.trackCount : ''}</td>
     <td style="text-align:center;color:var(--cyan);">${info ? info.tempo : ''}</td>
     <td style="text-align:center;">${info ? info.timeSignature : ''}</td>
     <td style="text-align:center;color:var(--accent);">${info ? (typeof escapeHtml === 'function' ? escapeHtml(info.keySignature) : info.keySignature) : ''}</td>
     <td style="text-align:right;">${info ? info.noteCount.toLocaleString() : ''}</td>
     <td style="text-align:center;">${info ? info.channelsUsed : ''}</td>
-    <td style="text-align:center;">${info && info.duration ? (typeof formatTime === 'function' ? formatTime(info.duration) : info.duration.toFixed(1) + 's') : ''}</td>
+    <td style="text-align:center;">${dur}</td>
     <td class="col-size">${s.sizeFormatted}</td>
     <td class="col-path" title="${hp}">${typeof escapeHtml === 'function' ? escapeHtml(s.directory) : s.directory}</td>
   </tr>`;
@@ -136,7 +195,14 @@ async function loadMidiMetadata() {
   }
 }
 
-// Filter input handler
+// Event handlers
 document.addEventListener('input', (e) => {
   if (e.target.id === 'midiSearchInput') filterMidi();
+});
+document.addEventListener('click', (e) => {
+  const sortBtn = e.target.closest('[data-action="sortMidi"]');
+  if (sortBtn && sortBtn.dataset.key) {
+    e.preventDefault();
+    sortMidi(sortBtn.dataset.key);
+  }
 });

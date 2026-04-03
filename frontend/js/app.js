@@ -269,6 +269,7 @@ async function updateHeaderInfo() {
     set('headerSamples', typeof allAudioSamples !== 'undefined' ? allAudioSamples.length : 0);
     set('headerDaw', typeof allDawProjects !== 'undefined' ? allDawProjects.length : 0);
     set('headerPresets', typeof allPresets !== 'undefined' ? allPresets.length : 0);
+    set('headerMidi', typeof getMidiCount === 'function' ? getMidiCount() : 0);
 
     // Scan status badge
     const sc = s.scanner || {};
