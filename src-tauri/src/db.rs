@@ -229,7 +229,26 @@ impl Database {
             conn: Mutex::new(conn),
         };
         db.migrate()?;
+        // Auto-prune: keep only 3 most recent scans per type
+        db.prune_old_scans(3);
         Ok(db)
+    }
+
+    /// Prune old scans — keep only the N most recent per type. Reduces DB bloat.
+    pub fn prune_old_scans(&self, keep: usize) {
+        let conn = self.conn.lock().unwrap();
+        let keep_i = keep as i64;
+        for (scan_tbl, data_tbl, id_col) in [
+            ("audio_scans", "audio_samples", "scan_id"),
+            ("plugin_scans", "plugins", "scan_id"),
+            ("daw_scans", "daw_projects", "scan_id"),
+            ("preset_scans", "presets", "scan_id"),
+        ] {
+            let _ = conn.execute_batch(&format!(
+                "DELETE FROM {data_tbl} WHERE {id_col} NOT IN (SELECT id FROM {scan_tbl} ORDER BY timestamp DESC LIMIT {keep_i});
+                 DELETE FROM {scan_tbl} WHERE id NOT IN (SELECT id FROM {scan_tbl} ORDER BY timestamp DESC LIMIT {keep_i});"
+            ));
+        }
     }
 
     /// Checkpoint WAL to merge it into the main DB file. Keeps WAL small.
