@@ -4129,6 +4129,10 @@ pub fn run() {
     // Initialize app start time for uptime tracking
     APP_START.get_or_init(Instant::now);
 
+    // Register atexit handler for shutdown logging (Cmd+Q, SIGTERM, etc.)
+    extern "C" fn on_exit() { log_shutdown(); }
+    unsafe { libc::atexit(on_exit); }
+
     // Load preferences once for all startup config
     let prefs = history::load_preferences();
 
@@ -4942,10 +4946,17 @@ pub fn run() {
         .run(|_app, event| {
             match event {
                 tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
-                    let uptime = APP_START.get().map(|s| s.elapsed().as_secs()).unwrap_or(0);
-                    append_log(format!("APP SHUTDOWN — uptime {}m {}s", uptime / 60, uptime % 60));
+                    log_shutdown();
                 }
                 _ => {}
             }
         });
+}
+
+fn log_shutdown() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static LOGGED: AtomicBool = AtomicBool::new(false);
+    if LOGGED.swap(true, Ordering::Relaxed) { return; } // only log once
+    let uptime = APP_START.get().map(|s| s.elapsed().as_secs()).unwrap_or(0);
+    append_log(format!("APP SHUTDOWN — uptime {}m {}s", uptime / 60, uptime % 60));
 }
