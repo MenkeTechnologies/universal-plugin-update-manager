@@ -7,22 +7,20 @@ fn test_export_payload_serialization() {
     let payload = ExportPayload {
         version: "1.11.0".to_string(),
         exported_at: "2024-04-03T12:00:00Z".to_string(),
-        plugins: vec![
-            ExportPlugin {
-                name: "FabFilter Pro-Q3".to_string(),
-                plugin_type: "VST3".to_string(),
-                version: "3.5.0".to_string(),
-                manufacturer: "FabFilter".to_string(),
-                manufacturer_url: Some("https://fabfilter.com".to_string()),
-                path: "/Library/Audio/Plug-Ins/VST3/Pro-Q3.vst3".to_string(),
-                size: "12.8 MB".to_string(),
-                size_bytes: 13_483_264,
-                modified: "2024-03-15T10:30:00Z".to_string(),
-                architectures: vec!["x86_64".to_string(), "arm64".to_string()],
-            },
-        ],
+        plugins: vec![ExportPlugin {
+            name: "FabFilter Pro-Q3".to_string(),
+            plugin_type: "VST3".to_string(),
+            version: "3.5.0".to_string(),
+            manufacturer: "FabFilter".to_string(),
+            manufacturer_url: Some("https://fabfilter.com".to_string()),
+            path: "/Library/Audio/Plug-Ins/VST3/Pro-Q3.vst3".to_string(),
+            size: "12.8 MB".to_string(),
+            size_bytes: 13_483_264,
+            modified: "2024-03-15T10:30:00Z".to_string(),
+            architectures: vec!["x86_64".to_string(), "arm64".to_string()],
+        }],
     };
-    
+
     let json = serde_json::to_string(&payload).unwrap();
     assert!(json.contains("FabFilter Pro-Q3"));
     assert!(json.contains("VST3"));
@@ -43,7 +41,7 @@ fn test_export_plugin_with_and_without_url() {
         modified: "2024-01-01".to_string(),
         architectures: vec![],
     };
-    
+
     // Plugin without manufacturer URL
     let plugin_without_url = ExportPlugin {
         name: "Plugin Without URL".to_string(),
@@ -57,7 +55,7 @@ fn test_export_plugin_with_and_without_url() {
         modified: "2024-01-01".to_string(),
         architectures: vec![],
     };
-    
+
     assert!(plugin_with_url.manufacturer_url.is_some());
     assert!(plugin_without_url.manufacturer_url.is_none());
 }
@@ -65,7 +63,7 @@ fn test_export_plugin_with_and_without_url() {
 #[test]
 fn test_payload_with_multiple_plugins() {
     let mut plugins = Vec::new();
-    
+
     // First plugin - VST2
     plugins.push(ExportPlugin {
         name: "ReaEQ".to_string(),
@@ -79,7 +77,7 @@ fn test_payload_with_multiple_plugins() {
         modified: "2024-01-01".to_string(),
         architectures: vec!["x86_64".to_string()],
     });
-    
+
     // Second plugin - VST3
     plugins.push(ExportPlugin {
         name: "Valhalla VintageVerb".to_string(),
@@ -93,7 +91,7 @@ fn test_payload_with_multiple_plugins() {
         modified: "2024-01-01".to_string(),
         architectures: vec!["x86_64".to_string(), "arm64".to_string()],
     });
-    
+
     // Third plugin - AU
     plugins.push(ExportPlugin {
         name: "Softube Tube-Tech".to_string(),
@@ -107,6 +105,6 @@ fn test_payload_with_multiple_plugins() {
         modified: "2024-01-01".to_string(),
         architectures: vec!["arm64".to_string()],
     });
-    
+
     assert_eq!(plugins.len(), 3);
 }

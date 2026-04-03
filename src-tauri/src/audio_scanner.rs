@@ -261,10 +261,7 @@ fn walk_dir_parallel(
                     name: sample_name,
                     path: path.to_string_lossy().to_string(),
                     directory: parent.to_string_lossy().to_string(),
-                    format: ext
-                        .strip_prefix('.')
-                        .unwrap_or("")
-                        .to_uppercase(),
+                    format: ext.strip_prefix('.').unwrap_or("").to_uppercase(),
                     size: meta.len(),
                     size_formatted: format_size(meta.len()),
                     modified,
@@ -387,10 +384,7 @@ pub fn get_audio_metadata(file_path: &str) -> AudioMetadata {
             .parent()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default(),
-        format: ext
-            .strip_prefix('.')
-            .unwrap_or("")
-            .to_uppercase(),
+        format: ext.strip_prefix('.').unwrap_or("").to_uppercase(),
         size_bytes: meta.len(),
         created: fmt_time(meta.created()),
         modified: fmt_time(meta.modified()),

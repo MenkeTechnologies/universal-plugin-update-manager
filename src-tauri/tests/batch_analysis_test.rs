@@ -29,8 +29,7 @@ fn test_batch_fingerprint_missing_files_all_none() {
 #[test]
 fn test_batch_key_detect_unsupported_extensions_none() {
     for ext in ["txt", "pdf", "rs"] {
-        let p = std::env::temp_dir()
-            .join(format!("audio_haxor_batch_key.{ext}"));
+        let p = std::env::temp_dir().join(format!("audio_haxor_batch_key.{ext}"));
         std::fs::write(&p, b"x").unwrap();
         assert!(
             app_lib::key_detect::detect_key(&p.to_string_lossy()).is_none(),

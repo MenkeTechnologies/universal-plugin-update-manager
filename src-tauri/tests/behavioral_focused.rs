@@ -168,10 +168,7 @@ fn compute_plugin_diff_swap_old_new_produces_added_removed_swap() {
 
 #[test]
 fn compute_daw_diff_detects_added_and_removed_paths() {
-    let old = build_daw_snapshot(
-        &[sample_daw("/a.als", "A", "Ableton Live")],
-        &["/r".into()],
-    );
+    let old = build_daw_snapshot(&[sample_daw("/a.als", "A", "Ableton Live")], &["/r".into()]);
     let new = build_daw_snapshot(
         &[
             sample_daw("/a.als", "A", "Ableton Live"),
@@ -266,7 +263,10 @@ fn xref_normalize_plugin_name_strips_nested_suffixes() {
     let once = app_lib::xref::normalize_plugin_name(s);
     let twice = app_lib::xref::normalize_plugin_name(&once);
     assert_eq!(once, twice);
-    assert!(!once.contains('('), "normalized name should drop arch parens: {once}");
+    assert!(
+        !once.contains('('),
+        "normalized name should drop arch parens: {once}"
+    );
 }
 
 #[test]
@@ -370,7 +370,9 @@ fn kvr_extract_version_plain_version_colon_line() {
 
 #[test]
 fn kvr_extract_download_url_returns_none_without_candidate_links() {
-    assert!(app_lib::kvr::extract_download_url("<html><body>no links here</body></html>").is_none());
+    assert!(
+        app_lib::kvr::extract_download_url("<html><body>no links here</body></html>").is_none()
+    );
 }
 
 #[test]

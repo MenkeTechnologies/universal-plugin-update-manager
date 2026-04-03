@@ -1,8 +1,6 @@
 #[test]
 fn test_similarity_compute_fingerprint_nonexistent() {
-    assert!(
-        app_lib::similarity::compute_fingerprint("/nonexistent/audio_haxor_fp.wav").is_none()
-    );
+    assert!(app_lib::similarity::compute_fingerprint("/nonexistent/audio_haxor_fp.wav").is_none());
 }
 
 #[test]

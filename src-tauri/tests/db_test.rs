@@ -57,10 +57,7 @@ fn test_db_preference_roundtrip() {
 fn test_db_save_load_preferences_stable() {
     let _lock = PREF_TEST_LOCK.lock().unwrap();
     let mut prefs = app_lib::history::load_preferences();
-    prefs.insert(
-        "audio_haxor_save_key".into(),
-        serde_json::json!({"x": 1}),
-    );
+    prefs.insert("audio_haxor_save_key".into(), serde_json::json!({"x": 1}));
     app_lib::history::save_preferences(&prefs);
     let mut prefs2 = app_lib::history::load_preferences();
     assert_eq!(

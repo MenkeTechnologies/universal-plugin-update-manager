@@ -55,7 +55,11 @@ fn handcrafted_fingerprint_different_paths_same_features_same_distance() {
     let p = fp("/a/x.wav", 0.5);
     let q = fp("/b/y.wav", 0.5);
     let d = fingerprint_distance(&p, &q);
-    assert!(d < 1e-9, "distance should ignore path when features match: {}", d);
+    assert!(
+        d < 1e-9,
+        "distance should ignore path when features match: {}",
+        d
+    );
 }
 
 macro_rules! fp_symmetric_pair_sc {

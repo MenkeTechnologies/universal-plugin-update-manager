@@ -7,9 +7,7 @@ use std::cmp::Ordering;
 
 #[test]
 fn diff_scans_unknown_ids_returns_none() {
-    assert!(
-        app_lib::history::diff_scans("no_such_scan_id_old", "no_such_scan_id_new").is_none()
-    );
+    assert!(app_lib::history::diff_scans("no_such_scan_id_old", "no_such_scan_id_new").is_none());
 }
 
 #[test]
@@ -19,9 +17,7 @@ fn diff_daw_scans_unknown_ids_returns_none() {
 
 #[test]
 fn diff_audio_scans_unknown_ids_returns_none() {
-    assert!(
-        app_lib::history::diff_audio_scans("missing_audio_old", "missing_audio_new").is_none()
-    );
+    assert!(app_lib::history::diff_audio_scans("missing_audio_old", "missing_audio_new").is_none());
 }
 
 #[test]
@@ -58,10 +54,7 @@ fn kvr_compare_patch_99_vs_100() {
 
 #[test]
 fn kvr_parse_version_large_numeric_segment() {
-    assert_eq!(
-        app_lib::kvr::parse_version("2025.11.3"),
-        vec![2025, 11, 3]
-    );
+    assert_eq!(app_lib::kvr::parse_version("2025.11.3"), vec![2025, 11, 3]);
 }
 
 // ── Similarity: candidate list with duplicate distances still yields sorted output ──

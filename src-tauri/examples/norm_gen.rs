@@ -64,11 +64,7 @@ fn main() {
     }
 
     // Whitespace
-    for s in [
-        "  spaced  name  ",
-        "Tab\there",
-        "Pro   Q   3",
-    ] {
+    for s in ["  spaced  name  ", "Tab\there", "Pro   Q   3"] {
         inputs.push(s.to_string());
     }
 

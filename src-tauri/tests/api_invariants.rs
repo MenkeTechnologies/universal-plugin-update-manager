@@ -5,11 +5,7 @@ use std::cmp::Ordering;
 #[test]
 fn kvr_compare_reflexive() {
     for v in ["0", "1", "1.0", "2.3.4", "10.20.30", "01.02.03"] {
-        assert_eq!(
-            app_lib::kvr::compare_versions(v, v),
-            Ordering::Equal,
-            "{v}"
-        );
+        assert_eq!(app_lib::kvr::compare_versions(v, v), Ordering::Equal, "{v}");
     }
 }
 
@@ -113,7 +109,14 @@ fn format_size_nonzero_labels_for_large_powers_of_two() {
         let b = 1u64 << exp;
         let s = app_lib::format_size(b);
         assert_ne!(s, "0 B");
-        assert!(s.ends_with(" B") || s.ends_with(" KB") || s.ends_with(" MB") || s.ends_with(" GB") || s.ends_with(" TB"), "{s}");
+        assert!(
+            s.ends_with(" B")
+                || s.ends_with(" KB")
+                || s.ends_with(" MB")
+                || s.ends_with(" GB")
+                || s.ends_with(" TB"),
+            "{s}"
+        );
     }
 }
 

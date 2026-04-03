@@ -194,9 +194,7 @@ mod tests {
         let tmp = std::env::temp_dir().join("lufs_test_tiny.wav");
         let sr = 44100u32;
         let samples: Vec<f32> = (0..512)
-            .map(|i| {
-                (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sr as f32).sin() * 0.5
-            })
+            .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sr as f32).sin() * 0.5)
             .collect();
         write_test_wav(&tmp, &samples, sr);
         assert!(
@@ -357,8 +355,8 @@ mod tests {
 
         let mut pcm_bytes = Vec::with_capacity(frames * 2);
         for i in 0..frames {
-            let s = (2.0 * std::f32::consts::PI * 600.0 * i as f32 / sample_rate as f32).sin()
-                * 0.55;
+            let s =
+                (2.0 * std::f32::consts::PI * 600.0 * i as f32 / sample_rate as f32).sin() * 0.55;
             let v = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
             pcm_bytes.extend_from_slice(&v.to_be_bytes());
         }

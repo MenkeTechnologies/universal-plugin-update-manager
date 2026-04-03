@@ -2632,7 +2632,10 @@ fn pv_edge_10() {
 
 #[test]
 fn pv_edge_11() {
-    assert_eq!(app_lib::kvr::parse_version("2147483647.0"), vec![2147483647, 0]);
+    assert_eq!(
+        app_lib::kvr::parse_version("2147483647.0"),
+        vec![2147483647, 0]
+    );
 }
 
 #[test]
@@ -2652,7704 +2655,12324 @@ fn pv_edge_14() {
 
 #[test]
 fn pv_edge_15() {
-    assert_eq!(app_lib::kvr::parse_version("2.0.0.0.1"), vec![2, 0, 0, 0, 1]);
+    assert_eq!(
+        app_lib::kvr::parse_version("2.0.0.0.1"),
+        vec![2, 0, 0, 0, 1]
+    );
 }
 
 // ── compare_versions ───────────────────────────────────────────────
 
 #[test]
 fn cmp_lt_0000() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.0", "0.0.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.0", "0.0.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0001() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.1", "0.0.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.1", "0.0.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0002() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.2", "0.0.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.2", "0.0.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0003() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.3", "0.0.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.3", "0.0.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0004() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.4", "0.0.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.4", "0.0.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0005() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.5", "0.0.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.5", "0.0.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0006() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.6", "0.0.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.6", "0.0.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0007() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.7", "0.1.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.7", "0.1.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0008() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.0", "0.1.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.0", "0.1.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0009() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.1", "0.1.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.1", "0.1.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0010() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.2", "0.1.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.2", "0.1.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0011() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.3", "0.1.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.3", "0.1.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0012() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.4", "0.1.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.4", "0.1.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0013() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.5", "0.1.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.5", "0.1.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0014() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.6", "0.1.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.6", "0.1.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0015() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.7", "0.2.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.7", "0.2.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0016() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.0", "0.2.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.0", "0.2.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0017() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.1", "0.2.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.1", "0.2.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0018() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.2", "0.2.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.2", "0.2.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0019() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.3", "0.2.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.3", "0.2.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0020() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.4", "0.2.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.4", "0.2.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0021() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.5", "0.2.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.5", "0.2.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0022() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.6", "0.2.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.6", "0.2.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0023() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.7", "0.3.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.7", "0.3.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0024() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.0", "0.3.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.0", "0.3.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0025() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.1", "0.3.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.1", "0.3.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0026() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.2", "0.3.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.2", "0.3.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0027() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.3", "0.3.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.3", "0.3.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0028() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.4", "0.3.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.4", "0.3.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0029() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.5", "0.3.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.5", "0.3.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0030() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.6", "0.3.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.6", "0.3.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0031() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.7", "0.4.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.7", "0.4.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0032() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.0", "0.4.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.0", "0.4.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0033() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.1", "0.4.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.1", "0.4.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0034() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.2", "0.4.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.2", "0.4.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0035() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.3", "0.4.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.3", "0.4.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0036() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.4", "0.4.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.4", "0.4.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0037() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.5", "0.4.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.5", "0.4.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0038() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.6", "0.4.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.6", "0.4.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0039() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.7", "0.5.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.7", "0.5.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0040() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.0", "0.5.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.0", "0.5.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0041() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.1", "0.5.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.1", "0.5.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0042() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.2", "0.5.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.2", "0.5.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0043() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.3", "0.5.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.3", "0.5.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0044() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.4", "0.5.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.4", "0.5.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0045() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.5", "0.5.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.5", "0.5.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0046() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.6", "0.5.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.6", "0.5.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0047() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.7", "0.6.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.7", "0.6.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0048() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.0", "0.6.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.0", "0.6.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0049() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.1", "0.6.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.1", "0.6.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0050() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.2", "0.6.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.2", "0.6.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0051() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.3", "0.6.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.3", "0.6.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0052() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.4", "0.6.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.4", "0.6.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0053() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.5", "0.6.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.5", "0.6.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0054() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.6", "0.6.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.6", "0.6.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0055() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.7", "0.7.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.7", "0.7.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0056() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.0", "0.7.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.0", "0.7.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0057() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.1", "0.7.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.1", "0.7.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0058() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.2", "0.7.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.2", "0.7.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0059() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.3", "0.7.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.3", "0.7.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0060() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.4", "0.7.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.4", "0.7.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0061() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.5", "0.7.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.5", "0.7.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0062() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.6", "0.7.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.6", "0.7.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0063() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.7", "1.0.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.7", "1.0.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0064() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.0", "1.0.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.0", "1.0.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0065() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.1", "1.0.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.1", "1.0.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0066() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.2", "1.0.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.2", "1.0.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0067() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.3", "1.0.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.3", "1.0.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0068() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.4", "1.0.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.4", "1.0.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0069() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.5", "1.0.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.5", "1.0.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0070() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.6", "1.0.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.6", "1.0.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0071() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.7", "1.1.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.7", "1.1.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0072() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.0", "1.1.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.0", "1.1.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0073() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.1", "1.1.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.1", "1.1.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0074() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.2", "1.1.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.2", "1.1.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0075() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.3", "1.1.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.3", "1.1.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0076() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.4", "1.1.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.4", "1.1.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0077() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.5", "1.1.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.5", "1.1.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0078() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.6", "1.1.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.6", "1.1.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0079() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.7", "1.2.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.7", "1.2.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0080() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.0", "1.2.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.0", "1.2.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0081() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.1", "1.2.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.1", "1.2.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0082() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.2", "1.2.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.2", "1.2.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0083() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.3", "1.2.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.3", "1.2.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0084() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.4", "1.2.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.4", "1.2.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0085() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.5", "1.2.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.5", "1.2.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0086() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.6", "1.2.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.6", "1.2.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0087() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.7", "1.3.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.7", "1.3.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0088() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.0", "1.3.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.0", "1.3.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0089() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.1", "1.3.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.1", "1.3.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0090() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.2", "1.3.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.2", "1.3.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0091() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.3", "1.3.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.3", "1.3.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0092() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.4", "1.3.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.4", "1.3.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0093() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.5", "1.3.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.5", "1.3.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0094() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.6", "1.3.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.6", "1.3.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0095() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.7", "1.4.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.7", "1.4.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0096() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.0", "1.4.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.0", "1.4.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0097() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.1", "1.4.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.1", "1.4.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0098() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.2", "1.4.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.2", "1.4.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0099() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.3", "1.4.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.3", "1.4.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0100() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.4", "1.4.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.4", "1.4.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0101() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.5", "1.4.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.5", "1.4.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0102() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.6", "1.4.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.6", "1.4.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0103() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.7", "1.5.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.7", "1.5.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0104() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.0", "1.5.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.0", "1.5.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0105() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.1", "1.5.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.1", "1.5.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0106() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.2", "1.5.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.2", "1.5.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0107() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.3", "1.5.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.3", "1.5.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0108() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.4", "1.5.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.4", "1.5.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0109() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.5", "1.5.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.5", "1.5.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0110() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.6", "1.5.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.6", "1.5.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0111() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.7", "1.6.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.7", "1.6.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0112() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.0", "1.6.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.0", "1.6.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0113() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.1", "1.6.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.1", "1.6.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0114() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.2", "1.6.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.2", "1.6.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0115() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.3", "1.6.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.3", "1.6.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0116() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.4", "1.6.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.4", "1.6.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0117() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.5", "1.6.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.5", "1.6.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0118() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.6", "1.6.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.6", "1.6.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0119() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.7", "1.7.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.7", "1.7.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0120() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.0", "1.7.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.0", "1.7.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0121() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.1", "1.7.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.1", "1.7.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0122() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.2", "1.7.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.2", "1.7.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0123() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.3", "1.7.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.3", "1.7.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0124() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.4", "1.7.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.4", "1.7.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0125() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.5", "1.7.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.5", "1.7.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0126() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.6", "1.7.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.6", "1.7.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0127() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.7", "2.0.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.7", "2.0.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0128() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.0", "2.0.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.0", "2.0.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0129() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.1", "2.0.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.1", "2.0.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0130() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.2", "2.0.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.2", "2.0.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0131() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.3", "2.0.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.3", "2.0.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0132() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.4", "2.0.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.4", "2.0.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0133() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.5", "2.0.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.5", "2.0.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0134() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.6", "2.0.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.6", "2.0.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0135() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.7", "2.1.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.7", "2.1.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0136() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.0", "2.1.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.0", "2.1.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0137() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.1", "2.1.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.1", "2.1.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0138() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.2", "2.1.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.2", "2.1.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0139() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.3", "2.1.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.3", "2.1.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0140() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.4", "2.1.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.4", "2.1.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0141() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.5", "2.1.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.5", "2.1.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0142() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.6", "2.1.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.6", "2.1.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0143() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.7", "2.2.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.7", "2.2.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0144() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.0", "2.2.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.0", "2.2.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0145() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.1", "2.2.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.1", "2.2.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0146() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.2", "2.2.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.2", "2.2.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0147() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.3", "2.2.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.3", "2.2.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0148() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.4", "2.2.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.4", "2.2.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0149() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.5", "2.2.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.5", "2.2.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0150() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.6", "2.2.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.6", "2.2.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0151() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.7", "2.3.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.7", "2.3.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0152() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.0", "2.3.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.0", "2.3.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0153() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.1", "2.3.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.1", "2.3.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0154() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.2", "2.3.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.2", "2.3.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0155() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.3", "2.3.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.3", "2.3.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0156() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.4", "2.3.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.4", "2.3.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0157() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.5", "2.3.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.5", "2.3.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0158() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.6", "2.3.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.6", "2.3.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0159() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.7", "2.4.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.7", "2.4.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0160() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.0", "2.4.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.0", "2.4.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0161() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.1", "2.4.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.1", "2.4.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0162() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.2", "2.4.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.2", "2.4.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0163() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.3", "2.4.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.3", "2.4.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0164() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.4", "2.4.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.4", "2.4.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0165() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.5", "2.4.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.5", "2.4.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0166() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.6", "2.4.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.6", "2.4.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0167() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.7", "2.5.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.7", "2.5.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0168() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.0", "2.5.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.0", "2.5.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0169() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.1", "2.5.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.1", "2.5.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0170() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.2", "2.5.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.2", "2.5.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0171() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.3", "2.5.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.3", "2.5.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0172() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.4", "2.5.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.4", "2.5.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0173() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.5", "2.5.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.5", "2.5.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0174() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.6", "2.5.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.6", "2.5.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0175() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.7", "2.6.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.7", "2.6.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0176() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.0", "2.6.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.0", "2.6.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0177() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.1", "2.6.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.1", "2.6.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0178() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.2", "2.6.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.2", "2.6.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0179() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.3", "2.6.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.3", "2.6.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0180() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.4", "2.6.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.4", "2.6.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0181() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.5", "2.6.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.5", "2.6.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0182() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.6", "2.6.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.6", "2.6.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0183() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.7", "2.7.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.7", "2.7.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0184() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.0", "2.7.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.0", "2.7.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0185() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.1", "2.7.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.1", "2.7.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0186() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.2", "2.7.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.2", "2.7.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0187() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.3", "2.7.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.3", "2.7.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0188() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.4", "2.7.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.4", "2.7.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0189() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.5", "2.7.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.5", "2.7.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0190() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.6", "2.7.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.6", "2.7.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0191() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.7", "3.0.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.7", "3.0.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0192() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.0", "3.0.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.0", "3.0.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0193() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.1", "3.0.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.1", "3.0.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0194() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.2", "3.0.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.2", "3.0.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0195() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.3", "3.0.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.3", "3.0.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0196() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.4", "3.0.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.4", "3.0.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0197() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.5", "3.0.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.5", "3.0.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0198() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.6", "3.0.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.6", "3.0.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0199() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.7", "3.1.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.7", "3.1.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0200() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.0", "3.1.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.0", "3.1.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0201() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.1", "3.1.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.1", "3.1.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0202() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.2", "3.1.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.2", "3.1.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0203() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.3", "3.1.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.3", "3.1.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0204() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.4", "3.1.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.4", "3.1.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0205() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.5", "3.1.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.5", "3.1.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0206() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.6", "3.1.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.6", "3.1.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0207() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.7", "3.2.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.7", "3.2.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0208() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.0", "3.2.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.0", "3.2.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0209() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.1", "3.2.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.1", "3.2.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0210() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.2", "3.2.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.2", "3.2.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0211() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.3", "3.2.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.3", "3.2.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0212() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.4", "3.2.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.4", "3.2.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0213() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.5", "3.2.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.5", "3.2.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0214() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.6", "3.2.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.6", "3.2.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0215() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.7", "3.3.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.7", "3.3.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0216() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.0", "3.3.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.0", "3.3.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0217() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.1", "3.3.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.1", "3.3.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0218() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.2", "3.3.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.2", "3.3.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0219() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.3", "3.3.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.3", "3.3.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0220() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.4", "3.3.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.4", "3.3.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0221() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.5", "3.3.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.5", "3.3.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0222() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.6", "3.3.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.6", "3.3.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0223() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.7", "3.4.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.7", "3.4.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0224() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.0", "3.4.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.0", "3.4.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0225() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.1", "3.4.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.1", "3.4.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0226() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.2", "3.4.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.2", "3.4.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0227() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.3", "3.4.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.3", "3.4.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0228() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.4", "3.4.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.4", "3.4.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0229() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.5", "3.4.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.5", "3.4.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0230() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.6", "3.4.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.6", "3.4.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0231() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.7", "3.5.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.7", "3.5.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0232() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.0", "3.5.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.0", "3.5.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0233() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.1", "3.5.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.1", "3.5.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0234() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.2", "3.5.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.2", "3.5.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0235() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.3", "3.5.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.3", "3.5.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0236() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.4", "3.5.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.4", "3.5.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0237() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.5", "3.5.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.5", "3.5.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0238() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.6", "3.5.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.6", "3.5.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0239() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.7", "3.6.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.7", "3.6.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0240() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.0", "3.6.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.0", "3.6.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0241() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.1", "3.6.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.1", "3.6.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0242() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.2", "3.6.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.2", "3.6.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0243() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.3", "3.6.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.3", "3.6.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0244() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.4", "3.6.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.4", "3.6.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0245() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.5", "3.6.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.5", "3.6.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0246() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.6", "3.6.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.6", "3.6.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0247() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.7", "3.7.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.7", "3.7.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0248() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.0", "3.7.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.0", "3.7.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0249() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.1", "3.7.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.1", "3.7.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0250() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.2", "3.7.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.2", "3.7.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0251() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.3", "3.7.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.3", "3.7.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0252() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.4", "3.7.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.4", "3.7.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0253() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.5", "3.7.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.5", "3.7.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0254() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.6", "3.7.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.6", "3.7.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0255() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.7", "4.0.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.7", "4.0.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0256() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.0", "4.0.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.0", "4.0.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0257() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.1", "4.0.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.1", "4.0.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0258() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.2", "4.0.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.2", "4.0.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0259() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.3", "4.0.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.3", "4.0.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0260() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.4", "4.0.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.4", "4.0.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0261() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.5", "4.0.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.5", "4.0.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0262() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.6", "4.0.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.6", "4.0.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0263() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.7", "4.1.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.7", "4.1.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0264() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.0", "4.1.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.0", "4.1.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0265() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.1", "4.1.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.1", "4.1.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0266() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.2", "4.1.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.2", "4.1.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0267() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.3", "4.1.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.3", "4.1.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0268() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.4", "4.1.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.4", "4.1.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0269() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.5", "4.1.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.5", "4.1.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0270() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.6", "4.1.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.6", "4.1.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0271() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.7", "4.2.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.7", "4.2.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0272() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.0", "4.2.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.0", "4.2.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0273() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.1", "4.2.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.1", "4.2.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0274() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.2", "4.2.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.2", "4.2.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0275() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.3", "4.2.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.3", "4.2.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0276() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.4", "4.2.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.4", "4.2.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0277() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.5", "4.2.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.5", "4.2.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0278() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.6", "4.2.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.6", "4.2.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0279() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.7", "4.3.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.7", "4.3.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0280() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.0", "4.3.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.0", "4.3.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0281() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.1", "4.3.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.1", "4.3.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0282() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.2", "4.3.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.2", "4.3.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0283() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.3", "4.3.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.3", "4.3.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0284() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.4", "4.3.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.4", "4.3.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0285() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.5", "4.3.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.5", "4.3.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0286() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.6", "4.3.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.6", "4.3.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0287() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.7", "4.4.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.7", "4.4.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0288() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.0", "4.4.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.0", "4.4.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0289() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.1", "4.4.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.1", "4.4.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0290() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.2", "4.4.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.2", "4.4.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0291() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.3", "4.4.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.3", "4.4.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0292() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.4", "4.4.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.4", "4.4.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0293() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.5", "4.4.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.5", "4.4.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0294() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.6", "4.4.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.6", "4.4.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0295() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.7", "4.5.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.7", "4.5.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0296() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.0", "4.5.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.0", "4.5.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0297() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.1", "4.5.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.1", "4.5.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0298() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.2", "4.5.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.2", "4.5.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0299() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.3", "4.5.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.3", "4.5.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0300() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.4", "4.5.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.4", "4.5.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0301() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.5", "4.5.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.5", "4.5.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0302() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.6", "4.5.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.6", "4.5.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0303() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.7", "4.6.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.7", "4.6.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0304() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.0", "4.6.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.0", "4.6.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0305() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.1", "4.6.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.1", "4.6.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0306() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.2", "4.6.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.2", "4.6.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0307() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.3", "4.6.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.3", "4.6.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0308() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.4", "4.6.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.4", "4.6.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0309() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.5", "4.6.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.5", "4.6.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0310() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.6", "4.6.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.6", "4.6.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0311() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.7", "4.7.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.7", "4.7.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0312() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.0", "4.7.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.0", "4.7.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0313() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.1", "4.7.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.1", "4.7.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0314() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.2", "4.7.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.2", "4.7.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0315() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.3", "4.7.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.3", "4.7.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0316() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.4", "4.7.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.4", "4.7.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0317() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.5", "4.7.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.5", "4.7.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0318() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.6", "4.7.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.6", "4.7.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0319() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.7", "5.0.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.7", "5.0.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0320() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.0", "5.0.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.0", "5.0.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0321() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.1", "5.0.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.1", "5.0.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0322() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.2", "5.0.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.2", "5.0.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0323() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.3", "5.0.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.3", "5.0.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0324() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.4", "5.0.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.4", "5.0.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0325() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.5", "5.0.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.5", "5.0.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0326() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.6", "5.0.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.6", "5.0.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0327() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.7", "5.1.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.7", "5.1.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0328() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.0", "5.1.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.0", "5.1.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0329() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.1", "5.1.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.1", "5.1.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0330() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.2", "5.1.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.2", "5.1.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0331() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.3", "5.1.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.3", "5.1.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0332() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.4", "5.1.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.4", "5.1.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0333() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.5", "5.1.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.5", "5.1.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0334() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.6", "5.1.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.6", "5.1.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0335() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.7", "5.2.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.7", "5.2.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0336() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.0", "5.2.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.0", "5.2.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0337() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.1", "5.2.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.1", "5.2.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0338() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.2", "5.2.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.2", "5.2.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0339() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.3", "5.2.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.3", "5.2.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0340() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.4", "5.2.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.4", "5.2.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0341() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.5", "5.2.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.5", "5.2.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0342() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.6", "5.2.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.6", "5.2.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0343() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.7", "5.3.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.7", "5.3.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0344() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.0", "5.3.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.0", "5.3.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0345() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.1", "5.3.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.1", "5.3.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0346() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.2", "5.3.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.2", "5.3.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0347() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.3", "5.3.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.3", "5.3.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0348() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.4", "5.3.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.4", "5.3.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0349() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.5", "5.3.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.5", "5.3.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0350() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.6", "5.3.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.6", "5.3.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0351() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.7", "5.4.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.7", "5.4.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0352() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.0", "5.4.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.0", "5.4.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0353() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.1", "5.4.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.1", "5.4.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0354() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.2", "5.4.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.2", "5.4.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0355() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.3", "5.4.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.3", "5.4.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0356() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.4", "5.4.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.4", "5.4.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0357() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.5", "5.4.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.5", "5.4.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0358() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.6", "5.4.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.6", "5.4.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0359() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.7", "5.5.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.7", "5.5.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0360() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.0", "5.5.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.0", "5.5.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0361() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.1", "5.5.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.1", "5.5.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0362() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.2", "5.5.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.2", "5.5.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0363() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.3", "5.5.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.3", "5.5.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0364() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.4", "5.5.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.4", "5.5.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0365() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.5", "5.5.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.5", "5.5.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0366() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.6", "5.5.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.6", "5.5.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0367() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.7", "5.6.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.7", "5.6.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0368() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.0", "5.6.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.0", "5.6.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0369() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.1", "5.6.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.1", "5.6.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0370() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.2", "5.6.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.2", "5.6.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0371() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.3", "5.6.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.3", "5.6.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0372() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.4", "5.6.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.4", "5.6.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0373() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.5", "5.6.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.5", "5.6.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0374() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.6", "5.6.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.6", "5.6.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0375() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.7", "5.7.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.7", "5.7.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0376() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.0", "5.7.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.0", "5.7.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0377() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.1", "5.7.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.1", "5.7.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0378() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.2", "5.7.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.2", "5.7.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0379() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.3", "5.7.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.3", "5.7.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0380() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.4", "5.7.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.4", "5.7.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0381() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.5", "5.7.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.5", "5.7.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0382() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.6", "5.7.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.6", "5.7.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0383() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.7", "6.0.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.7", "6.0.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0384() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.0", "6.0.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.0", "6.0.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0385() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.1", "6.0.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.1", "6.0.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0386() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.2", "6.0.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.2", "6.0.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0387() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.3", "6.0.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.3", "6.0.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0388() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.4", "6.0.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.4", "6.0.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0389() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.5", "6.0.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.5", "6.0.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0390() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.6", "6.0.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.6", "6.0.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0391() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.7", "6.1.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.7", "6.1.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0392() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.0", "6.1.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.0", "6.1.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0393() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.1", "6.1.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.1", "6.1.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0394() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.2", "6.1.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.2", "6.1.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0395() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.3", "6.1.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.3", "6.1.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0396() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.4", "6.1.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.4", "6.1.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0397() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.5", "6.1.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.5", "6.1.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0398() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.6", "6.1.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.6", "6.1.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0399() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.7", "6.2.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.7", "6.2.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0400() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.0", "6.2.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.0", "6.2.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0401() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.1", "6.2.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.1", "6.2.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0402() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.2", "6.2.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.2", "6.2.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0403() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.3", "6.2.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.3", "6.2.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0404() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.4", "6.2.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.4", "6.2.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0405() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.5", "6.2.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.5", "6.2.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0406() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.6", "6.2.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.6", "6.2.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0407() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.7", "6.3.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.7", "6.3.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0408() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.0", "6.3.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.0", "6.3.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0409() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.1", "6.3.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.1", "6.3.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0410() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.2", "6.3.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.2", "6.3.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0411() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.3", "6.3.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.3", "6.3.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0412() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.4", "6.3.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.4", "6.3.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0413() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.5", "6.3.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.5", "6.3.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0414() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.6", "6.3.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.6", "6.3.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0415() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.7", "6.4.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.7", "6.4.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0416() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.0", "6.4.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.0", "6.4.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0417() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.1", "6.4.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.1", "6.4.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0418() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.2", "6.4.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.2", "6.4.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0419() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.3", "6.4.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.3", "6.4.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0420() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.4", "6.4.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.4", "6.4.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0421() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.5", "6.4.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.5", "6.4.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0422() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.6", "6.4.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.6", "6.4.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0423() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.7", "6.5.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.7", "6.5.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0424() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.0", "6.5.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.0", "6.5.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0425() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.1", "6.5.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.1", "6.5.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0426() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.2", "6.5.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.2", "6.5.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0427() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.3", "6.5.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.3", "6.5.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0428() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.4", "6.5.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.4", "6.5.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0429() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.5", "6.5.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.5", "6.5.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0430() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.6", "6.5.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.6", "6.5.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0431() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.7", "6.6.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.7", "6.6.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0432() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.0", "6.6.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.0", "6.6.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0433() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.1", "6.6.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.1", "6.6.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0434() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.2", "6.6.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.2", "6.6.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0435() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.3", "6.6.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.3", "6.6.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0436() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.4", "6.6.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.4", "6.6.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0437() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.5", "6.6.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.5", "6.6.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0438() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.6", "6.6.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.6", "6.6.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0439() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.7", "6.7.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.7", "6.7.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0440() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.0", "6.7.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.0", "6.7.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0441() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.1", "6.7.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.1", "6.7.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0442() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.2", "6.7.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.2", "6.7.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0443() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.3", "6.7.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.3", "6.7.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0444() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.4", "6.7.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.4", "6.7.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0445() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.5", "6.7.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.5", "6.7.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0446() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.6", "6.7.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.6", "6.7.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0447() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.7", "7.0.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.7", "7.0.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0448() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.0", "7.0.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.0", "7.0.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0449() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.1", "7.0.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.1", "7.0.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0450() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.2", "7.0.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.2", "7.0.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0451() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.3", "7.0.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.3", "7.0.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0452() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.4", "7.0.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.4", "7.0.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0453() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.5", "7.0.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.5", "7.0.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0454() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.6", "7.0.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.6", "7.0.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0455() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.7", "7.1.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.7", "7.1.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0456() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.0", "7.1.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.0", "7.1.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0457() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.1", "7.1.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.1", "7.1.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0458() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.2", "7.1.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.2", "7.1.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0459() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.3", "7.1.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.3", "7.1.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0460() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.4", "7.1.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.4", "7.1.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0461() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.5", "7.1.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.5", "7.1.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0462() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.6", "7.1.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.6", "7.1.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0463() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.7", "7.2.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.7", "7.2.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0464() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.0", "7.2.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.0", "7.2.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0465() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.1", "7.2.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.1", "7.2.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0466() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.2", "7.2.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.2", "7.2.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0467() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.3", "7.2.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.3", "7.2.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0468() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.4", "7.2.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.4", "7.2.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0469() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.5", "7.2.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.5", "7.2.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0470() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.6", "7.2.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.6", "7.2.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0471() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.7", "7.3.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.7", "7.3.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0472() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.0", "7.3.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.0", "7.3.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0473() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.1", "7.3.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.1", "7.3.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0474() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.2", "7.3.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.2", "7.3.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0475() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.3", "7.3.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.3", "7.3.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0476() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.4", "7.3.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.4", "7.3.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0477() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.5", "7.3.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.5", "7.3.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0478() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.6", "7.3.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.6", "7.3.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0479() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.7", "7.4.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.7", "7.4.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0480() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.0", "7.4.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.0", "7.4.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0481() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.1", "7.4.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.1", "7.4.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0482() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.2", "7.4.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.2", "7.4.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0483() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.3", "7.4.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.3", "7.4.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0484() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.4", "7.4.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.4", "7.4.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0485() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.5", "7.4.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.5", "7.4.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0486() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.6", "7.4.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.6", "7.4.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0487() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.7", "7.5.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.7", "7.5.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0488() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.0", "7.5.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.0", "7.5.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0489() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.1", "7.5.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.1", "7.5.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0490() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.2", "7.5.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.2", "7.5.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0491() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.3", "7.5.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.3", "7.5.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0492() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.4", "7.5.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.4", "7.5.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0493() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.5", "7.5.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.5", "7.5.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0494() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.6", "7.5.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.6", "7.5.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0495() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.7", "7.6.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.7", "7.6.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0496() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.0", "7.6.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.0", "7.6.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0497() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.1", "7.6.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.1", "7.6.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0498() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.2", "7.6.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.2", "7.6.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0499() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.3", "7.6.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.3", "7.6.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0500() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.4", "7.6.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.4", "7.6.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0501() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.5", "7.6.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.5", "7.6.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0502() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.6", "7.6.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.6", "7.6.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0503() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.7", "7.7.0"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.7", "7.7.0"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0504() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.0", "7.7.1"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.0", "7.7.1"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0505() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.1", "7.7.2"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.1", "7.7.2"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0506() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.2", "7.7.3"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.2", "7.7.3"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0507() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.3", "7.7.4"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.3", "7.7.4"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0508() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.4", "7.7.5"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.4", "7.7.5"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0509() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.5", "7.7.6"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.5", "7.7.6"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_lt_0510() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.6", "7.7.7"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.6", "7.7.7"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_gt_0000() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.1", "0.0.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.1", "0.0.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0001() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.2", "0.0.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.2", "0.0.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0002() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.3", "0.0.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.3", "0.0.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0003() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.4", "0.0.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.4", "0.0.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0004() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.5", "0.0.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.5", "0.0.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0005() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.6", "0.0.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.6", "0.0.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0006() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.7", "0.0.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.7", "0.0.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0007() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.0", "0.0.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.0", "0.0.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0008() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.1", "0.1.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.1", "0.1.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0009() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.2", "0.1.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.2", "0.1.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0010() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.3", "0.1.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.3", "0.1.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0011() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.4", "0.1.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.4", "0.1.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0012() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.5", "0.1.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.5", "0.1.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0013() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.6", "0.1.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.6", "0.1.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0014() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.7", "0.1.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.7", "0.1.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0015() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.0", "0.1.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.0", "0.1.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0016() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.1", "0.2.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.1", "0.2.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0017() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.2", "0.2.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.2", "0.2.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0018() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.3", "0.2.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.3", "0.2.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0019() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.4", "0.2.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.4", "0.2.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0020() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.5", "0.2.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.5", "0.2.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0021() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.6", "0.2.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.6", "0.2.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0022() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.7", "0.2.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.7", "0.2.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0023() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.0", "0.2.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.0", "0.2.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0024() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.1", "0.3.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.1", "0.3.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0025() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.2", "0.3.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.2", "0.3.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0026() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.3", "0.3.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.3", "0.3.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0027() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.4", "0.3.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.4", "0.3.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0028() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.5", "0.3.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.5", "0.3.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0029() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.6", "0.3.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.6", "0.3.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0030() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.7", "0.3.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.7", "0.3.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0031() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.0", "0.3.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.0", "0.3.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0032() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.1", "0.4.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.1", "0.4.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0033() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.2", "0.4.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.2", "0.4.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0034() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.3", "0.4.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.3", "0.4.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0035() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.4", "0.4.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.4", "0.4.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0036() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.5", "0.4.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.5", "0.4.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0037() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.6", "0.4.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.6", "0.4.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0038() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.7", "0.4.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.7", "0.4.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0039() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.0", "0.4.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.0", "0.4.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0040() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.1", "0.5.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.1", "0.5.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0041() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.2", "0.5.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.2", "0.5.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0042() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.3", "0.5.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.3", "0.5.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0043() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.4", "0.5.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.4", "0.5.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0044() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.5", "0.5.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.5", "0.5.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0045() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.6", "0.5.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.6", "0.5.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0046() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.7", "0.5.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.7", "0.5.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0047() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.0", "0.5.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.0", "0.5.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0048() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.1", "0.6.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.1", "0.6.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0049() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.2", "0.6.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.2", "0.6.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0050() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.3", "0.6.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.3", "0.6.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0051() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.4", "0.6.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.4", "0.6.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0052() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.5", "0.6.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.5", "0.6.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0053() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.6", "0.6.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.6", "0.6.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0054() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.7", "0.6.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.7", "0.6.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0055() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.0", "0.6.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.0", "0.6.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0056() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.1", "0.7.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.1", "0.7.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0057() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.2", "0.7.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.2", "0.7.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0058() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.3", "0.7.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.3", "0.7.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0059() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.4", "0.7.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.4", "0.7.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0060() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.5", "0.7.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.5", "0.7.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0061() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.6", "0.7.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.6", "0.7.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0062() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.7", "0.7.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.7", "0.7.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0063() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.0", "0.7.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.0", "0.7.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0064() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.1", "1.0.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.1", "1.0.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0065() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.2", "1.0.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.2", "1.0.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0066() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.3", "1.0.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.3", "1.0.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0067() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.4", "1.0.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.4", "1.0.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0068() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.5", "1.0.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.5", "1.0.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0069() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.6", "1.0.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.6", "1.0.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0070() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.7", "1.0.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.7", "1.0.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0071() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.0", "1.0.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.0", "1.0.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0072() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.1", "1.1.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.1", "1.1.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0073() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.2", "1.1.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.2", "1.1.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0074() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.3", "1.1.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.3", "1.1.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0075() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.4", "1.1.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.4", "1.1.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0076() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.5", "1.1.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.5", "1.1.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0077() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.6", "1.1.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.6", "1.1.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0078() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.7", "1.1.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.7", "1.1.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0079() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.0", "1.1.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.0", "1.1.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0080() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.1", "1.2.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.1", "1.2.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0081() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.2", "1.2.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.2", "1.2.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0082() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.3", "1.2.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.3", "1.2.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0083() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.4", "1.2.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.4", "1.2.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0084() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.5", "1.2.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.5", "1.2.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0085() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.6", "1.2.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.6", "1.2.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0086() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.7", "1.2.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.7", "1.2.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0087() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.0", "1.2.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.0", "1.2.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0088() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.1", "1.3.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.1", "1.3.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0089() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.2", "1.3.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.2", "1.3.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0090() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.3", "1.3.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.3", "1.3.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0091() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.4", "1.3.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.4", "1.3.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0092() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.5", "1.3.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.5", "1.3.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0093() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.6", "1.3.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.6", "1.3.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0094() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.7", "1.3.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.7", "1.3.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0095() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.0", "1.3.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.0", "1.3.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0096() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.1", "1.4.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.1", "1.4.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0097() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.2", "1.4.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.2", "1.4.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0098() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.3", "1.4.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.3", "1.4.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0099() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.4", "1.4.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.4", "1.4.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0100() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.5", "1.4.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.5", "1.4.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0101() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.6", "1.4.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.6", "1.4.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0102() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.7", "1.4.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.7", "1.4.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0103() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.0", "1.4.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.0", "1.4.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0104() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.1", "1.5.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.1", "1.5.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0105() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.2", "1.5.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.2", "1.5.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0106() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.3", "1.5.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.3", "1.5.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0107() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.4", "1.5.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.4", "1.5.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0108() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.5", "1.5.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.5", "1.5.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0109() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.6", "1.5.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.6", "1.5.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0110() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.7", "1.5.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.7", "1.5.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0111() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.0", "1.5.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.0", "1.5.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0112() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.1", "1.6.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.1", "1.6.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0113() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.2", "1.6.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.2", "1.6.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0114() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.3", "1.6.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.3", "1.6.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0115() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.4", "1.6.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.4", "1.6.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0116() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.5", "1.6.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.5", "1.6.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0117() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.6", "1.6.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.6", "1.6.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0118() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.7", "1.6.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.7", "1.6.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0119() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.0", "1.6.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.0", "1.6.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0120() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.1", "1.7.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.1", "1.7.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0121() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.2", "1.7.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.2", "1.7.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0122() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.3", "1.7.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.3", "1.7.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0123() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.4", "1.7.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.4", "1.7.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0124() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.5", "1.7.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.5", "1.7.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0125() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.6", "1.7.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.6", "1.7.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0126() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.7", "1.7.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.7", "1.7.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0127() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.0", "1.7.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.0", "1.7.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0128() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.1", "2.0.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.1", "2.0.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0129() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.2", "2.0.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.2", "2.0.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0130() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.3", "2.0.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.3", "2.0.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0131() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.4", "2.0.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.4", "2.0.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0132() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.5", "2.0.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.5", "2.0.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0133() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.6", "2.0.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.6", "2.0.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0134() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.7", "2.0.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.7", "2.0.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0135() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.0", "2.0.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.0", "2.0.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0136() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.1", "2.1.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.1", "2.1.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0137() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.2", "2.1.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.2", "2.1.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0138() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.3", "2.1.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.3", "2.1.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0139() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.4", "2.1.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.4", "2.1.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0140() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.5", "2.1.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.5", "2.1.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0141() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.6", "2.1.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.6", "2.1.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0142() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.7", "2.1.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.7", "2.1.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0143() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.0", "2.1.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.0", "2.1.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0144() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.1", "2.2.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.1", "2.2.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0145() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.2", "2.2.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.2", "2.2.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0146() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.3", "2.2.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.3", "2.2.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0147() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.4", "2.2.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.4", "2.2.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0148() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.5", "2.2.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.5", "2.2.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0149() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.6", "2.2.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.6", "2.2.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0150() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.7", "2.2.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.7", "2.2.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0151() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.0", "2.2.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.0", "2.2.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0152() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.1", "2.3.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.1", "2.3.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0153() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.2", "2.3.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.2", "2.3.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0154() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.3", "2.3.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.3", "2.3.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0155() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.4", "2.3.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.4", "2.3.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0156() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.5", "2.3.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.5", "2.3.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0157() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.6", "2.3.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.6", "2.3.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0158() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.7", "2.3.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.7", "2.3.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0159() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.0", "2.3.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.0", "2.3.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0160() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.1", "2.4.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.1", "2.4.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0161() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.2", "2.4.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.2", "2.4.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0162() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.3", "2.4.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.3", "2.4.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0163() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.4", "2.4.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.4", "2.4.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0164() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.5", "2.4.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.5", "2.4.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0165() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.6", "2.4.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.6", "2.4.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0166() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.7", "2.4.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.7", "2.4.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0167() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.0", "2.4.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.0", "2.4.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0168() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.1", "2.5.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.1", "2.5.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0169() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.2", "2.5.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.2", "2.5.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0170() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.3", "2.5.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.3", "2.5.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0171() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.4", "2.5.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.4", "2.5.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0172() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.5", "2.5.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.5", "2.5.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0173() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.6", "2.5.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.6", "2.5.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0174() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.7", "2.5.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.7", "2.5.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0175() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.0", "2.5.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.0", "2.5.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0176() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.1", "2.6.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.1", "2.6.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0177() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.2", "2.6.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.2", "2.6.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0178() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.3", "2.6.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.3", "2.6.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0179() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.4", "2.6.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.4", "2.6.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0180() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.5", "2.6.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.5", "2.6.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0181() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.6", "2.6.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.6", "2.6.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0182() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.7", "2.6.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.7", "2.6.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0183() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.0", "2.6.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.0", "2.6.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0184() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.1", "2.7.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.1", "2.7.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0185() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.2", "2.7.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.2", "2.7.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0186() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.3", "2.7.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.3", "2.7.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0187() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.4", "2.7.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.4", "2.7.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0188() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.5", "2.7.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.5", "2.7.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0189() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.6", "2.7.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.6", "2.7.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0190() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.7", "2.7.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.7", "2.7.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0191() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.0", "2.7.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.0", "2.7.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0192() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.1", "3.0.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.1", "3.0.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0193() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.2", "3.0.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.2", "3.0.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0194() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.3", "3.0.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.3", "3.0.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0195() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.4", "3.0.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.4", "3.0.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0196() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.5", "3.0.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.5", "3.0.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0197() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.6", "3.0.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.6", "3.0.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0198() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.7", "3.0.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.7", "3.0.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0199() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.0", "3.0.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.0", "3.0.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0200() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.1", "3.1.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.1", "3.1.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0201() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.2", "3.1.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.2", "3.1.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0202() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.3", "3.1.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.3", "3.1.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0203() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.4", "3.1.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.4", "3.1.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0204() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.5", "3.1.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.5", "3.1.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0205() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.6", "3.1.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.6", "3.1.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0206() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.7", "3.1.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.7", "3.1.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0207() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.0", "3.1.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.0", "3.1.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0208() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.1", "3.2.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.1", "3.2.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0209() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.2", "3.2.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.2", "3.2.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0210() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.3", "3.2.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.3", "3.2.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0211() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.4", "3.2.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.4", "3.2.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0212() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.5", "3.2.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.5", "3.2.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0213() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.6", "3.2.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.6", "3.2.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0214() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.7", "3.2.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.7", "3.2.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0215() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.0", "3.2.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.0", "3.2.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0216() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.1", "3.3.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.1", "3.3.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0217() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.2", "3.3.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.2", "3.3.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0218() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.3", "3.3.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.3", "3.3.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0219() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.4", "3.3.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.4", "3.3.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0220() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.5", "3.3.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.5", "3.3.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0221() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.6", "3.3.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.6", "3.3.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0222() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.7", "3.3.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.7", "3.3.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0223() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.0", "3.3.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.0", "3.3.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0224() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.1", "3.4.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.1", "3.4.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0225() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.2", "3.4.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.2", "3.4.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0226() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.3", "3.4.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.3", "3.4.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0227() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.4", "3.4.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.4", "3.4.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0228() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.5", "3.4.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.5", "3.4.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0229() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.6", "3.4.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.6", "3.4.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0230() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.7", "3.4.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.7", "3.4.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0231() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.0", "3.4.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.0", "3.4.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0232() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.1", "3.5.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.1", "3.5.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0233() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.2", "3.5.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.2", "3.5.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0234() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.3", "3.5.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.3", "3.5.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0235() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.4", "3.5.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.4", "3.5.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0236() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.5", "3.5.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.5", "3.5.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0237() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.6", "3.5.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.6", "3.5.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0238() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.7", "3.5.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.7", "3.5.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0239() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.0", "3.5.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.0", "3.5.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0240() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.1", "3.6.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.1", "3.6.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0241() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.2", "3.6.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.2", "3.6.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0242() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.3", "3.6.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.3", "3.6.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0243() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.4", "3.6.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.4", "3.6.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0244() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.5", "3.6.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.5", "3.6.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0245() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.6", "3.6.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.6", "3.6.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0246() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.7", "3.6.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.7", "3.6.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0247() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.0", "3.6.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.0", "3.6.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0248() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.1", "3.7.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.1", "3.7.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0249() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.2", "3.7.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.2", "3.7.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0250() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.3", "3.7.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.3", "3.7.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0251() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.4", "3.7.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.4", "3.7.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0252() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.5", "3.7.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.5", "3.7.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0253() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.6", "3.7.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.6", "3.7.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0254() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.7", "3.7.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.7", "3.7.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0255() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.0", "3.7.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.0", "3.7.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0256() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.1", "4.0.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.1", "4.0.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0257() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.2", "4.0.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.2", "4.0.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0258() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.3", "4.0.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.3", "4.0.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0259() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.4", "4.0.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.4", "4.0.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0260() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.5", "4.0.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.5", "4.0.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0261() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.6", "4.0.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.6", "4.0.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0262() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.7", "4.0.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.7", "4.0.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0263() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.0", "4.0.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.0", "4.0.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0264() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.1", "4.1.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.1", "4.1.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0265() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.2", "4.1.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.2", "4.1.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0266() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.3", "4.1.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.3", "4.1.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0267() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.4", "4.1.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.4", "4.1.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0268() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.5", "4.1.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.5", "4.1.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0269() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.6", "4.1.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.6", "4.1.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0270() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.7", "4.1.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.7", "4.1.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0271() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.0", "4.1.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.0", "4.1.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0272() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.1", "4.2.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.1", "4.2.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0273() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.2", "4.2.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.2", "4.2.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0274() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.3", "4.2.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.3", "4.2.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0275() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.4", "4.2.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.4", "4.2.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0276() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.5", "4.2.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.5", "4.2.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0277() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.6", "4.2.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.6", "4.2.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0278() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.7", "4.2.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.7", "4.2.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0279() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.0", "4.2.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.0", "4.2.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0280() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.1", "4.3.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.1", "4.3.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0281() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.2", "4.3.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.2", "4.3.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0282() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.3", "4.3.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.3", "4.3.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0283() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.4", "4.3.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.4", "4.3.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0284() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.5", "4.3.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.5", "4.3.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0285() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.6", "4.3.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.6", "4.3.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0286() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.7", "4.3.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.7", "4.3.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0287() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.0", "4.3.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.0", "4.3.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0288() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.1", "4.4.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.1", "4.4.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0289() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.2", "4.4.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.2", "4.4.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0290() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.3", "4.4.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.3", "4.4.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0291() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.4", "4.4.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.4", "4.4.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0292() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.5", "4.4.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.5", "4.4.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0293() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.6", "4.4.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.6", "4.4.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0294() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.7", "4.4.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.7", "4.4.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0295() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.0", "4.4.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.0", "4.4.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0296() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.1", "4.5.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.1", "4.5.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0297() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.2", "4.5.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.2", "4.5.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0298() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.3", "4.5.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.3", "4.5.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0299() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.4", "4.5.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.4", "4.5.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0300() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.5", "4.5.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.5", "4.5.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0301() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.6", "4.5.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.6", "4.5.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0302() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.7", "4.5.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.7", "4.5.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0303() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.0", "4.5.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.0", "4.5.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0304() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.1", "4.6.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.1", "4.6.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0305() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.2", "4.6.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.2", "4.6.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0306() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.3", "4.6.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.3", "4.6.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0307() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.4", "4.6.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.4", "4.6.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0308() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.5", "4.6.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.5", "4.6.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0309() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.6", "4.6.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.6", "4.6.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0310() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.7", "4.6.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.7", "4.6.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0311() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.0", "4.6.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.0", "4.6.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0312() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.1", "4.7.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.1", "4.7.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0313() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.2", "4.7.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.2", "4.7.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0314() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.3", "4.7.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.3", "4.7.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0315() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.4", "4.7.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.4", "4.7.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0316() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.5", "4.7.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.5", "4.7.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0317() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.6", "4.7.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.6", "4.7.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0318() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.7", "4.7.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.7", "4.7.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0319() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.0", "4.7.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.0", "4.7.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0320() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.1", "5.0.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.1", "5.0.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0321() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.2", "5.0.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.2", "5.0.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0322() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.3", "5.0.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.3", "5.0.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0323() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.4", "5.0.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.4", "5.0.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0324() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.5", "5.0.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.5", "5.0.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0325() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.6", "5.0.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.6", "5.0.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0326() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.7", "5.0.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.7", "5.0.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0327() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.0", "5.0.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.0", "5.0.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0328() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.1", "5.1.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.1", "5.1.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0329() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.2", "5.1.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.2", "5.1.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0330() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.3", "5.1.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.3", "5.1.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0331() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.4", "5.1.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.4", "5.1.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0332() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.5", "5.1.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.5", "5.1.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0333() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.6", "5.1.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.6", "5.1.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0334() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.7", "5.1.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.7", "5.1.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0335() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.0", "5.1.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.0", "5.1.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0336() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.1", "5.2.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.1", "5.2.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0337() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.2", "5.2.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.2", "5.2.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0338() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.3", "5.2.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.3", "5.2.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0339() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.4", "5.2.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.4", "5.2.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0340() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.5", "5.2.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.5", "5.2.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0341() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.6", "5.2.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.6", "5.2.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0342() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.7", "5.2.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.7", "5.2.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0343() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.0", "5.2.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.0", "5.2.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0344() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.1", "5.3.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.1", "5.3.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0345() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.2", "5.3.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.2", "5.3.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0346() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.3", "5.3.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.3", "5.3.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0347() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.4", "5.3.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.4", "5.3.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0348() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.5", "5.3.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.5", "5.3.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0349() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.6", "5.3.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.6", "5.3.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0350() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.7", "5.3.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.7", "5.3.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0351() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.0", "5.3.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.0", "5.3.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0352() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.1", "5.4.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.1", "5.4.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0353() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.2", "5.4.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.2", "5.4.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0354() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.3", "5.4.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.3", "5.4.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0355() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.4", "5.4.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.4", "5.4.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0356() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.5", "5.4.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.5", "5.4.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0357() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.6", "5.4.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.6", "5.4.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0358() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.7", "5.4.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.7", "5.4.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0359() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.0", "5.4.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.0", "5.4.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0360() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.1", "5.5.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.1", "5.5.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0361() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.2", "5.5.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.2", "5.5.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0362() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.3", "5.5.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.3", "5.5.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0363() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.4", "5.5.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.4", "5.5.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0364() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.5", "5.5.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.5", "5.5.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0365() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.6", "5.5.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.6", "5.5.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0366() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.7", "5.5.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.7", "5.5.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0367() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.0", "5.5.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.0", "5.5.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0368() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.1", "5.6.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.1", "5.6.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0369() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.2", "5.6.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.2", "5.6.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0370() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.3", "5.6.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.3", "5.6.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0371() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.4", "5.6.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.4", "5.6.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0372() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.5", "5.6.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.5", "5.6.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0373() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.6", "5.6.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.6", "5.6.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0374() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.7", "5.6.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.7", "5.6.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0375() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.0", "5.6.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.0", "5.6.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0376() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.1", "5.7.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.1", "5.7.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0377() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.2", "5.7.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.2", "5.7.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0378() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.3", "5.7.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.3", "5.7.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0379() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.4", "5.7.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.4", "5.7.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0380() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.5", "5.7.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.5", "5.7.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0381() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.6", "5.7.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.6", "5.7.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0382() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.7", "5.7.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.7", "5.7.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0383() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.0", "5.7.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.0", "5.7.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0384() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.1", "6.0.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.1", "6.0.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0385() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.2", "6.0.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.2", "6.0.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0386() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.3", "6.0.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.3", "6.0.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0387() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.4", "6.0.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.4", "6.0.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0388() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.5", "6.0.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.5", "6.0.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0389() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.6", "6.0.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.6", "6.0.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0390() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.7", "6.0.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.7", "6.0.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0391() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.0", "6.0.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.0", "6.0.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0392() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.1", "6.1.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.1", "6.1.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0393() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.2", "6.1.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.2", "6.1.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0394() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.3", "6.1.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.3", "6.1.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0395() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.4", "6.1.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.4", "6.1.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0396() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.5", "6.1.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.5", "6.1.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0397() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.6", "6.1.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.6", "6.1.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0398() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.7", "6.1.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.7", "6.1.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0399() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.0", "6.1.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.0", "6.1.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0400() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.1", "6.2.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.1", "6.2.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0401() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.2", "6.2.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.2", "6.2.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0402() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.3", "6.2.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.3", "6.2.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0403() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.4", "6.2.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.4", "6.2.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0404() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.5", "6.2.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.5", "6.2.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0405() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.6", "6.2.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.6", "6.2.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0406() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.7", "6.2.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.7", "6.2.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0407() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.0", "6.2.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.0", "6.2.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0408() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.1", "6.3.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.1", "6.3.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0409() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.2", "6.3.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.2", "6.3.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0410() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.3", "6.3.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.3", "6.3.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0411() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.4", "6.3.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.4", "6.3.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0412() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.5", "6.3.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.5", "6.3.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0413() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.6", "6.3.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.6", "6.3.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0414() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.7", "6.3.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.7", "6.3.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0415() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.0", "6.3.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.0", "6.3.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0416() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.1", "6.4.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.1", "6.4.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0417() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.2", "6.4.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.2", "6.4.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0418() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.3", "6.4.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.3", "6.4.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0419() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.4", "6.4.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.4", "6.4.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0420() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.5", "6.4.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.5", "6.4.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0421() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.6", "6.4.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.6", "6.4.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0422() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.7", "6.4.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.7", "6.4.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0423() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.0", "6.4.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.0", "6.4.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0424() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.1", "6.5.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.1", "6.5.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0425() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.2", "6.5.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.2", "6.5.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0426() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.3", "6.5.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.3", "6.5.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0427() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.4", "6.5.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.4", "6.5.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0428() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.5", "6.5.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.5", "6.5.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0429() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.6", "6.5.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.6", "6.5.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0430() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.7", "6.5.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.7", "6.5.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0431() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.0", "6.5.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.0", "6.5.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0432() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.1", "6.6.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.1", "6.6.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0433() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.2", "6.6.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.2", "6.6.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0434() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.3", "6.6.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.3", "6.6.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0435() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.4", "6.6.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.4", "6.6.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0436() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.5", "6.6.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.5", "6.6.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0437() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.6", "6.6.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.6", "6.6.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0438() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.7", "6.6.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.7", "6.6.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0439() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.0", "6.6.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.0", "6.6.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0440() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.1", "6.7.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.1", "6.7.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0441() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.2", "6.7.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.2", "6.7.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0442() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.3", "6.7.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.3", "6.7.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0443() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.4", "6.7.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.4", "6.7.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0444() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.5", "6.7.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.5", "6.7.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0445() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.6", "6.7.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.6", "6.7.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0446() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.7", "6.7.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.7", "6.7.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0447() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.0", "6.7.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.0", "6.7.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0448() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.1", "7.0.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.1", "7.0.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0449() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.2", "7.0.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.2", "7.0.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0450() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.3", "7.0.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.3", "7.0.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0451() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.4", "7.0.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.4", "7.0.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0452() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.5", "7.0.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.5", "7.0.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0453() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.6", "7.0.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.6", "7.0.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0454() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.7", "7.0.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.7", "7.0.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0455() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.0", "7.0.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.0", "7.0.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0456() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.1", "7.1.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.1", "7.1.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0457() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.2", "7.1.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.2", "7.1.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0458() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.3", "7.1.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.3", "7.1.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0459() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.4", "7.1.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.4", "7.1.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0460() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.5", "7.1.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.5", "7.1.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0461() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.6", "7.1.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.6", "7.1.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0462() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.7", "7.1.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.7", "7.1.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0463() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.0", "7.1.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.0", "7.1.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0464() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.1", "7.2.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.1", "7.2.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0465() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.2", "7.2.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.2", "7.2.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0466() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.3", "7.2.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.3", "7.2.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0467() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.4", "7.2.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.4", "7.2.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0468() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.5", "7.2.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.5", "7.2.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0469() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.6", "7.2.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.6", "7.2.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0470() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.7", "7.2.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.7", "7.2.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0471() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.0", "7.2.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.0", "7.2.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0472() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.1", "7.3.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.1", "7.3.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0473() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.2", "7.3.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.2", "7.3.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0474() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.3", "7.3.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.3", "7.3.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0475() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.4", "7.3.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.4", "7.3.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0476() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.5", "7.3.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.5", "7.3.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0477() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.6", "7.3.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.6", "7.3.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0478() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.7", "7.3.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.7", "7.3.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0479() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.0", "7.3.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.0", "7.3.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0480() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.1", "7.4.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.1", "7.4.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0481() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.2", "7.4.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.2", "7.4.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0482() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.3", "7.4.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.3", "7.4.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0483() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.4", "7.4.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.4", "7.4.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0484() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.5", "7.4.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.5", "7.4.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0485() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.6", "7.4.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.6", "7.4.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0486() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.7", "7.4.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.7", "7.4.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0487() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.0", "7.4.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.0", "7.4.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0488() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.1", "7.5.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.1", "7.5.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0489() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.2", "7.5.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.2", "7.5.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0490() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.3", "7.5.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.3", "7.5.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0491() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.4", "7.5.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.4", "7.5.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0492() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.5", "7.5.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.5", "7.5.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0493() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.6", "7.5.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.6", "7.5.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0494() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.7", "7.5.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.7", "7.5.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0495() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.0", "7.5.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.0", "7.5.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0496() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.1", "7.6.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.1", "7.6.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0497() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.2", "7.6.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.2", "7.6.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0498() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.3", "7.6.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.3", "7.6.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0499() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.4", "7.6.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.4", "7.6.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0500() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.5", "7.6.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.5", "7.6.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0501() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.6", "7.6.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.6", "7.6.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0502() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.7", "7.6.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.7", "7.6.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0503() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.0", "7.6.7"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.0", "7.6.7"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0504() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.1", "7.7.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.1", "7.7.0"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0505() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.2", "7.7.1"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.2", "7.7.1"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0506() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.3", "7.7.2"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.3", "7.7.2"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0507() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.4", "7.7.3"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.4", "7.7.3"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0508() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.5", "7.7.4"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.5", "7.7.4"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0509() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.6", "7.7.5"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.6", "7.7.5"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_gt_0510() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.7", "7.7.6"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.7", "7.7.6"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_eq_0000() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.0", "0.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.0", "0.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0001() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.1", "0.0.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.1", "0.0.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0002() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.2", "0.0.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.2", "0.0.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0003() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.3", "0.0.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.3", "0.0.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0004() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.4", "0.0.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.4", "0.0.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0005() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.5", "0.0.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.5", "0.0.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0006() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.6", "0.0.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.6", "0.0.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0007() {
-    assert_eq!(app_lib::kvr::compare_versions("0.0.7", "0.0.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.7", "0.0.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0008() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.0", "0.1.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.0", "0.1.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0009() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.1", "0.1.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.1", "0.1.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0010() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.2", "0.1.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.2", "0.1.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0011() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.3", "0.1.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.3", "0.1.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0012() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.4", "0.1.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.4", "0.1.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0013() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.5", "0.1.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.5", "0.1.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0014() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.6", "0.1.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.6", "0.1.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0015() {
-    assert_eq!(app_lib::kvr::compare_versions("0.1.7", "0.1.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.1.7", "0.1.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0016() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.0", "0.2.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.0", "0.2.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0017() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.1", "0.2.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.1", "0.2.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0018() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.2", "0.2.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.2", "0.2.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0019() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.3", "0.2.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.3", "0.2.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0020() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.4", "0.2.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.4", "0.2.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0021() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.5", "0.2.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.5", "0.2.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0022() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.6", "0.2.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.6", "0.2.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0023() {
-    assert_eq!(app_lib::kvr::compare_versions("0.2.7", "0.2.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.2.7", "0.2.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0024() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.0", "0.3.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.0", "0.3.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0025() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.1", "0.3.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.1", "0.3.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0026() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.2", "0.3.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.2", "0.3.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0027() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.3", "0.3.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.3", "0.3.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0028() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.4", "0.3.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.4", "0.3.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0029() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.5", "0.3.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.5", "0.3.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0030() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.6", "0.3.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.6", "0.3.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0031() {
-    assert_eq!(app_lib::kvr::compare_versions("0.3.7", "0.3.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.3.7", "0.3.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0032() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.0", "0.4.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.0", "0.4.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0033() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.1", "0.4.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.1", "0.4.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0034() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.2", "0.4.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.2", "0.4.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0035() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.3", "0.4.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.3", "0.4.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0036() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.4", "0.4.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.4", "0.4.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0037() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.5", "0.4.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.5", "0.4.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0038() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.6", "0.4.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.6", "0.4.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0039() {
-    assert_eq!(app_lib::kvr::compare_versions("0.4.7", "0.4.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.4.7", "0.4.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0040() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.0", "0.5.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.0", "0.5.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0041() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.1", "0.5.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.1", "0.5.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0042() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.2", "0.5.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.2", "0.5.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0043() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.3", "0.5.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.3", "0.5.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0044() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.4", "0.5.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.4", "0.5.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0045() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.5", "0.5.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.5", "0.5.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0046() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.6", "0.5.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.6", "0.5.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0047() {
-    assert_eq!(app_lib::kvr::compare_versions("0.5.7", "0.5.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.5.7", "0.5.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0048() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.0", "0.6.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.0", "0.6.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0049() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.1", "0.6.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.1", "0.6.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0050() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.2", "0.6.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.2", "0.6.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0051() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.3", "0.6.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.3", "0.6.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0052() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.4", "0.6.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.4", "0.6.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0053() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.5", "0.6.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.5", "0.6.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0054() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.6", "0.6.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.6", "0.6.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0055() {
-    assert_eq!(app_lib::kvr::compare_versions("0.6.7", "0.6.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.6.7", "0.6.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0056() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.0", "0.7.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.0", "0.7.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0057() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.1", "0.7.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.1", "0.7.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0058() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.2", "0.7.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.2", "0.7.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0059() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.3", "0.7.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.3", "0.7.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0060() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.4", "0.7.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.4", "0.7.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0061() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.5", "0.7.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.5", "0.7.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0062() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.6", "0.7.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.6", "0.7.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0063() {
-    assert_eq!(app_lib::kvr::compare_versions("0.7.7", "0.7.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.7.7", "0.7.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0064() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.0", "1.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.0", "1.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0065() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.1", "1.0.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.1", "1.0.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0066() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.2", "1.0.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.2", "1.0.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0067() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.3", "1.0.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.3", "1.0.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0068() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.4", "1.0.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.4", "1.0.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0069() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.5", "1.0.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.5", "1.0.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0070() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.6", "1.0.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.6", "1.0.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0071() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.7", "1.0.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.7", "1.0.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0072() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.0", "1.1.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.0", "1.1.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0073() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.1", "1.1.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.1", "1.1.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0074() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.2", "1.1.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.2", "1.1.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0075() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.3", "1.1.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.3", "1.1.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0076() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.4", "1.1.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.4", "1.1.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0077() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.5", "1.1.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.5", "1.1.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0078() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.6", "1.1.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.6", "1.1.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0079() {
-    assert_eq!(app_lib::kvr::compare_versions("1.1.7", "1.1.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.1.7", "1.1.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0080() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.0", "1.2.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.0", "1.2.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0081() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.1", "1.2.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.1", "1.2.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0082() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.2", "1.2.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.2", "1.2.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0083() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.3", "1.2.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.3", "1.2.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0084() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.4", "1.2.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.4", "1.2.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0085() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.5", "1.2.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.5", "1.2.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0086() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.6", "1.2.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.6", "1.2.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0087() {
-    assert_eq!(app_lib::kvr::compare_versions("1.2.7", "1.2.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.2.7", "1.2.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0088() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.0", "1.3.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.0", "1.3.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0089() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.1", "1.3.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.1", "1.3.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0090() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.2", "1.3.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.2", "1.3.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0091() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.3", "1.3.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.3", "1.3.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0092() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.4", "1.3.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.4", "1.3.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0093() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.5", "1.3.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.5", "1.3.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0094() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.6", "1.3.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.6", "1.3.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0095() {
-    assert_eq!(app_lib::kvr::compare_versions("1.3.7", "1.3.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.3.7", "1.3.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0096() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.0", "1.4.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.0", "1.4.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0097() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.1", "1.4.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.1", "1.4.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0098() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.2", "1.4.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.2", "1.4.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0099() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.3", "1.4.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.3", "1.4.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0100() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.4", "1.4.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.4", "1.4.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0101() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.5", "1.4.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.5", "1.4.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0102() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.6", "1.4.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.6", "1.4.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0103() {
-    assert_eq!(app_lib::kvr::compare_versions("1.4.7", "1.4.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.4.7", "1.4.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0104() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.0", "1.5.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.0", "1.5.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0105() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.1", "1.5.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.1", "1.5.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0106() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.2", "1.5.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.2", "1.5.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0107() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.3", "1.5.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.3", "1.5.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0108() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.4", "1.5.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.4", "1.5.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0109() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.5", "1.5.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.5", "1.5.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0110() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.6", "1.5.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.6", "1.5.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0111() {
-    assert_eq!(app_lib::kvr::compare_versions("1.5.7", "1.5.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.5.7", "1.5.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0112() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.0", "1.6.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.0", "1.6.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0113() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.1", "1.6.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.1", "1.6.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0114() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.2", "1.6.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.2", "1.6.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0115() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.3", "1.6.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.3", "1.6.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0116() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.4", "1.6.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.4", "1.6.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0117() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.5", "1.6.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.5", "1.6.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0118() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.6", "1.6.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.6", "1.6.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0119() {
-    assert_eq!(app_lib::kvr::compare_versions("1.6.7", "1.6.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.6.7", "1.6.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0120() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.0", "1.7.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.0", "1.7.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0121() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.1", "1.7.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.1", "1.7.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0122() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.2", "1.7.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.2", "1.7.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0123() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.3", "1.7.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.3", "1.7.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0124() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.4", "1.7.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.4", "1.7.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0125() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.5", "1.7.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.5", "1.7.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0126() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.6", "1.7.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.6", "1.7.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0127() {
-    assert_eq!(app_lib::kvr::compare_versions("1.7.7", "1.7.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.7.7", "1.7.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0128() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.0", "2.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.0", "2.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0129() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.1", "2.0.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.1", "2.0.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0130() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.2", "2.0.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.2", "2.0.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0131() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.3", "2.0.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.3", "2.0.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0132() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.4", "2.0.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.4", "2.0.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0133() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.5", "2.0.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.5", "2.0.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0134() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.6", "2.0.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.6", "2.0.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0135() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.7", "2.0.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.7", "2.0.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0136() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.0", "2.1.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.0", "2.1.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0137() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.1", "2.1.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.1", "2.1.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0138() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.2", "2.1.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.2", "2.1.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0139() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.3", "2.1.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.3", "2.1.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0140() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.4", "2.1.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.4", "2.1.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0141() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.5", "2.1.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.5", "2.1.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0142() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.6", "2.1.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.6", "2.1.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0143() {
-    assert_eq!(app_lib::kvr::compare_versions("2.1.7", "2.1.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.1.7", "2.1.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0144() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.0", "2.2.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.0", "2.2.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0145() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.1", "2.2.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.1", "2.2.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0146() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.2", "2.2.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.2", "2.2.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0147() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.3", "2.2.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.3", "2.2.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0148() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.4", "2.2.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.4", "2.2.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0149() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.5", "2.2.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.5", "2.2.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0150() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.6", "2.2.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.6", "2.2.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0151() {
-    assert_eq!(app_lib::kvr::compare_versions("2.2.7", "2.2.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.2.7", "2.2.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0152() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.0", "2.3.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.0", "2.3.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0153() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.1", "2.3.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.1", "2.3.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0154() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.2", "2.3.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.2", "2.3.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0155() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.3", "2.3.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.3", "2.3.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0156() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.4", "2.3.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.4", "2.3.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0157() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.5", "2.3.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.5", "2.3.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0158() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.6", "2.3.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.6", "2.3.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0159() {
-    assert_eq!(app_lib::kvr::compare_versions("2.3.7", "2.3.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.3.7", "2.3.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0160() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.0", "2.4.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.0", "2.4.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0161() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.1", "2.4.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.1", "2.4.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0162() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.2", "2.4.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.2", "2.4.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0163() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.3", "2.4.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.3", "2.4.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0164() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.4", "2.4.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.4", "2.4.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0165() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.5", "2.4.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.5", "2.4.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0166() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.6", "2.4.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.6", "2.4.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0167() {
-    assert_eq!(app_lib::kvr::compare_versions("2.4.7", "2.4.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.4.7", "2.4.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0168() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.0", "2.5.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.0", "2.5.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0169() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.1", "2.5.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.1", "2.5.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0170() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.2", "2.5.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.2", "2.5.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0171() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.3", "2.5.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.3", "2.5.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0172() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.4", "2.5.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.4", "2.5.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0173() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.5", "2.5.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.5", "2.5.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0174() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.6", "2.5.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.6", "2.5.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0175() {
-    assert_eq!(app_lib::kvr::compare_versions("2.5.7", "2.5.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.5.7", "2.5.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0176() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.0", "2.6.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.0", "2.6.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0177() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.1", "2.6.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.1", "2.6.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0178() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.2", "2.6.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.2", "2.6.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0179() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.3", "2.6.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.3", "2.6.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0180() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.4", "2.6.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.4", "2.6.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0181() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.5", "2.6.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.5", "2.6.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0182() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.6", "2.6.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.6", "2.6.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0183() {
-    assert_eq!(app_lib::kvr::compare_versions("2.6.7", "2.6.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.6.7", "2.6.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0184() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.0", "2.7.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.0", "2.7.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0185() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.1", "2.7.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.1", "2.7.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0186() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.2", "2.7.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.2", "2.7.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0187() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.3", "2.7.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.3", "2.7.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0188() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.4", "2.7.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.4", "2.7.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0189() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.5", "2.7.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.5", "2.7.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0190() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.6", "2.7.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.6", "2.7.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0191() {
-    assert_eq!(app_lib::kvr::compare_versions("2.7.7", "2.7.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.7.7", "2.7.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0192() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.0", "3.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.0", "3.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0193() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.1", "3.0.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.1", "3.0.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0194() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.2", "3.0.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.2", "3.0.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0195() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.3", "3.0.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.3", "3.0.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0196() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.4", "3.0.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.4", "3.0.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0197() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.5", "3.0.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.5", "3.0.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0198() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.6", "3.0.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.6", "3.0.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0199() {
-    assert_eq!(app_lib::kvr::compare_versions("3.0.7", "3.0.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.0.7", "3.0.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0200() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.0", "3.1.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.0", "3.1.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0201() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.1", "3.1.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.1", "3.1.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0202() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.2", "3.1.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.2", "3.1.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0203() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.3", "3.1.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.3", "3.1.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0204() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.4", "3.1.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.4", "3.1.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0205() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.5", "3.1.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.5", "3.1.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0206() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.6", "3.1.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.6", "3.1.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0207() {
-    assert_eq!(app_lib::kvr::compare_versions("3.1.7", "3.1.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.1.7", "3.1.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0208() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.0", "3.2.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.0", "3.2.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0209() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.1", "3.2.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.1", "3.2.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0210() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.2", "3.2.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.2", "3.2.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0211() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.3", "3.2.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.3", "3.2.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0212() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.4", "3.2.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.4", "3.2.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0213() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.5", "3.2.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.5", "3.2.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0214() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.6", "3.2.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.6", "3.2.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0215() {
-    assert_eq!(app_lib::kvr::compare_versions("3.2.7", "3.2.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.2.7", "3.2.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0216() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.0", "3.3.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.0", "3.3.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0217() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.1", "3.3.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.1", "3.3.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0218() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.2", "3.3.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.2", "3.3.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0219() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.3", "3.3.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.3", "3.3.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0220() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.4", "3.3.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.4", "3.3.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0221() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.5", "3.3.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.5", "3.3.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0222() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.6", "3.3.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.6", "3.3.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0223() {
-    assert_eq!(app_lib::kvr::compare_versions("3.3.7", "3.3.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.3.7", "3.3.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0224() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.0", "3.4.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.0", "3.4.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0225() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.1", "3.4.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.1", "3.4.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0226() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.2", "3.4.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.2", "3.4.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0227() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.3", "3.4.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.3", "3.4.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0228() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.4", "3.4.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.4", "3.4.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0229() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.5", "3.4.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.5", "3.4.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0230() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.6", "3.4.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.6", "3.4.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0231() {
-    assert_eq!(app_lib::kvr::compare_versions("3.4.7", "3.4.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.4.7", "3.4.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0232() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.0", "3.5.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.0", "3.5.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0233() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.1", "3.5.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.1", "3.5.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0234() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.2", "3.5.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.2", "3.5.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0235() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.3", "3.5.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.3", "3.5.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0236() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.4", "3.5.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.4", "3.5.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0237() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.5", "3.5.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.5", "3.5.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0238() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.6", "3.5.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.6", "3.5.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0239() {
-    assert_eq!(app_lib::kvr::compare_versions("3.5.7", "3.5.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.5.7", "3.5.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0240() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.0", "3.6.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.0", "3.6.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0241() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.1", "3.6.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.1", "3.6.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0242() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.2", "3.6.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.2", "3.6.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0243() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.3", "3.6.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.3", "3.6.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0244() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.4", "3.6.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.4", "3.6.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0245() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.5", "3.6.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.5", "3.6.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0246() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.6", "3.6.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.6", "3.6.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0247() {
-    assert_eq!(app_lib::kvr::compare_versions("3.6.7", "3.6.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.6.7", "3.6.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0248() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.0", "3.7.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.0", "3.7.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0249() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.1", "3.7.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.1", "3.7.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0250() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.2", "3.7.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.2", "3.7.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0251() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.3", "3.7.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.3", "3.7.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0252() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.4", "3.7.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.4", "3.7.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0253() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.5", "3.7.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.5", "3.7.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0254() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.6", "3.7.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.6", "3.7.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0255() {
-    assert_eq!(app_lib::kvr::compare_versions("3.7.7", "3.7.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("3.7.7", "3.7.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0256() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.0", "4.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.0", "4.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0257() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.1", "4.0.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.1", "4.0.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0258() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.2", "4.0.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.2", "4.0.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0259() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.3", "4.0.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.3", "4.0.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0260() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.4", "4.0.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.4", "4.0.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0261() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.5", "4.0.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.5", "4.0.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0262() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.6", "4.0.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.6", "4.0.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0263() {
-    assert_eq!(app_lib::kvr::compare_versions("4.0.7", "4.0.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.0.7", "4.0.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0264() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.0", "4.1.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.0", "4.1.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0265() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.1", "4.1.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.1", "4.1.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0266() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.2", "4.1.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.2", "4.1.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0267() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.3", "4.1.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.3", "4.1.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0268() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.4", "4.1.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.4", "4.1.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0269() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.5", "4.1.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.5", "4.1.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0270() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.6", "4.1.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.6", "4.1.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0271() {
-    assert_eq!(app_lib::kvr::compare_versions("4.1.7", "4.1.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.1.7", "4.1.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0272() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.0", "4.2.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.0", "4.2.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0273() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.1", "4.2.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.1", "4.2.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0274() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.2", "4.2.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.2", "4.2.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0275() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.3", "4.2.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.3", "4.2.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0276() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.4", "4.2.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.4", "4.2.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0277() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.5", "4.2.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.5", "4.2.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0278() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.6", "4.2.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.6", "4.2.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0279() {
-    assert_eq!(app_lib::kvr::compare_versions("4.2.7", "4.2.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.2.7", "4.2.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0280() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.0", "4.3.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.0", "4.3.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0281() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.1", "4.3.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.1", "4.3.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0282() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.2", "4.3.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.2", "4.3.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0283() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.3", "4.3.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.3", "4.3.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0284() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.4", "4.3.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.4", "4.3.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0285() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.5", "4.3.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.5", "4.3.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0286() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.6", "4.3.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.6", "4.3.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0287() {
-    assert_eq!(app_lib::kvr::compare_versions("4.3.7", "4.3.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.3.7", "4.3.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0288() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.0", "4.4.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.0", "4.4.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0289() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.1", "4.4.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.1", "4.4.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0290() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.2", "4.4.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.2", "4.4.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0291() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.3", "4.4.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.3", "4.4.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0292() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.4", "4.4.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.4", "4.4.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0293() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.5", "4.4.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.5", "4.4.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0294() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.6", "4.4.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.6", "4.4.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0295() {
-    assert_eq!(app_lib::kvr::compare_versions("4.4.7", "4.4.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.4.7", "4.4.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0296() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.0", "4.5.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.0", "4.5.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0297() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.1", "4.5.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.1", "4.5.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0298() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.2", "4.5.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.2", "4.5.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0299() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.3", "4.5.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.3", "4.5.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0300() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.4", "4.5.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.4", "4.5.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0301() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.5", "4.5.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.5", "4.5.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0302() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.6", "4.5.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.6", "4.5.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0303() {
-    assert_eq!(app_lib::kvr::compare_versions("4.5.7", "4.5.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.5.7", "4.5.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0304() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.0", "4.6.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.0", "4.6.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0305() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.1", "4.6.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.1", "4.6.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0306() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.2", "4.6.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.2", "4.6.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0307() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.3", "4.6.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.3", "4.6.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0308() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.4", "4.6.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.4", "4.6.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0309() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.5", "4.6.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.5", "4.6.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0310() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.6", "4.6.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.6", "4.6.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0311() {
-    assert_eq!(app_lib::kvr::compare_versions("4.6.7", "4.6.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.6.7", "4.6.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0312() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.0", "4.7.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.0", "4.7.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0313() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.1", "4.7.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.1", "4.7.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0314() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.2", "4.7.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.2", "4.7.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0315() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.3", "4.7.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.3", "4.7.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0316() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.4", "4.7.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.4", "4.7.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0317() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.5", "4.7.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.5", "4.7.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0318() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.6", "4.7.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.6", "4.7.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0319() {
-    assert_eq!(app_lib::kvr::compare_versions("4.7.7", "4.7.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("4.7.7", "4.7.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0320() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.0", "5.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.0", "5.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0321() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.1", "5.0.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.1", "5.0.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0322() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.2", "5.0.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.2", "5.0.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0323() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.3", "5.0.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.3", "5.0.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0324() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.4", "5.0.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.4", "5.0.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0325() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.5", "5.0.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.5", "5.0.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0326() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.6", "5.0.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.6", "5.0.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0327() {
-    assert_eq!(app_lib::kvr::compare_versions("5.0.7", "5.0.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.0.7", "5.0.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0328() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.0", "5.1.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.0", "5.1.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0329() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.1", "5.1.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.1", "5.1.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0330() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.2", "5.1.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.2", "5.1.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0331() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.3", "5.1.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.3", "5.1.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0332() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.4", "5.1.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.4", "5.1.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0333() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.5", "5.1.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.5", "5.1.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0334() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.6", "5.1.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.6", "5.1.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0335() {
-    assert_eq!(app_lib::kvr::compare_versions("5.1.7", "5.1.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.1.7", "5.1.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0336() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.0", "5.2.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.0", "5.2.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0337() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.1", "5.2.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.1", "5.2.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0338() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.2", "5.2.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.2", "5.2.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0339() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.3", "5.2.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.3", "5.2.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0340() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.4", "5.2.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.4", "5.2.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0341() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.5", "5.2.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.5", "5.2.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0342() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.6", "5.2.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.6", "5.2.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0343() {
-    assert_eq!(app_lib::kvr::compare_versions("5.2.7", "5.2.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.2.7", "5.2.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0344() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.0", "5.3.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.0", "5.3.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0345() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.1", "5.3.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.1", "5.3.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0346() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.2", "5.3.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.2", "5.3.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0347() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.3", "5.3.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.3", "5.3.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0348() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.4", "5.3.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.4", "5.3.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0349() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.5", "5.3.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.5", "5.3.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0350() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.6", "5.3.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.6", "5.3.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0351() {
-    assert_eq!(app_lib::kvr::compare_versions("5.3.7", "5.3.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.3.7", "5.3.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0352() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.0", "5.4.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.0", "5.4.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0353() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.1", "5.4.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.1", "5.4.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0354() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.2", "5.4.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.2", "5.4.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0355() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.3", "5.4.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.3", "5.4.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0356() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.4", "5.4.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.4", "5.4.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0357() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.5", "5.4.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.5", "5.4.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0358() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.6", "5.4.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.6", "5.4.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0359() {
-    assert_eq!(app_lib::kvr::compare_versions("5.4.7", "5.4.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.4.7", "5.4.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0360() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.0", "5.5.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.0", "5.5.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0361() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.1", "5.5.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.1", "5.5.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0362() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.2", "5.5.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.2", "5.5.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0363() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.3", "5.5.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.3", "5.5.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0364() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.4", "5.5.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.4", "5.5.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0365() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.5", "5.5.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.5", "5.5.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0366() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.6", "5.5.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.6", "5.5.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0367() {
-    assert_eq!(app_lib::kvr::compare_versions("5.5.7", "5.5.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.5.7", "5.5.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0368() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.0", "5.6.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.0", "5.6.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0369() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.1", "5.6.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.1", "5.6.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0370() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.2", "5.6.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.2", "5.6.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0371() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.3", "5.6.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.3", "5.6.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0372() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.4", "5.6.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.4", "5.6.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0373() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.5", "5.6.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.5", "5.6.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0374() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.6", "5.6.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.6", "5.6.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0375() {
-    assert_eq!(app_lib::kvr::compare_versions("5.6.7", "5.6.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.6.7", "5.6.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0376() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.0", "5.7.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.0", "5.7.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0377() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.1", "5.7.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.1", "5.7.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0378() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.2", "5.7.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.2", "5.7.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0379() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.3", "5.7.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.3", "5.7.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0380() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.4", "5.7.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.4", "5.7.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0381() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.5", "5.7.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.5", "5.7.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0382() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.6", "5.7.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.6", "5.7.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0383() {
-    assert_eq!(app_lib::kvr::compare_versions("5.7.7", "5.7.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("5.7.7", "5.7.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0384() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.0", "6.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.0", "6.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0385() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.1", "6.0.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.1", "6.0.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0386() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.2", "6.0.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.2", "6.0.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0387() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.3", "6.0.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.3", "6.0.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0388() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.4", "6.0.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.4", "6.0.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0389() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.5", "6.0.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.5", "6.0.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0390() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.6", "6.0.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.6", "6.0.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0391() {
-    assert_eq!(app_lib::kvr::compare_versions("6.0.7", "6.0.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.0.7", "6.0.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0392() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.0", "6.1.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.0", "6.1.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0393() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.1", "6.1.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.1", "6.1.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0394() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.2", "6.1.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.2", "6.1.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0395() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.3", "6.1.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.3", "6.1.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0396() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.4", "6.1.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.4", "6.1.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0397() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.5", "6.1.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.5", "6.1.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0398() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.6", "6.1.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.6", "6.1.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0399() {
-    assert_eq!(app_lib::kvr::compare_versions("6.1.7", "6.1.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.1.7", "6.1.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0400() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.0", "6.2.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.0", "6.2.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0401() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.1", "6.2.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.1", "6.2.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0402() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.2", "6.2.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.2", "6.2.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0403() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.3", "6.2.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.3", "6.2.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0404() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.4", "6.2.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.4", "6.2.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0405() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.5", "6.2.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.5", "6.2.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0406() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.6", "6.2.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.6", "6.2.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0407() {
-    assert_eq!(app_lib::kvr::compare_versions("6.2.7", "6.2.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.2.7", "6.2.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0408() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.0", "6.3.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.0", "6.3.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0409() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.1", "6.3.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.1", "6.3.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0410() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.2", "6.3.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.2", "6.3.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0411() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.3", "6.3.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.3", "6.3.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0412() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.4", "6.3.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.4", "6.3.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0413() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.5", "6.3.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.5", "6.3.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0414() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.6", "6.3.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.6", "6.3.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0415() {
-    assert_eq!(app_lib::kvr::compare_versions("6.3.7", "6.3.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.3.7", "6.3.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0416() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.0", "6.4.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.0", "6.4.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0417() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.1", "6.4.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.1", "6.4.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0418() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.2", "6.4.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.2", "6.4.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0419() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.3", "6.4.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.3", "6.4.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0420() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.4", "6.4.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.4", "6.4.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0421() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.5", "6.4.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.5", "6.4.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0422() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.6", "6.4.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.6", "6.4.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0423() {
-    assert_eq!(app_lib::kvr::compare_versions("6.4.7", "6.4.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.4.7", "6.4.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0424() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.0", "6.5.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.0", "6.5.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0425() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.1", "6.5.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.1", "6.5.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0426() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.2", "6.5.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.2", "6.5.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0427() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.3", "6.5.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.3", "6.5.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0428() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.4", "6.5.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.4", "6.5.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0429() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.5", "6.5.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.5", "6.5.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0430() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.6", "6.5.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.6", "6.5.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0431() {
-    assert_eq!(app_lib::kvr::compare_versions("6.5.7", "6.5.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.5.7", "6.5.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0432() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.0", "6.6.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.0", "6.6.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0433() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.1", "6.6.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.1", "6.6.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0434() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.2", "6.6.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.2", "6.6.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0435() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.3", "6.6.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.3", "6.6.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0436() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.4", "6.6.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.4", "6.6.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0437() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.5", "6.6.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.5", "6.6.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0438() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.6", "6.6.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.6", "6.6.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0439() {
-    assert_eq!(app_lib::kvr::compare_versions("6.6.7", "6.6.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.6.7", "6.6.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0440() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.0", "6.7.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.0", "6.7.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0441() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.1", "6.7.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.1", "6.7.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0442() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.2", "6.7.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.2", "6.7.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0443() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.3", "6.7.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.3", "6.7.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0444() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.4", "6.7.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.4", "6.7.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0445() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.5", "6.7.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.5", "6.7.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0446() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.6", "6.7.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.6", "6.7.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0447() {
-    assert_eq!(app_lib::kvr::compare_versions("6.7.7", "6.7.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("6.7.7", "6.7.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0448() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.0", "7.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.0", "7.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0449() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.1", "7.0.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.1", "7.0.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0450() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.2", "7.0.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.2", "7.0.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0451() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.3", "7.0.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.3", "7.0.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0452() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.4", "7.0.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.4", "7.0.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0453() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.5", "7.0.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.5", "7.0.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0454() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.6", "7.0.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.6", "7.0.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0455() {
-    assert_eq!(app_lib::kvr::compare_versions("7.0.7", "7.0.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.0.7", "7.0.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0456() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.0", "7.1.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.0", "7.1.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0457() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.1", "7.1.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.1", "7.1.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0458() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.2", "7.1.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.2", "7.1.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0459() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.3", "7.1.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.3", "7.1.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0460() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.4", "7.1.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.4", "7.1.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0461() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.5", "7.1.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.5", "7.1.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0462() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.6", "7.1.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.6", "7.1.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0463() {
-    assert_eq!(app_lib::kvr::compare_versions("7.1.7", "7.1.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.1.7", "7.1.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0464() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.0", "7.2.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.0", "7.2.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0465() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.1", "7.2.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.1", "7.2.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0466() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.2", "7.2.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.2", "7.2.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0467() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.3", "7.2.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.3", "7.2.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0468() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.4", "7.2.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.4", "7.2.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0469() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.5", "7.2.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.5", "7.2.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0470() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.6", "7.2.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.6", "7.2.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0471() {
-    assert_eq!(app_lib::kvr::compare_versions("7.2.7", "7.2.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.2.7", "7.2.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0472() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.0", "7.3.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.0", "7.3.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0473() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.1", "7.3.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.1", "7.3.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0474() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.2", "7.3.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.2", "7.3.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0475() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.3", "7.3.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.3", "7.3.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0476() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.4", "7.3.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.4", "7.3.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0477() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.5", "7.3.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.5", "7.3.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0478() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.6", "7.3.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.6", "7.3.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0479() {
-    assert_eq!(app_lib::kvr::compare_versions("7.3.7", "7.3.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.3.7", "7.3.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0480() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.0", "7.4.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.0", "7.4.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0481() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.1", "7.4.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.1", "7.4.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0482() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.2", "7.4.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.2", "7.4.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0483() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.3", "7.4.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.3", "7.4.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0484() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.4", "7.4.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.4", "7.4.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0485() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.5", "7.4.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.5", "7.4.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0486() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.6", "7.4.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.6", "7.4.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0487() {
-    assert_eq!(app_lib::kvr::compare_versions("7.4.7", "7.4.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.4.7", "7.4.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0488() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.0", "7.5.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.0", "7.5.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0489() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.1", "7.5.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.1", "7.5.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0490() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.2", "7.5.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.2", "7.5.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0491() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.3", "7.5.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.3", "7.5.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0492() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.4", "7.5.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.4", "7.5.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0493() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.5", "7.5.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.5", "7.5.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0494() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.6", "7.5.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.6", "7.5.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0495() {
-    assert_eq!(app_lib::kvr::compare_versions("7.5.7", "7.5.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.5.7", "7.5.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0496() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.0", "7.6.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.0", "7.6.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0497() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.1", "7.6.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.1", "7.6.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0498() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.2", "7.6.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.2", "7.6.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0499() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.3", "7.6.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.3", "7.6.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0500() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.4", "7.6.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.4", "7.6.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0501() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.5", "7.6.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.5", "7.6.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0502() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.6", "7.6.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.6", "7.6.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0503() {
-    assert_eq!(app_lib::kvr::compare_versions("7.6.7", "7.6.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.6.7", "7.6.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0504() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.0", "7.7.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.0", "7.7.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0505() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.1", "7.7.1"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.1", "7.7.1"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0506() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.2", "7.7.2"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.2", "7.7.2"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0507() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.3", "7.7.3"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.3", "7.7.3"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0508() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.4", "7.7.4"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.4", "7.7.4"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0509() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.5", "7.7.5"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.5", "7.7.5"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0510() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.6", "7.7.6"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.6", "7.7.6"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_eq_0511() {
-    assert_eq!(app_lib::kvr::compare_versions("7.7.7", "7.7.7"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("7.7.7", "7.7.7"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_sp_1p0p9_1p0p10() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.9", "1.0.10"), Ordering::Less);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.9", "1.0.10"),
+        Ordering::Less
+    );
 }
 
 #[test]
 fn cmp_sp_1p0p10_1p0p9() {
-    assert_eq!(app_lib::kvr::compare_versions("1.0.10", "1.0.9"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.10", "1.0.9"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_sp_2p0p0_1p99p99() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0.0", "1.99.99"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.0", "1.99.99"),
+        Ordering::Greater
+    );
 }
 
 #[test]
 fn cmp_sp_2p0_2p0p0p0() {
-    assert_eq!(app_lib::kvr::compare_versions("2.0", "2.0.0.0"), Ordering::Equal);
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0", "2.0.0.0"),
+        Ordering::Equal
+    );
 }
 
 #[test]
 fn cmp_sp_10p0_9p0() {
-    assert_eq!(app_lib::kvr::compare_versions("10.0", "9.0"), Ordering::Greater);
+    assert_eq!(
+        app_lib::kvr::compare_versions("10.0", "9.0"),
+        Ordering::Greater
+    );
 }
 
 // ── format_size ────────────────────────────────────────────────────
@@ -18253,4 +22876,3 @@ fn fmt_mb_1048576() {
 fn fmt_pib() {
     assert_eq!(app_lib::format_size(1125899906842624u64), "1024.0 TB");
 }
-

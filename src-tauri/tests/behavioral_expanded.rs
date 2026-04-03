@@ -6,7 +6,7 @@ use std::path::Path;
 use app_lib::daw_scanner::{daw_name_for_format, ext_matches, is_package_ext};
 use app_lib::history::{build_plugin_snapshot, compute_plugin_diff};
 use app_lib::scanner::{get_plugin_type, PluginInfo};
-use app_lib::similarity::{fingerprint_distance, find_similar, AudioFingerprint};
+use app_lib::similarity::{find_similar, fingerprint_distance, AudioFingerprint};
 use app_lib::xref::normalize_plugin_name;
 
 fn fp(path: &str, rms: f64, sc: f64) -> AudioFingerprint {
@@ -110,8 +110,7 @@ fn kvr_extract_version_software_version_json_attr() {
 
 #[test]
 fn kvr_extract_download_url_first_generic_link() {
-    let html =
-        r#"<html><body><a href="https://cdn.vendor.com/releases/get-installer-v2">download</a></body></html>"#;
+    let html = r#"<html><body><a href="https://cdn.vendor.com/releases/get-installer-v2">download</a></body></html>"#;
     let r = app_lib::kvr::extract_download_url(html).expect("expected a link");
     assert!(r.0.contains("get-installer"));
 }

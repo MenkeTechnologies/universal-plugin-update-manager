@@ -6000,4 +6000,3 @@ fn radix_b36_n118() {
 fn radix_b36_n119() {
     assert_eq!(radix_string(119u64, 36u64), "3b");
 }
-

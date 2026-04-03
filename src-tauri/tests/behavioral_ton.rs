@@ -9,7 +9,7 @@ use app_lib::history::{
     AudioSample, DawProject, PresetFile,
 };
 use app_lib::scanner::PluginInfo;
-use app_lib::similarity::{fingerprint_distance, find_similar, AudioFingerprint};
+use app_lib::similarity::{find_similar, fingerprint_distance, AudioFingerprint};
 use app_lib::xref::normalize_plugin_name;
 use app_lib::{ExportPayload, ExportPlugin};
 
@@ -139,7 +139,10 @@ fn kvr_extract_version_current_keyword() {
 fn kvr_extract_download_url_buy_href() {
     let html = r#"<a href="https://shop.example.com/buy-plugin-v3">buy</a>"#;
     let r = app_lib::kvr::extract_download_url(html);
-    assert!(r.is_some(), "buy in path should match download link pattern");
+    assert!(
+        r.is_some(),
+        "buy in path should match download link pattern"
+    );
 }
 
 // ── format_size (spot checks) ───────────────────────────────────────────────
@@ -355,11 +358,7 @@ fn audio_scan_snapshot_build_has_sample_count() {
 
 #[test]
 fn compute_plugin_diff_removes_two_plugins() {
-    let old = build_plugin_snapshot(
-        &[plug("/a.vst3", "1"), plug("/b.vst3", "1")],
-        &[],
-        &[],
-    );
+    let old = build_plugin_snapshot(&[plug("/a.vst3", "1"), plug("/b.vst3", "1")], &[], &[]);
     let new = build_plugin_snapshot(&[], &[], &[]);
     let d = compute_plugin_diff(&old, &new);
     assert_eq!(d.removed.len(), 2);
@@ -389,10 +388,7 @@ fn kvr_extract_version_none_for_plain_text() {
 
 #[test]
 fn kvr_cmp_less_for_all_zeros_vs_one() {
-    assert_eq!(
-        app_lib::kvr::compare_versions("0.0.0", "1"),
-        Ordering::Less
-    );
+    assert_eq!(app_lib::kvr::compare_versions("0.0.0", "1"), Ordering::Less);
 }
 
 #[test]

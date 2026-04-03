@@ -42,14 +42,17 @@ fn test_flac_bad_magic() {
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 fn test_mp3_truncated() {
     let temp = std::env::temp_dir().join("truncated.mp3");
-    
+
     // Valid MP3 header: ID3v1 or MPEG frame sync
     // Sync word: 0xFF
-    let _ = std::fs::write(&temp, vec![
-        0xFF, 0xF0, 0x00, 0x0E, // Frame header (14 bytes)
-        0x28, 0x9E, 0x12, 0xAC, 0x52, 0x24, 0x25, 0xD2,
-        0xC0, 0x21, 0x25, 0x00, 0x00, // Truncated mid-frame
-    ]);
+    let _ = std::fs::write(
+        &temp,
+        vec![
+            0xFF, 0xF0, 0x00, 0x0E, // Frame header (14 bytes)
+            0x28, 0x9E, 0x12, 0xAC, 0x52, 0x24, 0x25, 0xD2, 0xC0, 0x21, 0x25, 0x00,
+            0x00, // Truncated mid-frame
+        ],
+    );
 
     let audio_meta = get_audio_metadata(temp.to_str().unwrap());
     // Should handle gracefully
@@ -60,14 +63,16 @@ fn test_mp3_truncated() {
 #[test]
 fn test_ogg_bad_vendor() {
     let temp = std::env::temp_dir().join("bad.ogg");
-    
+
     // OGG magic bytes + invalid vendor string
     // Magic: FF FB 90 84
-    let _ = std::fs::write(&temp, vec![
-        0xFF, 0xFB, 0x90, 0x84,
-        b'X', b'X', b'X', b'X', b'X', b'X', b'X', b'X',
-        b'X', b'X', b'X', b'X', b'X', b'X', b'X', b'X',
-    ]);
+    let _ = std::fs::write(
+        &temp,
+        vec![
+            0xFF, 0xFB, 0x90, 0x84, b'X', b'X', b'X', b'X', b'X', b'X', b'X', b'X', b'X', b'X',
+            b'X', b'X', b'X', b'X', b'X', b'X',
+        ],
+    );
 
     let audio_meta = get_audio_metadata(temp.to_str().unwrap());
     let _ = audio_meta;

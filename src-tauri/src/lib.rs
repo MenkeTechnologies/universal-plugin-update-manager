@@ -196,7 +196,10 @@ async fn scan_plugins(
     }
     state.stop_scan.store(false, Ordering::SeqCst);
     let scan_start = Instant::now();
-    append_log(format!("SCAN START — plugins | roots: {:?}", custom_roots.as_deref().unwrap_or(&[])));
+    append_log(format!(
+        "SCAN START — plugins | roots: {:?}",
+        custom_roots.as_deref().unwrap_or(&[])
+    ));
 
     let app_handle = app.clone();
     let result = tokio::task::spawn_blocking(move || {
@@ -381,7 +384,11 @@ async fn scan_plugins(
                 .map(|a| a.len())
                 .unwrap_or(0)
         )),
-        Err(e) => append_log(format!("SCAN ERROR — plugins | {}s | {}", elapsed.as_secs(), e)),
+        Err(e) => append_log(format!(
+            "SCAN ERROR — plugins | {}s | {}",
+            elapsed.as_secs(),
+            e
+        )),
     }
     result.map_err(|e| e.to_string())
 }
@@ -409,7 +416,8 @@ async fn check_updates(
     let kvr_cache = history::load_kvr_cache();
 
     let total = plugins.len();
-    #[cfg(not(test))] append_log(format!("UPDATE CHECK — {} plugins", total));
+    #[cfg(not(test))]
+    append_log(format!("UPDATE CHECK — {} plugins", total));
     let _ = app.emit(
         "update-progress",
         serde_json::json!({
@@ -569,7 +577,8 @@ fn history_delete(id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn history_clear() -> Result<(), String> {
-    #[cfg(not(test))] append_log("HISTORY CLEAR — plugins (all scan history deleted)".into());
+    #[cfg(not(test))]
+    append_log("HISTORY CLEAR — plugins (all scan history deleted)".into());
     db::global().clear_plugin_history()
 }
 
@@ -605,7 +614,10 @@ async fn scan_audio_samples(
 ) -> Result<serde_json::Value, String> {
     let state = app.state::<AudioScanState>();
     let scan_start = Instant::now();
-    append_log(format!("SCAN START — audio | roots: {:?}", custom_roots.as_deref().unwrap_or(&[])));
+    append_log(format!(
+        "SCAN START — audio | roots: {:?}",
+        custom_roots.as_deref().unwrap_or(&[])
+    ));
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("Audio scan already in progress".into());
     }
@@ -685,7 +697,11 @@ async fn scan_audio_samples(
                 .map(|a| a.len())
                 .unwrap_or(0)
         )),
-        Err(e) => append_log(format!("SCAN ERROR — audio | {}s | {}", elapsed.as_secs(), e)),
+        Err(e) => append_log(format!(
+            "SCAN ERROR — audio | {}s | {}",
+            elapsed.as_secs(),
+            e
+        )),
     }
     result.map_err(|e| e.to_string())
 }
@@ -732,7 +748,8 @@ fn audio_history_delete(id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn audio_history_clear() -> Result<(), String> {
-    #[cfg(not(test))] append_log("HISTORY CLEAR — audio samples (all scan history deleted)".into());
+    #[cfg(not(test))]
+    append_log("HISTORY CLEAR — audio samples (all scan history deleted)".into());
     db::global().clear_audio_history()
 }
 
@@ -757,7 +774,10 @@ async fn scan_daw_projects(
 ) -> Result<serde_json::Value, String> {
     let state = app.state::<DawScanState>();
     let scan_start = Instant::now();
-    append_log(format!("SCAN START — daw | roots: {:?}", custom_roots.as_deref().unwrap_or(&[])));
+    append_log(format!(
+        "SCAN START — daw | roots: {:?}",
+        custom_roots.as_deref().unwrap_or(&[])
+    ));
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("DAW scan already in progress".into());
     }
@@ -885,7 +905,8 @@ fn daw_history_delete(id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn daw_history_clear() -> Result<(), String> {
-    #[cfg(not(test))] append_log("HISTORY CLEAR — DAW projects".into());
+    #[cfg(not(test))]
+    append_log("HISTORY CLEAR — DAW projects".into());
     db::global().clear_daw_history()
 }
 
@@ -910,7 +931,10 @@ async fn scan_presets(
 ) -> Result<serde_json::Value, String> {
     let state = app.state::<PresetScanState>();
     let scan_start = Instant::now();
-    append_log(format!("SCAN START — presets | roots: {:?}", custom_roots.as_deref().unwrap_or(&[])));
+    append_log(format!(
+        "SCAN START — presets | roots: {:?}",
+        custom_roots.as_deref().unwrap_or(&[])
+    ));
     if state.scanning.swap(true, Ordering::SeqCst) {
         return Err("Preset scan already in progress".into());
     }
@@ -988,7 +1012,11 @@ async fn scan_presets(
                 .map(|a| a.len())
                 .unwrap_or(0)
         )),
-        Err(e) => append_log(format!("SCAN ERROR — presets | {}s | {}", elapsed.as_secs(), e)),
+        Err(e) => append_log(format!(
+            "SCAN ERROR — presets | {}s | {}",
+            elapsed.as_secs(),
+            e
+        )),
     }
     result.map_err(|e| e.to_string())
 }
@@ -1030,7 +1058,8 @@ fn preset_history_delete(id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn preset_history_clear() -> Result<(), String> {
-    #[cfg(not(test))] append_log("HISTORY CLEAR — presets".into());
+    #[cfg(not(test))]
+    append_log("HISTORY CLEAR — presets".into());
     db::global().clear_preset_history()
 }
 
@@ -1106,7 +1135,12 @@ async fn open_daw_project(file_path: String) -> Result<(), String> {
 #[tauri::command]
 async fn extract_project_plugins(file_path: String) -> Result<Vec<xref::PluginRef>, String> {
     let result = xref::extract_plugins(&file_path);
-    #[cfg(not(test))] append_log(format!("XREF EXTRACT — {} | {} plugins found", file_path, result.len()));
+    #[cfg(not(test))]
+    append_log(format!(
+        "XREF EXTRACT — {} | {} plugins found",
+        file_path,
+        result.len()
+    ));
     Ok(result)
 }
 
@@ -1396,7 +1430,9 @@ fn write_cache_file(name: String, data: serde_json::Value) -> Result<(), String>
 fn append_log(msg: String) {
     let path = history::get_data_dir().join("app.log");
     // Ensure dir exists
-    if let Some(parent) = path.parent() { let _ = std::fs::create_dir_all(parent); }
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     // Rotate if > 5MB — rename to app.log.1, truncate
     const MAX_LOG_SIZE: u64 = 5 * 1024 * 1024;
     if let Ok(meta) = std::fs::metadata(&path) {
@@ -1698,7 +1734,12 @@ fn plugins_to_export(plugins: &[PluginInfo]) -> Vec<ExportPlugin> {
 
 #[tauri::command]
 fn export_plugins_json(plugins: Vec<PluginInfo>, file_path: String) -> Result<(), String> {
-    #[cfg(not(test))] append_log(format!("EXPORT — {} plugins → {}", plugins.len(), file_path));
+    #[cfg(not(test))]
+    append_log(format!(
+        "EXPORT — {} plugins → {}",
+        plugins.len(),
+        file_path
+    ));
     let payload = ExportPayload {
         version: env!("CARGO_PKG_VERSION").into(),
         exported_at: chrono::Utc::now().to_rfc3339(),
@@ -1710,7 +1751,12 @@ fn export_plugins_json(plugins: Vec<PluginInfo>, file_path: String) -> Result<()
 
 #[tauri::command]
 fn export_plugins_csv(plugins: Vec<PluginInfo>, file_path: String) -> Result<(), String> {
-    #[cfg(not(test))] append_log(format!("EXPORT — {} plugins → {}", plugins.len(), file_path));
+    #[cfg(not(test))]
+    append_log(format!(
+        "EXPORT — {} plugins → {}",
+        plugins.len(),
+        file_path
+    ));
     let sep = detect_separator(&file_path);
     let mut out = format!(
         "Name{s}Type{s}Version{s}Manufacturer{s}Manufacturer URL{s}Path{s}Size{s}Modified\n",
@@ -1828,7 +1874,8 @@ fn export_daw_dsv(projects: Vec<history::DawProject>, file_path: String) -> Resu
 
 #[tauri::command]
 fn import_plugins_json(file_path: String) -> Result<Vec<PluginInfo>, String> {
-    #[cfg(not(test))] append_log(format!("IMPORT — plugins ← {}", file_path));
+    #[cfg(not(test))]
+    append_log(format!("IMPORT — plugins ← {}", file_path));
     let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
     let payload: ExportPayload = serde_json::from_str(&data).map_err(|e| e.to_string())?;
     Ok(payload
@@ -2235,7 +2282,10 @@ fn get_thread_count() -> u32 {
         use std::sync::{Mutex, OnceLock};
         use sysinfo::{Pid, System};
         static SYS: OnceLock<Mutex<System>> = OnceLock::new();
-        let mut sys = SYS.get_or_init(|| Mutex::new(System::new())).lock().unwrap();
+        let mut sys = SYS
+            .get_or_init(|| Mutex::new(System::new()))
+            .lock()
+            .unwrap();
         let pid = Pid::from_u32(std::process::id());
         sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), true);
         if let Some(p) = sys.process(pid) {
@@ -2439,7 +2489,14 @@ fn export_pdf(
     rows: Vec<Vec<String>>,
     file_path: String,
 ) -> Result<(), String> {
-    #[cfg(not(test))] append_log(format!("EXPORT PDF — \"{}\" | {} rows | {} columns → {}", title, rows.len(), headers.len(), file_path));
+    #[cfg(not(test))]
+    append_log(format!(
+        "EXPORT PDF — \"{}\" | {} rows | {} columns → {}",
+        title,
+        rows.len(),
+        headers.len(),
+        file_path
+    ));
     use printpdf::path::{PaintMode, WindingOrder};
     use printpdf::*;
 
@@ -2968,7 +3025,8 @@ fn fs_list_dir(dir_path: String) -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 fn delete_file(file_path: String) -> Result<(), String> {
-    #[cfg(not(test))] append_log(format!("FILE DELETE — {}", file_path));
+    #[cfg(not(test))]
+    append_log(format!("FILE DELETE — {}", file_path));
     let path = std::path::Path::new(&file_path);
     if !path.exists() {
         return Err("File not found".into());
@@ -2982,7 +3040,8 @@ fn delete_file(file_path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
-    #[cfg(not(test))] append_log(format!("FILE RENAME — {} → {}", old_path, new_path));
+    #[cfg(not(test))]
+    append_log(format!("FILE RENAME — {} → {}", old_path, new_path));
     std::fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
 }
 
@@ -3056,9 +3115,7 @@ mod tests {
     static APP_LOG_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn app_log_lock() -> std::sync::MutexGuard<'static, ()> {
-        APP_LOG_TEST_LOCK
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
+        APP_LOG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// Isolated temp data dir for log tests; cleared on drop.
@@ -3787,7 +3844,8 @@ mod tests {
         append_log("timestamp-check".into());
         let log = read_log().unwrap();
         // Timestamp format: [YYYY-MM-DD HH:MM:SS]
-        let re = regex::Regex::new(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] timestamp-check").unwrap();
+        let re =
+            regex::Regex::new(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] timestamp-check").unwrap();
         assert!(re.is_match(&log), "log entry missing timestamp: {}", log);
     }
 
@@ -3801,7 +3859,11 @@ mod tests {
         append_log("third".into());
         let log = read_log().unwrap();
         let lines: Vec<&str> = log.lines().collect();
-        assert!(lines.len() >= 3, "expected at least 3 lines, got {}", lines.len());
+        assert!(
+            lines.len() >= 3,
+            "expected at least 3 lines, got {}",
+            lines.len()
+        );
         assert!(lines.iter().any(|l| l.contains("first")));
         assert!(lines.iter().any(|l| l.contains("second")));
         assert!(lines.iter().any(|l| l.contains("third")));
@@ -3809,7 +3871,10 @@ mod tests {
         let first_pos = log.find("first").unwrap();
         let second_pos = log.find("second").unwrap();
         let third_pos = log.find("third").unwrap();
-        assert!(first_pos < second_pos && second_pos < third_pos, "log entries out of order");
+        assert!(
+            first_pos < second_pos && second_pos < third_pos,
+            "log entries out of order"
+        );
     }
 
     #[test]
@@ -3846,7 +3911,10 @@ mod tests {
         }
         let log = read_log().unwrap();
         for i in 0..10 {
-            assert!(log.contains(&format!("concurrent-{i}")), "missing concurrent-{i}");
+            assert!(
+                log.contains(&format!("concurrent-{i}")),
+                "missing concurrent-{i}"
+            );
         }
     }
 
@@ -4109,7 +4177,11 @@ fn db_clear_cache_table(table: String) -> Result<(), String> {
 
 #[tauri::command]
 fn start_file_watcher(app: AppHandle, dirs: Vec<String>) -> Result<(), String> {
-    append_log(format!("FILE WATCHER START — {} directories: {:?}", dirs.len(), dirs));
+    append_log(format!(
+        "FILE WATCHER START — {} directories: {:?}",
+        dirs.len(),
+        dirs
+    ));
     let state = app.state::<file_watcher::FileWatcherState>();
     file_watcher::start_watching(&app, &state, dirs)
 }
@@ -4139,7 +4211,10 @@ pub fn run() {
     std::panic::set_hook(Box::new(|info| {
         let path = history::ensure_data_dir().join("app.log");
         let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let location = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column())).unwrap_or_default();
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_default();
         let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
             s.to_string()
         } else if let Some(s) = info.payload().downcast_ref::<String>() {
@@ -4150,16 +4225,26 @@ pub fn run() {
         let backtrace = std::backtrace::Backtrace::force_capture();
         let msg = format!("[{timestamp}] PANIC at {location}: {payload}\n{backtrace}\n");
         eprintln!("{msg}");
-        let _ = std::fs::OpenOptions::new().create(true).append(true).open(&path)
-            .and_then(|mut f| { use std::io::Write; f.write_all(msg.as_bytes()) });
+        let _ = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .and_then(|mut f| {
+                use std::io::Write;
+                f.write_all(msg.as_bytes())
+            });
     }));
 
     // Initialize app start time for uptime tracking
     APP_START.get_or_init(Instant::now);
 
     // Register atexit handler for shutdown logging (Cmd+Q, SIGTERM, etc.)
-    extern "C" fn on_exit() { log_shutdown(); }
-    unsafe { libc::atexit(on_exit); }
+    extern "C" fn on_exit() {
+        log_shutdown();
+    }
+    unsafe {
+        libc::atexit(on_exit);
+    }
 
     // Load preferences once for all startup config
     let prefs = history::load_preferences();
@@ -4180,13 +4265,34 @@ pub fn run() {
     #[cfg(not(unix))]
     let fd_target: u64 = 0;
 
-    let batch_size = prefs.get("batchSize").and_then(|v| v.as_str()).unwrap_or("100");
-    let channel_buffer = prefs.get("channelBuffer").and_then(|v| v.as_str()).unwrap_or("512");
-    let flush_interval = prefs.get("flushInterval").and_then(|v| v.as_str()).unwrap_or("100");
-    let analysis_pause = prefs.get("analysisPause").and_then(|v| v.as_str()).unwrap_or("100");
-    let page_size = prefs.get("pageSize").and_then(|v| v.as_str()).unwrap_or("500");
-    let auto_scan = prefs.get("autoScan").and_then(|v| v.as_str()).unwrap_or("off");
-    let folder_watch = prefs.get("folderWatch").and_then(|v| v.as_str()).unwrap_or("off");
+    let batch_size = prefs
+        .get("batchSize")
+        .and_then(|v| v.as_str())
+        .unwrap_or("100");
+    let channel_buffer = prefs
+        .get("channelBuffer")
+        .and_then(|v| v.as_str())
+        .unwrap_or("512");
+    let flush_interval = prefs
+        .get("flushInterval")
+        .and_then(|v| v.as_str())
+        .unwrap_or("100");
+    let analysis_pause = prefs
+        .get("analysisPause")
+        .and_then(|v| v.as_str())
+        .unwrap_or("100");
+    let page_size = prefs
+        .get("pageSize")
+        .and_then(|v| v.as_str())
+        .unwrap_or("500");
+    let auto_scan = prefs
+        .get("autoScan")
+        .and_then(|v| v.as_str())
+        .unwrap_or("off");
+    let folder_watch = prefs
+        .get("folderWatch")
+        .and_then(|v| v.as_str())
+        .unwrap_or("off");
 
     append_log(format!(
         "APP START — v{} | {} {} | {} | {} cores | {} rayon threads | pid {} | RSS {} | DB {}",
@@ -4982,20 +5088,24 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app, event| {
-            match event {
-                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
-                    log_shutdown();
-                }
-                _ => {}
+        .run(|_app, event| match event {
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+                log_shutdown();
             }
+            _ => {}
         });
 }
 
 fn log_shutdown() {
     use std::sync::atomic::{AtomicBool, Ordering};
     static LOGGED: AtomicBool = AtomicBool::new(false);
-    if LOGGED.swap(true, Ordering::Relaxed) { return; } // only log once
+    if LOGGED.swap(true, Ordering::Relaxed) {
+        return;
+    } // only log once
     let uptime = APP_START.get().map(|s| s.elapsed().as_secs()).unwrap_or(0);
-    append_log(format!("APP SHUTDOWN — uptime {}m {}s", uptime / 60, uptime % 60));
+    append_log(format!(
+        "APP SHUTDOWN — uptime {}m {}s",
+        uptime / 60,
+        uptime % 60
+    ));
 }

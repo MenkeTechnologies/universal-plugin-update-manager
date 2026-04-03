@@ -3,25 +3,21 @@
 
 use std::cmp::Ordering;
 
-use app_lib::similarity::{fingerprint_distance, find_similar, AudioFingerprint};
+use app_lib::similarity::{find_similar, fingerprint_distance, AudioFingerprint};
 
 fn smf_single_track(tempo_micros: u32, include_note_on: bool) -> Vec<u8> {
     let t0 = ((tempo_micros >> 16) & 0xff) as u8;
     let t1 = ((tempo_micros >> 8) & 0xff) as u8;
     let t2 = (tempo_micros & 0xff) as u8;
 
-    let mut track = vec![
-        0x00, 0xFF, 0x51, 0x03, t0, t1, t2,
-    ];
+    let mut track = vec![0x00, 0xFF, 0x51, 0x03, t0, t1, t2];
     if include_note_on {
         track.extend_from_slice(&[0x00, 0x90, 0x3C, 0x40]);
     }
     track.extend_from_slice(&[0x00, 0xFF, 0x2F, 0x00]);
 
     let trk_len = track.len() as u32;
-    let mut mid = vec![
-        b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0,
-    ];
+    let mut mid = vec![b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0];
     mid.extend_from_slice(b"MTrk");
     mid.extend_from_slice(&trk_len.to_be_bytes());
     mid.extend_from_slice(&track);
@@ -156,11 +152,26 @@ fn scanner_get_plugin_type_unknown_extension() {
 
 #[test]
 fn daw_name_for_format_covers_major_formats() {
-    assert_eq!(app_lib::daw_scanner::daw_name_for_format("ALS"), "Ableton Live");
-    assert_eq!(app_lib::daw_scanner::daw_name_for_format("LOGICX"), "Logic Pro");
-    assert_eq!(app_lib::daw_scanner::daw_name_for_format("DAWPROJECT"), "DAWproject");
-    assert_eq!(app_lib::daw_scanner::daw_name_for_format("RPP-BAK"), "REAPER");
-    assert_eq!(app_lib::daw_scanner::daw_name_for_format("BAND"), "GarageBand");
+    assert_eq!(
+        app_lib::daw_scanner::daw_name_for_format("ALS"),
+        "Ableton Live"
+    );
+    assert_eq!(
+        app_lib::daw_scanner::daw_name_for_format("LOGICX"),
+        "Logic Pro"
+    );
+    assert_eq!(
+        app_lib::daw_scanner::daw_name_for_format("DAWPROJECT"),
+        "DAWproject"
+    );
+    assert_eq!(
+        app_lib::daw_scanner::daw_name_for_format("RPP-BAK"),
+        "REAPER"
+    );
+    assert_eq!(
+        app_lib::daw_scanner::daw_name_for_format("BAND"),
+        "GarageBand"
+    );
 }
 
 #[test]

@@ -48,7 +48,10 @@ fn norm_gen_00008() {
 
 #[test]
 fn norm_gen_00009() {
-    assert_eq!(normalize_plugin_name("Compressor (Apple Silicon)"), "compressor");
+    assert_eq!(
+        normalize_plugin_name("Compressor (Apple Silicon)"),
+        "compressor"
+    );
 }
 
 #[test]
@@ -68,7 +71,10 @@ fn norm_gen_00012() {
 
 #[test]
 fn norm_gen_00013() {
-    assert_eq!(normalize_plugin_name("Compressor (Universal)"), "compressor");
+    assert_eq!(
+        normalize_plugin_name("Compressor (Universal)"),
+        "compressor"
+    );
 }
 
 #[test]
@@ -233,7 +239,10 @@ fn norm_gen_00045() {
 
 #[test]
 fn norm_gen_00046() {
-    assert_eq!(normalize_plugin_name("EQ Eight (Apple Silicon)"), "eq eight");
+    assert_eq!(
+        normalize_plugin_name("EQ Eight (Apple Silicon)"),
+        "eq eight"
+    );
 }
 
 #[test]
@@ -318,7 +327,10 @@ fn norm_gen_00062() {
 
 #[test]
 fn norm_gen_00063() {
-    assert_eq!(normalize_plugin_name("FabFilter (Apple Silicon)"), "fabfilter");
+    assert_eq!(
+        normalize_plugin_name("FabFilter (Apple Silicon)"),
+        "fabfilter"
+    );
 }
 
 #[test]
@@ -673,7 +685,10 @@ fn norm_gen_00133() {
 
 #[test]
 fn norm_gen_00134() {
-    assert_eq!(normalize_plugin_name("Omnisphere (Apple Silicon)"), "omnisphere");
+    assert_eq!(
+        normalize_plugin_name("Omnisphere (Apple Silicon)"),
+        "omnisphere"
+    );
 }
 
 #[test]
@@ -693,7 +708,10 @@ fn norm_gen_00137() {
 
 #[test]
 fn norm_gen_00138() {
-    assert_eq!(normalize_plugin_name("Omnisphere (Universal)"), "omnisphere");
+    assert_eq!(
+        normalize_plugin_name("Omnisphere (Universal)"),
+        "omnisphere"
+    );
 }
 
 #[test]
@@ -758,7 +776,10 @@ fn norm_gen_00150() {
 
 #[test]
 fn norm_gen_00151() {
-    assert_eq!(normalize_plugin_name("Pigments (Apple Silicon)"), "pigments");
+    assert_eq!(
+        normalize_plugin_name("Pigments (Apple Silicon)"),
+        "pigments"
+    );
 }
 
 #[test]
@@ -1378,7 +1399,10 @@ fn norm_gen_00274() {
 
 #[test]
 fn norm_gen_00275() {
-    assert_eq!(normalize_plugin_name("Valhalla (Apple Silicon)"), "valhalla");
+    assert_eq!(
+        normalize_plugin_name("Valhalla (Apple Silicon)"),
+        "valhalla"
+    );
 }
 
 #[test]
@@ -1525,4 +1549,3 @@ fn norm_gen_00303() {
 fn norm_gen_00304() {
     assert_eq!(normalize_plugin_name("插件A x86_64"), "插件a");
 }
-

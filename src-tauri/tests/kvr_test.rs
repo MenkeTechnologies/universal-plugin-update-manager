@@ -64,5 +64,8 @@ fn test_kvr_cache_operations() {
     };
 
     cache.insert("test_key".to_string(), entry);
-    assert_eq!(cache.get("test_key").map(|e| e.source.as_str()), Some("kvraudio"));
+    assert_eq!(
+        cache.get("test_key").map(|e| e.source.as_str()),
+        Some("kvraudio")
+    );
 }

@@ -13,10 +13,10 @@ fn test_midi_parse_basic_header() {
     std::fs::create_dir_all(temp.parent().unwrap()).ok();
     let midi_header = vec![
         0x4D, 0x54, 0x68, 0x64, // 'MThd'
-        0, 0, 0, 6,            // header chunk length
-        0, 1,                  // format 1
-        0, 1,                  // 1 track
-        0x01, 0xC0,            // 448 PPQN
+        0, 0, 0, 6, // header chunk length
+        0, 1, // format 1
+        0, 1, // 1 track
+        0x01, 0xC0, // 448 PPQN
     ];
     std::fs::write(&temp, &midi_header).unwrap();
     let result = app_lib::midi::parse_midi(&temp);

@@ -78,10 +78,7 @@ fn ext_matches_is_case_insensitive_on_file_name() {
         ext_matches(Path::new("/p/MySession.ALS")).as_deref(),
         Some("ALS")
     );
-    assert_eq!(
-        ext_matches(Path::new("/p/Mix.FLP")).as_deref(),
-        Some("FLP")
-    );
+    assert_eq!(ext_matches(Path::new("/p/Mix.FLP")).as_deref(), Some("FLP"));
 }
 
 #[test]

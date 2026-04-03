@@ -45,15 +45,15 @@ fn test_command_layer_export_payload() {
 #[test]
 fn test_command_layer_sort_plugins() {
     use std::collections::HashMap;
-    
+
     let mut plugins = HashMap::new();
     plugins.insert("Zebra VST".to_string(), "/plugin.vst".to_string());
     plugins.insert("Apple VST".to_string(), "/plugin2.vst".to_string());
     plugins.insert("Banana VST".to_string(), "/plugin3.vst".to_string());
-    
+
     let mut sorted: Vec<String> = plugins.keys().cloned().collect();
     sorted.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
-    
+
     // Check alphabetical order (case-insensitive sort, original casing preserved)
     assert!(sorted[0].to_lowercase().contains("apple"));
     assert!(sorted[1].to_lowercase().contains("banana"));

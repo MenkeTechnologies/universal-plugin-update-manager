@@ -20,8 +20,21 @@ fn test_audio_extensions_on_file_paths() {
 #[test]
 fn test_daw_extensions_on_file_paths() {
     let exts = [
-        "als", "band", "bwproject", "song", "flp", "ptx", "reason", "rpp", "cpr",
-        "logicx", "npr", "dawproject", "ardour", "aup", "aup3",
+        "als",
+        "band",
+        "bwproject",
+        "song",
+        "flp",
+        "ptx",
+        "reason",
+        "rpp",
+        "cpr",
+        "logicx",
+        "npr",
+        "dawproject",
+        "ardour",
+        "aup",
+        "aup3",
     ];
     for ext in exts {
         let p = Path::new("/tmp").join(format!("project.{ext}"));

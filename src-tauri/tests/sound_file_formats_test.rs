@@ -21,8 +21,7 @@ fn test_read_aiff_pcm_rejects_incomplete_form() {
 #[test]
 fn test_pcm_payload_bytes_stereo_24bit_three_minutes() {
     fn pcm_payload_bytes(channels: u16, sample_rate: u32, bits: u16, duration_sec: f32) -> usize {
-        let bytes_per_sec =
-            (channels as u64) * (sample_rate as u64) * (bits as u64 / 8);
+        let bytes_per_sec = (channels as u64) * (sample_rate as u64) * (bits as u64 / 8);
         (bytes_per_sec as f64 * f64::from(duration_sec)) as usize
     }
     let size = pcm_payload_bytes(2, 44100, 24, 180.0);

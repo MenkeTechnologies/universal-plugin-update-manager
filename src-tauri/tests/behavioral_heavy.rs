@@ -10,7 +10,7 @@ use app_lib::history::{
     KvrCacheEntry,
 };
 use app_lib::scanner::{get_plugin_type, PluginInfo};
-use app_lib::similarity::{fingerprint_distance, find_similar, AudioFingerprint};
+use app_lib::similarity::{find_similar, fingerprint_distance, AudioFingerprint};
 use app_lib::xref::{extract_plugins, normalize_plugin_name, PluginRef};
 use app_lib::{ExportPayload, ExportPlugin};
 
@@ -124,10 +124,7 @@ fn radix_base_3_ten() {
 
 #[test]
 fn ext_matches_ptf_suffix() {
-    assert_eq!(
-        ext_matches(Path::new("/s.ptf")).as_deref(),
-        Some("PTF")
-    );
+    assert_eq!(ext_matches(Path::new("/s.ptf")).as_deref(), Some("PTF"));
 }
 
 #[test]
@@ -558,10 +555,7 @@ fn extract_plugins_no_extension_empty() {
 #[test]
 fn kvr_extract_version_latest_keyword_line() {
     let html = "<p>Latest version 8.1 here</p>";
-    assert_eq!(
-        app_lib::kvr::extract_version(html).as_deref(),
-        Some("8.1")
-    );
+    assert_eq!(app_lib::kvr::extract_version(html).as_deref(), Some("8.1"));
 }
 
 #[test]
@@ -589,8 +583,5 @@ fn read_aiff_pub_missing_none() {
 
 #[test]
 fn kvr_compare_versions_reflexive_single_digit() {
-    assert_eq!(
-        app_lib::kvr::compare_versions("7", "7"),
-        Ordering::Equal
-    );
+    assert_eq!(app_lib::kvr::compare_versions("7", "7"), Ordering::Equal);
 }

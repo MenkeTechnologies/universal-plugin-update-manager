@@ -8,7 +8,7 @@ use app_lib::history::{
     build_audio_snapshot, build_daw_snapshot, build_preset_snapshot, compute_audio_diff,
     compute_daw_diff, compute_preset_diff, AudioSample, DawProject, PresetFile,
 };
-use app_lib::similarity::{fingerprint_distance, find_similar, AudioFingerprint};
+use app_lib::similarity::{find_similar, fingerprint_distance, AudioFingerprint};
 
 // ── KVR: `compare_versions` — explicit pairs (real semver-like strings) ──
 
@@ -50,10 +50,7 @@ fn kvr_compare_equal_with_trailing_zeros() {
 
 #[test]
 fn kvr_compare_single_segment_vs_triple() {
-    assert_eq!(
-        app_lib::kvr::compare_versions("3", "3.0.1"),
-        Ordering::Less
-    );
+    assert_eq!(app_lib::kvr::compare_versions("3", "3.0.1"), Ordering::Less);
 }
 
 #[test]
@@ -76,10 +73,7 @@ fn kvr_compare_transitivity_sample() {
 
 #[test]
 fn kvr_parse_version_multidigit_segments() {
-    assert_eq!(
-        app_lib::kvr::parse_version("12.34.56"),
-        vec![12, 34, 56]
-    );
+    assert_eq!(app_lib::kvr::parse_version("12.34.56"), vec![12, 34, 56]);
 }
 
 #[test]

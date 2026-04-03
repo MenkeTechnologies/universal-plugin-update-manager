@@ -52,16 +52,8 @@ fn compute_plugin_diff_no_change_when_identical_snapshots() {
 
 #[test]
 fn compute_plugin_diff_same_path_version_bump_only_in_version_changed() {
-    let old = build_plugin_snapshot(
-        &[plugin("/p.vst3", "P", "1.0.0")],
-        &[],
-        &[],
-    );
-    let new = build_plugin_snapshot(
-        &[plugin("/p.vst3", "P", "2.0.0")],
-        &[],
-        &[],
-    );
+    let old = build_plugin_snapshot(&[plugin("/p.vst3", "P", "1.0.0")], &[], &[]);
+    let new = build_plugin_snapshot(&[plugin("/p.vst3", "P", "2.0.0")], &[], &[]);
     let d = compute_plugin_diff(&old, &new);
     assert!(d.added.is_empty());
     assert!(d.removed.is_empty());
@@ -95,10 +87,7 @@ fn kvr_compare_versions_10_gt_2_in_first_segment() {
 
 #[test]
 fn kvr_parse_version_double_digit_segments() {
-    assert_eq!(
-        app_lib::kvr::parse_version("10.20.30"),
-        vec![10, 20, 30]
-    );
+    assert_eq!(app_lib::kvr::parse_version("10.20.30"), vec![10, 20, 30]);
 }
 
 #[test]
@@ -135,16 +124,17 @@ fn find_similar_returns_all_distinct_candidates_when_max_large() {
 
 #[test]
 fn bpm_decode_symphonia_nonexistent_returns_none() {
-    assert!(
-        app_lib::bpm::decode_with_symphonia_pub(Path::new("/nonexistent/audio_haxor/missing.mp3"))
-            .is_none()
-    );
+    assert!(app_lib::bpm::decode_with_symphonia_pub(Path::new(
+        "/nonexistent/audio_haxor/missing.mp3"
+    ))
+    .is_none());
 }
 
 #[test]
 fn bpm_read_aiff_nonexistent_returns_none() {
     assert!(
-        app_lib::bpm::read_aiff_pcm_pub(Path::new("/nonexistent/audio_haxor/missing.aif")).is_none()
+        app_lib::bpm::read_aiff_pcm_pub(Path::new("/nonexistent/audio_haxor/missing.aif"))
+            .is_none()
     );
 }
 
@@ -186,12 +176,18 @@ fn format_size_just_below_one_mib() {
 #[test]
 fn daw_name_audacity_project_extensions() {
     assert_eq!(app_lib::daw_scanner::daw_name_for_format("AUP"), "Audacity");
-    assert_eq!(app_lib::daw_scanner::daw_name_for_format("AUP3"), "Audacity");
+    assert_eq!(
+        app_lib::daw_scanner::daw_name_for_format("AUP3"),
+        "Audacity"
+    );
 }
 
 #[test]
 fn daw_name_ardour_token() {
-    assert_eq!(app_lib::daw_scanner::daw_name_for_format("ARDOUR"), "Ardour");
+    assert_eq!(
+        app_lib::daw_scanner::daw_name_for_format("ARDOUR"),
+        "Ardour"
+    );
 }
 
 // ── xref: `.als` missing file yields empty plugin list ───────────────────

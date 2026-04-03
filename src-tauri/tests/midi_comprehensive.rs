@@ -32,9 +32,7 @@ fn test_midi_info_default() {
 #[test]
 fn test_parse_midi_minimal_header() {
     let temp = std::env::temp_dir().join("audio_haxor_midi_comp.mid");
-    let midi_header = vec![
-        0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 1, 0x01, 0xC0,
-    ];
+    let midi_header = vec![0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 1, 0x01, 0xC0];
     std::fs::write(&temp, &midi_header).unwrap();
     let r = app_lib::midi::parse_midi(&temp);
     assert!(r.is_some());

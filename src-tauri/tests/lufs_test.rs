@@ -23,7 +23,5 @@ fn test_lufs_directory_path_returns_none() {
 
 #[test]
 fn test_lufs_nonexistent_file() {
-    assert!(
-        app_lib::lufs::measure_lufs("/nonexistent/audio_haxor/missing.wav").is_none()
-    );
+    assert!(app_lib::lufs::measure_lufs("/nonexistent/audio_haxor/missing.wav").is_none());
 }

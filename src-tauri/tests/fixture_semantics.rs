@@ -90,7 +90,10 @@ fn kvr_extract_download_url_marks_platform_when_url_contains_mac_keyword() {
 fn kvr_extract_download_url_marks_platform_when_url_contains_linux_keyword() {
     let html = r#"<a href="https://cdn.example.com/download/linux">Linux</a>"#;
     let r = app_lib::kvr::extract_download_url(html).expect("expected link");
-    assert!(r.1, "linux in URL should count as platform-specific on Linux");
+    assert!(
+        r.1,
+        "linux in URL should count as platform-specific on Linux"
+    );
 }
 
 #[cfg(target_os = "windows")]
@@ -98,7 +101,10 @@ fn kvr_extract_download_url_marks_platform_when_url_contains_linux_keyword() {
 fn kvr_extract_download_url_marks_platform_when_url_contains_windows_keyword() {
     let html = r#"<a href="https://cdn.example.com/download/windows">Win</a>"#;
     let r = app_lib::kvr::extract_download_url(html).expect("expected link");
-    assert!(r.1, "windows in URL should count as platform-specific on Windows");
+    assert!(
+        r.1,
+        "windows in URL should count as platform-specific on Windows"
+    );
 }
 
 // ── Similarity: truncation and empty input ──
@@ -148,10 +154,7 @@ fn find_similar_empty_candidates_returns_empty() {
 #[test]
 fn normalize_plugin_name_strips_multiple_arch_suffixes_in_order() {
     let s = "Serum (x64) (VST3)";
-    assert_eq!(
-        app_lib::xref::normalize_plugin_name(s),
-        "serum"
-    );
+    assert_eq!(app_lib::xref::normalize_plugin_name(s), "serum");
 }
 
 #[test]
@@ -259,7 +262,9 @@ fn daw_ext_matches_dawproject() {
 
 #[test]
 fn daw_is_package_ext_logicx_and_band() {
-    assert!(app_lib::daw_scanner::is_package_ext(Path::new("song.logicx")));
+    assert!(app_lib::daw_scanner::is_package_ext(Path::new(
+        "song.logicx"
+    )));
     assert!(app_lib::daw_scanner::is_package_ext(Path::new("my.band")));
     assert!(!app_lib::daw_scanner::is_package_ext(Path::new("song.als")));
 }

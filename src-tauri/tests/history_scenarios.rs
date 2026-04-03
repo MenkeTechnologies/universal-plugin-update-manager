@@ -21,11 +21,7 @@ fn plugin(path: &str, name: &str, ver: &str) -> PluginInfo {
 #[test]
 fn diff_detects_single_added_plugin() {
     let old_snap = build_plugin_snapshot(&[], &[], &[]);
-    let new_snap = build_plugin_snapshot(
-        &[plugin("/p/a.vst3", "A", "1.0")],
-        &[],
-        &[],
-    );
+    let new_snap = build_plugin_snapshot(&[plugin("/p/a.vst3", "A", "1.0")], &[], &[]);
     let diff = compute_plugin_diff(&old_snap, &new_snap);
     assert_eq!(diff.added.len(), 1);
     assert_eq!(diff.removed.len(), 0);
@@ -35,11 +31,7 @@ fn diff_detects_single_added_plugin() {
 
 #[test]
 fn diff_detects_single_removed_plugin() {
-    let old_snap = build_plugin_snapshot(
-        &[plugin("/p/a.vst3", "A", "1.0")],
-        &[],
-        &[],
-    );
+    let old_snap = build_plugin_snapshot(&[plugin("/p/a.vst3", "A", "1.0")], &[], &[]);
     let new_snap = build_plugin_snapshot(&[], &[], &[]);
     let diff = compute_plugin_diff(&old_snap, &new_snap);
     assert_eq!(diff.removed.len(), 1);
