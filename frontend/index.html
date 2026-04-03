@@ -5721,10 +5721,6 @@
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="settings-section" data-section="engine">
-          <h2 class="settings-heading">&#9776; Engine</h2>
           <div class="settings-row">
             <div class="settings-label">
               <span class="settings-title">Thread Pool Multiplier</span>
@@ -5829,16 +5825,13 @@
           </div>
         </div>
 
-        <div class="settings-section" data-section="fzf">
-          <h2 class="settings-heading">&#9776; Fuzzy Search (fzf)</h2>
-          <div id="fzfSettingsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;"></div>
-          <div style="margin-top:8px;">
-            <button class="btn btn-secondary btn-settings-action" data-action="resetFzfParams" title="Reset all fzf parameters to defaults">Reset to Defaults</button>
-          </div>
-        </div>
-
         <div class="settings-section" data-section="shortcuts">
-          <h2 class="settings-heading">&#9776; Keyboard Shortcuts</h2>
+          <h2 class="settings-heading">&#9776; Shortcuts &amp; Search</h2>
+          <div style="margin-bottom:8px;">
+            <h3 style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">FUZZY SEARCH WEIGHTS</h3>
+            <div id="fzfSettingsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;"></div>
+            <button class="btn btn-secondary btn-settings-action" data-action="resetFzfParams" title="Reset all fzf parameters to defaults" style="margin-top:4px;font-size:10px;">Reset fzf</button>
+          </div>
           <div class="search-box" style="max-width:400px;margin-bottom:8px;">
             <span class="search-icon">&#128269;</span>
             <input type="text" id="shortcutsFilter" placeholder="Fuzzy search shortcuts..." data-action="filterShortcuts" title="Fuzzy filter keyboard shortcuts by name or key" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -6027,17 +6020,12 @@
               <button class="btn btn-secondary btn-settings-action" data-action="openDataDir" title="Open data directory in Finder">Open in Finder</button>
             </div>
           </div>
-        </div>
-
-        <div class="settings-section" data-section="about">
-          <h2 class="settings-heading">&#9776; About</h2>
           <div class="settings-row">
             <div class="settings-label">
               <span class="settings-title">AUDIO_HAXOR</span>
               <span class="settings-desc">
-                Version <span id="settingsVersion"></span><br>
-                by MenkeTechnologies<br>
-                <a href="#" data-action="openUpdate" data-url="https://github.com/MenkeTechnologies/universal-plugin-update-manager" style="color: var(--cyan); text-decoration: none;" title="Open AUDIO_HAXOR GitHub repository in browser">&#128279; GitHub Repository</a>
+                Version <span id="settingsVersion"></span> &middot; by MenkeTechnologies &middot;
+                <a href="#" data-action="openUpdate" data-url="https://github.com/MenkeTechnologies/universal-plugin-update-manager" style="color: var(--cyan); text-decoration: none;" title="Open AUDIO_HAXOR GitHub repository in browser">&#128279; GitHub</a>
               </span>
             </div>
           </div>
@@ -6054,39 +6042,39 @@
     </div>
   </div>
 
-  <script src="js/ipc.js?v=18793"></script>
-  <script src="js/utils.js?v=18793"></script>
-  <script src="js/drag-reorder.js?v=18793"></script>
-  <script src="js/modal-drag.js?v=18793"></script>
-  <script src="js/columns.js?v=18793"></script>
-  <script src="js/notes.js?v=18793"></script>
-  <script src="js/favorites.js?v=18793"></script>
-  <script src="js/export.js?v=18793"></script>
-  <script src="js/plugins.js?v=18793"></script>
-  <script src="js/settings.js?v=18793"></script>
-  <script src="js/history.js?v=18793"></script>
-  <script src="js/kvr.js?v=18793"></script>
-  <script src="js/audio.js?v=18793"></script>
-  <script src="js/daw.js?v=18793"></script>
-  <script src="js/presets.js?v=18793"></script>
-  <script src="js/disk-usage.js?v=18793"></script>
-  <script src="js/batch-select.js?v=18793"></script>
-  <script src="js/sort-persist.js?v=18793"></script>
-  <script src="js/multi-filter.js?v=18793"></script>
-  <script src="js/file-browser.js?v=18793"></script>
-  <script src="js/duplicates.js?v=18793"></script>
-  <script src="js/command-palette.js?v=18793"></script>
-  <script src="js/xref.js?v=18793"></script>
-  <script src="js/dep-graph.js?v=18793"></script>
-  <script src="js/smart-playlists.js?v=18793"></script>
-  <script src="js/heatmap-dashboard.js?v=18793"></script>
-  <script src="js/midi.js?v=18793"></script>
-  <script src="js/visualizer.js?v=18793"></script>
-  <script src="js/walker-status.js?v=18793"></script>
-  <script src="js/context-menu.js?v=18793"></script>
-  <script src="js/help-overlay.js?v=18793"></script>
-  <script src="js/shortcuts.js?v=18793"></script>
-  <script src="js/keyboard-nav.js?v=18793"></script>
-  <script src="js/app.js?v=18793"></script>
+  <script src="js/ipc.js?v=22943"></script>
+  <script src="js/utils.js?v=22943"></script>
+  <script src="js/drag-reorder.js?v=22943"></script>
+  <script src="js/modal-drag.js?v=22943"></script>
+  <script src="js/columns.js?v=22943"></script>
+  <script src="js/notes.js?v=22943"></script>
+  <script src="js/favorites.js?v=22943"></script>
+  <script src="js/export.js?v=22943"></script>
+  <script src="js/plugins.js?v=22943"></script>
+  <script src="js/settings.js?v=22943"></script>
+  <script src="js/history.js?v=22943"></script>
+  <script src="js/kvr.js?v=22943"></script>
+  <script src="js/audio.js?v=22943"></script>
+  <script src="js/daw.js?v=22943"></script>
+  <script src="js/presets.js?v=22943"></script>
+  <script src="js/disk-usage.js?v=22943"></script>
+  <script src="js/batch-select.js?v=22943"></script>
+  <script src="js/sort-persist.js?v=22943"></script>
+  <script src="js/multi-filter.js?v=22943"></script>
+  <script src="js/file-browser.js?v=22943"></script>
+  <script src="js/duplicates.js?v=22943"></script>
+  <script src="js/command-palette.js?v=22943"></script>
+  <script src="js/xref.js?v=22943"></script>
+  <script src="js/dep-graph.js?v=22943"></script>
+  <script src="js/smart-playlists.js?v=22943"></script>
+  <script src="js/heatmap-dashboard.js?v=22943"></script>
+  <script src="js/midi.js?v=22943"></script>
+  <script src="js/visualizer.js?v=22943"></script>
+  <script src="js/walker-status.js?v=22943"></script>
+  <script src="js/context-menu.js?v=22943"></script>
+  <script src="js/help-overlay.js?v=22943"></script>
+  <script src="js/shortcuts.js?v=22943"></script>
+  <script src="js/keyboard-nav.js?v=22943"></script>
+  <script src="js/app.js?v=22943"></script>
 </body>
 </html>
