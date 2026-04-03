@@ -345,6 +345,7 @@ audioPlayer.addEventListener('seeked', updatePlaybackTime);
 
 // ── Audio Similarity Search ──
 async function findSimilarSamples(filePath) {
+  showToast('Finding similar samples...');
   const name = filePath.split('/').pop().replace(/\.[^.]+$/, '');
   let existing = document.getElementById('similarPanel');
   if (existing) existing.remove();
@@ -1510,7 +1511,7 @@ function metaItem(label, value, wide) {
 }
 
 function openAudioFolder(filePath) {
-  window.vstUpdater.openAudioFolder(filePath);
+  window.vstUpdater.openAudioFolder(filePath).then(() => showToast('Revealed in Finder')).catch(e => showToast('Failed: ' + e, 4000, 'error'));
 }
 
 // ── Recently Played / Expanded Player ──

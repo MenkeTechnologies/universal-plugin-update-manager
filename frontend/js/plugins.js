@@ -479,7 +479,7 @@ async function openKvr(btn, directUrl, pluginName) {
 }
 
 function openFolder(pluginPath) {
-  window.vstUpdater.openPluginFolder(pluginPath);
+  window.vstUpdater.openPluginFolder(pluginPath).then(() => showToast('Revealed in Finder')).catch(e => showToast('Failed: ' + e, 4000, 'error'));
 }
 
 let batchIndex = 0;
