@@ -1,0 +1,29 @@
+# Build
+src-tauri/target/
+dist/
+node_modules/
+
+# Lock files
+src-tauri/Cargo.lock
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Rust build artifacts
+src-tauri/rust_out/
+
+# Generated docs
+docs/api/
+
+# AI coding tools
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+OPENCODE.md
+.opencode.json
+.cursor/
+.cursorrules
