@@ -1042,5 +1042,66 @@ document.addEventListener('contextmenu', (e) => {
     return;
   }
 
+  // ── Visualizer tiles ──
+  const vizTile = e.target.closest('.viz-tile');
+  if (vizTile) {
+    const label = vizTile.querySelector('.viz-tile-label')?.textContent?.trim() || 'Visualizer';
+    const canvas = vizTile.querySelector('canvas');
+    const items = [
+      { icon: '&#128247;', label: 'Export Snapshot (PNG)', action: () => {
+        if (canvas) {
+          const link = document.createElement('a');
+          link.download = `${label.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          showToast('Snapshot exported');
+        }
+      }, disabled: !canvas },
+      { icon: '&#128203;', label: 'Copy Tile Name', action: () => typeof copyToClipboard === 'function' && copyToClipboard(label) },
+      '---',
+      { icon: '&#128260;', label: 'Toggle Fullscreen', action: () => {
+        vizTile.classList.toggle('viz-fullscreen');
+        if (vizTile.classList.contains('viz-fullscreen')) {
+          vizTile.requestFullscreen?.().catch(() => {});
+        } else {
+          document.exitFullscreen?.().catch(() => {});
+        }
+      }},
+    ];
+    showContextMenu(e, items);
+    return;
+  }
+
+  // ── Settings sections ──
+  const settingsSection = e.target.closest('.settings-section');
+  if (settingsSection) {
+    const heading = settingsSection.querySelector('.settings-heading')?.textContent?.trim() || 'Section';
+    const items = [
+      { icon: '&#128203;', label: 'Copy Section Name', action: () => typeof copyToClipboard === 'function' && copyToClipboard(heading) },
+      { icon: '&#9650;', label: 'Move Up', action: () => {
+        const prev = settingsSection.previousElementSibling;
+        if (prev && prev.classList.contains('settings-section')) {
+          settingsSection.parentNode.insertBefore(settingsSection, prev);
+          showToast(`Moved "${heading}" up`);
+        }
+      }},
+      { icon: '&#9660;', label: 'Move Down', action: () => {
+        const next = settingsSection.nextElementSibling;
+        if (next && next.classList.contains('settings-section')) {
+          next.parentNode.insertBefore(next, settingsSection);
+          showToast(`Moved "${heading}" down`);
+        }
+      }},
+      '---',
+      { icon: '&#128065;', label: settingsSection.classList.contains('collapsed') ? 'Expand Section' : 'Collapse Section', action: () => {
+        settingsSection.classList.toggle('collapsed');
+        const body = settingsSection.querySelectorAll('.settings-row');
+        body.forEach(r => r.style.display = settingsSection.classList.contains('collapsed') ? 'none' : '');
+      }},
+    ];
+    showContextMenu(e, items);
+    return;
+  }
+
   } catch (err) { console.error('Context menu error:', err, err.stack); showToast('Context menu error: ' + (err.message || err), 4000, 'error'); }
 });
