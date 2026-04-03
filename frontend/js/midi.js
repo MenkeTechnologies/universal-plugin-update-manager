@@ -228,7 +228,7 @@ async function loadMidiMetadata() {
           }
         }
       }
-    } catch(e) { if(typeof showToast==='function'&&e) showToast(String(e),4000,'error'); }
+    } catch(e) { /* skip individual file errors silently */ }
     await new Promise(r => setTimeout(r, 5));
   }
   _midiMetadataRunning = false;

@@ -237,6 +237,8 @@ async function scanPresets(resume = false) {
         renderMidiTable(); // first batch — init table
       }
       if (typeof updateMidiCount === 'function') updateMidiCount();
+      // Trigger metadata load for new MIDI rows
+      if (typeof _midiMetadataRunning !== 'undefined' && !_midiMetadataRunning && typeof loadMidiMetadata === 'function') loadMidiMetadata();
     }
     const tbody = document.getElementById('presetTableBody');
     if (tbody && presetRenderCount < 2000) {
