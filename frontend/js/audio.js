@@ -1651,11 +1651,13 @@ function collapsePlayer() {
 function hidePlayer() {
   const np = document.getElementById('audioNowPlaying');
   prefs.setItem('playerExpanded', np.classList.contains('expanded') ? 'on' : 'off');
-  np.classList.remove('active');
+  // Stop playback and clear state
+  audioPlayer.pause();
+  np.classList.remove('active', 'np-playing');
   const pill = document.getElementById('audioRestorePill');
-  if (pill && audioPlayerPath && !audioPlayer.paused) {
-    pill.classList.add('active');
-  }
+  if (pill) pill.classList.remove('active');
+  updatePlayBtnStates();
+  updateNowPlayingBtn();
 }
 
 function showPlayer() {
