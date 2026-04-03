@@ -364,14 +364,16 @@ function renderPlugins(plugins) {
     return;
   }
 
-  const batch = plugins.slice(0, AUDIO_PAGE_SIZE);
+  // Render first 50 immediately, then progressively add more
+  const INITIAL = 50;
+  const batch = plugins.slice(0, INITIAL);
   list.innerHTML = batch.map(p => buildPluginCardHtml(p)).join('');
   _pluginRenderCount = batch.length;
 
-  if (plugins.length > AUDIO_PAGE_SIZE) {
+  if (plugins.length > INITIAL) {
     list.insertAdjacentHTML('beforeend',
       `<div class="plugin-load-more" id="pluginLoadMore" data-action="loadMorePlugins" style="text-align:center;padding:16px;color:var(--text-muted);cursor:pointer;font-size:12px;">
-        Showing ${_pluginRenderCount} of ${plugins.length} — click to load more
+        Showing ${_pluginRenderCount} of ${_pluginTotalCount} — click to load more
       </div>`);
   }
 
