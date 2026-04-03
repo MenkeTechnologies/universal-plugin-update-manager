@@ -131,31 +131,19 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
     showToast(`Failed to load audio scan — ${err.message || err}`, 4000, 'error');
   }
 
-  // Auto-load last DAW scan
-  try {
-    const latestDaw = await window.vstUpdater.getLatestDawScan();
-    if (latestDaw && latestDaw.projects && latestDaw.projects.length > 0) {
-      allDawProjects = latestDaw.projects;
-      rebuildDawStats();
-      filterDawProjects();
-    }
-  } catch (err) {
-    showToast(`Failed to load DAW scan — ${err.message || err}`, 4000, 'error');
+  // Auto-load last DAW scan (paginated from SQLite)
+  if (typeof fetchDawPage === 'function') {
+    _dawOffset = 0;
+    fetchDawPage().catch(err => showToast(`Failed to load DAW scan — ${err}`, 4000, 'error'));
   }
 
-  // Auto-load last preset scan
-  try {
-    const latestPresets = await window.vstUpdater.getLatestPresetScan();
-    if (latestPresets && latestPresets.presets && latestPresets.presets.length > 0) {
-      allPresets = latestPresets.presets;
-      rebuildPresetStats();
-      filterPresets();
-      document.getElementById('btnExportPresets').style.display = '';
-      // Load MIDI tab from preset data
+  // Auto-load last preset scan (paginated from SQLite)
+  if (typeof fetchPresetPage === 'function') {
+    _presetOffset = 0;
+    fetchPresetPage().then(() => {
+      document.getElementById('btnExportPresets').style.display = allPresets.length > 0 ? '' : 'none';
       if (typeof loadMidiFiles === 'function') loadMidiFiles();
-    }
-  } catch (err) {
-    showToast(`Failed to load preset scan — ${err.message || err}`, 4000, 'error');
+    }).catch(err => showToast(`Failed to load preset scan — ${err}`, 4000, 'error'));
   }
 
   // Apply default type filter from settings

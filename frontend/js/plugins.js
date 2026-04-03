@@ -1,49 +1,65 @@
 let scanProgressCleanup = null;
 let _pluginsLoaded = false;
 
+let _pluginOffset = 0;
+let _pluginTotalCount = 0;
+let _pluginSortKey = 'name';
+let _pluginSortAsc = true;
+
 async function loadPluginsFromDb() {
   if (_pluginsLoaded) return;
-  // Show loading state immediately
   const list = document.getElementById('pluginList');
   if (list && list.querySelector('#emptyState')) {
     list.innerHTML = '<div class="state-message"><div class="spinner"></div><h2>Loading plugins...</h2></div>';
   }
   try {
-    const latest = await window.vstUpdater.getLatestScan();
-    if (latest && latest.plugins && latest.plugins.length > 0) {
-      allPlugins = latest.plugins;
-      _pluginsLoaded = true;
+    _pluginOffset = 0;
+    await fetchPluginPage();
+    _pluginsLoaded = true;
 
-      try {
-        const kvrCache = await window.vstUpdater.getKvrCache();
-        applyKvrCache(allPlugins, kvrCache);
-      } catch(e) { if(typeof showToast==='function'&&e) showToast(String(e),4000,'error'); }
-
-      document.getElementById('totalCount').textContent = allPlugins.length;
+    document.getElementById('totalCount').textContent = _pluginTotalCount;
+    if (_pluginTotalCount > 0) {
       document.getElementById('btnCheckUpdates').disabled = false;
       const toolbar = document.getElementById('toolbar');
       if (toolbar) toolbar.style.display = 'flex';
-
-      const withUpdates = allPlugins.filter(p => p.hasUpdate).length;
-      const unknown = allPlugins.filter(p => p.source === 'not-found').length;
-      const upToDate = allPlugins.filter(p => !p.hasUpdate && p.source && p.source !== 'not-found').length;
-      if (withUpdates || unknown || upToDate) {
-        document.getElementById('updateCount').textContent = withUpdates;
-        document.getElementById('unknownCount').textContent = unknown;
-        document.getElementById('upToDateCount').textContent = upToDate;
-      }
-
-      const dirsSection = document.getElementById('dirsSection');
-      if (dirsSection) {
-        dirsSection.style.display = 'block';
-        document.getElementById('dirsList').innerHTML = buildDirsTable(latest.directories || [], allPlugins);
-      }
-
-      renderPlugins(allPlugins);
-      resolveKvrDownloads();
     }
+
+    // KVR cache for visible plugins
+    try {
+      const kvrCache = await window.vstUpdater.getKvrCache();
+      applyKvrCache(allPlugins, kvrCache);
+    } catch(e) { if(typeof showToast==='function'&&e) showToast(String(e),4000,'error'); }
+
+    resolveKvrDownloads();
   } catch (err) {
     showToast(`Failed to load plugin scan — ${err.message || err}`, 4000, 'error');
+  }
+}
+
+async function fetchPluginPage() {
+  const search = document.getElementById('searchInput')?.value || '';
+  try {
+    const result = await window.vstUpdater.dbQueryPlugins({
+      search: search || null,
+      sort_key: _pluginSortKey,
+      sort_asc: _pluginSortAsc,
+      offset: _pluginOffset,
+      limit: AUDIO_PAGE_SIZE,
+    });
+    const plugins = result.plugins || [];
+    _pluginTotalCount = result.totalCount || 0;
+
+    // Keep allPlugins in sync for KVR/export compat
+    if (_pluginOffset === 0) {
+      allPlugins = plugins;
+    } else {
+      allPlugins.push(...plugins);
+    }
+
+    renderPlugins(allPlugins);
+    document.getElementById('totalCount').textContent = _pluginTotalCount;
+  } catch (e) {
+    showToast('Plugin query failed: ' + e, 4000, 'error');
   }
 }
 
@@ -364,18 +380,8 @@ function renderPlugins(plugins) {
 }
 
 function loadMorePlugins() {
-  const list = document.getElementById('pluginList');
-  const more = document.getElementById('pluginLoadMore');
-  if (more) more.remove();
-  const next = _renderedPlugins.slice(_pluginRenderCount, _pluginRenderCount + AUDIO_PAGE_SIZE);
-  list.insertAdjacentHTML('beforeend', next.map(p => buildPluginCardHtml(p)).join(''));
-  _pluginRenderCount += next.length;
-  if (_pluginRenderCount < _renderedPlugins.length) {
-    list.insertAdjacentHTML('beforeend',
-      `<div class="plugin-load-more" id="pluginLoadMore" data-action="loadMorePlugins" style="text-align:center;padding:16px;color:var(--text-muted);cursor:pointer;font-size:12px;">
-        Showing ${_pluginRenderCount} of ${_renderedPlugins.length} — click to load more
-      </div>`);
-  }
+  _pluginOffset = allPlugins.length;
+  fetchPluginPage();
 }
 
 // Debounce helper — fires immediately on first call, then debounces
@@ -413,31 +419,10 @@ let _lastPluginMode = 'fuzzy';
 const _filterPluginsImmediate = function() {
   if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
   const search = document.getElementById('searchInput').value;
-  const typeEl = document.getElementById('typeFilter');
-  autoSelectDropdown(typeEl, search);
-  const typeSet = getMultiFilterValues('typeFilter');
-  const statusSet = getMultiFilterValues('statusFilter');
-  const mode = getSearchMode('regexPlugins');
   _lastPluginSearch = search;
-  _lastPluginMode = mode;
-
-  let scored = [];
-  for (const p of allPlugins) {
-    if (typeof passesGlobalTagFilter === 'function' && !passesGlobalTagFilter(p.path)) continue;
-    if (typeSet && !typeSet.has(p.type)) continue;
-    if (statusSet) {
-      let matchesStatus = false;
-      if (statusSet.has('update') && p.hasUpdate === true) matchesStatus = true;
-      if (statusSet.has('current') && p.hasUpdate === false && p.source !== 'not-found') matchesStatus = true;
-      if (statusSet.has('unknown') && !p.hasUpdate && p.source === 'not-found') matchesStatus = true;
-      if (!matchesStatus) continue;
-    }
-    const score = searchScore(search, [p.name, p.manufacturer || ''], mode);
-    if (score > 0) scored.push({ plugin: p, score });
-  }
-  // Sort by score descending when searching, preserve original order otherwise
-  if (search) scored.sort((a, b) => b.score - a.score);
-  renderPlugins(scored.map(s => s.plugin));
+  _lastPluginMode = getSearchMode('regexPlugins');
+  _pluginOffset = 0;
+  fetchPluginPage();
 };
 
 const filterPlugins = debounce(_filterPluginsImmediate, 120);

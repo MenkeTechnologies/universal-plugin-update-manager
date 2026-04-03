@@ -6,6 +6,37 @@ let presetSortAsc = true;
 let presetScanProgressCleanup = null;
 let PRESET_PAGE_SIZE = 500;
 let presetRenderCount = 0;
+let _presetOffset = 0;
+let _presetTotalCount = 0;
+
+async function fetchPresetPage() {
+  const search = document.getElementById('presetSearchInput')?.value || '';
+  const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('presetFormatFilter') : null;
+  const formatFilter = fmtSet && fmtSet.size === 1 ? [...fmtSet][0] : null;
+  try {
+    const result = await window.vstUpdater.dbQueryPresets({
+      search: search || null,
+      format_filter: formatFilter,
+      sort_key: presetSortKey,
+      sort_asc: presetSortAsc,
+      offset: _presetOffset,
+      limit: PRESET_PAGE_SIZE,
+    });
+    if (_presetOffset === 0) {
+      filteredPresets = result.presets || [];
+      allPresets = filteredPresets;
+    } else {
+      const batch = result.presets || [];
+      filteredPresets.push(...batch);
+      allPresets.push(...batch);
+    }
+    _presetTotalCount = result.totalCount || 0;
+    renderPresetTable();
+    rebuildPresetStats();
+  } catch (e) {
+    showToast('Preset query failed: ' + e, 4000, 'error');
+  }
+}
 
 function formatPresetSize(bytes) {
   if (bytes === 0) return '0 B';
@@ -80,33 +111,20 @@ let _lastPresetMode = 'fuzzy';
 
 function filterPresets() {
   if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
-  const search = document.getElementById('presetSearchInput')?.value || '';
-  const formatEl = document.getElementById('presetFormatFilter');
-  if (formatEl) autoSelectDropdown(formatEl, search);
-  const fmtSet = getMultiFilterValues('presetFormatFilter');
-  const mode = getSearchMode('regexPresets');
-  _lastPresetSearch = search;
-  _lastPresetMode = mode;
+  _lastPresetSearch = document.getElementById('presetSearchInput')?.value || '';
+  _lastPresetMode = typeof getSearchMode === 'function' ? getSearchMode('regexPresets') : 'fuzzy';
+  _presetOffset = 0;
+  fetchPresetPage();
+  // Also reload MIDI tab from preset data
+  if (typeof loadMidiFiles === 'function') { _midiLoaded = false; loadMidiFiles(); }
+}
 
-  if (search) {
-    const scored = [];
-    for (const p of allPresets) {
-      if (typeof passesGlobalTagFilter === 'function' && !passesGlobalTagFilter(p.path)) continue;
-      if (fmtSet && !fmtSet.has(p.format)) continue;
-      const score = searchScore(search, [p.name, p.path, p.format], mode);
-      if (score > 0) scored.push({ item: p, score });
-    }
-    scored.sort((a, b) => b.score - a.score);
-    filteredPresets = scored.map(s => s.item);
-  } else {
-    filteredPresets = allPresets.filter(p => {
-      if (typeof passesGlobalTagFilter === 'function' && !passesGlobalTagFilter(p.path)) return false;
-      if (fmtSet && !fmtSet.has(p.format)) return false;
-      return true;
-    });
-  }
+function _legacyFilterPresets() {
+  // Kept for scan streaming — not used for user-initiated filter
+  if (!allPresets.length) return;
+  filteredPresets = allPresets;
 
-  if (!search) {
+  if (false) {
     const key = presetSortKey;
     const dir = presetSortAsc ? 1 : -1;
     filteredPresets.sort((a, b) => {
@@ -137,20 +155,8 @@ function filterPresets() {
 }
 
 function loadMorePresets() {
-  const tbody = document.getElementById('presetTableBody');
-  const loadMoreRow = tbody.querySelector('[data-action="loadMorePresets"]')?.closest('tr');
-  if (loadMoreRow) loadMoreRow.remove();
-
-  const next = filteredPresets.slice(presetRenderCount, presetRenderCount + PRESET_PAGE_SIZE);
-  tbody.insertAdjacentHTML('beforeend', next.map(buildPresetRow).join(''));
-  presetRenderCount += next.length;
-
-  if (presetRenderCount < filteredPresets.length) {
-    tbody.insertAdjacentHTML('beforeend',
-      `<tr><td colspan="7" style="text-align:center; padding: 12px;">
-        <button class="btn btn-secondary" data-action="loadMorePresets" title="Load next batch of presets">Load more (${filteredPresets.length - presetRenderCount} remaining)</button>
-      </td></tr>`);
-  }
+  _presetOffset = allPresets.length;
+  fetchPresetPage();
 }
 
 function openPresetFolder(path) {

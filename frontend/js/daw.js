@@ -4,9 +4,40 @@ let filteredDawProjects = [];
 let dawSortKey = 'name';
 let dawSortAsc = true;
 let dawScanProgressCleanup = null;
+let _dawOffset = 0;
+let _dawTotalCount = 0;
 
 let dawStatCounts = {};
 let dawStatBytes = 0;
+
+async function fetchDawPage() {
+  const search = document.getElementById('dawSearchInput')?.value || '';
+  const dawSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('dawDawFilter') : null;
+  const dawFilter = dawSet && dawSet.size === 1 ? [...dawSet][0] : null;
+  try {
+    const result = await window.vstUpdater.dbQueryDaw({
+      search: search || null,
+      daw_filter: dawFilter,
+      sort_key: dawSortKey,
+      sort_asc: dawSortAsc,
+      offset: _dawOffset,
+      limit: typeof DAW_PAGE_SIZE !== 'undefined' ? DAW_PAGE_SIZE : 200,
+    });
+    if (_dawOffset === 0) {
+      filteredDawProjects = result.projects || [];
+      allDawProjects = filteredDawProjects;
+    } else {
+      const batch = result.projects || [];
+      filteredDawProjects.push(...batch);
+      allDawProjects.push(...batch);
+    }
+    _dawTotalCount = result.totalCount || 0;
+    renderDawTable();
+    rebuildDawStats();
+  } catch (e) {
+    showToast('DAW query failed: ' + e, 4000, 'error');
+  }
+}
 
 function resetDawStats() {
   dawStatCounts = {};
@@ -104,25 +135,8 @@ function filterDawProjects() {
   _lastDawSearch = search;
   _lastDawMode = mode;
 
-  if (search) {
-    const scored = [];
-    for (const p of allDawProjects) {
-      if (typeof passesGlobalTagFilter === 'function' && !passesGlobalTagFilter(p.path)) continue;
-      if (dawSet && !dawSet.has(p.daw)) continue;
-      const score = searchScore(search, [p.name, p.path, p.daw, p.format], mode);
-      if (score > 0) scored.push({ item: p, score });
-    }
-    scored.sort((a, b) => b.score - a.score);
-    filteredDawProjects = scored.map(s => s.item);
-  } else {
-    filteredDawProjects = allDawProjects.filter(p => {
-      if (typeof passesGlobalTagFilter === 'function' && !passesGlobalTagFilter(p.path)) return false;
-      if (dawSet && !dawSet.has(p.daw)) return false;
-      return true;
-    });
-    sortDawArray();
-  }
-  renderDawTable();
+  _dawOffset = 0;
+  fetchDawPage();
 }
 
 function sortDaw(key) {
@@ -140,8 +154,8 @@ function sortDaw(key) {
       el.closest('th').classList.toggle('sort-active', isActive);
     }
   });
-  sortDawArray();
-  renderDawTable();
+  _dawOffset = 0;
+  fetchDawPage();
   if (typeof saveSortState === 'function') saveSortState('daw', dawSortKey, dawSortAsc);
 }
 
@@ -162,10 +176,10 @@ function renderDawTable() {
   if (!document.getElementById('dawTable')) initDawTable();
   const tbody = document.getElementById('dawTableBody');
   if (!tbody) return;
-  dawRenderCount = Math.min(DAW_PAGE_SIZE, filteredDawProjects.length);
-  tbody.innerHTML = filteredDawProjects.slice(0, dawRenderCount).map(buildDawRow).join('');
+  dawRenderCount = filteredDawProjects.length;
+  tbody.innerHTML = filteredDawProjects.map(buildDawRow).join('');
 
-  if (dawRenderCount < filteredDawProjects.length) {
+  if (dawRenderCount < _dawTotalCount) {
     appendDawLoadMore(tbody);
   }
 }
@@ -178,15 +192,8 @@ function appendDawLoadMore(tbody) {
 }
 
 function loadMoreDaw() {
-  const tbody = document.getElementById('dawTableBody');
-  const loadMore = document.getElementById('dawLoadMore');
-  if (loadMore) loadMore.remove();
-  const nextBatch = filteredDawProjects.slice(dawRenderCount, dawRenderCount + DAW_PAGE_SIZE);
-  dawRenderCount += nextBatch.length;
-  tbody.insertAdjacentHTML('beforeend', nextBatch.map(buildDawRow).join(''));
-  if (dawRenderCount < filteredDawProjects.length) {
-    appendDawLoadMore(tbody);
-  }
+  _dawOffset = allDawProjects.length;
+  fetchDawPage();
 }
 
 async function scanDawProjects(resume = false) {
