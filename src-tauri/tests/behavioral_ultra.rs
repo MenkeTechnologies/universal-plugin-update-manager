@@ -5121,3 +5121,186 @@ fn audio_sample_serde_roundtrip_channels_none() {
 fn kvr_parse_version_triple_x_components_all_zero() {
     assert_eq!(app_lib::kvr::parse_version("x.x.x"), vec![0, 0, 0]);
 }
+
+// ── Wave 25: radix 36⁴−1 (`zzzz`), `find_similar` 14/16, thirteen-sample / eleven-DAW /
+//    twelve-preset / eleven-plugin-removed batches, DAW net 9/6, `format_size` 4 KiB / 2 KiB ─
+
+#[test]
+fn radix_string_1679615_base36_is_four_z_digits() {
+    assert_eq!(radix_string(1_679_615, 36), "zzzz");
+}
+
+#[test]
+fn extract_plugins_nonexistent_junk_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_project.junk");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_sixteen_candidates_max_fourteen() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..16).map(|i| fp(&format!("/cand{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 14);
+    assert_eq!(out.len(), 14);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_thirteen_samples_added() {
+    let samples: Vec<_> = (0..13)
+        .map(|i| sample(&format!("/stem{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 13);
+}
+
+#[test]
+fn compute_daw_diff_eleven_added_from_empty() {
+    let projects: Vec<_> = (0..11)
+        .map(|i| dawproj(&format!("/clients/p{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 11);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_twelve_presets() {
+    let presets: Vec<_> = (0..12)
+        .map(|i| preset(&format!("/presets/u{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 12);
+}
+
+#[test]
+fn compute_plugin_diff_eleven_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &(0..11)
+            .map(|i| plug(&format!("/p{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 11);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_4_kilobytes() {
+    assert_eq!(app_lib::format_size(4 * 1024), "4.0 KB");
+}
+
+#[test]
+fn format_size_exactly_2_kilobytes() {
+    assert_eq!(app_lib::format_size(2 * 1024), "2.0 KB");
+}
+
+#[test]
+fn compute_daw_diff_nine_removed_six_added_net() {
+    let old = build_daw_snapshot(
+        &(0..9)
+            .map(|i| dawproj(&format!("/legacy/a{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &(0..6)
+            .map(|i| dawproj(&format!("/next/b{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 9);
+    assert_eq!(d.added.len(), 6);
+}
+
+#[test]
+fn ext_matches_audacity_aup_long_path_segments() {
+    assert_eq!(
+        ext_matches(Path::new(
+            "/home/user/Audio/AudacityExports/podcast_ep42_final.aup"
+        ))
+        .as_deref(),
+        Some("AUP")
+    );
+}
+
+#[test]
+fn fingerprint_distance_low_energy_ratio_only_change_nonzero_alt() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.low_energy_ratio = 0.88;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_quad_zero_equals_triple_zero() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("0.0.0.0", "0.0.0"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn compute_plugin_diff_five_added_three_removed_net_two() {
+    let old = build_plugin_snapshot(
+        &[
+            plug("/x.vst3", "1"),
+            plug("/y.vst3", "1"),
+            plug("/z.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &[
+            plug("/n0.vst3", "1"),
+            plug("/n1.vst3", "1"),
+            plug("/n2.vst3", "1"),
+            plug("/n3.vst3", "1"),
+            plug("/n4.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 3);
+    assert_eq!(d.added.len(), 5);
+}
+
+#[test]
+fn normalize_plugin_name_strips_universal_brackets_then_vst3() {
+    assert_eq!(
+        normalize_plugin_name("Filter [Universal] (VST3)"),
+        "filter"
+    );
+}
+
+#[test]
+fn audio_sample_serde_roundtrip_duration_none() {
+    let mut s = sample("/ambient/drone.wav");
+    s.duration = None;
+    let j = serde_json::to_string(&s).unwrap();
+    let back: AudioSample = serde_json::from_str(&j).unwrap();
+    assert!(back.duration.is_none());
+}
+
+#[test]
+fn kvr_parse_version_numeric_with_internal_letters_becomes_zero() {
+    assert_eq!(app_lib::kvr::parse_version("1a.2.3"), vec![0, 2, 3]);
+}
+
+#[test]
+fn kvr_compare_versions_fifth_component_patch_bump() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.0.0.0", "1.0.0.0.1"),
+        Ordering::Less
+    );
+}
