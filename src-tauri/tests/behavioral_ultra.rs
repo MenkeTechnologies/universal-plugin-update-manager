@@ -6656,3 +6656,202 @@ fn audio_sample_serde_roundtrip_path_with_unicode_segment_wave33() {
     let back: AudioSample = serde_json::from_str(&j).unwrap();
     assert_eq!(back.path, "/exports/音楽/stem.wav");
 }
+
+// ── Wave 34: `radix_string(u64::MAX, 36)` round-trip, `find_similar` 24/26, twenty-two-sample /
+//    twenty-two-DAW / twenty-two-preset / twenty-one-plugin-removed batches, DAW net 18/15,
+//    `format_size` 3 B, fourteenth-component KVR padding ─────────────────────────────────
+
+#[test]
+fn radix_string_u64_max_base36_roundtrips_via_parse() {
+    let s = radix_string(u64::MAX, 36);
+    let back = u128::from_str_radix(&s, 36).expect("valid base-36") as u64;
+    assert_eq!(back, u64::MAX);
+}
+
+#[test]
+fn extract_plugins_nonexistent_cobweb_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_project.cobweb");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_twenty_six_candidates_max_twenty_four() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..26).map(|i| fp(&format!("/take{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 24);
+    assert_eq!(out.len(), 24);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_twenty_two_samples_added() {
+    let samples: Vec<_> = (0..22)
+        .map(|i| sample(&format!("/mixdown/layer{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 22);
+}
+
+#[test]
+fn compute_daw_diff_twenty_two_added_from_empty() {
+    let projects: Vec<_> = (0..22)
+        .map(|i| dawproj(&format!("/orchestration/cue{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 22);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_twenty_two_presets() {
+    let presets: Vec<_> = (0..22)
+        .map(|i| preset(&format!("/pigments/BankB/preset{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 22);
+}
+
+#[test]
+fn compute_plugin_diff_twenty_one_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &(0..21)
+            .map(|i| plug(&format!("/bus/effect{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 21);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_3_bytes() {
+    assert_eq!(app_lib::format_size(3), "3.0 B");
+}
+
+#[test]
+fn compute_daw_diff_eighteen_removed_fifteen_added_net() {
+    let old = build_daw_snapshot(
+        &(0..18)
+            .map(|i| dawproj(&format!("/cold_storage/p{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &(0..15)
+            .map(|i| dawproj(&format!("/active_set/q{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 18);
+    assert_eq!(d.added.len(), 15);
+}
+
+#[test]
+fn compute_plugin_diff_fourteen_added_twelve_removed_net_two() {
+    let old = build_plugin_snapshot(
+        &(0..12)
+            .map(|i| plug(&format!("/u{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &(0..14)
+            .map(|i| plug(&format!("/v{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 12);
+    assert_eq!(d.added.len(), 14);
+}
+
+#[test]
+fn ext_matches_reaper_rpp_deep_path_wave34() {
+    assert_eq!(
+        ext_matches(Path::new(
+            "/Volumes/Audio/REAPER/Projects/2026/Score/Act_I/Finale_alt2.rpp"
+        ))
+        .as_deref(),
+        Some("RPP")
+    );
+}
+
+#[test]
+fn fingerprint_distance_spectral_centroid_only_change_nonzero_alt3() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.spectral_centroid = 0.88;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_fourteenth_component_padding_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions(
+            "1.0.0.0.0.0.0.0.0.0.0.0.0",
+            "1.0.0.0.0.0.0.0.0.0.0.0.0.0"
+        ),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn kvr_parse_version_interior_gap_nine_and_one() {
+    assert_eq!(app_lib::kvr::parse_version("9..1"), vec![9, 0, 1]);
+}
+
+#[test]
+fn kvr_compare_versions_three_vs_three_dot_zero_zero_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("3", "3.0.0"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn normalize_plugin_name_strips_aarch64_then_vst3_parens() {
+    assert_eq!(
+        normalize_plugin_name("Synth (aarch64) (VST3)"),
+        "synth"
+    );
+}
+
+#[test]
+fn kvr_cache_entry_serde_roundtrip_optional_urls_all_none_wave34() {
+    let e = KvrCacheEntry {
+        kvr_url: None,
+        update_url: None,
+        latest_version: None,
+        has_update: false,
+        source: "none".into(),
+        timestamp: "2026-01-01T00:00:00Z".into(),
+    };
+    let j = serde_json::to_string(&e).unwrap();
+    let back: KvrCacheEntry = serde_json::from_str(&j).unwrap();
+    assert!(back.kvr_url.is_none());
+    assert!(back.update_url.is_none());
+    assert!(back.latest_version.is_none());
+}
+
+#[test]
+fn export_payload_serde_roundtrip_empty_plugin_list_wave34() {
+    let p = ExportPayload {
+        version: "1".into(),
+        exported_at: "t".into(),
+        plugins: vec![],
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: ExportPayload = serde_json::from_str(&j).unwrap();
+    assert!(back.plugins.is_empty());
+    assert_eq!(back.version, "1");
+}
