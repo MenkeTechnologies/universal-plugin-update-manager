@@ -4541,3 +4541,195 @@ fn export_plugin_json_serializes_empty_architectures_array() {
     let back: ExportPlugin = serde_json::from_str(&j).unwrap();
     assert!(back.architectures.is_empty());
 }
+
+// ── Wave 22: radix 36¹², `find_similar` 11/13, xref missing `.band`, max snapshot batches ─
+
+#[test]
+fn radix_string_4738381338321616896_base36_is_trillion() {
+    assert_eq!(radix_string(4_738_381_338_321_616_896, 36), "1000000000000");
+}
+
+#[test]
+fn extract_plugins_nonexistent_band_extension_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_a_package.foo.band");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_thirteen_candidates_max_eleven() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..13).map(|i| fp(&format!("/x{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 11);
+    assert_eq!(out.len(), 11);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_ten_samples_added() {
+    let samples: Vec<_> = (0..10)
+        .map(|i| sample(&format!("/take{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 10);
+}
+
+#[test]
+fn compute_daw_diff_eight_added_from_empty() {
+    let projects: Vec<_> = (0..8)
+        .map(|i| dawproj(&format!("/daw{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 8);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_nine_presets() {
+    let presets: Vec<_> = (0..9)
+        .map(|i| preset(&format!("/u{i}.h2p")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 9);
+}
+
+#[test]
+fn compute_plugin_diff_eight_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &[
+            plug("/s0.vst3", "1"),
+            plug("/s1.vst3", "1"),
+            plug("/s2.vst3", "1"),
+            plug("/s3.vst3", "1"),
+            plug("/s4.vst3", "1"),
+            plug("/s5.vst3", "1"),
+            plug("/s6.vst3", "1"),
+            plug("/s7.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 8);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_32_kilobytes() {
+    assert_eq!(app_lib::format_size(32 * 1024), "32.0 KB");
+}
+
+#[test]
+fn kvr_compare_versions_unknown_vs_numeric_less() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("Unknown", "1.0.0"),
+        Ordering::Less
+    );
+}
+
+#[test]
+fn ext_matches_pro_tools_ptf_deep_lowercase() {
+    assert_eq!(
+        ext_matches(Path::new("/Audio/PT_Sessions/legacy/mixdown.ptf")).as_deref(),
+        Some("PTF")
+    );
+}
+
+#[test]
+fn ext_matches_reaper_rpp_windows_drive_path() {
+    assert_eq!(
+        ext_matches(Path::new("D:/Audio/Reaper/2026/LiveSet.RPP")).as_deref(),
+        Some("RPP")
+    );
+}
+
+#[test]
+fn compute_daw_diff_six_removed_three_added_net() {
+    let old = build_daw_snapshot(
+        &[
+            dawproj("/a.dawproject"),
+            dawproj("/b.dawproject"),
+            dawproj("/c.dawproject"),
+            dawproj("/d.dawproject"),
+            dawproj("/e.dawproject"),
+            dawproj("/f.dawproject"),
+        ],
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &[
+            dawproj("/n0.dawproject"),
+            dawproj("/n1.dawproject"),
+            dawproj("/n2.dawproject"),
+        ],
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 6);
+    assert_eq!(d.added.len(), 3);
+}
+
+#[test]
+fn normalize_plugin_name_strips_aax_bracket_suffix() {
+    assert_eq!(
+        normalize_plugin_name("Channel Strip [AAX]"),
+        "channel strip"
+    );
+}
+
+#[test]
+fn kvr_parse_version_single_zero_string() {
+    assert_eq!(app_lib::kvr::parse_version("0"), vec![0]);
+}
+
+#[test]
+fn audio_sample_serde_roundtrip_unicode_directory() {
+    let mut s = sample("/tracks/ボーカル/main.wav");
+    s.directory = "/tracks/ボーカル".into();
+    let j = serde_json::to_string(&s).unwrap();
+    let back: AudioSample = serde_json::from_str(&j).unwrap();
+    assert!(back.directory.contains("ボーカル"));
+}
+
+#[test]
+fn export_payload_plugins_two_roundtrip_mixed_types() {
+    let p = ExportPayload {
+        version: "1".into(),
+        exported_at: "t".into(),
+        plugins: vec![
+            ExportPlugin {
+                name: "A".into(),
+                plugin_type: "AU".into(),
+                version: "2".into(),
+                manufacturer: "Ma".into(),
+                manufacturer_url: None,
+                path: "/a.component".into(),
+                size: "1 B".into(),
+                size_bytes: 1,
+                modified: "m".into(),
+                architectures: vec!["arm64".into()],
+            },
+            ExportPlugin {
+                name: "B".into(),
+                plugin_type: "CLAP".into(),
+                version: "3".into(),
+                manufacturer: "Mb".into(),
+                manufacturer_url: Some("https://u".into()),
+                path: "/b.clap".into(),
+                size: "2 B".into(),
+                size_bytes: 2,
+                modified: "m".into(),
+                architectures: vec!["x64".into(), "arm64".into()],
+            },
+        ],
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: ExportPayload = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.plugins.len(), 2);
+    assert_eq!(back.plugins[1].plugin_type, "CLAP");
+    assert_eq!(back.plugins[1].architectures.len(), 2);
+}
