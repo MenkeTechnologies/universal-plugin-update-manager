@@ -47,7 +47,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   await prefs.load();
   const uiLoc = prefs.getItem('uiLocale');
   if (typeof reloadAppStrings === 'function') {
-    await reloadAppStrings(uiLoc === 'de' ? 'de' : 'en');
+    await reloadAppStrings(uiLoc === 'de' || uiLoc === 'es' ? uiLoc : 'en');
   }
   // Ensure stop/resume buttons are hidden on fresh start
   const _stopAll = document.getElementById('btnStopAll');

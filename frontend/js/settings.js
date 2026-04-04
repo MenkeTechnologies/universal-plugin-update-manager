@@ -1363,7 +1363,7 @@ function restoreSettings() {
 
   const uiLoc = prefs.getItem('uiLocale');
   const localeSel = document.getElementById('settingUiLocale');
-  if (localeSel && (uiLoc === 'de' || uiLoc === 'en')) localeSel.value = uiLoc;
+  if (localeSel && (uiLoc === 'de' || uiLoc === 'es' || uiLoc === 'en')) localeSel.value = uiLoc;
 
   // Restore tag bar position
   const tagPos = prefs.getItem('tagBarPosition');

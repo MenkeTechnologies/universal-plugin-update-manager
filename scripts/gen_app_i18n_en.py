@@ -281,6 +281,7 @@ SETTINGS_UI_EN: dict[str, str] = {
     "ui.settings.interface_language_desc": "UI text (restart the app to apply the native menu bar language)",
     "ui.opt.lang_en": "English",
     "ui.opt.lang_de": "Deutsch",
+    "ui.opt.lang_es": "Español",
 }
 
 CONFIRM_EN: dict[str, str] = {
@@ -313,8 +314,12 @@ def main() -> None:
     merged.update(TRAY_EN)
     merged.update(HELP_EN)
     merged.update(CONFIRM_EN)
-    merged.update(SETTINGS_UI_EN)
     merged.update(ui_en)
+    merged.update(SETTINGS_UI_EN)
+    # Locale <option> text also creates ui.opt.english etc.; canonical keys are ui.opt.lang_*.
+    for dup in ("ui.opt.english", "ui.opt.deutsch", "ui.opt.espa_ol"):
+        merged.pop(dup, None)
+    merged.pop("ui.tt.interface_language", None)
 
     overlap = set(toast_en) & (
         set(MENU_EN) | set(TRAY_EN) | set(HELP_EN) | set(CONFIRM_EN) | set(SETTINGS_UI_EN) | set(ui_en)

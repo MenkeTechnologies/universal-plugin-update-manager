@@ -48,9 +48,11 @@ def main() -> None:
     if de.get("ui.opt.lang_en") == "Englisch":
         de["ui.opt.lang_en"] = "English"
     # Placeholders must match appFmt tokens
-    for k in ("confirm.delete_data_file",):
-        if k in de and "{Name}" in de[k]:
+    for k in list(de.keys()):
+        if "{Name}" in de[k]:
             de[k] = de[k].replace("{Name}", "{name}")
+        if "{Wert}" in de[k]:
+            de[k] = de[k].replace("{Wert}", "{value}")
 
     out_path.write_text(json.dumps(de, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Wrote {len(de)} keys to {out_path}", file=sys.stderr)
