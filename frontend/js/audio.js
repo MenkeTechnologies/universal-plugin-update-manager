@@ -2377,11 +2377,15 @@ function updateMetaLine() {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
-  // Band definitions: { filter, color, label }
+  // Band definitions: { filter, color, id } — labels from ui.eq.band_*
+  function eqBandLabel(id) {
+    const k = id === 'low' ? 'ui.eq.band_low' : id === 'mid' ? 'ui.eq.band_mid' : 'ui.eq.band_high';
+    return typeof appFmt === 'function' ? appFmt(k) : id.toUpperCase();
+  }
   const bands = [
-    { id: 'low', get filter() { return _eqLow; }, color: '#05d9e8', label: 'LOW' },
-    { id: 'mid', get filter() { return _eqMid; }, color: '#d300c5', label: 'MID' },
-    { id: 'high', get filter() { return _eqHigh; }, color: '#ff2a6d', label: 'HIGH' },
+    { id: 'low', get filter() { return _eqLow; }, color: '#05d9e8' },
+    { id: 'mid', get filter() { return _eqMid; }, color: '#d300c5' },
+    { id: 'high', get filter() { return _eqHigh; }, color: '#ff2a6d' },
   ];
 
   const FREQ_MIN = 20, FREQ_MAX = 20000;
@@ -2516,7 +2520,7 @@ function updateMetaLine() {
       // Label
       ctx.fillStyle = band.color;
       ctx.font = 'bold 8px Orbitron, sans-serif';
-      ctx.fillText(band.label, x + 10, y - 4);
+      ctx.fillText(eqBandLabel(band.id), x + 10, y - 4);
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.font = '8px sans-serif';
       ctx.fillText(Math.round(band.filter.frequency.value) + 'Hz ' + band.filter.gain.value.toFixed(1) + 'dB', x + 10, y + 8);

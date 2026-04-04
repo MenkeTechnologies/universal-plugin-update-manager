@@ -38,6 +38,10 @@ async function reloadAppStrings(locale) {
     window.__toastStr = window.__appStr;
     if (typeof applyUiI18n === 'function') applyUiI18n();
     if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
+    if (typeof renderShortcutSettings === 'function') {
+      const sf = document.getElementById('shortcutsFilter');
+      renderShortcutSettings(sf && sf.value ? sf.value : '');
+    }
     try {
       await invoke('refresh_native_menu');
     } catch (_) {}

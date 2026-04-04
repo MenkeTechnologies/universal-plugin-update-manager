@@ -30,6 +30,7 @@ function loadFzfParams() {
     BONUS_CONSECUTIVE = saved.BONUS_CONSECUTIVE ?? 4;
     BONUS_FIRST_CHAR_MULT = saved.BONUS_FIRST_CHAR_MULT ?? 2;
   }
+  if (typeof renderFzfSettings === 'function') renderFzfSettings();
 }
 
 function saveFzfParams() {

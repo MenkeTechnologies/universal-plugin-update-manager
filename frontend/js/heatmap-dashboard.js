@@ -2,6 +2,10 @@
 // Full-screen analytics overview: format distribution, size breakdown,
 // folder heatmap, BPM histogram, key wheel, activity timeline.
 
+function _hmFmt(key, vars) {
+  return typeof appFmt === 'function' ? appFmt(key, vars) : key;
+}
+
 function showHeatmapDashboard() {
   let existing = document.getElementById('heatmapDashModal');
   if (existing) existing.remove();
@@ -14,8 +18,8 @@ function showHeatmapDashboard() {
   const html = `<div class="modal-overlay" id="heatmapDashModal" data-action-modal="closeHeatmapDash">
     <div class="modal-content modal-wide" style="max-width:95vw;width:95vw;max-height:95vh;height:95vh;">
       <div class="modal-header">
-        <h2>Audio Heatmap Dashboard</h2>
-        <button class="modal-close" data-action-modal="closeHeatmapDash" title="Close">&#10005;</button>
+        <h2>${escapeHtml(_hmFmt('ui.hm.title'))}</h2>
+        <button class="modal-close" data-action-modal="closeHeatmapDash" title="${escapeHtml(_hmFmt('ui.hm.close'))}">&#10005;</button>
       </div>
       <div class="modal-body" style="overflow-y:auto;max-height:calc(90vh - 60px);">
         <div class="hm-overview" id="hmOverview"></div>
@@ -47,11 +51,11 @@ function renderDashboard(samples, plugins, projects, presets) {
 
   // Overview stats
   overview.innerHTML = `
-    <div class="hm-stat"><span class="hm-stat-val">${samples.length.toLocaleString()}</span><span class="hm-stat-label">Samples</span></div>
-    <div class="hm-stat"><span class="hm-stat-val">${plugins.length.toLocaleString()}</span><span class="hm-stat-label">Plugins</span></div>
-    <div class="hm-stat"><span class="hm-stat-val">${projects.length.toLocaleString()}</span><span class="hm-stat-label">DAW Projects</span></div>
-    <div class="hm-stat"><span class="hm-stat-val">${presets.length.toLocaleString()}</span><span class="hm-stat-label">Presets</span></div>
-    <div class="hm-stat"><span class="hm-stat-val">${typeof formatAudioSize === 'function' ? formatAudioSize(totalSize) : (totalSize / (1024*1024*1024)).toFixed(1) + ' GB'}</span><span class="hm-stat-label">Total Size</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${samples.length.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_samples'))}</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${plugins.length.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_plugins'))}</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${projects.length.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_daw'))}</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${presets.length.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_presets'))}</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${typeof formatAudioSize === 'function' ? formatAudioSize(totalSize) : (totalSize / (1024*1024*1024)).toFixed(1) + ' GB'}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_total_size'))}</span></div>
   `;
 
   let cards = '';
@@ -124,17 +128,17 @@ function buildFormatCard(samples) {
     </div>`;
   }).join('');
 
-  return `<div class="hm-card" data-hm-card="format"><h3 class="hm-card-title">Format Distribution</h3>${bars || '<span class="hm-empty">No samples</span>'}</div>`;
+  return `<div class="hm-card" data-hm-card="format"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_format_dist'))}</h3>${bars || `<span class="hm-empty">${escapeHtml(_hmFmt('ui.hm.empty_no_samples'))}</span>`}</div>`;
 }
 
 function buildSizeCard(samples) {
   const buckets = [
-    { label: '< 100 KB', max: 100 * 1024 },
-    { label: '100 KB – 1 MB', max: 1024 * 1024 },
-    { label: '1 – 10 MB', max: 10 * 1024 * 1024 },
-    { label: '10 – 50 MB', max: 50 * 1024 * 1024 },
-    { label: '50 – 100 MB', max: 100 * 1024 * 1024 },
-    { label: '> 100 MB', max: Infinity },
+    { labelKey: 'ui.hm.bucket_lt_100kb', max: 100 * 1024 },
+    { labelKey: 'ui.hm.bucket_100kb_1mb', max: 1024 * 1024 },
+    { labelKey: 'ui.hm.bucket_1_10mb', max: 10 * 1024 * 1024 },
+    { labelKey: 'ui.hm.bucket_10_50mb', max: 50 * 1024 * 1024 },
+    { labelKey: 'ui.hm.bucket_50_100mb', max: 100 * 1024 * 1024 },
+    { labelKey: 'ui.hm.bucket_gt_100mb', max: Infinity },
   ];
   const counts = new Array(buckets.length).fill(0);
   for (const s of samples) {
@@ -148,20 +152,21 @@ function buildSizeCard(samples) {
   const bars = buckets.map((b, i) => {
     const barPct = (counts[i] / maxBucket) * 100;
     const share = ((counts[i] / total) * 100).toFixed(1);
+    const bl = _hmFmt(b.labelKey);
     return `<div class="hm-bar-row">
-      <span class="hm-bar-label">${b.label}</span>
+      <span class="hm-bar-label">${escapeHtml(bl)}</span>
       <div class="hm-bar-track"><div class="hm-bar-fill hm-bar-magenta" data-bar-pct="${barPct.toFixed(1)}" style="width:0"></div></div>
       <span class="hm-bar-val">${counts[i].toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
 
-  return `<div class="hm-card" data-hm-card="size"><h3 class="hm-card-title">Size Distribution</h3>${bars}</div>`;
+  return `<div class="hm-card" data-hm-card="size"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_size_dist'))}</h3>${bars}</div>`;
 }
 
 function buildFolderCard(samples) {
   const dirs = {};
   for (const s of samples) {
-    const dir = s.directory || s.path?.replace(/\/[^/]+$/, '') || 'Unknown';
+    const dir = s.directory || s.path?.replace(/\/[^/]+$/, '') || _hmFmt('ui.hm.unknown');
     // Use top 2 path components for grouping
     const parts = dir.split('/').filter(Boolean);
     const key = '/' + parts.slice(0, Math.min(parts.length, 3)).join('/');
@@ -182,34 +187,34 @@ function buildFolderCard(samples) {
     </div>`;
   }).join('');
 
-  return `<div class="hm-card" data-hm-card="folders"><h3 class="hm-card-title">Top Folders</h3>${bars || '<span class="hm-empty">No data</span>'}</div>`;
+  return `<div class="hm-card" data-hm-card="folders"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_top_folders'))}</h3>${bars || `<span class="hm-empty">${escapeHtml(_hmFmt('ui.hm.empty_no_data'))}</span>`}</div>`;
 }
 
 function buildBpmCard() {
   const bpms = typeof _bpmCache !== 'undefined' ? Object.values(_bpmCache).filter(v => v && v > 0) : [];
   if (bpms.length === 0) {
-    return `<div class="hm-card" data-hm-card="bpm"><h3 class="hm-card-title">BPM Distribution</h3><span class="hm-empty">Expand sample rows to populate BPM data</span></div>`;
+    return `<div class="hm-card" data-hm-card="bpm"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_bpm_dist'))}</h3><span class="hm-empty">${escapeHtml(_hmFmt('ui.hm.card_bpm_empty'))}</span></div>`;
   }
-  return `<div class="hm-card" data-hm-card="bpm"><h3 class="hm-card-title">BPM Distribution (${bpms.length} analyzed)</h3><canvas id="hmBpmCanvas" width="400" height="120" style="width:100%;height:120px;" title="BPM histogram — wait for background process to populate data"></canvas></div>`;
+  return `<div class="hm-card" data-hm-card="bpm"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_bpm_title_analyzed', { n: bpms.length }))}</h3><canvas id="hmBpmCanvas" width="400" height="120" style="width:100%;height:120px;" title="${escapeHtml(_hmFmt('ui.hm.card_bpm_canvas_title'))}"></canvas></div>`;
 }
 
 function buildKeyCard() {
   const keys = typeof _keyCache !== 'undefined' ? Object.values(_keyCache).filter(Boolean) : [];
   if (keys.length === 0) {
-    return `<div class="hm-card" data-hm-card="key"><h3 class="hm-card-title">Key Distribution</h3><span class="hm-empty">Expand sample rows to populate key data</span></div>`;
+    return `<div class="hm-card" data-hm-card="key"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_key_dist'))}</h3><span class="hm-empty">${escapeHtml(_hmFmt('ui.hm.card_key_empty'))}</span></div>`;
   }
-  return `<div class="hm-card" data-hm-card="key"><h3 class="hm-card-title">Key Distribution (${keys.length} analyzed)</h3><canvas id="hmKeyCanvas" width="400" height="200" style="width:100%;height:200px;" title="Musical key distribution — major (cyan) vs minor (magenta)"></canvas></div>`;
+  return `<div class="hm-card" data-hm-card="key"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_key_title_analyzed', { n: keys.length }))}</h3><canvas id="hmKeyCanvas" width="400" height="200" style="width:100%;height:200px;" title="${escapeHtml(_hmFmt('ui.hm.card_key_canvas_title'))}"></canvas></div>`;
 }
 
 function buildTimelineCard(samples) {
   if (samples.length === 0) return '';
-  return `<div class="hm-card hm-card-wide" data-hm-card="timeline"><h3 class="hm-card-title">Activity Timeline</h3><canvas id="hmTimelineCanvas" width="800" height="100" style="width:100%;height:100px;" title="Files modified per month over the last 24 months"></canvas></div>`;
+  return `<div class="hm-card hm-card-wide" data-hm-card="timeline"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_timeline'))}</h3><canvas id="hmTimelineCanvas" width="800" height="100" style="width:100%;height:100px;" title="${escapeHtml(_hmFmt('ui.hm.card_timeline_canvas_title'))}"></canvas></div>`;
 }
 
 function buildPluginTypeCard(plugins) {
   if (plugins.length === 0) return '';
   const types = {};
-  for (const p of plugins) types[p.type || 'Unknown'] = (types[p.type || 'Unknown'] || 0) + 1;
+  for (const p of plugins) types[p.type || _hmFmt('ui.hm.unknown')] = (types[p.type || _hmFmt('ui.hm.unknown')] || 0) + 1;
   const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]);
   const total = plugins.length || 1;
   const maxType = sorted[0]?.[1] || 1;
@@ -222,14 +227,14 @@ function buildPluginTypeCard(plugins) {
       <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
-  return `<div class="hm-card" data-hm-card="pluginTypes"><h3 class="hm-card-title">Plugin Types</h3>${bars}</div>`;
+  return `<div class="hm-card" data-hm-card="pluginTypes"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_plugin_types'))}</h3>${bars}</div>`;
 }
 
 function buildDawFormatCard(projects) {
   if (projects.length === 0) return '';
   const fmts = {};
   for (const p of projects) {
-    const fmt = p.daw || p.format || 'Unknown';
+    const fmt = p.daw || p.format || _hmFmt('ui.hm.unknown');
     fmts[fmt] = (fmts[fmt] || 0) + 1;
   }
   const sorted = Object.entries(fmts).sort((a, b) => b[1] - a[1]);
@@ -244,7 +249,7 @@ function buildDawFormatCard(projects) {
       <span class="hm-bar-val">${count.toLocaleString()} (${share}%)</span>
     </div>`;
   }).join('');
-  return `<div class="hm-card" data-hm-card="dawFormats"><h3 class="hm-card-title">DAW Formats</h3>${bars}</div>`;
+  return `<div class="hm-card" data-hm-card="dawFormats"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_daw_formats'))}</h3>${bars}</div>`;
 }
 
 // ── Canvas Renderers ──

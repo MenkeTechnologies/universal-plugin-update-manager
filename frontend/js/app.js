@@ -81,7 +81,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
       }
     }
   }
-  if (typeof renderFzfSettings === 'function') renderFzfSettings();
+  // renderFzfSettings is invoked from refreshSettingsUI (after reloadAppStrings)
 
   // Start folder watcher if enabled
   if (prefs.getItem('folderWatch') === 'on' && typeof startFolderWatch === 'function') {
@@ -184,15 +184,16 @@ function renderWelcomeDashboard() {
   const noteCount = Object.keys(getNotes()).length;
   const tagCount = getAllTags().length;
   const recentCount = recentlyPlayed.length;
+  const wf = typeof appFmt === 'function' ? appFmt : (k) => k;
   el.innerHTML = [
-    { value: allPlugins.length, label: 'Plugins', color: 'var(--cyan)' },
-    { value: allAudioSamples.length, label: 'Samples', color: 'var(--yellow)' },
-    { value: allDawProjects.length, label: 'DAW Projects', color: 'var(--magenta)' },
-    { value: allPresets.length, label: 'Presets', color: 'var(--orange)' },
-    { value: favCount, label: 'Favorites', color: 'var(--yellow)' },
-    { value: noteCount, label: 'Notes', color: 'var(--green)' },
-    { value: tagCount, label: 'Tags', color: 'var(--accent)' },
-    { value: recentCount, label: 'Recently Played', color: 'var(--cyan)' },
+    { value: allPlugins.length, label: wf('ui.welcome.plugins'), color: 'var(--cyan)' },
+    { value: allAudioSamples.length, label: wf('ui.welcome.samples'), color: 'var(--yellow)' },
+    { value: allDawProjects.length, label: wf('ui.welcome.daw_projects'), color: 'var(--magenta)' },
+    { value: allPresets.length, label: wf('ui.welcome.presets'), color: 'var(--orange)' },
+    { value: favCount, label: wf('ui.welcome.favorites'), color: 'var(--yellow)' },
+    { value: noteCount, label: wf('ui.welcome.notes'), color: 'var(--green)' },
+    { value: tagCount, label: wf('ui.welcome.tags'), color: 'var(--accent)' },
+    { value: recentCount, label: wf('ui.welcome.recently_played'), color: 'var(--cyan)' },
   ].filter(s => s.value > 0).map(s =>
     `<div class="welcome-stat" style="border-left-color: ${s.color};">
       <div class="welcome-stat-value" style="color: ${s.color};">${s.value}</div>
@@ -202,19 +203,22 @@ function renderWelcomeDashboard() {
 }
 
 function formatBytes(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+  const u = (k, fb) => (typeof appFmt === 'function' ? appFmt(k) : fb);
+  if (!bytes || bytes === 0) return '0 ' + u('ui.unit.byte', 'B');
+  const keys = ['ui.unit.byte', 'ui.unit.kb', 'ui.unit.mb', 'ui.unit.gb', 'ui.unit.tb'];
+  const fallbacks = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), keys.length - 1);
+  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + u(keys[i], fallbacks[i]);
 }
 
 function formatUptime(secs) {
-  if (!secs) return '0s';
-  if (secs < 60) return secs + 's';
-  if (secs < 3600) return Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+  const u = (k, fb) => (typeof appFmt === 'function' ? appFmt(k) : fb);
+  if (!secs) return '0' + u('ui.unit.sec', 's');
+  if (secs < 60) return secs + u('ui.unit.sec', 's');
+  if (secs < 3600) return Math.floor(secs / 60) + u('ui.unit.min', 'm') + ' ' + (secs % 60) + u('ui.unit.sec', 's');
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
-  return h + 'h ' + m + 'm';
+  return h + u('ui.unit.hr', 'h') + ' ' + m + u('ui.unit.min', 'm');
 }
 
 async function updateHeaderInfo() {

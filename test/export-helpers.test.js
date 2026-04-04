@@ -8,12 +8,12 @@ function exportFileName(label) {
   return `audiohaxor-${label}-${ts}`;
 }
 
-const EXPORT_FORMATS = [
-  { id: 'json', label: 'JSON', ext: 'json', icon: '{ }', desc: 'Full data, re-importable' },
-  { id: 'toml', label: 'TOML', ext: 'toml', icon: '[T]', desc: 'Human-readable config' },
-  { id: 'csv', label: 'CSV', ext: 'csv', icon: ',,,', desc: 'Spreadsheet compatible' },
-  { id: 'tsv', label: 'TSV', ext: 'tsv', icon: '\\t', desc: 'Tab-separated values' },
-  { id: 'pdf', label: 'PDF', ext: 'pdf', icon: '&#128196;', desc: 'Printable A4 report' },
+const EXPORT_FORMAT_DEFS = [
+  { id: 'json', labelKey: 'ui.export.fmt_json', ext: 'json', icon: '{ }', descKey: 'ui.export.fmt_json_desc' },
+  { id: 'toml', labelKey: 'ui.export.fmt_toml', ext: 'toml', icon: '[T]', descKey: 'ui.export.fmt_toml_desc' },
+  { id: 'csv', labelKey: 'ui.export.fmt_csv', ext: 'csv', icon: ',,,', descKey: 'ui.export.fmt_csv_desc' },
+  { id: 'tsv', labelKey: 'ui.export.fmt_tsv', ext: 'tsv', icon: '\\t', descKey: 'ui.export.fmt_tsv_desc' },
+  { id: 'pdf', labelKey: 'ui.export.fmt_pdf', ext: 'pdf', icon: '&#128196;', descKey: 'ui.export.fmt_pdf_desc' },
 ];
 
 const ALL_IMPORT_FILTERS = [
@@ -42,25 +42,25 @@ describe('exportFileName', () => {
   });
 });
 
-describe('EXPORT_FORMATS', () => {
+describe('EXPORT_FORMAT_DEFS', () => {
   it('has unique ids', () => {
-    const ids = EXPORT_FORMATS.map(f => f.id);
+    const ids = EXPORT_FORMAT_DEFS.map(f => f.id);
     assert.strictEqual(new Set(ids).size, ids.length);
   });
 
-  it('each format has id, label, ext', () => {
-    for (const f of EXPORT_FORMATS) {
-      assert.ok(f.id && f.label && f.ext);
+  it('each format has id, labelKey, ext', () => {
+    for (const f of EXPORT_FORMAT_DEFS) {
+      assert.ok(f.id && f.labelKey && f.ext);
       assert.strictEqual(f.id, f.ext);
     }
   });
 
   it('includes json as default-friendly first entry', () => {
-    assert.strictEqual(EXPORT_FORMATS[0].id, 'json');
+    assert.strictEqual(EXPORT_FORMAT_DEFS[0].id, 'json');
   });
 
   it('pdf uses pdf extension', () => {
-    assert.strictEqual(EXPORT_FORMATS.find(f => f.id === 'pdf').ext, 'pdf');
+    assert.strictEqual(EXPORT_FORMAT_DEFS.find(f => f.id === 'pdf').ext, 'pdf');
   });
 });
 

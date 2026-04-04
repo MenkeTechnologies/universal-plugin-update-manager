@@ -1,78 +1,144 @@
 // ── Keyboard Shortcut Customization ──
 
-const DEFAULT_SHORTCUTS = {
-  'tab1': { key: '1', mod: true, label: 'Plugins tab' },
-  'tab2': { key: '2', mod: true, label: 'Samples tab' },
-  'tab3': { key: '3', mod: true, label: 'DAW Projects tab' },
-  'tab4': { key: '4', mod: true, label: 'Presets tab' },
-  'tab5': { key: '5', mod: true, label: 'Favorites tab' },
-  'tab6': { key: '6', mod: true, label: 'Notes tab' },
-  'tab7': { key: '7', mod: true, label: 'Tags tab' },
-  'tab8': { key: '8', mod: true, label: 'Files tab' },
-  'tab9': { key: '9', mod: true, label: 'History tab' },
-  'tab10': { key: '0', mod: true, label: 'Visualizer tab' },
-  'tab11': { key: 'F3', mod: false, label: 'Walkers tab' },
-  'tab12': { key: 'F4', mod: false, label: 'Settings tab' },
-  'search': { key: 'f', mod: true, label: 'Focus search' },
-  'help': { key: '?', mod: false, label: 'Help overlay' },
-  'playPause': { key: ' ', mod: false, label: 'Play / Pause' },
-  'nextTrack': { key: 'ArrowRight', mod: true, label: 'Next track' },
-  'prevTrack': { key: 'ArrowLeft', mod: true, label: 'Previous track' },
-  'scanAll': { key: 's', mod: true, label: 'Scan all' },
-  'stopAll': { key: '.', mod: true, label: 'Stop all scans' },
-  'commandPalette': { key: 'k', mod: true, label: 'Command palette' },
-  'toggleLoop': { key: 'l', mod: false, label: 'Toggle loop' },
-  'toggleMute': { key: 'm', mod: false, label: 'Mute / Unmute' },
-  'volumeUp': { key: 'ArrowUp', mod: true, label: 'Volume up' },
-  'volumeDown': { key: 'ArrowDown', mod: true, label: 'Volume down' },
-  'revealFile': { key: 'r', mod: false, label: 'Reveal selected in Finder' },
-  'copyPath': { key: 'c', mod: false, label: 'Copy selected path' },
-  'toggleFavorite': { key: 'f', mod: false, label: 'Toggle favorite' },
-  'addNote': { key: 'n', mod: false, label: 'Add note to selected' },
-  'deleteItem': { key: 'Backspace', mod: false, label: 'Delete selected' },
-  'selectAll': { key: 'a', mod: true, label: 'Select all visible' },
-  'escape': { key: 'Escape', mod: false, label: 'Close / clear / stop' },
-  'exportTab': { key: 'e', mod: true, label: 'Export current tab' },
-  'importTab': { key: 'i', mod: true, label: 'Import to current tab' },
-  'toggleShuffle': { key: 's', mod: false, label: 'Toggle shuffle' },
-  'findDuplicates': { key: 'd', mod: true, label: 'Find duplicates' },
-  'depGraph': { key: 'g', mod: true, label: 'Dependency graph' },
-  'resetAllScans': { key: 'Backspace', mod: true, label: 'Reset all scans' },
-  'toggleTheme': { key: 't', mod: true, label: 'Toggle light/dark theme' },
-  'openPrefs': { key: ',', mod: true, label: 'Settings' },
-  'nextTab': { key: ']', mod: true, label: 'Next tab' },
-  'prevTab': { key: '[', mod: true, label: 'Previous tab' },
-  'findSimilar': { key: 'w', mod: false, label: 'Find similar samples' },
-  'togglePlayerExpand': { key: 'e', mod: false, label: 'Expand / collapse player' },
-  'toggleEq': { key: 'q', mod: false, label: 'Toggle EQ panel' },
-  'toggleMono': { key: 'u', mod: false, label: 'Toggle mono playback' },
-  'newSmartPlaylist': { key: 'p', mod: true, label: 'New smart playlist' },
-  'deselectAll': { key: 'Escape', mod: true, label: 'Deselect all' },
-  'toggleABLoop': { key: 'b', mod: false, label: 'Set / clear A-B loop' },
-  'heatmapDash': { key: 'd', mod: false, label: 'Heatmap dashboard' },
-  'togglePlayer': { key: 'p', mod: false, label: 'Show / hide player' },
-  'toggleCrt': { key: 'F1', mod: false, label: 'Toggle CRT effects' },
-  'toggleNeonGlow': { key: 'F2', mod: false, label: 'Toggle neon glow' },
-  'clearPlayHistory': { key: 'h', mod: true, label: 'Clear play history' },
+const SHORTCUT_LABEL_KEYS = {
+  tab1: 'ui.shortcut.plugins_tab',
+  tab2: 'ui.shortcut.samples_tab',
+  tab3: 'ui.shortcut.daw_projects_tab',
+  tab4: 'ui.shortcut.presets_tab',
+  tab5: 'ui.shortcut.favorites_tab',
+  tab6: 'ui.shortcut.notes_tab',
+  tab7: 'ui.shortcut.tags_tab',
+  tab8: 'ui.shortcut.files_tab',
+  tab9: 'ui.shortcut.history_tab',
+  tab10: 'ui.shortcut.visualizer_tab',
+  tab11: 'ui.shortcut.walkers_tab',
+  tab12: 'ui.shortcut.settings_tab',
+  search: 'ui.shortcut.focus_search',
+  help: 'ui.shortcut.help_overlay',
+  playPause: 'ui.shortcut.play_pause',
+  nextTrack: 'ui.shortcut.next_track',
+  prevTrack: 'ui.shortcut.prev_track',
+  scanAll: 'ui.shortcut.scan_all',
+  stopAll: 'ui.shortcut.stop_all_scans',
+  commandPalette: 'ui.shortcut.command_palette',
+  toggleLoop: 'ui.shortcut.toggle_loop',
+  toggleMute: 'ui.shortcut.toggle_mute',
+  volumeUp: 'ui.shortcut.volume_up',
+  volumeDown: 'ui.shortcut.volume_down',
+  revealFile: 'ui.shortcut.reveal_in_finder',
+  copyPath: 'ui.shortcut.copy_path',
+  toggleFavorite: 'ui.shortcut.toggle_favorite',
+  addNote: 'ui.shortcut.add_note',
+  deleteItem: 'ui.shortcut.delete_selected',
+  selectAll: 'ui.shortcut.select_all_visible',
+  escape: 'ui.shortcut.close_clear_stop',
+  exportTab: 'ui.shortcut.export_current_tab',
+  importTab: 'ui.shortcut.import_current_tab',
+  toggleShuffle: 'ui.shortcut.toggle_shuffle',
+  findDuplicates: 'ui.shortcut.find_duplicates',
+  depGraph: 'ui.shortcut.dependency_graph',
+  resetAllScans: 'ui.shortcut.reset_all_scans',
+  toggleTheme: 'ui.shortcut.toggle_theme',
+  openPrefs: 'ui.shortcut.settings',
+  nextTab: 'ui.shortcut.next_tab',
+  prevTab: 'ui.shortcut.previous_tab',
+  findSimilar: 'ui.shortcut.find_similar_samples',
+  togglePlayerExpand: 'ui.shortcut.expand_collapse_player',
+  toggleEq: 'ui.shortcut.toggle_eq',
+  toggleMono: 'ui.shortcut.toggle_mono',
+  newSmartPlaylist: 'ui.shortcut.new_smart_playlist',
+  deselectAll: 'ui.shortcut.deselect_all',
+  toggleABLoop: 'ui.shortcut.ab_loop',
+  heatmapDash: 'ui.shortcut.heatmap_dashboard',
+  togglePlayer: 'ui.shortcut.show_hide_player',
+  toggleCrt: 'ui.shortcut.toggle_crt',
+  toggleNeonGlow: 'ui.shortcut.toggle_neon_glow',
+  clearPlayHistory: 'ui.shortcut.clear_play_history',
+};
+
+const DEFAULT_SHORTCUT_DEFS = {
+  tab1: { key: '1', mod: true },
+  tab2: { key: '2', mod: true },
+  tab3: { key: '3', mod: true },
+  tab4: { key: '4', mod: true },
+  tab5: { key: '5', mod: true },
+  tab6: { key: '6', mod: true },
+  tab7: { key: '7', mod: true },
+  tab8: { key: '8', mod: true },
+  tab9: { key: '9', mod: true },
+  tab10: { key: '0', mod: true },
+  tab11: { key: 'F3', mod: false },
+  tab12: { key: 'F4', mod: false },
+  search: { key: 'f', mod: true },
+  help: { key: '?', mod: false },
+  playPause: { key: ' ', mod: false },
+  nextTrack: { key: 'ArrowRight', mod: true },
+  prevTrack: { key: 'ArrowLeft', mod: true },
+  scanAll: { key: 's', mod: true },
+  stopAll: { key: '.', mod: true },
+  commandPalette: { key: 'k', mod: true },
+  toggleLoop: { key: 'l', mod: false },
+  toggleMute: { key: 'm', mod: false },
+  volumeUp: { key: 'ArrowUp', mod: true },
+  volumeDown: { key: 'ArrowDown', mod: true },
+  revealFile: { key: 'r', mod: false },
+  copyPath: { key: 'c', mod: false },
+  toggleFavorite: { key: 'f', mod: false },
+  addNote: { key: 'n', mod: false },
+  deleteItem: { key: 'Backspace', mod: false },
+  selectAll: { key: 'a', mod: true },
+  escape: { key: 'Escape', mod: false },
+  exportTab: { key: 'e', mod: true },
+  importTab: { key: 'i', mod: true },
+  toggleShuffle: { key: 's', mod: false },
+  findDuplicates: { key: 'd', mod: true },
+  depGraph: { key: 'g', mod: true },
+  resetAllScans: { key: 'Backspace', mod: true },
+  toggleTheme: { key: 't', mod: true },
+  openPrefs: { key: ',', mod: true },
+  nextTab: { key: ']', mod: true },
+  prevTab: { key: '[', mod: true },
+  findSimilar: { key: 'w', mod: false },
+  togglePlayerExpand: { key: 'e', mod: false },
+  toggleEq: { key: 'q', mod: false },
+  toggleMono: { key: 'u', mod: false },
+  newSmartPlaylist: { key: 'p', mod: true },
+  deselectAll: { key: 'Escape', mod: true },
+  toggleABLoop: { key: 'b', mod: false },
+  heatmapDash: { key: 'd', mod: false },
+  togglePlayer: { key: 'p', mod: false },
+  toggleCrt: { key: 'F1', mod: false },
+  toggleNeonGlow: { key: 'F2', mod: false },
+  clearPlayHistory: { key: 'h', mod: true },
 };
 
 const TAB_MAP = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'tags', 'files', 'history', 'midi', 'visualizer', 'walkers', 'settings'];
 
 function getShortcuts() {
   const saved = prefs.getObject('customShortcuts', null);
-  if (!saved) return { ...DEFAULT_SHORTCUTS };
-  // Merge with defaults for new shortcuts
-  const merged = { ...DEFAULT_SHORTCUTS };
-  for (const [id, val] of Object.entries(saved)) {
-    if (merged[id]) {
-      merged[id] = { ...merged[id], key: val.key, mod: val.mod };
+  const fmt = typeof appFmt === 'function' ? appFmt : (k) => k;
+  const merged = {};
+  for (const [id, def] of Object.entries(DEFAULT_SHORTCUT_DEFS)) {
+    const lk = SHORTCUT_LABEL_KEYS[id];
+    merged[id] = {
+      key: def.key,
+      mod: def.mod,
+      label: lk ? fmt(lk) : id,
+    };
+    if (saved && saved[id]) {
+      merged[id].key = saved[id].key;
+      merged[id].mod = saved[id].mod;
     }
   }
   return merged;
 }
 
 function saveShortcuts(shortcuts) {
-  prefs.setItem('customShortcuts', shortcuts);
+  const slim = {};
+  for (const [id, sc] of Object.entries(shortcuts)) {
+    slim[id] = { key: sc.key, mod: sc.mod };
+  }
+  prefs.setItem('customShortcuts', slim);
 }
 
 function resetShortcuts() {
@@ -119,7 +185,7 @@ function renderShortcutSettings(filter) {
   list.innerHTML = entries.map(([id, sc]) =>
     `<div class="shortcut-row" data-sc-id="${id}">
       <span class="shortcut-name">${hl(sc.label)}</span>
-      <span class="shortcut-key" data-shortcut-id="${id}" title="Click to rebind">${q ? hl(formatKey(sc)) : formatKey(sc)}</span>
+      <span class="shortcut-key" data-shortcut-id="${id}" title="${typeof appFmt === 'function' ? escapeHtml(appFmt('menu.rebind_shortcut')) : 'Rebind'}">${q ? hl(formatKey(sc)) : formatKey(sc)}</span>
     </div>`
   ).join('');
   if (!q && typeof initDragReorder === 'function') {
@@ -149,7 +215,7 @@ document.addEventListener('click', (e) => {
     }
     _recordingId = keyEl.dataset.shortcutId;
     keyEl.classList.add('recording');
-    keyEl.textContent = 'Press key...';
+    keyEl.textContent = typeof appFmt === 'function' ? appFmt('ui.shortcut.press_key') : 'Press key…';
     e.stopPropagation();
     return;
   }

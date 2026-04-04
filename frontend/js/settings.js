@@ -205,21 +205,35 @@ const ROOT_DEFAULTS = {};
   }
 })();
 
-// Dynamically build scheme buttons from COLOR_SCHEMES
-(function buildSchemeButtons() {
+// Rebuilt on load and when locale changes (refreshSettingsUI)
+function rebuildSchemeButtons() {
   const grid = document.getElementById('schemeGrid');
+  if (!grid) return;
   const dotKeys = ['--accent', '--cyan', '--magenta', '--green', '--yellow', '--orange', '--red', '--text'];
+  const fmt = typeof appFmt === 'function' ? appFmt : (k) => k;
+  const meta = {
+    cyberpunk: { labelKey: 'ui.scheme.cyberpunk.label', descKey: 'ui.scheme.cyberpunk.desc' },
+    midnight: { labelKey: 'ui.scheme.midnight.label', descKey: 'ui.scheme.midnight.desc' },
+    matrix: { labelKey: 'ui.scheme.matrix.label', descKey: 'ui.scheme.matrix.desc' },
+    ember: { labelKey: 'ui.scheme.ember.label', descKey: 'ui.scheme.ember.desc' },
+    arctic: { labelKey: 'ui.scheme.arctic.label', descKey: 'ui.scheme.arctic.desc' },
+  };
+  grid.innerHTML = '';
   for (const [key, scheme] of Object.entries(COLOR_SCHEMES)) {
+    const m = meta[key];
+    const label = m ? fmt(m.labelKey) : key;
+    const desc = m ? fmt(m.descKey) : '';
+    const title = fmt('ui.scheme.apply_title', { name: label });
     const dots = dotKeys.map(k => `<span class="scheme-dot" style="background: ${scheme.vars[k]};"></span>`).join('');
     grid.insertAdjacentHTML('beforeend',
-      `<button class="scheme-btn" data-action="settingColorScheme" data-scheme="${key}" title="Apply ${scheme.label} color scheme">` +
-        `<div class="scheme-btn-name">${scheme.label}</div>` +
-        `<div class="scheme-btn-desc">${scheme.desc}</div>` +
+      `<button class="scheme-btn" data-action="settingColorScheme" data-scheme="${key}" title="${escapeHtml(title)}">` +
+        `<div class="scheme-btn-name">${escapeHtml(label)}</div>` +
+        `<div class="scheme-btn-desc">${escapeHtml(desc)}</div>` +
         `<div class="scheme-btn-preview">${dots}</div>` +
       `</button>`
     );
   }
-})();
+}
 
 function applyColorScheme(name) {
   const scheme = COLOR_SCHEMES[name];
@@ -1013,8 +1027,9 @@ function refreshSettingsUI() {
   const tagPosEl = document.getElementById('settingTagBarPosition');
   if (tagPosEl) tagPosEl.value = prefs.getItem('tagBarPosition') || 'top';
 
-  // Color scheme
+  // Color scheme — rebuild labels for locale, then highlight active
   const currentScheme = prefs.getItem('colorScheme') || 'cyberpunk';
+  rebuildSchemeButtons();
   document.querySelectorAll('.scheme-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.scheme === currentScheme);
   });
@@ -1341,6 +1356,8 @@ function refreshSettingsUI() {
   if (prefsPathEl && !prefsPathEl.textContent) {
     window.vstUpdater.getPrefsPath().then(p => { prefsPathEl.textContent = p; }).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
   }
+
+  if (typeof renderFzfSettings === 'function') renderFzfSettings();
 }
 
 // Restore settings on load
@@ -1393,25 +1410,29 @@ function restoreSettings() {
 function renderFzfSettings() {
   const grid = document.getElementById('fzfSettingsGrid');
   if (!grid) return;
+  const fmt = typeof appFmt === 'function' ? appFmt : (k) => k;
   const params = [
-    { key: 'SCORE_MATCH', label: 'Match Score', desc: 'Points per matched character', min: 1, max: 50 },
-    { key: 'SCORE_GAP_START', label: 'Gap Start Penalty', desc: 'Penalty for starting a gap', min: -20, max: 0 },
-    { key: 'SCORE_GAP_EXTENSION', label: 'Gap Extension', desc: 'Penalty per additional gap character', min: -10, max: 0 },
-    { key: 'BONUS_BOUNDARY', label: 'Word Boundary Bonus', desc: 'Bonus for matching at word boundaries', min: 0, max: 30 },
-    { key: 'BONUS_NON_WORD', label: 'Non-Word Bonus', desc: 'Bonus for non-word character transitions', min: 0, max: 30 },
-    { key: 'BONUS_CAMEL', label: 'CamelCase Bonus', desc: 'Bonus for camelCase transitions', min: 0, max: 30 },
-    { key: 'BONUS_CONSECUTIVE', label: 'Consecutive Bonus', desc: 'Bonus for consecutive matches', min: 0, max: 20 },
-    { key: 'BONUS_FIRST_CHAR_MULT', label: 'First Char Multiplier', desc: 'Multiplier for first character bonus', min: 1, max: 5 },
+    { key: 'SCORE_MATCH', labelKey: 'ui.fzf.score_match.label', descKey: 'ui.fzf.score_match.desc', min: 1, max: 50 },
+    { key: 'SCORE_GAP_START', labelKey: 'ui.fzf.gap_start.label', descKey: 'ui.fzf.gap_start.desc', min: -20, max: 0 },
+    { key: 'SCORE_GAP_EXTENSION', labelKey: 'ui.fzf.gap_extension.label', descKey: 'ui.fzf.gap_extension.desc', min: -10, max: 0 },
+    { key: 'BONUS_BOUNDARY', labelKey: 'ui.fzf.boundary.label', descKey: 'ui.fzf.boundary.desc', min: 0, max: 30 },
+    { key: 'BONUS_NON_WORD', labelKey: 'ui.fzf.non_word.label', descKey: 'ui.fzf.non_word.desc', min: 0, max: 30 },
+    { key: 'BONUS_CAMEL', labelKey: 'ui.fzf.camel.label', descKey: 'ui.fzf.camel.desc', min: 0, max: 30 },
+    { key: 'BONUS_CONSECUTIVE', labelKey: 'ui.fzf.consecutive.label', descKey: 'ui.fzf.consecutive.desc', min: 0, max: 20 },
+    { key: 'BONUS_FIRST_CHAR_MULT', labelKey: 'ui.fzf.first_char_mult.label', descKey: 'ui.fzf.first_char_mult.desc', min: 1, max: 5 },
   ];
   grid.innerHTML = params.map(p => {
     const val = window[p.key] ?? FZF_DEFAULTS[p.key];
+    const label = fmt(p.labelKey);
+    const desc = fmt(p.descKey);
+    const titleAttr = `${desc} (default: ${FZF_DEFAULTS[p.key]})`;
     return `<div class="settings-row" style="padding:6px 8px;margin-bottom:2px;">
       <div class="settings-label" style="min-width:0;">
-        <span class="settings-title" style="font-size:11px;">${p.label}</span>
-        <span class="settings-desc" style="font-size:9px;">${p.desc}</span>
+        <span class="settings-title" style="font-size:11px;">${escapeHtml(label)}</span>
+        <span class="settings-desc" style="font-size:9px;">${escapeHtml(desc)}</span>
       </div>
       <div class="settings-control" style="display:flex;align-items:center;gap:6px;">
-        <input type="number" class="settings-input" data-fzf-param="${p.key}" value="${val}" min="${p.min}" max="${p.max}" step="1" style="width:60px;font-size:11px;padding:3px 6px;" title="${p.desc} (default: ${FZF_DEFAULTS[p.key]})">
+        <input type="number" class="settings-input" data-fzf-param="${p.key}" value="${val}" min="${p.min}" max="${p.max}" step="1" style="width:60px;font-size:11px;padding:3px 6px;" title="${escapeHtml(titleAttr)}">
       </div>
     </div>`;
   }).join('');
