@@ -470,14 +470,21 @@
       padding: 6px 8px;
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--border);
+      border-left: 3px solid var(--cyan);
       margin-bottom: 2px;
-      transition: border-color 0.15s;
       cursor: grab;
+      animation: settings-row-glow 3s ease-in-out infinite;
     }
+    @keyframes settings-row-glow {
+      0%, 100% { border-left-color: var(--cyan); }
+      50% { border-left-color: var(--accent); }
+    }
+    .settings-row:nth-child(2n) { animation-delay: 0.5s; }
+    .settings-row:nth-child(3n) { animation-delay: 1.0s; }
 
     .settings-row:hover {
-      border-left-color: var(--cyan);
+      border-left-color: var(--cyan) !important;
+      border-color: var(--cyan);
     }
     .settings-row:active { cursor: grabbing; }
     .settings-row-ghost {
@@ -6035,39 +6042,39 @@
     </div>
   </div>
 
-  <script src="js/ipc.js?v=26651"></script>
-  <script src="js/utils.js?v=26651"></script>
-  <script src="js/drag-reorder.js?v=26651"></script>
-  <script src="js/modal-drag.js?v=26651"></script>
-  <script src="js/columns.js?v=26651"></script>
-  <script src="js/notes.js?v=26651"></script>
-  <script src="js/favorites.js?v=26651"></script>
-  <script src="js/export.js?v=26651"></script>
-  <script src="js/plugins.js?v=26651"></script>
-  <script src="js/settings.js?v=26651"></script>
-  <script src="js/history.js?v=26651"></script>
-  <script src="js/kvr.js?v=26651"></script>
-  <script src="js/audio.js?v=26651"></script>
-  <script src="js/daw.js?v=26651"></script>
-  <script src="js/presets.js?v=26651"></script>
-  <script src="js/disk-usage.js?v=26651"></script>
-  <script src="js/batch-select.js?v=26651"></script>
-  <script src="js/sort-persist.js?v=26651"></script>
-  <script src="js/multi-filter.js?v=26651"></script>
-  <script src="js/file-browser.js?v=26651"></script>
-  <script src="js/duplicates.js?v=26651"></script>
-  <script src="js/command-palette.js?v=26651"></script>
-  <script src="js/xref.js?v=26651"></script>
-  <script src="js/dep-graph.js?v=26651"></script>
-  <script src="js/smart-playlists.js?v=26651"></script>
-  <script src="js/heatmap-dashboard.js?v=26651"></script>
-  <script src="js/midi.js?v=26651"></script>
-  <script src="js/visualizer.js?v=26651"></script>
-  <script src="js/walker-status.js?v=26651"></script>
-  <script src="js/context-menu.js?v=26651"></script>
-  <script src="js/help-overlay.js?v=26651"></script>
-  <script src="js/shortcuts.js?v=26651"></script>
-  <script src="js/keyboard-nav.js?v=26651"></script>
-  <script src="js/app.js?v=26651"></script>
+  <script src="js/ipc.js?v=87356"></script>
+  <script src="js/utils.js?v=87356"></script>
+  <script src="js/drag-reorder.js?v=87356"></script>
+  <script src="js/modal-drag.js?v=87356"></script>
+  <script src="js/columns.js?v=87356"></script>
+  <script src="js/notes.js?v=87356"></script>
+  <script src="js/favorites.js?v=87356"></script>
+  <script src="js/export.js?v=87356"></script>
+  <script src="js/plugins.js?v=87356"></script>
+  <script src="js/settings.js?v=87356"></script>
+  <script src="js/history.js?v=87356"></script>
+  <script src="js/kvr.js?v=87356"></script>
+  <script src="js/audio.js?v=87356"></script>
+  <script src="js/daw.js?v=87356"></script>
+  <script src="js/presets.js?v=87356"></script>
+  <script src="js/disk-usage.js?v=87356"></script>
+  <script src="js/batch-select.js?v=87356"></script>
+  <script src="js/sort-persist.js?v=87356"></script>
+  <script src="js/multi-filter.js?v=87356"></script>
+  <script src="js/file-browser.js?v=87356"></script>
+  <script src="js/duplicates.js?v=87356"></script>
+  <script src="js/command-palette.js?v=87356"></script>
+  <script src="js/xref.js?v=87356"></script>
+  <script src="js/dep-graph.js?v=87356"></script>
+  <script src="js/smart-playlists.js?v=87356"></script>
+  <script src="js/heatmap-dashboard.js?v=87356"></script>
+  <script src="js/midi.js?v=87356"></script>
+  <script src="js/visualizer.js?v=87356"></script>
+  <script src="js/walker-status.js?v=87356"></script>
+  <script src="js/context-menu.js?v=87356"></script>
+  <script src="js/help-overlay.js?v=87356"></script>
+  <script src="js/shortcuts.js?v=87356"></script>
+  <script src="js/keyboard-nav.js?v=87356"></script>
+  <script src="js/app.js?v=87356"></script>
 </body>
 </html>
