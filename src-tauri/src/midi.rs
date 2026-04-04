@@ -301,6 +301,12 @@ mod tests {
     }
 
     #[test]
+    fn test_read_var_len_pos_past_end_returns_zero_bytes_consumed() {
+        let data = [0x40u8];
+        assert_eq!(read_var_len(&data, 1), (0, 0));
+    }
+
+    #[test]
     fn test_read_var_len_128_two_bytes() {
         let data = [0x81u8, 0x00];
         assert_eq!(read_var_len(&data, 0), (128, 2));

@@ -3244,11 +3244,88 @@ mod tests {
     }
 
     #[test]
+    fn test_dsv_escape_newline_requires_quoting() {
+        assert_eq!(
+            dsv_escape("a\nb", ','),
+            "\"a\nb\"",
+            "embedded newline must quote for CSV/DSV"
+        );
+        assert_eq!(dsv_escape("line1\nline2", '\t'), "\"line1\nline2\"");
+    }
+
+    #[test]
     fn test_detect_separator() {
         assert_eq!(detect_separator("x.csv"), ',');
         assert_eq!(detect_separator("/path/to/out.tsv"), '\t');
         assert_eq!(detect_separator("nested/dir/report.csv"), ',');
         assert_eq!(detect_separator("sheet.tsv"), '\t');
+    }
+
+    #[test]
+    fn test_read_zip_xml_returns_named_entry() {
+        use std::io::Write;
+        let tmp = std::env::temp_dir().join("upum_test_lib_read_zip_named.zip");
+        let _ = fs::remove_file(&tmp);
+        let file = fs::File::create(&tmp).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file::<_, ()>("notes.txt", Default::default())
+            .unwrap();
+        zip.write_all(b"noise").unwrap();
+        zip.start_file::<_, ()>("project.xml", Default::default())
+            .unwrap();
+        zip.write_all(b"<Project>ok</Project>").unwrap();
+        zip.finish().unwrap();
+
+        let xml = read_zip_xml(tmp.to_str().unwrap(), &["project.xml"]).unwrap();
+        assert_eq!(xml, "<Project>ok</Project>");
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_read_zip_xml_fallback_scans_first_xml_member() {
+        use std::io::Write;
+        let tmp = std::env::temp_dir().join("upum_test_lib_read_zip_fallback.zip");
+        let _ = fs::remove_file(&tmp);
+        let file = fs::File::create(&tmp).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file::<_, ()>("nested/session.xml", Default::default())
+            .unwrap();
+        zip.write_all(b"<Session/>").unwrap();
+        zip.finish().unwrap();
+
+        let xml = read_zip_xml(tmp.to_str().unwrap(), &["project.xml"]).unwrap();
+        assert_eq!(xml, "<Session/>");
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_read_zip_xml_invalid_file_errors() {
+        let tmp = std::env::temp_dir().join("upum_test_lib_not_zip.bin");
+        let _ = fs::remove_file(&tmp);
+        fs::write(&tmp, b"plain text not zip").unwrap();
+        let err = read_zip_xml(tmp.to_str().unwrap(), &["a.xml"]).unwrap_err();
+        assert!(
+            err.contains("Not a valid ZIP") || err.contains("zip"),
+            "unexpected err: {err}"
+        );
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_read_zip_xml_no_xml_member_errors() {
+        use std::io::Write;
+        let tmp = std::env::temp_dir().join("upum_test_lib_zip_no_xml.zip");
+        let _ = fs::remove_file(&tmp);
+        let file = fs::File::create(&tmp).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file::<_, ()>("readme.txt", Default::default())
+            .unwrap();
+        zip.write_all(b"hello").unwrap();
+        zip.finish().unwrap();
+
+        let err = read_zip_xml(tmp.to_str().unwrap(), &["missing.xml"]).unwrap_err();
+        assert_eq!(err, "No XML found in archive");
+        let _ = fs::remove_file(&tmp);
     }
 
     #[test]

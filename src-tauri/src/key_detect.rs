@@ -583,6 +583,24 @@ mod tests {
         assert_eq!(r, 0.0);
     }
 
+    #[test]
+    fn test_compute_chromagram_too_short_for_one_frame_returns_zeros() {
+        let sr = 44100u32;
+        let samples: Vec<f32> = vec![0.5; 3000];
+        let chroma = compute_chromagram(&samples, sr);
+        assert!(
+            chroma.iter().all(|&v| v == 0.0),
+            "len < frame_size gives num_frames=0 → zero chroma"
+        );
+    }
+
+    #[test]
+    fn test_match_key_profile_all_zero_chroma_picks_first_tie_at_zero_correlation() {
+        let z = [0.0f64; 12];
+        let key = match_key_profile(&z);
+        assert_eq!(key.as_deref(), Some("C Major"));
+    }
+
     fn write_test_wav(path: &Path, samples: &[f32], sample_rate: u32) {
         let n = samples.len() as u32;
         let data_size = n * 2;

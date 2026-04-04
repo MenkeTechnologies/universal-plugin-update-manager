@@ -527,12 +527,41 @@ mod tests {
     }
 
     #[test]
-    fn test_daw_name_for_format() {
+    fn test_ext_matches_reaper_backup_suffix_before_plain_rpp() {
+        assert_eq!(
+            ext_matches(Path::new("Mixdown.rpp-bak")),
+            Some("RPP-BAK".into())
+        );
+        assert_eq!(ext_matches(Path::new("Mixdown.rpp")), Some("RPP".into()));
+    }
+
+    #[test]
+    fn test_ext_matches_case_insensitive_file_name() {
+        assert_eq!(
+            ext_matches(Path::new("LIVE.SET.ALS")),
+            Some("ALS".into())
+        );
+    }
+
+    #[test]
+    fn test_daw_name_for_format_all_known_tokens() {
         assert_eq!(daw_name_for_format("ALS"), "Ableton Live");
         assert_eq!(daw_name_for_format("LOGICX"), "Logic Pro");
         assert_eq!(daw_name_for_format("FLP"), "FL Studio");
         assert_eq!(daw_name_for_format("CPR"), "Cubase");
+        assert_eq!(daw_name_for_format("NPR"), "Nuendo");
+        assert_eq!(daw_name_for_format("BWPROJECT"), "Bitwig Studio");
         assert_eq!(daw_name_for_format("RPP"), "REAPER");
+        assert_eq!(daw_name_for_format("RPP-BAK"), "REAPER");
+        assert_eq!(daw_name_for_format("PTX"), "Pro Tools");
+        assert_eq!(daw_name_for_format("PTF"), "Pro Tools");
+        assert_eq!(daw_name_for_format("SONG"), "Studio One");
+        assert_eq!(daw_name_for_format("REASON"), "Reason");
+        assert_eq!(daw_name_for_format("AUP"), "Audacity");
+        assert_eq!(daw_name_for_format("AUP3"), "Audacity");
+        assert_eq!(daw_name_for_format("BAND"), "GarageBand");
+        assert_eq!(daw_name_for_format("ARDOUR"), "Ardour");
+        assert_eq!(daw_name_for_format("DAWPROJECT"), "DAWproject");
         assert_eq!(daw_name_for_format("XYZ"), "Unknown");
     }
 

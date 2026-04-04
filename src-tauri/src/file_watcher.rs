@@ -22,6 +22,7 @@ const AUDIO_EXTS: &[&str] = &[
 const DAW_EXTS: &[&str] = &[
     "als",
     "rpp",
+    "rpp-bak",
     "flp",
     "cpr",
     "npr",
@@ -314,6 +315,15 @@ mod tests {
     #[test]
     fn test_classify_daw_bwproject() {
         assert_eq!(classify(Path::new("song.bwproject")), Some("daw"));
+    }
+
+    #[test]
+    fn test_classify_daw_reaper_backup_rpp_bak() {
+        assert_eq!(
+            classify(Path::new("session.rpp-bak")),
+            Some("daw"),
+            "REAPER backups must match DAW scanner .rpp-bak"
+        );
     }
 
     #[test]

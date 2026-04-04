@@ -1080,4 +1080,57 @@ mod tests {
         assert!(meta.sample_rate.is_none());
         let _ = fs::remove_dir_all(&tmp);
     }
+
+    #[test]
+    fn test_get_audio_metadata_wav_zero_byte_rate_skips_duration() {
+        let tmp = std::env::temp_dir().join("upum_test_meta_wav_zero_br");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let wav_path = tmp.join("zero_br.wav");
+
+        let mut header = [0u8; 44];
+        header[0..4].copy_from_slice(b"RIFF");
+        let file_size: u32 = 44 - 8 + 1000;
+        header[4..8].copy_from_slice(&file_size.to_le_bytes());
+        header[8..12].copy_from_slice(b"WAVE");
+        header[12..16].copy_from_slice(b"fmt ");
+        header[16..20].copy_from_slice(&16u32.to_le_bytes());
+        header[20..22].copy_from_slice(&1u16.to_le_bytes());
+        header[22..24].copy_from_slice(&2u16.to_le_bytes());
+        header[24..28].copy_from_slice(&44100u32.to_le_bytes());
+        header[28..32].copy_from_slice(&0u32.to_le_bytes());
+        header[32..34].copy_from_slice(&4u16.to_le_bytes());
+        header[34..36].copy_from_slice(&16u16.to_le_bytes());
+        header[36..40].copy_from_slice(b"data");
+        header[40..44].copy_from_slice(&1000u32.to_le_bytes());
+
+        let mut file = fs::File::create(&wav_path).unwrap();
+        file.write_all(&header).unwrap();
+        file.write_all(&vec![0u8; 1000]).unwrap();
+
+        let meta = get_audio_metadata(wav_path.to_str().unwrap());
+        assert_eq!(meta.format, "WAV");
+        assert_eq!(meta.channels, Some(2));
+        assert_eq!(meta.sample_rate, Some(44100));
+        assert!(
+            meta.duration.is_none(),
+            "byte_rate 0 must not produce duration via division"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_get_audio_metadata_no_extension_still_reads_file_times() {
+        let tmp = std::env::temp_dir().join("upum_test_meta_no_ext");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.join("README"); // no extension
+        fs::write(&path, b"plain").unwrap();
+        let meta = get_audio_metadata(path.to_str().unwrap());
+        assert_eq!(meta.format, "");
+        assert_eq!(meta.file_name, "README");
+        assert!(meta.error.is_none());
+        assert_eq!(meta.size_bytes, 5);
+        let _ = fs::remove_dir_all(&tmp);
+    }
 }
