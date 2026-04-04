@@ -7046,3 +7046,206 @@ fn update_result_serde_roundtrip_has_update_false_wave35() {
     let back: app_lib::kvr::UpdateResult = serde_json::from_str(&j).unwrap();
     assert!(!back.has_update);
 }
+
+// ── Wave 36: `radix_string(999_999_999, 36)` (`gjdgxr`), `find_similar` 26/28, twenty-four-sample /
+//    twenty-four-DAW / twenty-four-preset / twenty-three-plugin-removed batches, DAW net 20/17,
+//    `format_size` 6 B, sixteenth-component KVR padding ─────────────────────────────────
+
+#[test]
+fn radix_string_999999999_base36_is_gjdgxr() {
+    assert_eq!(radix_string(999_999_999, 36), "gjdgxr");
+}
+
+#[test]
+fn extract_plugins_nonexistent_dust_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_project.dust");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_twenty_eight_candidates_max_twenty_six() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..28).map(|i| fp(&format!("/region{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 26);
+    assert_eq!(out.len(), 26);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_twenty_four_samples_added() {
+    let samples: Vec<_> = (0..24)
+        .map(|i| sample(&format!("/render/pass{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 24);
+}
+
+#[test]
+fn compute_daw_diff_twenty_four_added_from_empty() {
+    let projects: Vec<_> = (0..24)
+        .map(|i| dawproj(&format!("/orchestra/movement{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 24);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_twenty_four_presets() {
+    let presets: Vec<_> = (0..24)
+        .map(|i| preset(&format!("/massive/BankD/preset{i}.nmsv")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 24);
+}
+
+#[test]
+fn compute_plugin_diff_twenty_three_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &(0..23)
+            .map(|i| plug(&format!("/chain/link{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 23);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_6_bytes() {
+    assert_eq!(app_lib::format_size(6), "6.0 B");
+}
+
+#[test]
+fn compute_daw_diff_twenty_removed_seventeen_added_net() {
+    let old = build_daw_snapshot(
+        &(0..20)
+            .map(|i| dawproj(&format!("/vault/v{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &(0..17)
+            .map(|i| dawproj(&format!("/stage/s{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 20);
+    assert_eq!(d.added.len(), 17);
+}
+
+#[test]
+fn compute_plugin_diff_sixteen_added_fourteen_removed_net_two() {
+    let old = build_plugin_snapshot(
+        &(0..14)
+            .map(|i| plug(&format!("/left/l{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &(0..16)
+            .map(|i| plug(&format!("/right/r{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 14);
+    assert_eq!(d.added.len(), 16);
+}
+
+#[test]
+fn ext_matches_nuendo_npr_deep_path_wave36() {
+    assert_eq!(
+        ext_matches(Path::new(
+            "/Clients/2026/FilmScore/Act_III/Session_Main_v9.npr"
+        ))
+        .as_deref(),
+        Some("NPR")
+    );
+}
+
+#[test]
+fn fingerprint_distance_high_band_energy_only_change_nonzero_alt4() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.high_band_energy = 0.94;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_sixteenth_component_padding_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions(
+            "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+            "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0"
+        ),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn kvr_parse_version_triple_gap_five_five_five() {
+    assert_eq!(
+        app_lib::kvr::parse_version("5..5..5"),
+        vec![5, 0, 5, 0, 5]
+    );
+}
+
+#[test]
+fn kvr_compare_versions_six_vs_six_dot_zeros_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("6", "6.0.0.0"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn normalize_plugin_name_strips_universal_then_vst3_parens() {
+    assert_eq!(
+        normalize_plugin_name("Channel Strip (Universal) (VST3)"),
+        "channel strip"
+    );
+}
+
+#[test]
+fn preset_file_serde_roundtrip_name_with_unicode_wave36() {
+    let mut p = preset("/x.fxp");
+    p.name = "プリセットA".into();
+    let j = serde_json::to_string(&p).unwrap();
+    let back: PresetFile = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.name, "プリセットA");
+}
+
+#[test]
+fn export_payload_serde_roundtrip_single_plugin_wave36() {
+    let p = ExportPayload {
+        version: "1".into(),
+        exported_at: "t".into(),
+        plugins: vec![ExportPlugin {
+            name: "P".into(),
+            plugin_type: "VST3".into(),
+            version: "1".into(),
+            manufacturer: "M".into(),
+            manufacturer_url: None,
+            path: "/p.vst3".into(),
+            size: "1 B".into(),
+            size_bytes: 1,
+            modified: "m".into(),
+            architectures: vec!["x86_64".into()],
+        }],
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: ExportPayload = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.plugins.len(), 1);
+    assert_eq!(back.plugins[0].name, "P");
+}
