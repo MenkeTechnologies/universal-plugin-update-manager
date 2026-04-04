@@ -7451,3 +7451,204 @@ fn plugin_ref_serde_roundtrip_unicode_normalized_name_wave37() {
     let back: PluginRef = serde_json::from_str(&j).unwrap();
     assert_eq!(back.normalized_name, "エコー");
 }
+
+// ── Wave 38: `radix_string(997_999_999, 36)` (`gi6lq7`), `find_similar` 28/30, twenty-six-sample /
+//    twenty-six-DAW / twenty-six-preset / twenty-five-plugin-removed batches, DAW net 22/19,
+//    `format_size` 8 B, eighteenth-component KVR padding ───────────────────────────────────────
+
+#[test]
+fn radix_string_997999999_base36_is_gi6lq7() {
+    assert_eq!(radix_string(997_999_999, 36), "gi6lq7");
+}
+
+#[test]
+fn extract_plugins_nonexistent_lint_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_project.lint");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_thirty_candidates_max_twenty_eight() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..30).map(|i| fp(&format!("/region{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 28);
+    assert_eq!(out.len(), 28);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_twenty_six_samples_added() {
+    let samples: Vec<_> = (0..26)
+        .map(|i| sample(&format!("/render/pass{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 26);
+}
+
+#[test]
+fn compute_daw_diff_twenty_six_added_from_empty() {
+    let projects: Vec<_> = (0..26)
+        .map(|i| dawproj(&format!("/orchestra/movement{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 26);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_twenty_six_presets() {
+    let presets: Vec<_> = (0..26)
+        .map(|i| preset(&format!("/massive/BankD/preset{i}.nmsv")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 26);
+}
+
+#[test]
+fn compute_plugin_diff_twenty_five_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &(0..25)
+            .map(|i| plug(&format!("/chain/link{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 25);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_8_bytes_wave38() {
+    assert_eq!(app_lib::format_size(8), "8.0 B");
+}
+
+#[test]
+fn compute_daw_diff_twenty_two_removed_nineteen_added_net() {
+    let old = build_daw_snapshot(
+        &(0..22)
+            .map(|i| dawproj(&format!("/vault/v{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &(0..19)
+            .map(|i| dawproj(&format!("/stage/s{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 22);
+    assert_eq!(d.added.len(), 19);
+}
+
+#[test]
+fn compute_plugin_diff_eighteen_added_sixteen_removed_net_two() {
+    let old = build_plugin_snapshot(
+        &(0..16)
+            .map(|i| plug(&format!("/left/l{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &(0..18)
+            .map(|i| plug(&format!("/right/r{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 16);
+    assert_eq!(d.added.len(), 18);
+}
+
+#[test]
+fn ext_matches_ardour_deep_path_wave38() {
+    assert_eq!(
+        ext_matches(Path::new(
+            "/mnt/nfs/audio/sessions/2026/tour/FOH/Monitors/MainMix_v4.ardour"
+        ))
+        .as_deref(),
+        Some("ARDOUR")
+    );
+}
+
+#[test]
+fn fingerprint_distance_low_band_energy_only_change_nonzero_wave38() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.low_band_energy = 0.92;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_eighteenth_component_padding_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions(
+            "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+            "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0"
+        ),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn kvr_parse_version_triple_gap_ten_ten_ten() {
+    assert_eq!(
+        app_lib::kvr::parse_version("10..10..10"),
+        vec![10, 0, 10, 0, 10]
+    );
+}
+
+#[test]
+fn kvr_compare_versions_ten_vs_ten_dot_zeros_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("10", "10.0.0.0"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn normalize_plugin_name_strips_x86_64_then_au_parens() {
+    assert_eq!(
+        normalize_plugin_name("Gate (x86_64) (AU)"),
+        "gate"
+    );
+}
+
+#[test]
+fn export_plugin_serde_roundtrip_manufacturer_url_https_wave38() {
+    let p = ExportPlugin {
+        name: "P".into(),
+        plugin_type: "VST3".into(),
+        version: "2".into(),
+        manufacturer: "M".into(),
+        manufacturer_url: Some("https://vendor.example/plugin/p".into()),
+        path: "/p.vst3".into(),
+        size: "1 B".into(),
+        size_bytes: 1,
+        modified: "m".into(),
+        architectures: vec!["arm64".into()],
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: ExportPlugin = serde_json::from_str(&j).unwrap();
+    assert_eq!(
+        back.manufacturer_url.as_deref(),
+        Some("https://vendor.example/plugin/p")
+    );
+}
+
+#[test]
+fn audio_sample_serde_roundtrip_name_unicode_wave38() {
+    let mut s = sample("/recordings/take.wav");
+    s.name = "波形".into();
+    let j = serde_json::to_string(&s).unwrap();
+    let back: AudioSample = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.name, "波形");
+}
