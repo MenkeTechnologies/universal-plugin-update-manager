@@ -351,6 +351,21 @@ document.addEventListener('change', (e) => {
   else if (action === 'settingPluginSort') settingSaveSelect('pluginSort', e.target.value);
   else if (action === 'settingAudioSort') settingSaveSelect('audioSort', e.target.value);
   else if (action === 'settingDawSort') settingSaveSelect('dawSort', e.target.value);
+  else if (action === 'settingTagBarPosition') {
+    const pos = e.target.value || 'top';
+    prefs.setItem('tagBarPosition', pos);
+    const bar = document.getElementById('globalTagBar');
+    const tabNav = document.querySelector('.tab-nav');
+    if (bar && tabNav) {
+      if (pos === 'bottom') {
+        const lastTab = [...document.querySelectorAll('.tab-content')].pop();
+        if (lastTab) lastTab.parentNode.insertBefore(bar, lastTab.nextSibling);
+      } else {
+        tabNav.parentNode.insertBefore(bar, tabNav);
+      }
+    }
+    showToast(`Tag bar moved to ${pos}`);
+  }
 });
 document.addEventListener('blur', (e) => {}, true);
 
