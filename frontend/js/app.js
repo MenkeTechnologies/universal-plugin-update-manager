@@ -25,7 +25,7 @@
     await win.onResized(saveWindow);
     await win.onMoved(saveWindow);
   } catch (e) {
-    console.error('Failed to set up window listeners:', e);
+    if (typeof showToast === 'function') showToast('Window listener setup failed: ' + (e.message || e), 4000, 'error');
   }
 })();
 
@@ -253,7 +253,7 @@ async function updateHeaderInfo() {
         badge.style.display = 'none';
       }
     }
-  } catch (err) { console.error('updateHeaderInfo:', err); }
+  } catch (err) { if (typeof showToast === 'function') showToast('Stats update failed: ' + (err.message || err), 4000, 'error'); }
 }
 
 if (typeof document !== 'undefined') {

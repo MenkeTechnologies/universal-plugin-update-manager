@@ -31,7 +31,7 @@ async function loadMidiFiles() {
     updateMidiCount();
     updateMidiHeaderCount();
   } catch (e) {
-    console.warn('MIDI load error:', e);
+    if (typeof showToast === 'function') showToast('MIDI load failed: ' + (e.message || e), 4000, 'error');
   }
 }
 
