@@ -3859,3 +3859,162 @@ fn ext_matches_fl_studio_flp_deep_path_lowercase() {
         Some("FLP")
     );
 }
+
+// ── Wave 18: radix 36⁸, xref missing `.dawproject`/`.bwproject`/`.logicx`, `find_similar` 7/9,
+//    six-sample audio + quad plugin/DAW/preset batches, `low_energy_ratio` fingerprint ─
+
+#[test]
+fn radix_string_2821109907456_base36_is_hundred_million() {
+    assert_eq!(radix_string(2_821_109_907_456, 36), "100000000");
+}
+
+#[test]
+fn extract_plugins_nonexistent_dawproject_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_export.dawproject");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn extract_plugins_nonexistent_bwproject_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_bitwig.bwproject");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn extract_plugins_nonexistent_logicx_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_logic.logicx");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_nine_candidates_max_seven() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..9).map(|i| fp(&format!("/c{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 7);
+    assert_eq!(out.len(), 7);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_six_samples_added() {
+    let samples: Vec<_> = (0..6)
+        .map(|i| sample(&format!("/s{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 6);
+}
+
+#[test]
+fn compute_daw_diff_four_removed_to_empty() {
+    let old = build_daw_snapshot(
+        &[
+            dawproj("/d0.dawproject"),
+            dawproj("/d1.dawproject"),
+            dawproj("/d2.dawproject"),
+            dawproj("/d3.dawproject"),
+        ],
+        &[],
+    );
+    let new = build_daw_snapshot(&[], &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 4);
+    assert!(d.added.is_empty());
+}
+
+#[test]
+fn compute_plugin_diff_four_added_from_empty() {
+    let new = build_plugin_snapshot(
+        &[
+            plug("/a.vst3", "1"),
+            plug("/b.vst3", "1"),
+            plug("/c.vst3", "1"),
+            plug("/d.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let old = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.added.len(), 4);
+    assert!(d.removed.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn compute_preset_diff_empty_to_five_presets() {
+    let presets: Vec<_> = (0..5)
+        .map(|i| preset(&format!("/preset{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 5);
+}
+
+#[test]
+fn fingerprint_distance_low_energy_ratio_only_change_nonzero() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.low_energy_ratio = 0.91;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_hundred_vs_twenty_numeric() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("100.0.0", "20.99.99"),
+        Ordering::Greater
+    );
+}
+
+#[test]
+fn ext_matches_dawproject_deep_lowercase_ext() {
+    assert_eq!(
+        ext_matches(Path::new(
+            "/Users/shared/DAWproject/exports/live_stem_mix.dawproject"
+        ))
+        .as_deref(),
+        Some("DAWPROJECT")
+    );
+}
+
+#[test]
+fn compute_daw_diff_one_removed_three_added_net_two() {
+    let old = build_daw_snapshot(&[dawproj("/only.dawproject")], &[]);
+    let new = build_daw_snapshot(
+        &[
+            dawproj("/a.dawproject"),
+            dawproj("/b.dawproject"),
+            dawproj("/c.dawproject"),
+        ],
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 1);
+    assert_eq!(d.added.len(), 3);
+}
+
+#[test]
+fn compute_plugin_diff_two_removed_one_added_net() {
+    let old = build_plugin_snapshot(
+        &[plug("/old1.vst3", "1"), plug("/old2.vst3", "1")],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[plug("/new1.vst3", "1")], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 2);
+    assert_eq!(d.added.len(), 1);
+}
+
+#[test]
+fn kvr_parse_version_leading_dot_yields_leading_zero_segment() {
+    assert_eq!(app_lib::kvr::parse_version(".5"), vec![0, 5]);
+}
+
+#[test]
+fn is_package_ext_band_deep_path_true() {
+    assert!(is_package_ext(Path::new(
+        "/Music/GarageBand/2026/jam_session.band"
+    )));
+}

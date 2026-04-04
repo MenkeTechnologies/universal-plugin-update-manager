@@ -47,8 +47,8 @@ jobs:
       - name: Run Rust tests (library)
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
-      - name: Run Rust tests (behavioral_ultra integration)
-        run: cargo test --manifest-path src-tauri/Cargo.toml --test behavioral_ultra
+      - name: Run Rust tests (behavioral_ultra + app_i18n integration)
+        run: cargo test --manifest-path src-tauri/Cargo.toml --test behavioral_ultra --test app_i18n_test
 
   build:
     needs: test
