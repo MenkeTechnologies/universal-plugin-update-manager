@@ -3337,3 +3337,117 @@ fn compute_audio_diff_duplicate_paths_in_new_scan_both_rows_in_added() {
     assert_eq!(d.added.len(), 2);
     assert_eq!(d.added[0].path, d.added[1].path);
 }
+
+// ── Wave 14: radix 36⁴, xref missing `.als`, format_size GiB/PiB edges, plugin
+//    shrink-from-three, Studio One path, KVR semver-ish parse, `find_similar` cap ─────
+
+#[test]
+fn radix_string_1679616_base36_is_ten_thousand() {
+    assert_eq!(radix_string(1_679_616, 36), "10000");
+}
+
+#[test]
+fn extract_plugins_nonexistent_als_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_project.als");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn kvr_compare_versions_leading_zero_string_vs_plain_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("01", "1"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn format_size_one_byte_below_one_gib_exactly_1024_mb() {
+    let b = 1024_u64.pow(3) - 1;
+    assert_eq!(app_lib::format_size(b), "1024.0 MB");
+}
+
+#[test]
+fn format_size_one_byte_below_one_tebibyte_exactly_1024_tb() {
+    let b = 1024_u64.pow(5) - 1;
+    assert_eq!(app_lib::format_size(b), "1024.0 TB");
+}
+
+#[test]
+fn compute_plugin_diff_remove_two_keep_one_path() {
+    let old = build_plugin_snapshot(
+        &[
+            plug("/a.vst3", "1"),
+            plug("/b.vst3", "1"),
+            plug("/c.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[plug("/c.vst3", "1")], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 2);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn ext_matches_studio_one_deep_path_uppercase_song() {
+    assert_eq!(
+        ext_matches(Path::new("/Volumes/Audio/Sessions/2025/MixFinal.SONG")).as_deref(),
+        Some("SONG")
+    );
+}
+
+#[test]
+fn kvr_parse_version_prerelease_suffix_segment_zero() {
+    let v = app_lib::kvr::parse_version("1.0.0-alpha");
+    assert_eq!(v, vec![1, 0, 0]);
+}
+
+#[test]
+fn find_similar_five_candidates_max_three() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..5).map(|i| fp(&format!("/s{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 3);
+    assert_eq!(out.len(), 3);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_two_presets() {
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&[preset("/a.fxp"), preset("/b.fxp")], &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 2);
+    assert!(d.removed.is_empty());
+}
+
+#[test]
+fn fingerprint_distance_attack_time_only_change_nonzero() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.attack_time = 1.95;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_lexicographic_three_digits() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("999", "1000"),
+        Ordering::Less
+    );
+}
+
+#[test]
+fn normalize_plugin_name_strips_stereo_then_vst3_parens() {
+    assert_eq!(
+        normalize_plugin_name("Tape Echo (Stereo) (VST3)"),
+        "tape echo"
+    );
+}
+
+#[test]
+fn kvr_compare_versions_patch_09_vs_10_numeric() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.09", "1.10"),
+        Ordering::Less
+    );
+}
