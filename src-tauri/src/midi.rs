@@ -635,4 +635,19 @@ mod tests {
         assert_eq!(read_var_len(&[0x81, 0x00], 0), (128, 2));
         assert_eq!(read_var_len(&[0x83, 0x60], 0), (480, 2));
     }
+
+    #[test]
+    fn test_parse_midi_sysex_advances_parser_without_note_count() {
+        // F0 + var-len payload (3 bytes) + 3 data bytes, then end-of-track.
+        let track = vec![
+            0x00, 0xF0, 0x03, 0x01, 0x02, 0x03, // SysEx
+            0x00, 0xFF, 0x2F, 0x00,
+        ];
+        let data = make_midi(0, 1, 480, &track);
+        let tmp = std::env::temp_dir().join("test_midi_sysex.mid");
+        std::fs::write(&tmp, &data).unwrap();
+        let info = parse_midi(&tmp).unwrap();
+        assert_eq!(info.note_count, 0);
+        let _ = std::fs::remove_file(&tmp);
+    }
 }

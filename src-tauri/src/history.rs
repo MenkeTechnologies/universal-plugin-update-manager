@@ -1643,6 +1643,18 @@ mod tests {
     }
 
     #[test]
+    fn test_json_to_toml_nested_object_and_array_round_trip() {
+        let j = serde_json::json!({
+            "nested": { "x": 1, "flag": true },
+            "arr": [1, 2, 3],
+            "empty": {}
+        });
+        let t = json_to_toml_value(&j);
+        let back = toml_value_to_json(&t);
+        assert_eq!(back, j);
+    }
+
+    #[test]
     fn test_build_audio_snapshot_aggregates_formats_and_total_bytes() {
         let samples = vec![
             AudioSample {

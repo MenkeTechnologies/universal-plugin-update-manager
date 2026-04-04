@@ -727,4 +727,17 @@ mod tests {
             "non-numeric tail segment parses as 0 — semver text not preserved"
         );
     }
+
+    /// `compare_versions` uses numeric dot segments only; prerelease text does not implement semver ordering.
+    #[test]
+    fn test_compare_versions_equal_when_prerelease_differs_only_in_suffix() {
+        assert_eq!(
+            compare_versions("1.0.0-rc1", "1.0.0"),
+            std::cmp::Ordering::Equal
+        );
+        assert_eq!(
+            compare_versions("2.1.0-beta", "2.1.0"),
+            std::cmp::Ordering::Equal
+        );
+    }
 }

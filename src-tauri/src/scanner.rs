@@ -727,6 +727,26 @@ mod tests {
         let _ = fs::remove_dir_all(&tmp);
     }
 
+    /// Universal binary with reversed fat magic `0xBEBAFECA` (first 4 bytes on disk: `BE BA FE CA` when
+    /// read as big-endian u32). Parser uses LE for `nfat` and CPU slots on this path.
+    #[test]
+    fn test_detect_architectures_fat_binary_little_endian_magic() {
+        let tmp = std::env::temp_dir().join("upum_test_fat_le_plugin.vst3");
+        let macos = tmp.join("Contents").join("MacOS");
+        let _ = fs::create_dir_all(&macos);
+        let mut header = vec![0u8; 48];
+        header[0..4].copy_from_slice(&0xBEBAFECAu32.to_be_bytes());
+        header[4..8].copy_from_slice(&2u32.to_le_bytes());
+        header[8..12].copy_from_slice(&0x01000007u32.to_le_bytes());
+        header[28..32].copy_from_slice(&0x0100000Cu32.to_le_bytes());
+        fs::write(macos.join("binary"), &header).unwrap();
+
+        let archs = super::detect_architectures(&tmp);
+        assert!(archs.contains(&"x86_64".to_string()));
+        assert!(archs.contains(&"ARM64".to_string()));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
     #[test]
     fn test_detect_architectures_pe_x64_dll_file() {
         let tmp = std::env::temp_dir().join("upum_test_pe_amd64.dll");
