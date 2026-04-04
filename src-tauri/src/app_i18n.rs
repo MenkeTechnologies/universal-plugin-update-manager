@@ -134,6 +134,17 @@ mod tests {
         "menu.window",
     ];
 
+    /// Keys passed to `t("tray.…", …)` for the system tray in `lib.rs`.
+    const TRAY_KEYS: &[&str] = &[
+        "tray.show",
+        "tray.scan_all",
+        "tray.stop_all",
+        "tray.play_pause",
+        "tray.next_track",
+        "tray.quit",
+        "tray.tooltip",
+    ];
+
     fn setup_minimal_i18n(conn: &Connection) {
         conn.execute_batch(
             "CREATE TABLE app_i18n (
@@ -318,6 +329,17 @@ mod tests {
             assert!(
                 en.get(*key).map(|s| !s.trim().is_empty()).unwrap_or(false),
                 "English seed missing native menu bar key {key} (sync with native_menu.rs)"
+            );
+        }
+    }
+
+    #[test]
+    fn seed_json_en_defines_all_tray_keys() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        for key in TRAY_KEYS {
+            assert!(
+                en.get(*key).map(|s| !s.trim().is_empty()).unwrap_or(false),
+                "English seed missing tray key {key} (sync with lib.rs tray menu)"
             );
         }
     }

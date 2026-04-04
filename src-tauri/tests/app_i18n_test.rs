@@ -102,3 +102,25 @@ fn app_strings_de_retains_placeholder_for_menu_batch_selected() {
         "German menu.batch_selected must keep {{n}} for appFmt: {v:?}"
     );
 }
+
+#[test]
+fn app_strings_en_contains_tray_keys() {
+    ensure_db();
+    let m = app_lib::db::global()
+        .get_app_strings("en")
+        .expect("en");
+    for key in [
+        "tray.show",
+        "tray.scan_all",
+        "tray.stop_all",
+        "tray.play_pause",
+        "tray.next_track",
+        "tray.quit",
+        "tray.tooltip",
+    ] {
+        assert!(
+            m.get(key).map(|s| !s.is_empty()).unwrap_or(false),
+            "missing or empty tray key: {key}"
+        );
+    }
+}

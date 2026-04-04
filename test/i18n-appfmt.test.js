@@ -56,3 +56,23 @@ test('appFmt does not replace brace segments that are not {word}', () => {
   const map = { t: 'x {not-a-token} y' };
   assert.equal(appFmt(map, 't', { not: 1 }), 'x {not-a-token} y');
 });
+
+/**
+ * Per-field lookup used by `applyUiI18n` (`frontend/js/i18n-ui.js`): only non-null, non-empty map values apply.
+ */
+function resolveUiString(map, key) {
+  if (!map || typeof map !== 'object') return null;
+  const v = map[key];
+  if (v == null || v === '') return null;
+  return v;
+}
+
+test('resolveUiString returns null for missing or empty values', () => {
+  assert.equal(resolveUiString({}, 'a'), null);
+  assert.equal(resolveUiString({ a: '' }, 'a'), null);
+  assert.equal(resolveUiString({ a: null }, 'a'), null);
+});
+
+test('resolveUiString returns value when key has text', () => {
+  assert.equal(resolveUiString({ k: 'OK' }, 'k'), 'OK');
+});
