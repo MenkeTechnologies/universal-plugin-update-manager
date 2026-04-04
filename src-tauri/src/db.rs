@@ -1284,7 +1284,9 @@ impl Database {
             bi += 1;
         }
         if let Some(f) = daw_filter {
-            if !f.is_empty() && f != "all" {
+            // Comma-separated filters are inlined into `daw IN (...)` by the SQL builder
+            // and have no placeholder to bind to — skip them here.
+            if !f.is_empty() && f != "all" && !f.contains(',') {
                 stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
                 bi += 1;
             }
@@ -1433,7 +1435,9 @@ impl Database {
             bi += 1;
         }
         if let Some(f) = format_filter {
-            if !f.is_empty() && f != "all" {
+            // Comma-separated filters are inlined into `format IN (...)` by the SQL builder
+            // and have no placeholder to bind to — skip them here.
+            if !f.is_empty() && f != "all" && !f.contains(',') {
                 stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
                 bi += 1;
             }
@@ -3387,6 +3391,374 @@ mod tests {
         let res = db.query_presets(None, None, "name", true, 0, 100).unwrap();
         assert_eq!(res.total_count, 0);
         assert_eq!(res.total_unfiltered, 0);
+    }
+
+    // ── Multi-scan semantics ──
+    //
+    // Each new scan inserts rows with a fresh scan_id (daw_projects/presets/plugins
+    // accumulate rows across history). Queries must return the LATEST scan's count,
+    // not the cumulative total.
+
+    fn daw_snap(id: &str, ts: &str, projects: Vec<DawProject>) -> DawScanSnapshot {
+        let mut daw_counts = HashMap::new();
+        for p in &projects {
+            *daw_counts.entry(p.daw.clone()).or_insert(0usize) += 1;
+        }
+        let total_bytes = projects.iter().map(|p| p.size).sum();
+        DawScanSnapshot {
+            id: id.into(),
+            timestamp: ts.into(),
+            project_count: projects.len(),
+            total_bytes,
+            daw_counts,
+            projects,
+            roots: vec!["/music".into()],
+        }
+    }
+
+    #[test]
+    fn test_query_daw_multi_scan_returns_latest_only() {
+        let db = test_db();
+        // First (older) scan with 3 projects
+        db.save_daw_scan(&daw_snap(
+            "ds-old",
+            "2024-01-01T00:00:00",
+            vec![
+                daw_project("old1.als", "Ableton"),
+                daw_project("old2.als", "Ableton"),
+                daw_project("old3.als", "Ableton"),
+            ],
+        ))
+        .unwrap();
+        // Second (newer) scan with 2 projects
+        db.save_daw_scan(&daw_snap(
+            "ds-new",
+            "2024-06-01T00:00:00",
+            vec![
+                daw_project("new1.als", "Ableton"),
+                daw_project("new2.als", "Ableton"),
+            ],
+        ))
+        .unwrap();
+
+        let res = db.query_daw(None, None, "name", true, 0, 100).unwrap();
+        assert_eq!(res.total_unfiltered, 2, "should reflect latest scan only");
+        assert_eq!(res.total_count, 2);
+        assert_eq!(res.projects.len(), 2);
+        assert!(res.projects.iter().all(|p| p.name.starts_with("new")));
+    }
+
+    #[test]
+    fn test_query_daw_empty_latest_scan_ignored() {
+        // Selecting the "latest" scan uses `WHERE project_count > 0` — a zero-result
+        // scan saved after a successful one must NOT clobber the header count.
+        let db = test_db();
+        db.save_daw_scan(&daw_snap(
+            "ds-real",
+            "2024-01-01T00:00:00",
+            vec![daw_project("only.als", "Ableton")],
+        ))
+        .unwrap();
+        // A subsequent empty scan (user hit Stop immediately, or nothing found)
+        db.save_daw_scan(&daw_snap("ds-empty", "2024-12-01T00:00:00", vec![]))
+            .unwrap();
+
+        let res = db.query_daw(None, None, "name", true, 0, 100).unwrap();
+        assert_eq!(
+            res.total_unfiltered, 1,
+            "empty scans with project_count=0 must not hide the real latest scan"
+        );
+        assert_eq!(res.projects.len(), 1);
+        assert_eq!(res.projects[0].name, "only.als");
+    }
+
+    #[test]
+    fn test_query_daw_total_unfiltered_stable_across_pagination() {
+        let db = test_db();
+        let projects: Vec<_> = (0..25)
+            .map(|i| daw_project(&format!("p{i:02}.als"), "Ableton"))
+            .collect();
+        db.save_daw_scan(&daw_snap("ds-page", "2024-06-01T00:00:00", projects))
+            .unwrap();
+
+        let p1 = db.query_daw(None, None, "name", true, 0, 10).unwrap();
+        let p2 = db.query_daw(None, None, "name", true, 10, 10).unwrap();
+        let p3 = db.query_daw(None, None, "name", true, 20, 10).unwrap();
+
+        assert_eq!(p1.total_unfiltered, 25);
+        assert_eq!(p2.total_unfiltered, 25);
+        assert_eq!(p3.total_unfiltered, 25);
+        assert_eq!(p1.total_count, 25);
+        assert_eq!(p1.projects.len(), 10);
+        assert_eq!(p2.projects.len(), 10);
+        assert_eq!(p3.projects.len(), 5);
+    }
+
+    #[test]
+    fn test_query_daw_combined_search_and_filter() {
+        let db = test_db();
+        db.save_daw_scan(&daw_snap(
+            "ds-combo",
+            "2024-06-01T00:00:00",
+            vec![
+                daw_project("bass.als", "Ableton"),
+                daw_project("drums.als", "Ableton"),
+                daw_project("bass.logicx", "Logic"),
+                daw_project("mix.logicx", "Logic"),
+            ],
+        ))
+        .unwrap();
+
+        // search="bass" + daw_filter="Ableton" → 1 match, unfiltered stays 4
+        let res = db
+            .query_daw(Some("bass"), Some("Ableton"), "name", true, 0, 100)
+            .unwrap();
+        assert_eq!(res.total_count, 1);
+        assert_eq!(res.total_unfiltered, 4);
+        assert_eq!(res.projects.len(), 1);
+        assert_eq!(res.projects[0].name, "bass.als");
+    }
+
+    #[test]
+    fn test_query_daw_comma_separated_filter_unfiltered_stable() {
+        let db = test_db();
+        db.save_daw_scan(&daw_snap(
+            "ds-multi",
+            "2024-06-01T00:00:00",
+            vec![
+                daw_project("a.als", "Ableton"),
+                daw_project("b.logicx", "Logic"),
+                daw_project("c.flp", "FL Studio"),
+                daw_project("d.rpp", "REAPER"),
+            ],
+        ))
+        .unwrap();
+
+        let res = db
+            .query_daw(None, Some("Ableton,Logic"), "name", true, 0, 100)
+            .unwrap();
+        assert_eq!(res.total_count, 2);
+        assert_eq!(res.total_unfiltered, 4);
+    }
+
+    fn preset_snap(id: &str, ts: &str, presets: Vec<PresetFile>) -> PresetScanSnapshot {
+        let mut format_counts = HashMap::new();
+        for p in &presets {
+            *format_counts.entry(p.format.clone()).or_insert(0usize) += 1;
+        }
+        let total_bytes = presets.iter().map(|p| p.size).sum();
+        PresetScanSnapshot {
+            id: id.into(),
+            timestamp: ts.into(),
+            preset_count: presets.len(),
+            total_bytes,
+            format_counts,
+            presets,
+            roots: vec!["/presets".into()],
+        }
+    }
+
+    #[test]
+    fn test_query_presets_multi_scan_returns_latest_only() {
+        let db = test_db();
+        db.save_preset_scan(&preset_snap(
+            "pr-old",
+            "2024-01-01T00:00:00",
+            vec![
+                preset_file("a.fxp", "FXP"),
+                preset_file("b.fxp", "FXP"),
+                preset_file("c.fxp", "FXP"),
+            ],
+        ))
+        .unwrap();
+        db.save_preset_scan(&preset_snap(
+            "pr-new",
+            "2024-06-01T00:00:00",
+            vec![preset_file("x.fxp", "FXP")],
+        ))
+        .unwrap();
+
+        let res = db.query_presets(None, None, "name", true, 0, 100).unwrap();
+        assert_eq!(res.total_unfiltered, 1);
+        assert_eq!(res.presets.len(), 1);
+        assert_eq!(res.presets[0].name, "x.fxp");
+    }
+
+    #[test]
+    fn test_query_presets_midi_filter_still_excluded() {
+        // Even if the user explicitly format-filters for MID, the `NOT IN ('MID','MIDI')`
+        // clause must still exclude them — MIDI belongs in its own tab. The filtered
+        // AND unfiltered counts for presets should both be 0 in this case.
+        let db = test_db();
+        db.save_preset_scan(&preset_snap(
+            "pr-midi",
+            "2024-06-01T00:00:00",
+            vec![
+                preset_file("song.mid", "MID"),
+                preset_file("beat.midi", "MIDI"),
+                preset_file("lead.fxp", "FXP"),
+            ],
+        ))
+        .unwrap();
+
+        // Explicit MID filter still returns 0 filtered results
+        let res = db
+            .query_presets(None, Some("MID"), "name", true, 0, 100)
+            .unwrap();
+        assert_eq!(res.total_count, 0);
+        // Unfiltered excludes MIDI regardless of format_filter
+        assert_eq!(res.total_unfiltered, 1);
+    }
+
+    #[test]
+    fn test_query_presets_comma_separated_filter_unfiltered_stable() {
+        // Regression: comma-separated format_filter was binding the raw string to the
+        // LIMIT placeholder, causing "column index out of range" on the main SELECT.
+        let db = test_db();
+        db.save_preset_scan(&preset_snap(
+            "pr-multi-fmt",
+            "2024-06-01T00:00:00",
+            vec![
+                preset_file("a.fxp", "FXP"),
+                preset_file("b.h2p", "H2P"),
+                preset_file("c.nmsv", "NMSV"),
+                preset_file("d.fxp", "FXP"),
+            ],
+        ))
+        .unwrap();
+
+        let res = db
+            .query_presets(None, Some("FXP,H2P"), "name", true, 0, 100)
+            .unwrap();
+        assert_eq!(res.total_count, 3);
+        assert_eq!(res.total_unfiltered, 4);
+        assert_eq!(res.presets.len(), 3);
+        assert!(res.presets.iter().all(|p| p.format == "FXP" || p.format == "H2P"));
+    }
+
+    #[test]
+    fn test_query_presets_total_unfiltered_stable_across_pagination() {
+        let db = test_db();
+        let presets: Vec<_> = (0..30)
+            .map(|i| preset_file(&format!("p{i:02}.fxp"), "FXP"))
+            .collect();
+        db.save_preset_scan(&preset_snap("pr-page", "2024-06-01T00:00:00", presets))
+            .unwrap();
+
+        let p1 = db.query_presets(None, None, "name", true, 0, 10).unwrap();
+        let p2 = db.query_presets(None, None, "name", true, 10, 10).unwrap();
+        let p3 = db.query_presets(None, None, "name", true, 25, 10).unwrap();
+
+        assert_eq!(p1.total_unfiltered, 30);
+        assert_eq!(p2.total_unfiltered, 30);
+        assert_eq!(p3.total_unfiltered, 30);
+        assert_eq!(p1.presets.len(), 10);
+        assert_eq!(p2.presets.len(), 10);
+        assert_eq!(p3.presets.len(), 5);
+    }
+
+    fn plugin_snap(id: &str, ts: &str, plugins: Vec<PluginInfo>) -> ScanSnapshot {
+        ScanSnapshot {
+            id: id.into(),
+            timestamp: ts.into(),
+            plugin_count: plugins.len(),
+            plugins,
+            directories: vec!["/vst".into()],
+            roots: vec!["/vst".into()],
+        }
+    }
+
+    #[test]
+    fn test_query_plugins_multi_scan_returns_latest_only() {
+        let db = test_db();
+        db.save_plugin_scan(&plugin_snap(
+            "ps-old",
+            "2024-01-01T00:00:00",
+            vec![
+                plugin_info("Old1", "VST3", "Acme"),
+                plugin_info("Old2", "VST3", "Acme"),
+                plugin_info("Old3", "VST3", "Acme"),
+            ],
+        ))
+        .unwrap();
+        db.save_plugin_scan(&plugin_snap(
+            "ps-new",
+            "2024-06-01T00:00:00",
+            vec![plugin_info("New1", "VST3", "Acme")],
+        ))
+        .unwrap();
+
+        let res = db.query_plugins(None, None, "name", true, 0, 100).unwrap();
+        assert_eq!(res.total_unfiltered, 1);
+        assert_eq!(res.plugins.len(), 1);
+        assert_eq!(res.plugins[0].name, "New1");
+    }
+
+    #[test]
+    fn test_query_plugins_type_filter_multi_type() {
+        let db = test_db();
+        db.save_plugin_scan(&plugin_snap(
+            "ps-types",
+            "2024-06-01T00:00:00",
+            vec![
+                plugin_info("A", "VST3", "X"),
+                plugin_info("B", "VST2", "X"),
+                plugin_info("C", "AU", "X"),
+                plugin_info("D", "VST3", "X"),
+            ],
+        ))
+        .unwrap();
+
+        let res = db
+            .query_plugins(None, Some("VST3"), "name", true, 0, 100)
+            .unwrap();
+        assert_eq!(res.total_count, 2);
+        assert_eq!(res.total_unfiltered, 4);
+
+        let res = db
+            .query_plugins(None, Some("VST3,AU"), "name", true, 0, 100)
+            .unwrap();
+        assert_eq!(res.total_count, 3);
+        assert_eq!(res.total_unfiltered, 4);
+    }
+
+    #[test]
+    fn test_query_plugins_total_unfiltered_stable_across_pagination() {
+        let db = test_db();
+        let plugins: Vec<_> = (0..40)
+            .map(|i| plugin_info(&format!("plug{i:02}"), "VST3", "X"))
+            .collect();
+        db.save_plugin_scan(&plugin_snap("ps-page", "2024-06-01T00:00:00", plugins))
+            .unwrap();
+
+        let p1 = db.query_plugins(None, None, "name", true, 0, 15).unwrap();
+        let p2 = db.query_plugins(None, None, "name", true, 15, 15).unwrap();
+
+        assert_eq!(p1.total_unfiltered, 40);
+        assert_eq!(p2.total_unfiltered, 40);
+        assert_eq!(p1.plugins.len(), 15);
+        assert_eq!(p2.plugins.len(), 15);
+    }
+
+    #[test]
+    fn test_query_plugins_search_by_manufacturer() {
+        let db = test_db();
+        db.save_plugin_scan(&plugin_snap(
+            "ps-mfg",
+            "2024-06-01T00:00:00",
+            vec![
+                plugin_info("Serum", "VST3", "Xfer"),
+                plugin_info("Serum2", "VST3", "Xfer"),
+                plugin_info("Vital", "VST3", "Matt"),
+            ],
+        ))
+        .unwrap();
+
+        let res = db
+            .query_plugins(Some("Xfer"), None, "name", true, 0, 100)
+            .unwrap();
+        assert_eq!(res.total_count, 2);
+        assert_eq!(res.total_unfiltered, 3);
     }
 
     #[test]

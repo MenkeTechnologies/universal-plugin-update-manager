@@ -1526,6 +1526,13 @@ mod tests {
     }
 
     #[test]
+    fn test_radix_string_base2() {
+        assert_eq!(radix_string(0, 2), "0");
+        assert_eq!(radix_string(8, 2), "1000");
+        assert_eq!(radix_string(255, 2), "11111111");
+    }
+
+    #[test]
     fn test_gen_id_unique() {
         let id1 = gen_id();
         let id2 = gen_id();
@@ -2256,6 +2263,31 @@ mod tests {
         assert!(d.added.is_empty());
         assert!(d.removed.is_empty());
         assert!(d.version_changed.is_empty());
+    }
+
+    #[test]
+    fn test_compute_plugin_diff_unknown_to_known_same_path_no_version_changed() {
+        let old = ScanSnapshot {
+            id: "o".into(),
+            timestamp: "t1".into(),
+            plugin_count: 1,
+            plugins: vec![make_plugin("P", "Unknown", "/x/plugin.vst3")],
+            directories: vec![],
+            roots: vec![],
+        };
+        let new = ScanSnapshot {
+            id: "n".into(),
+            timestamp: "t2".into(),
+            plugin_count: 1,
+            plugins: vec![make_plugin("P", "1.0.0", "/x/plugin.vst3")],
+            directories: vec![],
+            roots: vec![],
+        };
+        let d = compute_plugin_diff(&old, &new);
+        assert!(
+            d.version_changed.is_empty(),
+            "Unknown→known should not emit version_changed (scanner ambiguity)"
+        );
     }
 
     #[test]

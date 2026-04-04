@@ -387,6 +387,21 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_note_on_velocity_zero_not_counted() {
+        // MIDI: note-on with velocity 0 is equivalent to note-off — must not increment note_count
+        let track = vec![
+            0x00, 0x90, 60, 0, // "note on" C4 vel 0
+            0x00, 0xFF, 0x2F, 0x00,
+        ];
+        let data = make_midi(0, 1, 480, &track);
+        let tmp = std::env::temp_dir().join("test_vel0_note_on.mid");
+        std::fs::write(&tmp, &data).unwrap();
+        let info = parse_midi(&tmp).unwrap();
+        assert_eq!(info.note_count, 0);
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
     fn test_parse_notes() {
         let track = vec![
             0x00, 0x90, 60, 100, // note on C4 vel=100

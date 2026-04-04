@@ -367,6 +367,28 @@ mod tests {
     }
 
     #[test]
+    fn test_walk_for_presets_finds_tfx_and_h2p() {
+        let tmp = std::env::temp_dir().join("upum_test_preset_tfx_h2p");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        fs::write(tmp.join("tone.tfx"), b"tone2").unwrap();
+        fs::write(tmp.join("diva.h2p"), b"u-he").unwrap();
+
+        let mut found = Vec::new();
+        walk_for_presets(
+            from_ref(&tmp),
+            &mut |batch, _count| found.extend_from_slice(batch),
+            &|| false,
+            None,
+            None,
+        );
+        let formats: Vec<&str> = found.iter().map(|p| p.format.as_str()).collect();
+        assert!(formats.contains(&"TFX"), "expected TFX, got {:?}", formats);
+        assert!(formats.contains(&"H2P"), "expected H2P, got {:?}", formats);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn test_walk_for_presets_finds_files() {
         let tmp = std::env::temp_dir().join("upum_test_preset_find");
         let _ = fs::remove_dir_all(&tmp);

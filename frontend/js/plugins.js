@@ -145,6 +145,8 @@ async function scanPlugins(resume = false) {
     }
 
     document.getElementById('totalCount').textContent = allPlugins.length;
+    // Refresh header count immediately — scan already saved server-side; don't wait for next fetchPluginPage
+    _pluginTotalUnfiltered = allPlugins.length;
     document.getElementById('btnCheckUpdates').disabled = allPlugins.length === 0;
 
     const dirsSection = document.getElementById('dirsSection');

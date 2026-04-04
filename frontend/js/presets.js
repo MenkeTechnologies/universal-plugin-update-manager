@@ -348,6 +348,10 @@ async function scanPresets(resume = false) {
     }
     rebuildPresetStats();
     filterPresets();
+    // Refresh header count immediately — don't wait for next fetchPresetPage.
+    // Exclude MIDI since they live in their own tab (matches backend `total_unfiltered` definition).
+    const midiFormats = new Set(['MID', 'MIDI']);
+    _presetTotalUnfiltered = allPresets.filter(p => !midiFormats.has(p.format)).length;
     // Reload MIDI tab from preset data
     if (typeof loadMidiFiles === 'function') { _midiLoaded = false; loadMidiFiles(); }
     if (!result.stopped) {

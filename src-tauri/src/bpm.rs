@@ -614,6 +614,20 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_pcm_32bit_le() {
+        let mut data = vec![0u8; 4];
+        let raw = 0x4000_0000i32;
+        data.copy_from_slice(&raw.to_le_bytes());
+        let samples = decode_pcm(&data, 32, 1, true);
+        assert_eq!(samples.len(), 1);
+        assert!(
+            (samples[0] - 0.5).abs() < 1e-5,
+            "32-bit LE 0x40000000 should normalize ~0.5, got {}",
+            samples[0]
+        );
+    }
+
+    #[test]
     fn test_decode_pcm_24bit() {
         // 24-bit LE sample: bytes [0x00, 0x00, 0x40] = 0x400000 as signed = 4194304
         // normalized: 4194304 / 8388608 = 0.5

@@ -500,6 +500,17 @@ mod tests {
     }
 
     #[test]
+    fn test_ext_matches_ardour_and_dawproject() {
+        assert_eq!(ext_matches(Path::new("session.ardour")), Some("ARDOUR".into()));
+        assert_eq!(
+            ext_matches(Path::new("openstd.dawproject")),
+            Some("DAWPROJECT".into())
+        );
+        assert_eq!(daw_name_for_format("ARDOUR"), "Ardour");
+        assert_eq!(daw_name_for_format("DAWPROJECT"), "DAWproject");
+    }
+
+    #[test]
     fn test_is_package_ext() {
         assert!(is_package_ext(Path::new("MySong.logicx")));
         assert!(is_package_ext(Path::new("MySong.band")));
