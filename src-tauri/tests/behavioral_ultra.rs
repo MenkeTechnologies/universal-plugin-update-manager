@@ -8269,3 +8269,207 @@ fn update_result_serde_roundtrip_has_update_true_kvr_url_wave41() {
         Some("https://www.kvraudio.com/p/1")
     );
 }
+
+// ── Wave 42: `radix_string(993_999_999, 36)` (`gfsvb3`), `find_similar` 33/35, thirty-sample /
+//    thirty-DAW / thirty-preset / twenty-nine-plugin-removed batches, DAW net 26/23,
+//    `format_size` 12 B, twenty-second-component KVR padding ───────────────────────────────────
+
+#[test]
+fn radix_string_993999999_base36_is_gfsvb3() {
+    assert_eq!(radix_string(993_999_999, 36), "gfsvb3");
+}
+
+#[test]
+fn extract_plugins_nonexistent_krex_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_project.krex");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_thirty_five_candidates_max_thirty_three() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..35).map(|i| fp(&format!("/tile{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 33);
+    assert_eq!(out.len(), 33);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_thirty_samples_added() {
+    let samples: Vec<_> = (0..30)
+        .map(|i| sample(&format!("/bounce/take{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 30);
+}
+
+#[test]
+fn compute_daw_diff_thirty_added_from_empty() {
+    let projects: Vec<_> = (0..30)
+        .map(|i| dawproj(&format!("/suite/section{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 30);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_thirty_presets() {
+    let presets: Vec<_> = (0..30)
+        .map(|i| preset(&format!("/serum/BankE/preset{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 30);
+}
+
+#[test]
+fn compute_plugin_diff_twenty_nine_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &(0..29)
+            .map(|i| plug(&format!("/rack/slot{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 29);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_12_bytes_wave42() {
+    assert_eq!(app_lib::format_size(12), "12.0 B");
+}
+
+#[test]
+fn compute_daw_diff_twenty_six_removed_twenty_three_added_net() {
+    let old = build_daw_snapshot(
+        &(0..26)
+            .map(|i| dawproj(&format!("/archive/a{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &(0..23)
+            .map(|i| dawproj(&format!("/live/b{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 26);
+    assert_eq!(d.added.len(), 23);
+}
+
+#[test]
+fn compute_plugin_diff_twenty_two_added_twenty_removed_net_two() {
+    let old = build_plugin_snapshot(
+        &(0..20)
+            .map(|i| plug(&format!("/west/w{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &(0..22)
+            .map(|i| plug(&format!("/east/e{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 20);
+    assert_eq!(d.added.len(), 22);
+}
+
+#[test]
+fn ext_matches_bitwig_bwproject_deep_path_wave42() {
+    assert_eq!(
+        ext_matches(Path::new(
+            "/Volumes/Stem/2026/Tour/Encore/Mix_Final/Master_v4.bwproject"
+        ))
+        .as_deref(),
+        Some("BWPROJECT")
+    );
+}
+
+#[test]
+fn fingerprint_distance_attack_time_only_change_nonzero_wave42() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.attack_time = 0.91;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_twenty_second_component_padding_equal() {
+    let short = format!("1{}", ".0".repeat(20));
+    let long = format!("1{}", ".0".repeat(21));
+    assert_eq!(
+        app_lib::kvr::compare_versions(&short, &long),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn kvr_parse_version_triple_gap_fourteen_fourteen_fourteen() {
+    assert_eq!(
+        app_lib::kvr::parse_version("14..14..14"),
+        vec![14, 0, 14, 0, 14]
+    );
+}
+
+#[test]
+fn kvr_compare_versions_fourteen_vs_fourteen_dot_zeros_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("14", "14.0.0.0"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn normalize_plugin_name_strips_apple_silicon_then_au_parens() {
+    assert_eq!(
+        normalize_plugin_name("Channel Strip (Apple Silicon) (AU)"),
+        "channel strip"
+    );
+}
+
+#[test]
+fn kvr_cache_entry_serde_roundtrip_both_urls_wave42() {
+    let e = KvrCacheEntry {
+        kvr_url: Some("https://www.kvraudio.com/p/42".into()),
+        update_url: Some("https://cdn.example/u.bin".into()),
+        latest_version: Some("3.2.1".into()),
+        has_update: true,
+        source: "kvr".into(),
+        timestamp: "2026-04-03T12:00:00Z".into(),
+    };
+    let j = serde_json::to_string(&e).unwrap();
+    let back: KvrCacheEntry = serde_json::from_str(&j).unwrap();
+    assert_eq!(
+        back.kvr_url.as_deref(),
+        Some("https://www.kvraudio.com/p/42")
+    );
+    assert_eq!(back.update_url.as_deref(), Some("https://cdn.example/u.bin"));
+}
+
+#[test]
+fn update_result_serde_roundtrip_has_platform_download_false_wave42() {
+    let u = app_lib::kvr::UpdateResult {
+        latest_version: "2".into(),
+        has_update: true,
+        source: "kvr".into(),
+        update_url: Some("https://files.example/x".into()),
+        kvr_url: Some("https://www.kvraudio.com/p/9".into()),
+        has_platform_download: false,
+    };
+    let j = serde_json::to_string(&u).unwrap();
+    let back: app_lib::kvr::UpdateResult = serde_json::from_str(&j).unwrap();
+    assert!(!back.has_platform_download);
+    assert!(back.has_update);
+}
