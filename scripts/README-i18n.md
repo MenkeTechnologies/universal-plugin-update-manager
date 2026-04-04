@@ -25,6 +25,13 @@ python3 -m venv .venv-i18n
 .venv-i18n/bin/python scripts/gen_app_i18n_fr.py
 ```
 
+- **German (`de`) — translate keys that still match English** (after stub sync or partial merges): `fill_de_i18n_gaps.py` calls Google Translate only for keys where the German value is still identical to English (skips `ui.ph.ui_ph_*` indirection strings and branding). Run `de_i18n_manual_overrides.py` afterward for hyphenation (`Plug-ins`), menu labels, localized `/pfad/zu/…` placeholders, and other strings machine translation leaves as English cognates. Then run `cargo test app_i18n:: --lib` and `pnpm run test:js`.
+
+```bash
+.venv-i18n/bin/python scripts/fill_de_i18n_gaps.py
+.venv-i18n/bin/python scripts/de_i18n_manual_overrides.py
+```
+
 - **Fast stub sync:** Copy any missing keys from English so every locale has the same key set (values stay English until you translate):
 
 ```bash
