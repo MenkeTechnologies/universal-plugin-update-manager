@@ -205,7 +205,7 @@ function loadMorePresets() {
 }
 
 function openPresetFolder(path) {
-  window.vstUpdater.openPresetFolder(path);
+  window.vstUpdater.openPresetFolder(path).then(() => showToast('Revealed in Finder')).catch(e => showToast('Failed: ' + e, 4000, 'error'));
 }
 
 async function scanPresets(resume = false) {

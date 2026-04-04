@@ -341,5 +341,5 @@ async function stopDawScan() {
 }
 
 function openDawFolder(filePath) {
-  window.vstUpdater.openDawFolder(filePath);
+  window.vstUpdater.openDawFolder(filePath).then(() => showToast('Revealed in Finder')).catch(e => showToast('Failed: ' + e, 4000, 'error'));
 }
