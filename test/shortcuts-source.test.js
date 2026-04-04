@@ -1,0 +1,80 @@
+/**
+ * Real shortcuts.js: prefs merge in getShortcuts, saveShortcuts shape, formatKey display.
+ */
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const { loadFrontendScripts, defaultDocument } = require('./frontend-vm-harness.js');
+
+function prefsStore() {
+  return {
+    _cache: {},
+    getObject(key, fallback) {
+      const v = this._cache[key];
+      if (v === undefined || v === null) return fallback;
+      return v;
+    },
+    setItem(key, value) {
+      this._cache[key] = value;
+    },
+    removeItem(key) {
+      delete this._cache[key];
+    },
+  };
+}
+
+function loadShortcutsSandbox(platform) {
+  return loadFrontendScripts(['utils.js', 'shortcuts.js'], {
+    prefs: prefsStore(),
+    registerFilter: () => {},
+    showToast: () => {},
+    toastFmt: (k) => k,
+    appFmt: (k) => k,
+    navigator: { platform },
+    document: {
+      ...defaultDocument(),
+      getElementById: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener: () => {},
+      body: {},
+    },
+  });
+}
+
+describe('frontend/js/shortcuts.js (vm-loaded)', () => {
+  it('getShortcuts merges customShortcuts over defaults', () => {
+    const S = loadShortcutsSandbox('MacIntel');
+    S.prefs._cache.customShortcuts = {
+      tab1: { key: 'q', mod: false },
+    };
+    const sc = S.getShortcuts();
+    assert.strictEqual(sc.tab1.key, 'q');
+    assert.strictEqual(sc.tab1.mod, false);
+    assert.strictEqual(sc.tab2.key, '2');
+    assert.strictEqual(sc.tab2.mod, true);
+  });
+
+  it('saveShortcuts persists only key+mod per id', () => {
+    const S = loadShortcutsSandbox('MacIntel');
+    S.saveShortcuts({
+      tab1: { key: 'q', mod: false, label: 'ignored' },
+    });
+    const slim = S.prefs._cache.customShortcuts;
+    assert.strictEqual(slim.tab1.key, 'q');
+    assert.strictEqual(slim.tab1.mod, false);
+    assert.strictEqual(slim.tab1.label, undefined);
+  });
+
+  it('formatKey uses Cmd glyph on Mac and Ctrl on Windows', () => {
+    const mac = loadShortcutsSandbox('MacIntel');
+    assert.ok(mac.formatKey({ key: 'k', mod: true }).includes('\u2318'));
+    const win = loadShortcutsSandbox('Win32');
+    assert.ok(win.formatKey({ key: 'k', mod: true }).includes('Ctrl'));
+  });
+
+  it('formatKey maps Space and arrow keys to readable labels', () => {
+    const S = loadShortcutsSandbox('MacIntel');
+    assert.strictEqual(S.formatKey({ key: ' ', mod: false }), 'Space');
+    assert.strictEqual(S.formatKey({ key: 'ArrowLeft', mod: false }).includes('\u2190'), true);
+  });
+});
