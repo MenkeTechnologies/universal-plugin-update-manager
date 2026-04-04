@@ -57,16 +57,16 @@ document.addEventListener('keydown', (e) => {
 // Open file with specific app
 function openWithApp(filePath, appName) {
   window.vstUpdater.openWithApp(filePath, appName).then(() => {
-    showToast(`Opening in ${appName}...`);
+    showToast(toastFmt('toast.opening_in_app', { app: appName }));
   }).catch(err => {
-    showToast(`${appName} not available — ${err}`, 4000, 'error');
+    showToast(toastFmt('toast.app_not_available', { app: appName, err }), 4000, 'error');
   });
 }
 
 // Copy helper
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
-    showToast('Copied to clipboard');
+    showToast(toastFmt('toast.copied_clipboard'));
   }).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
 }
 
@@ -120,7 +120,7 @@ document.addEventListener('contextmenu', (e) => {
                   setTimeout(() => newRow.classList.remove('row-playing'), 2000);
                 }
               }
-              showToast(`Added "${name}" to samples table`);
+              showToast(toastFmt('toast.added_name_to_samples', { name }));
             } else {
               const input = document.getElementById('audioSearchInput');
               if (input) { input.value = name; input.dispatchEvent(new Event('input')); }
@@ -186,7 +186,7 @@ document.addEventListener('contextmenu', (e) => {
       for (const tag of allTags.slice(0, 8)) {
         const has = currentTags.includes(tag);
         items.push({ icon: has ? '&#10003;' : '&#9634;', label: `${has ? 'Remove' : 'Add'} tag: ${tag}`,
-          action: () => { if (has) removeTagFromItem(path, tag); else addTagToItem(path, tag); showToast(`Tag "${tag}" ${has ? 'removed' : 'added'}`); }
+          action: () => { if (has) removeTagFromItem(path, tag); else addTagToItem(path, tag); showToast(has ? toastFmt('toast.tag_removed', { tag }) : toastFmt('toast.tag_added', { tag })); }
         });
       }
     }
@@ -278,10 +278,10 @@ document.addEventListener('contextmenu', (e) => {
             if (row) row.click();
           }
           if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
-          showToast(on ? 'Row expand disabled' : 'Row expand enabled');
+          showToast(on ? toastFmt('toast.row_expand_disabled') : toastFmt('toast.row_expand_enabled'));
         } }; })()],
       ...[(() => { const ap = prefs.getItem('autoplayNext') !== 'off'; return { icon: ap ? '&#9209;' : '&#9654;', label: ap ? 'Disable Autoplay Next' : 'Enable Autoplay Next',
-        action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? 'Autoplay next disabled' : 'Autoplay next enabled'); } }; })()],
+        action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? toastFmt('toast.autoplay_next_disabled') : toastFmt('toast.autoplay_next_enabled')); } }; })()],
     ];
     showContextMenu(e, items);
     return;
@@ -293,10 +293,10 @@ document.addEventListener('contextmenu', (e) => {
     const path = midiRow.getAttribute('data-midi-path');
     const name = midiRow.querySelector('.col-name')?.textContent || '';
     const items = [
-      { icon: '&#9654;', label: 'Preview in GarageBand', action: () => window.vstUpdater.openWithApp(path, 'GarageBand').catch(() => showToast('GarageBand not found — install from App Store', 4000, 'error')) },
-      { icon: '&#127911;', label: 'Open in Logic Pro', action: () => window.vstUpdater.openWithApp(path, 'Logic Pro').catch(() => showToast('Logic Pro not found', 4000, 'error')) },
-      { icon: '&#127925;', label: 'Open in Ableton Live', action: () => window.vstUpdater.openWithApp(path, 'Ableton Live 12 Standard').catch(() => window.vstUpdater.openWithApp(path, 'Ableton Live 11 Suite').catch(() => showToast('Ableton Live not found', 4000, 'error'))) },
-      { icon: '&#9889;', label: 'Open with Default App', action: () => window.vstUpdater.openDawProject(path).catch(e => showToast('No MIDI handler: ' + e, 4000, 'error')) },
+      { icon: '&#9654;', label: 'Preview in GarageBand', action: () => window.vstUpdater.openWithApp(path, 'GarageBand').catch(() => showToast(toastFmt('toast.garageband_not_found'), 4000, 'error')) },
+      { icon: '&#127911;', label: 'Open in Logic Pro', action: () => window.vstUpdater.openWithApp(path, 'Logic Pro').catch(() => showToast(toastFmt('toast.logic_not_found'), 4000, 'error')) },
+      { icon: '&#127925;', label: 'Open in Ableton Live', action: () => window.vstUpdater.openWithApp(path, 'Ableton Live 12 Standard').catch(() => window.vstUpdater.openWithApp(path, 'Ableton Live 11 Suite').catch(() => showToast(toastFmt('toast.ableton_not_found'), 4000, 'error'))) },
+      { icon: '&#9889;', label: 'Open with Default App', action: () => window.vstUpdater.openDawProject(path).catch(e => showToast(toastFmt('toast.no_midi_handler', { err: e }), 4000, 'error')) },
       '---',
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
       { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
@@ -320,7 +320,7 @@ document.addEventListener('contextmenu', (e) => {
     const name = dawRow.querySelector('.col-name')?.textContent || '';
     const dawName = dawRow.querySelector('.format-badge')?.textContent || 'DAW';
     const items = [
-      { icon: '&#9654;', label: `Open in ${dawName}`, action: () => { showToast(`Opening "${name}" in ${dawName}...`); window.vstUpdater.openDawProject(path).catch(err => showToast(`${dawName} not installed — ${err}`, 4000, 'error')); } },
+      { icon: '&#9654;', label: `Open in ${dawName}`, action: () => { showToast(toastFmt('toast.opening_in_daw', { name, daw: dawName })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw: dawName, err }), 4000, 'error')); } },
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => openDawFolder(path) },
       { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       ...(typeof isXrefSupported === 'function' && isXrefSupported(dawRow.querySelector('.format-badge.format-default')?.textContent || '')
@@ -339,7 +339,7 @@ document.addEventListener('contextmenu', (e) => {
               const tmp = path.replace(/\.als$/i, '_decompressed.xml');
               window.vstUpdater.writeTextFile(tmp, xml).then(() => {
                 window.vstUpdater.openWithApp(tmp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
-                showToast('Decompressed XML opened in TextEdit');
+                showToast(toastFmt('toast.decompressed_xml_textedit'));
               });
             }).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
           } else {
@@ -589,7 +589,7 @@ document.addEventListener('contextmenu', (e) => {
       items.push('---');
     } else if (type === 'daw') {
       const daw = favItem.querySelector('.format-badge')?.textContent || 'DAW';
-      items.push({ icon: '&#9654;', label: `Open in ${daw}`, action: () => { showToast(`Opening "${name}" in ${daw}...`); window.vstUpdater.openDawProject(path).catch(err => showToast(`${daw} not installed — ${err}`, 4000, 'error')); } });
+      items.push({ icon: '&#9654;', label: `Open in ${daw}`, action: () => { showToast(toastFmt('toast.opening_in_daw', { name, daw })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw, err }), 4000, 'error')); } });
       items.push('---');
     } else if (type === 'plugin') {
       const plugin = typeof allPlugins !== 'undefined' && allPlugins.find(p => p.path === path);
@@ -687,9 +687,9 @@ document.addEventListener('contextmenu', (e) => {
         switchTab('plugins');
         const input = document.getElementById('searchInput');
         if (input) { input.value = pluginName; input.dispatchEvent(new Event('input', { bubbles: true })); }
-        showToast(`Searching plugins for "${pluginName}"...`);
+        showToast(toastFmt('toast.searching_plugins_for', { pluginName }));
       }},
-      { icon: '&#128203;', label: 'Copy Plugin Name', action: () => { navigator.clipboard.writeText(pluginName); showToast('Copied: ' + pluginName); }},
+      { icon: '&#128203;', label: 'Copy Plugin Name', action: () => { navigator.clipboard.writeText(pluginName); showToast(toastFmt('toast.copied_plugin_name', { pluginName })); }},
     ];
     showContextMenu(e, items);
     return;
@@ -725,7 +725,7 @@ document.addEventListener('contextmenu', (e) => {
     const name = depProject.querySelector('.dep-project-name')?.textContent?.trim() || '';
     const daw = depProject.querySelector('.format-badge')?.textContent?.trim() || '';
     const items = [
-      { icon: '&#9654;', label: `Open in ${daw || 'DAW'}`, action: () => { showToast(`Opening "${name}"...`); window.vstUpdater.openDawProject(path).catch(err => showToast(`Failed — ${err}`, 4000, 'error')); } },
+      { icon: '&#9654;', label: `Open in ${daw || 'DAW'}`, action: () => { showToast(toastFmt('toast.opening_name', { name })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.failed_dash', { err }), 4000, 'error')); } },
       { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openDawFolder === 'function' && openDawFolder(path) },
       '---',
       { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
@@ -926,7 +926,7 @@ document.addEventListener('contextmenu', (e) => {
       items.push('---');
       const ap = prefs.getItem('autoplayNext') !== 'off';
       items.push({ icon: ap ? '&#9209;' : '&#9654;', label: ap ? 'Disable Autoplay Next' : 'Enable Autoplay Next',
-        action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? 'Autoplay next disabled' : 'Autoplay next enabled'); } });
+        action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? toastFmt('toast.autoplay_next_disabled') : toastFmt('toast.autoplay_next_enabled')); } });
     }
     showContextMenu(e, items);
     return;
@@ -1044,7 +1044,7 @@ document.addEventListener('contextmenu', (e) => {
             const pl = createSmartPlaylist(preset.name, preset.rules);
             pl.matchMode = preset.matchMode;
             if (typeof saveSmartPlaylists === 'function') saveSmartPlaylists();
-            showToast(`Created "${preset.name}"`);
+            showToast(toastFmt('toast.created_preset', { name: preset.name }));
           }
         }});
       }
@@ -1103,7 +1103,7 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#128203;', label: 'Copy All Paths', action: () => copyToClipboard(dirs), disabled: !dirs },
       { icon: '&#128203;', label: 'Copy Tile Title', action: () => copyToClipboard(title) },
       '---',
-      { icon: '&#10005;', label: 'Clear Tile', action: () => { if (body) body.innerHTML = ''; showToast(`${title} cleared`); } },
+      { icon: '&#10005;', label: 'Clear Tile', action: () => { if (body) body.innerHTML = ''; showToast(toastFmt('toast.tile_cleared', { title })); } },
     ];
     showContextMenu(e, items);
     return;
@@ -1121,7 +1121,7 @@ document.addEventListener('contextmenu', (e) => {
           link.download = `${label.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.png`;
           link.href = canvas.toDataURL('image/png');
           link.click();
-          showToast('Snapshot exported');
+          showToast(toastFmt('toast.snapshot_exported'));
         }
       }, disabled: !canvas },
       { icon: '&#128203;', label: 'Copy Tile Name', action: () => typeof copyToClipboard === 'function' && copyToClipboard(label) },
@@ -1149,14 +1149,14 @@ document.addEventListener('contextmenu', (e) => {
         const prev = settingsSection.previousElementSibling;
         if (prev && prev.classList.contains('settings-section')) {
           settingsSection.parentNode.insertBefore(settingsSection, prev);
-          showToast(`Moved "${heading}" up`);
+          showToast(toastFmt('toast.moved_heading_up', { heading }));
         }
       }},
       { icon: '&#9660;', label: 'Move Down', action: () => {
         const next = settingsSection.nextElementSibling;
         if (next && next.classList.contains('settings-section')) {
           next.parentNode.insertBefore(next, settingsSection);
-          showToast(`Moved "${heading}" down`);
+          showToast(toastFmt('toast.moved_heading_down', { heading }));
         }
       }},
       '---',
@@ -1170,5 +1170,5 @@ document.addEventListener('contextmenu', (e) => {
     return;
   }
 
-  } catch (err) { console.error('Context menu error:', err, err.stack); showToast('Context menu error: ' + (err.message || err), 4000, 'error'); }
+  } catch (err) { console.error('Context menu error:', err, err.stack); showToast(toastFmt('toast.context_menu_error', { err: err.message || err }), 4000, 'error'); }
 });

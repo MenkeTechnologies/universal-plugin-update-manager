@@ -142,7 +142,7 @@ function loadSmartPlaylistIntoPlayer(id) {
   if (!pl) return;
   const matches = evaluateSmartPlaylist(pl);
   if (matches.length === 0) {
-    if (typeof showToast === 'function') showToast('No matching samples found', 3000, 'warning');
+    if (typeof showToast === 'function') showToast(toastFmt('toast.no_matching_samples'), 3000, 'warning');
     return;
   }
 
@@ -161,7 +161,7 @@ function loadSmartPlaylistIntoPlayer(id) {
   if (typeof renderRecentlyPlayed === 'function') renderRecentlyPlayed();
   renderSmartPlaylists();
 
-  if (typeof showToast === 'function') showToast(`Loaded "${pl.name}" — ${matches.length} tracks`);
+  if (typeof showToast === 'function') showToast(toastFmt('toast.loaded_playlist', { name: pl.name, n: matches.length }));
   // Auto-play first track
   if (matches.length > 0 && typeof previewAudio === 'function') {
     previewAudio(matches[0].path);
@@ -255,7 +255,7 @@ function showSmartPlaylistEditor(existingId) {
         saveSmartPlaylists();
       }
       modal.remove();
-      if (typeof showToast === 'function') showToast(`Playlist "${plName}" ${existing ? 'updated' : 'created'}`);
+      if (typeof showToast === 'function') showToast(toastFmt('toast.playlist_saved', { name: plName, action: existing ? toastFmt('toast.playlist_updated') : toastFmt('toast.playlist_created') }));
     } else if (e.target.classList.contains('sp-add-rule')) {
       rules.push({ type: 'format', value: '' });
       render();
@@ -336,7 +336,7 @@ document.addEventListener('contextmenu', (e) => {
       _smartPlaylists.push(clone);
       saveSmartPlaylists();
       renderSmartPlaylists();
-      showToast(`Cloned "${pl.name}"`);
+      showToast(toastFmt('toast.cloned_playlist', { name: pl.name }));
     }},
     { icon: '&#128203;', label: 'Copy Rules as JSON', action: () => {
       if (typeof copyToClipboard === 'function') copyToClipboard(JSON.stringify(pl.rules, null, 2));

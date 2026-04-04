@@ -738,7 +738,7 @@ function settingResetTabOrder() {
   for (const key of defaultOrder) {
     if (tabMap[key]) nav.appendChild(tabMap[key]);
   }
-  showToast('Tab order reset');
+  showToast(toastFmt('toast.tab_order_reset'));
 }
 
 // ── Tab switching ──

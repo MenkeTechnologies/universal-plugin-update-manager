@@ -32,7 +32,7 @@ async function loadPluginsFromDb() {
 
     resolveKvrDownloads();
   } catch (err) {
-    showToast(`Failed to load plugin scan — ${err.message || err}`, 4000, 'error');
+    showToast(toastFmt('toast.failed_load_plugin_scan', { err: err.message || err }), 4000, 'error');
   }
 }
 
@@ -72,7 +72,7 @@ async function fetchPluginPage() {
     }
     document.getElementById('totalCount').textContent = _pluginTotalCount;
   } catch (e) {
-    showToast('Plugin query failed: ' + e, 4000, 'error');
+    showToast(toastFmt('toast.plugin_query_failed', { err: e }), 4000, 'error');
   }
 }
 
@@ -156,7 +156,7 @@ async function scanPlugins(resume = false) {
   } catch (err) {
     const errMsg = err.message || err || 'Unknown error';
     list.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;
-    showToast(`Plugin scan failed — ${errMsg}`, 4000, 'error');
+    showToast(toastFmt('toast.plugin_scan_failed', { errMsg }), 4000, 'error');
   }
 
   if (scanProgressCleanup) { scanProgressCleanup(); scanProgressCleanup = null; }
@@ -298,7 +298,7 @@ async function checkUpdates() {
 
       // Persist to KVR cache
       if (cacheEntries.length > 0) {
-        window.vstUpdater.updateKvrCache(cacheEntries).catch(() => showToast('Cache write failed', 4000, 'error'));
+        window.vstUpdater.updateKvrCache(cacheEntries).catch(() => showToast(toastFmt('toast.cache_write_failed'), 4000, 'error'));
       }
 
       // Update live stats
@@ -344,7 +344,7 @@ async function checkUpdates() {
   } catch (err) {
     const updateErr = err.message || err || 'Unknown error';
     if (updateErr !== 'stopped') {
-      showToast(`Update check failed — ${updateErr}`, 4000, 'error');
+      showToast(toastFmt('toast.update_check_failed', { updateErr }), 4000, 'error');
     }
   }
 
@@ -475,7 +475,7 @@ async function openKvr(btn, directUrl, pluginName) {
 }
 
 function openFolder(pluginPath) {
-  window.vstUpdater.openPluginFolder(pluginPath).then(() => showToast('Revealed in Finder')).catch(e => showToast('Failed: ' + e, 4000, 'error'));
+  window.vstUpdater.openPluginFolder(pluginPath).then(() => showToast(toastFmt('toast.revealed_in_finder'))).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error'));
 }
 
 let batchIndex = 0;

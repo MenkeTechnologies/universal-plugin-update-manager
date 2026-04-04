@@ -73,14 +73,14 @@ function batchFavoriteAll() {
       added++;
     }
   }
-  showToast(`Added ${added} items to favorites`);
+  showToast(toastFmt('toast.added_favorites_batch', { n: added }));
   deselectAll();
 }
 
 function batchCopyPaths() {
   const paths = [...batchSelected].join('\n');
   copyToClipboard(paths);
-  showToast(`Copied ${batchSelected.size} paths`);
+  showToast(toastFmt('toast.copied_n_paths', { n: batchSelected.size }));
 }
 
 function batchExportSelected() {
@@ -98,7 +98,7 @@ function batchExportSelected() {
 
   if (items.length === 0) return;
   copyToClipboard(JSON.stringify(items, null, 2));
-  showToast(`Copied ${items.length} items as JSON`);
+  showToast(toastFmt('toast.copied_n_json', { n: items.length }));
 }
 
 function batchRevealAll() {
@@ -109,7 +109,7 @@ function batchRevealAll() {
   if (activeTab.id === 'tabSamples') openAudioFolder(path);
   else if (activeTab.id === 'tabDaw') openDawFolder(path);
   else if (activeTab.id === 'tabPresets') openPresetFolder(path);
-  showToast(`Revealing first of ${batchSelected.size} items`);
+  showToast(toastFmt('toast.revealing_first_batch', { n: batchSelected.size }));
 }
 
 // Wire up checkbox changes and batch action buttons

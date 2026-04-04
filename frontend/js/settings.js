@@ -399,7 +399,7 @@ function settingToggleTheme() {
   const next = current === 'light' ? 'dark' : 'light';
   html.setAttribute('data-theme', next);
   prefs.setItem('theme', next);
-  showToast(`Theme: ${next}`);
+  showToast(toastFmt('toast.theme_set', { next }));
   const scheme = prefs.getItem('colorScheme') || 'cyberpunk';
   if (scheme.startsWith('custom')) {
     const customVars = prefs.getObject('customSchemeVars', {});
@@ -419,7 +419,7 @@ function settingToggleCrt() {
   const next = !current;
   prefs.setItem('crtEffects', next ? 'on' : 'off');
   applyCrtSetting(next);
-  showToast(`CRT effects: ${next ? 'on' : 'off'}`);
+  showToast(toastFmt('toast.crt_effects', { state: next ? 'on' : 'off' }));
   refreshSettingsUI();
 }
 
@@ -438,7 +438,7 @@ function settingToggleNeonGlow() {
   const next = !current;
   prefs.setItem('neonGlow', next ? 'on' : 'off');
   applyNeonGlowSetting(next);
-  showToast(`Neon glow: ${next ? 'on' : 'off'}`);
+  showToast(toastFmt('toast.neon_glow', { state: next ? 'on' : 'off' }));
   refreshSettingsUI();
 }
 
@@ -510,8 +510,8 @@ async function exportSettingsPdf() {
     }
     try {
       await window.vstUpdater.exportPdf('AUDIO_HAXOR Settings & Keybindings', headers, rows, savePath);
-      showToast('Settings PDF exported');
-    } catch (e) { showToast('PDF export failed: ' + (e.message || e), 4000, 'error'); }
+      showToast(toastFmt('toast.settings_pdf_exported'));
+    } catch (e) { showToast(toastFmt('toast.pdf_export_failed', { err: e.message || e }), 4000, 'error'); }
   } else {
     // Text export
     let text = 'AUDIO_HAXOR — Settings & Keybindings\n' + '='.repeat(50) + '\n\n';
@@ -525,14 +525,14 @@ async function exportSettingsPdf() {
       text += `  ${k.padEnd(35)} ${v}\n`;
     }
     await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: text });
-    showToast('Settings exported');
+    showToast(toastFmt('toast.settings_exported'));
   }
 }
 
 async function exportLogPdf() {
   try {
     const log = await window.vstUpdater.readLog();
-    if (!log || !log.trim()) { showToast('Log is empty', 3000, 'warning'); return; }
+    if (!log || !log.trim()) { showToast(toastFmt('toast.log_empty'), 3000, 'warning'); return; }
 
     const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
     if (!dialogApi) return;
@@ -551,14 +551,14 @@ async function exportLogPdf() {
       });
       try {
         await window.vstUpdater.exportPdf('AUDIO_HAXOR Error Log', headers, rows, savePath);
-        showToast('Log PDF exported');
-      } catch (e) { showToast('PDF export failed: ' + (e.message || e), 4000, 'error'); }
+        showToast(toastFmt('toast.log_pdf_exported'));
+      } catch (e) { showToast(toastFmt('toast.pdf_export_failed', { err: e.message || e }), 4000, 'error'); }
     } else {
       await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: log });
-      showToast('Log exported');
+      showToast(toastFmt('toast.log_exported'));
     }
   } catch (e) {
-    showToast('Could not read log: ' + (e?.message || e), 4000, 'error');
+    showToast(toastFmt('toast.could_not_read_log', { err: e?.message || e }), 4000, 'error');
   }
 }
 
@@ -607,7 +607,7 @@ async function settingClearAnalysisCache() {
   // Clear in-memory caches
   if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; }
   if (typeof _waveformCache !== 'undefined') { _waveformCache = {}; _spectrogramCache = {}; }
-  showToast('Analysis cache cleared — BPM/Key/LUFS/waveform/spectrogram');
+  showToast(toastFmt('toast.analysis_cache_cleared_long'));
 }
 
 function settingResetAllUI() {
@@ -633,7 +633,7 @@ function settingResetAllUI() {
   for (const key of uiKeys) {
     prefs.removeItem(key);
   }
-  showToast('All UI layout reset to factory defaults — reloading...');
+  showToast(toastFmt('toast.all_ui_factory_reset'));
   setTimeout(() => location.reload(), 1000);
 }
 
@@ -660,9 +660,9 @@ async function settingClearAllHistory() {
       window.vstUpdater.clearDawHistory(),
       window.vstUpdater.clearPresetHistory(),
     ]);
-    showToast('All scan history cleared');
+    showToast(toastFmt('toast.all_scan_history_cleared'));
   } catch (e) {
-    showToast(`Failed to clear history — ${e.message || e}`, 4000, 'error');
+    showToast(toastFmt('toast.failed_clear_history', { err: e.message || e }), 4000, 'error');
   } finally { hideGlobalProgress(); }
 }
 
@@ -717,9 +717,9 @@ async function resetAllScans() {
     if (presetStats) presetStats.style.display = 'none';
     // Reset history
     if (typeof loadHistory === 'function') loadHistory();
-    showToast('All scans reset to fresh state');
+    showToast(toastFmt('toast.all_scans_reset_fresh'));
   } catch (e) {
-    showToast(`Reset failed — ${e.message || e}`, 4000, 'error');
+    showToast(toastFmt('toast.reset_failed', { err: e.message || e }), 4000, 'error');
   } finally { hideGlobalProgress(); }
 }
 
@@ -728,9 +728,9 @@ async function settingClearKvrCache() {
   showGlobalProgress();
   try {
     await window.vstUpdater.updateKvrCache([]);
-    showToast('KVR cache cleared');
+    showToast(toastFmt('toast.kvr_cache_cleared_palette'));
   } catch (e) {
-    showToast(`Failed to clear KVR cache — ${e.message || e}`, 4000, 'error');
+    showToast(toastFmt('toast.failed_clear_kvr', { err: e.message || e }), 4000, 'error');
   } finally { hideGlobalProgress(); }
 }
 
@@ -738,7 +738,7 @@ function settingToggleAutoScan() {
   const current = prefs.getItem('autoScan') === 'on';
   const next = !current;
   prefs.setItem('autoScan', next ? 'on' : 'off');
-  showToast(`Auto-scan on launch: ${next ? 'on' : 'off'}`);
+  showToast(toastFmt('toast.auto_scan_launch', { state: next ? 'on' : 'off' }));
   refreshSettingsUI();
 }
 
@@ -748,10 +748,10 @@ function settingToggleFolderWatch() {
   prefs.setItem('folderWatch', next ? 'on' : 'off');
   if (next) {
     startFolderWatch();
-    showToast('Folder watch: on');
+    showToast(toastFmt('toast.folder_watch_on'));
   } else {
-    window.vstUpdater.stopFileWatcher().catch(() => showToast('Failed to stop file watcher', 4000, 'error'));
-    showToast('Folder watch: off');
+    window.vstUpdater.stopFileWatcher().catch(() => showToast(toastFmt('toast.failed_stop_watcher'), 4000, 'error'));
+    showToast(toastFmt('toast.folder_watch_off'));
   }
   refreshSettingsUI();
 }
@@ -763,17 +763,17 @@ function startFolderWatch() {
     if (val) dirs.push(...val.split('\n').map(d => d.trim()).filter(Boolean));
   }
   const unique = [...new Set(dirs)];
-  if (unique.length === 0) { showToast('No scan directories configured', 3000, 'error'); return; }
+  if (unique.length === 0) { showToast(toastFmt('toast.no_scan_dirs'), 3000, 'error'); return; }
   window.vstUpdater.startFileWatcher(unique).then(() => {
-    showToast(`Watching ${unique.length} directories`);
-  }).catch(e => showToast('Watch failed: ' + e, 4000, 'error'));
+    showToast(toastFmt('toast.watching_n_dirs', { n: unique.length }));
+  }).catch(e => showToast(toastFmt('toast.watch_failed', { err: e }), 4000, 'error'));
 }
 
 function settingToggleAutoUpdate() {
   const current = prefs.getItem('autoUpdate') === 'on';
   const next = !current;
   prefs.setItem('autoUpdate', next ? 'on' : 'off');
-  showToast(`Auto-check updates: ${next ? 'on' : 'off'}`);
+  showToast(toastFmt('toast.auto_check_updates', { state: next ? 'on' : 'off' }));
   refreshSettingsUI();
 }
 
@@ -781,7 +781,7 @@ function settingToggleSingleClickPlay() {
   const current = prefs.getItem('singleClickPlay') === 'on';
   const next = !current;
   prefs.setItem('singleClickPlay', next ? 'on' : 'off');
-  showToast(`Single-click play: ${next ? 'on' : 'off'}`);
+  showToast(toastFmt('toast.single_click_play', { state: next ? 'on' : 'off' }));
   refreshSettingsUI();
 }
 
@@ -789,7 +789,7 @@ function settingToggleAutoplayNext() {
   const current = prefs.getItem('autoplayNext');
   const next = current === 'off' ? 'on' : 'off';
   prefs.setItem('autoplayNext', next);
-  showToast(`Autoplay next: ${next}`);
+  showToast(toastFmt('toast.autoplay_next_state', { next }));
   refreshSettingsUI();
 }
 
@@ -797,7 +797,7 @@ function settingToggleShowPlayerOnStartup() {
   const current = prefs.getItem('showPlayerOnStartup') === 'on';
   const next = !current;
   prefs.setItem('showPlayerOnStartup', next ? 'on' : 'off');
-  showToast(`Show player on startup: ${next ? 'on' : 'off'}`);
+  showToast(toastFmt('toast.show_player_startup', { state: next ? 'on' : 'off' }));
   refreshSettingsUI();
 }
 
@@ -805,7 +805,7 @@ function settingToggleExpandOnClick() {
   const current = prefs.getItem('expandOnClick');
   const next = current === 'off' ? 'on' : 'off';
   prefs.setItem('expandOnClick', next);
-  showToast(`Expand on click: ${next}`);
+  showToast(toastFmt('toast.expand_on_click', { next }));
   refreshSettingsUI();
 }
 
@@ -813,7 +813,7 @@ function settingToggleIncludeBackups() {
   const current = prefs.getItem('includeAbletonBackups') === 'on';
   const next = !current;
   prefs.setItem('includeAbletonBackups', next ? 'on' : 'off');
-  showToast(`Include Ableton backups: ${next ? 'on' : 'off'}`);
+  showToast(toastFmt('toast.include_ableton_backups', { state: next ? 'on' : 'off' }));
   refreshSettingsUI();
 }
 
@@ -833,25 +833,25 @@ function settingUpdateFlushInterval(val) {
 function settingUpdateThreadMultiplier(val) {
   document.getElementById('settingThreadMultiplierValue').textContent = val + 'x';
   prefs.setItem('threadMultiplier', val);
-  showToast('Thread multiplier set to ' + val + 'x — restart to apply');
+  showToast(toastFmt('toast.thread_multiplier_set', { val }));
 }
 
 function settingUpdateChannelBuffer(val) {
   document.getElementById('settingChannelBufferValue').textContent = val;
   prefs.setItem('channelBuffer', val);
-  showToast('Channel buffer set to ' + val + ' — restart to apply');
+  showToast(toastFmt('toast.channel_buffer_set', { val }));
 }
 
 function settingUpdateBatchSize(val) {
   document.getElementById('settingBatchSizeValue').textContent = val;
   prefs.setItem('batchSize', val);
-  showToast('Batch size set to ' + val + ' — restart to apply');
+  showToast(toastFmt('toast.batch_size_set', { val }));
 }
 
 function settingUpdateFdLimit(val) {
   document.getElementById('settingFdLimitValue').textContent = val;
   prefs.setItem('fdLimit', val);
-  showToast('FD limit set to ' + val + ' — restart to apply');
+  showToast(toastFmt('toast.fd_limit_set', { val }));
 }
 
 function settingUpdateVizFps(val) {
@@ -893,14 +893,14 @@ async function settingToggleFileWatcher() {
     if (preset) dirs.push(...preset.split('\n').filter(d => d.trim()));
     try {
       await window.vstUpdater.startFileWatcher(dirs);
-      showToast(`Watching ${dirs.length} directories`);
+      showToast(toastFmt('toast.watching_n_dirs', { n: dirs.length }));
     } catch (e) {
-      showToast('Watcher failed: ' + e, 4000, 'error');
+      showToast(toastFmt('toast.watcher_failed', { err: e }), 4000, 'error');
       prefs.setItem('fileWatcher', 'off');
     }
   } else {
     try { await window.vstUpdater.stopFileWatcher(); } catch(e) { if(typeof showToast==='function'&&e) showToast(String(e),4000,'error'); }
-    showToast('File watcher stopped');
+    showToast(toastFmt('toast.file_watcher_stopped'));
   }
   refreshSettingsUI();
 }
@@ -920,7 +920,7 @@ function showSavedMsg(id) {
 async function browseDir(targetId) {
   const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
   if (!dialogApi || !dialogApi.open) {
-    showToast('Dialog API not available', 3000, 'error');
+    showToast(toastFmt('toast.dialog_api_unavailable'), 3000, 'error');
     return;
   }
   const selected = await dialogApi.open({ directory: true, multiple: false, title: 'Select folder to scan' });
@@ -934,39 +934,39 @@ async function browseDir(targetId) {
     lines.push(selected);
     textarea.value = lines.join('\n');
   }
-  showToast(`Added: ${selected}`);
+  showToast(toastFmt('toast.added_selected', { selected }));
 }
 
 function saveCustomDirs() {
   const val = document.getElementById('settingCustomDirs').value.trim();
   prefs.setItem('customDirs', val);
   showSavedMsg('savedMsgCustomDirs');
-  showToast('Plugin scan directories saved');
+  showToast(toastFmt('toast.plugin_scan_dirs_saved'));
 }
 
 function saveAudioScanDirs() {
   const val = document.getElementById('settingAudioScanDirs').value.trim();
   prefs.setItem('audioScanDirs', val);
   showSavedMsg('savedMsgAudioScanDirs');
-  showToast('Audio scan directories saved');
+  showToast(toastFmt('toast.audio_scan_dirs_saved'));
 }
 
 function saveDawScanDirs() {
   const val = document.getElementById('settingDawScanDirs').value.trim();
   prefs.setItem('dawScanDirs', val);
   showSavedMsg('savedMsgDawScanDirs');
-  showToast('DAW scan directories saved');
+  showToast(toastFmt('toast.daw_scan_dirs_saved'));
 }
 
 function savePresetScanDirs() {
   const val = document.getElementById('settingPresetScanDirs').value.trim();
   prefs.setItem('presetScanDirs', val);
   showSavedMsg('savedMsgPresetScanDirs');
-  showToast('Preset scan directories saved');
+  showToast(toastFmt('toast.preset_scan_dirs_saved'));
 }
 
 function openPrefsFile() {
-  window.vstUpdater.openPrefsFile().catch(e => showToast(`Failed to open prefs file — ${e.message || e}`, 4000, 'error'));
+  window.vstUpdater.openPrefsFile().catch(e => showToast(toastFmt('toast.failed_open_prefs_file', { err: e.message || e }), 4000, 'error'));
 }
 
 function getSettingValue(key, defaultVal) {
@@ -1511,5 +1511,5 @@ function resetSettingsSectionOrder() {
   for (const key of defaultOrder) {
     if (sectionMap[key]) container.appendChild(sectionMap[key]);
   }
-  showToast('Settings layout reset');
+  showToast(toastFmt('toast.settings_layout_reset_short'));
 }

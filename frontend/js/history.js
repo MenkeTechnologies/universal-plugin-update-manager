@@ -29,7 +29,7 @@ async function loadHistory() {
     ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     renderHistoryList();
   } catch (e) {
-    showToast(`Failed to load history — ${e.message || e}`, 4000, 'error');
+    showToast(toastFmt('toast.failed_load_history', { err: e.message || e }), 4000, 'error');
   } finally { hideGlobalProgress(); }
 }
 
@@ -596,7 +596,7 @@ async function clearAllHistory() {
   selectedScanType = null;
   document.getElementById('historyDetail').innerHTML = '<div class="empty-history"><div class="empty-history-icon">&#8592;</div><p>Select a scan from the sidebar to view details</p></div>';
   await loadHistory();
-  showToast('All scan history cleared');
+  showToast(toastFmt('toast.all_scan_history_cleared'));
 }
 
 function timeAgo(date) {

@@ -29,65 +29,65 @@ function collectPaletteItems() {
   items.push(...tabs);
 
   // Actions — all trigger toast confirmation
-  items.push({ type: 'action', name: 'Scan Plugins', icon: '&#8635;', action: () => { showToast('Scanning plugins...'); scanPlugins(); } });
-  items.push({ type: 'action', name: 'Scan Samples', icon: '&#8635;', action: () => { showToast('Scanning samples...'); scanAudioSamples(); } });
-  items.push({ type: 'action', name: 'Scan DAW Projects', icon: '&#8635;', action: () => { showToast('Scanning DAW projects...'); scanDawProjects(); } });
-  items.push({ type: 'action', name: 'Scan Presets', icon: '&#8635;', action: () => { showToast('Scanning presets...'); scanPresets(); } });
-  items.push({ type: 'action', name: 'Check Updates', icon: '&#9889;', action: () => { showToast('Checking for updates...'); checkUpdates(); } });
-  items.push({ type: 'action', name: 'Find Duplicates', icon: '&#128270;', action: () => { showToast('Scanning for duplicates...'); showDuplicateReport(); } });
-  items.push({ type: 'action', name: 'Reset All Scans', icon: '&#128465;', action: () => { showToast('Resetting all scans...'); resetAllScans(); } });
+  items.push({ type: 'action', name: 'Scan Plugins', icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_plugins')); scanPlugins(); } });
+  items.push({ type: 'action', name: 'Scan Samples', icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_samples')); scanAudioSamples(); } });
+  items.push({ type: 'action', name: 'Scan DAW Projects', icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_daw_projects')); scanDawProjects(); } });
+  items.push({ type: 'action', name: 'Scan Presets', icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_presets')); scanPresets(); } });
+  items.push({ type: 'action', name: 'Check Updates', icon: '&#9889;', action: () => { showToast(toastFmt('toast.checking_updates')); checkUpdates(); } });
+  items.push({ type: 'action', name: 'Find Duplicates', icon: '&#128270;', action: () => { showToast(toastFmt('toast.scanning_duplicates')); showDuplicateReport(); } });
+  items.push({ type: 'action', name: 'Reset All Scans', icon: '&#128465;', action: () => { showToast(toastFmt('toast.resetting_scans')); resetAllScans(); } });
   if (typeof buildXrefIndex === 'function') {
-    items.push({ type: 'action', name: 'Build Plugin Index', icon: '&#9889;', action: () => { showToast('Building plugin index...'); buildXrefIndex(); } });
+    items.push({ type: 'action', name: 'Build Plugin Index', icon: '&#9889;', action: () => { showToast(toastFmt('toast.building_plugin_index')); buildXrefIndex(); } });
   }
   if (typeof showDepGraph === 'function') {
-    items.push({ type: 'action', name: 'Plugin Dependency Graph', icon: '&#128200;', action: () => { showToast('Opening dependency graph...'); showDepGraph(); } });
+    items.push({ type: 'action', name: 'Plugin Dependency Graph', icon: '&#128200;', action: () => { showToast(toastFmt('toast.opening_dep_graph')); showDepGraph(); } });
   }
   if (typeof findSimilarSamples === 'function' && typeof audioPlayerPath !== 'undefined' && audioPlayerPath) {
-    items.push({ type: 'action', name: 'Find Similar to Current Track', icon: '&#128270;', action: () => { showToast('Finding similar samples...'); findSimilarSamples(audioPlayerPath); } });
+    items.push({ type: 'action', name: 'Find Similar to Current Track', icon: '&#128270;', action: () => { showToast(toastFmt('toast.finding_similar')); findSimilarSamples(audioPlayerPath); } });
   }
   if (typeof showPlayer === 'function') {
     const np = document.getElementById('audioNowPlaying');
     const visible = np && np.classList.contains('active');
-    items.push({ type: 'action', name: visible ? 'Hide Audio Player' : 'Show Audio Player', icon: '&#9835;', action: () => { visible ? hidePlayer() : showPlayer(); showToast(visible ? 'Player hidden' : 'Player shown'); } });
+    items.push({ type: 'action', name: visible ? 'Hide Audio Player' : 'Show Audio Player', icon: '&#9835;', action: () => { visible ? hidePlayer() : showPlayer(); showToast(visible ? toastFmt('toast.player_hidden') : toastFmt('toast.player_shown')); } });
   }
   if (typeof showHeatmapDashboard === 'function') {
-    items.push({ type: 'action', name: 'Heatmap Dashboard', icon: '&#128202;', action: () => { showToast('Opening dashboard...'); showHeatmapDashboard(); } });
+    items.push({ type: 'action', name: 'Heatmap Dashboard', icon: '&#128202;', action: () => { showToast(toastFmt('toast.opening_dashboard')); showHeatmapDashboard(); } });
   }
   if (typeof showSmartPlaylistEditor === 'function') {
-    items.push({ type: 'action', name: 'New Smart Playlist', icon: '&#127926;', action: () => { showToast('Creating smart playlist...'); showSmartPlaylistEditor(null); } });
+    items.push({ type: 'action', name: 'New Smart Playlist', icon: '&#127926;', action: () => { showToast(toastFmt('toast.creating_smart_playlist')); showSmartPlaylistEditor(null); } });
   }
   if (typeof exportSettingsPdf === 'function') {
-    items.push({ type: 'action', name: 'Export Settings & Keybindings', icon: '&#128196;', action: () => { showToast('Exporting settings...'); exportSettingsPdf(); } });
+    items.push({ type: 'action', name: 'Export Settings & Keybindings', icon: '&#128196;', action: () => { showToast(toastFmt('toast.exporting_settings_pdf')); exportSettingsPdf(); } });
   }
   if (typeof exportLogPdf === 'function') {
-    items.push({ type: 'action', name: 'Export App Log', icon: '&#128196;', action: () => { showToast('Exporting log...'); exportLogPdf(); } });
+    items.push({ type: 'action', name: 'Export App Log', icon: '&#128196;', action: () => { showToast(toastFmt('toast.exporting_log')); exportLogPdf(); } });
   }
   if (typeof exportMidi === 'function') {
-    items.push({ type: 'action', name: 'Export MIDI Files', icon: '&#127924;', action: () => { showToast('Exporting MIDI...'); exportMidi(); } });
+    items.push({ type: 'action', name: 'Export MIDI Files', icon: '&#127924;', action: () => { showToast(toastFmt('toast.exporting_midi')); exportMidi(); } });
   }
   if (typeof exportXref === 'function') {
-    items.push({ type: 'action', name: 'Export Plugin Cross-Reference', icon: '&#9889;', action: () => { showToast('Exporting cross-reference...'); exportXref(); } });
+    items.push({ type: 'action', name: 'Export Plugin Cross-Reference', icon: '&#9889;', action: () => { showToast(toastFmt('toast.exporting_xref')); exportXref(); } });
   }
   if (typeof exportSmartPlaylists === 'function') {
-    items.push({ type: 'action', name: 'Export Smart Playlists', icon: '&#127926;', action: () => { showToast('Exporting playlists...'); exportSmartPlaylists(); } });
+    items.push({ type: 'action', name: 'Export Smart Playlists', icon: '&#127926;', action: () => { showToast(toastFmt('toast.exporting_playlists')); exportSmartPlaylists(); } });
   }
   items.push({ type: 'action', name: 'Clear All Caches', icon: '&#128465;', action: () => {
-    showToast('Clearing caches...');
+    showToast(toastFmt('toast.clearing_caches'));
     window.vstUpdater.dbClearCaches().then(() => {
       if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; }
       if (typeof _waveformCache !== 'undefined') { _waveformCache = {}; _spectrogramCache = {}; }
-      showToast('All caches cleared');
-    }).catch(e => showToast('Failed: ' + e, 4000, 'error'));
+      showToast(toastFmt('toast.all_caches_cleared'));
+    }).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error'));
   }});
   if (typeof settingToggleTheme === 'function') {
     items.push({ type: 'action', name: 'Toggle Dark/Light Theme', icon: '&#127912;', action: () => settingToggleTheme() });
   }
-  items.push({ type: 'action', name: 'Scan All', icon: '&#9889;', action: () => { showToast('Scanning all...'); typeof scanAll === 'function' && scanAll(); } });
-  items.push({ type: 'action', name: 'Stop All Scans', icon: '&#9632;', action: () => { showToast('Stopping all scans...'); typeof stopAll === 'function' && stopAll(); } });
+  items.push({ type: 'action', name: 'Scan All', icon: '&#9889;', action: () => { showToast(toastFmt('toast.scanning_all')); typeof scanAll === 'function' && scanAll(); } });
+  items.push({ type: 'action', name: 'Stop All Scans', icon: '&#9632;', action: () => { showToast(toastFmt('toast.stopping_scans')); typeof stopAll === 'function' && stopAll(); } });
   items.push({ type: 'action', name: 'Export Current Tab', icon: '&#8615;', action: () => { typeof _exportCurrentTab === 'function' && _exportCurrentTab(); } });
   items.push({ type: 'action', name: 'Import to Current Tab', icon: '&#8613;', action: () => { typeof _importCurrentTab === 'function' && _importCurrentTab(); } });
   items.push({ type: 'action', name: 'Help / Keyboard Shortcuts', icon: '&#10068;', action: () => { typeof toggleHelpOverlay === 'function' && toggleHelpOverlay(); } });
-  items.push({ type: 'action', name: 'Open Log File', icon: '&#128196;', action: () => { showToast('Opening log...'); window.vstUpdater.getPrefsPath().then(p => { const lp = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(lp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); } });
+  items.push({ type: 'action', name: 'Open Log File', icon: '&#128196;', action: () => { showToast(toastFmt('toast.opening_log')); window.vstUpdater.getPrefsPath().then(p => { const lp = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(lp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); } });
 
   // Toggles
   if (typeof settingToggleCrt === 'function') items.push({ type: 'action', name: 'Toggle CRT Effects', icon: '&#128187;', action: () => settingToggleCrt() });
@@ -102,16 +102,16 @@ function collectPaletteItems() {
   if (typeof settingToggleIncludeBackups === 'function') items.push({ type: 'action', name: 'Toggle Include Ableton Backups', icon: '&#128190;', action: () => settingToggleIncludeBackups() });
 
   // Resets & Clears
-  if (typeof resetTabOrder === 'function') items.push({ type: 'action', name: 'Reset Tab Order', icon: '&#8634;', action: () => { resetTabOrder(); showToast('Tab order reset'); } });
-  if (typeof resetSettingsSectionOrder === 'function') items.push({ type: 'action', name: 'Reset Settings Layout', icon: '&#8634;', action: () => { resetSettingsSectionOrder(); showToast('Settings layout reset'); } });
-  if (typeof resetFzfParams === 'function') items.push({ type: 'action', name: 'Reset Search Weights', icon: '&#8634;', action: () => { resetFzfParams(); showToast('Search weights reset'); } });
-  if (typeof settingResetAllUI === 'function') items.push({ type: 'action', name: 'Reset All UI Layout', icon: '&#9888;', action: () => { settingResetAllUI(); showToast('All UI layout reset'); } });
-  if (typeof settingResetColumns === 'function') items.push({ type: 'action', name: 'Reset Column Widths', icon: '&#8634;', action: () => { settingResetColumns(); showToast('Column widths reset'); } });
-  if (typeof settingClearAllHistory === 'function') items.push({ type: 'action', name: 'Clear All Scan History', icon: '&#128465;', action: () => { settingClearAllHistory(); showToast('All history cleared'); } });
-  if (typeof settingClearKvrCache === 'function') items.push({ type: 'action', name: 'Clear KVR Cache', icon: '&#128465;', action: () => { settingClearKvrCache(); showToast('KVR cache cleared'); } });
-  items.push({ type: 'action', name: 'Clear App Log', icon: '&#128465;', action: () => { window.vstUpdater.clearLog().then(() => showToast('Log cleared')).catch(() => showToast('Failed to clear log', 4000, 'error')); } });
-  items.push({ type: 'action', name: 'Open Preferences File', icon: '&#128196;', action: () => { showToast('Opening preferences...'); typeof openPrefsFile === 'function' && openPrefsFile(); } });
-  items.push({ type: 'action', name: 'Open Data Directory', icon: '&#128193;', action: () => { showToast('Opening data directory...'); window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir); }); } });
+  if (typeof resetTabOrder === 'function') items.push({ type: 'action', name: 'Reset Tab Order', icon: '&#8634;', action: () => { resetTabOrder(); showToast(toastFmt('toast.tab_order_reset')); } });
+  if (typeof resetSettingsSectionOrder === 'function') items.push({ type: 'action', name: 'Reset Settings Layout', icon: '&#8634;', action: () => { resetSettingsSectionOrder(); showToast(toastFmt('toast.settings_layout_reset')); } });
+  if (typeof resetFzfParams === 'function') items.push({ type: 'action', name: 'Reset Search Weights', icon: '&#8634;', action: () => { resetFzfParams(); showToast(toastFmt('toast.search_weights_reset')); } });
+  if (typeof settingResetAllUI === 'function') items.push({ type: 'action', name: 'Reset All UI Layout', icon: '&#9888;', action: () => { settingResetAllUI(); showToast(toastFmt('toast.all_ui_layout_reset')); } });
+  if (typeof settingResetColumns === 'function') items.push({ type: 'action', name: 'Reset Column Widths', icon: '&#8634;', action: () => { settingResetColumns(); showToast(toastFmt('toast.column_widths_reset')); } });
+  if (typeof settingClearAllHistory === 'function') items.push({ type: 'action', name: 'Clear All Scan History', icon: '&#128465;', action: () => { settingClearAllHistory(); showToast(toastFmt('toast.all_history_cleared')); } });
+  if (typeof settingClearKvrCache === 'function') items.push({ type: 'action', name: 'Clear KVR Cache', icon: '&#128465;', action: () => { settingClearKvrCache(); showToast(toastFmt('toast.kvr_cache_cleared_palette')); } });
+  items.push({ type: 'action', name: 'Clear App Log', icon: '&#128465;', action: () => { window.vstUpdater.clearLog().then(() => showToast(toastFmt('toast.log_cleared'))).catch(() => showToast(toastFmt('toast.failed_clear_log'), 4000, 'error')); } });
+  items.push({ type: 'action', name: 'Open Preferences File', icon: '&#128196;', action: () => { showToast(toastFmt('toast.opening_preferences')); typeof openPrefsFile === 'function' && openPrefsFile(); } });
+  items.push({ type: 'action', name: 'Open Data Directory', icon: '&#128193;', action: () => { showToast(toastFmt('toast.opening_data_dir')); window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir); }); } });
   if (typeof clearRecentlyPlayed === 'function') items.push({ type: 'action', name: 'Clear Play History', icon: '&#128465;', action: () => clearRecentlyPlayed() });
   if (typeof clearFavorites === 'function') items.push({ type: 'action', name: 'Clear All Favorites', icon: '&#128465;', action: () => clearFavorites() });
   if (typeof clearAllNotes === 'function') items.push({ type: 'action', name: 'Clear All Notes & Tags', icon: '&#128465;', action: () => clearAllNotes() });

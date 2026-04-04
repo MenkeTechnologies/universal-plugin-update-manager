@@ -87,7 +87,7 @@ function renameTag(oldTag, newTag) {
   }
   if (changed > 0) {
     prefs.setItem('itemNotes', notes);
-    showToast(`Renamed "${oldTag}" → "${newTag}" on ${changed} items`);
+    showToast(toastFmt('toast.tag_renamed_items', { oldTag, newTag, changed }));
   }
 }
 
@@ -110,7 +110,7 @@ function deleteTag(tag) {
     standalone.splice(idx, 1);
     setStandaloneTags(standalone);
   }
-  showToast(`Removed tag "${tag}"${changed > 0 ? ` from ${changed} items` : ''}`);
+  showToast(changed > 0 ? toastFmt('toast.tag_removed_from_n', { tag, n: changed }) : toastFmt('toast.tag_removed_only', { tag }));
 }
 
 // ── Note Editor Modal ──
@@ -172,7 +172,7 @@ function saveNoteFromModal() {
   const tags = tagsStr.split(',').map(t => t.trim()).filter(Boolean);
   setNote(path, note, tags);
   closeNoteModal();
-  showToast('Note saved');
+  showToast(toastFmt('toast.note_saved'));
   refreshRowBadges(path);
   if (document.getElementById('tabNotes')?.classList.contains('active')) renderNotesTab();
 }
@@ -182,7 +182,7 @@ function deleteNoteFromModal() {
   const path = _noteModalPath;
   setNote(path, '', []);
   closeNoteModal();
-  showToast('Note deleted');
+  showToast(toastFmt('toast.note_deleted'));
   refreshRowBadges(path);
   if (document.getElementById('tabNotes')?.classList.contains('active')) renderNotesTab();
 }
@@ -377,7 +377,7 @@ function exportNotes() {
   const notes = getNotes();
   const tags = getStandaloneTags();
   const entries = Object.entries(notes);
-  if (entries.length === 0 && tags.length === 0) { showToast('No notes or tags to export'); return; }
+  if (entries.length === 0 && tags.length === 0) { showToast(toastFmt('toast.no_notes_export')); return; }
   const data = { notes, standaloneTags: tags };
   const count = entries.length + tags.length;
   _exportCtx = {
@@ -441,9 +441,9 @@ async function importNotes() {
     }
     renderNotesTab();
     renderGlobalTagBar();
-    showToast(`Imported ${added} notes/tags`);
+    showToast(toastFmt('toast.imported_notes_tags', { n: added }));
   } catch (e) {
-    showToast(`Import failed: ${e.message || e}`, 4000, 'error');
+    showToast(toastFmt('toast.import_failed', { err: e.message || e }), 4000, 'error');
   }
 }
 
@@ -453,7 +453,7 @@ function clearAllNotes() {
   setStandaloneTags([]);
   renderNotesTab();
   renderGlobalTagBar();
-  showToast('All notes and tags deleted');
+  showToast(toastFmt('toast.all_notes_deleted'));
 }
 
 // ── Tags Manager Tab ──
@@ -616,7 +616,7 @@ function tagWizardAdd() {
 
   const existing = getAllTags();
   if (existing.includes(name)) {
-    showToast(`Tag "${name}" already exists`);
+    showToast(toastFmt('toast.tag_exists', { name }));
     return;
   }
 
@@ -625,7 +625,7 @@ function tagWizardAdd() {
   setStandaloneTags(standalone);
   input.value = '';
   renderTagWizardList();
-  showToast(`Tag "${name}" created`);
+  showToast(toastFmt('toast.tag_created', { name }));
 }
 
 function tagWizardDelete(tag) {
@@ -654,7 +654,7 @@ function tagWizardConfirmRename(oldTag) {
   }
   const existing = getAllTags();
   if (existing.includes(newName)) {
-    showToast(`Tag "${newName}" already exists`);
+    showToast(toastFmt('toast.tag_newname_exists', { newName }));
     return;
   }
   renameTag(oldTag, newName);
@@ -805,7 +805,7 @@ document.addEventListener('click', (e) => {
       setNote(path, '', []);
       renderNotesTab();
       renderGlobalTagBar();
-      showToast('Note deleted');
+      showToast(toastFmt('toast.note_deleted'));
     }
   }
 
@@ -835,7 +835,7 @@ document.addEventListener('click', (e) => {
       removeTagFromItem(path, tag);
       renderTagsManager();
       renderGlobalTagBar();
-      showToast(`Tag "${tag}" removed`);
+      showToast(toastFmt('toast.tag_removed_from_note', { tag }));
     }
   }
 

@@ -25,7 +25,7 @@
     await win.onResized(saveWindow);
     await win.onMoved(saveWindow);
   } catch (e) {
-    if (typeof showToast === 'function') showToast('Window listener setup failed: ' + (e.message || e), 4000, 'error');
+    if (typeof showToast === 'function') showToast(toastFmt('toast.window_listener_failed', { err: e.message || e }), 4000, 'error');
   }
 })();
 
@@ -42,6 +42,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
 
 (async function loadLastScan() {
   showGlobalProgress();
+  await (window.__toastReady || Promise.resolve());
   // Load file-backed preferences before anything else
   await prefs.load();
   // Ensure stop/resume buttons are hidden on fresh start
@@ -89,8 +90,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
     if (listen) {
       listen('file-watcher-change', (event) => {
         const cats = event.payload?.categories || [];
-        const msg = `Files changed: ${cats.join(', ')}`;
-        showToast(msg + ' — re-scanning...');
+        showToast(toastFmt('toast.files_changed_rescan', { cats: cats.join(', ') }));
         for (const cat of cats) {
           if (cat === 'audio' && typeof scanAudioSamples === 'function') scanAudioSamples();
           else if (cat === 'daw' && typeof scanDawProjects === 'function') scanDawProjects();
@@ -132,13 +132,13 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
       if (typeof startBackgroundAnalysis === 'function') startBackgroundAnalysis();
     }
   } catch (err) {
-    showToast(`Failed to load audio scan — ${err.message || err}`, 4000, 'error');
+    showToast(toastFmt('toast.failed_load_audio_scan', { err: err.message || err }), 4000, 'error');
   }
 
   // Auto-load last DAW scan (paginated from SQLite)
   if (typeof fetchDawPage === 'function') {
     _dawOffset = 0;
-    fetchDawPage().catch(err => showToast(`Failed to load DAW scan — ${err}`, 4000, 'error'));
+    fetchDawPage().catch(err => showToast(toastFmt('toast.failed_load_daw_scan', { err }), 4000, 'error'));
   }
 
   // Auto-load last preset scan (paginated from SQLite)
@@ -147,7 +147,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
     fetchPresetPage().then(() => {
       document.getElementById('btnExportPresets').style.display = allPresets.length > 0 ? '' : 'none';
       if (typeof loadMidiFiles === 'function') loadMidiFiles();
-    }).catch(err => showToast(`Failed to load preset scan — ${err}`, 4000, 'error'));
+    }).catch(err => showToast(toastFmt('toast.failed_load_preset_scan', { err }), 4000, 'error'));
   }
 
   // Apply default type filter from settings
@@ -253,7 +253,7 @@ async function updateHeaderInfo() {
         badge.style.display = 'none';
       }
     }
-  } catch (err) { if (typeof showToast === 'function') showToast('Stats update failed: ' + (err.message || err), 4000, 'error'); }
+  } catch (err) { if (typeof showToast === 'function') showToast(toastFmt('toast.stats_update_failed', { err: err.message || err }), 4000, 'error'); }
 }
 
 if (typeof document !== 'undefined') {
@@ -282,7 +282,7 @@ async function scanAll(resume = false) {
       scanPresets(resume),
     ]);
   } catch (err) {
-    showToast(`Scan all failed — ${err.message || err}`, 4000, 'error');
+    showToast(toastFmt('toast.scan_all_failed', { err: err.message || err }), 4000, 'error');
   }
 
   scanAllRunning = false;

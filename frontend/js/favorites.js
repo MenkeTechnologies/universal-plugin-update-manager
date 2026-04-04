@@ -16,26 +16,26 @@ function isFavorite(path) {
 function addFavorite(type, path, name, extra) {
   const favs = getFavorites();
   if (favs.some(f => f.path === path)) {
-    showToast(`"${name}" is already in favorites`);
+    showToast(toastFmt('toast.already_in_favorites', { name }));
     return;
   }
   favs.unshift({ type, path, name, ...extra, addedAt: new Date().toISOString() });
   saveFavorites(favs);
-  showToast(`Added "${name}" to favorites`);
+  showToast(toastFmt('toast.added_to_favorites', { name }));
   if (typeof refreshRowBadges === 'function') refreshRowBadges(path);
 }
 
 function removeFavorite(path) {
   const favs = getFavorites().filter(f => f.path !== path);
   saveFavorites(favs);
-  showToast('Removed from favorites');
+  showToast(toastFmt('toast.removed_from_favorites'));
   if (typeof refreshRowBadges === 'function') refreshRowBadges(path);
   renderFavorites();
 }
 
 function exportFavorites() {
   const favs = getFavorites();
-  if (favs.length === 0) { showToast('No favorites to export'); return; }
+  if (favs.length === 0) { showToast(toastFmt('toast.no_favorites_export')); return; }
   _exportCtx = {
     title: 'Favorites',
     defaultName: exportFileName('favorites', favs.length),
@@ -89,16 +89,16 @@ async function importFavorites() {
     }
     saveFavorites(favs);
     renderFavorites();
-    showToast(`Imported ${added} favorites (${imported.length - added} duplicates skipped)`);
+    showToast(toastFmt('toast.imported_favorites', { added, dup: imported.length - added }));
   } catch (e) {
-    showToast(`Import failed: ${e.message || e}`, 4000, 'error');
+    showToast(toastFmt('toast.import_failed_favs', { err: e.message || e }), 4000, 'error');
   }
 }
 
 function clearFavorites() {
   if (!confirm('Remove all favorites?')) return;
   saveFavorites([]);
-  showToast('All favorites cleared');
+  showToast(toastFmt('toast.all_favorites_cleared'));
   renderFavorites();
 }
 
@@ -248,8 +248,8 @@ document.addEventListener('dblclick', (e) => {
 
   if (type === 'daw') {
     const daw = favItem.querySelector('.format-badge')?.textContent || 'DAW';
-    showToast(`Opening "${name}" in ${daw}...`);
-    window.vstUpdater.openDawProject(path).catch(err => showToast(`${daw} not installed — ${err}`, 4000, 'error'));
+    showToast(toastFmt('toast.opening_in_daw', { name, daw }));
+    window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw, err }), 4000, 'error'));
   } else if (type === 'plugin') {
     const plugin = typeof allPlugins !== 'undefined' && allPlugins.find(p => p.path === path);
     const kvrUrl = plugin ? (plugin.kvrUrl || buildKvrUrl(plugin.name, plugin.manufacturer)) : buildKvrUrl(name, '');

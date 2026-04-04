@@ -31,7 +31,7 @@ async function loadMidiFiles() {
     updateMidiCount();
     updateMidiHeaderCount();
   } catch (e) {
-    if (typeof showToast === 'function') showToast('MIDI load failed: ' + (e.message || e), 4000, 'error');
+    if (typeof showToast === 'function') showToast(toastFmt('toast.midi_load_failed', { err: e.message || e }), 4000, 'error');
   }
 }
 

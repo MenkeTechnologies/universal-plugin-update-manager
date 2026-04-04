@@ -59,7 +59,7 @@ async function loadXrefCache() {
 }
 
 function saveXrefCache() {
-  window.vstUpdater.writeCacheFile('xref-cache.json', _xrefCache).catch(() => showToast('Cache write failed', 4000, 'error'));
+  window.vstUpdater.writeCacheFile('xref-cache.json', _xrefCache).catch(() => showToast(toastFmt('toast.cache_write_failed'), 4000, 'error'));
 }
 
 function isXrefSupported(format) {
@@ -214,11 +214,11 @@ async function buildXrefIndex() {
     scanned++;
     // Update progress every 10 projects
     if (scanned % 10 === 0) {
-      showToast(`Indexing plugins: ${scanned}/${supported.length}...`, 1500);
+      showToast(toastFmt('toast.indexing_plugins', { scanned, total: supported.length }), 1500);
     }
   }
   saveXrefCache();
-  showToast(`Plugin index built: ${supported.length} projects scanned`);
+  showToast(toastFmt('toast.plugin_index_built', { n: supported.length }));
 }
 
 // Event delegation
@@ -429,7 +429,7 @@ async function showXmlProjectViewer(filePath, projectName) {
       const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
       if (!dialogApi) return;
       const savePath = await dialogApi.save({ title: 'Export XML', defaultPath: projectName + '.xml', filters: [{ name: 'XML', extensions: ['xml'] }] });
-      if (savePath) { await window.vstUpdater.writeTextFile(savePath, xml); showToast('XML exported'); }
+      if (savePath) { await window.vstUpdater.writeTextFile(savePath, xml); showToast(toastFmt('toast.xml_exported')); }
     });
   } catch (e) {
     const modal = document.getElementById('projectViewerModal');
@@ -595,7 +595,7 @@ async function showAlsViewer(filePath, projectName) {
       });
       if (savePath) {
         await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: xml });
-        showToast('XML exported');
+        showToast(toastFmt('toast.xml_exported'));
       }
     });
     } // end else (not too large)
@@ -795,7 +795,7 @@ async function showBwViewer(filePath, projectName) {
       });
       if (savePath) {
         await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: jsonStr });
-        showToast('JSON exported');
+        showToast(toastFmt('toast.json_exported'));
       }
     });
   } catch (err) {

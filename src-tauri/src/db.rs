@@ -226,7 +226,7 @@ pub struct PresetQueryResult {
 
 /// Current schema version — bump when adding migrations.
 #[allow(dead_code)]
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 
 impl Database {
     /// Open or create the database in the app data directory.
@@ -281,6 +281,12 @@ impl Database {
     pub fn checkpoint(&self) {
         let conn = self.conn.lock().unwrap();
         let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+    }
+
+    /// Resolved toast strings for the given locale (merged with English fallback).
+    pub fn get_toast_strings(&self, locale: &str) -> Result<HashMap<String, String>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        crate::toast_i18n::load_merged(&conn, locale)
     }
 
     /// VACUUM if >20% of pages are free (dead space from deleted rows).
@@ -506,6 +512,31 @@ impl Database {
                 INSERT INTO schema_version (version) VALUES (3);",
             )
             .map_err(|e| format!("Migration v3 failed: {e}"))?;
+        }
+
+        if current < 4 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS toast_i18n (
+                    key TEXT NOT NULL,
+                    locale TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    PRIMARY KEY (key, locale)
+                );
+                CREATE INDEX IF NOT EXISTS idx_toast_i18n_locale ON toast_i18n(locale);
+                INSERT INTO schema_version (version) VALUES (4);",
+            )
+            .map_err(|e| format!("Migration v4 failed: {e}"))?;
+        }
+
+        if conn
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='toast_i18n'",
+                [],
+                |_| Ok(()),
+            )
+            .is_ok()
+        {
+            crate::toast_i18n::seed_defaults(&conn)?;
         }
 
         Ok(())

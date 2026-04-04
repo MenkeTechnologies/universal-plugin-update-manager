@@ -78,7 +78,7 @@ function saveShortcuts(shortcuts) {
 function resetShortcuts() {
   prefs.removeItem('customShortcuts');
   renderShortcutSettings();
-  showToast('Shortcuts reset to defaults');
+  showToast(toastFmt('toast.shortcuts_reset'));
 }
 
 function formatKey(shortcut) {
@@ -179,7 +179,7 @@ document.addEventListener('keydown', (e) => {
     saveShortcuts(shortcuts);
     _recordingId = null;
     renderShortcutSettings();
-    showToast('Shortcut updated');
+    showToast(toastFmt('toast.shortcut_updated'));
     return;
   }
 

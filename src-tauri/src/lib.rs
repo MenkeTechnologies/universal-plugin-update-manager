@@ -26,6 +26,7 @@ pub mod midi;
 pub mod preset_scanner;
 pub mod scanner;
 pub mod similarity;
+pub mod toast_i18n;
 pub mod xref;
 
 /// Shared utility: format bytes to human-readable string.
@@ -4191,6 +4192,17 @@ fn db_clear_cache_table(table: String) -> Result<(), String> {
     db::global().clear_cache_table(&table)
 }
 
+#[tauri::command]
+fn get_toast_strings(locale: Option<String>) -> Result<std::collections::HashMap<String, String>, String> {
+    let loc = locale.unwrap_or_else(|| {
+        history::load_preferences()
+            .get("uiLocale")
+            .and_then(|v| v.as_str().map(|s| s.to_string()))
+            .unwrap_or_else(|| "en".to_string())
+    });
+    db::global().get_toast_strings(&loc)
+}
+
 // ── File watcher commands ──
 
 #[tauri::command]
@@ -4535,6 +4547,7 @@ pub fn run() {
             db_cache_stats,
             db_clear_caches,
             db_clear_cache_table,
+            get_toast_strings,
             start_file_watcher,
             stop_file_watcher,
             get_file_watcher_status,

@@ -2,6 +2,22 @@
 const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
+// Toast i18n — strings loaded from SQLite via get_toast_strings (seeded from toast_i18n_en.json).
+window.__toastStr = {};
+function toastFmt(key, vars) {
+  const map = window.__toastStr;
+  let s = map && map[key];
+  if (s == null || s === '') return key;
+  if (vars && typeof vars === 'object') {
+    s = s.replace(/\{(\w+)\}/g, (_, name) => (vars[name] != null && vars[name] !== '') ? String(vars[name]) : '');
+  }
+  return s;
+}
+window.toastFmt = toastFmt;
+window.__toastReady = invoke('get_toast_strings', { locale: null }).then((m) => {
+  window.__toastStr = m || {};
+}).catch(() => {});
+
 // ── Menu bar event handler ──
 listen('menu-action', (event) => {
   const id = event.payload;
@@ -60,8 +76,8 @@ listen('menu-action', (event) => {
     case 'cmd_palette': openPalette(); break;
     case 'help_overlay': toggleHelpOverlay(); break;
     // Help
-    case 'github': showToast('Opening GitHub...'); openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
-    case 'docs': showToast('Opening docs...'); openUpdate('https://menketechnologies.github.io/universal-plugin-update-manager/'); break;
+    case 'github': showToast(toastFmt('toast.opening_github')); openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
+    case 'docs': showToast(toastFmt('toast.opening_docs')); openUpdate('https://menketechnologies.github.io/universal-plugin-update-manager/'); break;
     // Find (handled by existing Cmd+F)
     case 'find': {
       const activeTab = document.querySelector('.tab-content.active');
@@ -105,7 +121,7 @@ document.addEventListener('click', (e) => {
     case 'seekAudio': seekAudio(e); break;
     case 'seekMetaWaveform': seekMetaWaveform(e); break;
     case 'stopAudioPlayback': stopAudioPlayback(); break;
-    case 'openUpdate': showToast('Opening link...'); openUpdate(el.dataset.url); break;
+    case 'openUpdate': showToast(toastFmt('toast.opening_link')); openUpdate(el.dataset.url); break;
     case 'openKvr': openKvr(el, el.dataset.url, el.dataset.name); break;
     case 'openFolder': openFolder(el.dataset.path); break;
     case 'openAudioFolder': openAudioFolder(el.dataset.path); break;
@@ -161,7 +177,7 @@ document.addEventListener('click', (e) => {
       prefs.setItem('tagBarVisible', current ? 'off' : 'on');
       const bar = document.getElementById('globalTagBar');
       if (bar && current) bar.style.display = 'none';
-      showToast(current ? 'Tag bar hidden' : 'Tag bar will show when tag is active');
+      showToast(current ? toastFmt('toast.tag_bar_hidden') : toastFmt('toast.tag_bar_show_when_active'));
       if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
     } break;
     case 'settingTagBarPosition': {
@@ -177,7 +193,7 @@ document.addEventListener('click', (e) => {
           tabNav.parentNode.insertBefore(bar, tabNav);
         }
       }
-      showToast(`Tag bar moved to ${pos}`);
+      showToast(toastFmt('toast.tag_bar_moved', { pos }));
     } break;
     case 'clearFavorites': clearFavorites(); break;
     case 'exportFavorites': exportFavorites(); break;
@@ -190,7 +206,7 @@ document.addEventListener('click', (e) => {
       const bar = document.getElementById('globalTagBar');
       if (bar) bar.style.display = 'none';
       prefs.setItem('tagBarVisible', 'off');
-      showToast('Tag bar hidden (filter still active). Show via Settings.');
+      showToast(toastFmt('toast.tag_bar_hidden_filter'));
     } break;
     case 'moveTagBar': {
       const bar = document.getElementById('globalTagBar');
@@ -203,12 +219,12 @@ document.addEventListener('click', (e) => {
         const lastTab = [...document.querySelectorAll('.tab-content')].pop();
         if (lastTab) lastTab.parentNode.insertBefore(bar, lastTab.nextSibling);
         prefs.setItem('tagBarPosition', 'bottom');
-        showToast('Tag bar moved to bottom');
+        showToast(toastFmt('toast.tag_bar_bottom'));
       } else {
         // Move to top (before tab nav)
         if (tabNav) tabNav.parentNode.insertBefore(bar, tabNav);
         prefs.setItem('tagBarPosition', 'top');
-        showToast('Tag bar moved to top');
+        showToast(toastFmt('toast.tag_bar_top'));
       }
     } break;
     case 'settingResetAllUI': settingResetAllUI(); break;
@@ -217,17 +233,17 @@ document.addEventListener('click', (e) => {
     case 'settingResetTabOrder': settingResetTabOrder(); break;
     case 'settingClearAllHistory': settingClearAllHistory(); break;
     case 'settingClearKvrCache': settingClearKvrCache(); break;
-    case 'settingClearAnalysisCache': window.vstUpdater.dbClearCaches().then(() => { if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; } if (typeof _waveformCache !== 'undefined') { _waveformCache = {}; _spectrogramCache = {}; } showToast('All caches cleared'); if (typeof renderCacheStats === 'function') renderCacheStats(); }).catch(e => showToast('Failed: ' + e, 4000, 'error')); break;
-    case 'clearCacheTable': { const c = el.dataset.cache; if (c) window.vstUpdater.dbClearCacheTable(c).then(() => { if (c === 'bpm' && typeof _bpmCache !== 'undefined') _bpmCache = {}; if (c === 'key' && typeof _keyCache !== 'undefined') _keyCache = {}; if (c === 'lufs' && typeof _lufsCache !== 'undefined') _lufsCache = {}; if (c === 'waveform' && typeof _waveformCache !== 'undefined') _waveformCache = {}; if (c === 'spectrogram' && typeof _spectrogramCache !== 'undefined') _spectrogramCache = {}; showToast(`${c.toUpperCase()} cache cleared`); if (typeof renderCacheStats === 'function') renderCacheStats(); }).catch(e => showToast('Failed: ' + e, 4000, 'error')); } break;
+    case 'settingClearAnalysisCache': window.vstUpdater.dbClearCaches().then(() => { if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; } if (typeof _waveformCache !== 'undefined') { _waveformCache = {}; _spectrogramCache = {}; } showToast(toastFmt('toast.all_caches_cleared')); if (typeof renderCacheStats === 'function') renderCacheStats(); }).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error')); break;
+    case 'clearCacheTable': { const c = el.dataset.cache; if (c) window.vstUpdater.dbClearCacheTable(c).then(() => { if (c === 'bpm' && typeof _bpmCache !== 'undefined') _bpmCache = {}; if (c === 'key' && typeof _keyCache !== 'undefined') _keyCache = {}; if (c === 'lufs' && typeof _lufsCache !== 'undefined') _lufsCache = {}; if (c === 'waveform' && typeof _waveformCache !== 'undefined') _waveformCache = {}; if (c === 'spectrogram' && typeof _spectrogramCache !== 'undefined') _spectrogramCache = {}; showToast(toastFmt('toast.cache_type_cleared', { cache: c.toUpperCase() })); if (typeof renderCacheStats === 'function') renderCacheStats(); }).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error')); } break;
     case 'exportSettingsPdf': if (typeof exportSettingsPdf === 'function') exportSettingsPdf(); break;
     case 'exportLogPdf': if (typeof exportLogPdf === 'function') exportLogPdf(); break;
-    case 'clearAppLog': window.vstUpdater.clearLog().then(() => showToast('Log cleared')).catch(() => showToast('Failed to clear log', 4000, 'error')); break;
-    case 'openLogFile': showToast('Opening log file...'); window.vstUpdater.getPrefsPath().then(p => { const logPath = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(logPath, 'TextEdit').catch(() => window.vstUpdater.openDawProject(logPath).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); })); }); break;
-    case 'openDataDir': showToast('Opening data directory...'); window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); break;
-    case 'refreshCacheList': if (typeof renderCacheFilesList === 'function') { renderCacheFilesList(); showToast('Cache list refreshed'); } break;
-    case 'refreshCacheStats': if (typeof renderCacheStats === 'function') { renderCacheStats(); showToast('Cache stats refreshed'); } break;
-    case 'revealDataFile': if (el.dataset.path) { showToast('Revealing file...'); window.vstUpdater.openAudioFolder(el.dataset.path).catch(() => showToast('Failed to reveal file', 4000, 'error')); } break;
-    case 'deleteDataFile': if (el.dataset.name && confirm(`Delete ${el.dataset.name}?`)) { window.vstUpdater.deleteDataFile(el.dataset.name).then(() => { showToast(`Deleted ${el.dataset.name}`); if (typeof renderCacheFilesList === 'function') renderCacheFilesList(); }).catch(e => showToast('Delete failed: ' + e, 4000, 'error')); } break;
+    case 'clearAppLog': window.vstUpdater.clearLog().then(() => showToast(toastFmt('toast.log_cleared'))).catch(() => showToast(toastFmt('toast.failed_clear_log'), 4000, 'error')); break;
+    case 'openLogFile': showToast(toastFmt('toast.opening_log_file')); window.vstUpdater.getPrefsPath().then(p => { const logPath = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(logPath, 'TextEdit').catch(() => window.vstUpdater.openDawProject(logPath).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); })); }); break;
+    case 'openDataDir': showToast(toastFmt('toast.opening_data_dir')); window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); break;
+    case 'refreshCacheList': if (typeof renderCacheFilesList === 'function') { renderCacheFilesList(); showToast(toastFmt('toast.cache_list_refreshed')); } break;
+    case 'refreshCacheStats': if (typeof renderCacheStats === 'function') { renderCacheStats(); showToast(toastFmt('toast.cache_stats_refreshed')); } break;
+    case 'revealDataFile': if (el.dataset.path) { showToast(toastFmt('toast.revealing_file')); window.vstUpdater.openAudioFolder(el.dataset.path).catch(() => showToast(toastFmt('toast.failed_reveal_file'), 4000, 'error')); } break;
+    case 'deleteDataFile': if (el.dataset.name && confirm(`Delete ${el.dataset.name}?`)) { window.vstUpdater.deleteDataFile(el.dataset.name).then(() => { showToast(toastFmt('toast.deleted_name', { name: el.dataset.name })); if (typeof renderCacheFilesList === 'function') renderCacheFilesList(); }).catch(e => showToast(toastFmt('toast.delete_failed', { err: e }), 4000, 'error')); } break;
     case 'resetAllScans': resetAllScans(); break;
     case 'settingColorScheme': settingColorScheme(el.dataset.scheme); break;
     case 'settingToggleAutoScan': settingToggleAutoScan(); break;
@@ -239,7 +255,7 @@ document.addEventListener('click', (e) => {
     case 'settingToggleAutoplayNext': settingToggleAutoplayNext(); break;
     case 'resetFzfParams': resetFzfParams(); break;
     case 'settingToggleIncludeBackups': settingToggleIncludeBackups(); break;
-    case 'saveBlacklist': { const el = document.getElementById('settingBlacklist'); if (el) { prefs.setItem('blacklistDirs', el.value); showSavedMsg('savedMsgBlacklist'); showToast('Directory blacklist saved'); } } break;
+    case 'saveBlacklist': { const el = document.getElementById('settingBlacklist'); if (el) { prefs.setItem('blacklistDirs', el.value); showSavedMsg('savedMsgBlacklist'); showToast(toastFmt('toast.directory_blacklist_saved')); } } break;
     case 'applyCustomScheme': applyCustomScheme(); break;
     case 'showSavePreset': showSavePreset(); break;
     case 'confirmSavePreset': confirmSavePreset(); break;
@@ -251,7 +267,7 @@ document.addEventListener('click', (e) => {
     case 'saveAudioScanDirs': saveAudioScanDirs(); break;
     case 'saveDawScanDirs': saveDawScanDirs(); break;
     case 'savePresetScanDirs': savePresetScanDirs(); break;
-    case 'openPrefsFile': showToast('Opening preferences...'); openPrefsFile(); break;
+    case 'openPrefsFile': showToast(toastFmt('toast.opening_preferences')); openPrefsFile(); break;
     case 'toggleRegex': toggleRegex(el); break;
     case 'collapsePlayer': collapsePlayer(); break;
     case 'hidePlayer': hidePlayer(); break;
@@ -273,7 +289,7 @@ document.addEventListener('click', (e) => {
     case 'clearAbLoop': clearAbLoop(); break;
     case 'createTag': createNewTag(); break;
     case 'closeMetaRow': closeMetaRow(); break;
-  } } catch (err) { console.error('Action error:', action, err); showToast('Action error: ' + (err.message || err), 4000, 'error'); }
+  } } catch (err) { console.error('Action error:', action, err); showToast(toastFmt('toast.action_error', { err: err.message || err }), 4000, 'error'); }
 });
 document.addEventListener('dblclick', (e) => {
   // DAW projects — open in DAW
@@ -286,9 +302,9 @@ document.addEventListener('dblclick', (e) => {
     dawRow.classList.remove('row-opening');
     void dawRow.offsetWidth;
     dawRow.classList.add('row-opening');
-    showToast(`Opening "${name}" in ${dawName}...`);
+    showToast(toastFmt('toast.opening_in_daw', { name, daw: dawName }));
     window.vstUpdater.openDawProject(filePath).catch(err => {
-      showToast(`${dawName} not installed — ${err}`, 4000, 'error');
+      showToast(toastFmt('toast.daw_not_installed', { daw: dawName, err }), 4000, 'error');
     });
     return;
   }
@@ -318,7 +334,7 @@ document.addEventListener('dblclick', (e) => {
     e.preventDefault();
     const presetName = presetRow.querySelector('td')?.textContent || 'preset';
     openPresetFolder(presetRow.dataset.presetPath);
-    showToast(`Revealing "${presetName}" in Finder...`);
+    showToast(toastFmt('toast.revealing_preset_finder', { presetName }));
     return;
   }
 });
@@ -345,11 +361,11 @@ document.addEventListener('input', (e) => {
 document.addEventListener('change', (e) => {
   const action = e.target.dataset.action;
   if (_filterRegistry[action]) { applyFilter(action); return; }
-  if (action === 'setPlaybackSpeed') { setPlaybackSpeed(e.target.value); showToast('Speed: ' + e.target.value + 'x'); }
-  else if (action === 'settingDefaultTypeFilter') { settingSaveSelect('defaultTypeFilter', e.target.value); showToast('Default type filter: ' + e.target.value); }
-  else if (action === 'settingPluginSort') { settingSaveSelect('pluginSort', e.target.value); showToast('Plugin sort: ' + e.target.value); }
-  else if (action === 'settingAudioSort') { settingSaveSelect('audioSort', e.target.value); showToast('Audio sort: ' + e.target.value); }
-  else if (action === 'settingDawSort') { settingSaveSelect('dawSort', e.target.value); showToast('DAW sort: ' + e.target.value); }
+  if (action === 'setPlaybackSpeed') { setPlaybackSpeed(e.target.value); showToast(toastFmt('toast.speed_value', { value: e.target.value })); }
+  else if (action === 'settingDefaultTypeFilter') { settingSaveSelect('defaultTypeFilter', e.target.value); showToast(toastFmt('toast.default_type_filter', { value: e.target.value })); }
+  else if (action === 'settingPluginSort') { settingSaveSelect('pluginSort', e.target.value); showToast(toastFmt('toast.plugin_sort', { value: e.target.value })); }
+  else if (action === 'settingAudioSort') { settingSaveSelect('audioSort', e.target.value); showToast(toastFmt('toast.audio_sort', { value: e.target.value })); }
+  else if (action === 'settingDawSort') { settingSaveSelect('dawSort', e.target.value); showToast(toastFmt('toast.daw_sort', { value: e.target.value })); }
   else if (action === 'settingTagBarPosition') {
     const pos = e.target.value || 'top';
     prefs.setItem('tagBarPosition', pos);
@@ -363,7 +379,7 @@ document.addEventListener('change', (e) => {
         tabNav.parentNode.insertBefore(bar, tabNav);
       }
     }
-    showToast(`Tag bar moved to ${pos}`);
+    showToast(toastFmt('toast.tag_bar_moved', { pos }));
   }
 });
 document.addEventListener('blur', (e) => {}, true);
@@ -406,6 +422,7 @@ function showToast(message, duration = 2500, type = '') {
 window.vstUpdater = {
   appendLog: (msg) => invoke('append_log', { msg }),
   getVersion: () => invoke('get_version'),
+  getToastStrings: (locale) => invoke('get_toast_strings', { locale: locale ?? null }),
   scanPlugins: (customRoots, excludePaths) => invoke('scan_plugins', { customRoots: customRoots || null, excludePaths: excludePaths || null }),
   stopScan: () => invoke('stop_scan'),
   onScanProgress: (callback) => {
@@ -577,11 +594,11 @@ const prefs = {
   },
   setItem(key, value) {
     this._cache[key] = value;
-    window.vstUpdater.prefsSet(key, value).catch(() => showToast('Failed to save preference', 4000, 'error'));
+    window.vstUpdater.prefsSet(key, value).catch(() => showToast(toastFmt('toast.failed_save_preference'), 4000, 'error'));
   },
   removeItem(key) {
     delete this._cache[key];
-    window.vstUpdater.prefsRemove(key).catch(() => showToast('Failed to save preference', 4000, 'error'));
+    window.vstUpdater.prefsRemove(key).catch(() => showToast(toastFmt('toast.failed_save_preference'), 4000, 'error'));
   },
 };
 

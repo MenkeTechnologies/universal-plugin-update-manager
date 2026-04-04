@@ -185,7 +185,7 @@ function showDepGraph() {
         }
       });
     } else {
-      showToast('Run "Plugin Index" on the DAW tab first.', 4000);
+      showToast(toastFmt('toast.run_plugin_index_first'), 4000);
     }
     return;
   }

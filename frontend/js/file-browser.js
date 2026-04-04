@@ -25,14 +25,14 @@ function addFavDir(dirPath) {
   saveFavDirs(dirs);
   renderFavDirs();
   updateBookmarkBtn();
-  showToast(`Bookmarked "${name}"`);
+  showToast(toastFmt('toast.bookmarked_name', { name }));
 }
 
 function removeFavDir(dirPath) {
   saveFavDirs(getFavDirs().filter(d => d.path !== dirPath));
   renderFavDirs();
   updateBookmarkBtn();
-  showToast('Bookmark removed');
+  showToast(toastFmt('toast.bookmark_removed'));
 }
 
 function renderFavDirs() {
@@ -111,7 +111,7 @@ async function loadDirectory(dirPath) {
     renderBreadcrumb(dirPath);
     updateBookmarkBtn();
   } catch (err) {
-    showToast(`Failed to open directory — ${err.message || err}`, 4000, 'error');
+    showToast(toastFmt('toast.failed_open_directory', { err: err.message || err }), 4000, 'error');
   } finally {
     hideGlobalProgress();
   }
@@ -554,7 +554,7 @@ document.addEventListener('contextmenu', (e) => {
     for (const tag of allTags.slice(0, 6)) {
       const has = currentTags.includes(tag);
       items.push({ icon: has ? '&#10003;' : '&#9634;', label: `${has ? 'Remove' : 'Add'} tag: ${tag}`,
-        action: () => { if (has) removeTagFromItem(path, tag); else addTagToItem(path, tag); showToast(`Tag "${tag}" ${has ? 'removed' : 'added'}`); renderFileList(); }
+        action: () => { if (has) removeTagFromItem(path, tag); else addTagToItem(path, tag); showToast(has ? toastFmt('toast.tag_removed', { tag }) : toastFmt('toast.tag_added', { tag })); renderFileList(); }
       });
     }
   }
@@ -570,10 +570,10 @@ document.addEventListener('contextmenu', (e) => {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     try {
       await window.vstUpdater.deleteFile(path);
-      showToast(`Deleted "${name}"`);
+      showToast(toastFmt('toast.deleted_name_quotes', { name }));
       loadDirectory(_fileBrowserPath);
     } catch (err) {
-      showToast(`Delete failed — ${err.message || err}`, 4000, 'error');
+      showToast(toastFmt('toast.delete_failed_msg', { err: err.message || err }), 4000, 'error');
     }
   }});
 

@@ -126,12 +126,12 @@ async function doExport() {
   const title = _exportCtx.title;
   const exportFn = _exportCtx.exportFn;
   closeExportModal();
-  showToast(`Exporting ${title} as ${ext.toUpperCase()}...`);
+  showToast(toastFmt('toast.exporting_title_as', { title, ext: ext.toUpperCase() }));
   showGlobalProgress();
   exportFn(fmt, filePath).then(() => {
-    showToast(`${title} exported as ${ext.toUpperCase()}`);
+    showToast(toastFmt('toast.exported_title_as', { title, ext: ext.toUpperCase() }));
   }).catch(err => {
-    showToast(`Export failed — ${err.message || err || 'Unknown error'}`, 4000, 'error');
+    showToast(toastFmt('toast.export_failed', { err: err.message || err || 'Unknown error' }), 4000, 'error');
   }).finally(() => {
     hideGlobalProgress();
   });
@@ -279,7 +279,7 @@ function exportMidi() {
 function exportXref() {
   const cache = typeof _xrefCache !== 'undefined' ? _xrefCache : {};
   const entries = Object.entries(cache).filter(([, v]) => v && v.length > 0);
-  if (entries.length === 0) { showToast('No xref data — build plugin index first'); return; }
+  if (entries.length === 0) { showToast(toastFmt('toast.no_xref_build_index')); return; }
   _exportCtx = {
     title: 'Plugin Cross-Reference',
     defaultName: exportFileName('xref', entries.length),
@@ -312,7 +312,7 @@ function exportXref() {
 
 function exportSmartPlaylists() {
   const playlists = typeof prefs !== 'undefined' ? prefs.getObject('smartPlaylists', []) : [];
-  if (playlists.length === 0) { showToast('No smart playlists to export'); return; }
+  if (playlists.length === 0) { showToast(toastFmt('toast.no_smart_playlists_export')); return; }
   _exportCtx = {
     title: 'Smart Playlists',
     defaultName: exportFileName('smart-playlists', playlists.length),
@@ -359,7 +359,7 @@ async function importPlugins() {
     document.getElementById('btnExport').style.display = '';
     renderPlugins(allPlugins);
     resolveKvrDownloads();
-    showToast(`Imported ${imported.length} plugins`);
+    showToast(toastFmt('toast.imported_n_plugins', { n: imported.length }));
   } catch (err) {
     await showImportError('plugins', err.message || String(err));
   } finally { hideGlobalProgress(); }
@@ -389,7 +389,7 @@ async function importAudio() {
     rebuildAudioStats();
     filterAudioSamples();
     document.getElementById('btnExportAudio').style.display = '';
-    showToast(`Imported ${imported.length} samples`);
+    showToast(toastFmt('toast.imported_n_samples', { n: imported.length }));
   } catch (err) { await showImportError('audio', err.message || String(err)); } finally { hideGlobalProgress(); }
 }
 
@@ -417,7 +417,7 @@ async function importDaw() {
     rebuildDawStats();
     filterDawProjects();
     document.getElementById('btnExportDaw').style.display = '';
-    showToast(`Imported ${imported.length} DAW projects`);
+    showToast(toastFmt('toast.imported_n_daw', { n: imported.length }));
   } catch (err) { await showImportError('daw', err.message || String(err)); } finally { hideGlobalProgress(); }
 }
 
@@ -445,14 +445,14 @@ async function importPresets() {
     rebuildPresetStats();
     filterPresets();
     document.getElementById('btnExportPresets').style.display = '';
-    showToast(`Imported ${imported.length} presets`);
+    showToast(toastFmt('toast.imported_n_presets', { n: imported.length }));
   } catch (err) { await showImportError('presets', err.message || String(err)); } finally { hideGlobalProgress(); }
 }
 
 function exportXrefPlugins() {
   const plugins = window._xrefExportPlugins || [];
   const projectName = window._xrefExportProjectName || 'Project';
-  if (plugins.length === 0) { showToast('No plugins to export'); return; }
+  if (plugins.length === 0) { showToast(toastFmt('toast.no_plugins_export')); return; }
   _exportCtx = {
     title: `Plugins in ${projectName}`,
     defaultName: exportFileName('project-plugins'),

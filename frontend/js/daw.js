@@ -41,7 +41,7 @@ async function fetchDawPage() {
     renderDawTable();
     rebuildDawStats();
   } catch (e) {
-    showToast('DAW query failed: ' + e, 4000, 'error');
+    showToast(toastFmt('toast.daw_query_failed', { err: e }), 4000, 'error');
   }
 }
 
@@ -315,7 +315,7 @@ async function scanDawProjects(resume = false) {
     }
     rebuildDawStats();
     filterDawProjects();
-    try { await window.vstUpdater.saveDawScan(allDawProjects, result.roots); } catch (e) { showToast(`Failed to save DAW history — ${e.message || e}`, 4000, 'error'); }
+    try { await window.vstUpdater.saveDawScan(allDawProjects, result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_daw_history', { err: e.message || e }), 4000, 'error'); }
     if (result.stopped && allDawProjects.length > 0) {
       resumeBtn.style.display = '';
     }
@@ -324,7 +324,7 @@ async function scanDawProjects(resume = false) {
     flushPendingProjects();
     const errMsg = err.message || err || 'Unknown error';
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;
-    showToast(`DAW scan failed — ${errMsg}`, 4000, 'error');
+    showToast(toastFmt('toast.daw_scan_failed', { errMsg }), 4000, 'error');
   }
 
   hideGlobalProgress();
@@ -341,5 +341,5 @@ async function stopDawScan() {
 }
 
 function openDawFolder(filePath) {
-  window.vstUpdater.openDawFolder(filePath).then(() => showToast('Revealed in Finder')).catch(e => showToast('Failed: ' + e, 4000, 'error'));
+  window.vstUpdater.openDawFolder(filePath).then(() => showToast(toastFmt('toast.revealed_in_finder'))).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error'));
 }

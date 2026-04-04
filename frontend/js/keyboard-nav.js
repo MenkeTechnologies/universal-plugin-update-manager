@@ -44,8 +44,8 @@ function activateNavItem() {
     if (path) {
       const name = item.querySelector('.col-name')?.textContent || '';
       const dawName = item.querySelector('.format-badge')?.textContent || 'DAW';
-      showToast(`Opening "${name}" in ${dawName}...`);
-      window.vstUpdater.openDawProject(path).catch(err => showToast(`${dawName} not installed — ${err}`, 4000, 'error'));
+      showToast(toastFmt('toast.opening_in_daw', { name, daw: dawName }));
+      window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw: dawName, err }), 4000, 'error'));
     }
   } else if (activeTab === 'tabPresets') {
     const path = item.dataset.presetPath;

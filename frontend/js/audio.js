@@ -175,7 +175,7 @@ function resetEq() {
   document.getElementById('npEqHighVal').textContent = '0 dB';
   document.getElementById('npGainVal').textContent = '100%';
   document.getElementById('npPanVal').textContent = 'C';
-  showToast('EQ reset');
+  showToast(toastFmt('toast.eq_reset'));
 }
 
 // A-B loop
@@ -185,7 +185,7 @@ function setAbLoopStart() {
   if (!_abLoop) _abLoop = { start: t, end: audioPlayer.duration };
   else _abLoop.start = Math.min(t, _abLoop.end - 0.05); // keep start < end
   updateAbLoopUI();
-  showToast(`A point: ${formatTime(_abLoop.start)}`);
+  showToast(toastFmt('toast.ab_point_a', { time: formatTime(_abLoop.start) }));
 }
 
 function setAbLoopEnd() {
@@ -194,7 +194,7 @@ function setAbLoopEnd() {
   if (!_abLoop) _abLoop = { start: 0, end: t };
   else _abLoop.end = Math.max(t, _abLoop.start + 0.05); // keep end > start
   updateAbLoopUI();
-  showToast(`B point: ${formatTime(_abLoop.end)}`);
+  showToast(toastFmt('toast.ab_point_b', { time: formatTime(_abLoop.end) }));
 }
 
 function clearAbLoop() {
@@ -280,11 +280,11 @@ function clearRecentlyPlayed() {
   recentlyPlayed = [];
   saveRecentlyPlayed();
   renderRecentlyPlayed();
-  showToast('Play history cleared');
+  showToast(toastFmt('toast.play_history_cleared'));
 }
 
 function exportRecentlyPlayed() {
-  if (recentlyPlayed.length === 0) { showToast('No play history to export'); return; }
+  if (recentlyPlayed.length === 0) { showToast(toastFmt('toast.no_play_history_export')); return; }
   _exportCtx = {
     title: 'Play History',
     defaultName: exportFileName('play-history', recentlyPlayed.length),
@@ -343,9 +343,9 @@ async function importRecentlyPlayed() {
     if (recentlyPlayed.length > MAX_RECENT) recentlyPlayed.length = MAX_RECENT;
     saveRecentlyPlayed();
     renderRecentlyPlayed();
-    showToast(`Imported ${added} tracks (${imported.length - added} duplicates skipped)`);
+    showToast(toastFmt('toast.imported_tracks', { added, dup: imported.length - added }));
   } catch (e) {
-    showToast(`Import failed: ${e.message || e}`, 4000, 'error');
+    showToast(toastFmt('toast.import_failed', { err: e.message || e }), 4000, 'error');
   }
 }
 
@@ -380,7 +380,7 @@ audioPlayer.addEventListener('seeked', updatePlaybackTime);
 
 // ── Audio Similarity Search ──
 async function findSimilarSamples(filePath) {
-  showToast('Finding similar samples...');
+  showToast(toastFmt('toast.finding_similar_samples'));
   const name = filePath.split('/').pop().replace(/\.[^.]+$/, '');
   let existing = document.getElementById('similarPanel');
   if (existing) existing.remove();
@@ -723,7 +723,7 @@ async function scanAudioSamples(resume = false) {
     if (audioScanProgressCleanup) { audioScanProgressCleanup(); audioScanProgressCleanup = null; }
     flushPendingSamples();
     // Save scan results to SQLite
-    try { await window.vstUpdater.saveAudioScan(result.samples || [], result.roots); } catch (e) { showToast(`Failed to save audio history — ${e.message || e}`, 4000, 'error'); }
+    try { await window.vstUpdater.saveAudioScan(result.samples || [], result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_audio_history', { err: e.message || e }), 4000, 'error'); }
     // Fetch first page from DB (no in-memory array needed)
     audioCurrentOffset = 0;
     await rebuildAudioStats();
@@ -737,7 +737,7 @@ async function scanAudioSamples(resume = false) {
     flushPendingSamples();
     const errMsg = err.message || err || 'Unknown error';
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;
-    showToast(`Audio scan failed — ${errMsg}`, 4000, 'error');
+    showToast(toastFmt('toast.audio_scan_failed', { errMsg }), 4000, 'error');
   }
 
   _audioScanActive = false;
@@ -873,7 +873,7 @@ async function fetchAudioPage() {
     // Update stats from DB
     rebuildAudioStats();
   } catch (e) {
-    if (typeof showToast === 'function') showToast('Audio query failed: ' + (e.message || e), 4000, 'error');
+    if (typeof showToast === 'function') showToast(toastFmt('toast.audio_query_failed', { err: e.message || e }), 4000, 'error');
   }
 }
 
@@ -993,7 +993,7 @@ async function previewAudio(filePath) {
   const ext = filePath.split('.').pop().toLowerCase();
   const UNPLAYABLE = ['sf2', 'sfz', 'rex', 'rx2', 'wma', 'ape', 'opus', 'mid', 'midi'];
   if (UNPLAYABLE.includes(ext)) {
-    showToast(`${ext.toUpperCase()} format is not playable in browser`, 3000);
+    showToast(toastFmt('toast.format_not_playable', { ext: ext.toUpperCase() }), 3000);
     return;
   }
 
@@ -1032,7 +1032,7 @@ async function previewAudio(filePath) {
     updateMetaLine();
     drawWaveform(filePath);
   } catch (err) {
-    showToast(`Playback failed (${ext.toUpperCase()}) — ${err.message || err || 'Unknown error'}`, 4000, 'error');
+    showToast(toastFmt('toast.playback_failed', { ext: ext.toUpperCase(), err: err.message || err || 'Unknown error' }), 4000, 'error');
   }
 }
 
@@ -1369,21 +1369,21 @@ function _saveBpmCache() {
   if (!_bpmCacheDirty) return;
   _bpmCacheDirty = false;
   // Use requestIdleCallback to avoid blocking animations
-  const doSave = () => window.vstUpdater.writeCacheFile('bpm-cache.json', _bpmCache).catch(() => showToast('Cache write failed', 4000, 'error'));
+  const doSave = () => window.vstUpdater.writeCacheFile('bpm-cache.json', _bpmCache).catch(() => showToast(toastFmt('toast.cache_write_failed'), 4000, 'error'));
   if (typeof requestIdleCallback === 'function') requestIdleCallback(doSave); else setTimeout(doSave, 0);
 }
 
 function _saveKeyCache() {
   if (!_keyCacheDirty) return;
   _keyCacheDirty = false;
-  const doSave = () => window.vstUpdater.writeCacheFile('key-cache.json', _keyCache).catch(() => showToast('Cache write failed', 4000, 'error'));
+  const doSave = () => window.vstUpdater.writeCacheFile('key-cache.json', _keyCache).catch(() => showToast(toastFmt('toast.cache_write_failed'), 4000, 'error'));
   if (typeof requestIdleCallback === 'function') requestIdleCallback(doSave); else setTimeout(doSave, 0);
 }
 
 function _saveLufsCache() {
   if (!_lufsCacheDirty) return;
   _lufsCacheDirty = false;
-  const doSave = () => window.vstUpdater.writeCacheFile('lufs-cache.json', _lufsCache).catch(() => showToast('Cache write failed', 4000, 'error'));
+  const doSave = () => window.vstUpdater.writeCacheFile('lufs-cache.json', _lufsCache).catch(() => showToast(toastFmt('toast.cache_write_failed'), 4000, 'error'));
   if (typeof requestIdleCallback === 'function') requestIdleCallback(doSave); else setTimeout(doSave, 0);
 }
 
@@ -1539,7 +1539,7 @@ async function startBackgroundAnalysis() {
       const count = await window.vstUpdater.batchAnalyze(paths);
       _bgDone += count;
     } catch (e) {
-      if (typeof showToast === 'function') showToast('Analysis batch failed: ' + (e.message || e), 4000, 'error');
+      if (typeof showToast === 'function') showToast(toastFmt('toast.analysis_batch_failed', { err: e.message || e }), 4000, 'error');
       break; // Stop loop on persistent failure
     }
 
@@ -1555,7 +1555,7 @@ async function startBackgroundAnalysis() {
           if (bpmCell && a.bpm) bpmCell.textContent = a.bpm;
           if (keyCell && a.key) keyCell.textContent = a.key;
           if (lufsCell && a.lufs != null) { lufsCell.textContent = a.lufs; lufsCell.classList.toggle('lufs-low', a.lufs < -25); }
-        } catch (e) { if (typeof showToast === 'function') showToast('Analysis read failed: ' + (e.message || e), 4000, 'error'); }
+        } catch (e) { if (typeof showToast === 'function') showToast(toastFmt('toast.analysis_read_failed', { err: e.message || e }), 4000, 'error'); }
       }
     }
 
@@ -1578,7 +1578,7 @@ function metaItem(label, value, wide) {
 }
 
 function openAudioFolder(filePath) {
-  window.vstUpdater.openAudioFolder(filePath).then(() => showToast('Revealed in Finder')).catch(e => showToast('Failed: ' + e, 4000, 'error'));
+  window.vstUpdater.openAudioFolder(filePath).then(() => showToast(toastFmt('toast.revealed_in_finder'))).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error'));
 }
 
 // ── Recently Played / Expanded Player ──
@@ -1861,8 +1861,8 @@ function _saveWaveformCache() {
   _evictCache(_waveformCache);
   _evictCache(_spectrogramCache);
   // Stagger to avoid blocking
-  const saveWf = () => window.vstUpdater.writeCacheFile('waveform-cache.json', _waveformCache).catch(() => showToast('Cache write failed', 4000, 'error'));
-  const saveSg = () => window.vstUpdater.writeCacheFile('spectrogram-cache.json', _spectrogramCache).catch(() => showToast('Cache write failed', 4000, 'error'));
+  const saveWf = () => window.vstUpdater.writeCacheFile('waveform-cache.json', _waveformCache).catch(() => showToast(toastFmt('toast.cache_write_failed'), 4000, 'error'));
+  const saveSg = () => window.vstUpdater.writeCacheFile('spectrogram-cache.json', _spectrogramCache).catch(() => showToast(toastFmt('toast.cache_write_failed'), 4000, 'error'));
   if (typeof requestIdleCallback === 'function') {
     requestIdleCallback(saveWf);
     requestIdleCallback(saveSg);

@@ -40,7 +40,7 @@ async function fetchPresetPage() {
     renderPresetTable();
     rebuildPresetStats();
   } catch (e) {
-    showToast('Preset query failed: ' + e, 4000, 'error');
+    showToast(toastFmt('toast.preset_query_failed', { err: e }), 4000, 'error');
   }
 }
 
@@ -205,7 +205,7 @@ function loadMorePresets() {
 }
 
 function openPresetFolder(path) {
-  window.vstUpdater.openPresetFolder(path).then(() => showToast('Revealed in Finder')).catch(e => showToast('Failed: ' + e, 4000, 'error'));
+  window.vstUpdater.openPresetFolder(path).then(() => showToast(toastFmt('toast.revealed_in_finder'))).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error'));
 }
 
 async function scanPresets(resume = false) {
@@ -347,7 +347,7 @@ async function scanPresets(resume = false) {
     filterPresets();
     // Reload MIDI tab from preset data
     if (typeof loadMidiFiles === 'function') { _midiLoaded = false; loadMidiFiles(); }
-    try { await window.vstUpdater.savePresetScan(allPresets, result.roots); } catch (e) { showToast(`Failed to save preset history — ${e.message || e}`, 4000, 'error'); }
+    try { await window.vstUpdater.savePresetScan(allPresets, result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_preset_history', { err: e.message || e }), 4000, 'error'); }
     if (result.stopped && allPresets.length > 0) {
       resumeBtn.style.display = '';
     }
@@ -356,7 +356,7 @@ async function scanPresets(resume = false) {
     flushPending();
     const errMsg = err.message || err || 'Unknown error';
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;
-    showToast(`Preset scan failed — ${errMsg}`, 4000, 'error');
+    showToast(toastFmt('toast.preset_scan_failed', { errMsg }), 4000, 'error');
   }
 
   hideGlobalProgress();
