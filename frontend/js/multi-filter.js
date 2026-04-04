@@ -96,8 +96,10 @@ function initMultiFilters() {
       updateMultiFilterLabel(wrapper, allLabel);
       // Sync back to hidden select for compat
       syncMultiToSelect(wrapper);
-      // Trigger filter
+      // Trigger filter — mark as dropdown-triggered so applyFilter skips autoSelectDropdown
+      window._dropdownTriggered = true;
       triggerFilter(wrapper._action);
+      window._dropdownTriggered = false;
     });
 
     // Prevent dropdown close on click inside
@@ -136,11 +138,12 @@ function syncMultiToSelect(wrapper) {
 }
 
 function triggerFilter(action) {
-  if (_filterRegistry && _filterRegistry[action]) {
-    applyFilter(action);
-  } else if (action === 'filterFavorites' && typeof renderFavorites === 'function') {
-    renderFavorites();
-  }
+  if (action === 'filterPlugins' && typeof filterPlugins === 'function') filterPlugins();
+  else if (action === 'filterAudioSamples' && typeof filterAudioSamples === 'function') filterAudioSamples();
+  else if (action === 'filterDawProjects' && typeof filterDawProjects === 'function') filterDawProjects();
+  else if (action === 'filterPresets' && typeof filterPresets === 'function') filterPresets();
+  else if (action === 'filterFavorites' && typeof renderFavorites === 'function') renderFavorites();
+  else if (_filterRegistry && _filterRegistry[action]) applyFilter(action);
 }
 
 // Get selected values for a multi-filter. Returns null if "all", or a Set of values.
