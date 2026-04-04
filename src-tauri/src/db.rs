@@ -4,7 +4,8 @@
 
 use crate::history::{
     self, AudioHistory, AudioSample, AudioScanSnapshot, DawHistory, DawProject, DawScanSnapshot,
-    KvrCacheEntry, PresetFile, PresetHistory, PresetScanSnapshot, ScanHistory, ScanSnapshot,
+    KvrCacheEntry, PdfFile, PdfScanSnapshot, PresetFile, PresetHistory, PresetScanSnapshot,
+    ScanHistory, ScanSnapshot,
 };
 use crate::scanner::PluginInfo;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -255,6 +256,34 @@ pub struct PresetQueryResult {
     pub total_unfiltered: u64,
 }
 
+#[derive(Debug, Serialize)]
+pub struct PdfRow {
+    pub name: String,
+    pub path: String,
+    pub directory: String,
+    pub size: u64,
+    #[serde(rename = "sizeFormatted")]
+    pub size_formatted: String,
+    pub modified: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PdfQueryResult {
+    pub pdfs: Vec<PdfRow>,
+    #[serde(rename = "totalCount")]
+    pub total_count: u64,
+    #[serde(rename = "totalUnfiltered")]
+    pub total_unfiltered: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PdfStatsResult {
+    #[serde(rename = "pdfCount")]
+    pub pdf_count: u64,
+    #[serde(rename = "totalBytes")]
+    pub total_bytes: u64,
+}
+
 /// Current schema version — bump when adding migrations.
 #[allow(dead_code)]
 const SCHEMA_VERSION: i64 = 4;
@@ -300,6 +329,7 @@ impl Database {
             ("plugin_scans", "plugins", "scan_id"),
             ("daw_scans", "daw_projects", "scan_id"),
             ("preset_scans", "presets", "scan_id"),
+            ("pdf_scans", "pdfs", "scan_id"),
         ] {
             let _ = conn.execute_batch(&format!(
                 "DELETE FROM {data_tbl} WHERE {id_col} NOT IN (SELECT id FROM {scan_tbl} ORDER BY timestamp DESC LIMIT {keep_i});
@@ -503,6 +533,29 @@ impl Database {
                     preset_count    INTEGER NOT NULL,
                     total_bytes     INTEGER NOT NULL,
                     format_counts   TEXT NOT NULL,
+                    roots           TEXT NOT NULL
+                );
+
+                -- PDF history
+                CREATE TABLE IF NOT EXISTS pdfs (
+                    id              INTEGER PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    path            TEXT NOT NULL,
+                    directory       TEXT NOT NULL,
+                    size            INTEGER NOT NULL,
+                    size_formatted  TEXT NOT NULL,
+                    modified        TEXT NOT NULL,
+                    scan_id         TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_pdfs_path_scan ON pdfs(path, scan_id);
+                CREATE INDEX IF NOT EXISTS idx_pdfs_name ON pdfs(name COLLATE NOCASE);
+                CREATE INDEX IF NOT EXISTS idx_pdfs_scan_id ON pdfs(scan_id);
+
+                CREATE TABLE IF NOT EXISTS pdf_scans (
+                    id              TEXT PRIMARY KEY,
+                    timestamp       TEXT NOT NULL,
+                    pdf_count       INTEGER NOT NULL,
+                    total_bytes     INTEGER NOT NULL,
                     roots           TEXT NOT NULL
                 );
 
@@ -2073,6 +2126,270 @@ impl Database {
             .map_err(|e| e.to_string())
     }
 
+    // ── PDF scan CRUD ──
+
+    pub fn save_pdf_scan(&self, snap: &PdfScanSnapshot) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let roots_json = serde_json::to_string(&snap.roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO pdf_scans (id, timestamp, pdf_count, total_bytes, roots) VALUES (?1,?2,?3,?4,?5)",
+            params![snap.id, snap.timestamp, snap.pdf_count, snap.total_bytes, roots_json],
+        ).map_err(|e| e.to_string())?;
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            tx.execute("DELETE FROM pdfs WHERE scan_id = ?1", params![snap.id])
+                .map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO pdfs (name, path, directory, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7)").map_err(|e| e.to_string())?;
+            for p in &snap.pdfs {
+                stmt.execute(params![
+                    p.name,
+                    p.path,
+                    p.directory,
+                    p.size,
+                    p.size_formatted,
+                    p.modified,
+                    snap.id
+                ])
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
+    pub fn get_pdf_scans(&self) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, timestamp, pdf_count, total_bytes, roots FROM pdf_scans ORDER BY timestamp DESC").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            let roots_str: String = row.get(4)?;
+            Ok(serde_json::json!({
+                "id": row.get::<_,String>(0)?,
+                "timestamp": row.get::<_,String>(1)?,
+                "pdfCount": row.get::<_,u64>(2)?,
+                "totalBytes": row.get::<_,u64>(3)?,
+                "roots": serde_json::from_str::<Vec<String>>(&roots_str).unwrap_or_default(),
+            }))
+        }).map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    }
+
+    pub fn get_pdf_scan_detail(&self, id: &str) -> Result<PdfScanSnapshot, String> {
+        let conn = self.conn.lock().unwrap();
+        let (ts, pc, tb, roots_str): (String, usize, u64, String) = conn
+            .query_row(
+                "SELECT timestamp, pdf_count, total_bytes, roots FROM pdf_scans WHERE id = ?1",
+                params![id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("SELECT name, path, directory, size, size_formatted, modified FROM pdfs WHERE scan_id = ?1")
+            .map_err(|e| e.to_string())?;
+        let pdfs = stmt
+            .query_map(params![id], |row| {
+                Ok(PdfFile {
+                    name: row.get(0)?,
+                    path: row.get(1)?,
+                    directory: row.get(2)?,
+                    size: row.get::<_, i64>(3).unwrap_or(0) as u64,
+                    size_formatted: row.get(4)?,
+                    modified: row.get(5)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        Ok(PdfScanSnapshot {
+            id: id.to_string(),
+            timestamp: ts,
+            pdf_count: pc,
+            total_bytes: tb,
+            pdfs,
+            roots: serde_json::from_str(&roots_str).unwrap_or_default(),
+        })
+    }
+
+    pub fn get_latest_pdf_scan(&self) -> Result<Option<PdfScanSnapshot>, String> {
+        let conn = self.conn.lock().unwrap();
+        let id: Option<String> = conn
+            .query_row(
+                "SELECT id FROM pdf_scans WHERE pdf_count > 0 ORDER BY timestamp DESC LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        drop(conn);
+        match id {
+            Some(id) => self.get_pdf_scan_detail(&id).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    pub fn delete_pdf_scan(&self, id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM pdfs WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM pdf_scans WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn clear_pdf_history(&self) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("DELETE FROM pdfs; DELETE FROM pdf_scans;")
+            .map_err(|e| e.to_string())
+    }
+
+    // ── Paginated PDF query ──
+    pub fn query_pdfs(
+        &self,
+        search: Option<&str>,
+        sort_key: &str,
+        sort_asc: bool,
+        offset: u64,
+        limit: u64,
+    ) -> Result<PdfQueryResult, String> {
+        let conn = self.conn.lock().unwrap();
+        let scan_id: String = conn
+            .query_row(
+                "SELECT id FROM pdf_scans WHERE pdf_count > 0 ORDER BY timestamp DESC LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
+        if scan_id.is_empty() {
+            return Ok(PdfQueryResult {
+                pdfs: vec![],
+                total_count: 0,
+                total_unfiltered: 0,
+            });
+        }
+
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pdfs WHERE scan_id = ?1",
+                params![scan_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        let mut where_parts = vec!["scan_id = ?1".to_string()];
+        let mut bind_idx = 2usize;
+        let search_pat = search.and_then(|s| {
+            let t = s.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(format!(
+                    "%{}%",
+                    t.chars().map(|c| c.to_string()).collect::<Vec<_>>().join("%")
+                ))
+            }
+        });
+        if search_pat.is_some() {
+            where_parts.push(format!(
+                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+            ));
+            bind_idx += 1;
+        }
+        let where_cl = where_parts.join(" AND ");
+
+        let sort_col = match sort_key {
+            "name" => "name COLLATE NOCASE",
+            "size" => "size",
+            "modified" => "modified",
+            "directory" => "directory COLLATE NOCASE",
+            _ => "name COLLATE NOCASE",
+        };
+        let dir = if sort_asc { "ASC" } else { "DESC" };
+
+        let total_count: u64 = {
+            let sql = format!("SELECT COUNT(*) FROM pdfs WHERE {where_cl}");
+            let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+            let mut bi = 1;
+            stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+            bi += 1;
+            if let Some(ref p) = search_pat {
+                stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            }
+            let mut rows = stmt.raw_query();
+            rows.next()
+                .map_err(|e| e.to_string())?
+                .map(|r| r.get::<_, u64>(0).unwrap_or(0))
+                .unwrap_or(0)
+        };
+
+        let sql = format!("SELECT name, path, directory, size, size_formatted, modified FROM pdfs WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}", bind_idx + 1);
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut bi = 1;
+        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+        bi += 1;
+        if let Some(ref p) = search_pat {
+            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        stmt.raw_bind_parameter(bi, limit as i64).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi + 1, offset as i64).map_err(|e| e.to_string())?;
+
+        let mut pdfs = Vec::new();
+        let mut rows = stmt.raw_query();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            pdfs.push(PdfRow {
+                name: row.get(0).unwrap_or_default(),
+                path: row.get(1).unwrap_or_default(),
+                directory: row.get(2).unwrap_or_default(),
+                size: row.get::<_, i64>(3).unwrap_or(0) as u64,
+                size_formatted: row.get(4).unwrap_or_default(),
+                modified: row.get(5).unwrap_or_default(),
+            });
+        }
+        Ok(PdfQueryResult {
+            pdfs,
+            total_count,
+            total_unfiltered,
+        })
+    }
+
+    /// Unfiltered aggregate stats for the latest PDF scan.
+    pub fn pdf_stats(&self, scan_id: Option<&str>) -> Result<PdfStatsResult, String> {
+        let conn = self.conn.lock().unwrap();
+        let sid = match scan_id {
+            Some(id) => id.to_string(),
+            None => conn
+                .query_row(
+                    "SELECT id FROM pdf_scans WHERE pdf_count > 0 ORDER BY timestamp DESC LIMIT 1",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|e| e.to_string())?
+                .unwrap_or_default(),
+        };
+        if sid.is_empty() {
+            return Ok(PdfStatsResult {
+                pdf_count: 0,
+                total_bytes: 0,
+            });
+        }
+        let pdf_count: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pdfs WHERE scan_id = ?1",
+                params![sid],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        let total_bytes: u64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(size), 0) FROM pdfs WHERE scan_id = ?1",
+                params![sid],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(PdfStatsResult { pdf_count, total_bytes })
+    }
+
     // ── KVR cache ──
 
     pub fn load_kvr_cache(&self) -> Result<HashMap<String, KvrCacheEntry>, String> {
@@ -2278,6 +2595,8 @@ impl Database {
             "daw_scans",
             "presets",
             "preset_scans",
+            "pdfs",
+            "pdf_scans",
             "kvr_cache",
             "waveform_cache",
             "spectrogram_cache",
@@ -2367,6 +2686,7 @@ impl Database {
             ("Audio Scans", "audio_scans", "audio_samples", "audio_scans"),
             ("DAW Scans", "daw_scans", "daw_projects", "daw_scans"),
             ("Preset Scans", "preset_scans", "presets", "preset_scans"),
+            ("PDF Scans", "pdf_scans", "pdfs", "pdf_scans"),
         ] {
             let scan_count: u64 = conn
                 .query_row(&format!("SELECT COUNT(*) FROM {scan_table}"), [], |r| {

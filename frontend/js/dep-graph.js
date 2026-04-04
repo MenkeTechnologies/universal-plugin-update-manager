@@ -8,7 +8,7 @@ function buildDepGraphData() {
 
   // Build from xref cache
   for (const [path, plugins] of Object.entries(_xrefCache)) {
-    const project = allDawProjects.find(d => d.path === path);
+    const project = findByPath(allDawProjects, path);
     if (!project) continue;
     projectPlugins[path] = { name: project.name, daw: project.daw || project.format, plugins };
     for (const p of plugins) {
@@ -363,7 +363,7 @@ document.addEventListener('click', (e) => {
   if (projRow) {
     const path = projRow.dataset.depProject;
     const plugins = typeof _xrefCache !== 'undefined' ? (_xrefCache[path] || []) : [];
-    const project = typeof allDawProjects !== 'undefined' && allDawProjects.find(d => d.path === path);
+    const project = typeof allDawProjects !== 'undefined' && findByPath(allDawProjects, path);
     const name = project ? project.name : path.split('/').pop();
     const panel = document.getElementById('depPanelProjects');
     if (panel) {

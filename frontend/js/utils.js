@@ -757,6 +757,7 @@ function switchTab(tab) {
   document.getElementById('tabTags').classList.toggle('active', tab === 'tags');
   document.getElementById('tabFiles').classList.toggle('active', tab === 'files');
   document.getElementById('tabMidi')?.classList.toggle('active', tab === 'midi');
+  document.getElementById('tabPdf')?.classList.toggle('active', tab === 'pdf');
   document.getElementById('tabVisualizer')?.classList.toggle('active', tab === 'visualizer');
   if (tab === 'visualizer' && typeof startVisualizer === 'function') startVisualizer();
   document.getElementById('tabWalkers')?.classList.toggle('active', tab === 'walkers');
@@ -770,4 +771,32 @@ function switchTab(tab) {
   if (tab === 'midi' && typeof loadMidiFiles === 'function' && !_midiLoaded) loadMidiFiles();
   if (tab === 'settings') { refreshSettingsUI(); if (typeof renderCacheStats === 'function') renderCacheStats(); }
   prefs.setItem('activeTab', tab);
+}
+
+// ── O(1) lookup by path for large arrays ──
+// Maintains a per-array path→item index in a WeakMap, incrementally built as
+// items are appended. Callers that swap the array (e.g. `allAudioSamples = [...]`)
+// get a fresh index automatically because WeakMap key is the array instance.
+// Callers that truncate/replace items in-place (rare) must signal via
+// `findByPath(arr, path, /*reindex*/ true)`.
+//
+// This is critical for scans with millions of items where linear `.find()` on
+// user-interactive paths (play selection, context menu, favorites, xref) would
+// cost 10–100ms per call.
+const _pathIndexCache = new WeakMap();
+function findByPath(arr, path, reindex) {
+  if (!arr || !path) return undefined;
+  let entry = _pathIndexCache.get(arr);
+  // Rebuild when absent, after truncation, or when caller forces reindex.
+  if (!entry || reindex || arr.length < entry.indexedUpTo) {
+    entry = { map: new Map(), indexedUpTo: 0 };
+    _pathIndexCache.set(arr, entry);
+  }
+  // Incrementally index newly-appended items.
+  for (let i = entry.indexedUpTo; i < arr.length; i++) {
+    const item = arr[i];
+    if (item && item.path) entry.map.set(item.path, item);
+  }
+  entry.indexedUpTo = arr.length;
+  return entry.map.get(path);
 }

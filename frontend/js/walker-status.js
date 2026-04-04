@@ -36,9 +36,10 @@ async function _updateWalkerTiles() {
     _renderTile('walkerAudioBody', 'walkerTileAudio', status.audio, 'var(--yellow)', status.poolThreads, status.audioScanning);
     _renderTile('walkerDawBody', 'walkerTileDaw', status.daw, 'var(--magenta)', status.poolThreads, status.dawScanning);
     _renderTile('walkerPresetBody', 'walkerTilePreset', status.preset, 'var(--orange)', status.poolThreads, status.presetScanning);
+    _renderTile('walkerPdfBody', 'walkerTilePdf', status.pdf, 'var(--green)', status.poolThreads, status.pdfScanning);
 
     // Stop polling after 10 consecutive idle checks (5 seconds)
-    const allIdle = !status.pluginScanning && !status.audioScanning && !status.dawScanning && !status.presetScanning;
+    const allIdle = !status.pluginScanning && !status.audioScanning && !status.dawScanning && !status.presetScanning && !status.pdfScanning;
     if (allIdle) { _walkerIdleCount++; if (_walkerIdleCount >= 10) stopWalkerPolling(); }
     else { _walkerIdleCount = 0; }
   } catch (err) {

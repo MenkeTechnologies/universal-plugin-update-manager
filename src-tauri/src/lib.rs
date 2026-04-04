@@ -25,6 +25,7 @@ pub mod kvr;
 pub mod lufs;
 pub mod midi;
 pub mod native_menu;
+pub mod pdf_scanner;
 pub mod preset_scanner;
 pub mod scanner;
 pub mod similarity;
@@ -41,7 +42,7 @@ pub fn format_size(bytes: u64) -> String {
     format!("{:.1} {}", bytes as f64 / 1024f64.powi(i as i32), units[i])
 }
 
-use history::{AudioSample, DawProject, KvrCacheUpdateEntry, PresetFile};
+use history::{AudioSample, DawProject, KvrCacheUpdateEntry, PdfFile, PresetFile};
 use scanner::PluginInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -102,12 +103,18 @@ struct PresetScanState {
     stop_scan: AtomicBool,
 }
 
+struct PdfScanState {
+    scanning: AtomicBool,
+    stop_scan: AtomicBool,
+}
+
 /// Tracks active directory paths being walked by each scanner for live status display.
 struct WalkerStatus {
     plugin_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     audio_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     daw_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     preset_dirs: Arc<std::sync::Mutex<Vec<String>>>,
+    pdf_dirs: Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 // ── Plugin update types ──
@@ -161,6 +168,11 @@ fn get_walker_status(app: AppHandle) -> serde_json::Value {
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .clone();
+    let pdf = ws
+        .pdf_dirs
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     let pool_threads = num_cpus::get().max(4);
     let plugin_scanning = app.state::<ScanState>().scanning.load(Ordering::Relaxed);
     let audio_scanning = app
@@ -172,16 +184,19 @@ fn get_walker_status(app: AppHandle) -> serde_json::Value {
         .state::<PresetScanState>()
         .scanning
         .load(Ordering::Relaxed);
+    let pdf_scanning = app.state::<PdfScanState>().scanning.load(Ordering::Relaxed);
     serde_json::json!({
         "plugin": plugin,
         "audio": audio,
         "daw": daw,
         "preset": preset,
+        "pdf": pdf,
         "poolThreads": pool_threads,
         "pluginScanning": plugin_scanning,
         "audioScanning": audio_scanning,
         "dawScanning": daw_scanning,
         "presetScanning": preset_scanning,
+        "pdfScanning": pdf_scanning,
     })
 }
 
@@ -1075,6 +1090,156 @@ fn preset_history_diff(old_id: String, new_id: String) -> Option<history::Preset
     let old = db::global().get_preset_scan_detail(&old_id).ok()?;
     let new = db::global().get_preset_scan_detail(&new_id).ok()?;
     Some(history::compute_preset_diff(&old, &new))
+}
+
+// PDF scanner commands
+#[tauri::command]
+async fn scan_pdfs(
+    app: AppHandle,
+    custom_roots: Option<Vec<String>>,
+    exclude_paths: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    let state = app.state::<PdfScanState>();
+    let scan_start = Instant::now();
+    append_log(format!(
+        "SCAN START — pdfs | roots: {:?}",
+        custom_roots.as_deref().unwrap_or(&[])
+    ));
+    if state.scanning.swap(true, Ordering::SeqCst) {
+        return Err("PDF scan already in progress".into());
+    }
+    state.stop_scan.store(false, Ordering::SeqCst);
+
+    let _ = app.emit(
+        "pdf-scan-progress",
+        serde_json::json!({
+            "phase": "status",
+            "message": "Walking filesystem directories parallelized for PDF files..."
+        }),
+    );
+
+    let app_handle = app.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let pdf_state = app_handle.state::<PdfScanState>();
+        let roots = if let Some(ref extra) = custom_roots {
+            let custom: Vec<std::path::PathBuf> = extra
+                .iter()
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.exists())
+                .collect();
+            if custom.is_empty() {
+                pdf_scanner::get_pdf_roots()
+            } else {
+                custom
+            }
+        } else {
+            pdf_scanner::get_pdf_roots()
+        };
+        let mut all_pdfs: Vec<PdfFile> = Vec::new();
+        let exclude_set = exclude_paths.map(|v| v.into_iter().collect::<HashSet<String>>());
+
+        pdf_scanner::walk_for_pdfs(
+            &roots,
+            &mut |batch, found| {
+                all_pdfs.extend_from_slice(batch);
+                let _ = app_handle.emit(
+                    "pdf-scan-progress",
+                    serde_json::json!({
+                        "phase": "scanning",
+                        "pdfs": batch,
+                        "found": found
+                    }),
+                );
+            },
+            &|| pdf_state.stop_scan.load(Ordering::SeqCst),
+            exclude_set,
+            Some(Arc::clone(&app_handle.state::<WalkerStatus>().pdf_dirs)),
+        );
+
+        {
+            let ws = app_handle.state::<WalkerStatus>();
+            let mut ad = ws.pdf_dirs.lock().unwrap_or_else(|e| e.into_inner());
+            ad.clear();
+        }
+        let was_stopped = pdf_state.stop_scan.load(Ordering::Relaxed);
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
+        all_pdfs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        serde_json::json!({ "pdfs": all_pdfs, "roots": root_strs, "stopped": was_stopped })
+    })
+    .await;
+
+    state.scanning.store(false, Ordering::SeqCst);
+    let elapsed = scan_start.elapsed();
+    match &result {
+        Ok(v) => append_log(format!(
+            "SCAN END — pdfs | {}s | {} found",
+            elapsed.as_secs(),
+            v.get("pdfs").and_then(|p| p.as_array()).map(|a| a.len()).unwrap_or(0)
+        )),
+        Err(e) => append_log(format!("SCAN ERROR — pdfs | {}s | {}", elapsed.as_secs(), e)),
+    }
+    result.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn stop_pdf_scan(app: AppHandle) -> Result<(), String> {
+    append_log("SCAN STOP — pdfs (user requested)".into());
+    let state = app.state::<PdfScanState>();
+    state.stop_scan.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+#[tauri::command]
+fn pdf_history_save(
+    pdfs: Vec<PdfFile>,
+    roots: Option<Vec<String>>,
+) -> Result<history::PdfScanSnapshot, String> {
+    let snap = history::build_pdf_snapshot(&pdfs, &roots.unwrap_or_default());
+    db::global().save_pdf_scan(&snap)?;
+    db::global().checkpoint();
+    Ok(snap)
+}
+
+#[tauri::command]
+fn pdf_history_get_scans() -> Result<Vec<serde_json::Value>, String> {
+    db::global().get_pdf_scans()
+}
+
+#[tauri::command]
+fn pdf_history_get_detail(id: String) -> Result<history::PdfScanSnapshot, String> {
+    db::global().get_pdf_scan_detail(&id)
+}
+
+#[tauri::command]
+fn pdf_history_delete(id: String) -> Result<(), String> {
+    db::global().delete_pdf_scan(&id)
+}
+
+#[tauri::command]
+fn pdf_history_clear() -> Result<(), String> {
+    #[cfg(not(test))]
+    append_log("HISTORY CLEAR — pdfs".into());
+    db::global().clear_pdf_history()
+}
+
+#[tauri::command]
+fn pdf_history_latest() -> Result<Option<history::PdfScanSnapshot>, String> {
+    db::global().get_latest_pdf_scan()
+}
+
+#[tauri::command]
+fn pdf_history_diff(old_id: String, new_id: String) -> Option<history::PdfScanDiff> {
+    let old = db::global().get_pdf_scan_detail(&old_id).ok()?;
+    let new = db::global().get_pdf_scan_detail(&new_id).ok()?;
+    Some(history::compute_pdf_diff(&old, &new))
+}
+
+#[tauri::command]
+async fn open_pdf_file(file_path: String) -> Result<(), String> {
+    open_plugin_folder(file_path).await
 }
 
 #[tauri::command]
@@ -2010,6 +2175,7 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
     let audio_state = app.state::<AudioScanState>();
     let daw_state = app.state::<DawScanState>();
     let preset_state = app.state::<PresetScanState>();
+    let pdf_state = app.state::<PdfScanState>();
 
     // Preferences for scanner config
     let prefs = history::load_preferences();
@@ -2175,6 +2341,8 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
             "dawStopped": daw_state.stop_scan.load(Ordering::Relaxed),
             "presetScanning": preset_state.scanning.load(Ordering::Relaxed),
             "presetStopped": preset_state.stop_scan.load(Ordering::Relaxed),
+            "pdfScanning": pdf_state.scanning.load(Ordering::Relaxed),
+            "pdfStopped": pdf_state.stop_scan.load(Ordering::Relaxed),
         },
         "config": {
             "threadMultiplier": thread_mult,
@@ -4514,6 +4682,28 @@ fn db_preset_stats(scan_id: Option<String>) -> Result<db::PresetStatsResult, Str
     db::global().preset_stats(scan_id.as_deref())
 }
 
+#[tauri::command(rename_all = "snake_case")]
+fn db_query_pdfs(
+    search: Option<String>,
+    sort_key: Option<String>,
+    sort_asc: Option<bool>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> Result<db::PdfQueryResult, String> {
+    db::global().query_pdfs(
+        search.as_deref(),
+        &sort_key.unwrap_or("name".into()),
+        sort_asc.unwrap_or(true),
+        offset.unwrap_or(0),
+        limit.unwrap_or(200),
+    )
+}
+
+#[tauri::command]
+fn db_pdf_stats(scan_id: Option<String>) -> Result<db::PdfStatsResult, String> {
+    db::global().pdf_stats(scan_id.as_deref())
+}
+
 #[tauri::command]
 fn db_list_scans() -> Result<Vec<db::ScanInfo>, String> {
     db::global().list_scans()
@@ -4825,11 +5015,16 @@ pub fn run() {
             scanning: AtomicBool::new(false),
             stop_scan: AtomicBool::new(false),
         })
+        .manage(PdfScanState {
+            scanning: AtomicBool::new(false),
+            stop_scan: AtomicBool::new(false),
+        })
         .manage(WalkerStatus {
             plugin_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             audio_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             daw_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             preset_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            pdf_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
         })
         .manage(file_watcher::FileWatcherState::new())
         .invoke_handler(tauri::generate_handler![
@@ -4910,6 +5105,16 @@ pub fn run() {
             preset_history_latest,
             preset_history_diff,
             open_preset_folder,
+            scan_pdfs,
+            stop_pdf_scan,
+            pdf_history_save,
+            pdf_history_get_scans,
+            pdf_history_get_detail,
+            pdf_history_delete,
+            pdf_history_clear,
+            pdf_history_latest,
+            pdf_history_diff,
+            open_pdf_file,
             export_presets_json,
             export_presets_dsv,
             export_toml,
@@ -4935,6 +5140,8 @@ pub fn run() {
             db_audio_stats,
             db_daw_stats,
             db_preset_stats,
+            db_query_pdfs,
+            db_pdf_stats,
             db_list_scans,
             db_update_bpm,
             db_update_key,

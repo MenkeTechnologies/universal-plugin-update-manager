@@ -93,13 +93,23 @@ function batchExportSelected() {
   const activeTab = document.querySelector('.tab-content.active');
   if (!activeTab) return;
 
+  // O(selected) via path index instead of O(total) linear filter — matters when
+  // total is millions and selection is small.
+  const pickByPaths = (arr) => {
+    const out = [];
+    for (const path of batchSelected) {
+      const item = findByPath(arr, path);
+      if (item) out.push(item);
+    }
+    return out;
+  };
   let items = [];
   if (activeTab.id === 'tabSamples') {
-    items = allAudioSamples.filter(s => batchSelected.has(s.path));
+    items = pickByPaths(allAudioSamples);
   } else if (activeTab.id === 'tabDaw') {
-    items = allDawProjects.filter(p => batchSelected.has(p.path));
+    items = pickByPaths(allDawProjects);
   } else if (activeTab.id === 'tabPresets') {
-    items = allPresets.filter(p => batchSelected.has(p.path));
+    items = pickByPaths(allPresets);
   }
 
   if (items.length === 0) return;

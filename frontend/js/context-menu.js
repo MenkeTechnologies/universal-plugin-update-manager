@@ -599,7 +599,7 @@ document.addEventListener('contextmenu', (e) => {
       items.push({ icon: '&#9654;', label: appFmt('menu.open_in_daw', { daw }), ..._noEcho, action: () => { showToast(toastFmt('toast.opening_in_daw', { name, daw })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw, err }), 4000, 'error')); } });
       items.push('---');
     } else if (type === 'plugin') {
-      const plugin = typeof allPlugins !== 'undefined' && allPlugins.find(p => p.path === path);
+      const plugin = typeof allPlugins !== 'undefined' && findByPath(allPlugins, path);
       const kvrUrl = plugin ? (plugin.kvrUrl || buildKvrUrl(plugin.name, plugin.manufacturer)) : buildKvrUrl(name, '');
       items.push({ icon: '&#127760;', label: appFmt('menu.open_kvr'), ..._noEcho, action: () => window.vstUpdater.openUpdate(kvrUrl) });
       if (typeof findProjectsUsingPlugin === 'function') {
@@ -874,7 +874,7 @@ document.addEventListener('contextmenu', (e) => {
       items.push({ icon: '&#9654;', label: appFmt('menu.play'), ..._noEcho, action: () => typeof previewAudio === 'function' && previewAudio(path) });
       items.push({ icon: '&#128269;', label: appFmt('menu.show_in_samples_tab'), ..._noEcho, action: async () => {
         // If not in allAudioSamples, add it
-        if (typeof allAudioSamples !== 'undefined' && !allAudioSamples.some(s => s.path === path)) {
+        if (typeof allAudioSamples !== 'undefined' && !findByPath(allAudioSamples, path)) {
           try {
             const meta = await window.vstUpdater.getAudioMetadata(path);
             allAudioSamples.push({

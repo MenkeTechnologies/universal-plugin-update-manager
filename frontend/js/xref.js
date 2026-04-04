@@ -163,7 +163,7 @@ function findProjectsUsingPlugin(pluginName) {
   const matches = [];
   for (const [path, plugins] of Object.entries(_xrefCache)) {
     if (plugins.some(p => (p.normalizedName || p.name.toLowerCase()) === normalized)) {
-      const project = allDawProjects.find(d => d.path === path);
+      const project = findByPath(allDawProjects, path);
       if (project) matches.push(project);
     }
   }

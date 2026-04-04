@@ -788,16 +788,26 @@ function accumulateAudioStats(samples) {
 }
 
 function updateAudioStats() {
-  const total = audioTotalUnfiltered;
   const stats = document.getElementById('audioStats');
   stats.style.display = 'flex';
+  const wav = audioStatCounts['WAV'] || 0;
+  const mp3 = audioStatCounts['MP3'] || 0;
+  const aiff = (audioStatCounts['AIFF'] || 0) + (audioStatCounts['AIF'] || 0);
+  const flac = audioStatCounts['FLAC'] || 0;
+  const mainFormats = wav + mp3 + aiff + flac;
+  // Sum ALL incremental format counts for "other" so the breakdown is internally
+  // consistent even before audioTotalUnfiltered has been populated (scan in progress).
+  let accumulatedTotal = 0;
+  for (const k in audioStatCounts) accumulatedTotal += audioStatCounts[k];
+  // Use the larger of (incremental accumulation, DB unfiltered total) so we never
+  // display a total smaller than the breakdown we're showing.
+  const total = Math.max(audioTotalUnfiltered || 0, accumulatedTotal);
   document.getElementById('audioTotalCount').textContent = total.toLocaleString();
-  document.getElementById('audioWavCount').textContent = (audioStatCounts['WAV'] || 0).toLocaleString();
-  document.getElementById('audioMp3Count').textContent = (audioStatCounts['MP3'] || 0).toLocaleString();
-  document.getElementById('audioAiffCount').textContent = ((audioStatCounts['AIFF'] || 0) + (audioStatCounts['AIF'] || 0)).toLocaleString();
-  document.getElementById('audioFlacCount').textContent = (audioStatCounts['FLAC'] || 0).toLocaleString();
-  const mainFormats = (audioStatCounts['WAV'] || 0) + (audioStatCounts['MP3'] || 0) + (audioStatCounts['AIFF'] || 0) + (audioStatCounts['AIF'] || 0) + (audioStatCounts['FLAC'] || 0);
-  document.getElementById('audioOtherCount').textContent = (total - mainFormats).toLocaleString();
+  document.getElementById('audioWavCount').textContent = wav.toLocaleString();
+  document.getElementById('audioMp3Count').textContent = mp3.toLocaleString();
+  document.getElementById('audioAiffCount').textContent = aiff.toLocaleString();
+  document.getElementById('audioFlacCount').textContent = flac.toLocaleString();
+  document.getElementById('audioOtherCount').textContent = Math.max(0, total - mainFormats).toLocaleString();
   document.getElementById('audioTotalSize').textContent = formatAudioSize(audioStatBytes);
   // Don't overwrite live scan counter during active scan
   if (!_audioScanActive) {
@@ -868,6 +878,30 @@ async function fetchAudioPage() {
   const search = _lastAudioSearch || '';
   const fmtSet = getMultiFilterValues('audioFormatFilter');
   const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
+  // During an active scan, scan data hasn't been saved to the DB yet. DOM-toggle
+  // filter on the currently-rendered rows (capped ≤2000 by scan streaming) instead
+  // of re-iterating millions of in-memory samples. Scan's own flushPending applies
+  // the active filter to incoming batches, so state stays consistent.
+  if (audioScanProgressCleanup) {
+    const tbody = document.getElementById('audioTableBody');
+    if (tbody) {
+      const needle = search ? search.trim().toLowerCase() : '';
+      const rows = tbody.rows;
+      let visible = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const fmt = r.dataset.audioFormat;
+        if (!fmt) continue; // skip non-data rows (load-more etc.)
+        let match = true;
+        if (fmtSet && !fmtSet.has(fmt)) match = false;
+        if (match && needle && !r.dataset.audioName.includes(needle)) match = false;
+        r.style.display = match ? '' : 'none';
+        if (match) visible++;
+      }
+      audioTotalCount = visible;
+    }
+    return;
+  }
   try {
     const result = await window.vstUpdater.dbQueryAudio({
       search: search || null,
@@ -967,7 +1001,7 @@ function buildAudioRow(s) {
   const dur = s.duration ? (typeof formatTime === 'function' ? formatTime(s.duration) : s.duration.toFixed(1) + 's') : '';
   const ch = s.channels ? (s.channels === 1 ? 'M' : s.channels === 2 ? 'S' : s.channels + 'ch') : (s.sampleRate ? '?' : '');
   const lufs = s.lufs != null ? s.lufs : (typeof _lufsCache !== 'undefined' && _lufsCache[s.path] != null) ? _lufsCache[s.path] : '';
-  return `<tr${rowClass} data-audio-path="${hp}" data-action="toggleMetadata" data-path="${hp}">
+  return `<tr${rowClass} data-audio-path="${hp}" data-audio-format="${escapeHtml(s.format)}" data-audio-name="${escapeHtml((s.name || '').toLowerCase())}" data-action="toggleMetadata" data-path="${hp}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(s.name)}">${_lastAudioSearch ? highlightMatch(s.name, _lastAudioSearch, _lastAudioMode) : escapeHtml(s.name)}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
     <td class="col-format"><span class="format-badge ${fmtClass}">${s.format}</span></td>
@@ -1042,7 +1076,7 @@ async function previewAudio(filePath) {
       np.classList.add('expanded');
       renderRecentlyPlayed();
     }
-    const sample = allAudioSamples.find(s => s.path === filePath);
+    const sample = findByPath(allAudioSamples, filePath);
     const displayName = sample ? `${sample.name}.${sample.format.toLowerCase()}` : filePath.split('/').pop();
     document.getElementById('npName').textContent = displayName;
 
@@ -1641,7 +1675,11 @@ function renderRecentlyPlayed() {
       if (score > 0 && !seen.has(r.path)) { seen.add(r.path); scored.push({ item: r, score: score + 1000 }); }
     }
     if (typeof allAudioSamples !== 'undefined') {
-      for (const s of allAudioSamples) {
+      // Cap iteration — this runs on every keystroke; must not scan millions.
+      // User searching among millions should use the main samples-tab search.
+      const N = Math.min(allAudioSamples.length, 10000);
+      for (let i = 0; i < N; i++) {
+        const s = allAudioSamples[i];
         const score = searchScore(query, [s.name, s.path], 'fuzzy');
         if (score > 0 && !seen.has(s.path)) {
           seen.add(s.path);
@@ -1701,7 +1739,10 @@ function renderMiniSearchResults() {
     if (score > 0 && !seen.has(r.path)) { seen.add(r.path); scored.push({ item: r, score: score + 1000 }); }
   }
   if (typeof allAudioSamples !== 'undefined') {
-    for (const s of allAudioSamples) {
+    // Cap iteration for keystroke-speed search (see note in renderRecentlyPlayed).
+    const N = Math.min(allAudioSamples.length, 10000);
+    for (let i = 0; i < N; i++) {
+      const s = allAudioSamples[i];
       const score = searchScore(query, [s.name, s.path], 'fuzzy');
       if (score > 0 && !seen.has(s.path)) {
         seen.add(s.path);
@@ -1743,7 +1784,7 @@ function favCurrentTrack() {
     removeFavorite(audioPlayerPath);
     if (btn) btn.style.color = '';
   } else {
-    const sample = allAudioSamples.find(s => s.path === audioPlayerPath);
+    const sample = findByPath(allAudioSamples, audioPlayerPath);
     const name = sample ? sample.name : audioPlayerPath.split('/').pop().replace(/\.[^.]+$/, '');
     addFavorite('sample', audioPlayerPath, name, { format: sample ? sample.format : '' });
     if (btn) btn.style.color = 'var(--yellow)';
@@ -1758,7 +1799,7 @@ function updateFavBtn() {
 
 function tagCurrentTrack() {
   if (!audioPlayerPath) return;
-  const sample = typeof allAudioSamples !== 'undefined' && allAudioSamples.find(s => s.path === audioPlayerPath);
+  const sample = typeof allAudioSamples !== 'undefined' && findByPath(allAudioSamples, audioPlayerPath);
   const name = sample ? sample.name : audioPlayerPath.split('/').pop().replace(/\.[^.]+$/, '');
   if (typeof showNoteEditor === 'function') showNoteEditor(audioPlayerPath, name);
 }
@@ -2223,7 +2264,7 @@ function seekMetaWaveform(event) {
 function updateMetaLine() {
   const el = document.getElementById('npMetaLine');
   if (!el || !audioPlayerPath) { if (el) el.textContent = ''; return; }
-  const sample = allAudioSamples.find(s => s.path === audioPlayerPath);
+  const sample = findByPath(allAudioSamples, audioPlayerPath);
   if (!sample) { el.textContent = audioPlayerPath.split('/').pop(); return; }
   const parts = [sample.format, sample.sizeFormatted];
   if (_bpmCache[audioPlayerPath]) parts.push(_bpmCache[audioPlayerPath] + ' BPM');
@@ -2289,11 +2330,14 @@ function updateMetaLine() {
     prefs.setItem('playerDock', dock);
   }
 
-  // Restore saved dock position
-  const saved = prefs.getItem('playerDock');
-  if (saved && ['dock-tl', 'dock-tr', 'dock-bl', 'dock-br'].includes(saved)) {
-    setDock(saved);
-  }
+  // Expose the dock restore — must be called AFTER prefs.load() (app.js does this).
+  // Reading prefs here at IIFE time is too early; cache is still empty.
+  window.restorePlayerDock = function() {
+    const saved = prefs.getItem('playerDock');
+    if (saved && ['dock-tl', 'dock-tr', 'dock-bl', 'dock-br'].includes(saved)) {
+      setDock(saved);
+    }
+  };
 
   function nearestDock(x, y) {
     const cx = window.innerWidth / 2;
@@ -2399,19 +2443,24 @@ function updateMetaLine() {
 // Use the same drag/resize system as all modals
 (function initPlayerResize() {
   const np = document.getElementById('audioNowPlaying');
-  // Restore saved dimensions or use defaults
-  const savedGeo = prefs.getItem('modal_audioNowPlaying');
-  if (savedGeo) {
-    try {
-      const geo = JSON.parse(savedGeo);
-      if (geo.width > 200) np.style.width = geo.width + 'px';
-      if (geo.height > 100) np.style.height = geo.height + 'px';
-    } catch {}
-  }
-  if (!np.style.width) np.style.width = '360px';
+  // Attach resize handles immediately (synchronous, no prefs needed).
   if (typeof initModalDragResize === 'function') {
     initModalDragResize(np);
   }
+  // Dimension restore must wait for prefs.load() — expose it for app.js to call.
+  window.restorePlayerDimensions = function() {
+    const savedGeo = prefs.getItem('modal_audioNowPlaying');
+    if (savedGeo) {
+      try {
+        const geo = JSON.parse(savedGeo);
+        if (geo.width > 200) np.style.width = geo.width + 'px';
+        if (geo.height > 100) np.style.height = geo.height + 'px';
+      } catch {}
+    }
+    if (!np.style.width) np.style.width = '360px';
+  };
+  // Set a safe default immediately so the player has a size before prefs load.
+  if (!np.style.width) np.style.width = '360px';
 })();
 
 // ── Parametric EQ Visualization ──

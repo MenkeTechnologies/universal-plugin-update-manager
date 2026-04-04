@@ -1449,8 +1449,10 @@
       50% { opacity: 1; }
     }
 
-    /* Plugin card entrance animation */
-    .plugin-card {
+    /* Plugin card entrance animation — only on initial render, NOT on filter/search
+       re-renders (each keystroke would otherwise restart every card's animation and
+       produce a visible flash). Gated by .plugin-list-animated modifier class. */
+    .plugin-list-animated .plugin-card {
       animation: card-slide-in 0.3s ease-out;
     }
     @keyframes card-slide-in {
@@ -4889,6 +4891,7 @@
       <button class="tab-btn" data-action="switchTab" data-tab="daw" title="DAW project files (Cmd+3)" data-i18n-title="ui.tt.daw_project_files_cmd_3" data-i18n="ui.btn.daw_projects">DAW Projects</button>
       <button class="tab-btn" data-action="switchTab" data-tab="presets" title="Plugin presets (Cmd+4)" data-i18n-title="ui.tt.plugin_presets_cmd_4" data-i18n="ui.btn.presets">Presets</button>
       <button class="tab-btn" data-action="switchTab" data-tab="midi" title="MIDI files with note/tempo/key metadata" data-i18n-title="ui.tt.midi_files_with_note_tempo_key_metadata">&#127924; <span data-i18n="ui.btn.127924_midi">MIDI</span></button>
+      <button class="tab-btn" data-action="switchTab" data-tab="pdf" title="PDF documents" data-i18n-title="ui.tt.pdf_documents">&#128196; <span data-i18n="ui.btn.128196_pdf">PDF</span></button>
       <button class="tab-btn" data-action="switchTab" data-tab="favorites" title="Favorited items (Cmd+5)" data-i18n-title="ui.tt.favorited_items_cmd_5">&#9733; <span data-i18n="ui.btn.9733_favorites">Favorites</span></button>
       <button class="tab-btn" data-action="switchTab" data-tab="notes" title="Notes &amp; tags (Cmd+6)" data-i18n-title="ui.tt.notes_amp_tags_cmd_6">&#128221; <span data-i18n="ui.btn.128221_notes">Notes</span></button>
       <button class="tab-btn" data-action="switchTab" data-tab="tags" title="Tag manager (Cmd+7)" data-i18n-title="ui.tt.tag_manager_cmd_7">&#127991; <span data-i18n="ui.btn.127991_tags">Tags</span></button>
@@ -4942,6 +4945,14 @@
       </div>
     </div>
 
+    <div class="audio-stats" id="pluginStats" style="display:none;">
+      <span>Total: <span class="audio-stat-value" id="pluginStatsTotal">0</span></span>
+      <span>VST3: <span class="audio-stat-value" id="pluginStatsVst3">0</span></span>
+      <span>VST2: <span class="audio-stat-value" id="pluginStatsVst2">0</span></span>
+      <span>AU: <span class="audio-stat-value" id="pluginStatsAu">0</span></span>
+      <span>Other: <span class="audio-stat-value" id="pluginStatsOther">0</span></span>
+      <span>Size: <span class="audio-stat-value" id="pluginStatsSize">0 B</span></span>
+    </div>
     <div class="disk-usage" id="pluginDiskUsage" style="display:none;"></div>
     <div class="plugin-list" id="pluginList">
       <div class="state-message" id="emptyState">
@@ -5250,6 +5261,34 @@
       <div class="table-wrap" id="midiTableWrap"></div>
     </div>
 
+    <div class="tab-content" id="tabPdf">
+      <div class="audio-toolbar">
+        <button class="btn btn-primary" data-action="scanPdfs" title="Scan filesystem for PDF documents" data-i18n-title="ui.tt.scan_filesystem_for_pdf_documents">&#8635; <span data-i18n="ui.btn.scan_pdfs">Scan PDFs</span></button>
+        <button class="btn btn-secondary" data-action="resumePdfScan" id="btnResumePdf" style="display:none;" title="Resume scan from where it stopped" data-i18n-title="ui.tt.resume_scan_from_where_it_stopped">&#9654; <span data-i18n="ui.btn.9654_resume">Resume</span></button>
+        <button class="btn btn-stop" data-action="stopPdfScan" id="btnStopPdf" style="display:none;" title="Stop the current scan" data-i18n-title="ui.tt.stop_the_current_scan">&#9632; <span data-i18n="ui.btn.9632_stop">Stop</span></button>
+        <button class="btn btn-secondary" id="btnExportPdf" data-action="exportPdfs" style="display:none;" title="Export PDF list to JSON" data-i18n-title="ui.tt.export_pdf_list_to_json">&#8615; <span data-i18n="ui.btn.8615_export">Export</span></button>
+        <button class="btn btn-secondary" data-action="importPdfs" title="Import PDF list from JSON" data-i18n-title="ui.tt.import_pdf_list_from_json">&#8613; <span data-i18n="ui.btn.8613_import">Import</span></button>
+        <div class="search-box" style="flex: 1;">
+          <span class="search-icon">&#128269;</span>
+          <input type="text" id="pdfSearchInput" placeholder="Fuzzy search PDFs..." data-action="filterPdfs" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Search PDFs by name or path" data-i18n-placeholder="ui.ph.fuzzy_search_pdfs" data-i18n-title="ui.tt.search_pdfs_by_name_or_path">
+          <button class="btn-regex" id="regexPdf" data-action="toggleRegex" data-target="filterPdfs" title="Toggle regex search" data-i18n-title="ui.tt.toggle_regex_search">.*</button>
+        </div>
+      </div>
+      <div class="progress-bar" id="pdfProgressBar"><div class="progress-fill" id="pdfProgressFill"></div></div>
+      <div class="audio-stats" id="pdfStats" style="display:none;">
+        <span>Total: <span class="audio-stat-value" id="pdfCount">0</span></span>
+        <span>Size: <span class="audio-stat-value" id="pdfTotalSize">0 B</span></span>
+      </div>
+      <div class="disk-usage" id="pdfDiskUsage" style="display:none;"></div>
+      <div class="table-wrap" id="pdfTableWrap">
+        <div class="state-message" id="pdfEmptyState">
+          <div class="state-icon">&#128196;</div>
+          <h2 data-i18n="ui.h2.pdf_index">PDF Document Index</h2>
+          <p data-i18n="ui.p.pdfs_empty">Click &quot;Scan PDFs&quot; to find PDF documents on your system.</p>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-content" id="tabVisualizer">
       <div class="viz-container" id="vizContainer">
         <div class="viz-toolbar">
@@ -5320,6 +5359,11 @@
           <div class="walker-tile-header" style="color:var(--orange);">&#127926; Preset/MIDI Walker</div>
           <div class="walker-tile-status">idle</div>
           <div class="walker-tile-body" id="walkerPresetBody"></div>
+        </div>
+        <div class="walker-tile" id="walkerTilePdf" title="PDF scanner — directories being walked for PDF documents. Right-click to copy paths." data-i18n-title="ui.tt.pdf_scanner_directories_being_walked_for_pdf_docume">
+          <div class="walker-tile-header" style="color:var(--green);">&#128196; PDF Walker</div>
+          <div class="walker-tile-status">idle</div>
+          <div class="walker-tile-body" id="walkerPdfBody"></div>
         </div>
       </div>
     </div>
@@ -5549,6 +5593,18 @@
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPresetScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="savePresetScanDirs" style="margin-top: 6px;" title="Save custom preset scan directories" data-i18n-title="ui.tt.save_custom_preset_scan_directories" data-i18n="ui.btn.save">Save</button>
               <span class="settings-saved-msg" id="savedMsgPresetScanDirs"></span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.pdf_scan_directories">PDF Scan Directories</span>
+              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_pdf_documents">Additional directories to scan for PDF documents (one per line)</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingPdfScanDirs" rows="3" placeholder="/path/to/pdfs&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for PDF documents, one path per line" data-i18n-placeholder="ui.ph.path_to_pdfs_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_pdf_documents"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPdfScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="savePdfScanDirs" style="margin-top: 6px;" title="Save custom PDF scan directories" data-i18n-title="ui.tt.save_custom_pdf_scan_directories" data-i18n="ui.btn.save">Save</button>
+              <span class="settings-saved-msg" id="savedMsgPdfScanDirs"></span>
             </div>
           </div>
         </div>
@@ -6047,40 +6103,41 @@
     </div>
   </div>
 
-  <script src="js/i18n-ui.js?v=25746"></script>
-  <script src="js/ipc.js?v=25746"></script>
-  <script src="js/utils.js?v=25746"></script>
-  <script src="js/drag-reorder.js?v=25746"></script>
-  <script src="js/modal-drag.js?v=25746"></script>
-  <script src="js/columns.js?v=25746"></script>
-  <script src="js/notes.js?v=25746"></script>
-  <script src="js/favorites.js?v=25746"></script>
-  <script src="js/export.js?v=25746"></script>
-  <script src="js/plugins.js?v=25746"></script>
-  <script src="js/settings.js?v=25746"></script>
-  <script src="js/history.js?v=25746"></script>
-  <script src="js/kvr.js?v=25746"></script>
-  <script src="js/audio.js?v=25746"></script>
-  <script src="js/daw.js?v=25746"></script>
-  <script src="js/presets.js?v=25746"></script>
-  <script src="js/disk-usage.js?v=25746"></script>
-  <script src="js/batch-select.js?v=25746"></script>
-  <script src="js/sort-persist.js?v=25746"></script>
-  <script src="js/multi-filter.js?v=25746"></script>
-  <script src="js/file-browser.js?v=25746"></script>
-  <script src="js/duplicates.js?v=25746"></script>
-  <script src="js/command-palette.js?v=25746"></script>
-  <script src="js/xref.js?v=25746"></script>
-  <script src="js/dep-graph.js?v=25746"></script>
-  <script src="js/smart-playlists.js?v=25746"></script>
-  <script src="js/heatmap-dashboard.js?v=25746"></script>
-  <script src="js/midi.js?v=25746"></script>
-  <script src="js/visualizer.js?v=25746"></script>
-  <script src="js/walker-status.js?v=25746"></script>
-  <script src="js/context-menu.js?v=25746"></script>
-  <script src="js/help-overlay.js?v=25746"></script>
-  <script src="js/shortcuts.js?v=25746"></script>
-  <script src="js/keyboard-nav.js?v=25746"></script>
-  <script src="js/app.js?v=25746"></script>
+  <script src="js/i18n-ui.js?v=6327"></script>
+  <script src="js/ipc.js?v=6327"></script>
+  <script src="js/utils.js?v=6327"></script>
+  <script src="js/drag-reorder.js?v=6327"></script>
+  <script src="js/modal-drag.js?v=6327"></script>
+  <script src="js/columns.js?v=6327"></script>
+  <script src="js/notes.js?v=6327"></script>
+  <script src="js/favorites.js?v=6327"></script>
+  <script src="js/export.js?v=6327"></script>
+  <script src="js/plugins.js?v=6327"></script>
+  <script src="js/settings.js?v=6327"></script>
+  <script src="js/history.js?v=6327"></script>
+  <script src="js/kvr.js?v=6327"></script>
+  <script src="js/audio.js?v=6327"></script>
+  <script src="js/daw.js?v=6327"></script>
+  <script src="js/presets.js?v=6327"></script>
+  <script src="js/disk-usage.js?v=6327"></script>
+  <script src="js/batch-select.js?v=6327"></script>
+  <script src="js/sort-persist.js?v=6327"></script>
+  <script src="js/multi-filter.js?v=6327"></script>
+  <script src="js/file-browser.js?v=6327"></script>
+  <script src="js/duplicates.js?v=6327"></script>
+  <script src="js/command-palette.js?v=6327"></script>
+  <script src="js/xref.js?v=6327"></script>
+  <script src="js/dep-graph.js?v=6327"></script>
+  <script src="js/smart-playlists.js?v=6327"></script>
+  <script src="js/heatmap-dashboard.js?v=6327"></script>
+  <script src="js/midi.js?v=6327"></script>
+  <script src="js/pdf.js?v=6327"></script>
+  <script src="js/visualizer.js?v=6327"></script>
+  <script src="js/walker-status.js?v=6327"></script>
+  <script src="js/context-menu.js?v=6327"></script>
+  <script src="js/help-overlay.js?v=6327"></script>
+  <script src="js/shortcuts.js?v=6327"></script>
+  <script src="js/keyboard-nav.js?v=6327"></script>
+  <script src="js/app.js?v=6327"></script>
 </body>
 </html>

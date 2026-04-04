@@ -793,7 +793,7 @@ function settingToggleFolderWatch() {
 
 function startFolderWatch() {
   const dirs = [];
-  for (const key of ['audioScanDirs', 'dawScanDirs', 'presetScanDirs']) {
+  for (const key of ['audioScanDirs', 'dawScanDirs', 'presetScanDirs', 'pdfScanDirs']) {
     const val = prefs.getItem(key);
     if (val) dirs.push(...val.split('\n').map(d => d.trim()).filter(Boolean));
   }
@@ -1002,6 +1002,13 @@ function savePresetScanDirs() {
   prefs.setItem('presetScanDirs', val);
   showSavedMsg('savedMsgPresetScanDirs');
   showToast(toastFmt('toast.preset_scan_dirs_saved'));
+}
+
+function savePdfScanDirs() {
+  const val = document.getElementById('settingPdfScanDirs').value.trim();
+  prefs.setItem('pdfScanDirs', val);
+  showSavedMsg('savedMsgPdfScanDirs');
+  showToast(toastFmt('toast.pdf_scan_dirs_saved'));
 }
 
 function openPrefsFile() {
@@ -1400,6 +1407,9 @@ function refreshSettingsUI() {
   const presetScanDirs = prefs.getItem('presetScanDirs') || '';
   const presetScanDirsEl = document.getElementById('settingPresetScanDirs');
   if (presetScanDirsEl) presetScanDirsEl.value = presetScanDirs;
+  const pdfScanDirs = prefs.getItem('pdfScanDirs') || '';
+  const pdfScanDirsEl = document.getElementById('settingPdfScanDirs');
+  if (pdfScanDirsEl) pdfScanDirsEl.value = pdfScanDirs;
 
   const dawSort = getSettingValue('dawSort', 'name');
   const dawSortEl = document.getElementById('settingDawSort');

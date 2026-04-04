@@ -251,7 +251,7 @@ document.addEventListener('dblclick', (e) => {
     showToast(toastFmt('toast.opening_in_daw', { name, daw }));
     window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw, err }), 4000, 'error'));
   } else if (type === 'plugin') {
-    const plugin = typeof allPlugins !== 'undefined' && allPlugins.find(p => p.path === path);
+    const plugin = typeof allPlugins !== 'undefined' && findByPath(allPlugins, path);
     const kvrUrl = plugin ? (plugin.kvrUrl || buildKvrUrl(plugin.name, plugin.manufacturer)) : buildKvrUrl(name, '');
     window.vstUpdater.openUpdate(kvrUrl);
   } else if (type === 'preset') {

@@ -73,6 +73,7 @@ listen('menu-action', (event) => {
     case 'scan_audio': scanAudioSamples(); break;
     case 'scan_daw': scanDawProjects(); break;
     case 'scan_presets': scanPresets(); break;
+    case 'scan_pdfs': scanPdfs(); break;
     case 'check_updates': checkUpdates(); break;
     // View — tabs
     case 'tab_plugins': switchTab('plugins'); break;
@@ -183,6 +184,13 @@ document.addEventListener('click', (e) => {
     case 'openPresetFolder': openPresetFolder(el.dataset.path); break;
     case 'sortPreset': sortPreset(el.dataset.key); break;
     case 'loadMorePresets': loadMorePresets(); break;
+    case 'scanPdfs': scanPdfs(); break;
+    case 'resumePdfScan': scanPdfs(true); break;
+    case 'stopPdfScan': stopPdfScan(); break;
+    case 'openPdfFile': openPdfFile(el.dataset.path); break;
+    case 'sortPdf': sortPdf(el.dataset.key); break;
+    case 'loadMorePdfs': loadMorePdfs(); break;
+    case 'filterPdfs': filterPdfs(); break;
     case 'openDawFolder': openDawFolder(el.dataset.path); break;
     case 'sortDaw': sortDaw(el.dataset.key); break;
     case 'loadMoreDaw': loadMoreDaw(); break;
@@ -300,6 +308,7 @@ document.addEventListener('click', (e) => {
     case 'saveAudioScanDirs': saveAudioScanDirs(); break;
     case 'saveDawScanDirs': saveDawScanDirs(); break;
     case 'savePresetScanDirs': savePresetScanDirs(); break;
+    case 'savePdfScanDirs': savePdfScanDirs(); break;
     case 'openPrefsFile': showToast(toastFmt('toast.opening_preferences')); openPrefsFile(); break;
     case 'toggleRegex': toggleRegex(el); break;
     case 'collapsePlayer': collapsePlayer(); break;
@@ -368,6 +377,14 @@ document.addEventListener('dblclick', (e) => {
     const presetName = presetRow.querySelector('td')?.textContent || 'preset';
     openPresetFolder(presetRow.dataset.presetPath);
     showToast(toastFmt('toast.revealing_preset_finder', { presetName }));
+    return;
+  }
+
+  // PDFs — reveal in Finder
+  const pdfRow = e.target.closest('#pdfTableBody tr[data-pdf-path]');
+  if (pdfRow && !e.target.closest('.col-actions')) {
+    e.preventDefault();
+    openPdfFile(pdfRow.dataset.pdfPath);
     return;
   }
 });
@@ -518,6 +535,21 @@ window.vstUpdater = {
   clearPresetHistory: () => invoke('preset_history_clear'),
   getLatestPresetScan: () => invoke('preset_history_latest'),
   diffPresetScans: (oldId, newId) => invoke('preset_history_diff', { oldId, newId }),
+  // PDFs
+  scanPdfs: (customRoots, excludePaths) => invoke('scan_pdfs', { customRoots: customRoots || null, excludePaths: excludePaths || null }),
+  stopPdfScan: () => invoke('stop_pdf_scan'),
+  onPdfScanProgress: (callback) => {
+    const p = listen('pdf-scan-progress', (event) => callback(event.payload));
+    return () => { p.then(fn => fn()); };
+  },
+  openPdfFile: (path) => invoke('open_pdf_file', { filePath: path }),
+  savePdfScan: (pdfs, roots) => invoke('pdf_history_save', { pdfs, roots: roots || null }),
+  getPdfScans: () => invoke('pdf_history_get_scans'),
+  getPdfScanDetail: (id) => invoke('pdf_history_get_detail', { id }),
+  deletePdfScan: (id) => invoke('pdf_history_delete', { id }),
+  clearPdfHistory: () => invoke('pdf_history_clear'),
+  getLatestPdfScan: () => invoke('pdf_history_latest'),
+  diffPdfScans: (oldId, newId) => invoke('pdf_history_diff', { oldId, newId }),
   exportPresetsJson: (presets, filePath) => invoke('export_presets_json', { presets, filePath }),
   importPresetsJson: (filePath) => invoke('import_presets_json', { filePath }),
   importAudioJson: (filePath) => invoke('import_audio_json', { filePath }),
@@ -607,6 +639,8 @@ window.vstUpdater = {
   dbQueryPlugins: (params) => invoke('db_query_plugins', params || {}),
   dbQueryDaw: (params) => invoke('db_query_daw', params || {}),
   dbQueryPresets: (params) => invoke('db_query_presets', params || {}),
+  dbQueryPdfs: (params) => invoke('db_query_pdfs', params || {}),
+  dbPdfStats: (scanId) => invoke('db_pdf_stats', { scanId: scanId || null }),
 };
 
 // ── Preferences layer (file-backed, survives reboots) ──

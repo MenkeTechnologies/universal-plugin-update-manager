@@ -9,11 +9,37 @@ let presetRenderCount = 0;
 let _presetOffset = 0;
 let _presetTotalCount = 0;
 let _presetTotalUnfiltered = 0;
+// Incremental stats for presets — avoids O(N) rebuild on every scan flush.
+let _presetStatsTotalBytes = 0;
+let _presetStatsFormatCounts = {};
 
 async function fetchPresetPage() {
   const search = document.getElementById('presetSearchInput')?.value || '';
   const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('presetFormatFilter') : null;
   const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
+  // During an active scan, DOM-toggle filter existing rendered rows (O(visible))
+  // instead of re-scanning the in-memory array. Scan streaming already excludes
+  // MIDI and filters by active selection going forward.
+  if (presetScanProgressCleanup) {
+    const tbody = document.getElementById('presetTableBody');
+    if (tbody) {
+      const needle = search ? search.trim().toLowerCase() : '';
+      const rows = tbody.rows;
+      let visible = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const fmt = r.dataset.presetFormat;
+        if (!fmt) continue;
+        let match = true;
+        if (fmtSet && !fmtSet.has(fmt)) match = false;
+        if (match && needle && !r.dataset.presetName.includes(needle)) match = false;
+        r.style.display = match ? '' : 'none';
+        if (match) visible++;
+      }
+      _presetTotalCount = visible;
+    }
+    return;
+  }
   try {
     const result = await window.vstUpdater.dbQueryPresets({
       search: search || null,
@@ -56,7 +82,7 @@ function formatPresetSize(bytes) {
 function buildPresetRow(p) {
   const hp = escapeHtml(p.path);
   const checked = batchSelected.has(p.path) ? ' checked' : '';
-  return `<tr data-preset-path="${hp}" style="cursor: pointer;" title="Double-click to reveal in Finder">
+  return `<tr data-preset-path="${hp}" data-preset-format="${escapeHtml(p.format)}" data-preset-name="${escapeHtml((p.name || '').toLowerCase())}" style="cursor: pointer;" title="Double-click to reveal in Finder">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td>${_lastPresetSearch ? highlightMatch(p.name, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
     <td class="col-format"><span class="format-badge format-default">${p.format}</span></td>
@@ -69,23 +95,43 @@ function buildPresetRow(p) {
   </tr>`;
 }
 
+// Maintain incremental stats so flushPending is O(batch) not O(total).
+// Accepts a batch of new items; excludes MIDI (own tab).
+function accumulatePresetStats(batch) {
+  const midiFormats = new Set(['MID', 'MIDI']);
+  for (let i = 0; i < batch.length; i++) {
+    const p = batch[i];
+    if (midiFormats.has(p.format)) continue;
+    _presetStatsTotalBytes += p.size || 0;
+    _presetStatsFormatCounts[p.format] = (_presetStatsFormatCounts[p.format] || 0) + 1;
+  }
+}
+
+function resetPresetStatsAccumulators() {
+  _presetStatsTotalBytes = 0;
+  _presetStatsFormatCounts = {};
+}
+
 function rebuildPresetStats() {
   const statsEl = document.getElementById('presetStats');
   if (!statsEl) return;
-  const displayCount = _presetTotalCount || allPresets.length;
+  // Use unfiltered scan count so the stats don't flash to 0 when a filter matches nothing.
+  const displayCount = _presetTotalUnfiltered || _presetTotalCount || allPresets.length;
   statsEl.style.display = displayCount > 0 ? 'flex' : 'none';
 
   document.getElementById('presetCount').textContent = displayCount.toLocaleString();
   const headerCount = document.getElementById('presetCountHeader');
   if (headerCount) headerCount.textContent = displayCount.toLocaleString();
 
-  const totalBytes = allPresets.reduce((sum, p) => sum + p.size, 0);
-  document.getElementById('presetTotalSize').textContent = formatPresetSize(totalBytes);
+  // If accumulators are empty (e.g., after post-scan reload from DB), backfill from
+  // allPresets ONCE. Subsequent flushes stay O(batch).
+  if (_presetStatsTotalBytes === 0 && Object.keys(_presetStatsFormatCounts).length === 0 && allPresets.length > 0) {
+    accumulatePresetStats(allPresets);
+  }
+  document.getElementById('presetTotalSize').textContent = formatPresetSize(_presetStatsTotalBytes);
 
-  const formats = {};
-  allPresets.forEach(p => { formats[p.format] = (formats[p.format] || 0) + 1; });
-  const fmtHtml = Object.entries(formats)
-    .sort((a, b) => b[1] - a[1])
+  const entries = Object.entries(_presetStatsFormatCounts).sort((a, b) => b[1] - a[1]);
+  const fmtHtml = entries
     .map(([fmt, count]) => `<span class="format-badge format-default">${fmt}: ${count}</span>`)
     .join(' ');
   document.getElementById('presetFormatBreakdown').innerHTML = fmtHtml;
@@ -95,6 +141,7 @@ function resetPresetStats() {
   document.getElementById('presetCount').textContent = '0';
   document.getElementById('presetTotalSize').textContent = '0 B';
   document.getElementById('presetFormatBreakdown').innerHTML = '';
+  resetPresetStatsAccumulators();
 }
 
 function sortPreset(key) {
@@ -233,6 +280,7 @@ async function scanPresets(resume = false) {
     allPresets = [];
     filteredPresets = [];
     resetPresetStats();
+    resetPresetStatsAccumulators();
     document.getElementById('presetStats').style.display = 'none';
     tableWrap.innerHTML = '<div class="state-message"><div class="spinner"></div><h2>Scanning for presets...</h2><p>Walking filesystem directories parallelized...</p></div>';
   }
@@ -277,6 +325,8 @@ async function scanPresets(resume = false) {
     const presetBatch = batch.filter(p => !midiFormats.has(p.format));
     allPresets.push(...batch); // keep all in allPresets for export/history
     filteredPresets.push(...presetBatch);
+    // Incrementally update stats — O(batch) not O(total).
+    accumulatePresetStats(batch);
     // Stream MIDI files to MIDI tab incrementally
     if (midiBatch.length > 0 && typeof allMidiFiles !== 'undefined') {
       allMidiFiles.push(...midiBatch);
@@ -298,7 +348,17 @@ async function scanPresets(resume = false) {
     if (tbody && presetRenderCount < 2000) {
       const loadMore = document.getElementById('presetLoadMore');
       if (loadMore) loadMore.remove();
-      const toRender = presetBatch.slice(0, 2000 - presetRenderCount);
+      // Apply active filter so newly-streamed rows respect user's checkbox/search.
+      const scanFmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('presetFormatFilter') : null;
+      const scanSearch = (document.getElementById('presetSearchInput')?.value || '').trim().toLowerCase();
+      const visibleBatch = (scanFmtSet || scanSearch)
+        ? presetBatch.filter(p => {
+            if (scanFmtSet && !scanFmtSet.has(p.format)) return false;
+            if (scanSearch && !((p.name || '').toLowerCase().includes(scanSearch))) return false;
+            return true;
+          })
+        : presetBatch;
+      const toRender = visibleBatch.slice(0, 2000 - presetRenderCount);
       tbody.insertAdjacentHTML('beforeend', toRender.map(buildPresetRow).join(''));
       presetRenderCount += toRender.length;
     }

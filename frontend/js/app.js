@@ -55,6 +55,9 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   if (_stopAll) _stopAll.style.display = 'none';
   if (_resumeAll) _resumeAll.style.display = 'none';
   restoreSettings();
+  // Restore audio player state — must run post-prefs-load (the IIFEs run too early).
+  if (typeof restorePlayerDock === 'function') restorePlayerDock();
+  if (typeof restorePlayerDimensions === 'function') restorePlayerDimensions();
   initTabDragReorder();
   initMultiFilters();
   initSortPersistence();
@@ -142,7 +145,9 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   // Auto-load last DAW scan (paginated from SQLite)
   if (typeof fetchDawPage === 'function') {
     _dawOffset = 0;
-    fetchDawPage().catch(err => showToast(toastFmt('toast.failed_load_daw_scan', { err }), 4000, 'error'));
+    fetchDawPage()
+      .then(() => { if (typeof refreshDawStatsSnapshot === 'function') refreshDawStatsSnapshot(); })
+      .catch(err => showToast(toastFmt('toast.failed_load_daw_scan', { err }), 4000, 'error'));
   }
 
   // Auto-load last preset scan (paginated from SQLite)
@@ -152,6 +157,14 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
       document.getElementById('btnExportPresets').style.display = allPresets.length > 0 ? '' : 'none';
       if (typeof loadMidiFiles === 'function') loadMidiFiles();
     }).catch(err => showToast(toastFmt('toast.failed_load_preset_scan', { err }), 4000, 'error'));
+  }
+
+  // Auto-load last PDF scan (paginated from SQLite)
+  if (typeof fetchPdfPage === 'function') {
+    _pdfOffset = 0;
+    fetchPdfPage()
+      .then(() => { if (typeof rebuildPdfStats === 'function') rebuildPdfStats(); })
+      .catch(err => showToast(toastFmt('toast.failed_load_pdf_scan', { err }), 4000, 'error'));
   }
 
   // Apply default type filter from settings

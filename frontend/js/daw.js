@@ -10,11 +10,37 @@ let _dawTotalUnfiltered = 0;
 
 let dawStatCounts = {};
 let dawStatBytes = 0;
+// Snapshot of unfiltered per-DAW counts + total bytes from the latest scan.
+// Set once on mount / post-scan via dbDawStats so filter changes DON'T wipe it.
+let _dawStatsSnapshot = null;
 
 async function fetchDawPage() {
   const search = document.getElementById('dawSearchInput')?.value || '';
   const dawSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('dawDawFilter') : null;
   const dawFilter = dawSet ? [...dawSet].join(',') : null;
+  // During an active scan, DOM-toggle filter existing rendered rows (O(visible))
+  // instead of re-scanning the in-memory array. Scan streaming already filters
+  // incoming batches, so going forward stays consistent.
+  if (dawScanProgressCleanup) {
+    const tbody = document.getElementById('dawTableBody');
+    if (tbody) {
+      const needle = search ? search.trim().toLowerCase() : '';
+      const rows = tbody.rows;
+      let visible = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const daw = r.dataset.dawName;
+        if (!daw) continue;
+        let match = true;
+        if (dawSet && !dawSet.has(daw)) match = false;
+        if (match && needle && !r.dataset.dawSearch.includes(needle)) match = false;
+        r.style.display = match ? '' : 'none';
+        if (match) visible++;
+      }
+      _dawTotalCount = visible;
+    }
+    return;
+  }
   try {
     const result = await window.vstUpdater.dbQueryDaw({
       search: search || null,
@@ -41,7 +67,9 @@ async function fetchDawPage() {
     _dawTotalCount = result.totalCount || 0;
     _dawTotalUnfiltered = result.totalUnfiltered || 0;
     renderDawTable();
-    rebuildDawStats();
+    // NOTE: do NOT rebuild the stats breakdown here — it would shrink to match
+    // the filtered page. updateDawStats() reads the unfiltered _dawStatsSnapshot.
+    updateDawStats();
   } catch (e) {
     showToast(toastFmt('toast.daw_query_failed', { err: e }), 4000, 'error');
   }
@@ -62,18 +90,45 @@ function accumulateDawStats(projects) {
 function updateDawStats() {
   const stats = document.getElementById('dawStats');
   stats.style.display = 'flex';
-  const dawDisplayCount = _dawTotalCount || allDawProjects.length;
+  // Prefer the unfiltered snapshot so filter/search changes NEVER shrink the breakdown.
+  // Fall back to incremental (scan-in-progress) or paged values only if snapshot absent.
+  const src = _dawStatsSnapshot ? _dawStatsSnapshot.counts : dawStatCounts;
+  const bytes = _dawStatsSnapshot ? _dawStatsSnapshot.totalBytes : dawStatBytes;
+  const ableton = src['Ableton Live'] || 0;
+  const logic = src['Logic Pro'] || 0;
+  const fl = src['FL Studio'] || 0;
+  const reaper = src['REAPER'] || 0;
+  const mainDaws = ableton + logic + fl + reaper;
+  let accumulatedTotal = 0;
+  for (const k in src) accumulatedTotal += src[k];
+  const dawDisplayCount = Math.max(_dawTotalUnfiltered || 0, accumulatedTotal, _dawTotalCount || 0, allDawProjects.length);
   document.getElementById('dawTotalCount').textContent = dawDisplayCount;
-  document.getElementById('dawAbletonCount').textContent = dawStatCounts['Ableton Live'] || 0;
-  document.getElementById('dawLogicCount').textContent = dawStatCounts['Logic Pro'] || 0;
-  document.getElementById('dawFlCount').textContent = dawStatCounts['FL Studio'] || 0;
-  document.getElementById('dawReaperCount').textContent = dawStatCounts['REAPER'] || 0;
-  const mainDaws = (dawStatCounts['Ableton Live'] || 0) + (dawStatCounts['Logic Pro'] || 0) + (dawStatCounts['FL Studio'] || 0) + (dawStatCounts['REAPER'] || 0);
-  document.getElementById('dawOtherCount').textContent = dawDisplayCount - mainDaws;
-  document.getElementById('dawTotalSize').textContent = formatAudioSize(dawStatBytes);
+  document.getElementById('dawAbletonCount').textContent = ableton;
+  document.getElementById('dawLogicCount').textContent = logic;
+  document.getElementById('dawFlCount').textContent = fl;
+  document.getElementById('dawReaperCount').textContent = reaper;
+  document.getElementById('dawOtherCount').textContent = Math.max(0, dawDisplayCount - mainDaws);
+  document.getElementById('dawTotalSize').textContent = formatAudioSize(bytes);
   document.getElementById('dawProjectCount').textContent = dawDisplayCount;
-  document.getElementById('btnExportDaw').style.display = allDawProjects.length > 0 ? '' : 'none';
+  document.getElementById('btnExportDaw').style.display = dawDisplayCount > 0 ? '' : 'none';
   if (typeof updateDawDiskUsage === 'function') updateDawDiskUsage();
+}
+
+// Load unfiltered stats snapshot from DB (for post-scan / app-mount paths).
+// This drives the stats breakdown and is immune to table-filter changes.
+async function refreshDawStatsSnapshot() {
+  try {
+    const s = await window.vstUpdater.dbDawStats();
+    _dawStatsSnapshot = {
+      counts: s.dawCounts || {},
+      totalBytes: s.totalBytes || 0,
+      projectCount: s.projectCount || 0,
+    };
+    if (_dawStatsSnapshot.projectCount > 0) {
+      _dawTotalUnfiltered = _dawStatsSnapshot.projectCount;
+    }
+    updateDawStats();
+  } catch { /* fall through — updateDawStats() still works with incremental state */ }
 }
 
 function rebuildDawStats() {
@@ -117,7 +172,7 @@ function buildDawRow(p) {
   const xrefBtn = xrefSupported
     ? `<button class="xref-badge${cached && cached.length > 0 ? ' has-plugins' : ''}" data-action="showXref" data-path="${hp}" data-name="${escapeHtml(p.name)}" title="Show plugins used in this project">&#9889;${cached ? ' ' + cached.length : ''}</button>`
     : '';
-  return `<tr data-daw-path="${hp}" title="Double-click to open in ${escapeHtml(p.daw)}" style="cursor: pointer;">
+  return `<tr data-daw-path="${hp}" data-daw-name="${escapeHtml(p.daw)}" data-daw-search="${escapeHtml((p.name || '').toLowerCase())}" title="Double-click to open in ${escapeHtml(p.daw)}" style="cursor: pointer;">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(p.name)}">${_lastDawSearch ? highlightMatch(p.name, _lastDawSearch, _lastDawMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
     <td class="col-format"><span class="format-badge ${dawClass}">${escapeHtml(p.daw)}</span></td>
@@ -317,13 +372,14 @@ async function scanDawProjects(resume = false) {
       allDawProjects = result.projects;
     }
     rebuildDawStats();
-    filterDawProjects();
-    // Refresh header count immediately — don't wait for next fetchDawPage to pick up the new scan
     _dawTotalUnfiltered = allDawProjects.length;
+    filterDawProjects();
     // Only save if scan completed fully (not stopped/aborted with partial results)
     if (!result.stopped) {
       try { await window.vstUpdater.saveDawScan(allDawProjects, result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_daw_history', { err: e.message || e }), 4000, 'error'); }
     }
+    // Pull authoritative unfiltered breakdown from DB so filter changes don't reset it.
+    await refreshDawStatsSnapshot();
     if (result.stopped && allDawProjects.length > 0) {
       resumeBtn.style.display = '';
     }

@@ -270,6 +270,53 @@ pub struct PresetScanDiff {
     pub removed: Vec<PresetFile>,
 }
 
+// PDF scan types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PdfFile {
+    pub name: String,
+    pub path: String,
+    pub directory: String,
+    pub size: u64,
+    #[serde(rename = "sizeFormatted")]
+    pub size_formatted: String,
+    pub modified: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PdfScanSnapshot {
+    pub id: String,
+    pub timestamp: String,
+    #[serde(rename = "pdfCount")]
+    pub pdf_count: usize,
+    #[serde(rename = "totalBytes")]
+    pub total_bytes: u64,
+    pub pdfs: Vec<PdfFile>,
+    #[serde(default)]
+    pub roots: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PdfScanSummary {
+    pub id: String,
+    pub timestamp: String,
+    #[serde(rename = "pdfCount")]
+    pub pdf_count: usize,
+    #[serde(rename = "totalBytes")]
+    pub total_bytes: u64,
+    #[serde(default)]
+    pub roots: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PdfScanDiff {
+    #[serde(rename = "oldScan")]
+    pub old_scan: PdfScanSummary,
+    #[serde(rename = "newScan")]
+    pub new_scan: PdfScanSummary,
+    pub added: Vec<PdfFile>,
+    pub removed: Vec<PdfFile>,
+}
+
 #[cfg(test)]
 thread_local! {
     static TEST_DATA_DIR: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
@@ -1392,6 +1439,58 @@ pub fn compute_preset_diff(
             preset_count: new_scan.preset_count,
             total_bytes: new_scan.total_bytes,
             format_counts: new_scan.format_counts.clone(),
+            roots: new_scan.roots.clone(),
+        },
+        added,
+        removed,
+    }
+}
+
+pub fn build_pdf_snapshot(pdfs: &[PdfFile], roots: &[String]) -> PdfScanSnapshot {
+    let mut total_bytes = 0u64;
+    for p in pdfs {
+        total_bytes += p.size;
+    }
+    PdfScanSnapshot {
+        id: gen_id(),
+        timestamp: now_iso(),
+        pdf_count: pdfs.len(),
+        total_bytes,
+        pdfs: pdfs.to_vec(),
+        roots: roots.to_vec(),
+    }
+}
+
+pub fn compute_pdf_diff(old_scan: &PdfScanSnapshot, new_scan: &PdfScanSnapshot) -> PdfScanDiff {
+    let old_paths: std::collections::HashSet<&str> =
+        old_scan.pdfs.iter().map(|p| p.path.as_str()).collect();
+    let new_paths: std::collections::HashSet<&str> =
+        new_scan.pdfs.iter().map(|p| p.path.as_str()).collect();
+    let added: Vec<PdfFile> = new_scan
+        .pdfs
+        .iter()
+        .filter(|p| !old_paths.contains(p.path.as_str()))
+        .cloned()
+        .collect();
+    let removed: Vec<PdfFile> = old_scan
+        .pdfs
+        .iter()
+        .filter(|p| !new_paths.contains(p.path.as_str()))
+        .cloned()
+        .collect();
+    PdfScanDiff {
+        old_scan: PdfScanSummary {
+            id: old_scan.id.clone(),
+            timestamp: old_scan.timestamp.clone(),
+            pdf_count: old_scan.pdf_count,
+            total_bytes: old_scan.total_bytes,
+            roots: old_scan.roots.clone(),
+        },
+        new_scan: PdfScanSummary {
+            id: new_scan.id.clone(),
+            timestamp: new_scan.timestamp.clone(),
+            pdf_count: new_scan.pdf_count,
+            total_bytes: new_scan.total_bytes,
             roots: new_scan.roots.clone(),
         },
         added,

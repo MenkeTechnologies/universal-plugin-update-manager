@@ -20,6 +20,7 @@ async function loadPluginsFromDb() {
   }
   try {
     _pluginOffset = 0;
+    enablePluginCardAnimation(); // initial render gets the slide-in animation
     await fetchPluginPage();
     _pluginsLoaded = true;
 
@@ -46,6 +47,28 @@ async function fetchPluginPage() {
   const search = document.getElementById('searchInput')?.value || '';
   const typeSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('typeFilter') : null;
   const typeFilter = typeSet ? [...typeSet].join(',') : null;
+  // During an active scan, DOM-toggle filter existing cards (O(visible)) instead
+  // of iterating the full in-memory list.
+  if (scanProgressCleanup) {
+    const list = document.getElementById('pluginList');
+    if (list) {
+      const needle = search ? search.trim().toLowerCase() : '';
+      const cards = list.querySelectorAll('.plugin-card[data-plugin-type]');
+      let visible = 0;
+      for (let i = 0; i < cards.length; i++) {
+        const c = cards[i];
+        const t = c.dataset.pluginType;
+        let match = true;
+        if (typeSet && !typeSet.has(t)) match = false;
+        if (match && needle && !c.dataset.pluginName.includes(needle) && !c.dataset.pluginMfg.includes(needle)) match = false;
+        c.style.display = match ? '' : 'none';
+        if (match) visible++;
+      }
+      _pluginTotalCount = visible;
+      document.getElementById('totalCount').textContent = _pluginTotalCount;
+    }
+    return;
+  }
   try {
     const result = await window.vstUpdater.dbQueryPlugins({
       search: search || null,
@@ -129,7 +152,23 @@ async function scanPlugins(resume = false) {
       const fragment = document.createDocumentFragment();
       const temp = document.createElement('div');
       temp.innerHTML = data.plugins.map(p => buildPluginCardHtml(p)).join('');
-      while (temp.firstChild) fragment.appendChild(temp.firstChild);
+      // Apply active filter so newly-streamed cards respect user's checkbox/search.
+      const scanTypeSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('typeFilter') : null;
+      const scanSearch = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+      const hasFilter = !!(scanTypeSet || scanSearch);
+      while (temp.firstChild) {
+        const c = temp.firstChild;
+        if (hasFilter && c.dataset) {
+          const t = c.dataset.pluginType;
+          const n = c.dataset.pluginName || '';
+          const m = c.dataset.pluginMfg || '';
+          let match = true;
+          if (scanTypeSet && t && !scanTypeSet.has(t)) match = false;
+          if (match && scanSearch && !n.includes(scanSearch) && !m.includes(scanSearch)) match = false;
+          if (!match) c.style.display = 'none';
+        }
+        fragment.appendChild(c);
+      }
       list.appendChild(fragment);
     }
   });
@@ -156,6 +195,7 @@ async function scanPlugins(resume = false) {
     if (allPlugins.length === 0) {
       list.innerHTML = `<div class="state-message"><div class="state-icon">&#128270;</div><h2>${_ui('ui.js.no_plugins_found')}</h2><p>${_ui('ui.js.no_plugins_found_body')}</p></div>`;
     } else {
+      enablePluginCardAnimation(); // post-scan render gets the slide-in animation
       renderPlugins(allPlugins);
       resolveKvrDownloads();
     }
@@ -212,7 +252,7 @@ function buildPluginCardHtml(p) {
   }
 
   return `
-    <div class="plugin-card" data-path="${escapeHtml(p.path)}">
+    <div class="plugin-card" data-path="${escapeHtml(p.path)}" data-plugin-type="${escapeHtml(p.type)}" data-plugin-name="${escapeHtml((p.name || '').toLowerCase())}" data-plugin-mfg="${escapeHtml((p.manufacturer || '').toLowerCase())}">
       <div class="plugin-info">
         <h3>${_lastPluginSearch ? highlightMatch(p.name, _lastPluginSearch, _lastPluginMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? ' ' + rowBadges(p.path) : ''}</h3>
         <div class="plugin-meta">
@@ -286,9 +326,9 @@ async function checkUpdates() {
       const cacheEntries = [];
       for (const p of data.plugins) {
         updatedByPath.set(p.path, p);
-        // Update allPlugins array entry
-        const idx = allPlugins.findIndex(ap => ap.path === p.path);
-        if (idx !== -1) allPlugins[idx] = p;
+        // Update allPlugins entry in-place (O(1) via path index instead of O(N) findIndex).
+        const existing = findByPath(allPlugins, p.path);
+        if (existing) Object.assign(existing, p);
         // Queue cache entry
         if (p.source && p.source !== 'not-found') {
           cacheEntries.push({
@@ -402,6 +442,10 @@ function renderPlugins(plugins) {
     return;
   }
 
+  // Strip entrance-animation modifier for filter re-renders so cards don't
+  // restart their slide-in animation on every keystroke (causes visible flash).
+  list.classList.remove('plugin-list-animated');
+
   // Render first 50 immediately, then progressively add more
   const INITIAL = 50;
   const batch = plugins.slice(0, INITIAL);
@@ -417,6 +461,13 @@ function renderPlugins(plugins) {
 
   list.classList.add('fade-in');
   if (typeof updatePluginDiskUsage === 'function') updatePluginDiskUsage();
+}
+
+// Re-enable entrance animation for the next renderPlugins call. Used by scan
+// completion and initial load so the first-draw still gets the slide-in effect.
+function enablePluginCardAnimation() {
+  const list = document.getElementById('pluginList');
+  if (list) list.classList.add('plugin-list-animated');
 }
 
 function loadMorePlugins() {
@@ -482,7 +533,7 @@ async function openKvr(btn, directUrl, pluginName) {
     if (result.downloadUrl) {
       const card = btn.closest('.plugin-card');
       const pluginPath = card ? card.dataset.path : null;
-      const plugin = pluginPath && allPlugins.find(p => p.path === pluginPath);
+      const plugin = pluginPath && findByPath(allPlugins, pluginPath);
       if (plugin && plugin.hasUpdate && card && !card.querySelector('.btn-dl-kvr')) {
         const dlBtn = document.createElement('button');
         dlBtn.className = 'btn-small btn-download btn-dl-kvr';

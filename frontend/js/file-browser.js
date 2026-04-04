@@ -179,7 +179,7 @@ function renderFileList() {
         parts.push(`<span class="file-meta-tag file-meta-key" title="Musical key">${escapeHtml(_keyCache[e.path])}</span>`);
       }
       if (typeof allAudioSamples !== 'undefined') {
-        const sample = allAudioSamples.find(s => s.path === e.path);
+        const sample = findByPath(allAudioSamples, e.path);
         if (sample && sample.duration) {
           parts.push(`<span class="file-meta-tag file-meta-dur" title="Duration">${typeof formatTime === 'function' ? formatTime(sample.duration) : sample.duration.toFixed(1) + 's'}</span>`);
         }

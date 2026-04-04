@@ -33,6 +33,7 @@ function collectPaletteItems() {
   items.push({ type: 'action', name: appFmt('menu.scan_samples'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_samples')); scanAudioSamples(); } });
   items.push({ type: 'action', name: appFmt('menu.scan_daw'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_daw_projects')); scanDawProjects(); } });
   items.push({ type: 'action', name: appFmt('menu.scan_presets'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_presets')); scanPresets(); } });
+  items.push({ type: 'action', name: 'Scan PDFs', icon: '&#8635;', action: () => { showToast('Scanning for PDFs...'); scanPdfs(); } });
   items.push({ type: 'action', name: appFmt('menu.check_updates'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.checking_updates')); checkUpdates(); } });
   items.push({ type: 'action', name: appFmt('menu.find_duplicates'), icon: '&#128270;', action: () => { showToast(toastFmt('toast.scanning_duplicates')); showDuplicateReport(); } });
   items.push({ type: 'action', name: appFmt('menu.reset_all_scans'), icon: '&#128465;', action: () => { showToast(toastFmt('toast.resetting_scans')); resetAllScans(); } });
