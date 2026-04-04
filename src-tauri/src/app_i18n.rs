@@ -217,6 +217,32 @@ mod tests {
     }
 
     #[test]
+    fn load_merged_overlay_empty_string_replaces_english_value() {
+        let conn = Connection::open_in_memory().expect("in memory");
+        conn.execute_batch(
+            "CREATE TABLE app_i18n (
+                key TEXT NOT NULL,
+                locale TEXT NOT NULL,
+                value TEXT NOT NULL,
+                PRIMARY KEY (key, locale)
+            );",
+        )
+        .expect("create app_i18n");
+        conn.execute(
+            "INSERT INTO app_i18n (key, locale, value) VALUES ('k1', 'en', 'english')",
+            [],
+        )
+        .expect("insert k1 en");
+        conn.execute(
+            "INSERT INTO app_i18n (key, locale, value) VALUES ('k1', 'de', '')",
+            [],
+        )
+        .expect("insert k1 de empty");
+        let m = load_merged(&conn, "de").expect("merged de");
+        assert_eq!(m.get("k1").map(String::as_str), Some(""));
+    }
+
+    #[test]
     fn seed_json_en_parses() {
         let map: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
         assert!(

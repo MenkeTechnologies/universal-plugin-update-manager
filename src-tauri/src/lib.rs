@@ -3703,6 +3703,75 @@ mod tests {
         let _ = fs::remove_file(&tmp);
     }
 
+    #[test]
+    fn test_import_audio_json_errors_when_object_has_no_samples_key() {
+        let tmp = std::env::temp_dir().join("upum_test_import_audio_no_samples.json");
+        fs::write(
+            &tmp,
+            r#"{"version":"1.0","exported_at":"2025-01-01T00:00:00Z"}"#,
+        )
+        .unwrap();
+        let err = import_audio_json(tmp.to_string_lossy().to_string()).unwrap_err();
+        assert!(err.contains("samples"), "unexpected error: {err}");
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_daw_json_empty_array() {
+        let tmp = std::env::temp_dir().join("upum_test_import_daw_empty.json");
+        fs::write(&tmp, "[]").unwrap();
+        let result = import_daw_json(tmp.to_string_lossy().to_string());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_daw_json_errors_when_object_has_no_projects_key() {
+        let tmp = std::env::temp_dir().join("upum_test_import_daw_no_projects.json");
+        fs::write(&tmp, r#"{"version":"1.0","samples":[]}"#).unwrap();
+        let err = import_daw_json(tmp.to_string_lossy().to_string()).unwrap_err();
+        assert!(err.contains("projects"), "unexpected error: {err}");
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_audio_json_errors_when_envelope_uses_projects_key() {
+        let tmp = std::env::temp_dir().join("upum_test_import_audio_wrong_envelope.json");
+        fs::write(&tmp, r#"{"projects":[]}"#).unwrap();
+        let err = import_audio_json(tmp.to_string_lossy().to_string()).unwrap_err();
+        assert!(err.contains("samples"), "unexpected error: {err}");
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_presets_json_envelope_without_bare_array() {
+        let tmp = std::env::temp_dir().join("upum_test_import_presets_envelope_only.json");
+        let preset = make_preset("OnlyEnvelope", "FXP");
+        let json = serde_json::json!({ "presets": [preset] });
+        fs::write(&tmp, serde_json::to_string(&json).unwrap()).unwrap();
+        let imported = import_presets_json(tmp.to_string_lossy().to_string()).unwrap();
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].name, "OnlyEnvelope");
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_audio_json_samples_not_array_returns_error() {
+        let tmp = std::env::temp_dir().join("upum_test_import_audio_samples_bad_type.json");
+        fs::write(&tmp, r#"{"samples":"nope"}"#).unwrap();
+        assert!(import_audio_json(tmp.to_string_lossy().to_string()).is_err());
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_import_daw_json_projects_not_array_returns_error() {
+        let tmp = std::env::temp_dir().join("upum_test_import_daw_projects_bad_type.json");
+        fs::write(&tmp, r#"{"projects":{}}"#).unwrap();
+        assert!(import_daw_json(tmp.to_string_lossy().to_string()).is_err());
+        let _ = fs::remove_file(&tmp);
+    }
+
     // ── File browser tests ──
 
     #[test]

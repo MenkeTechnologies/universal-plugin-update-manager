@@ -314,6 +314,7 @@ mod tests {
     fn test_classify_case_insensitive() {
         assert_eq!(classify(Path::new("test.WAV")), Some("audio"));
         assert_eq!(classify(Path::new("test.Flp")), Some("daw"));
+        assert_eq!(classify(Path::new("track.RPP")), Some("daw"));
         assert_eq!(classify(Path::new("test.FXP")), Some("preset"));
         assert_eq!(classify(Path::new("test.DLL")), Some("plugin"));
     }

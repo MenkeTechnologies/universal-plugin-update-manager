@@ -417,6 +417,23 @@ mod tests {
     }
 
     #[test]
+    fn test_discover_plugins_only_top_level_entries() {
+        let tmp = std::env::temp_dir().join("upum_test_discover_nonrecursive");
+        let _ = fs::remove_dir_all(&tmp);
+        let _ = fs::create_dir_all(&tmp);
+        let nested = tmp.join("nested");
+        let _ = fs::create_dir_all(&nested.join("Deep.vst3"));
+        let top = tmp.join("Shallow.vst3");
+        let _ = fs::create_dir_all(&top);
+        let dirs = vec![tmp.to_string_lossy().to_string()];
+        let mut result = discover_plugins(&dirs);
+        result.sort();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].ends_with("Shallow.vst3"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn test_get_directory_size() {
         let tmp = std::env::temp_dir().join("upum_test_dir_size");
         let _ = fs::remove_dir_all(&tmp);
