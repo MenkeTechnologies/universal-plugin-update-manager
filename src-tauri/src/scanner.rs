@@ -658,6 +658,38 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_architectures_macho_thin_i386_32bit() {
+        let tmp = std::env::temp_dir().join("upum_test_macho_i386.vst3");
+        let macos = tmp.join("Contents").join("MacOS");
+        let _ = fs::create_dir_all(&macos);
+        let mut header = vec![0u8; 8];
+        header[0..4].copy_from_slice(&0xFEEDFACEu32.to_le_bytes()); // MH_MAGIC 32-bit
+        header[4..8].copy_from_slice(&7u32.to_le_bytes()); // CPU_TYPE_I386
+        fs::write(macos.join("binary"), &header).unwrap();
+
+        assert_eq!(super::detect_architectures(&tmp), vec!["i386"]);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_detect_architectures_pe_unknown_machine_label() {
+        let tmp = std::env::temp_dir().join("upum_test_pe_unknown.dll");
+        let _ = fs::remove_file(&tmp);
+        let pe_off = 0x40usize;
+        let mut buf = vec![0u8; 0x80];
+        buf[0] = b'M';
+        buf[1] = b'Z';
+        buf[0x3C..0x40].copy_from_slice(&(pe_off as u32).to_le_bytes());
+        buf[pe_off] = b'P';
+        buf[pe_off + 1] = b'E';
+        buf[pe_off + 4..pe_off + 6].copy_from_slice(&0xFFFFu16.to_le_bytes());
+        fs::write(&tmp, &buf).unwrap();
+
+        assert_eq!(super::detect_architectures(&tmp), vec!["pe:65535"]);
+        let _ = fs::remove_file(&tmp);
+    }
+
+    #[test]
     fn test_detect_architectures_fat_binary() {
         let tmp = std::env::temp_dir().join("upum_test_fat_plugin.vst3");
         let macos = tmp.join("Contents").join("MacOS");

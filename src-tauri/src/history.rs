@@ -1533,6 +1533,11 @@ mod tests {
     }
 
     #[test]
+    fn test_radix_string_base16_hex_word() {
+        assert_eq!(radix_string(0xDEADBEEF, 16), "deadbeef");
+    }
+
+    #[test]
     fn test_toml_key_to_flat_maps_data_widths_to_flat_column_widths() {
         assert_eq!(
             toml_key_to_flat("data", "widths").as_deref(),
@@ -1591,6 +1596,13 @@ mod tests {
     #[test]
     fn test_toml_to_flat_invalid_toml_returns_empty_prefs() {
         assert!(toml_to_flat("this is not [[valid]] toml").is_empty());
+    }
+
+    #[test]
+    fn test_toml_to_flat_unknown_section_keeps_inner_keys_as_flat_names() {
+        let t = "[orphan]\nanswer = 42\n";
+        let flat = toml_to_flat(t);
+        assert_eq!(flat.get("answer"), Some(&serde_json::json!(42)));
     }
 
     #[test]
@@ -2689,6 +2701,32 @@ mod tests {
         assert_eq!(d.added[0].path, "/p/new.flp");
         assert_eq!(d.removed.len(), 1);
         assert_eq!(d.removed[0].path, "/p/old.als");
+    }
+
+    #[test]
+    fn test_compute_daw_diff_same_paths_no_added_or_removed() {
+        let p = make_daw_project("Live", "/projects/set.als", "ALS", "Ableton Live");
+        let old = DawScanSnapshot {
+            id: "o".into(),
+            timestamp: "t1".into(),
+            project_count: 1,
+            total_bytes: 1000,
+            daw_counts: std::collections::HashMap::new(),
+            projects: vec![p.clone()],
+            roots: vec!["/a".into()],
+        };
+        let new = DawScanSnapshot {
+            id: "n".into(),
+            timestamp: "t2".into(),
+            project_count: 1,
+            total_bytes: 999_000,
+            daw_counts: std::collections::HashMap::new(),
+            projects: vec![p],
+            roots: vec!["/b".into()],
+        };
+        let d = compute_daw_diff(&old, &new);
+        assert!(d.added.is_empty());
+        assert!(d.removed.is_empty());
     }
 
     #[test]

@@ -561,6 +561,35 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_midi_program_change_advances_without_note_count() {
+        let track = vec![
+            0x00, 0xC0, 7, // program change ch0, program 7 (one data byte)
+            0x00, 0xFF, 0x2F, 0x00,
+        ];
+        let data = make_midi(0, 1, 480, &track);
+        let tmp = std::env::temp_dir().join("test_midi_program_change.mid");
+        std::fs::write(&tmp, &data).unwrap();
+        let info = parse_midi(&tmp).unwrap();
+        assert_eq!(info.note_count, 0);
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_parse_midi_pitch_bend_two_data_bytes_no_note_count() {
+        let track = vec![
+            0x00, 0xE0, 0x00, 0x40, // pitch bend ch0
+            0x00, 0xFF, 0x2F, 0x00,
+        ];
+        let data = make_midi(0, 1, 480, &track);
+        let tmp = std::env::temp_dir().join("test_midi_pitch_bend.mid");
+        std::fs::write(&tmp, &data).unwrap();
+        let info = parse_midi(&tmp).unwrap();
+        assert_eq!(info.note_count, 0);
+        assert!(info.channels_used >= 1);
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
     fn test_var_len() {
         assert_eq!(read_var_len(&[0x00], 0), (0, 1));
         assert_eq!(read_var_len(&[0x7F], 0), (127, 1));

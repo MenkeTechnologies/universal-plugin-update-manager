@@ -1247,6 +1247,14 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_plugin_name_mixed_case_collapses_to_lowercase() {
+        assert_eq!(
+            normalize_plugin_name("FabFilter Pro-Q 3"),
+            "fabfilter pro-q 3"
+        );
+    }
+
+    #[test]
     fn test_normalize_strips_arch_suffixes() {
         assert_eq!(normalize_plugin_name("Serum (x64)"), "serum");
         assert_eq!(normalize_plugin_name("Kontakt (x86_64)"), "kontakt");

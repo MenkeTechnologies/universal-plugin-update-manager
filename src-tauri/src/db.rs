@@ -2887,6 +2887,20 @@ mod tests {
         assert!(p.format_filter.is_none());
     }
 
+    #[test]
+    fn test_audio_query_params_json_scan_id_and_format_filter() {
+        let v = serde_json::json!({
+            "scan_id": "scan-abc-123",
+            "format_filter": "WAV,AIFF"
+        });
+        let p: AudioQueryParams = serde_json::from_value(v).expect("deserialize");
+        assert_eq!(p.scan_id.as_deref(), Some("scan-abc-123"));
+        assert_eq!(p.format_filter.as_deref(), Some("WAV,AIFF"));
+        assert_eq!(p.sort_key, "name");
+        assert!(p.sort_asc);
+        assert_eq!(p.limit, 200);
+    }
+
     fn test_db() -> Database {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
