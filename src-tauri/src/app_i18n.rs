@@ -1,17 +1,17 @@
-//! Toast notification strings for i18n: seeded into SQLite (`toast_i18n` table) from
-//! `toast_i18n_en.json`; other locales can add rows with the same keys.
+//! App UI strings for i18n: seeded into SQLite (`app_i18n` table) from `app_i18n_en.json`
+//! (toasts, menus, tray, HTML `data-i18n*`, dialogs). Other locales add rows with the same keys.
 
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 
-static SEED_JSON: &str = include_str!("../toast_i18n_en.json");
+static SEED_JSON: &str = include_str!("../app_i18n_en.json");
 
 /// Insert default English rows (`INSERT OR IGNORE`) so new app versions can add keys without
 /// overwriting user-edited translations.
 pub fn seed_defaults(conn: &Connection) -> Result<(), String> {
     let map: HashMap<String, String> = serde_json::from_str(SEED_JSON).map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare_cached("INSERT OR IGNORE INTO toast_i18n (key, locale, value) VALUES (?1, 'en', ?2)")
+        .prepare_cached("INSERT OR IGNORE INTO app_i18n (key, locale, value) VALUES (?1, 'en', ?2)")
         .map_err(|e| e.to_string())?;
     for (k, v) in map {
         stmt.execute(params![k, v]).map_err(|e| e.to_string())?;
@@ -23,7 +23,7 @@ pub fn seed_defaults(conn: &Connection) -> Result<(), String> {
 pub fn load_merged(conn: &Connection, locale: &str) -> Result<HashMap<String, String>, String> {
     let mut out: HashMap<String, String> = HashMap::new();
     let mut stmt = conn
-        .prepare("SELECT key, value FROM toast_i18n WHERE locale = 'en'")
+        .prepare("SELECT key, value FROM app_i18n WHERE locale = 'en'")
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
@@ -36,7 +36,7 @@ pub fn load_merged(conn: &Connection, locale: &str) -> Result<HashMap<String, St
         return Ok(out);
     }
     let mut stmt = conn
-        .prepare("SELECT key, value FROM toast_i18n WHERE locale = ?1")
+        .prepare("SELECT key, value FROM app_i18n WHERE locale = ?1")
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(params![locale], |row| {

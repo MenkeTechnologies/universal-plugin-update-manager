@@ -567,7 +567,7 @@ document.addEventListener('contextmenu', (e) => {
 
   items.push('---');
   items.push({ icon: '&#128465;', label: 'Delete', action: async () => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    if (!confirm(appFmt('confirm.delete_file_browser', { name }))) return;
     try {
       await window.vstUpdater.deleteFile(path);
       showToast(toastFmt('toast.deleted_name_quotes', { name }));

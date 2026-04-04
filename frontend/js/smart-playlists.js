@@ -343,7 +343,7 @@ document.addEventListener('contextmenu', (e) => {
     }},
     '---',
     { icon: '&#128465;', label: 'Delete', action: () => {
-      if (confirm(`Delete "${pl.name}"?`)) deleteSmartPlaylist(id);
+      if (confirm(appFmt('confirm.delete_smart_playlist', { name: pl.name }))) deleteSmartPlaylist(id);
     }},
   ];
 

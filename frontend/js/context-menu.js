@@ -650,7 +650,7 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#128269;', label: 'Filter by This Tag', action: () => { if (typeof setGlobalTag === 'function') setGlobalTag(tag); } },
       { icon: '&#128203;', label: 'Copy Tag Name', action: () => copyToClipboard(tag) },
       '---',
-      { icon: '&#128465;', label: 'Delete Tag from All Items', action: () => { if (typeof deleteTagGlobally === 'function' && confirm(`Delete tag "${tag}" from all items?`)) { deleteTagGlobally(tag); } } },
+      { icon: '&#128465;', label: 'Delete Tag from All Items', action: () => { if (typeof deleteTagGlobally === 'function' && confirm(appFmt('confirm.delete_tag_globally', { tag }))) { deleteTagGlobally(tag); } } },
     ];
     showContextMenu(e, items);
     return;

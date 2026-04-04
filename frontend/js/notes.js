@@ -448,7 +448,7 @@ async function importNotes() {
 }
 
 function clearAllNotes() {
-  if (!confirm('Delete all notes and tags?')) return;
+  if (!confirm(appFmt('confirm.delete_all_notes'))) return;
   prefs.setItem('itemNotes', {});
   setStandaloneTags([]);
   renderNotesTab();
@@ -629,7 +629,7 @@ function tagWizardAdd() {
 }
 
 function tagWizardDelete(tag) {
-  if (!confirm(`Delete tag "${tag}" from all items?`)) return;
+  if (!confirm(appFmt('confirm.delete_tag_globally', { tag }))) return;
   deleteTag(tag);
   renderTagWizardList();
 }
@@ -822,7 +822,7 @@ document.addEventListener('click', (e) => {
         renderGlobalTagBar();
       }
     } else if (act === 'delete') {
-      if (confirm(`Remove tag "${tag}" from all items?`)) {
+      if (confirm(appFmt('confirm.remove_tag_globally', { tag }))) {
         deleteTag(tag);
         renderTagsManager();
         renderGlobalTagBar();

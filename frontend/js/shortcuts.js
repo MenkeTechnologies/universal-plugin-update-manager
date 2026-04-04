@@ -362,7 +362,7 @@ function _actionOnSelected(action) {
     if (typeof showNoteEditor === 'function') showNoteEditor(path, name);
   } else if (action === 'delete') {
     if (typeof deleteFile === 'function') {
-      if (confirm(`Delete "${name || path}"?`)) deleteFile(path);
+      if (confirm(appFmt('confirm.delete_shortcuts', { name: name || path }))) deleteFile(path);
     }
   }
 }

@@ -2,10 +2,11 @@
 const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
-// Toast i18n — strings loaded from SQLite via get_toast_strings (seeded from toast_i18n_en.json).
-window.__toastStr = {};
-function toastFmt(key, vars) {
-  const map = window.__toastStr;
+// App i18n — strings loaded from SQLite via get_app_strings (seeded from app_i18n_en.json).
+window.__appStr = {};
+window.__toastStr = window.__appStr;
+function appFmt(key, vars) {
+  const map = window.__appStr;
   let s = map && map[key];
   if (s == null || s === '') return key;
   if (vars && typeof vars === 'object') {
@@ -13,10 +14,14 @@ function toastFmt(key, vars) {
   }
   return s;
 }
-window.toastFmt = toastFmt;
-window.__toastReady = invoke('get_toast_strings', { locale: null }).then((m) => {
-  window.__toastStr = m || {};
+window.appFmt = appFmt;
+window.toastFmt = appFmt;
+window.__appReady = invoke('get_app_strings', { locale: null }).then((m) => {
+  window.__appStr = m || {};
+  window.__toastStr = window.__appStr;
+  if (typeof applyUiI18n === 'function') applyUiI18n();
 }).catch(() => {});
+window.__toastReady = window.__appReady;
 
 // ── Menu bar event handler ──
 listen('menu-action', (event) => {
@@ -243,7 +248,7 @@ document.addEventListener('click', (e) => {
     case 'refreshCacheList': if (typeof renderCacheFilesList === 'function') { renderCacheFilesList(); showToast(toastFmt('toast.cache_list_refreshed')); } break;
     case 'refreshCacheStats': if (typeof renderCacheStats === 'function') { renderCacheStats(); showToast(toastFmt('toast.cache_stats_refreshed')); } break;
     case 'revealDataFile': if (el.dataset.path) { showToast(toastFmt('toast.revealing_file')); window.vstUpdater.openAudioFolder(el.dataset.path).catch(() => showToast(toastFmt('toast.failed_reveal_file'), 4000, 'error')); } break;
-    case 'deleteDataFile': if (el.dataset.name && confirm(`Delete ${el.dataset.name}?`)) { window.vstUpdater.deleteDataFile(el.dataset.name).then(() => { showToast(toastFmt('toast.deleted_name', { name: el.dataset.name })); if (typeof renderCacheFilesList === 'function') renderCacheFilesList(); }).catch(e => showToast(toastFmt('toast.delete_failed', { err: e }), 4000, 'error')); } break;
+    case 'deleteDataFile': if (el.dataset.name && confirm(appFmt('confirm.delete_data_file', { name: el.dataset.name }))) { window.vstUpdater.deleteDataFile(el.dataset.name).then(() => { showToast(toastFmt('toast.deleted_name', { name: el.dataset.name })); if (typeof renderCacheFilesList === 'function') renderCacheFilesList(); }).catch(e => showToast(toastFmt('toast.delete_failed', { err: e }), 4000, 'error')); } break;
     case 'resetAllScans': resetAllScans(); break;
     case 'settingColorScheme': settingColorScheme(el.dataset.scheme); break;
     case 'settingToggleAutoScan': settingToggleAutoScan(); break;
@@ -422,6 +427,7 @@ function showToast(message, duration = 2500, type = '') {
 window.vstUpdater = {
   appendLog: (msg) => invoke('append_log', { msg }),
   getVersion: () => invoke('get_version'),
+  getAppStrings: (locale) => invoke('get_app_strings', { locale: locale ?? null }),
   getToastStrings: (locale) => invoke('get_toast_strings', { locale: locale ?? null }),
   scanPlugins: (customRoots, excludePaths) => invoke('scan_plugins', { customRoots: customRoots || null, excludePaths: excludePaths || null }),
   stopScan: () => invoke('stop_scan'),

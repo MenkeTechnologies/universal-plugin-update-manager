@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Generate src-tauri/toast_i18n_en.json from the canonical English map. Run after editing."""
-import json
+"""Canonical toast.* map used by scripts/gen_app_i18n_en.py. Run that script to emit app_i18n_en.json."""
 import pathlib
+import subprocess
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -256,15 +257,8 @@ TOAST_EN: dict[str, str] = {
 
 
 def main() -> None:
-    out = ROOT / "src-tauri" / "toast_i18n_en.json"
-    keys = sorted(TOAST_EN.keys())
-    for k in keys:
-        if not k.startswith("toast."):
-            raise SystemExit(f"invalid key prefix: {k}")
-    text = json.dumps(TOAST_EN, ensure_ascii=False, indent=2, sort_keys=True)
-    text += "\n"
-    out.write_text(text, encoding="utf-8")
-    print(f"Wrote {len(TOAST_EN)} entries to {out}")
+    gen = ROOT / "scripts" / "gen_app_i18n_en.py"
+    subprocess.run([sys.executable, str(gen)], check=True)
 
 
 if __name__ == "__main__":

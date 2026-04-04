@@ -4641,29 +4641,29 @@
     <div class="np-toolbar modal-header">
       <span class="np-toolbar-title">&#9835; Audio Player</span>
       <div class="np-toolbar-actions">
-        <button class="np-toolbar-btn" data-action="collapsePlayer" title="Minimize">&#9866;</button>
-        <button class="np-toolbar-btn" data-action="hidePlayer" title="Hide player">&#9868;</button>
-        <button class="np-toolbar-btn btn-close" data-action="stopAudioPlayback" title="Stop &amp; close">&#10005;</button>
+        <button class="np-toolbar-btn" data-action="collapsePlayer" title="Minimize" data-i18n-title="ui.tt.minimize">&#9866;</button>
+        <button class="np-toolbar-btn" data-action="hidePlayer" title="Hide player" data-i18n-title="ui.tt.hide_player">&#9868;</button>
+        <button class="np-toolbar-btn btn-close" data-action="stopAudioPlayback" title="Stop &amp; close" data-i18n-title="ui.tt.stop_amp_close">&#10005;</button>
       </div>
     </div>
     <div class="np-body">
       <div class="np-section" data-np-section="header">
         <div class="now-playing-header">
           <span class="now-playing-name" id="npName"></span>
-          <button class="btn-small btn-secondary" id="npHideBtn" data-action="hidePlayer" style="font-size: 10px; padding: 4px 8px;" title="Hide player">&#9868;</button>
-          <button class="btn-small btn-stop" id="npCloseBtn" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;" title="Stop &amp; close">&#10005;</button>
+          <button class="btn-small btn-secondary" id="npHideBtn" data-action="hidePlayer" style="font-size: 10px; padding: 4px 8px;" title="Hide player" data-i18n-title="ui.tt.hide_player">&#9868;</button>
+          <button class="btn-small btn-stop" id="npCloseBtn" data-action="stopAudioPlayback" style="font-size: 10px; padding: 4px 8px;" title="Stop &amp; close" data-i18n-title="ui.tt.stop_amp_close">&#10005;</button>
         </div>
       </div>
       <div class="np-section" data-np-section="transport">
         <div class="now-playing-transport">
           <div class="now-playing-controls">
-            <button class="btn-small btn-secondary" id="npBtnPrev" data-action="prevTrack" title="Previous track (Cmd+Left)" style="padding:4px 6px;font-size:10px;">&#9198;</button>
-            <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause (Space)">&#9654;</button>
-            <button class="btn-small btn-secondary" id="npBtnNext" data-action="nextTrack" title="Next track (Cmd+Right)" style="padding:4px 6px;font-size:10px;">&#9197;</button>
-            <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Toggle loop (L)">&#8634;</button>
-            <button class="btn-small btn-loop" id="npBtnShuffle" data-action="toggleShuffle" title="Shuffle">&#128256;</button>
-            <button class="btn-small btn-secondary" id="npBtnFav" data-action="favCurrentTrack" title="Add/remove current track from favorites (F)" style="padding:4px 6px;font-size:10px;">&#9733;</button>
-            <button class="btn-small btn-secondary" id="npBtnTag" data-action="tagCurrentTrack" title="Add note/tags to current track (N)" style="padding:4px 6px;font-size:10px;">&#127991;</button>
+            <button class="btn-small btn-secondary" id="npBtnPrev" data-action="prevTrack" title="Previous track (Cmd+Left)" style="padding:4px 6px;font-size:10px;" data-i18n-title="ui.tt.previous_track_cmd_left">&#9198;</button>
+            <button class="btn-small btn-play" id="npBtnPlay" data-action="toggleAudioPlayback" title="Play/Pause (Space)" data-i18n-title="ui.tt.play_pause_space">&#9654;</button>
+            <button class="btn-small btn-secondary" id="npBtnNext" data-action="nextTrack" title="Next track (Cmd+Right)" style="padding:4px 6px;font-size:10px;" data-i18n-title="ui.tt.next_track_cmd_right">&#9197;</button>
+            <button class="btn-small btn-loop" id="npBtnLoop" data-action="toggleAudioLoop" title="Toggle loop (L)" data-i18n-title="ui.tt.toggle_loop_l">&#8634;</button>
+            <button class="btn-small btn-loop" id="npBtnShuffle" data-action="toggleShuffle" title="Shuffle" data-i18n-title="ui.tt.shuffle">&#128256;</button>
+            <button class="btn-small btn-secondary" id="npBtnFav" data-action="favCurrentTrack" title="Add/remove current track from favorites (F)" style="padding:4px 6px;font-size:10px;" data-i18n-title="ui.tt.add_remove_current_track_from_favorites_f">&#9733;</button>
+            <button class="btn-small btn-secondary" id="npBtnTag" data-action="tagCurrentTrack" title="Add note/tags to current track (N)" style="padding:4px 6px;font-size:10px;" data-i18n-title="ui.tt.add_note_tags_to_current_track_n">&#127991;</button>
           </div>
           <div class="now-playing-waveform" id="npWaveform" data-action="seekAudio">
             <canvas class="waveform-canvas" id="npWaveformCanvas"></canvas>
@@ -4682,26 +4682,26 @@
       <div class="np-section" data-np-section="volume">
         <div class="now-playing-transport">
           <div class="now-playing-volume">
-            <button class="btn-small" id="npBtnMute" data-action="toggleMute" title="Mute/Unmute (M)" style="padding:3px 5px;font-size:12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">&#128264;</button>
-            <input type="range" class="volume-slider" id="npVolume" min="0" max="100" value="100" data-action="setVolume" title="Volume (Cmd+Up/Down)">
+            <button class="btn-small" id="npBtnMute" data-action="toggleMute" title="Mute/Unmute (M)" style="padding:3px 5px;font-size:12px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;" data-i18n-title="ui.tt.mute_unmute_m">&#128264;</button>
+            <input type="range" class="volume-slider" id="npVolume" min="0" max="100" value="100" data-action="setVolume" title="Volume (Cmd+Up/Down)" data-i18n-title="ui.tt.volume_cmd_up_down">
             <span class="volume-pct" id="npVolumePct">100%</span>
           </div>
           <div class="now-playing-speed">
             <label>Speed</label>
-            <select class="speed-select" id="npSpeed" data-action="setPlaybackSpeed" title="Playback speed">
-              <option value="0.25">0.25x</option>
-              <option value="0.5">0.5x</option>
-              <option value="0.75">0.75x</option>
-              <option value="1" selected>1x</option>
-              <option value="1.25">1.25x</option>
-              <option value="1.5">1.5x</option>
-              <option value="2">2x</option>
+            <select class="speed-select" id="npSpeed" data-action="setPlaybackSpeed" title="Playback speed" data-i18n-title="ui.tt.playback_speed">
+              <option value="0.25" data-i18n="ui.opt.0_25x">0.25x</option>
+              <option value="0.5" data-i18n="ui.opt.0_5x">0.5x</option>
+              <option value="0.75" data-i18n="ui.opt.0_75x">0.75x</option>
+              <option value="1" selected data-i18n="ui.opt.1x">1x</option>
+              <option value="1.25" data-i18n="ui.opt.1_25x">1.25x</option>
+              <option value="1.5" data-i18n="ui.opt.1_5x">1.5x</option>
+              <option value="2" data-i18n="ui.opt.2x">2x</option>
             </select>
           </div>
         </div>
       </div>
       <div class="np-section" data-np-section="search">
-        <input type="text" class="np-search-input" id="npSearchInput" data-action="filterNowPlaying" placeholder="Search songs..." title="Search recently played and sample library" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <input type="text" class="np-search-input" id="npSearchInput" data-action="filterNowPlaying" placeholder="Search songs..." title="Search recently played and sample library" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.search_songs" data-i18n-title="ui.tt.search_recently_played_and_sample_library">
         <div class="np-search-results" id="npSearchResults"></div>
       </div>
       <div class="np-section" data-np-section="hint">
@@ -4710,9 +4710,9 @@
       <div class="np-section" data-np-section="history">
         <div class="np-history" id="npHistory">
           <div class="np-history-title">Recently Played
-            <button class="btn-small btn-secondary" data-action="exportRecentlyPlayed" title="Export play history as JSON" style="font-size:8px;padding:2px 6px;margin-left:6px;vertical-align:middle;">Export</button>
-            <button class="btn-small btn-secondary" data-action="importRecentlyPlayed" title="Import play history from JSON" style="font-size:8px;padding:2px 6px;vertical-align:middle;">Import</button>
-            <button class="btn-small btn-stop" data-action="clearRecentlyPlayed" title="Clear play history" style="font-size:8px;padding:2px 6px;vertical-align:middle;">Clear</button>
+            <button class="btn-small btn-secondary" data-action="exportRecentlyPlayed" title="Export play history as JSON" style="font-size:8px;padding:2px 6px;margin-left:6px;vertical-align:middle;" data-i18n-title="ui.tt.export_play_history_as_json">Export</button>
+            <button class="btn-small btn-secondary" data-action="importRecentlyPlayed" title="Import play history from JSON" style="font-size:8px;padding:2px 6px;vertical-align:middle;" data-i18n-title="ui.tt.import_play_history_from_json">Import</button>
+            <button class="btn-small btn-stop" data-action="clearRecentlyPlayed" title="Clear play history" style="font-size:8px;padding:2px 6px;vertical-align:middle;" data-i18n-title="ui.tt.clear_play_history">Clear</button>
           </div>
           <div id="npHistoryList"></div>
         </div>
@@ -4720,76 +4720,76 @@
       <div class="np-section" data-np-section="playlists">
         <div class="np-smart-playlists-section">
           <div class="np-history-title" style="display:flex;align-items:center;gap:6px;">Smart Playlists
-            <button class="btn-small btn-secondary" data-action="createSmartPlaylist" title="Create a new rule-based smart playlist" style="font-size:8px;padding:2px 6px;vertical-align:middle;">+ New</button>
+            <button class="btn-small btn-secondary" data-action="createSmartPlaylist" title="Create a new rule-based smart playlist" style="font-size:8px;padding:2px 6px;vertical-align:middle;" data-i18n-title="ui.tt.create_a_new_rule_based_smart_playlist">+ New</button>
           </div>
           <div id="npSmartPlaylists"></div>
         </div>
       </div>
       <div class="np-section" data-np-section="eq">
         <div style="text-align: center; padding: 6px 0;">
-          <button class="np-eq-toggle" id="npEqToggle" data-action="toggleEqSection" title="Toggle EQ and effects panel">EQ &amp; FX</button>
+          <button class="np-eq-toggle" id="npEqToggle" data-action="toggleEqSection" title="Toggle EQ and effects panel" data-i18n-title="ui.tt.toggle_eq_and_effects_panel">EQ &amp; FX</button>
         </div>
       </div>
       <div class="np-eq-section" id="npEqSection">
         <div class="np-eq-header">
           <span class="np-eq-title">PARAMETRIC EQ &amp; FX</span>
-          <button class="btn-small btn-secondary" data-action="resetEq" style="padding:2px 8px;font-size:9px;" title="Reset all EQ bands and effects to defaults">Reset</button>
+          <button class="btn-small btn-secondary" data-action="resetEq" style="padding:2px 8px;font-size:9px;" title="Reset all EQ bands and effects to defaults" data-i18n-title="ui.tt.reset_all_eq_bands_and_effects_to_defaults">Reset</button>
         </div>
         <div style="position:relative;width:100%;height:120px;margin-bottom:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
-          <canvas id="npEqCanvas" width="800" height="120" style="position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;cursor:crosshair;" title="Drag band nodes to adjust frequency and gain"></canvas>
+          <canvas id="npEqCanvas" width="800" height="120" style="position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;cursor:crosshair;" title="Drag band nodes to adjust frequency and gain" data-i18n-title="ui.tt.drag_band_nodes_to_adjust_frequency_and_gain"></canvas>
         </div>
         <div class="np-eq-controls">
           <div class="np-eq-band">
             <label>Low</label>
-            <input type="range" class="eq-slider" id="npEqLow" min="-12" max="12" value="0" step="1" orient="vertical" data-action="setEqLow" title="Low EQ (200 Hz, -12 to +12 dB)">
+            <input type="range" class="eq-slider" id="npEqLow" min="-12" max="12" value="0" step="1" orient="vertical" data-action="setEqLow" title="Low EQ (200 Hz, -12 to +12 dB)" data-i18n-title="ui.tt.low_eq_200_hz_12_to_12_db">
             <span class="eq-val" id="npEqLowVal">0 dB</span>
             <span class="eq-freq">200 Hz</span>
           </div>
           <div class="np-eq-band">
             <label>Mid</label>
-            <input type="range" class="eq-slider" id="npEqMid" min="-12" max="12" value="0" step="1" orient="vertical" data-action="setEqMid" title="Mid EQ (1 kHz, -12 to +12 dB)">
+            <input type="range" class="eq-slider" id="npEqMid" min="-12" max="12" value="0" step="1" orient="vertical" data-action="setEqMid" title="Mid EQ (1 kHz, -12 to +12 dB)" data-i18n-title="ui.tt.mid_eq_1_khz_12_to_12_db">
             <span class="eq-val" id="npEqMidVal">0 dB</span>
             <span class="eq-freq">1 kHz</span>
           </div>
           <div class="np-eq-band">
             <label>High</label>
-            <input type="range" class="eq-slider" id="npEqHigh" min="-12" max="12" value="0" step="1" orient="vertical" data-action="setEqHigh" title="High EQ (8 kHz, -12 to +12 dB)">
+            <input type="range" class="eq-slider" id="npEqHigh" min="-12" max="12" value="0" step="1" orient="vertical" data-action="setEqHigh" title="High EQ (8 kHz, -12 to +12 dB)" data-i18n-title="ui.tt.high_eq_8_khz_12_to_12_db">
             <span class="eq-val" id="npEqHighVal">0 dB</span>
             <span class="eq-freq">8 kHz</span>
           </div>
           <div class="np-eq-divider"></div>
           <div class="np-eq-band">
             <label>Gain</label>
-            <input type="range" class="eq-slider" id="npGainSlider" min="0" max="2" value="1" step="0.05" orient="vertical" data-action="setGain" title="Preamp gain (0-200%)">
+            <input type="range" class="eq-slider" id="npGainSlider" min="0" max="2" value="1" step="0.05" orient="vertical" data-action="setGain" title="Preamp gain (0-200%)" data-i18n-title="ui.tt.preamp_gain_0_200">
             <span class="eq-val" id="npGainVal">100%</span>
           </div>
           <div class="np-eq-band">
             <label>Pan</label>
-            <input type="range" class="eq-slider" id="npPanSlider" min="-1" max="1" value="0" step="0.05" orient="vertical" data-action="setPan" title="Stereo pan (L-C-R)">
+            <input type="range" class="eq-slider" id="npPanSlider" min="-1" max="1" value="0" step="0.05" orient="vertical" data-action="setPan" title="Stereo pan (L-C-R)" data-i18n-title="ui.tt.stereo_pan_l_c_r">
             <span class="eq-val" id="npPanVal">C</span>
           </div>
           <div class="np-eq-divider"></div>
           <div class="np-eq-buttons">
-            <button class="btn-small btn-loop" id="npBtnMono" data-action="toggleMono" title="Mono">M</button>
-            <button class="btn-small btn-secondary" id="npAbA" data-action="setAbA" title="Set A point (loop start)">A</button>
-            <button class="btn-small btn-secondary" id="npAbB" data-action="setAbB" title="Set B point (loop end)">B</button>
-            <button class="btn-small btn-stop" id="npAbClear" data-action="clearAbLoop" title="Clear A-B loop" style="display:none;font-size:9px;padding:2px 6px;">&#10005;</button>
+            <button class="btn-small btn-loop" id="npBtnMono" data-action="toggleMono" title="Mono" data-i18n-title="ui.tt.mono">M</button>
+            <button class="btn-small btn-secondary" id="npAbA" data-action="setAbA" title="Set A point (loop start)" data-i18n-title="ui.tt.set_a_point_loop_start">A</button>
+            <button class="btn-small btn-secondary" id="npAbB" data-action="setAbB" title="Set B point (loop end)" data-i18n-title="ui.tt.set_b_point_loop_end">B</button>
+            <button class="btn-small btn-stop" id="npAbClear" data-action="clearAbLoop" title="Clear A-B loop" style="display:none;font-size:9px;padding:2px 6px;" data-i18n-title="ui.tt.clear_a_b_loop">&#10005;</button>
           </div>
         </div>
       </div>
     </div>
   </div>
-  <div class="audio-restore-pill" id="audioRestorePill" data-action="showPlayer" title="Show audio player">&#9835; Playing</div>
+  <div class="audio-restore-pill" id="audioRestorePill" data-action="showPlayer" title="Show audio player" data-i18n-title="ui.tt.show_audio_player">&#9835; Playing</div>
   <div class="batch-action-bar" id="batchActionBar">
     <span class="batch-count" id="batchCount">0 selected</span>
     <div class="batch-sep"></div>
-    <button class="btn btn-secondary" data-batch-action="selectAll" title="Select all visible rows">Select All</button>
-    <button class="btn btn-stop" data-batch-action="deselectAll" title="Clear selection">&#10005; Clear</button>
+    <button class="btn btn-secondary" data-batch-action="selectAll" title="Select all visible rows" data-i18n-title="ui.tt.select_all_visible_rows">Select All</button>
+    <button class="btn btn-stop" data-batch-action="deselectAll" title="Clear selection" data-i18n-title="ui.tt.clear_selection">&#10005; Clear</button>
     <div class="batch-sep"></div>
-    <button class="btn btn-secondary" data-batch-action="favorite" title="Add selected to favorites">&#9733; Favorite</button>
-    <button class="btn btn-secondary" data-batch-action="copyPaths" title="Copy paths to clipboard">&#128203; Copy Paths</button>
-    <button class="btn btn-secondary" data-batch-action="exportJson" title="Copy selected as JSON">&#8615; JSON</button>
-    <button class="btn btn-secondary" data-batch-action="reveal" title="Reveal first selected in Finder">&#128193; Reveal</button>
+    <button class="btn btn-secondary" data-batch-action="favorite" title="Add selected to favorites" data-i18n-title="ui.tt.add_selected_to_favorites">&#9733; Favorite</button>
+    <button class="btn btn-secondary" data-batch-action="copyPaths" title="Copy paths to clipboard" data-i18n-title="ui.tt.copy_paths_to_clipboard">&#128203; Copy Paths</button>
+    <button class="btn btn-secondary" data-batch-action="exportJson" title="Copy selected as JSON" data-i18n-title="ui.tt.copy_selected_as_json">&#8615; JSON</button>
+    <button class="btn btn-secondary" data-batch-action="reveal" title="Reveal first selected in Finder" data-i18n-title="ui.tt.reveal_first_selected_in_finder">&#128193; Reveal</button>
   </div>
   <div class="toast-container" id="toastContainer"></div>
   <div class="global-progress" id="globalProgress"><div class="global-progress-fill"></div></div>
@@ -4797,7 +4797,7 @@
   <div class="app">
     <div class="header">
       <div class="header-top">
-        <div class="logo" id="appLogo" style="cursor:pointer;" title="Open GitHub repository">
+        <div class="logo" id="appLogo" style="cursor:pointer;" title="Open GitHub repository" data-i18n-title="ui.tt.open_github_repository">
           <div class="logo-icon">&#9835;</div>
           <div class="logo-text">
             <h1>AUDIO_HAXOR</h1>
@@ -4808,25 +4808,25 @@
         <div class="scan-status-badge" id="scanStatusBadge"></div>
         <div class="header-actions">
           <div class="header-info" id="headerStats">
-            <div class="header-info-item" title="CPU cores">CORES <span class="header-info-value" id="headerCores">--</span></div>
-            <div class="header-info-item" title="CPU usage (%)">CPU <span class="header-info-value" id="headerCpu">--</span></div>
-            <div class="header-info-item" title="Resident memory (RSS)">RSS <span class="header-info-value" id="headerMem">--</span></div>
-            <div class="header-info-item" title="Virtual memory">VIRT <span class="header-info-value" id="headerVirt">--</span></div>
-            <div class="header-info-item" title="Total threads">THR <span class="header-info-value" id="headerThreads">--</span></div>
-            <div class="header-info-item" title="Rayon worker pool size">POOL <span class="header-info-value" id="headerPool">--</span></div>
-            <div class="header-info-item" title="Open file descriptors">FD <span class="header-info-value" id="headerFds">--</span></div>
-            <div class="header-info-item" title="Process uptime">UP <span class="header-info-value" id="headerUptime">--</span></div>
-            <div class="header-info-item" title="Process ID">PID <span class="header-info-value" id="headerPid">--</span></div>
-            <div class="header-info-item" title="Plugins scanned">PLG <span class="header-info-value" id="headerPlugins">0</span></div>
-            <div class="header-info-item" title="Audio samples scanned">SMP <span class="header-info-value" id="headerSamples">0</span></div>
-            <div class="header-info-item" title="DAW projects scanned">DAW <span class="header-info-value" id="headerDaw">0</span></div>
-            <div class="header-info-item" title="Presets scanned">PRE <span class="header-info-value" id="headerPresets">0</span></div>
-            <div class="header-info-item" title="MIDI files scanned">MID <span class="header-info-value" id="headerMidi">0</span></div>
+            <div class="header-info-item" title="CPU cores" data-i18n-title="ui.tt.cpu_cores">CORES <span class="header-info-value" id="headerCores">--</span></div>
+            <div class="header-info-item" title="CPU usage (%)" data-i18n-title="ui.tt.cpu_usage">CPU <span class="header-info-value" id="headerCpu">--</span></div>
+            <div class="header-info-item" title="Resident memory (RSS)" data-i18n-title="ui.tt.resident_memory_rss">RSS <span class="header-info-value" id="headerMem">--</span></div>
+            <div class="header-info-item" title="Virtual memory" data-i18n-title="ui.tt.virtual_memory">VIRT <span class="header-info-value" id="headerVirt">--</span></div>
+            <div class="header-info-item" title="Total threads" data-i18n-title="ui.tt.total_threads">THR <span class="header-info-value" id="headerThreads">--</span></div>
+            <div class="header-info-item" title="Rayon worker pool size" data-i18n-title="ui.tt.rayon_worker_pool_size">POOL <span class="header-info-value" id="headerPool">--</span></div>
+            <div class="header-info-item" title="Open file descriptors" data-i18n-title="ui.tt.open_file_descriptors">FD <span class="header-info-value" id="headerFds">--</span></div>
+            <div class="header-info-item" title="Process uptime" data-i18n-title="ui.tt.process_uptime">UP <span class="header-info-value" id="headerUptime">--</span></div>
+            <div class="header-info-item" title="Process ID" data-i18n-title="ui.tt.process_id">PID <span class="header-info-value" id="headerPid">--</span></div>
+            <div class="header-info-item" title="Plugins scanned" data-i18n-title="ui.tt.plugins_scanned">PLG <span class="header-info-value" id="headerPlugins">0</span></div>
+            <div class="header-info-item" title="Audio samples scanned" data-i18n-title="ui.tt.audio_samples_scanned">SMP <span class="header-info-value" id="headerSamples">0</span></div>
+            <div class="header-info-item" title="DAW projects scanned" data-i18n-title="ui.tt.daw_projects_scanned">DAW <span class="header-info-value" id="headerDaw">0</span></div>
+            <div class="header-info-item" title="Presets scanned" data-i18n-title="ui.tt.presets_scanned">PRE <span class="header-info-value" id="headerPresets">0</span></div>
+            <div class="header-info-item" title="MIDI files scanned" data-i18n-title="ui.tt.midi_files_scanned">MID <span class="header-info-value" id="headerMidi">0</span></div>
           </div>
           <span class="scan-btns-group" id="scanBtnsGroup">
-            <button class="btn btn-primary" id="btnScanAll" data-action="scanAll" title="Scan all plugins, samples, DAW projects, and presets">&#9889; Scan All</button>
-            <button class="btn btn-stop" id="btnStopAll" data-action="stopAll" style="display:none;" title="Stop all running scans">&#9632; Stop All</button>
-            <button class="btn btn-secondary" id="btnResumeAll" data-action="resumeAll" style="display:none;" title="Resume all paused scans">&#9654; Resume All</button>
+            <button class="btn btn-primary" id="btnScanAll" data-action="scanAll" title="Scan all plugins, samples, DAW projects, and presets" data-i18n-title="ui.tt.scan_all_plugins_samples_daw_projects_and_presets">&#9889; Scan All</button>
+            <button class="btn btn-stop" id="btnStopAll" data-action="stopAll" style="display:none;" title="Stop all running scans" data-i18n-title="ui.tt.stop_all_running_scans">&#9632; Stop All</button>
+            <button class="btn btn-secondary" id="btnResumeAll" data-action="resumeAll" style="display:none;" title="Resume all paused scans" data-i18n-title="ui.tt.resume_all_paused_scans">&#9654; Resume All</button>
           </span>
         </div>
       </div>
@@ -4871,59 +4871,59 @@
           <span class="stat-value" id="presetCountHeader">0</span>
           <span>Presets</span>
         </div>
-        <div class="stat" id="dashBtnGroup"><button class="btn btn-secondary" data-action="showHeatmapDash" title="Audio heatmap dashboard (D)" style="padding:4px 10px;font-size:10px;">&#128202; Dashboard</button></div>
-        <div class="stat" id="bgAnalysisBadge" title="Background BPM/Key analysis progress" style="font-size:10px;color:var(--cyan);"></div>
+        <div class="stat" id="dashBtnGroup"><button class="btn btn-secondary" data-action="showHeatmapDash" title="Audio heatmap dashboard (D)" style="padding:4px 10px;font-size:10px;" data-i18n-title="ui.tt.audio_heatmap_dashboard_d">&#128202; Dashboard</button></div>
+        <div class="stat" id="bgAnalysisBadge" title="Background BPM/Key analysis progress" style="font-size:10px;color:var(--cyan);" data-i18n-title="ui.tt.background_bpm_key_analysis_progress"></div>
       </div>
     </div>
 
     <div class="global-tag-bar" id="globalTagBar" style="display:none;">
       <span class="global-tag-label">&#127991; Tag Filter:</span>
       <div class="global-tag-list" id="globalTagList"></div>
-      <button class="global-tag-clear" id="globalTagClear" data-action="clearGlobalTag" title="Clear tag filter and hide bar">&#10005;</button>
-      <button class="btn-small" data-action="moveTagBar" title="Move tag bar to top/bottom" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-size:9px;padding:2px 6px;margin-left:auto;">&#8597;</button>
-      <button class="btn-small" data-action="hideTagBar" title="Hide tag bar (filter stays active)" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-size:9px;padding:2px 6px;">&#10005;</button>
+      <button class="global-tag-clear" id="globalTagClear" data-action="clearGlobalTag" title="Clear tag filter and hide bar" data-i18n-title="ui.tt.clear_tag_filter_and_hide_bar">&#10005;</button>
+      <button class="btn-small" data-action="moveTagBar" title="Move tag bar to top/bottom" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-size:9px;padding:2px 6px;margin-left:auto;" data-i18n-title="ui.tt.move_tag_bar_to_top_bottom">&#8597;</button>
+      <button class="btn-small" data-action="hideTagBar" title="Hide tag bar (filter stays active)" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-size:9px;padding:2px 6px;" data-i18n-title="ui.tt.hide_tag_bar_filter_stays_active">&#10005;</button>
     </div>
     <div class="tab-nav">
-      <button class="tab-btn active" data-action="switchTab" data-tab="plugins" title="VST2, VST3, and AU plugins (Cmd+1)">Plugins</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="samples" title="Audio sample files (Cmd+2)">Samples</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="daw" title="DAW project files (Cmd+3)">DAW Projects</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="presets" title="Plugin presets (Cmd+4)">Presets</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="midi" title="MIDI files with note/tempo/key metadata">&#127924; MIDI</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="favorites" title="Favorited items (Cmd+5)">&#9733; Favorites</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="notes" title="Notes &amp; tags (Cmd+6)">&#128221; Notes</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="tags" title="Tag manager (Cmd+7)">&#127991; Tags</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="files" title="File browser (Cmd+8)">&#128193; Files</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="history" title="Scan history and diffs (Cmd+9)">History</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="visualizer" title="Real-time audio analyzer and visualizer">&#127911; Visualizer</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="walkers" title="Live directory walker status">&#128270; Walkers</button>
-      <button class="tab-btn" data-action="switchTab" data-tab="settings" title="App settings (Cmd+0)">&#9881; Settings</button>
+      <button class="tab-btn active" data-action="switchTab" data-tab="plugins" title="VST2, VST3, and AU plugins (Cmd+1)" data-i18n-title="ui.tt.vst2_vst3_and_au_plugins_cmd_1">Plugins</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="samples" title="Audio sample files (Cmd+2)" data-i18n-title="ui.tt.audio_sample_files_cmd_2">Samples</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="daw" title="DAW project files (Cmd+3)" data-i18n-title="ui.tt.daw_project_files_cmd_3">DAW Projects</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="presets" title="Plugin presets (Cmd+4)" data-i18n-title="ui.tt.plugin_presets_cmd_4">Presets</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="midi" title="MIDI files with note/tempo/key metadata" data-i18n-title="ui.tt.midi_files_with_note_tempo_key_metadata">&#127924; MIDI</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="favorites" title="Favorited items (Cmd+5)" data-i18n-title="ui.tt.favorited_items_cmd_5">&#9733; Favorites</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="notes" title="Notes &amp; tags (Cmd+6)" data-i18n-title="ui.tt.notes_amp_tags_cmd_6">&#128221; Notes</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="tags" title="Tag manager (Cmd+7)" data-i18n-title="ui.tt.tag_manager_cmd_7">&#127991; Tags</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="files" title="File browser (Cmd+8)" data-i18n-title="ui.tt.file_browser_cmd_8">&#128193; Files</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="history" title="Scan history and diffs (Cmd+9)" data-i18n-title="ui.tt.scan_history_and_diffs_cmd_9">History</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="visualizer" title="Real-time audio analyzer and visualizer" data-i18n-title="ui.tt.real_time_audio_analyzer_and_visualizer">&#127911; Visualizer</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="walkers" title="Live directory walker status" data-i18n-title="ui.tt.live_directory_walker_status">&#128270; Walkers</button>
+      <button class="tab-btn" data-action="switchTab" data-tab="settings" title="App settings (Cmd+0)" data-i18n-title="ui.tt.app_settings_cmd_0">&#9881; Settings</button>
     </div>
 
     <div class="tab-content active" id="tabPlugins">
     <div class="audio-container">
       <div class="audio-toolbar">
-        <button class="btn btn-primary" id="btnScan" data-action="scanPlugins" title="Scan system directories for audio plugins">&#8635; Scan Plugins</button>
-        <button class="btn btn-secondary" id="btnResumeScan" data-action="resumePluginScan" style="display:none;" title="Resume scan from where it stopped">&#9654; Resume</button>
-        <button class="btn btn-stop" id="btnStopPlugins" data-action="stopPluginScan" style="display:none;" title="Stop the current scan">&#9632; Stop</button>
-        <button class="btn btn-primary" id="btnCheckUpdates" data-action="checkUpdates" disabled title="Check KVR Audio for newer versions">&#9889; Check Updates</button>
-        <button class="btn btn-secondary" id="btnExport" data-action="exportPlugins" style="display:none;" title="Export plugin list to JSON">&#8615; Export</button>
-        <button class="btn btn-secondary" id="btnImport" data-action="importPlugins" title="Import plugin list from JSON">&#8613; Import</button>
+        <button class="btn btn-primary" id="btnScan" data-action="scanPlugins" title="Scan system directories for audio plugins" data-i18n-title="ui.tt.scan_system_directories_for_audio_plugins">&#8635; Scan Plugins</button>
+        <button class="btn btn-secondary" id="btnResumeScan" data-action="resumePluginScan" style="display:none;" title="Resume scan from where it stopped" data-i18n-title="ui.tt.resume_scan_from_where_it_stopped">&#9654; Resume</button>
+        <button class="btn btn-stop" id="btnStopPlugins" data-action="stopPluginScan" style="display:none;" title="Stop the current scan" data-i18n-title="ui.tt.stop_the_current_scan">&#9632; Stop</button>
+        <button class="btn btn-primary" id="btnCheckUpdates" data-action="checkUpdates" disabled title="Check KVR Audio for newer versions" data-i18n-title="ui.tt.check_kvr_audio_for_newer_versions">&#9889; Check Updates</button>
+        <button class="btn btn-secondary" id="btnExport" data-action="exportPlugins" style="display:none;" title="Export plugin list to JSON" data-i18n-title="ui.tt.export_plugin_list_to_json">&#8615; Export</button>
+        <button class="btn btn-secondary" id="btnImport" data-action="importPlugins" title="Import plugin list from JSON" data-i18n-title="ui.tt.import_plugin_list_from_json">&#8613; Import</button>
         <div class="search-box" style="flex: 1;">
           <span class="search-icon">&#128269;</span>
-          <input type="text" id="searchInput" placeholder="Fuzzy search plugins..." title="Search plugins (Cmd+F)" data-action="filterPlugins" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-          <button class="btn-regex" id="regexPlugins" data-action="toggleRegex" data-target="filterPlugins" title="Toggle regex search">.*</button>
+          <input type="text" id="searchInput" placeholder="Fuzzy search plugins..." title="Search plugins (Cmd+F)" data-action="filterPlugins" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.fuzzy_search_plugins" data-i18n-title="ui.tt.search_plugins_cmd_f">
+          <button class="btn-regex" id="regexPlugins" data-action="toggleRegex" data-target="filterPlugins" title="Toggle regex search" data-i18n-title="ui.tt.toggle_regex_search">.*</button>
         </div>
-        <select class="filter-select" id="typeFilter" data-action="filterPlugins" title="Filter by plugin format">
-          <option value="all">All Types</option>
-          <option value="VST2">VST2</option>
-          <option value="VST3">VST3</option>
-          <option value="AU">Audio Units</option>
+        <select class="filter-select" id="typeFilter" data-action="filterPlugins" title="Filter by plugin format" data-i18n-title="ui.tt.filter_by_plugin_format">
+          <option value="all" data-i18n="ui.opt.all_types">All Types</option>
+          <option value="VST2" data-i18n="ui.opt.vst2">VST2</option>
+          <option value="VST3" data-i18n="ui.opt.vst3">VST3</option>
+          <option value="AU" data-i18n="ui.opt.audio_units">Audio Units</option>
         </select>
-        <select class="filter-select" id="statusFilter" data-action="filterPlugins" title="Filter by update status">
-          <option value="all">All Status</option>
-          <option value="update">Updates Available</option>
-          <option value="current">Up to Date</option>
-          <option value="unknown">Unknown Latest</option>
+        <select class="filter-select" id="statusFilter" data-action="filterPlugins" title="Filter by update status" data-i18n-title="ui.tt.filter_by_update_status">
+          <option value="all" data-i18n="ui.opt.all_status">All Status</option>
+          <option value="update" data-i18n="ui.opt.updates_available">Updates Available</option>
+          <option value="current" data-i18n="ui.opt.up_to_date">Up to Date</option>
+          <option value="unknown" data-i18n="ui.opt.unknown_latest">Unknown Latest</option>
         </select>
       </div>
       <div class="progress-bar" id="progressBar">
@@ -4937,8 +4937,8 @@
       </div>
       <div class="batch-controls">
         <span class="batch-progress" id="batchProgress"></span>
-        <button class="btn-skip" id="btnSkip" data-action="skipUpdate" title="Skip this plugin update">Skip</button>
-        <button class="btn-next" id="btnNext" data-action="openNextUpdate" title="Open the next available update">Open Next Update</button>
+        <button class="btn-skip" id="btnSkip" data-action="skipUpdate" title="Skip this plugin update" data-i18n-title="ui.tt.skip_this_plugin_update">Skip</button>
+        <button class="btn-next" id="btnNext" data-action="openNextUpdate" title="Open the next available update" data-i18n-title="ui.tt.open_the_next_available_update">Open Next Update</button>
       </div>
     </div>
 
@@ -4967,20 +4967,20 @@
         <div class="audio-toolbar">
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="favSearchInput" placeholder="Search favorites..." title="Search favorites" data-action="filterFavorites" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="favSearchInput" placeholder="Search favorites..." title="Search favorites" data-action="filterFavorites" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.search_favorites" data-i18n-title="ui.tt.search_favorites">
           </div>
-          <select class="filter-select" id="favTypeFilter" data-action="filterFavorites" title="Filter by item type">
-            <option value="all">All Types</option>
-            <option value="plugin">Plugins</option>
-            <option value="sample">Samples</option>
-            <option value="daw">DAW Projects</option>
-            <option value="preset">Presets</option>
-            <option value="folder">Folders</option>
-            <option value="file">Files</option>
+          <select class="filter-select" id="favTypeFilter" data-action="filterFavorites" title="Filter by item type" data-i18n-title="ui.tt.filter_by_item_type">
+            <option value="all" data-i18n="ui.opt.all_types">All Types</option>
+            <option value="plugin" data-i18n="ui.opt.plugins">Plugins</option>
+            <option value="sample" data-i18n="ui.opt.samples">Samples</option>
+            <option value="daw" data-i18n="ui.opt.daw_projects">DAW Projects</option>
+            <option value="preset" data-i18n="ui.opt.presets">Presets</option>
+            <option value="folder" data-i18n="ui.opt.folders">Folders</option>
+            <option value="file" data-i18n="ui.opt.files">Files</option>
           </select>
-          <button class="btn btn-secondary" data-action="exportFavorites" title="Export favorites">&#8615; Export</button>
-          <button class="btn btn-secondary" data-action="importFavorites" title="Import favorites">&#8613; Import</button>
-          <button class="btn btn-stop btn-settings-action" data-action="clearFavorites" title="Remove all favorites">Clear All</button>
+          <button class="btn btn-secondary" data-action="exportFavorites" title="Export favorites" data-i18n-title="ui.tt.export_favorites">&#8615; Export</button>
+          <button class="btn btn-secondary" data-action="importFavorites" title="Import favorites" data-i18n-title="ui.tt.import_favorites">&#8613; Import</button>
+          <button class="btn btn-stop btn-settings-action" data-action="clearFavorites" title="Remove all favorites" data-i18n-title="ui.tt.remove_all_favorites">Clear All</button>
         </div>
         <div class="fav-list" id="favList">
           <div class="state-message" id="favEmptyState">
@@ -4997,9 +4997,9 @@
         <div class="audio-toolbar">
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="tagSearchInput" placeholder="Search tags..." title="Search tags" data-action="filterTags" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="tagSearchInput" placeholder="Search tags..." title="Search tags" data-action="filterTags" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.search_tags" data-i18n-title="ui.tt.search_tags">
           </div>
-          <button class="btn btn-primary" data-action="createTag" title="Create a new tag">+ New Tag</button>
+          <button class="btn btn-primary" data-action="createTag" title="Create a new tag" data-i18n-title="ui.tt.create_a_new_tag">+ New Tag</button>
         </div>
         <div class="tags-manager" id="tagsManager">
           <div class="state-message" id="tagsEmptyState">
@@ -5014,18 +5014,18 @@
     <div class="tab-content" id="tabFiles">
       <div class="audio-container">
         <div class="audio-toolbar">
-          <button class="btn btn-secondary" id="btnFileUp" data-action="fileUp" title="Go to parent directory">&#8593; Up</button>
-          <button class="btn btn-secondary" data-action="fileHome" title="Go to home directory">&#127968; Home</button>
-          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="Desktop" title="Go to Desktop">&#128187; Desktop</button>
-          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="Downloads" title="Go to Downloads">&#11015; Downloads</button>
-          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="Music" title="Go to Music">&#127925; Music</button>
-          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="Documents" title="Go to Documents">&#128196; Documents</button>
-          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="/" title="Go to root filesystem">/ Root</button>
-          <button class="btn btn-secondary" id="btnFileFav" data-action="fileFav" title="Bookmark current directory">&#9733; Bookmark</button>
+          <button class="btn btn-secondary" id="btnFileUp" data-action="fileUp" title="Go to parent directory" data-i18n-title="ui.tt.go_to_parent_directory">&#8593; Up</button>
+          <button class="btn btn-secondary" data-action="fileHome" title="Go to home directory" data-i18n-title="ui.tt.go_to_home_directory">&#127968; Home</button>
+          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="Desktop" title="Go to Desktop" data-i18n-title="ui.tt.go_to_desktop">&#128187; Desktop</button>
+          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="Downloads" title="Go to Downloads" data-i18n-title="ui.tt.go_to_downloads">&#11015; Downloads</button>
+          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="Music" title="Go to Music" data-i18n-title="ui.tt.go_to_music">&#127925; Music</button>
+          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="Documents" title="Go to Documents" data-i18n-title="ui.tt.go_to_documents">&#128196; Documents</button>
+          <button class="btn btn-secondary" data-action="fileQuickNav" data-dir="/" title="Go to root filesystem" data-i18n-title="ui.tt.go_to_root_filesystem">/ Root</button>
+          <button class="btn btn-secondary" id="btnFileFav" data-action="fileFav" title="Bookmark current directory" data-i18n-title="ui.tt.bookmark_current_directory">&#9733; Bookmark</button>
           <div class="file-breadcrumb" id="fileBreadcrumb"></div>
           <div class="search-box" style="flex: 1; max-width: 300px;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="fileSearchInput" placeholder="Filter files..." title="Filter files in current directory" data-action="filterFiles" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="fileSearchInput" placeholder="Filter files..." title="Filter files in current directory" data-action="filterFiles" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.filter_files" data-i18n-title="ui.tt.filter_files_in_current_directory">
           </div>
         </div>
         <div class="file-favs" id="fileFavs" style="display:none;">
@@ -5047,11 +5047,11 @@
         <div class="audio-toolbar">
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="noteSearchInput" placeholder="Search notes and tags..." title="Search notes and tags" data-action="filterNotes" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="noteSearchInput" placeholder="Search notes and tags..." title="Search notes and tags" data-action="filterNotes" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.search_notes_and_tags" data-i18n-title="ui.tt.search_notes_and_tags">
           </div>
-          <button class="btn btn-secondary" data-action="exportNotes" title="Export notes and tags">&#8615; Export</button>
-          <button class="btn btn-secondary" data-action="importNotes" title="Import notes and tags">&#8613; Import</button>
-          <button class="btn btn-stop btn-settings-action" data-action="clearAllNotes" title="Delete all notes">Clear All</button>
+          <button class="btn btn-secondary" data-action="exportNotes" title="Export notes and tags" data-i18n-title="ui.tt.export_notes_and_tags">&#8615; Export</button>
+          <button class="btn btn-secondary" data-action="importNotes" title="Import notes and tags" data-i18n-title="ui.tt.import_notes_and_tags">&#8613; Import</button>
+          <button class="btn btn-stop btn-settings-action" data-action="clearAllNotes" title="Delete all notes" data-i18n-title="ui.tt.delete_all_notes">Clear All</button>
         </div>
         <div class="notes-list" id="notesList">
           <div class="state-message" id="notesEmptyState">
@@ -5068,7 +5068,7 @@
         <div class="history-sidebar">
           <div class="history-sidebar-header">
             <span>Scan History</span>
-            <button class="btn-danger" data-action="clearAllHistory" title="Delete all scan history entries">Clear All</button>
+            <button class="btn-danger" data-action="clearAllHistory" title="Delete all scan history entries" data-i18n-title="ui.tt.delete_all_scan_history_entries">Clear All</button>
           </div>
           <div class="history-list" id="historyList">
             <div class="empty-history">
@@ -5089,26 +5089,26 @@
     <div class="tab-content" id="tabSamples">
       <div class="audio-container">
         <div class="audio-toolbar">
-          <button class="btn btn-primary" id="btnScanAudio" data-action="scanAudioSamples" title="Scan for audio sample files">&#127925; Scan Samples</button>
-          <button class="btn btn-secondary" id="btnResumeAudio" data-action="resumeAudioScan" style="display: none;" title="Resume sample scan">&#9654; Resume</button>
-          <button class="btn btn-stop" id="btnStopAudio" style="display: none;" data-action="stopAudioScan" title="Stop the current scan">&#9632; Stop</button>
-          <button class="btn btn-secondary" id="btnExportAudio" data-action="exportAudio" style="display:none;" title="Export samples to JSON">&#8615; Export</button>
-          <button class="btn btn-secondary" id="btnImportAudio" data-action="importAudio" title="Import samples from JSON">&#8613; Import</button>
+          <button class="btn btn-primary" id="btnScanAudio" data-action="scanAudioSamples" title="Scan for audio sample files" data-i18n-title="ui.tt.scan_for_audio_sample_files">&#127925; Scan Samples</button>
+          <button class="btn btn-secondary" id="btnResumeAudio" data-action="resumeAudioScan" style="display: none;" title="Resume sample scan" data-i18n-title="ui.tt.resume_sample_scan">&#9654; Resume</button>
+          <button class="btn btn-stop" id="btnStopAudio" style="display: none;" data-action="stopAudioScan" title="Stop the current scan" data-i18n-title="ui.tt.stop_the_current_scan">&#9632; Stop</button>
+          <button class="btn btn-secondary" id="btnExportAudio" data-action="exportAudio" style="display:none;" title="Export samples to JSON" data-i18n-title="ui.tt.export_samples_to_json">&#8615; Export</button>
+          <button class="btn btn-secondary" id="btnImportAudio" data-action="importAudio" title="Import samples from JSON" data-i18n-title="ui.tt.import_samples_from_json">&#8613; Import</button>
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="audioSearchInput" placeholder="Fuzzy search samples..." title="Search audio samples (Cmd+F)" data-action="filterAudioSamples" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            <button class="btn-regex" id="regexAudio" data-action="toggleRegex" data-target="filterAudioSamples" title="Toggle regex search">.*</button>
+            <input type="text" id="audioSearchInput" placeholder="Fuzzy search samples..." title="Search audio samples (Cmd+F)" data-action="filterAudioSamples" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.fuzzy_search_samples" data-i18n-title="ui.tt.search_audio_samples_cmd_f">
+            <button class="btn-regex" id="regexAudio" data-action="toggleRegex" data-target="filterAudioSamples" title="Toggle regex search" data-i18n-title="ui.tt.toggle_regex_search">.*</button>
           </div>
-          <select class="filter-select" id="audioFormatFilter" data-action="filterAudioSamples" title="Filter by audio format">
-            <option value="all">All Formats</option>
-            <option value="WAV">WAV</option>
-            <option value="MP3">MP3</option>
-            <option value="AIFF">AIFF</option>
-            <option value="AIF">AIF</option>
-            <option value="FLAC">FLAC</option>
-            <option value="OGG">OGG</option>
-            <option value="M4A">M4A</option>
-            <option value="AAC">AAC</option>
+          <select class="filter-select" id="audioFormatFilter" data-action="filterAudioSamples" title="Filter by audio format" data-i18n-title="ui.tt.filter_by_audio_format">
+            <option value="all" data-i18n="ui.opt.all_formats">All Formats</option>
+            <option value="WAV" data-i18n="ui.opt.wav">WAV</option>
+            <option value="MP3" data-i18n="ui.opt.mp3">MP3</option>
+            <option value="AIFF" data-i18n="ui.opt.aiff">AIFF</option>
+            <option value="AIF" data-i18n="ui.opt.aif">AIF</option>
+            <option value="FLAC" data-i18n="ui.opt.flac">FLAC</option>
+            <option value="OGG" data-i18n="ui.opt.ogg">OGG</option>
+            <option value="M4A" data-i18n="ui.opt.m4a">M4A</option>
+            <option value="AAC" data-i18n="ui.opt.aac">AAC</option>
           </select>
         </div>
         <div class="audio-progress-bar" id="audioProgressBar">
@@ -5137,31 +5137,31 @@
     <div class="tab-content" id="tabDaw">
       <div class="audio-container">
         <div class="audio-toolbar">
-          <button class="btn btn-primary" id="btnScanDaw" data-action="scanDawProjects" title="Scan for DAW project files">&#127911; Scan DAW Projects</button>
-          <button class="btn btn-secondary" id="btnResumeDaw" data-action="resumeDawScan" style="display: none;" title="Resume DAW scan">&#9654; Resume</button>
-          <button class="btn btn-stop" id="btnStopDaw" style="display: none;" data-action="stopDawScan" title="Stop the current scan">&#9632; Stop</button>
-          <button class="btn btn-secondary" id="btnExportDaw" data-action="exportDaw" style="display:none;" title="Export projects to JSON">&#8615; Export</button>
-          <button class="btn btn-secondary" id="btnImportDaw" data-action="importDaw" title="Import projects from JSON">&#8613; Import</button>
-          <button class="btn btn-secondary" id="btnXrefIndex" data-action="buildXrefIndex" title="Scan all Ableton/REAPER projects for plugin references">&#9889; Plugin Index</button>
-          <button class="btn btn-secondary" data-action="showDepGraph" title="Show plugin dependency graph (run Plugin Index first)">&#128200; Dep Graph</button>
+          <button class="btn btn-primary" id="btnScanDaw" data-action="scanDawProjects" title="Scan for DAW project files" data-i18n-title="ui.tt.scan_for_daw_project_files">&#127911; Scan DAW Projects</button>
+          <button class="btn btn-secondary" id="btnResumeDaw" data-action="resumeDawScan" style="display: none;" title="Resume DAW scan" data-i18n-title="ui.tt.resume_daw_scan">&#9654; Resume</button>
+          <button class="btn btn-stop" id="btnStopDaw" style="display: none;" data-action="stopDawScan" title="Stop the current scan" data-i18n-title="ui.tt.stop_the_current_scan">&#9632; Stop</button>
+          <button class="btn btn-secondary" id="btnExportDaw" data-action="exportDaw" style="display:none;" title="Export projects to JSON" data-i18n-title="ui.tt.export_projects_to_json">&#8615; Export</button>
+          <button class="btn btn-secondary" id="btnImportDaw" data-action="importDaw" title="Import projects from JSON" data-i18n-title="ui.tt.import_projects_from_json">&#8613; Import</button>
+          <button class="btn btn-secondary" id="btnXrefIndex" data-action="buildXrefIndex" title="Scan all Ableton/REAPER projects for plugin references" data-i18n-title="ui.tt.scan_all_ableton_reaper_projects_for_plugin_refere">&#9889; Plugin Index</button>
+          <button class="btn btn-secondary" data-action="showDepGraph" title="Show plugin dependency graph (run Plugin Index first)" data-i18n-title="ui.tt.show_plugin_dependency_graph_run_plugin_index_firs">&#128200; Dep Graph</button>
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="dawSearchInput" placeholder="Fuzzy search projects..." title="Search DAW projects (Cmd+F)" data-action="filterDawProjects" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            <button class="btn-regex" id="regexDaw" data-action="toggleRegex" data-target="filterDawProjects" title="Toggle regex search">.*</button>
+            <input type="text" id="dawSearchInput" placeholder="Fuzzy search projects..." title="Search DAW projects (Cmd+F)" data-action="filterDawProjects" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.fuzzy_search_projects" data-i18n-title="ui.tt.search_daw_projects_cmd_f">
+            <button class="btn-regex" id="regexDaw" data-action="toggleRegex" data-target="filterDawProjects" title="Toggle regex search" data-i18n-title="ui.tt.toggle_regex_search">.*</button>
           </div>
-          <select class="filter-select" id="dawDawFilter" data-action="filterDawProjects" title="Filter by DAW application">
-            <option value="all">All DAWs</option>
-            <option value="Ableton Live">Ableton Live</option>
-            <option value="Logic Pro">Logic Pro</option>
-            <option value="FL Studio">FL Studio</option>
-            <option value="Cubase">Cubase</option>
-            <option value="REAPER">REAPER</option>
-            <option value="Pro Tools">Pro Tools</option>
-            <option value="Bitwig Studio">Bitwig Studio</option>
-            <option value="Studio One">Studio One</option>
-            <option value="Reason">Reason</option>
-            <option value="GarageBand">GarageBand</option>
-            <option value="Audacity">Audacity</option>
+          <select class="filter-select" id="dawDawFilter" data-action="filterDawProjects" title="Filter by DAW application" data-i18n-title="ui.tt.filter_by_daw_application">
+            <option value="all" data-i18n="ui.opt.all_daws">All DAWs</option>
+            <option value="Ableton Live" data-i18n="ui.opt.ableton_live">Ableton Live</option>
+            <option value="Logic Pro" data-i18n="ui.opt.logic_pro">Logic Pro</option>
+            <option value="FL Studio" data-i18n="ui.opt.fl_studio">FL Studio</option>
+            <option value="Cubase" data-i18n="ui.opt.cubase">Cubase</option>
+            <option value="REAPER" data-i18n="ui.opt.reaper">REAPER</option>
+            <option value="Pro Tools" data-i18n="ui.opt.pro_tools">Pro Tools</option>
+            <option value="Bitwig Studio" data-i18n="ui.opt.bitwig_studio">Bitwig Studio</option>
+            <option value="Studio One" data-i18n="ui.opt.studio_one">Studio One</option>
+            <option value="Reason" data-i18n="ui.opt.reason">Reason</option>
+            <option value="GarageBand" data-i18n="ui.opt.garageband">GarageBand</option>
+            <option value="Audacity" data-i18n="ui.opt.audacity">Audacity</option>
           </select>
         </div>
         <div class="audio-progress-bar" id="dawProgressBar">
@@ -5190,27 +5190,27 @@
     <div class="tab-content" id="tabPresets">
       <div class="audio-container">
         <div class="audio-toolbar">
-          <button class="btn btn-primary" id="btnScanPresets" data-action="scanPresets" title="Scan for plugin presets">&#127924; Scan Presets</button>
-          <button class="btn btn-secondary" id="btnResumePresets" data-action="resumePresetScan" style="display: none;" title="Resume preset scan">&#9654; Resume</button>
-          <button class="btn btn-stop" id="btnStopPresets" style="display: none;" data-action="stopPresetScan" title="Stop the current scan">&#9632; Stop</button>
-          <button class="btn btn-secondary" id="btnExportPresets" data-action="exportPresets" style="display:none;" title="Export presets to JSON">&#8615; Export</button>
-          <button class="btn btn-secondary" id="btnImportPresets" data-action="importPresets" title="Import presets from JSON">&#8613; Import</button>
+          <button class="btn btn-primary" id="btnScanPresets" data-action="scanPresets" title="Scan for plugin presets" data-i18n-title="ui.tt.scan_for_plugin_presets">&#127924; Scan Presets</button>
+          <button class="btn btn-secondary" id="btnResumePresets" data-action="resumePresetScan" style="display: none;" title="Resume preset scan" data-i18n-title="ui.tt.resume_preset_scan">&#9654; Resume</button>
+          <button class="btn btn-stop" id="btnStopPresets" style="display: none;" data-action="stopPresetScan" title="Stop the current scan" data-i18n-title="ui.tt.stop_the_current_scan">&#9632; Stop</button>
+          <button class="btn btn-secondary" id="btnExportPresets" data-action="exportPresets" style="display:none;" title="Export presets to JSON" data-i18n-title="ui.tt.export_presets_to_json">&#8615; Export</button>
+          <button class="btn btn-secondary" id="btnImportPresets" data-action="importPresets" title="Import presets from JSON" data-i18n-title="ui.tt.import_presets_from_json">&#8613; Import</button>
           <div class="search-box" style="flex: 1;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="presetSearchInput" placeholder="Fuzzy search presets..." title="Search presets (Cmd+F)" data-action="filterPresets" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            <button class="btn-regex" id="regexPresets" data-action="toggleRegex" data-target="filterPresets" title="Toggle regex search">.*</button>
+            <input type="text" id="presetSearchInput" placeholder="Fuzzy search presets..." title="Search presets (Cmd+F)" data-action="filterPresets" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.fuzzy_search_presets" data-i18n-title="ui.tt.search_presets_cmd_f">
+            <button class="btn-regex" id="regexPresets" data-action="toggleRegex" data-target="filterPresets" title="Toggle regex search" data-i18n-title="ui.tt.toggle_regex_search">.*</button>
           </div>
-          <select class="filter-select" id="presetFormatFilter" data-action="filterPresets" title="Filter by preset format">
-            <option value="all">All Formats</option>
-            <option value="FXP">FXP</option>
-            <option value="FXB">FXB</option>
-            <option value="VSTPRESET">VSTPRESET</option>
-            <option value="AUPRESET">AUPRESET</option>
-            <option value="ADV">ADV</option>
-            <option value="ADG">ADG</option>
-            <option value="NKI">NKI</option>
-            <option value="H2P">H2P</option>
-            <option value="SYX">SYX</option>
+          <select class="filter-select" id="presetFormatFilter" data-action="filterPresets" title="Filter by preset format" data-i18n-title="ui.tt.filter_by_preset_format">
+            <option value="all" data-i18n="ui.opt.all_formats">All Formats</option>
+            <option value="FXP" data-i18n="ui.opt.fxp">FXP</option>
+            <option value="FXB" data-i18n="ui.opt.fxb">FXB</option>
+            <option value="VSTPRESET" data-i18n="ui.opt.vstpreset">VSTPRESET</option>
+            <option value="AUPRESET" data-i18n="ui.opt.aupreset">AUPRESET</option>
+            <option value="ADV" data-i18n="ui.opt.adv">ADV</option>
+            <option value="ADG" data-i18n="ui.opt.adg">ADG</option>
+            <option value="NKI" data-i18n="ui.opt.nki">NKI</option>
+            <option value="H2P" data-i18n="ui.opt.h2p">H2P</option>
+            <option value="SYX" data-i18n="ui.opt.syx">SYX</option>
           </select>
         </div>
         <div class="progress-bar" id="presetProgressBar">
@@ -5233,13 +5233,13 @@
 
     <div class="tab-content" id="tabMidi">
       <div class="audio-toolbar">
-        <button class="btn btn-primary" data-action="scanPresets" title="Scan for MIDI files (runs preset/MIDI scanner)">&#127924; Scan MIDI</button>
-        <button class="btn btn-secondary" data-action="exportMidi" title="Export MIDI file list">&#8615; Export</button>
-        <button class="btn btn-secondary" data-action="importAudio" title="Import MIDI list from JSON">&#8613; Import</button>
+        <button class="btn btn-primary" data-action="scanPresets" title="Scan for MIDI files (runs preset/MIDI scanner)" data-i18n-title="ui.tt.scan_for_midi_files_runs_preset_midi_scanner">&#127924; Scan MIDI</button>
+        <button class="btn btn-secondary" data-action="exportMidi" title="Export MIDI file list" data-i18n-title="ui.tt.export_midi_file_list">&#8615; Export</button>
+        <button class="btn btn-secondary" data-action="importAudio" title="Import MIDI list from JSON" data-i18n-title="ui.tt.import_midi_list_from_json">&#8613; Import</button>
         <div class="search-box" style="flex: 1;">
           <span class="search-icon">&#128269;</span>
-          <input type="text" id="midiSearchInput" placeholder="Fuzzy search MIDI files..." data-action="filterMidi" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Search MIDI files by name or path">
-          <button class="btn-regex" id="regexMidi" data-action="toggleRegex" data-target="filterMidi" title="Toggle regex search">.*</button>
+          <input type="text" id="midiSearchInput" placeholder="Fuzzy search MIDI files..." data-action="filterMidi" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Search MIDI files by name or path" data-i18n-placeholder="ui.ph.fuzzy_search_midi_files" data-i18n-title="ui.tt.search_midi_files_by_name_or_path">
+          <button class="btn-regex" id="regexMidi" data-action="toggleRegex" data-target="filterMidi" title="Toggle regex search" data-i18n-title="ui.tt.toggle_regex_search">.*</button>
         </div>
       </div>
       <div class="audio-stats" id="midiStats" style="display:none;">
@@ -5254,41 +5254,41 @@
       <div class="viz-container" id="vizContainer">
         <div class="viz-toolbar">
           <div class="viz-mode-btns" id="vizModeBtns">
-            <button class="viz-mode-btn" data-viz-mode="fft" title="FFT Spectrum Analyzer — show only this">FFT</button>
-            <button class="viz-mode-btn" data-viz-mode="waveform" title="Oscilloscope — show only this">Waveform</button>
-            <button class="viz-mode-btn" data-viz-mode="spectrogram" title="Scrolling spectrogram — show only this">Spectrogram</button>
-            <button class="viz-mode-btn" data-viz-mode="stereo" title="Stereo field — show only this">Stereo</button>
-            <button class="viz-mode-btn" data-viz-mode="levels" title="Level meters — show only this">Levels</button>
-            <button class="viz-mode-btn" data-viz-mode="bands" title="Octave bands — show only this">Bands</button>
-            <button class="viz-mode-btn active" data-viz-mode="all" title="Show all visualizers in a grid">All</button>
+            <button class="viz-mode-btn" data-viz-mode="fft" title="FFT Spectrum Analyzer — show only this" data-i18n-title="ui.tt.fft_spectrum_analyzer_show_only_this">FFT</button>
+            <button class="viz-mode-btn" data-viz-mode="waveform" title="Oscilloscope — show only this" data-i18n-title="ui.tt.oscilloscope_show_only_this">Waveform</button>
+            <button class="viz-mode-btn" data-viz-mode="spectrogram" title="Scrolling spectrogram — show only this" data-i18n-title="ui.tt.scrolling_spectrogram_show_only_this">Spectrogram</button>
+            <button class="viz-mode-btn" data-viz-mode="stereo" title="Stereo field — show only this" data-i18n-title="ui.tt.stereo_field_show_only_this">Stereo</button>
+            <button class="viz-mode-btn" data-viz-mode="levels" title="Level meters — show only this" data-i18n-title="ui.tt.level_meters_show_only_this">Levels</button>
+            <button class="viz-mode-btn" data-viz-mode="bands" title="Octave bands — show only this" data-i18n-title="ui.tt.octave_bands_show_only_this">Bands</button>
+            <button class="viz-mode-btn active" data-viz-mode="all" title="Show all visualizers in a grid" data-i18n-title="ui.tt.show_all_visualizers_in_a_grid">All</button>
           </div>
           <div style="display:flex;gap:6px;">
-            <button class="viz-mode-btn" data-action="vizFullscreen" title="Toggle fullscreen visualizer">&#9974; Fullscreen</button>
+            <button class="viz-mode-btn" data-action="vizFullscreen" title="Toggle fullscreen visualizer" data-i18n-title="ui.tt.toggle_fullscreen_visualizer">&#9974; Fullscreen</button>
             <div class="viz-info" id="vizInfo" style="font-size:10px;color:var(--text-dim);line-height:28px;"></div>
           </div>
         </div>
         <div class="viz-grid" id="vizGrid">
-          <div class="viz-tile" data-viz-tile="fft" title="FFT Spectrum Analyzer — right-click for options">
+          <div class="viz-tile" data-viz-tile="fft" title="FFT Spectrum Analyzer — right-click for options" data-i18n-title="ui.tt.fft_spectrum_analyzer_right_click_for_options">
             <div class="viz-tile-label">FFT SPECTRUM</div>
             <canvas class="viz-tile-canvas" data-viz="fft" width="600" height="250"></canvas>
           </div>
-          <div class="viz-tile" data-viz-tile="waveform" title="Oscilloscope waveform — right-click for options">
+          <div class="viz-tile" data-viz-tile="waveform" title="Oscilloscope waveform — right-click for options" data-i18n-title="ui.tt.oscilloscope_waveform_right_click_for_options">
             <div class="viz-tile-label">WAVEFORM</div>
             <canvas class="viz-tile-canvas" data-viz="waveform" width="600" height="250"></canvas>
           </div>
-          <div class="viz-tile" data-viz-tile="spectrogram" title="Scrolling spectrogram — right-click for options">
+          <div class="viz-tile" data-viz-tile="spectrogram" title="Scrolling spectrogram — right-click for options" data-i18n-title="ui.tt.scrolling_spectrogram_right_click_for_options">
             <div class="viz-tile-label">SPECTROGRAM</div>
             <canvas class="viz-tile-canvas" data-viz="spectrogram" width="600" height="250"></canvas>
           </div>
-          <div class="viz-tile" data-viz-tile="stereo" title="Stereo field / Lissajous — right-click for options">
+          <div class="viz-tile" data-viz-tile="stereo" title="Stereo field / Lissajous — right-click for options" data-i18n-title="ui.tt.stereo_field_lissajous_right_click_for_options">
             <div class="viz-tile-label">STEREO FIELD</div>
             <canvas class="viz-tile-canvas" data-viz="stereo" width="600" height="250"></canvas>
           </div>
-          <div class="viz-tile" data-viz-tile="levels" title="Peak / RMS level meters — right-click for options">
+          <div class="viz-tile" data-viz-tile="levels" title="Peak / RMS level meters — right-click for options" data-i18n-title="ui.tt.peak_rms_level_meters_right_click_for_options">
             <div class="viz-tile-label">LEVELS</div>
             <canvas class="viz-tile-canvas" data-viz="levels" width="600" height="250"></canvas>
           </div>
-          <div class="viz-tile" data-viz-tile="bands" title="Octave band analyzer — right-click for options">
+          <div class="viz-tile" data-viz-tile="bands" title="Octave band analyzer — right-click for options" data-i18n-title="ui.tt.octave_band_analyzer_right_click_for_options">
             <div class="viz-tile-label">OCTAVE BANDS</div>
             <canvas class="viz-tile-canvas" data-viz="bands" width="600" height="250"></canvas>
           </div>
@@ -5301,22 +5301,22 @@
 
     <div class="tab-content" id="tabWalkers">
       <div class="walker-grid" id="walkerGrid">
-        <div class="walker-tile" id="walkerTilePlugin" title="Plugin scanner — directories being walked for VST/AU plugins. Right-click to copy paths.">
+        <div class="walker-tile" id="walkerTilePlugin" title="Plugin scanner — directories being walked for VST/AU plugins. Right-click to copy paths." data-i18n-title="ui.tt.plugin_scanner_directories_being_walked_for_vst_au">
           <div class="walker-tile-header" style="color:var(--cyan);">&#9889; Plugin Walker</div>
           <div class="walker-tile-status">idle</div>
           <div class="walker-tile-body" id="walkerPluginBody"></div>
         </div>
-        <div class="walker-tile" id="walkerTileAudio" title="Audio scanner — directories being walked for audio samples. Right-click to copy paths.">
+        <div class="walker-tile" id="walkerTileAudio" title="Audio scanner — directories being walked for audio samples. Right-click to copy paths." data-i18n-title="ui.tt.audio_scanner_directories_being_walked_for_audio_s">
           <div class="walker-tile-header" style="color:var(--yellow);">&#127925; Audio Walker</div>
           <div class="walker-tile-status">idle</div>
           <div class="walker-tile-body" id="walkerAudioBody"></div>
         </div>
-        <div class="walker-tile" id="walkerTileDaw" title="DAW scanner — directories being walked for DAW projects. Right-click to copy paths.">
+        <div class="walker-tile" id="walkerTileDaw" title="DAW scanner — directories being walked for DAW projects. Right-click to copy paths." data-i18n-title="ui.tt.daw_scanner_directories_being_walked_for_daw_proje">
           <div class="walker-tile-header" style="color:var(--magenta);">&#127911; DAW Walker</div>
           <div class="walker-tile-status">idle</div>
           <div class="walker-tile-body" id="walkerDawBody"></div>
         </div>
-        <div class="walker-tile" id="walkerTilePreset" title="Preset/MIDI scanner — directories being walked for presets and MIDI files. Right-click to copy paths.">
+        <div class="walker-tile" id="walkerTilePreset" title="Preset/MIDI scanner — directories being walked for presets and MIDI files. Right-click to copy paths." data-i18n-title="ui.tt.preset_midi_scanner_directories_being_walked_for_p">
           <div class="walker-tile-header" style="color:var(--orange);">&#127926; Preset/MIDI Walker</div>
           <div class="walker-tile-status">idle</div>
           <div class="walker-tile-body" id="walkerPresetBody"></div>
@@ -5334,7 +5334,7 @@
               <span class="settings-desc">Switch between dark cyberpunk and clean light mode</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingTheme" data-action="settingToggleTheme" title="Switch between dark and light theme">
+              <button class="settings-toggle" id="settingTheme" data-action="settingToggleTheme" title="Switch between dark and light theme" data-i18n-title="ui.tt.switch_between_dark_and_light_theme">
                 <span class="settings-toggle-label" id="settingThemeLabel">Dark</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5346,7 +5346,7 @@
               <span class="settings-desc">Animated scanline overlays and vignette</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingCrt" data-action="settingToggleCrt" title="Toggle CRT scanline overlay effect">
+              <button class="settings-toggle" id="settingCrt" data-action="settingToggleCrt" title="Toggle CRT scanline overlay effect" data-i18n-title="ui.tt.toggle_crt_scanline_overlay_effect">
                 <span class="settings-toggle-label" id="settingCrtLabel">On</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5358,7 +5358,7 @@
               <span class="settings-desc">Animated pulsing neon borders on panels, modals, and tiles</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingNeonGlow" data-action="settingToggleNeonGlow" title="Toggle neon glow border animations">
+              <button class="settings-toggle" id="settingNeonGlow" data-action="settingToggleNeonGlow" title="Toggle neon glow border animations" data-i18n-title="ui.tt.toggle_neon_glow_border_animations">
                 <span class="settings-toggle-label" id="settingNeonGlowLabel">On</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5370,7 +5370,7 @@
               <span class="settings-desc">Show/hide the tag filter bar when a tag is active</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingTagBar" data-action="settingToggleTagBar" title="Toggle tag filter bar visibility">
+              <button class="settings-toggle" id="settingTagBar" data-action="settingToggleTagBar" title="Toggle tag filter bar visibility" data-i18n-title="ui.tt.toggle_tag_filter_bar_visibility">
                 <span class="settings-toggle-label" id="settingTagBarLabel">On</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5382,9 +5382,9 @@
               <span class="settings-desc">Place the tag filter bar above or below tabs</span>
             </div>
             <div class="settings-control">
-              <select class="settings-select" id="settingTagBarPosition" data-action="settingTagBarPosition" title="Tag bar position">
-                <option value="top">Top</option>
-                <option value="bottom">Bottom</option>
+              <select class="settings-select" id="settingTagBarPosition" data-action="settingTagBarPosition" title="Tag bar position" data-i18n-title="ui.tt.tag_bar_position">
+                <option value="top" data-i18n="ui.opt.top">Top</option>
+                <option value="bottom" data-i18n="ui.opt.bottom">Bottom</option>
               </select>
             </div>
           </div>
@@ -5402,82 +5402,82 @@
               <div class="custom-color-grid">
                 <label class="custom-color-item">
                   <span class="custom-color-label">Accent</span>
-                  <input type="color" class="custom-color-input" data-var="--accent" value="#ff2a6d" title="Primary accent color (--accent)">
+                  <input type="color" class="custom-color-input" data-var="--accent" value="#ff2a6d" title="Primary accent color (--accent)" data-i18n-title="ui.tt.primary_accent_color_accent">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Accent Light</span>
-                  <input type="color" class="custom-color-input" data-var="--accent-light" value="#ff6b9d" title="Light accent for hover states (--accent-light)">
+                  <input type="color" class="custom-color-input" data-var="--accent-light" value="#ff6b9d" title="Light accent for hover states (--accent-light)" data-i18n-title="ui.tt.light_accent_for_hover_states_accent_light">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Cyan</span>
-                  <input type="color" class="custom-color-input" data-var="--cyan" value="#05d9e8" title="Cyan highlight color (--cyan)">
+                  <input type="color" class="custom-color-input" data-var="--cyan" value="#05d9e8" title="Cyan highlight color (--cyan)" data-i18n-title="ui.tt.cyan_highlight_color_cyan">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Magenta</span>
-                  <input type="color" class="custom-color-input" data-var="--magenta" value="#d300c5" title="Magenta highlight color (--magenta)">
+                  <input type="color" class="custom-color-input" data-var="--magenta" value="#d300c5" title="Magenta highlight color (--magenta)" data-i18n-title="ui.tt.magenta_highlight_color_magenta">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Green</span>
-                  <input type="color" class="custom-color-input" data-var="--green" value="#39ff14" title="Success/green color (--green)">
+                  <input type="color" class="custom-color-input" data-var="--green" value="#39ff14" title="Success/green color (--green)" data-i18n-title="ui.tt.success_green_color_green">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Yellow</span>
-                  <input type="color" class="custom-color-input" data-var="--yellow" value="#f9f002" title="Warning/yellow color (--yellow)">
+                  <input type="color" class="custom-color-input" data-var="--yellow" value="#f9f002" title="Warning/yellow color (--yellow)" data-i18n-title="ui.tt.warning_yellow_color_yellow">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Orange</span>
-                  <input type="color" class="custom-color-input" data-var="--orange" value="#ff6b35" title="Orange accent color (--orange)">
+                  <input type="color" class="custom-color-input" data-var="--orange" value="#ff6b35" title="Orange accent color (--orange)" data-i18n-title="ui.tt.orange_accent_color_orange">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Red</span>
-                  <input type="color" class="custom-color-input" data-var="--red" value="#ff073a" title="Error/red color (--red)">
+                  <input type="color" class="custom-color-input" data-var="--red" value="#ff073a" title="Error/red color (--red)" data-i18n-title="ui.tt.error_red_color_red">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Text</span>
-                  <input type="color" class="custom-color-input" data-var="--text" value="#e0f0ff" title="Primary text color (--text)">
+                  <input type="color" class="custom-color-input" data-var="--text" value="#e0f0ff" title="Primary text color (--text)" data-i18n-title="ui.tt.primary_text_color_text">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Text Dim</span>
-                  <input type="color" class="custom-color-input" data-var="--text-dim" value="#7a8ba8" title="Dimmed text color (--text-dim)">
+                  <input type="color" class="custom-color-input" data-var="--text-dim" value="#7a8ba8" title="Dimmed text color (--text-dim)" data-i18n-title="ui.tt.dimmed_text_color_text_dim">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Text Muted</span>
-                  <input type="color" class="custom-color-input" data-var="--text-muted" value="#3d4f6a" title="Muted text color (--text-muted)">
+                  <input type="color" class="custom-color-input" data-var="--text-muted" value="#3d4f6a" title="Muted text color (--text-muted)" data-i18n-title="ui.tt.muted_text_color_text_muted">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Background</span>
-                  <input type="color" class="custom-color-input" data-var="--bg-primary" value="#05050a" title="Primary background color (--bg-primary)">
+                  <input type="color" class="custom-color-input" data-var="--bg-primary" value="#05050a" title="Primary background color (--bg-primary)" data-i18n-title="ui.tt.primary_background_color_bg_primary">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">BG Secondary</span>
-                  <input type="color" class="custom-color-input" data-var="--bg-secondary" value="#0a0a14" title="Secondary background color (--bg-secondary)">
+                  <input type="color" class="custom-color-input" data-var="--bg-secondary" value="#0a0a14" title="Secondary background color (--bg-secondary)" data-i18n-title="ui.tt.secondary_background_color_bg_secondary">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Card BG</span>
-                  <input type="color" class="custom-color-input" data-var="--bg-card" value="#0d0d1a" title="Card/panel background color (--bg-card)">
+                  <input type="color" class="custom-color-input" data-var="--bg-card" value="#0d0d1a" title="Card/panel background color (--bg-card)" data-i18n-title="ui.tt.card_panel_background_color_bg_card">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">BG Hover</span>
-                  <input type="color" class="custom-color-input" data-var="--bg-hover" value="#12122a" title="Hover background color (--bg-hover)">
+                  <input type="color" class="custom-color-input" data-var="--bg-hover" value="#12122a" title="Hover background color (--bg-hover)" data-i18n-title="ui.tt.hover_background_color_bg_hover">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Border</span>
-                  <input type="color" class="custom-color-input" data-var="--border" value="#1a1a3e" title="Border color (--border)">
+                  <input type="color" class="custom-color-input" data-var="--border" value="#1a1a3e" title="Border color (--border)" data-i18n-title="ui.tt.border_color_border">
                 </label>
                 <label class="custom-color-item">
                   <span class="custom-color-label">Border Glow</span>
-                  <input type="color" class="custom-color-input" data-var="--border-glow" value="#2a1a4e" title="Border glow/accent color (--border-glow)">
+                  <input type="color" class="custom-color-input" data-var="--border-glow" value="#2a1a4e" title="Border glow/accent color (--border-glow)" data-i18n-title="ui.tt.border_glow_accent_color_border_glow">
                 </label>
               </div>
               <div class="custom-scheme-actions">
-                <button class="btn btn-secondary btn-settings-action" data-action="applyCustomScheme" title="Apply current color selections">Apply</button>
-                <button class="btn btn-secondary btn-settings-action" id="btnShowSavePreset" data-action="showSavePreset" title="Save current colors as a reusable preset">Save as Preset</button>
-                <button class="btn btn-stop btn-settings-action" data-action="deleteCustomSchemes" id="btnDeleteCustom" style="display: none;" title="Delete all saved custom color presets">Delete Saved</button>
+                <button class="btn btn-secondary btn-settings-action" data-action="applyCustomScheme" title="Apply current color selections" data-i18n-title="ui.tt.apply_current_color_selections">Apply</button>
+                <button class="btn btn-secondary btn-settings-action" id="btnShowSavePreset" data-action="showSavePreset" title="Save current colors as a reusable preset" data-i18n-title="ui.tt.save_current_colors_as_a_reusable_preset">Save as Preset</button>
+                <button class="btn btn-stop btn-settings-action" data-action="deleteCustomSchemes" id="btnDeleteCustom" style="display: none;" title="Delete all saved custom color presets" data-i18n-title="ui.tt.delete_all_saved_custom_color_presets">Delete Saved</button>
               </div>
               <div class="save-preset-row" id="savePresetRow" style="display: none;">
-                <input type="text" class="settings-input" id="savePresetName" placeholder="Preset name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Name for the custom color preset">
-                <button class="btn btn-secondary btn-settings-action" data-action="confirmSavePreset" title="Save this color preset">Save</button>
-                <button class="btn btn-secondary btn-settings-action" data-action="cancelSavePreset" title="Cancel saving preset">Cancel</button>
+                <input type="text" class="settings-input" id="savePresetName" placeholder="Preset name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Name for the custom color preset" data-i18n-placeholder="ui.ph.preset_name" data-i18n-title="ui.tt.name_for_the_custom_color_preset">
+                <button class="btn btn-secondary btn-settings-action" data-action="confirmSavePreset" title="Save this color preset" data-i18n-title="ui.tt.save_this_color_preset">Save</button>
+                <button class="btn btn-secondary btn-settings-action" data-action="cancelSavePreset" title="Cancel saving preset" data-i18n-title="ui.tt.cancel_saving_preset">Cancel</button>
               </div>
               <div class="custom-scheme-saved" id="customSchemeSaved"></div>
             </div>
@@ -5492,9 +5492,9 @@
               <span class="settings-desc">Additional directories to scan for plugins (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for VST/AU plugins, one path per line"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingCustomDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="saveCustomDirs" style="margin-top: 6px;" title="Save custom plugin scan directories">Save</button>
+              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for VST/AU plugins, one path per line" data-i18n-placeholder="ui.ph.path_to_plugins_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_vst_au_plugins_"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingCustomDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveCustomDirs" style="margin-top: 6px;" title="Save custom plugin scan directories" data-i18n-title="ui.tt.save_custom_plugin_scan_directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgCustomDirs"></span>
             </div>
           </div>
@@ -5504,9 +5504,9 @@
               <span class="settings-desc">Additional directories to scan for audio samples (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for audio samples, one path per line"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingAudioScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="saveAudioScanDirs" style="margin-top: 6px;" title="Save custom audio sample scan directories">Save</button>
+              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for audio samples, one path per line" data-i18n-placeholder="ui.ph.path_to_samples_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_audio_samples_o"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingAudioScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveAudioScanDirs" style="margin-top: 6px;" title="Save custom audio sample scan directories" data-i18n-title="ui.tt.save_custom_audio_sample_scan_directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgAudioScanDirs"></span>
             </div>
           </div>
@@ -5516,9 +5516,9 @@
               <span class="settings-desc">Additional directories to scan for DAW project files (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for DAW project files, one path per line"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingDawScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="saveDawScanDirs" style="margin-top: 6px;" title="Save custom DAW project scan directories">Save</button>
+              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for DAW project files, one path per line" data-i18n-placeholder="ui.ph.path_to_projects_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_daw_project_fil"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingDawScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveDawScanDirs" style="margin-top: 6px;" title="Save custom DAW project scan directories" data-i18n-title="ui.tt.save_custom_daw_project_scan_directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgDawScanDirs"></span>
             </div>
           </div>
@@ -5528,9 +5528,9 @@
               <span class="settings-desc">Additional directories to scan for plugin presets (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for plugin presets, one path per line"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPresetScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="savePresetScanDirs" style="margin-top: 6px;" title="Save custom preset scan directories">Save</button>
+              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for plugin presets, one path per line" data-i18n-placeholder="ui.ph.path_to_presets_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_plugin_presets_"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPresetScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="savePresetScanDirs" style="margin-top: 6px;" title="Save custom preset scan directories" data-i18n-title="ui.tt.save_custom_preset_scan_directories">Save</button>
               <span class="settings-saved-msg" id="savedMsgPresetScanDirs"></span>
             </div>
           </div>
@@ -5544,11 +5544,11 @@
               <span class="settings-desc">Plugin type to show by default after scanning</span>
             </div>
             <div class="settings-control">
-              <select class="settings-select" id="settingDefaultTypeFilter" data-action="settingDefaultTypeFilter" title="Default plugin type filter on launch">
-                <option value="all">All Types</option>
-                <option value="VST2">VST2</option>
-                <option value="VST3">VST3</option>
-                <option value="AU">Audio Units</option>
+              <select class="settings-select" id="settingDefaultTypeFilter" data-action="settingDefaultTypeFilter" title="Default plugin type filter on launch" data-i18n-title="ui.tt.default_plugin_type_filter_on_launch">
+                <option value="all" data-i18n="ui.opt.all_types">All Types</option>
+                <option value="VST2" data-i18n="ui.opt.vst2">VST2</option>
+                <option value="VST3" data-i18n="ui.opt.vst3">VST3</option>
+                <option value="AU" data-i18n="ui.opt.audio_units">Audio Units</option>
               </select>
             </div>
           </div>
@@ -5558,7 +5558,7 @@
               <span class="settings-desc">Automatically scan for plugins when the app starts</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingAutoScan" data-action="settingToggleAutoScan" title="Automatically scan on app launch">
+              <button class="settings-toggle" id="settingAutoScan" data-action="settingToggleAutoScan" title="Automatically scan on app launch" data-i18n-title="ui.tt.automatically_scan_on_app_launch">
                 <span class="settings-toggle-label" id="settingAutoScanLabel">Off</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5570,7 +5570,7 @@
               <span class="settings-desc">Watch scan directories for new/changed files and auto-index them</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingFolderWatch" data-action="settingToggleFolderWatch" title="Watch directories for filesystem changes">
+              <button class="settings-toggle" id="settingFolderWatch" data-action="settingToggleFolderWatch" title="Watch directories for filesystem changes" data-i18n-title="ui.tt.watch_directories_for_filesystem_changes">
                 <span class="settings-toggle-label" id="settingFolderWatchLabel">Off</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5582,7 +5582,7 @@
               <span class="settings-desc">Automatically check for plugin updates after scanning</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingAutoUpdate" data-action="settingToggleAutoUpdate" title="Automatically check KVR for updates after scanning">
+              <button class="settings-toggle" id="settingAutoUpdate" data-action="settingToggleAutoUpdate" title="Automatically check KVR for updates after scanning" data-i18n-title="ui.tt.automatically_check_kvr_for_updates_after_scanning">
                 <span class="settings-toggle-label" id="settingAutoUpdateLabel">Off</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5598,7 +5598,7 @@
               <span class="settings-desc">Click a sample row to start playback instead of requiring double-click</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingSingleClickPlay" data-action="settingToggleSingleClickPlay" title="Play audio samples on single click instead of double-click">
+              <button class="settings-toggle" id="settingSingleClickPlay" data-action="settingToggleSingleClickPlay" title="Play audio samples on single click instead of double-click" data-i18n-title="ui.tt.play_audio_samples_on_single_click_instead_of_doub">
                 <span class="settings-toggle-label" id="settingSingleClickPlayLabel">Off</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5610,7 +5610,7 @@
               <span class="settings-desc">Double-click a sample row to expand/collapse metadata. Setting is toggled automatically by double-click</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingExpandOnClick" data-action="settingToggleExpandOnClick" title="Toggle metadata expansion on double-click">
+              <button class="settings-toggle" id="settingExpandOnClick" data-action="settingToggleExpandOnClick" title="Toggle metadata expansion on double-click" data-i18n-title="ui.tt.toggle_metadata_expansion_on_double_click">
                 <span class="settings-toggle-label" id="settingExpandOnClickLabel">On</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5622,7 +5622,7 @@
               <span class="settings-desc">Show the audio player when the app starts (restores last playing state)</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingShowPlayerOnStartup" data-action="settingToggleShowPlayerOnStartup" title="Show audio player automatically on app launch">
+              <button class="settings-toggle" id="settingShowPlayerOnStartup" data-action="settingToggleShowPlayerOnStartup" title="Show audio player automatically on app launch" data-i18n-title="ui.tt.show_audio_player_automatically_on_app_launch">
                 <span class="settings-toggle-label" id="settingShowPlayerOnStartupLabel">Off</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5634,7 +5634,7 @@
               <span class="settings-desc">Automatically play the next sample when the current one ends</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingAutoplayNext" data-action="settingToggleAutoplayNext" title="Toggle auto-advance to next track on playback end">
+              <button class="settings-toggle" id="settingAutoplayNext" data-action="settingToggleAutoplayNext" title="Toggle auto-advance to next track on playback end" data-i18n-title="ui.tt.toggle_auto_advance_to_next_track_on_playback_end">
                 <span class="settings-toggle-label" id="settingAutoplayNextLabel">On</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5646,7 +5646,7 @@
               <span class="settings-desc">Include .als files from Ableton's Backup and Crash directories in DAW scan results</span>
             </div>
             <div class="settings-control">
-              <button class="settings-toggle" id="settingIncludeBackups" data-action="settingToggleIncludeBackups" title="Include backup files (e.g. .rpp-bak) in scans">
+              <button class="settings-toggle" id="settingIncludeBackups" data-action="settingToggleIncludeBackups" title="Include backup files (e.g. .rpp-bak) in scans" data-i18n-title="ui.tt.include_backup_files_e_g_rpp_bak_in_scans">
                 <span class="settings-toggle-label" id="settingIncludeBackupsLabel">Off</span>
                 <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
               </button>
@@ -5662,8 +5662,8 @@
               <span class="settings-desc">Directory names to skip during scans (one per line). Applies to all scanners.</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingBlacklist" rows="4" placeholder="#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;System Volume Information&#10;node_modules&#10;.git&#10;.Trash" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Directory names to exclude from scanning, one per line"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="saveBlacklist" style="margin-top: 6px;" title="Save directory blacklist">Save</button>
+              <textarea class="settings-textarea" id="settingBlacklist" rows="4" placeholder="#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;System Volume Information&#10;node_modules&#10;.git&#10;.Trash" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Directory names to exclude from scanning, one per line" data-i18n-placeholder="ui.ph.recycle_10_eadir_10_spotlight_v100_10_recycle_bin_" data-i18n-title="ui.tt.directory_names_to_exclude_from_scanning_one_per_l"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveBlacklist" style="margin-top: 6px;" title="Save directory blacklist" data-i18n-title="ui.tt.save_directory_blacklist">Save</button>
               <span class="settings-saved-msg" id="savedMsgBlacklist"></span>
             </div>
           </div>
@@ -5674,7 +5674,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingMaxRecent" min="20" max="500" step="10" value="50" data-action="settingMaxRecent" title="Maximum number of recently played tracks to remember">
+                <input type="range" class="settings-range" id="settingMaxRecent" min="20" max="500" step="10" value="50" data-action="settingMaxRecent" title="Maximum number of recently played tracks to remember" data-i18n-title="ui.tt.maximum_number_of_recently_played_tracks_to_rememb">
                 <span class="settings-range-value" id="settingMaxRecentValue">50</span>
               </div>
             </div>
@@ -5690,7 +5690,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingPageSize" min="100" max="2000" step="100" value="500" data-action="settingPageSize" title="Number of items per page in tables">
+                <input type="range" class="settings-range" id="settingPageSize" min="100" max="2000" step="100" value="500" data-action="settingPageSize" title="Number of items per page in tables" data-i18n-title="ui.tt.number_of_items_per_page_in_tables">
                 <span class="settings-range-value" id="settingPageSizeValue">500</span>
               </div>
             </div>
@@ -5702,7 +5702,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingFlushInterval" min="50" max="1000" step="50" value="100" data-action="settingFlushInterval" title="UI update frequency during scans (ms)">
+                <input type="range" class="settings-range" id="settingFlushInterval" min="50" max="1000" step="50" value="100" data-action="settingFlushInterval" title="UI update frequency during scans (ms)" data-i18n-title="ui.tt.ui_update_frequency_during_scans_ms">
                 <span class="settings-range-value" id="settingFlushIntervalValue">100</span>
               </div>
             </div>
@@ -5714,7 +5714,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingThreadMultiplier" min="1" max="8" step="1" value="4" data-action="settingThreadMultiplier" title="Thread pool multiplier (cores x N)">
+                <input type="range" class="settings-range" id="settingThreadMultiplier" min="1" max="8" step="1" value="4" data-action="settingThreadMultiplier" title="Thread pool multiplier (cores x N)" data-i18n-title="ui.tt.thread_pool_multiplier_cores_x_n">
                 <span class="settings-range-value" id="settingThreadMultiplierValue">4x</span>
               </div>
             </div>
@@ -5726,7 +5726,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingChannelBuffer" min="64" max="2048" step="64" value="512" data-action="settingChannelBuffer" title="Channel buffer size for scan results">
+                <input type="range" class="settings-range" id="settingChannelBuffer" min="64" max="2048" step="64" value="512" data-action="settingChannelBuffer" title="Channel buffer size for scan results" data-i18n-title="ui.tt.channel_buffer_size_for_scan_results">
                 <span class="settings-range-value" id="settingChannelBufferValue">512</span>
               </div>
             </div>
@@ -5738,7 +5738,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingBatchSize" min="10" max="200" step="10" value="100" data-action="settingBatchSize" title="Batch size for streaming scan results to UI">
+                <input type="range" class="settings-range" id="settingBatchSize" min="10" max="200" step="10" value="100" data-action="settingBatchSize" title="Batch size for streaming scan results to UI" data-i18n-title="ui.tt.batch_size_for_streaming_scan_results_to_ui">
                 <span class="settings-range-value" id="settingBatchSizeValue">100</span>
               </div>
             </div>
@@ -5750,7 +5750,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingFdLimit" min="256" max="65536" step="256" value="10240" data-action="settingFdLimit" title="Maximum file descriptors (open files) for the process">
+                <input type="range" class="settings-range" id="settingFdLimit" min="256" max="65536" step="256" value="10240" data-action="settingFdLimit" title="Maximum file descriptors (open files) for the process" data-i18n-title="ui.tt.maximum_file_descriptors_open_files_for_the_proces">
                 <span class="settings-range-value" id="settingFdLimitValue">10240</span>
               </div>
             </div>
@@ -5766,7 +5766,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingVizFps" min="10" max="60" step="5" value="30" data-action="settingVizFps" title="Visualizer frame rate cap">
+                <input type="range" class="settings-range" id="settingVizFps" min="10" max="60" step="5" value="30" data-action="settingVizFps" title="Visualizer frame rate cap" data-i18n-title="ui.tt.visualizer_frame_rate_cap">
                 <span class="settings-range-value" id="settingVizFpsValue">30</span>
               </div>
             </div>
@@ -5778,7 +5778,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingWfCacheMax" min="100" max="2000" step="100" value="500" data-action="settingWfCacheMax" title="Maximum number of cached waveforms">
+                <input type="range" class="settings-range" id="settingWfCacheMax" min="100" max="2000" step="100" value="500" data-action="settingWfCacheMax" title="Maximum number of cached waveforms" data-i18n-title="ui.tt.maximum_number_of_cached_waveforms">
                 <span class="settings-range-value" id="settingWfCacheMaxValue">500</span>
               </div>
             </div>
@@ -5790,7 +5790,7 @@
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingAnalysisPause" min="1" max="10" step="1" value="3" data-action="settingAnalysisPause" title="Seconds to wait before resuming background analysis">
+                <input type="range" class="settings-range" id="settingAnalysisPause" min="1" max="10" step="1" value="3" data-action="settingAnalysisPause" title="Seconds to wait before resuming background analysis" data-i18n-title="ui.tt.seconds_to_wait_before_resuming_background_analysi">
                 <span class="settings-range-value" id="settingAnalysisPauseValue">3</span>
               </div>
             </div>
@@ -5812,11 +5812,11 @@
           <div style="margin-bottom:8px;">
             <h3 style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">FUZZY SEARCH WEIGHTS</h3>
             <div id="fzfSettingsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;"></div>
-            <button class="btn btn-secondary btn-settings-action" data-action="resetFzfParams" title="Reset all fzf parameters to defaults" style="margin-top:4px;font-size:10px;">Reset fzf</button>
+            <button class="btn btn-secondary btn-settings-action" data-action="resetFzfParams" title="Reset all fzf parameters to defaults" style="margin-top:4px;font-size:10px;" data-i18n-title="ui.tt.reset_all_fzf_parameters_to_defaults">Reset fzf</button>
           </div>
           <div class="search-box" style="max-width:400px;margin-bottom:8px;">
             <span class="search-icon">&#128269;</span>
-            <input type="text" id="shortcutsFilter" placeholder="Fuzzy search shortcuts..." data-action="filterShortcuts" title="Fuzzy filter keyboard shortcuts by name or key" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <input type="text" id="shortcutsFilter" placeholder="Fuzzy search shortcuts..." data-action="filterShortcuts" title="Fuzzy filter keyboard shortcuts by name or key" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.fuzzy_search_shortcuts" data-i18n-title="ui.tt.fuzzy_filter_keyboard_shortcuts_by_name_or_key">
           </div>
           <div id="shortcutsList"></div>
           <div class="settings-row">
@@ -5825,7 +5825,7 @@
               <span class="settings-desc">Restore default keyboard shortcuts</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-secondary btn-settings-action" data-action="resetShortcuts" title="Reset all keyboard shortcuts to defaults">Reset</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="resetShortcuts" title="Reset all keyboard shortcuts to defaults" data-i18n-title="ui.tt.reset_all_keyboard_shortcuts_to_defaults">Reset</button>
             </div>
           </div>
         </div>
@@ -5838,11 +5838,11 @@
               <span class="settings-desc">How plugins are ordered after scanning</span>
             </div>
             <div class="settings-control">
-              <select class="settings-select" id="settingPluginSort" data-action="settingPluginSort" title="Default sort order for plugins">
-                <option value="name-asc">Name A-Z</option>
-                <option value="name-desc">Name Z-A</option>
-                <option value="type">By Type</option>
-                <option value="manufacturer">By Manufacturer</option>
+              <select class="settings-select" id="settingPluginSort" data-action="settingPluginSort" title="Default sort order for plugins" data-i18n-title="ui.tt.default_sort_order_for_plugins">
+                <option value="name-asc" data-i18n="ui.opt.name_a_z">Name A-Z</option>
+                <option value="name-desc" data-i18n="ui.opt.name_z_a">Name Z-A</option>
+                <option value="type" data-i18n="ui.opt.by_type">By Type</option>
+                <option value="manufacturer" data-i18n="ui.opt.by_manufacturer">By Manufacturer</option>
               </select>
             </div>
           </div>
@@ -5852,12 +5852,12 @@
               <span class="settings-desc">How audio samples are ordered after scanning</span>
             </div>
             <div class="settings-control">
-              <select class="settings-select" id="settingAudioSort" data-action="settingAudioSort" title="Default sort order for audio samples">
-                <option value="name">Name</option>
-                <option value="format">Format</option>
-                <option value="size">Size</option>
-                <option value="modified">Modified Date</option>
-                <option value="directory">Path</option>
+              <select class="settings-select" id="settingAudioSort" data-action="settingAudioSort" title="Default sort order for audio samples" data-i18n-title="ui.tt.default_sort_order_for_audio_samples">
+                <option value="name" data-i18n="ui.opt.name">Name</option>
+                <option value="format" data-i18n="ui.opt.format">Format</option>
+                <option value="size" data-i18n="ui.opt.size">Size</option>
+                <option value="modified" data-i18n="ui.opt.modified_date">Modified Date</option>
+                <option value="directory" data-i18n="ui.opt.path">Path</option>
               </select>
             </div>
           </div>
@@ -5867,13 +5867,13 @@
               <span class="settings-desc">How DAW projects are ordered after scanning</span>
             </div>
             <div class="settings-control">
-              <select class="settings-select" id="settingDawSort" data-action="settingDawSort" title="Default sort order for DAW projects">
-                <option value="name">Name</option>
-                <option value="daw">DAW</option>
-                <option value="format">Format</option>
-                <option value="size">Size</option>
-                <option value="modified">Modified Date</option>
-                <option value="directory">Path</option>
+              <select class="settings-select" id="settingDawSort" data-action="settingDawSort" title="Default sort order for DAW projects" data-i18n-title="ui.tt.default_sort_order_for_daw_projects">
+                <option value="name" data-i18n="ui.opt.name">Name</option>
+                <option value="daw" data-i18n="ui.opt.daw">DAW</option>
+                <option value="format" data-i18n="ui.opt.format">Format</option>
+                <option value="size" data-i18n="ui.opt.size">Size</option>
+                <option value="modified" data-i18n="ui.opt.modified_date">Modified Date</option>
+                <option value="directory" data-i18n="ui.opt.path">Path</option>
               </select>
             </div>
           </div>
@@ -5887,7 +5887,7 @@
               <span class="settings-desc">Reset ALL sizing, positioning, ordering, and layout to factory defaults. Clears tab order, column order/widths, section order, modal positions, player dock, stat bar order, toolbar order, dashboard card order, and all drag-reorder prefs. Requires reload.</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-stop btn-settings-action" data-action="settingResetAllUI" title="Reset every UI layout preference to factory defaults">&#9888; Reset All UI</button>
+              <button class="btn btn-stop btn-settings-action" data-action="settingResetAllUI" title="Reset every UI layout preference to factory defaults" data-i18n-title="ui.tt.reset_every_ui_layout_preference_to_factory_defaul">&#9888; Reset All UI</button>
             </div>
           </div>
           <div class="settings-row">
@@ -5896,7 +5896,7 @@
               <span class="settings-desc">Restore the default tab order (drag tabs to rearrange)</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-secondary btn-settings-action" data-action="settingResetTabOrder" title="Reset tab order to default">Reset</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="settingResetTabOrder" title="Reset tab order to default" data-i18n-title="ui.tt.reset_tab_order_to_default">Reset</button>
             </div>
           </div>
           <div class="settings-row">
@@ -5905,7 +5905,7 @@
               <span class="settings-desc">Restore default settings section order (drag headings to rearrange)</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-secondary btn-settings-action" data-action="settingResetSectionOrder" title="Reset settings section order to default">Reset</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="settingResetSectionOrder" title="Reset settings section order to default" data-i18n-title="ui.tt.reset_settings_section_order_to_default">Reset</button>
             </div>
           </div>
           <div class="settings-row">
@@ -5914,7 +5914,7 @@
               <span class="settings-desc">Clear saved table column sizes and restore defaults</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-secondary btn-settings-action" data-action="settingResetColumns" title="Reset all column widths to default">Reset</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="settingResetColumns" title="Reset all column widths to default" data-i18n-title="ui.tt.reset_all_column_widths_to_default">Reset</button>
             </div>
           </div>
         </div>
@@ -5927,7 +5927,7 @@
               <span class="settings-desc">Remove all plugin, audio, and DAW scan history</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-stop btn-settings-action" data-action="settingClearAllHistory" title="Delete all scan history data">Clear</button>
+              <button class="btn btn-stop btn-settings-action" data-action="settingClearAllHistory" title="Delete all scan history data" data-i18n-title="ui.tt.delete_all_scan_history_data">Clear</button>
             </div>
           </div>
           <div class="settings-row">
@@ -5936,7 +5936,7 @@
               <span class="settings-desc">Remove cached version lookups — next check will re-fetch all</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-stop btn-settings-action" data-action="settingClearKvrCache" title="Clear cached KVR plugin version data">Clear</button>
+              <button class="btn btn-stop btn-settings-action" data-action="settingClearKvrCache" title="Clear cached KVR plugin version data" data-i18n-title="ui.tt.clear_cached_kvr_plugin_version_data">Clear</button>
             </div>
           </div>
         </div>
@@ -5945,8 +5945,8 @@
           <h2 class="settings-heading">&#9776; Database Caches</h2>
           <div id="cacheStatsGrid" style="font-size:11px;margin-bottom:8px;"></div>
           <div style="display:flex;gap:6px;">
-            <button class="btn btn-stop btn-settings-action" data-action="settingClearAnalysisCache" title="Clear all caches at once" style="font-size:10px;">Clear All Caches</button>
-            <button class="btn btn-secondary btn-settings-action" data-action="refreshCacheStats" title="Refresh cache stats" style="font-size:10px;">Refresh</button>
+            <button class="btn btn-stop btn-settings-action" data-action="settingClearAnalysisCache" title="Clear all caches at once" style="font-size:10px;" data-i18n-title="ui.tt.clear_all_caches_at_once">Clear All Caches</button>
+            <button class="btn btn-secondary btn-settings-action" data-action="refreshCacheStats" title="Refresh cache stats" style="font-size:10px;" data-i18n-title="ui.tt.refresh_cache_stats">Refresh</button>
           </div>
         </div>
 
@@ -5958,7 +5958,7 @@
               <span class="settings-desc">Wipe all scan results, history, and KVR cache. Start completely fresh</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-stop btn-settings-action" data-action="resetAllScans" title="Clear all data and return to initial state">Reset All</button>
+              <button class="btn btn-stop btn-settings-action" data-action="resetAllScans" title="Clear all data and return to initial state" data-i18n-title="ui.tt.clear_all_data_and_return_to_initial_state">Reset All</button>
             </div>
           </div>
         </div>
@@ -5971,7 +5971,7 @@
               <span class="settings-desc">Open the preferences TOML file in your default editor</span>
             </div>
             <div class="settings-control" style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-              <button class="btn btn-secondary btn-settings-action" data-action="openPrefsFile" style="flex-shrink: 0;" title="Open preferences file in external editor">Open</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="openPrefsFile" style="flex-shrink: 0;" title="Open preferences file in external editor" data-i18n-title="ui.tt.open_preferences_file_in_external_editor">Open</button>
               <code class="root-path" id="prefsFilePath" style="font-size: 11px; word-break: break-all; overflow-wrap: anywhere; min-width: 0;"></code>
             </div>
           </div>
@@ -5981,7 +5981,7 @@
               <span class="settings-desc">Save all preferences and keyboard shortcuts to a text file</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-secondary btn-settings-action" data-action="exportSettingsPdf" title="Export settings and keybindings to text file">Export</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="exportSettingsPdf" title="Export settings and keybindings to text file" data-i18n-title="ui.tt.export_settings_and_keybindings_to_text_file">Export</button>
             </div>
           </div>
           <div class="settings-row">
@@ -5990,9 +5990,9 @@
               <span class="settings-desc">Save the error/crash log file for debugging</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-secondary btn-settings-action" data-action="exportLogPdf" title="Export application error log">Export</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="openLogFile" title="Open log file in default text editor" style="margin-left:6px;">Open</button>
-              <button class="btn btn-stop btn-settings-action" data-action="clearAppLog" title="Clear the log file" style="margin-left:6px;">Clear</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="exportLogPdf" title="Export application error log" data-i18n-title="ui.tt.export_application_error_log">Export</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="openLogFile" title="Open log file in default text editor" style="margin-left:6px;" data-i18n-title="ui.tt.open_log_file_in_default_text_editor">Open</button>
+              <button class="btn btn-stop btn-settings-action" data-action="clearAppLog" title="Clear the log file" style="margin-left:6px;" data-i18n-title="ui.tt.clear_the_log_file">Clear</button>
             </div>
           </div>
           <div class="settings-row">
@@ -6001,7 +6001,7 @@
               <span class="settings-desc">Open the app's preferences, database, and log directory in Finder</span>
             </div>
             <div class="settings-control">
-              <button class="btn btn-secondary btn-settings-action" data-action="openDataDir" title="Open data directory in Finder">Open in Finder</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="openDataDir" title="Open data directory in Finder" data-i18n-title="ui.tt.open_data_directory_in_finder">Open in Finder</button>
             </div>
           </div>
         </div>
@@ -6013,7 +6013,7 @@
               <span class="settings-title">AUDIO_HAXOR</span>
               <span class="settings-desc">
                 Version <span id="settingsVersion"></span> &middot; by MenkeTechnologies &middot;
-                <a href="#" data-action="openUpdate" data-url="https://github.com/MenkeTechnologies/universal-plugin-update-manager" style="color: var(--cyan); text-decoration: none;" title="Open AUDIO_HAXOR GitHub repository in browser">&#128279; GitHub</a>
+                <a href="#" data-action="openUpdate" data-url="https://github.com/MenkeTechnologies/universal-plugin-update-manager" style="color: var(--cyan); text-decoration: none;" title="Open AUDIO_HAXOR GitHub repository in browser" data-i18n-title="ui.tt.open_audio_haxor_github_repository_in_browser">&#128279; GitHub</a>
               </span>
             </div>
           </div>
@@ -6030,39 +6030,40 @@
     </div>
   </div>
 
-  <script src="js/ipc.js?v=7132"></script>
-  <script src="js/utils.js?v=7132"></script>
-  <script src="js/drag-reorder.js?v=7132"></script>
-  <script src="js/modal-drag.js?v=7132"></script>
-  <script src="js/columns.js?v=7132"></script>
-  <script src="js/notes.js?v=7132"></script>
-  <script src="js/favorites.js?v=7132"></script>
-  <script src="js/export.js?v=7132"></script>
-  <script src="js/plugins.js?v=7132"></script>
-  <script src="js/settings.js?v=7132"></script>
-  <script src="js/history.js?v=7132"></script>
-  <script src="js/kvr.js?v=7132"></script>
-  <script src="js/audio.js?v=7132"></script>
-  <script src="js/daw.js?v=7132"></script>
-  <script src="js/presets.js?v=7132"></script>
-  <script src="js/disk-usage.js?v=7132"></script>
-  <script src="js/batch-select.js?v=7132"></script>
-  <script src="js/sort-persist.js?v=7132"></script>
-  <script src="js/multi-filter.js?v=7132"></script>
-  <script src="js/file-browser.js?v=7132"></script>
-  <script src="js/duplicates.js?v=7132"></script>
-  <script src="js/command-palette.js?v=7132"></script>
-  <script src="js/xref.js?v=7132"></script>
-  <script src="js/dep-graph.js?v=7132"></script>
-  <script src="js/smart-playlists.js?v=7132"></script>
-  <script src="js/heatmap-dashboard.js?v=7132"></script>
-  <script src="js/midi.js?v=7132"></script>
-  <script src="js/visualizer.js?v=7132"></script>
-  <script src="js/walker-status.js?v=7132"></script>
-  <script src="js/context-menu.js?v=7132"></script>
-  <script src="js/help-overlay.js?v=7132"></script>
-  <script src="js/shortcuts.js?v=7132"></script>
-  <script src="js/keyboard-nav.js?v=7132"></script>
-  <script src="js/app.js?v=7132"></script>
+  <script src="js/i18n-ui.js?v=7133"></script>
+  <script src="js/ipc.js?v=7133"></script>
+  <script src="js/utils.js?v=7133"></script>
+  <script src="js/drag-reorder.js?v=7133"></script>
+  <script src="js/modal-drag.js?v=7133"></script>
+  <script src="js/columns.js?v=7133"></script>
+  <script src="js/notes.js?v=7133"></script>
+  <script src="js/favorites.js?v=7133"></script>
+  <script src="js/export.js?v=7133"></script>
+  <script src="js/plugins.js?v=7133"></script>
+  <script src="js/settings.js?v=7133"></script>
+  <script src="js/history.js?v=7133"></script>
+  <script src="js/kvr.js?v=7133"></script>
+  <script src="js/audio.js?v=7133"></script>
+  <script src="js/daw.js?v=7133"></script>
+  <script src="js/presets.js?v=7133"></script>
+  <script src="js/disk-usage.js?v=7133"></script>
+  <script src="js/batch-select.js?v=7133"></script>
+  <script src="js/sort-persist.js?v=7133"></script>
+  <script src="js/multi-filter.js?v=7133"></script>
+  <script src="js/file-browser.js?v=7133"></script>
+  <script src="js/duplicates.js?v=7133"></script>
+  <script src="js/command-palette.js?v=7133"></script>
+  <script src="js/xref.js?v=7133"></script>
+  <script src="js/dep-graph.js?v=7133"></script>
+  <script src="js/smart-playlists.js?v=7133"></script>
+  <script src="js/heatmap-dashboard.js?v=7133"></script>
+  <script src="js/midi.js?v=7133"></script>
+  <script src="js/visualizer.js?v=7133"></script>
+  <script src="js/walker-status.js?v=7133"></script>
+  <script src="js/context-menu.js?v=7133"></script>
+  <script src="js/help-overlay.js?v=7133"></script>
+  <script src="js/shortcuts.js?v=7133"></script>
+  <script src="js/keyboard-nav.js?v=7133"></script>
+  <script src="js/app.js?v=7133"></script>
 </body>
 </html>

@@ -283,10 +283,15 @@ impl Database {
         let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
     }
 
-    /// Resolved toast strings for the given locale (merged with English fallback).
-    pub fn get_toast_strings(&self, locale: &str) -> Result<HashMap<String, String>, String> {
+    /// Resolved app UI strings for the given locale (merged with English fallback).
+    pub fn get_app_strings(&self, locale: &str) -> Result<HashMap<String, String>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        crate::toast_i18n::load_merged(&conn, locale)
+        crate::app_i18n::load_merged(&conn, locale)
+    }
+
+    /// Alias for [`Self::get_app_strings`] (legacy command name).
+    pub fn get_toast_strings(&self, locale: &str) -> Result<HashMap<String, String>, String> {
+        self.get_app_strings(locale)
     }
 
     /// VACUUM if >20% of pages are free (dead space from deleted rows).
@@ -528,15 +533,38 @@ impl Database {
             .map_err(|e| format!("Migration v4 failed: {e}"))?;
         }
 
+        if current < 5 {
+            let has_toast: bool = conn
+                .query_row(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='toast_i18n'",
+                    [],
+                    |_| Ok(()),
+                )
+                .is_ok();
+            if has_toast {
+                conn.execute_batch(
+                    "ALTER TABLE toast_i18n RENAME TO app_i18n;
+                     DROP INDEX IF EXISTS idx_toast_i18n_locale;
+                     CREATE INDEX IF NOT EXISTS idx_app_i18n_locale ON app_i18n(locale);",
+                )
+                .map_err(|e| format!("Migration v5 failed: {e}"))?;
+            }
+            conn.execute(
+                "INSERT INTO schema_version (version) VALUES (5)",
+                [],
+            )
+            .map_err(|e| format!("Migration v5 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='toast_i18n'",
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
                 [],
                 |_| Ok(()),
             )
             .is_ok()
         {
-            crate::toast_i18n::seed_defaults(&conn)?;
+            crate::app_i18n::seed_defaults(&conn)?;
         }
 
         Ok(())

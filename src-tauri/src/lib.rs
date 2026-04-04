@@ -26,7 +26,7 @@ pub mod midi;
 pub mod preset_scanner;
 pub mod scanner;
 pub mod similarity;
-pub mod toast_i18n;
+pub mod app_i18n;
 pub mod xref;
 
 /// Shared utility: format bytes to human-readable string.
@@ -4192,15 +4192,23 @@ fn db_clear_cache_table(table: String) -> Result<(), String> {
     db::global().clear_cache_table(&table)
 }
 
-#[tauri::command]
-fn get_toast_strings(locale: Option<String>) -> Result<std::collections::HashMap<String, String>, String> {
-    let loc = locale.unwrap_or_else(|| {
+fn resolve_ui_locale(locale: Option<String>) -> String {
+    locale.unwrap_or_else(|| {
         history::load_preferences()
             .get("uiLocale")
             .and_then(|v| v.as_str().map(|s| s.to_string()))
             .unwrap_or_else(|| "en".to_string())
-    });
-    db::global().get_toast_strings(&loc)
+    })
+}
+
+#[tauri::command]
+fn get_app_strings(locale: Option<String>) -> Result<std::collections::HashMap<String, String>, String> {
+    db::global().get_app_strings(&resolve_ui_locale(locale))
+}
+
+#[tauri::command]
+fn get_toast_strings(locale: Option<String>) -> Result<std::collections::HashMap<String, String>, String> {
+    get_app_strings(locale)
 }
 
 // ── File watcher commands ──
@@ -4547,6 +4555,7 @@ pub fn run() {
             db_cache_stats,
             db_clear_caches,
             db_clear_cache_table,
+            get_app_strings,
             get_toast_strings,
             start_file_watcher,
             stop_file_watcher,
@@ -4577,14 +4586,30 @@ pub fn run() {
             use tauri::menu::*;
 
             let handle = app.handle();
+            let ui_locale = prefs
+                .get("uiLocale")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| "en".to_string());
+            let strings = db::global()
+                .get_app_strings(&ui_locale)
+                .unwrap_or_default();
+            let t = |key: &str, fallback: &str| -> String {
+                strings
+                    .get(key)
+                    .map(|s| s.as_str())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(fallback)
+                    .to_string()
+            };
 
             // App menu (macOS convention — first menu shows app name)
-            let app_about = PredefinedMenuItem::about(handle, Some("About AUDIO_HAXOR"), None)?;
+            let about_title = t("menu.about", "About AUDIO_HAXOR");
+            let app_about = PredefinedMenuItem::about(handle, Some(about_title.as_str()), None)?;
             let app_sep1 = PredefinedMenuItem::separator(handle)?;
             let app_prefs = MenuItem::with_id(
                 handle,
                 "open_prefs_app",
-                "Preferences...",
+                t("menu.preferences", "Preferences..."),
                 true,
                 Some("CmdOrCtrl+,"),
             )?;
@@ -4600,7 +4625,7 @@ pub fn run() {
             let app_menu = Submenu::with_id_and_items(
                 handle,
                 "app",
-                "AUDIO_HAXOR",
+                t("menu.app", "AUDIO_HAXOR"),
                 true,
                 &[
                     &app_about,
@@ -4621,24 +4646,24 @@ pub fn run() {
             let scan_all = MenuItem::with_id(
                 handle,
                 "scan_all",
-                "Scan All",
+                t("menu.scan_all", "Scan All"),
                 true,
                 Some("CmdOrCtrl+Shift+S"),
             )?;
             let stop_all =
-                MenuItem::with_id(handle, "stop_all", "Stop All", true, Some("CmdOrCtrl+."))?;
+                MenuItem::with_id(handle, "stop_all", t("menu.stop_all", "Stop All"), true, Some("CmdOrCtrl+."))?;
             let sep1 = PredefinedMenuItem::separator(handle)?;
             let export_plugins = MenuItem::with_id(
                 handle,
                 "export_plugins",
-                "Export Plugins...",
+                t("menu.export_plugins", "Export Plugins..."),
                 true,
                 Some("CmdOrCtrl+E"),
             )?;
             let import_plugins = MenuItem::with_id(
                 handle,
                 "import_plugins",
-                "Import Plugins...",
+                t("menu.import_plugins", "Import Plugins..."),
                 true,
                 Some("CmdOrCtrl+I"),
             )?;
@@ -4646,14 +4671,14 @@ pub fn run() {
             let export_audio = MenuItem::with_id(
                 handle,
                 "export_audio",
-                "Export Samples...",
+                t("menu.export_samples", "Export Samples..."),
                 true,
                 None::<&str>,
             )?;
             let import_audio = MenuItem::with_id(
                 handle,
                 "import_audio",
-                "Import Samples...",
+                t("menu.import_samples", "Import Samples..."),
                 true,
                 None::<&str>,
             )?;
@@ -4661,14 +4686,14 @@ pub fn run() {
             let export_daw = MenuItem::with_id(
                 handle,
                 "export_daw",
-                "Export DAW Projects...",
+                t("menu.export_daw", "Export DAW Projects..."),
                 true,
                 None::<&str>,
             )?;
             let import_daw = MenuItem::with_id(
                 handle,
                 "import_daw",
-                "Import DAW Projects...",
+                t("menu.import_daw", "Import DAW Projects..."),
                 true,
                 None::<&str>,
             )?;
@@ -4676,21 +4701,21 @@ pub fn run() {
             let export_presets = MenuItem::with_id(
                 handle,
                 "export_presets",
-                "Export Presets...",
+                t("menu.export_presets", "Export Presets..."),
                 true,
                 None::<&str>,
             )?;
             let import_presets = MenuItem::with_id(
                 handle,
                 "import_presets",
-                "Import Presets...",
+                t("menu.import_presets", "Import Presets..."),
                 true,
                 None::<&str>,
             )?;
             let file_menu = Submenu::with_id_and_items(
                 handle,
                 "file",
-                "File",
+                t("menu.file", "File"),
                 true,
                 &[
                     &scan_all,
@@ -4719,12 +4744,12 @@ pub fn run() {
             let edit_paste = PredefinedMenuItem::paste(handle, None)?;
             let edit_select_all = PredefinedMenuItem::select_all(handle, None)?;
             let edit_sep2 = PredefinedMenuItem::separator(handle)?;
-            let find = MenuItem::with_id(handle, "find", "Find...", true, Some("CmdOrCtrl+F"))?;
+            let find = MenuItem::with_id(handle, "find", t("menu.find", "Find..."), true, Some("CmdOrCtrl+F"))?;
 
             let edit_menu = Submenu::with_id_and_items(
                 handle,
                 "edit",
-                "Edit",
+                t("menu.edit", "Edit"),
                 true,
                 &[
                     &edit_undo,
@@ -4743,28 +4768,28 @@ pub fn run() {
             let scan_plugins = MenuItem::with_id(
                 handle,
                 "scan_plugins",
-                "Scan Plugins",
+                t("menu.scan_plugins", "Scan Plugins"),
                 true,
                 Some("CmdOrCtrl+Shift+P"),
             )?;
             let scan_audio = MenuItem::with_id(
                 handle,
                 "scan_audio",
-                "Scan Samples",
+                t("menu.scan_samples", "Scan Samples"),
                 true,
                 Some("CmdOrCtrl+Shift+A"),
             )?;
             let scan_daw = MenuItem::with_id(
                 handle,
                 "scan_daw",
-                "Scan DAW Projects",
+                t("menu.scan_daw", "Scan DAW Projects"),
                 true,
                 Some("CmdOrCtrl+Shift+D"),
             )?;
             let scan_presets = MenuItem::with_id(
                 handle,
                 "scan_presets",
-                "Scan Presets",
+                t("menu.scan_presets", "Scan Presets"),
                 true,
                 Some("CmdOrCtrl+Shift+R"),
             )?;
@@ -4772,7 +4797,7 @@ pub fn run() {
             let check_updates = MenuItem::with_id(
                 handle,
                 "check_updates",
-                "Check Updates",
+                t("menu.check_updates", "Check Updates"),
                 true,
                 Some("CmdOrCtrl+U"),
             )?;
@@ -4780,7 +4805,7 @@ pub fn run() {
             let scan_menu = Submenu::with_id_and_items(
                 handle,
                 "scan",
-                "Scan",
+                t("menu.scan", "Scan"),
                 true,
                 &[
                     &scan_plugins,
@@ -4794,45 +4819,45 @@ pub fn run() {
 
             // View menu
             let tab_plugins =
-                MenuItem::with_id(handle, "tab_plugins", "Plugins", true, Some("CmdOrCtrl+1"))?;
+                MenuItem::with_id(handle, "tab_plugins", t("menu.tab_plugins", "Plugins"), true, Some("CmdOrCtrl+1"))?;
             let tab_samples =
-                MenuItem::with_id(handle, "tab_samples", "Samples", true, Some("CmdOrCtrl+2"))?;
+                MenuItem::with_id(handle, "tab_samples", t("menu.tab_samples", "Samples"), true, Some("CmdOrCtrl+2"))?;
             let tab_daw =
-                MenuItem::with_id(handle, "tab_daw", "DAW Projects", true, Some("CmdOrCtrl+3"))?;
+                MenuItem::with_id(handle, "tab_daw", t("menu.tab_daw", "DAW Projects"), true, Some("CmdOrCtrl+3"))?;
             let tab_presets =
-                MenuItem::with_id(handle, "tab_presets", "Presets", true, Some("CmdOrCtrl+4"))?;
+                MenuItem::with_id(handle, "tab_presets", t("menu.tab_presets", "Presets"), true, Some("CmdOrCtrl+4"))?;
             let tab_favorites = MenuItem::with_id(
                 handle,
                 "tab_favorites",
-                "Favorites",
+                t("menu.tab_favorites", "Favorites"),
                 true,
                 Some("CmdOrCtrl+5"),
             )?;
             let tab_notes =
-                MenuItem::with_id(handle, "tab_notes", "Notes", true, Some("CmdOrCtrl+6"))?;
+                MenuItem::with_id(handle, "tab_notes", t("menu.tab_notes", "Notes"), true, Some("CmdOrCtrl+6"))?;
             let tab_history =
-                MenuItem::with_id(handle, "tab_history", "History", true, Some("CmdOrCtrl+7"))?;
+                MenuItem::with_id(handle, "tab_history", t("menu.tab_history", "History"), true, Some("CmdOrCtrl+7"))?;
             let tab_settings = MenuItem::with_id(
                 handle,
                 "tab_settings",
-                "Settings",
+                t("menu.tab_settings", "Settings"),
                 true,
                 Some("CmdOrCtrl+8"),
             )?;
             let tab_files =
-                MenuItem::with_id(handle, "tab_files", "Files", true, Some("CmdOrCtrl+9"))?;
+                MenuItem::with_id(handle, "tab_files", t("menu.tab_files", "Files"), true, Some("CmdOrCtrl+9"))?;
             let view_sep = PredefinedMenuItem::separator(handle)?;
             let toggle_theme = MenuItem::with_id(
                 handle,
                 "toggle_theme",
-                "Toggle Light/Dark",
+                t("menu.toggle_theme", "Toggle Light/Dark"),
                 true,
                 Some("CmdOrCtrl+T"),
             )?;
             let toggle_crt = MenuItem::with_id(
                 handle,
                 "toggle_crt",
-                "Toggle CRT Effects",
+                t("menu.toggle_crt", "Toggle CRT Effects"),
                 true,
                 None::<&str>,
             )?;
@@ -4840,17 +4865,17 @@ pub fn run() {
             let reset_columns = MenuItem::with_id(
                 handle,
                 "reset_columns",
-                "Reset Column Widths",
+                t("menu.reset_columns", "Reset Column Widths"),
                 true,
                 None::<&str>,
             )?;
             let reset_tabs =
-                MenuItem::with_id(handle, "reset_tabs", "Reset Tab Order", true, None::<&str>)?;
+                MenuItem::with_id(handle, "reset_tabs", t("menu.reset_tabs", "Reset Tab Order"), true, None::<&str>)?;
 
             let view_menu = Submenu::with_id_and_items(
                 handle,
                 "view",
-                "View",
+                t("menu.view", "View"),
                 true,
                 &[
                     &tab_plugins,
@@ -4873,25 +4898,25 @@ pub fn run() {
 
             // Playback menu
             let play_pause =
-                MenuItem::with_id(handle, "play_pause", "Play / Pause", true, Some("Space"))?;
+                MenuItem::with_id(handle, "play_pause", t("menu.play_pause", "Play / Pause"), true, Some("Space"))?;
             let toggle_loop = MenuItem::with_id(
                 handle,
                 "toggle_loop",
-                "Toggle Loop",
+                t("menu.toggle_loop", "Toggle Loop"),
                 true,
                 Some("CmdOrCtrl+L"),
             )?;
             let stop_playback = MenuItem::with_id(
                 handle,
                 "stop_playback",
-                "Stop Playback",
+                t("menu.stop_playback", "Stop Playback"),
                 true,
                 Some("CmdOrCtrl+Shift+."),
             )?;
             let expand_player = MenuItem::with_id(
                 handle,
                 "expand_player",
-                "Expand / Collapse Player",
+                t("menu.expand_player", "Expand / Collapse Player"),
                 true,
                 Some("CmdOrCtrl+Shift+M"),
             )?;
@@ -4899,32 +4924,32 @@ pub fn run() {
             let next_track = MenuItem::with_id(
                 handle,
                 "next_track",
-                "Next Track",
+                t("menu.next_track", "Next Track"),
                 true,
                 Some("CmdOrCtrl+Right"),
             )?;
             let prev_track = MenuItem::with_id(
                 handle,
                 "prev_track",
-                "Previous Track",
+                t("menu.prev_track", "Previous Track"),
                 true,
                 Some("CmdOrCtrl+Left"),
             )?;
             let toggle_shuffle = MenuItem::with_id(
                 handle,
                 "toggle_shuffle",
-                "Toggle Shuffle",
+                t("menu.toggle_shuffle", "Toggle Shuffle"),
                 true,
                 None::<&str>,
             )?;
             let toggle_mute =
-                MenuItem::with_id(handle, "toggle_mute", "Mute / Unmute", true, None::<&str>)?;
+                MenuItem::with_id(handle, "toggle_mute", t("menu.toggle_mute", "Mute / Unmute"), true, None::<&str>)?;
             let playback_sep = PredefinedMenuItem::separator(handle)?;
 
             let playback_menu = Submenu::with_id_and_items(
                 handle,
                 "playback",
-                "Playback",
+                t("menu.playback", "Playback"),
                 true,
                 &[
                     &play_pause,
@@ -4944,21 +4969,21 @@ pub fn run() {
             let clear_history = MenuItem::with_id(
                 handle,
                 "clear_history",
-                "Clear All History...",
+                t("menu.clear_history", "Clear All History..."),
                 true,
                 Some("CmdOrCtrl+Shift+Delete"),
             )?;
             let clear_kvr = MenuItem::with_id(
                 handle,
                 "clear_kvr",
-                "Clear KVR Cache...",
+                t("menu.clear_kvr", "Clear KVR Cache..."),
                 true,
                 None::<&str>,
             )?;
             let clear_favorites = MenuItem::with_id(
                 handle,
                 "clear_favorites",
-                "Clear Favorites...",
+                t("menu.clear_favorites", "Clear Favorites..."),
                 true,
                 None::<&str>,
             )?;
@@ -4966,7 +4991,7 @@ pub fn run() {
             let reset_all = MenuItem::with_id(
                 handle,
                 "reset_all",
-                "Reset All Scans...",
+                t("menu.reset_all_scans", "Reset All Scans..."),
                 true,
                 Some("CmdOrCtrl+Shift+Backspace"),
             )?;
@@ -4974,28 +4999,28 @@ pub fn run() {
             let find_duplicates = MenuItem::with_id(
                 handle,
                 "find_duplicates",
-                "Find Duplicates",
+                t("menu.find_duplicates", "Find Duplicates"),
                 true,
                 Some("CmdOrCtrl+D"),
             )?;
             let dep_graph = MenuItem::with_id(
                 handle,
                 "dep_graph",
-                "Dependency Graph",
+                t("menu.dep_graph", "Dependency Graph"),
                 true,
                 Some("CmdOrCtrl+G"),
             )?;
             let cmd_palette = MenuItem::with_id(
                 handle,
                 "cmd_palette",
-                "Command Palette",
+                t("menu.cmd_palette", "Command Palette"),
                 true,
                 Some("CmdOrCtrl+K"),
             )?;
             let help_overlay = MenuItem::with_id(
                 handle,
                 "help_overlay",
-                "Keyboard Shortcuts",
+                t("menu.help_overlay", "Keyboard Shortcuts"),
                 true,
                 None::<&str>,
             )?;
@@ -5003,7 +5028,7 @@ pub fn run() {
             let data_menu = Submenu::with_id_and_items(
                 handle,
                 "data",
-                "Data",
+                t("menu.data", "Data"),
                 true,
                 &[
                     &clear_history,
@@ -5017,7 +5042,7 @@ pub fn run() {
             let tools_menu = Submenu::with_id_and_items(
                 handle,
                 "tools",
-                "Tools",
+                t("menu.tools", "Tools"),
                 true,
                 &[
                     &find_duplicates,
@@ -5037,18 +5062,18 @@ pub fn run() {
             let window_menu = Submenu::with_id_and_items(
                 handle,
                 "window",
-                "Window",
+                t("menu.window", "Window"),
                 true,
                 &[&minimize, &zoom, &win_sep, &close_win],
             )?;
 
             // Help menu
             let github =
-                MenuItem::with_id(handle, "github", "GitHub Repository", true, None::<&str>)?;
-            let docs = MenuItem::with_id(handle, "docs", "Documentation", true, None::<&str>)?;
+                MenuItem::with_id(handle, "github", t("menu.github", "GitHub Repository"), true, None::<&str>)?;
+            let docs = MenuItem::with_id(handle, "docs", t("menu.docs", "Documentation"), true, None::<&str>)?;
 
             let help_menu =
-                Submenu::with_id_and_items(handle, "help", "Help", true, &[&github, &docs])?;
+                Submenu::with_id_and_items(handle, "help", t("menu.help", "Help"), true, &[&github, &docs])?;
 
             let menu = Menu::with_items(
                 handle,
@@ -5079,20 +5104,20 @@ pub fn run() {
             // System tray
             use tauri::tray::*;
             let tray_menu = MenuBuilder::new(app)
-                .text("tray_show", "Show AUDIO_HAXOR")
+                .text("tray_show", t("tray.show", "Show AUDIO_HAXOR"))
                 .separator()
-                .text("tray_scan_all", "Scan All")
-                .text("tray_stop_all", "Stop All")
+                .text("tray_scan_all", t("tray.scan_all", "Scan All"))
+                .text("tray_stop_all", t("tray.stop_all", "Stop All"))
                 .separator()
-                .text("tray_play_pause", "Play / Pause")
-                .text("tray_next", "Next Track")
+                .text("tray_play_pause", t("tray.play_pause", "Play / Pause"))
+                .text("tray_next", t("tray.next_track", "Next Track"))
                 .separator()
-                .text("tray_quit", "Quit")
+                .text("tray_quit", t("tray.quit", "Quit"))
                 .build()?;
 
             let _tray = TrayIconBuilder::new()
                 .menu(&tray_menu)
-                .tooltip("AUDIO_HAXOR")
+                .tooltip(t("tray.tooltip", "AUDIO_HAXOR"))
                 .on_menu_event(move |app_handle, event| {
                     let id = event.id().as_ref();
                     if id == "tray_quit" {

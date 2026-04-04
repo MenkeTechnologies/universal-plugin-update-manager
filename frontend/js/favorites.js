@@ -96,7 +96,7 @@ async function importFavorites() {
 }
 
 function clearFavorites() {
-  if (!confirm('Remove all favorites?')) return;
+  if (!confirm(appFmt('confirm.remove_all_favorites'))) return;
   saveFavorites([]);
   showToast(toastFmt('toast.all_favorites_cleared'));
   renderFavorites();

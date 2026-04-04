@@ -5,84 +5,86 @@ function toggleHelpOverlay() {
   let existing = document.getElementById('helpOverlay');
   if (existing) { existing.remove(); return; }
 
+  const h = (key) => (typeof appFmt === 'function' ? appFmt(key) : key);
+
   const html = `<div class="modal-overlay" id="helpOverlay" data-action-modal="closeHelp">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Keyboard Shortcuts</h2>
-        <button class="modal-close" data-action-modal="closeHelp" title="Close">&#10005;</button>
+        <h2>${h('help.title')}</h2>
+        <button class="modal-close" data-action-modal="closeHelp" title="${h('help.close')}">&#10005;</button>
       </div>
       <div class="modal-body">
         <div class="help-grid">
           <div class="help-section">
-            <h3>Navigation</h3>
-            <div class="help-row"><kbd>&#8984;1</kbd>-<kbd>&#8984;8</kbd> <span>Switch tabs</span></div>
-            <div class="help-row"><kbd>&#8984;K</kbd> <span>Command palette</span></div>
-            <div class="help-row"><kbd>&#8984;F</kbd> <span>Focus search</span></div>
-            <div class="help-row"><kbd>j</kbd> / <kbd>&#8595;</kbd> <span>Next item</span></div>
-            <div class="help-row"><kbd>k</kbd> / <kbd>&#8593;</kbd> <span>Previous item</span></div>
-            <div class="help-row"><kbd>gg</kbd> <span>First item</span></div>
-            <div class="help-row"><kbd>G</kbd> <span>Last item</span></div>
-            <div class="help-row"><kbd>Ctrl+D</kbd> <span>Half-page down</span></div>
-            <div class="help-row"><kbd>Ctrl+U</kbd> <span>Half-page up</span></div>
-            <div class="help-row"><kbd>/</kbd> <span>Focus search</span></div>
-            <div class="help-row"><kbd>Enter</kbd> <span>Open / activate item</span></div>
-            <div class="help-row"><kbd>o</kbd> <span>Reveal in Finder</span></div>
-            <div class="help-row"><kbd>y</kbd> <span>Yank (copy path)</span></div>
-            <div class="help-row"><kbd>p</kbd> <span>Play / preview</span></div>
-            <div class="help-row"><kbd>x</kbd> <span>Toggle favorite</span></div>
-            <div class="help-row"><kbd>v</kbd> <span>Toggle select</span></div>
-            <div class="help-row"><kbd>V</kbd> <span>Select all</span></div>
+            <h3>${h('help.section.navigation')}</h3>
+            <div class="help-row"><kbd>&#8984;1</kbd>-<kbd>&#8984;8</kbd> <span>${h('help.nav.switch_tabs')}</span></div>
+            <div class="help-row"><kbd>&#8984;K</kbd> <span>${h('help.nav.cmd_palette')}</span></div>
+            <div class="help-row"><kbd>&#8984;F</kbd> <span>${h('help.nav.focus_search')}</span></div>
+            <div class="help-row"><kbd>j</kbd> / <kbd>&#8595;</kbd> <span>${h('help.nav.next_item')}</span></div>
+            <div class="help-row"><kbd>k</kbd> / <kbd>&#8593;</kbd> <span>${h('help.nav.prev_item')}</span></div>
+            <div class="help-row"><kbd>gg</kbd> <span>${h('help.nav.first_item')}</span></div>
+            <div class="help-row"><kbd>G</kbd> <span>${h('help.nav.last_item')}</span></div>
+            <div class="help-row"><kbd>Ctrl+D</kbd> <span>${h('help.nav.half_down')}</span></div>
+            <div class="help-row"><kbd>Ctrl+U</kbd> <span>${h('help.nav.half_up')}</span></div>
+            <div class="help-row"><kbd>/</kbd> <span>${h('help.nav.focus_search_slash')}</span></div>
+            <div class="help-row"><kbd>Enter</kbd> <span>${h('help.nav.open_activate')}</span></div>
+            <div class="help-row"><kbd>o</kbd> <span>${h('help.nav.reveal_finder')}</span></div>
+            <div class="help-row"><kbd>y</kbd> <span>${h('help.nav.yank')}</span></div>
+            <div class="help-row"><kbd>p</kbd> <span>${h('help.nav.play_preview')}</span></div>
+            <div class="help-row"><kbd>x</kbd> <span>${h('help.nav.toggle_fav')}</span></div>
+            <div class="help-row"><kbd>v</kbd> <span>${h('help.nav.toggle_select')}</span></div>
+            <div class="help-row"><kbd>V</kbd> <span>${h('help.nav.select_all')}</span></div>
           </div>
           <div class="help-section">
-            <h3>Playback</h3>
-            <div class="help-row"><kbd>Space</kbd> <span>Play / pause</span></div>
-            <div class="help-row"><kbd>&#8984;&#8594;</kbd> <span>Next track</span></div>
-            <div class="help-row"><kbd>&#8984;&#8592;</kbd> <span>Previous track</span></div>
-            <div class="help-row"><kbd>L</kbd> <span>Toggle loop</span></div>
-            <div class="help-row"><kbd>M</kbd> <span>Mute / unmute</span></div>
-            <div class="help-row"><kbd>&#8984;&#8593;</kbd> <span>Volume up</span></div>
-            <div class="help-row"><kbd>&#8984;&#8595;</kbd> <span>Volume down</span></div>
+            <h3>${h('help.section.playback')}</h3>
+            <div class="help-row"><kbd>Space</kbd> <span>${h('help.play.pause')}</span></div>
+            <div class="help-row"><kbd>&#8984;&#8594;</kbd> <span>${h('help.play.next')}</span></div>
+            <div class="help-row"><kbd>&#8984;&#8592;</kbd> <span>${h('help.play.prev')}</span></div>
+            <div class="help-row"><kbd>L</kbd> <span>${h('help.play.loop')}</span></div>
+            <div class="help-row"><kbd>M</kbd> <span>${h('help.play.mute')}</span></div>
+            <div class="help-row"><kbd>&#8984;&#8593;</kbd> <span>${h('help.play.vol_up')}</span></div>
+            <div class="help-row"><kbd>&#8984;&#8595;</kbd> <span>${h('help.play.vol_down')}</span></div>
           </div>
           <div class="help-section">
-            <h3>Actions</h3>
-            <div class="help-row"><kbd>&#8984;S</kbd> <span>Scan all</span></div>
-            <div class="help-row"><kbd>&#8984;.</kbd> <span>Stop all scans</span></div>
-            <div class="help-row"><kbd>&#8984;A</kbd> <span>Select all visible</span></div>
-            <div class="help-row"><kbd>&#8984;E</kbd> <span>Export current tab</span></div>
-            <div class="help-row"><kbd>&#8984;I</kbd> <span>Import to current tab</span></div>
-            <div class="help-row"><kbd>&#8984;D</kbd> <span>Find duplicates</span></div>
-            <div class="help-row"><kbd>&#8984;G</kbd> <span>Dependency graph</span></div>
-            <div class="help-row"><kbd>&#8984;T</kbd> <span>Toggle theme</span></div>
-            <div class="help-row"><kbd>&#8984;,</kbd> <span>Open preferences file</span></div>
-            <div class="help-row"><kbd>&#8984;]</kbd> <span>Next tab</span></div>
-            <div class="help-row"><kbd>&#8984;[</kbd> <span>Previous tab</span></div>
-            <div class="help-row"><kbd>R</kbd> <span>Reveal in Finder</span></div>
-            <div class="help-row"><kbd>C</kbd> <span>Copy path</span></div>
-            <div class="help-row"><kbd>F</kbd> <span>Toggle favorite</span></div>
-            <div class="help-row"><kbd>N</kbd> <span>Add note</span></div>
-            <div class="help-row"><kbd>S</kbd> <span>Toggle shuffle</span></div>
-            <div class="help-row"><kbd>W</kbd> <span>Find similar samples</span></div>
-            <div class="help-row"><kbd>Del</kbd> <span>Delete selected</span></div>
-            <div class="help-row"><kbd>Esc</kbd> <span>Close / clear / stop</span></div>
-            <div class="help-row"><kbd>?</kbd> <span>Toggle this help</span></div>
+            <h3>${h('help.section.actions')}</h3>
+            <div class="help-row"><kbd>&#8984;S</kbd> <span>${h('help.act.scan_all')}</span></div>
+            <div class="help-row"><kbd>&#8984;.</kbd> <span>${h('help.act.stop_scans')}</span></div>
+            <div class="help-row"><kbd>&#8984;A</kbd> <span>${h('help.act.select_visible')}</span></div>
+            <div class="help-row"><kbd>&#8984;E</kbd> <span>${h('help.act.export_tab')}</span></div>
+            <div class="help-row"><kbd>&#8984;I</kbd> <span>${h('help.act.import_tab')}</span></div>
+            <div class="help-row"><kbd>&#8984;D</kbd> <span>${h('help.act.dupes')}</span></div>
+            <div class="help-row"><kbd>&#8984;G</kbd> <span>${h('help.act.deps')}</span></div>
+            <div class="help-row"><kbd>&#8984;T</kbd> <span>${h('help.act.theme')}</span></div>
+            <div class="help-row"><kbd>&#8984;,</kbd> <span>${h('help.act.prefs_file')}</span></div>
+            <div class="help-row"><kbd>&#8984;]</kbd> <span>${h('help.act.next_tab')}</span></div>
+            <div class="help-row"><kbd>&#8984;[</kbd> <span>${h('help.act.prev_tab')}</span></div>
+            <div class="help-row"><kbd>R</kbd> <span>${h('help.act.reveal')}</span></div>
+            <div class="help-row"><kbd>C</kbd> <span>${h('help.act.copy_path')}</span></div>
+            <div class="help-row"><kbd>F</kbd> <span>${h('help.act.toggle_fav')}</span></div>
+            <div class="help-row"><kbd>N</kbd> <span>${h('help.act.add_note')}</span></div>
+            <div class="help-row"><kbd>S</kbd> <span>${h('help.act.shuffle')}</span></div>
+            <div class="help-row"><kbd>W</kbd> <span>${h('help.act.similar')}</span></div>
+            <div class="help-row"><kbd>Del</kbd> <span>${h('help.act.delete')}</span></div>
+            <div class="help-row"><kbd>Esc</kbd> <span>${h('help.act.esc')}</span></div>
+            <div class="help-row"><kbd>?</kbd> <span>${h('help.act.toggle_help')}</span></div>
           </div>
           <div class="help-section">
-            <h3>Search Operators (fzf)</h3>
-            <div class="help-row"><code>term</code> <span>Fuzzy match</span></div>
-            <div class="help-row"><code>'exact</code> <span>Exact substring</span></div>
-            <div class="help-row"><code>^prefix</code> <span>Starts with</span></div>
-            <div class="help-row"><code>suffix$</code> <span>Ends with</span></div>
-            <div class="help-row"><code>!term</code> <span>Exclude</span></div>
-            <div class="help-row"><code>a | b</code> <span>OR match</span></div>
-            <div class="help-row"><code>.*</code> <span>Toggle regex mode</span></div>
+            <h3>${h('help.section.fzf')}</h3>
+            <div class="help-row"><code>term</code> <span>${h('help.fzf.fuzzy')}</span></div>
+            <div class="help-row"><code>'exact</code> <span>${h('help.fzf.exact')}</span></div>
+            <div class="help-row"><code>^prefix</code> <span>${h('help.fzf.prefix')}</span></div>
+            <div class="help-row"><code>suffix$</code> <span>${h('help.fzf.suffix')}</span></div>
+            <div class="help-row"><code>!term</code> <span>${h('help.fzf.exclude')}</span></div>
+            <div class="help-row"><code>a | b</code> <span>${h('help.fzf.or')}</span></div>
+            <div class="help-row"><code>.*</code> <span>${h('help.fzf.regex')}</span></div>
           </div>
           <div class="help-section">
-            <h3>Mouse</h3>
-            <div class="help-row"><span style="color:var(--cyan);">Click</span> <span>Play sample / expand metadata</span></div>
-            <div class="help-row"><span style="color:var(--cyan);">Double-click</span> <span>Open in DAW / KVR / Finder</span></div>
-            <div class="help-row"><span style="color:var(--cyan);">Right-click</span> <span>Context menu everywhere</span></div>
-            <div class="help-row"><span style="color:var(--cyan);">Drag tabs</span> <span>Reorder tabs</span></div>
-            <div class="help-row"><span style="color:var(--cyan);">Drag player</span> <span>Dock to any corner</span></div>
+            <h3>${h('help.section.mouse')}</h3>
+            <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.click')}</span> <span>${h('help.mouse.click_desc')}</span></div>
+            <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.dblclick')}</span> <span>${h('help.mouse.dblclick_desc')}</span></div>
+            <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.right')}</span> <span>${h('help.mouse.right_desc')}</span></div>
+            <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.drag_tabs')}</span> <span>${h('help.mouse.drag_tabs_desc')}</span></div>
+            <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.drag_player')}</span> <span>${h('help.mouse.drag_player_desc')}</span></div>
           </div>
         </div>
       </div>
