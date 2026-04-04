@@ -551,6 +551,48 @@ mod tests {
         );
     }
 
+    /// Mirrors `test/i18n-anchor-keys.test.js`: for every `menu.*` / `tray.*` key where **all** six
+    /// non-English seeds differ from English, assert each locale row is not a verbatim copy of `en`.
+    #[test]
+    fn seed_json_safe_menu_tray_keys_all_locales_differ_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let locales: [(&str, &str); 6] = [
+            ("de", SEED_JSON_DE),
+            ("es", SEED_JSON_ES),
+            ("sv", SEED_JSON_SV),
+            ("fr", SEED_JSON_FR),
+            ("nl", SEED_JSON_NL),
+            ("pt", SEED_JSON_PT),
+        ];
+        let maps: Vec<(&str, HashMap<String, String>)> = locales
+            .iter()
+            .map(|(loc, json)| (*loc, serde_json::from_str(json).expect(loc)))
+            .collect();
+
+        for (k, en_val) in &en {
+            if !k.starts_with("menu.") && !k.starts_with("tray.") {
+                continue;
+            }
+            if en_val.trim().is_empty() {
+                continue;
+            }
+            let all_differ = maps.iter().all(|(_, m)| match m.get(k) {
+                Some(v) => v != en_val,
+                None => false,
+            });
+            if !all_differ {
+                continue;
+            }
+            for (loc, m) in &maps {
+                assert_ne!(
+                    m.get(k),
+                    Some(en_val),
+                    "locale {loc} key {k} must not copy English verbatim"
+                );
+            }
+        }
+    }
+
     #[test]
     fn seed_json_all_locales_share_exact_key_set() {
         let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");

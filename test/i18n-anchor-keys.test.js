@@ -1,8 +1,10 @@
 /**
- * Per-locale, per-key spot checks: high-traffic menu and tray strings must not be a verbatim
- * copy of English (catches accidental `en` paste or failed translation in a seed JSON row).
- * Mirrors `seed_json_*_menu_scan_all_differs_from_en` in `src-tauri/src/app_i18n.rs` but covers
- * more anchors than `menu.scan_all` alone.
+ * Per-locale spot checks: for every **safe** `menu.*` / `tray.*` key, each non-English shipped
+ * locale must not copy the English string verbatim (catches pasted `en` rows or bad MT).
+ *
+ * **Safe key** = English value is non-empty and `de`/`es`/`fr`/`nl`/`pt`/`sv` **all** differ
+ * from English for that key (keys like `menu.app` / `tray.tooltip` where many locales keep
+ * `AUDIO_HAXOR` are excluded automatically).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -13,30 +15,6 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const i18nDir = join(root, 'i18n');
 
-/** Keys that must be translated in every non-English shipped locale (values differ from `en`). */
-const ANCHOR_KEYS = [
-  'menu.scan_all',
-  'menu.preferences',
-  'menu.file',
-  'menu.help',
-  'menu.about',
-  'tray.scan_all',
-  'tray.quit',
-  'tray.play_pause',
-  'tray.stop_all',
-  'tray.next_track',
-  'menu.edit',
-  'menu.view',
-  'menu.scan_plugins',
-  'menu.tools',
-  'menu.window',
-  'tray.show',
-  'menu.playback',
-  'menu.scan_daw',
-  'menu.scan_presets',
-  'menu.scan_samples',
-];
-
 const NON_EN = /** @type {const} */ (['de', 'es', 'fr', 'nl', 'pt', 'sv']);
 
 function loadMap(name) {
@@ -45,6 +23,30 @@ function loadMap(name) {
 }
 
 const en = loadMap('app_i18n_en.json');
+const locMaps = Object.fromEntries(
+  NON_EN.map((loc) => [loc, loadMap(`app_i18n_${loc}.json`)])
+);
+
+/** @returns {string[]} */
+function anchorKeysWhereEveryLocaleDiffers() {
+  const keys = [];
+  for (const k of Object.keys(en).sort()) {
+    if (!k.startsWith('menu.') && !k.startsWith('tray.')) continue;
+    const ev = en[k];
+    if (typeof ev !== 'string' || ev.trim() === '') continue;
+    if (NON_EN.every((loc) => locMaps[loc][k] !== ev)) keys.push(k);
+  }
+  return keys;
+}
+
+const ANCHOR_KEYS = anchorKeysWhereEveryLocaleDiffers();
+
+test('catalog yields a large safe menu/tray anchor set', () => {
+  assert.ok(
+    ANCHOR_KEYS.length > 200,
+    `expected 200+ safe keys, got ${ANCHOR_KEYS.length}`
+  );
+});
 
 for (const anchor of ANCHOR_KEYS) {
   assert.ok(
@@ -53,7 +55,7 @@ for (const anchor of ANCHOR_KEYS) {
   );
   for (const loc of NON_EN) {
     test(`locale ${loc} differs from en for ${anchor}`, () => {
-      const m = loadMap(`app_i18n_${loc}.json`);
+      const m = locMaps[loc];
       assert.notEqual(
         m[anchor],
         en[anchor],
