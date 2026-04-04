@@ -3541,6 +3541,35 @@ mod tests {
         let _ = fs::remove_file(&tmp);
     }
 
+    /// Forward-compatible imports: serde ignores unknown keys on plugin objects.
+    #[test]
+    fn test_import_plugins_json_extra_keys_on_plugin_ignored() {
+        let tmp = std::env::temp_dir().join("upum_test_import_plugins_extra_keys.json");
+        let _ = fs::remove_file(&tmp);
+        let content = r#"{
+        "version":"1.0",
+        "exported_at":"2025-01-01T00:00:00Z",
+        "plugins":[{
+            "name":"Extra",
+            "type":"VST3",
+            "version":"1",
+            "manufacturer":"M",
+            "path":"/p.vst3",
+            "size":"1 B",
+            "sizeBytes":1,
+            "modified":"t",
+            "architectures":[],
+            "futureProofField":true
+        }]
+    }"#;
+        fs::write(&tmp, content).unwrap();
+        let imported = import_plugins_json(tmp.to_string_lossy().to_string()).unwrap();
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].name, "Extra");
+        assert_eq!(imported[0].plugin_type, "VST3");
+        let _ = fs::remove_file(&tmp);
+    }
+
     #[test]
     fn test_export_csv_empty_plugins() {
         let tmp = std::env::temp_dir().join("upum_test_export_empty.csv");
