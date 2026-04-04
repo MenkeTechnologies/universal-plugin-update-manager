@@ -67,7 +67,7 @@ function updateDawStats() {
   document.getElementById('dawFlCount').textContent = dawStatCounts['FL Studio'] || 0;
   document.getElementById('dawReaperCount').textContent = dawStatCounts['REAPER'] || 0;
   const mainDaws = (dawStatCounts['Ableton Live'] || 0) + (dawStatCounts['Logic Pro'] || 0) + (dawStatCounts['FL Studio'] || 0) + (dawStatCounts['REAPER'] || 0);
-  document.getElementById('dawOtherCount').textContent = allDawProjects.length - mainDaws;
+  document.getElementById('dawOtherCount').textContent = dawDisplayCount - mainDaws;
   document.getElementById('dawTotalSize').textContent = formatAudioSize(dawStatBytes);
   document.getElementById('dawProjectCount').textContent = dawDisplayCount;
   document.getElementById('btnExportDaw').style.display = allDawProjects.length > 0 ? '' : 'none';
