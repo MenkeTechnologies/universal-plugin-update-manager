@@ -86,16 +86,16 @@ document.addEventListener('contextmenu', (e) => {
     const name = npItem.querySelector('.np-h-name')?.textContent?.trim() || '';
     const isPlaying = typeof audioPlayerPath !== 'undefined' && audioPlayerPath === path && typeof audioPlayer !== 'undefined' && !audioPlayer.paused;
     const items = [
-      { icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? 'Pause' : 'Play', action: () => typeof previewAudio === 'function' && previewAudio(path) },
-      { icon: '&#8634;', label: 'Loop', action: () => typeof toggleRowLoop === 'function' && toggleRowLoop(path, new MouseEvent('click')) },
+      { icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? appFmt('menu.pause') : appFmt('menu.play'), ..._noEcho, action: () => typeof previewAudio === 'function' && previewAudio(path) },
+      { icon: '&#8634;', label: appFmt('menu.loop'), ..._noEcho, action: () => typeof toggleRowLoop === 'function' && toggleRowLoop(path, new MouseEvent('click')) },
       '---',
-      { icon: '&#127926;', label: 'Open in Music', action: () => typeof openWithApp === 'function' && openWithApp(path, 'Music') },
-      { icon: '&#127911;', label: 'Open in QuickTime', action: () => typeof openWithApp === 'function' && openWithApp(path, 'QuickTime Player') },
-      { icon: '&#127908;', label: 'Open in Audacity', action: () => typeof openWithApp === 'function' && openWithApp(path, 'Audacity') },
+      { icon: '&#127926;', label: appFmt('menu.open_in_music'), ..._noEcho, action: () => typeof openWithApp === 'function' && openWithApp(path, 'Music') },
+      { icon: '&#127911;', label: appFmt('menu.open_in_quicktime'), ..._noEcho, action: () => typeof openWithApp === 'function' && openWithApp(path, 'QuickTime Player') },
+      { icon: '&#127908;', label: appFmt('menu.open_audacity'), ..._noEcho, action: () => typeof openWithApp === 'function' && openWithApp(path, 'Audacity') },
       '---',
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
-      { icon: '&#127925;', label: 'Show in Samples Tab', action: () => {
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
+      { icon: '&#127925;', label: appFmt('menu.show_in_samples_tab'), ..._noEcho, action: () => {
         switchTab('samples');
         setTimeout(() => {
           const row = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`);
@@ -129,21 +129,21 @@ document.addEventListener('contextmenu', (e) => {
         }, 200);
       }},
       '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
       '---',
     ];
     if (typeof isFavorite === 'function') {
       const fav = isFavorite(path);
-      items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? 'Remove from Favorites' : 'Add to Favorites',
+      items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => fav ? removeFavorite(path) : addFavorite('sample', path, name) });
     }
     if (typeof showNoteEditor === 'function') {
-      items.push({ icon: '&#128221;', label: 'Add Note / Tags', action: () => showNoteEditor(path, name) });
+      items.push({ icon: '&#128221;', label: appFmt('menu.add_note_tags'), action: () => showNoteEditor(path, name) });
     }
     items.push(...quickTagItems(path, name));
     items.push('---');
-    items.push({ icon: '&#128270;', label: 'Find Similar Samples', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
+    items.push({ icon: '&#128270;', label: appFmt('menu.find_similar_samples'), action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
     showContextMenu(e, items);
     return;
   }
@@ -154,18 +154,18 @@ document.addEventListener('contextmenu', (e) => {
     const path = simRow.dataset.similarPath || '';
     const name = path.split('/').pop().replace(/\.[^.]+$/, '');
     const items = [
-      { icon: '&#9654;', label: 'Play', action: () => typeof previewAudio === 'function' && previewAudio(path) },
-      { icon: '&#8634;', label: 'Loop', action: () => typeof toggleRowLoop === 'function' && toggleRowLoop(path, new MouseEvent('click')) },
+      { icon: '&#9654;', label: appFmt('menu.play'), ..._noEcho, action: () => typeof previewAudio === 'function' && previewAudio(path) },
+      { icon: '&#8634;', label: appFmt('menu.loop'), ..._noEcho, action: () => typeof toggleRowLoop === 'function' && toggleRowLoop(path, new MouseEvent('click')) },
       '---',
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
       '---',
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
-      { icon: '&#128270;', label: 'Find Similar to This', action: () => { typeof closeSimilarPanel === 'function' && closeSimilarPanel(); typeof findSimilarSamples === 'function' && findSimilarSamples(path); } },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
+      { icon: '&#128270;', label: appFmt('menu.find_similar_to_this'), action: () => { typeof closeSimilarPanel === 'function' && closeSimilarPanel(); typeof findSimilarSamples === 'function' && findSimilarSamples(path); } },
     ];
     if (typeof isFavorite === 'function') {
       const fav = isFavorite(path);
-      items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? 'Remove from Favorites' : 'Add to Favorites',
+      items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => fav ? removeFavorite(path) : addFavorite('sample', path, name) });
     }
     showContextMenu(e, items);
@@ -185,7 +185,7 @@ document.addEventListener('contextmenu', (e) => {
       items.push('---');
       for (const tag of allTags.slice(0, 8)) {
         const has = currentTags.includes(tag);
-        items.push({ icon: has ? '&#10003;' : '&#9634;', label: `${has ? 'Remove' : 'Add'} tag: ${tag}`,
+        items.push({ icon: has ? '&#10003;' : '&#9634;', label: has ? appFmt('menu.remove_tag_named', { tag }) : appFmt('menu.add_tag_named', { tag }), ..._noEcho,
           action: () => { if (has) removeTagFromItem(path, tag); else addTagToItem(path, tag); showToast(has ? toastFmt('toast.tag_removed', { tag }) : toastFmt('toast.tag_added', { tag })); }
         });
       }
@@ -202,28 +202,28 @@ document.addEventListener('contextmenu', (e) => {
     const folderBtn = pluginCard.querySelector('[data-action="openFolder"]');
     const archBadges = [...pluginCard.querySelectorAll('.arch-badge')].map(b => b.textContent).join(', ');
     const items = [
-      { icon: '&#128269;', label: 'Open on KVR', action: () => kvrBtn && openKvr(kvrBtn, kvrBtn.dataset.url, kvrBtn.dataset.name) },
+      { icon: '&#128269;', label: appFmt('menu.open_kvr'), ..._noEcho, action: () => kvrBtn && openKvr(kvrBtn, kvrBtn.dataset.url, kvrBtn.dataset.name) },
     ];
     if (mfgBtn && !mfgBtn.disabled) {
-      items.push({ icon: '&#127760;', label: 'Open Manufacturer Site', action: () => openUpdate(mfgBtn.dataset.url) });
+      items.push({ icon: '&#127760;', label: appFmt('menu.open_manufacturer_site'), ..._noEcho, action: () => openUpdate(mfgBtn.dataset.url) });
     }
-    items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => folderBtn && openFolder(folderBtn.dataset.path) });
-    items.push({ icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } });
+    items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => folderBtn && openFolder(folderBtn.dataset.path) });
+    items.push({ icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } });
     items.push('---');
-    items.push({ icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) });
-    items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) });
+    items.push({ icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) });
+    items.push({ icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) });
     if (archBadges) {
-      items.push({ icon: '&#128203;', label: 'Copy Architecture', action: () => copyToClipboard(archBadges) });
+      items.push({ icon: '&#128203;', label: appFmt('menu.copy_architecture'), ..._noEcho, action: () => copyToClipboard(archBadges) });
     }
     items.push('---');
     if (typeof isFavorite === 'function') {
       const pluginFav = isFavorite(path);
-      items.push({ icon: pluginFav ? '&#9734;' : '&#9733;', label: pluginFav ? 'Remove from Favorites' : 'Add to Favorites',
+      items.push({ icon: pluginFav ? '&#9734;' : '&#9733;', label: pluginFav ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => pluginFav ? removeFavorite(path) : addFavorite('plugin', path, name, { format: pluginCard.querySelector('.plugin-type')?.textContent }) });
     }
-    if (typeof showNoteEditor === 'function') items.push({ icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) });
+    if (typeof showNoteEditor === 'function') items.push({ icon: '&#128221;', label: appFmt('menu.add_note'), action: () => showNoteEditor(path, name) });
     if (typeof findProjectsUsingPlugin === 'function') {
-      items.push({ icon: '&#9889;', label: 'Find Projects Using This', action: () => {
+      items.push({ icon: '&#9889;', label: appFmt('menu.find_projects_using'), action: () => {
         const projects = findProjectsUsingPlugin(name);
         showReverseXrefModal(name, projects);
       }});
@@ -240,28 +240,28 @@ document.addEventListener('contextmenu', (e) => {
     const name = audioRow.querySelector('.col-name')?.textContent || '';
     const isPlaying = audioPlayerPath === path && !audioPlayer.paused;
     const items = [
-      { icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? 'Pause' : 'Play', action: () => previewAudio(path) },
-      { icon: '&#8634;', label: 'Loop', action: () => { toggleRowLoop(path, new MouseEvent('click')); } },
+      { icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? appFmt('menu.pause') : appFmt('menu.play'), ..._noEcho, action: () => previewAudio(path) },
+      { icon: '&#8634;', label: appFmt('menu.loop'), ..._noEcho, action: () => { toggleRowLoop(path, new MouseEvent('click')); } },
       '---',
-      { icon: '&#127926;', label: 'Open in Music', action: () => openWithApp(path, 'Music') },
-      { icon: '&#127911;', label: 'Open in QuickTime', action: () => openWithApp(path, 'QuickTime Player') },
-      { icon: '&#127908;', label: 'Open in Audacity', action: () => openWithApp(path, 'Audacity') },
-      { icon: '&#9889;', label: 'Open in Default App', action: () => window.vstUpdater.openDawProject(path).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }) },
+      { icon: '&#127926;', label: appFmt('menu.open_in_music'), ..._noEcho, action: () => openWithApp(path, 'Music') },
+      { icon: '&#127911;', label: appFmt('menu.open_in_quicktime'), ..._noEcho, action: () => openWithApp(path, 'QuickTime Player') },
+      { icon: '&#127908;', label: appFmt('menu.open_audacity'), ..._noEcho, action: () => openWithApp(path, 'Audacity') },
+      { icon: '&#9889;', label: appFmt('menu.open_default_app'), ..._noEcho, action: () => window.vstUpdater.openDawProject(path).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }) },
       '---',
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => openAudioFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openAudioFolder(path) },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
       '---',
-      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
+      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => f ? removeFavorite(path) : addFavorite('sample', path, name, { format: audioRow.querySelector('.format-badge')?.textContent }) }; })()],
-      { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
+      { icon: '&#128221;', label: appFmt('menu.add_note'), action: () => showNoteEditor(path, name) },
       ...quickTagItems(path, name),
       '---',
-      { icon: '&#128270;', label: 'Find Similar Samples', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) },
+      { icon: '&#128270;', label: appFmt('menu.find_similar_samples'), action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) },
       '---',
-      ...[(() => { const on = prefs.getItem('expandOnClick') !== 'off'; return { icon: on ? '&#9660;' : '&#9654;', label: on ? 'Disable Row Expand' : 'Enable Row Expand',
+      ...[(() => { const on = prefs.getItem('expandOnClick') !== 'off'; return { icon: on ? '&#9660;' : '&#9654;', label: on ? appFmt('menu.disable_row_expand') : appFmt('menu.enable_row_expand'),
         action: () => {
           if (on) {
             // Disable: close any expanded row
@@ -280,7 +280,7 @@ document.addEventListener('contextmenu', (e) => {
           if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
           showToast(on ? toastFmt('toast.row_expand_disabled') : toastFmt('toast.row_expand_enabled'));
         } }; })()],
-      ...[(() => { const ap = prefs.getItem('autoplayNext') !== 'off'; return { icon: ap ? '&#9209;' : '&#9654;', label: ap ? 'Disable Autoplay Next' : 'Enable Autoplay Next',
+      ...[(() => { const ap = prefs.getItem('autoplayNext') !== 'off'; return { icon: ap ? '&#9209;' : '&#9654;', label: ap ? appFmt('menu.disable_autoplay_next') : appFmt('menu.enable_autoplay_next'),
         action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? toastFmt('toast.autoplay_next_disabled') : toastFmt('toast.autoplay_next_enabled')); } }; })()],
     ];
     showContextMenu(e, items);
@@ -293,20 +293,20 @@ document.addEventListener('contextmenu', (e) => {
     const path = midiRow.getAttribute('data-midi-path');
     const name = midiRow.querySelector('.col-name')?.textContent || '';
     const items = [
-      { icon: '&#9654;', label: 'Preview in GarageBand', action: () => window.vstUpdater.openWithApp(path, 'GarageBand').catch(() => showToast(toastFmt('toast.garageband_not_found'), 4000, 'error')) },
-      { icon: '&#127911;', label: 'Open in Logic Pro', action: () => window.vstUpdater.openWithApp(path, 'Logic Pro').catch(() => showToast(toastFmt('toast.logic_not_found'), 4000, 'error')) },
-      { icon: '&#127925;', label: 'Open in Ableton Live', action: () => window.vstUpdater.openWithApp(path, 'Ableton Live 12 Standard').catch(() => window.vstUpdater.openWithApp(path, 'Ableton Live 11 Suite').catch(() => showToast(toastFmt('toast.ableton_not_found'), 4000, 'error'))) },
-      { icon: '&#9889;', label: 'Open with Default App', action: () => window.vstUpdater.openDawProject(path).catch(e => showToast(toastFmt('toast.no_midi_handler', { err: e }), 4000, 'error')) },
+      { icon: '&#9654;', label: appFmt('menu.open_garageband'), ..._noEcho, action: () => window.vstUpdater.openWithApp(path, 'GarageBand').catch(() => showToast(toastFmt('toast.garageband_not_found'), 4000, 'error')) },
+      { icon: '&#127911;', label: appFmt('menu.open_in_logic_pro'), ..._noEcho, action: () => window.vstUpdater.openWithApp(path, 'Logic Pro').catch(() => showToast(toastFmt('toast.logic_not_found'), 4000, 'error')) },
+      { icon: '&#127925;', label: appFmt('menu.open_ableton_live'), ..._noEcho, action: () => window.vstUpdater.openWithApp(path, 'Ableton Live 12 Standard').catch(() => window.vstUpdater.openWithApp(path, 'Ableton Live 11 Suite').catch(() => showToast(toastFmt('toast.ableton_not_found'), 4000, 'error'))) },
+      { icon: '&#9889;', label: appFmt('menu.open_with_default_app'), ..._noEcho, action: () => window.vstUpdater.openDawProject(path).catch(e => showToast(toastFmt('toast.no_midi_handler', { err: e }), 4000, 'error')) },
       '---',
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => { if (typeof loadDirectory === 'function') loadDirectory(path.replace(/\/[^/]+$/, '')); }, 200); } },
       '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => typeof copyToClipboard === 'function' && copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => typeof copyToClipboard === 'function' && copyToClipboard(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => typeof copyToClipboard === 'function' && copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => typeof copyToClipboard === 'function' && copyToClipboard(path) },
       '---',
-      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
+      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => f ? removeFavorite(path) : addFavorite('midi', path, name) }; })()],
-      { icon: '&#128221;', label: 'Add Note', action: () => typeof showNoteEditor === 'function' && showNoteEditor(path, name) },
+      { icon: '&#128221;', label: appFmt('menu.add_note'), action: () => typeof showNoteEditor === 'function' && showNoteEditor(path, name) },
       ...(typeof quickTagItems === 'function' ? quickTagItems(path, name) : []),
     ];
     showContextMenu(e, items);
@@ -320,16 +320,16 @@ document.addEventListener('contextmenu', (e) => {
     const name = dawRow.querySelector('.col-name')?.textContent || '';
     const dawName = dawRow.querySelector('.format-badge')?.textContent || 'DAW';
     const items = [
-      { icon: '&#9654;', label: `Open in ${dawName}`, action: () => { showToast(toastFmt('toast.opening_in_daw', { name, daw: dawName })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw: dawName, err }), 4000, 'error')); } },
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => openDawFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
+      { icon: '&#9654;', label: appFmt('menu.open_in_daw', { daw: dawName }), ..._noEcho, action: () => { showToast(toastFmt('toast.opening_in_daw', { name, daw: dawName })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw: dawName, err }), 4000, 'error')); } },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openDawFolder(path) },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       ...(typeof isXrefSupported === 'function' && isXrefSupported(dawRow.querySelector('.format-badge.format-default')?.textContent || '')
-        ? [{ icon: '&#9889;', label: 'Show Plugins Used', action: () => showProjectPlugins(path, name) }]
+        ? [{ icon: '&#9889;', label: appFmt('menu.show_plugins_used'), action: () => showProjectPlugins(path, name) }]
         : []),
       ...(typeof showProjectViewer === 'function'
-        ? [{ icon: '&#128196;', label: 'Explore Project Contents', action: () => showProjectViewer(path, name) }]
+        ? [{ icon: '&#128196;', label: appFmt('menu.explore_project_contents'), action: () => showProjectViewer(path, name) }]
         : []),
-      { icon: '&#128221;', label: 'Open in Text Editor', action: () => {
+      { icon: '&#128221;', label: appFmt('menu.open_in_text_editor'), ..._noEcho, action: () => {
         const ext = path.split('.').pop().toLowerCase();
         const xmlFormats = ['als', 'rpp', 'song', 'dawproject'];
         if (xmlFormats.includes(ext)) {
@@ -351,12 +351,12 @@ document.addEventListener('contextmenu', (e) => {
         }
       }},
       '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
       '---',
-      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
+      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => f ? removeFavorite(path) : addFavorite('daw', path, name, { format: dawRow.querySelector('.format-badge:last-of-type')?.textContent, daw: dawName }) }; })()],
-      { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
+      { icon: '&#128221;', label: appFmt('menu.add_note'), action: () => showNoteEditor(path, name) },
       ...quickTagItems(path, name),
     ];
     showContextMenu(e, items);
@@ -369,15 +369,15 @@ document.addEventListener('contextmenu', (e) => {
     const path = presetRow.dataset.presetPath;
     const name = presetRow.querySelector('td')?.textContent || '';
     const items = [
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => openPresetFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openPresetFolder(path) },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
       '---',
-      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? 'Remove from Favorites' : 'Add to Favorites',
+      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => f ? removeFavorite(path) : addFavorite('preset', path, name, { format: presetRow.querySelector('.format-badge')?.textContent }) }; })()],
-      { icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) },
+      { icon: '&#128221;', label: appFmt('menu.add_note'), action: () => showNoteEditor(path, name) },
       ...quickTagItems(path, name),
     ];
     showContextMenu(e, items);
@@ -390,18 +390,18 @@ document.addEventListener('contextmenu', (e) => {
     const action = th.dataset.action;
     const key = th.dataset.key;
     const items = [
-      { icon: '&#9650;', label: 'Sort Ascending', action: () => {
+      { icon: '&#9650;', label: appFmt('menu.sort_ascending'), action: () => {
         if (action === 'sortAudio') { audioSortAsc = true; audioSortKey = key; sortAudio(key); }
         else if (action === 'sortDaw') { dawSortAsc = true; dawSortKey = key; sortDaw(key); }
         else if (action === 'sortPreset') { presetSortAsc = true; presetSortKey = key; sortPreset(key); }
       }},
-      { icon: '&#9660;', label: 'Sort Descending', action: () => {
+      { icon: '&#9660;', label: appFmt('menu.sort_descending'), action: () => {
         if (action === 'sortAudio') { audioSortAsc = false; audioSortKey = key; sortAudio(key); }
         else if (action === 'sortDaw') { dawSortAsc = false; dawSortKey = key; sortDaw(key); }
         else if (action === 'sortPreset') { presetSortAsc = false; presetSortKey = key; sortPreset(key); }
       }},
       '---',
-      { icon: '&#8596;', label: 'Reset Column Widths', action: () => settingResetColumns() },
+      { icon: '&#8596;', label: appFmt('menu.reset_columns'), action: () => settingResetColumns() },
     ];
     showContextMenu(e, items);
     return;
@@ -416,8 +416,8 @@ document.addEventListener('contextmenu', (e) => {
       const hasText = input.value.length > 0;
       const isRegex = regexBtn?.classList.contains('active');
       const items = [
-        { icon: '&#10005;', label: 'Clear Search', action: () => { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }, disabled: !hasText },
-        { icon: '&#128203;', label: 'Paste & Search', action: async () => {
+        { icon: '&#10005;', label: appFmt('menu.clear_search'), action: () => { input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); }, disabled: !hasText },
+        { icon: '&#128203;', label: appFmt('menu.paste_and_search'), action: async () => {
           try {
             const text = await navigator.clipboard.readText();
             input.value = text;
@@ -425,7 +425,7 @@ document.addEventListener('contextmenu', (e) => {
           } catch(e) { if(typeof showToast==='function'&&e) showToast(String(e),4000,'error'); }
         }},
         '---',
-        { icon: '.*', label: isRegex ? 'Switch to Fuzzy' : 'Switch to Regex', action: () => regexBtn && toggleRegex(regexBtn) },
+        { icon: '.*', label: isRegex ? appFmt('menu.switch_to_fuzzy') : appFmt('menu.switch_to_regex'), action: () => regexBtn && toggleRegex(regexBtn) },
       ];
       showContextMenu(e, items);
       return;
@@ -436,7 +436,7 @@ document.addEventListener('contextmenu', (e) => {
   const filterSelect = e.target.closest('.filter-select');
   if (filterSelect) {
     const items = [
-      { icon: '&#8635;', label: 'Reset to All', action: () => {
+      { icon: '&#8635;', label: appFmt('menu.reset_to_all'), action: () => {
         filterSelect.value = 'all';
         filterSelect.dispatchEvent(new Event('change', { bubbles: true }));
       }},
@@ -452,30 +452,30 @@ document.addEventListener('contextmenu', (e) => {
     const tabId = tab?.id;
     const items = [];
     if (tabId === 'tabPlugins') {
-      items.push({ icon: '&#8635;', label: 'Scan Plugins', action: () => scanPlugins() });
-      items.push({ icon: '&#9889;', label: 'Check Updates', action: () => checkUpdates(), disabled: allPlugins.length === 0 });
+      items.push({ icon: '&#8635;', label: appFmt('menu.scan_plugins'), action: () => scanPlugins() });
+      items.push({ icon: '&#9889;', label: appFmt('menu.check_updates'), action: () => checkUpdates(), disabled: allPlugins.length === 0 });
       items.push('---');
-      items.push({ icon: '&#8615;', label: 'Export Plugins', action: () => exportPlugins(), disabled: allPlugins.length === 0 });
-      items.push({ icon: '&#8613;', label: 'Import Plugins', action: () => importPlugins() });
+      items.push({ icon: '&#8615;', label: appFmt('menu.export_plugins'), action: () => exportPlugins(), disabled: allPlugins.length === 0 });
+      items.push({ icon: '&#8613;', label: appFmt('menu.import_plugins'), action: () => importPlugins() });
     } else if (tabId === 'tabSamples') {
-      items.push({ icon: '&#127925;', label: 'Scan Samples', action: () => scanAudioSamples() });
+      items.push({ icon: '&#127925;', label: appFmt('menu.scan_samples'), action: () => scanAudioSamples() });
       items.push('---');
-      items.push({ icon: '&#8615;', label: 'Export Samples', action: () => exportAudio(), disabled: allAudioSamples.length === 0 });
-      items.push({ icon: '&#8613;', label: 'Import Samples', action: () => importAudio() });
+      items.push({ icon: '&#8615;', label: appFmt('menu.export_samples'), action: () => exportAudio(), disabled: allAudioSamples.length === 0 });
+      items.push({ icon: '&#8613;', label: appFmt('menu.import_samples'), action: () => importAudio() });
     } else if (tabId === 'tabDaw') {
-      items.push({ icon: '&#127911;', label: 'Scan DAW Projects', action: () => scanDawProjects() });
+      items.push({ icon: '&#127911;', label: appFmt('menu.scan_daw'), action: () => scanDawProjects() });
       items.push('---');
-      items.push({ icon: '&#8615;', label: 'Export Projects', action: () => exportDaw(), disabled: allDawProjects.length === 0 });
-      items.push({ icon: '&#8613;', label: 'Import Projects', action: () => importDaw() });
+      items.push({ icon: '&#8615;', label: appFmt('menu.export_projects'), action: () => exportDaw(), disabled: allDawProjects.length === 0 });
+      items.push({ icon: '&#8613;', label: appFmt('menu.import_projects_short'), action: () => importDaw() });
     } else if (tabId === 'tabPresets') {
-      items.push({ icon: '&#127924;', label: 'Scan Presets', action: () => scanPresets() });
+      items.push({ icon: '&#127924;', label: appFmt('menu.scan_presets'), action: () => scanPresets() });
       items.push('---');
-      items.push({ icon: '&#8615;', label: 'Export Presets', action: () => exportPresets(), disabled: allPresets.length === 0 });
-      items.push({ icon: '&#8613;', label: 'Import Presets', action: () => importPresets() });
+      items.push({ icon: '&#8615;', label: appFmt('menu.export_presets'), action: () => exportPresets(), disabled: allPresets.length === 0 });
+      items.push({ icon: '&#8613;', label: appFmt('menu.import_presets'), action: () => importPresets() });
     }
     if (items.length) {
       items.push('---');
-      items.push({ icon: '&#128270;', label: 'Find Duplicates', action: () => showDuplicateReport() });
+      items.push({ icon: '&#128270;', label: appFmt('menu.find_duplicates'), action: () => showDuplicateReport() });
       showContextMenu(e, items);
       return;
     }
@@ -486,9 +486,9 @@ document.addEventListener('contextmenu', (e) => {
   if (statsBar) {
     const statsText = [...statsBar.querySelectorAll('.stat')].map(s => s.textContent.trim()).join(' | ');
     const items = [
-      { icon: '&#128203;', label: 'Copy Stats', action: () => copyToClipboard(statsText) },
+      { icon: '&#128203;', label: appFmt('menu.copy_stats'), ..._noEcho, action: () => copyToClipboard(statsText) },
       '---',
-      { icon: '&#9889;', label: 'Scan All', action: () => scanAll() },
+      { icon: '&#9889;', label: appFmt('menu.scan_all'), action: () => scanAll() },
     ];
     showContextMenu(e, items);
     return;
@@ -501,19 +501,19 @@ document.addEventListener('contextmenu', (e) => {
     if (headerInfo) {
       const statsText = [...headerInfo.querySelectorAll('.header-info-item')].map(s => s.textContent.trim()).join(' | ');
       const items = [
-        { icon: '&#128203;', label: 'Copy Process Stats', action: () => copyToClipboard(statsText) },
+        { icon: '&#128203;', label: appFmt('menu.copy_process_stats'), ..._noEcho, action: () => copyToClipboard(statsText) },
       ];
       showContextMenu(e, items);
       return;
     }
     const items = [
-      { icon: '&#128202;', label: 'Heatmap Dashboard', action: () => { if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard(); } },
-      { icon: '&#128200;', label: 'Dependency Graph', action: () => { if (typeof showDepGraph === 'function') showDepGraph(); } },
+      { icon: '&#128202;', label: appFmt('menu.heatmap_dashboard'), action: () => { if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard(); } },
+      { icon: '&#128200;', label: appFmt('menu.dep_graph'), action: () => { if (typeof showDepGraph === 'function') showDepGraph(); } },
       '---',
-      { icon: '&#127760;', label: 'Open GitHub Repository', action: () => openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager') },
-      { icon: '&#9881;', label: 'Settings', action: () => switchTab('settings') },
+      { icon: '&#127760;', label: appFmt('menu.open_github_repository'), action: () => openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager') },
+      { icon: '&#9881;', label: appFmt('menu.tab_settings'), action: () => switchTab('settings') },
       '---',
-      { icon: '&#9889;', label: 'Scan All', action: () => scanAll() },
+      { icon: '&#9889;', label: appFmt('menu.scan_all'), action: () => scanAll() },
     ];
     showContextMenu(e, items);
     return;
@@ -526,8 +526,8 @@ document.addEventListener('contextmenu', (e) => {
     const type = historyRow.dataset.type;
     if (id) {
       const items = [
-        { icon: '&#128269;', label: 'View Details', action: () => selectScan(id, type) },
-        { icon: '&#128465;', label: 'Delete Entry', action: () => {
+        { icon: '&#128269;', label: appFmt('menu.view_details'), action: () => selectScan(id, type) },
+        { icon: '&#128465;', label: appFmt('menu.delete_entry'), action: () => {
           if (type === 'audio') deleteAudioScanEntry(id);
           else if (type === 'daw') deleteDawScanEntry(id);
           else if (type === 'preset') deletePresetScanEntry(id);
@@ -543,7 +543,7 @@ document.addEventListener('contextmenu', (e) => {
   const historyTab = e.target.closest('#tabHistory');
   if (historyTab) {
     const items = [
-      { icon: '&#128465;', label: 'Clear All History', action: () => settingClearAllHistory() },
+      { icon: '&#128465;', label: appFmt('menu.clear_history'), action: () => settingClearAllHistory() },
     ];
     showContextMenu(e, items);
     return;
@@ -556,16 +556,16 @@ document.addEventListener('contextmenu', (e) => {
     const isExpanded = player.classList.contains('expanded');
     const items = [];
     if (audioPlayerPath) {
-      items.push({ icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? 'Pause' : 'Play', action: () => toggleAudioPlayback() });
-      items.push({ icon: '&#8634;', label: audioLooping ? 'Disable Loop' : 'Enable Loop', action: () => toggleAudioLoop() });
-      items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => openAudioFolder(audioPlayerPath) });
+      items.push({ icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? appFmt('menu.pause') : appFmt('menu.play'), ..._noEcho, action: () => toggleAudioPlayback() });
+      items.push({ icon: '&#8634;', label: audioLooping ? appFmt('menu.disable_loop') : appFmt('menu.enable_loop'), ..._noEcho, action: () => toggleAudioLoop() });
+      items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openAudioFolder(audioPlayerPath) });
       items.push('---');
-      items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(audioPlayerPath) });
+      items.push({ icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(audioPlayerPath) });
       items.push('---');
     }
-    items.push({ icon: isExpanded ? '&#9660;' : '&#9650;', label: isExpanded ? 'Collapse Player' : 'Expand Player', action: () => togglePlayerExpanded() });
-    items.push({ icon: '&#9868;', label: 'Hide Player', action: () => hidePlayer() });
-    items.push({ icon: '&#10005;', label: 'Stop &amp; Close', action: () => stopAudioPlayback() });
+    items.push({ icon: isExpanded ? '&#9660;' : '&#9650;', label: isExpanded ? appFmt('menu.player_collapse') : appFmt('menu.player_expand'), ..._noEcho, action: () => togglePlayerExpanded() });
+    items.push({ icon: '&#9868;', label: appFmt('menu.hide_player'), action: () => hidePlayer() });
+    items.push({ icon: '&#10005;', label: appFmt('menu.stop_and_close'), ..._noEcho, action: () => stopAudioPlayback() });
     showContextMenu(e, items);
     return;
   }
@@ -580,42 +580,42 @@ document.addEventListener('contextmenu', (e) => {
 
     if (type === 'sample') {
       const isPlaying = typeof audioPlayerPath !== 'undefined' && audioPlayerPath === path && !audioPlayer.paused;
-      items.push({ icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? 'Pause' : 'Play', action: () => previewAudio(path) });
-      items.push({ icon: '&#8634;', label: 'Loop', action: () => toggleRowLoop(path, new MouseEvent('click')) });
+      items.push({ icon: isPlaying ? '&#9646;&#9646;' : '&#9654;', label: isPlaying ? appFmt('menu.pause') : appFmt('menu.play'), ..._noEcho, action: () => previewAudio(path) });
+      items.push({ icon: '&#8634;', label: appFmt('menu.loop'), ..._noEcho, action: () => toggleRowLoop(path, new MouseEvent('click')) });
       items.push('---');
-      items.push({ icon: '&#127926;', label: 'Open in Music', action: () => openWithApp(path, 'Music') });
-      items.push({ icon: '&#127911;', label: 'Open in QuickTime', action: () => openWithApp(path, 'QuickTime Player') });
-      items.push({ icon: '&#127908;', label: 'Open in Audacity', action: () => openWithApp(path, 'Audacity') });
+      items.push({ icon: '&#127926;', label: appFmt('menu.open_in_music'), ..._noEcho, action: () => openWithApp(path, 'Music') });
+      items.push({ icon: '&#127911;', label: appFmt('menu.open_in_quicktime'), ..._noEcho, action: () => openWithApp(path, 'QuickTime Player') });
+      items.push({ icon: '&#127908;', label: appFmt('menu.open_audacity'), ..._noEcho, action: () => openWithApp(path, 'Audacity') });
       items.push('---');
     } else if (type === 'daw') {
       const daw = favItem.querySelector('.format-badge')?.textContent || 'DAW';
-      items.push({ icon: '&#9654;', label: `Open in ${daw}`, action: () => { showToast(toastFmt('toast.opening_in_daw', { name, daw })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw, err }), 4000, 'error')); } });
+      items.push({ icon: '&#9654;', label: appFmt('menu.open_in_daw', { daw }), ..._noEcho, action: () => { showToast(toastFmt('toast.opening_in_daw', { name, daw })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.daw_not_installed', { daw, err }), 4000, 'error')); } });
       items.push('---');
     } else if (type === 'plugin') {
       const plugin = typeof allPlugins !== 'undefined' && allPlugins.find(p => p.path === path);
       const kvrUrl = plugin ? (plugin.kvrUrl || buildKvrUrl(plugin.name, plugin.manufacturer)) : buildKvrUrl(name, '');
-      items.push({ icon: '&#127760;', label: 'Open on KVR', action: () => window.vstUpdater.openUpdate(kvrUrl) });
+      items.push({ icon: '&#127760;', label: appFmt('menu.open_kvr'), ..._noEcho, action: () => window.vstUpdater.openUpdate(kvrUrl) });
       if (typeof findProjectsUsingPlugin === 'function') {
-        items.push({ icon: '&#9889;', label: 'Find Projects Using This', action: () => { const projects = findProjectsUsingPlugin(name); showReverseXrefModal(name, projects); } });
+        items.push({ icon: '&#9889;', label: appFmt('menu.find_projects_using'), action: () => { const projects = findProjectsUsingPlugin(name); showReverseXrefModal(name, projects); } });
       }
       items.push('---');
     }
 
-    items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => {
+    items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => {
       if (type === 'sample') openAudioFolder(path);
       else if (type === 'daw') openDawFolder(path);
       else if (type === 'preset') openPresetFolder(path);
       else openFolder(path);
     }});
-    items.push({ icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } });
+    items.push({ icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } });
     items.push('---');
-    items.push({ icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) });
-    items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) });
+    items.push({ icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) });
+    items.push({ icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) });
     items.push('---');
-    items.push({ icon: '&#128221;', label: 'Add Note', action: () => showNoteEditor(path, name) });
+    items.push({ icon: '&#128221;', label: appFmt('menu.add_note'), action: () => showNoteEditor(path, name) });
     items.push(...quickTagItems(path, name));
     items.push('---');
-    items.push({ icon: '&#9734;', label: 'Remove from Favorites', action: () => { removeFavorite(path); if (typeof renderFavorites === 'function') renderFavorites(); } });
+    items.push({ icon: '&#9734;', label: appFmt('menu.remove_from_favorites'), ..._noEcho, action: () => { removeFavorite(path); if (typeof renderFavorites === 'function') renderFavorites(); } });
 
     showContextMenu(e, items);
     return;
@@ -627,16 +627,16 @@ document.addEventListener('contextmenu', (e) => {
     const path = noteItem.dataset.path || '';
     const name = noteItem.querySelector('.note-item-name')?.textContent?.trim() || '';
     const items = [
-      { icon: '&#128221;', label: 'Edit Note', action: () => showNoteEditor(path, name) },
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => openFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
+      { icon: '&#128221;', label: appFmt('menu.edit_note'), action: () => showNoteEditor(path, name) },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openFolder(path) },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
       '---',
-      { icon: '&#9733;', label: isFavorite(path) ? 'Remove from Favorites' : 'Add to Favorites',
+      { icon: '&#9733;', label: isFavorite(path) ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => isFavorite(path) ? removeFavorite(path) : addFavorite('item', path, name) },
-      { icon: '&#128465;', label: 'Delete Note', action: () => { if (typeof deleteNote === 'function') { deleteNote(path); if (typeof renderNotesTab === 'function') renderNotesTab(); } } },
+      { icon: '&#128465;', label: appFmt('menu.delete_note'), action: () => { if (typeof deleteNote === 'function') { deleteNote(path); if (typeof renderNotesTab === 'function') renderNotesTab(); } } },
     ];
     showContextMenu(e, items);
     return;
@@ -647,10 +647,10 @@ document.addEventListener('contextmenu', (e) => {
   if (tagItem) {
     const tag = tagItem.dataset.tag || '';
     const items = [
-      { icon: '&#128269;', label: 'Filter by This Tag', action: () => { if (typeof setGlobalTag === 'function') setGlobalTag(tag); } },
-      { icon: '&#128203;', label: 'Copy Tag Name', action: () => copyToClipboard(tag) },
+      { icon: '&#128269;', label: appFmt('menu.filter_by_this_tag'), action: () => { if (typeof setGlobalTag === 'function') setGlobalTag(tag); } },
+      { icon: '&#128203;', label: appFmt('menu.copy_tag_name'), ..._noEcho, action: () => copyToClipboard(tag) },
       '---',
-      { icon: '&#128465;', label: 'Delete Tag from All Items', action: () => { if (typeof deleteTagGlobally === 'function' && confirm(appFmt('confirm.delete_tag_globally', { tag }))) { deleteTagGlobally(tag); } } },
+      { icon: '&#128465;', label: appFmt('menu.delete_tag_globally'), action: () => { if (typeof deleteTagGlobally === 'function' && confirm(appFmt('confirm.delete_tag_globally', { tag }))) { deleteTagGlobally(tag); } } },
     ];
     showContextMenu(e, items);
     return;
@@ -665,14 +665,14 @@ document.addEventListener('contextmenu', (e) => {
     const name = nameEl?.textContent?.trim() || '';
     const editBtn = noteCard.querySelector('[data-action-note="edit"]');
     const items = [
-      { icon: '&#128221;', label: 'Edit Note', action: () => { if (editBtn) editBtn.click(); else if (typeof showNoteEditor === 'function') showNoteEditor(path, name); } },
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => openFolder(path) },
-      { icon: '&#128194;', label: 'Show in File Browser', action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
+      { icon: '&#128221;', label: appFmt('menu.edit_note'), action: () => { if (editBtn) editBtn.click(); else if (typeof showNoteEditor === 'function') showNoteEditor(path, name); } },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openFolder(path) },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
       '---',
-      { icon: '&#128465;', label: 'Delete Note', action: () => { if (typeof deleteNote === 'function') { deleteNote(path); if (typeof renderNotesTab === 'function') renderNotesTab(); } } },
+      { icon: '&#128465;', label: appFmt('menu.delete_note'), action: () => { if (typeof deleteNote === 'function') { deleteNote(path); if (typeof renderNotesTab === 'function') renderNotesTab(); } } },
     ];
     showContextMenu(e, items);
     return;
@@ -683,13 +683,13 @@ document.addEventListener('contextmenu', (e) => {
   if (xrefItem) {
     const pluginName = xrefItem.dataset.xrefPlugin;
     const items = [
-      { icon: '&#128269;', label: 'Find in Plugins Tab', action: () => {
+      { icon: '&#128269;', label: appFmt('menu.find_in_plugins_tab'), action: () => {
         switchTab('plugins');
         const input = document.getElementById('searchInput');
         if (input) { input.value = pluginName; input.dispatchEvent(new Event('input', { bubbles: true })); }
         showToast(toastFmt('toast.searching_plugins_for', { pluginName }));
       }},
-      { icon: '&#128203;', label: 'Copy Plugin Name', action: () => { navigator.clipboard.writeText(pluginName); showToast(toastFmt('toast.copied_plugin_name', { pluginName })); }},
+      { icon: '&#128203;', label: appFmt('menu.copy_plugin_name'), ..._noEcho, action: () => { navigator.clipboard.writeText(pluginName); showToast(toastFmt('toast.copied_plugin_name', { pluginName })); }},
     ];
     showContextMenu(e, items);
     return;
@@ -701,18 +701,18 @@ document.addEventListener('contextmenu', (e) => {
     const name = depRow.querySelector('.dep-plugin-name')?.textContent?.trim() || '';
     const mfg = depRow.querySelector('.dep-plugin-mfg')?.textContent?.trim() || '';
     const items = [
-      { icon: '&#128203;', label: 'Copy Plugin Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Manufacturer', action: () => copyToClipboard(mfg) },
+      { icon: '&#128203;', label: appFmt('menu.copy_plugin_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_manufacturer'), ..._noEcho, action: () => copyToClipboard(mfg) },
     ];
     if (typeof findProjectsUsingPlugin === 'function') {
       items.push('---');
-      items.push({ icon: '&#9889;', label: 'Find Projects Using This', action: () => { const projects = findProjectsUsingPlugin(name); showReverseXrefModal(name, projects); } });
+      items.push({ icon: '&#9889;', label: appFmt('menu.find_projects_using'), action: () => { const projects = findProjectsUsingPlugin(name); showReverseXrefModal(name, projects); } });
     }
     const plugin = typeof allPlugins !== 'undefined' && allPlugins.find(p => p.name === name);
     if (plugin) {
       const kvrUrl = plugin.kvrUrl || buildKvrUrl(plugin.name, plugin.manufacturer);
-      items.push({ icon: '&#127760;', label: 'Open on KVR', action: () => window.vstUpdater.openUpdate(kvrUrl) });
-      items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => openFolder(plugin.path) });
+      items.push({ icon: '&#127760;', label: appFmt('menu.open_kvr'), ..._noEcho, action: () => window.vstUpdater.openUpdate(kvrUrl) });
+      items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openFolder(plugin.path) });
     }
     showContextMenu(e, items);
     return;
@@ -725,11 +725,11 @@ document.addEventListener('contextmenu', (e) => {
     const name = depProject.querySelector('.dep-project-name')?.textContent?.trim() || '';
     const daw = depProject.querySelector('.format-badge')?.textContent?.trim() || '';
     const items = [
-      { icon: '&#9654;', label: `Open in ${daw || 'DAW'}`, action: () => { showToast(toastFmt('toast.opening_name', { name })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.failed_dash', { err }), 4000, 'error')); } },
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openDawFolder === 'function' && openDawFolder(path) },
+      { icon: '&#9654;', label: appFmt('menu.open_in_daw', { daw: daw || 'DAW' }), ..._noEcho, action: () => { showToast(toastFmt('toast.opening_name', { name })); window.vstUpdater.openDawProject(path).catch(err => showToast(toastFmt('toast.failed_dash', { err }), 4000, 'error')); } },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => typeof openDawFolder === 'function' && openDawFolder(path) },
       '---',
-      { icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
     ];
     showContextMenu(e, items);
     return;
@@ -741,9 +741,9 @@ document.addEventListener('contextmenu', (e) => {
     const name = depOrphan.querySelector('.dep-plugin-name')?.textContent?.trim() || '';
     const path = depOrphan.getAttribute('title') || '';
     const items = [
-      { icon: '&#128203;', label: 'Copy Plugin Name', action: () => copyToClipboard(name) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) },
-      { icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openFolder === 'function' && openFolder(path) },
+      { icon: '&#128203;', label: appFmt('menu.copy_plugin_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => typeof openFolder === 'function' && openFolder(path) },
     ];
     showContextMenu(e, items);
     return;
@@ -756,19 +756,19 @@ document.addEventListener('contextmenu', (e) => {
     const exportMap = { plugins: 'exportPlugins', samples: 'exportAudio', daw: 'exportDaw', presets: 'exportPresets' };
     const scanMap = { plugins: 'scanPlugins', samples: 'scanAudioSamples', daw: 'scanDawProjects', presets: 'scanPresets' };
     const items = [
-      { icon: '&#8635;', label: 'Switch to Tab', action: () => switchTab(tab) },
+      { icon: '&#8635;', label: appFmt('menu.switch_to_tab'), action: () => switchTab(tab) },
       '---',
     ];
     const scanFn = scanMap[tab];
     if (scanFn && typeof window[scanFn] === 'function') {
-      items.push({ icon: '&#9889;', label: 'Rescan Tab Data', action: () => window[scanFn]() });
+      items.push({ icon: '&#9889;', label: appFmt('menu.rescan_tab_data'), action: () => window[scanFn]() });
     }
     const exportFn = exportMap[tab];
     if (exportFn && typeof window[exportFn] === 'function') {
-      items.push({ icon: '&#8615;', label: 'Export Tab Data', action: () => window[exportFn]() });
+      items.push({ icon: '&#8615;', label: appFmt('menu.export_tab_data'), action: () => window[exportFn]() });
     }
     if (scanFn || exportFn) items.push('---');
-    items.push({ icon: '&#8644;', label: 'Reset Tab Order', action: () => settingResetTabOrder() });
+    items.push({ icon: '&#8644;', label: appFmt('menu.reset_tabs'), action: () => settingResetTabOrder() });
     showContextMenu(e, items);
     return;
   }
@@ -777,7 +777,7 @@ document.addEventListener('contextmenu', (e) => {
   const tabNav = e.target.closest('.tab-nav');
   if (tabNav) {
     const items = [
-      { icon: '&#8644;', label: 'Reset Tab Order', action: () => settingResetTabOrder() },
+      { icon: '&#8644;', label: appFmt('menu.reset_tabs'), action: () => settingResetTabOrder() },
     ];
     showContextMenu(e, items);
     return;
@@ -791,11 +791,11 @@ document.addEventListener('contextmenu', (e) => {
     const items = [];
     if (toggle) {
       const isOn = toggle.classList.contains('active');
-      items.push({ icon: isOn ? '&#9711;' : '&#9679;', label: isOn ? 'Turn Off' : 'Turn On', action: () => toggle.click() });
+      items.push({ icon: isOn ? '&#9711;' : '&#9679;', label: isOn ? appFmt('menu.turn_off') : appFmt('menu.turn_on'), action: () => toggle.click() });
     }
     if (textarea) {
-      items.push({ icon: '&#10005;', label: 'Clear', action: () => { textarea.value = ''; } });
-      items.push({ icon: '&#128203;', label: 'Copy', action: () => copyToClipboard(textarea.value) });
+      items.push({ icon: '&#10005;', label: appFmt('menu.clear'), ..._noEcho, action: () => { textarea.value = ''; } });
+      items.push({ icon: '&#128203;', label: appFmt('menu.copy'), ..._noEcho, action: () => copyToClipboard(textarea.value) });
     }
     if (items.length === 0) return; // no special actions
     showContextMenu(e, items);
@@ -806,11 +806,11 @@ document.addEventListener('contextmenu', (e) => {
   const settingsContainer = e.target.closest('.settings-container');
   if (settingsContainer) {
     const items = [
-      { icon: '&#8596;', label: 'Reset Column Widths', action: () => settingResetColumns() },
-      { icon: '&#8644;', label: 'Reset Tab Order', action: () => settingResetTabOrder() },
-      { icon: '&#128465;', label: 'Clear All History', action: () => settingClearAllHistory() },
+      { icon: '&#8596;', label: appFmt('menu.reset_columns'), action: () => settingResetColumns() },
+      { icon: '&#8644;', label: appFmt('menu.reset_tabs'), action: () => settingResetTabOrder() },
+      { icon: '&#128465;', label: appFmt('menu.clear_history'), action: () => settingClearAllHistory() },
       '---',
-      { icon: '&#128206;', label: 'Open Prefs File', action: () => openPrefsFile() },
+      { icon: '&#128206;', label: appFmt('menu.open_prefs_file'), action: () => openPrefsFile() },
     ];
     showContextMenu(e, items);
     return;
@@ -822,8 +822,8 @@ document.addEventListener('contextmenu', (e) => {
     const dirPath = dirsRow.querySelector('td')?.textContent?.trim() || '';
     if (dirPath) {
       const items = [
-        { icon: '&#128193;', label: 'Open Directory', action: () => openFolder(dirPath) },
-        { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(dirPath) },
+        { icon: '&#128193;', label: appFmt('menu.open_directory'), ..._noEcho, action: () => openFolder(dirPath) },
+        { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(dirPath) },
       ];
       showContextMenu(e, items);
       return;
@@ -835,7 +835,7 @@ document.addEventListener('contextmenu', (e) => {
   if (audioStats) {
     const statsText = audioStats.textContent.trim().replace(/\s+/g, ' ');
     const items = [
-      { icon: '&#128203;', label: 'Copy Stats', action: () => copyToClipboard(statsText) },
+      { icon: '&#128203;', label: appFmt('menu.copy_stats'), ..._noEcho, action: () => copyToClipboard(statsText) },
     ];
     showContextMenu(e, items);
     return;
@@ -846,9 +846,9 @@ document.addEventListener('contextmenu', (e) => {
   if (crumb) {
     const crumbPath = crumb.dataset.fileNav || '';
     const items = [
-      { icon: '&#128193;', label: 'Open in Finder', action: () => typeof openFolder === 'function' && openFolder(crumbPath) },
-      { icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(crumbPath) },
-      { icon: '&#9733;', label: 'Bookmark This Directory', action: () => typeof addFavDir === 'function' && addFavDir(crumbPath) },
+      { icon: '&#128193;', label: appFmt('menu.open_in_finder'), ..._noEcho, action: () => typeof openFolder === 'function' && openFolder(crumbPath) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(crumbPath) },
+      { icon: '&#9733;', label: appFmt('menu.bookmark_this_directory'), action: () => typeof addFavDir === 'function' && addFavDir(crumbPath) },
     ];
     showContextMenu(e, items);
     return;
@@ -864,8 +864,8 @@ document.addEventListener('contextmenu', (e) => {
     const isAudio = !isDir && typeof AUDIO_EXTS !== 'undefined' && AUDIO_EXTS.includes(ext);
     const items = [];
     if (isAudio) {
-      items.push({ icon: '&#9654;', label: 'Play', action: () => typeof previewAudio === 'function' && previewAudio(path) });
-      items.push({ icon: '&#128269;', label: 'Show in Samples Tab', action: async () => {
+      items.push({ icon: '&#9654;', label: appFmt('menu.play'), ..._noEcho, action: () => typeof previewAudio === 'function' && previewAudio(path) });
+      items.push({ icon: '&#128269;', label: appFmt('menu.show_in_samples_tab'), ..._noEcho, action: async () => {
         // If not in allAudioSamples, add it
         if (typeof allAudioSamples !== 'undefined' && !allAudioSamples.some(s => s.path === path)) {
           try {
@@ -901,31 +901,31 @@ document.addEventListener('contextmenu', (e) => {
           }
         }, 100);
       }});
-      items.push({ icon: '&#128270;', label: 'Find Similar', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
+      items.push({ icon: '&#128270;', label: appFmt('menu.find_similar'), action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
       items.push('---');
     }
     if (isDir) {
-      items.push({ icon: '&#128193;', label: 'Open Directory', action: () => typeof loadDirectory === 'function' && loadDirectory(path) });
+      items.push({ icon: '&#128193;', label: appFmt('menu.open_directory'), ..._noEcho, action: () => typeof loadDirectory === 'function' && loadDirectory(path) });
     }
-    items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => {
+    items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => {
       const dir = isDir ? path : path.replace(/\/[^/]+$/, '');
       if (typeof openFolder === 'function') openFolder(dir);
       else if (typeof openAudioFolder === 'function') openAudioFolder(path);
     }});
-    items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) });
-    items.push({ icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name) });
+    items.push({ icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) });
+    items.push({ icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) });
     items.push('---');
     if (typeof isFavorite === 'function') {
       const fav = isFavorite(path);
       const favType = isDir ? 'folder' : 'file';
-      items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? 'Remove from Favorites' : 'Add to Favorites',
+      items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
         action: () => { fav ? removeFavorite(path) : addFavorite(favType, path, name); if (typeof renderFileList === 'function') renderFileList(); } });
     }
-    items.push({ icon: '&#128221;', label: 'Add Note / Tags', action: () => { if (typeof showNoteEditor === 'function') showNoteEditor(path, name); } });
+    items.push({ icon: '&#128221;', label: appFmt('menu.add_note_tags'), action: () => { if (typeof showNoteEditor === 'function') showNoteEditor(path, name); } });
     if (isAudio) {
       items.push('---');
       const ap = prefs.getItem('autoplayNext') !== 'off';
-      items.push({ icon: ap ? '&#9209;' : '&#9654;', label: ap ? 'Disable Autoplay Next' : 'Enable Autoplay Next',
+      items.push({ icon: ap ? '&#9209;' : '&#9654;', label: ap ? appFmt('menu.disable_autoplay_next') : appFmt('menu.enable_autoplay_next'),
         action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? toastFmt('toast.autoplay_next_disabled') : toastFmt('toast.autoplay_next_enabled')); } });
     }
     showContextMenu(e, items);
@@ -937,7 +937,7 @@ document.addEventListener('contextmenu', (e) => {
   if (diskSeg) {
     const label = diskSeg.getAttribute('title') || diskSeg.textContent.trim();
     const items = [
-      { icon: '&#128203;', label: 'Copy', action: () => copyToClipboard(label) },
+      { icon: '&#128203;', label: appFmt('menu.copy'), ..._noEcho, action: () => copyToClipboard(label) },
     ];
     showContextMenu(e, items);
     return;
@@ -947,7 +947,7 @@ document.addEventListener('contextmenu', (e) => {
   const eqSlider = e.target.closest('.eq-slider, .volume-slider');
   if (eqSlider) {
     const items = [
-      { icon: '&#8634;', label: 'Reset to Default', action: () => { if (typeof resetEq === 'function') resetEq(); } },
+      { icon: '&#8634;', label: appFmt('menu.reset_eq_default'), action: () => { if (typeof resetEq === 'function') resetEq(); } },
     ];
     showContextMenu(e, items);
     return;
@@ -964,23 +964,23 @@ document.addEventListener('contextmenu', (e) => {
     if (metaValue) {
       const label = metaValue.querySelector('.meta-label')?.textContent || '';
       const val = metaValue.querySelector('.meta-value')?.textContent || '';
-      items.push({ icon: '&#128203;', label: `Copy ${label}`, action: () => copyToClipboard(val) });
+      items.push({ icon: '&#128203;', label: appFmt('menu.copy_field_label', { label }), ..._noEcho, action: () => copyToClipboard(val) });
     }
     if (path) {
-      items.push({ icon: '&#128203;', label: 'Copy File Path', action: () => copyToClipboard(path) });
-      items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) });
+      items.push({ icon: '&#128203;', label: appFmt('menu.copy_file_path'), ..._noEcho, action: () => copyToClipboard(path) });
+      items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => typeof openAudioFolder === 'function' && openAudioFolder(path) });
       items.push('---');
-      items.push({ icon: '&#9654;', label: 'Play', action: () => typeof previewAudio === 'function' && previewAudio(path) });
+      items.push({ icon: '&#9654;', label: appFmt('menu.play'), ..._noEcho, action: () => typeof previewAudio === 'function' && previewAudio(path) });
       if (typeof isFavorite === 'function') {
         const fav = isFavorite(path);
         const name = metaPanel.querySelector('.meta-value')?.textContent || '';
-        items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? 'Remove from Favorites' : 'Add to Favorites',
+        items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
           action: () => fav ? removeFavorite(path) : addFavorite('sample', path, name) });
       }
-      items.push({ icon: '&#128221;', label: 'Add Note', action: () => { const name = metaPanel.querySelector('.meta-value')?.textContent || ''; typeof showNoteEditor === 'function' && showNoteEditor(path, name); } });
-      items.push({ icon: '&#128270;', label: 'Find Similar', action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
+      items.push({ icon: '&#128221;', label: appFmt('menu.add_note'), action: () => { const name = metaPanel.querySelector('.meta-value')?.textContent || ''; typeof showNoteEditor === 'function' && showNoteEditor(path, name); } });
+      items.push({ icon: '&#128270;', label: appFmt('menu.find_similar'), action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) });
       items.push('---');
-      items.push({ icon: '&#10005;', label: 'Close Panel', action: () => { const mr = document.getElementById('audioMetaRow'); if (mr) mr.remove(); expandedMetaPath = null; } });
+      items.push({ icon: '&#10005;', label: appFmt('menu.close_panel'), action: () => { const mr = document.getElementById('audioMetaRow'); if (mr) mr.remove(); expandedMetaPath = null; } });
     }
     if (items.length > 0) { showContextMenu(e, items); return; }
   }
@@ -990,8 +990,8 @@ document.addEventListener('contextmenu', (e) => {
   if (waveform) {
     const items = [];
     if (typeof audioPlayerPath !== 'undefined' && audioPlayerPath) {
-      items.push({ icon: '&#128203;', label: 'Copy File Path', action: () => copyToClipboard(audioPlayerPath) });
-      items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => typeof openAudioFolder === 'function' && openAudioFolder(audioPlayerPath) });
+      items.push({ icon: '&#128203;', label: appFmt('menu.copy_file_path'), ..._noEcho, action: () => copyToClipboard(audioPlayerPath) });
+      items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => typeof openAudioFolder === 'function' && openAudioFolder(audioPlayerPath) });
     }
     if (items.length > 0) { showContextMenu(e, items); return; }
   }
@@ -1001,8 +1001,8 @@ document.addEventListener('contextmenu', (e) => {
   if (shortcutKey) {
     const scId = shortcutKey.dataset.shortcutId;
     const items = [
-      { icon: '&#9881;', label: 'Rebind This Shortcut', action: () => shortcutKey.click() },
-      { icon: '&#8634;', label: 'Reset All Shortcuts', action: () => typeof resetShortcuts === 'function' && resetShortcuts() },
+      { icon: '&#9881;', label: appFmt('menu.rebind_shortcut'), action: () => shortcutKey.click() },
+      { icon: '&#8634;', label: appFmt('menu.reset_all_shortcuts'), action: () => typeof resetShortcuts === 'function' && resetShortcuts() },
     ];
     showContextMenu(e, items);
     return;
@@ -1013,8 +1013,8 @@ document.addEventListener('contextmenu', (e) => {
   if (schemeBtn) {
     const scheme = schemeBtn.dataset.scheme;
     const items = [
-      { icon: '&#127912;', label: `Apply ${scheme || 'scheme'}`, action: () => schemeBtn.click() },
-      { icon: '&#128203;', label: 'Copy Scheme Name', action: () => copyToClipboard(scheme || '') },
+      { icon: '&#127912;', label: appFmt('menu.apply_scheme', { scheme: scheme || 'scheme' }), ..._noEcho, action: () => schemeBtn.click() },
+      { icon: '&#128203;', label: appFmt('menu.copy_scheme_name'), ..._noEcho, action: () => copyToClipboard(scheme || '') },
     ];
     showContextMenu(e, items);
     return;
@@ -1024,7 +1024,7 @@ document.addEventListener('contextmenu', (e) => {
   const progressBar = e.target.closest('.audio-progress-bar, .global-progress, .progress-bar');
   if (progressBar) {
     const items = [
-      { icon: '&#9632;', label: 'Stop All Scans', action: () => typeof stopAll === 'function' && stopAll() },
+      { icon: '&#9632;', label: appFmt('menu.stop_all_scans'), action: () => typeof stopAll === 'function' && stopAll() },
     ];
     showContextMenu(e, items);
     return;
@@ -1034,12 +1034,12 @@ document.addEventListener('contextmenu', (e) => {
   const spSection = e.target.closest('.np-smart-playlists-section');
   if (spSection && !e.target.closest('.sp-item')) {
     const items = [
-      { icon: '&#127926;', label: 'New Smart Playlist', action: () => typeof showSmartPlaylistEditor === 'function' && showSmartPlaylistEditor(null) },
+      { icon: '&#127926;', label: appFmt('menu.new_smart_playlist'), action: () => typeof showSmartPlaylistEditor === 'function' && showSmartPlaylistEditor(null) },
       '---',
     ];
     if (typeof getSmartPlaylistPresets === 'function') {
       for (const preset of getSmartPlaylistPresets()) {
-        items.push({ icon: '&#127925;', label: `Add: ${preset.name}`, action: () => {
+        items.push({ icon: '&#127925;', label: appFmt('menu.add_smart_playlist_named', { name: preset.name }), action: () => {
           if (typeof createSmartPlaylist === 'function') {
             const pl = createSmartPlaylist(preset.name, preset.rules);
             pl.matchMode = preset.matchMode;
@@ -1057,8 +1057,8 @@ document.addEventListener('contextmenu', (e) => {
   const simPanel = e.target.closest('.similar-panel');
   if (simPanel && !e.target.closest('[data-similar-path]')) {
     const items = [
-      { icon: '&#9866;', label: 'Minimize', action: () => typeof minimizeSimilarPanel === 'function' && minimizeSimilarPanel() },
-      { icon: '&#10005;', label: 'Close', action: () => typeof closeSimilarPanel === 'function' && closeSimilarPanel() },
+      { icon: '&#9866;', label: appFmt('menu.minimize'), action: () => typeof minimizeSimilarPanel === 'function' && minimizeSimilarPanel() },
+      { icon: '&#10005;', label: appFmt('menu.close'), action: () => typeof closeSimilarPanel === 'function' && closeSimilarPanel() },
     ];
     showContextMenu(e, items);
     return;
@@ -1073,11 +1073,11 @@ document.addEventListener('contextmenu', (e) => {
     if (barRow) {
       const label = barRow.querySelector('.hm-bar-label')?.textContent || '';
       const val = barRow.querySelector('.hm-bar-val')?.textContent || '';
-      items.push({ icon: '&#128203;', label: `Copy "${label}: ${val}"`, action: () => copyToClipboard(`${label}: ${val}`) });
+      items.push({ icon: '&#128203;', label: appFmt('menu.copy_quoted_label_val', { label, val }), ..._noEcho, action: () => copyToClipboard(`${label}: ${val}`) });
     }
     if (card) {
       const title = card.querySelector('.hm-card-title')?.textContent || '';
-      items.push({ icon: '&#128203;', label: `Copy ${title} Data`, action: () => {
+      items.push({ icon: '&#128203;', label: appFmt('menu.copy_tabular_title', { title }), ..._noEcho, action: () => {
         const rows = [...card.querySelectorAll('.hm-bar-row')].map(r => {
           const l = r.querySelector('.hm-bar-label')?.textContent || '';
           const v = r.querySelector('.hm-bar-val')?.textContent || '';
@@ -1087,8 +1087,8 @@ document.addEventListener('contextmenu', (e) => {
       }});
     }
     items.push('---');
-    items.push({ icon: '&#8634;', label: 'Refresh Dashboard', action: () => { if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard(); } });
-    items.push({ icon: '&#10005;', label: 'Close Dashboard', action: () => { if (typeof closeHeatmapDash === 'function') closeHeatmapDash(); } });
+    items.push({ icon: '&#8634;', label: appFmt('menu.refresh_dashboard'), action: () => { if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard(); } });
+    items.push({ icon: '&#10005;', label: appFmt('menu.close_dashboard'), action: () => { if (typeof closeHeatmapDash === 'function') closeHeatmapDash(); } });
     showContextMenu(e, items);
     return;
   }
@@ -1100,10 +1100,10 @@ document.addEventListener('contextmenu', (e) => {
     const dirs = body ? [...body.querySelectorAll('.walker-dir')].map(d => d.textContent).join('\n') : '';
     const title = walkerTile.querySelector('.walker-tile-title, h4, h3')?.textContent?.trim() || 'Walker';
     const items = [
-      { icon: '&#128203;', label: 'Copy All Paths', action: () => copyToClipboard(dirs), disabled: !dirs },
-      { icon: '&#128203;', label: 'Copy Tile Title', action: () => copyToClipboard(title) },
+      { icon: '&#128203;', label: appFmt('menu.copy_all_paths'), ..._noEcho, action: () => copyToClipboard(dirs), disabled: !dirs },
+      { icon: '&#128203;', label: appFmt('menu.copy_tile_title'), ..._noEcho, action: () => copyToClipboard(title) },
       '---',
-      { icon: '&#10005;', label: 'Clear Tile', action: () => { if (body) body.innerHTML = ''; showToast(toastFmt('toast.tile_cleared', { title })); } },
+      { icon: '&#10005;', label: appFmt('menu.clear_tile'), action: () => { if (body) body.innerHTML = ''; showToast(toastFmt('toast.tile_cleared', { title })); } },
     ];
     showContextMenu(e, items);
     return;
@@ -1115,7 +1115,7 @@ document.addEventListener('contextmenu', (e) => {
     const label = vizTile.querySelector('.viz-tile-label')?.textContent?.trim() || 'Visualizer';
     const canvas = vizTile.querySelector('canvas');
     const items = [
-      { icon: '&#128247;', label: 'Export Snapshot (PNG)', action: () => {
+      { icon: '&#128247;', label: appFmt('menu.export_snapshot_png'), action: () => {
         if (canvas) {
           const link = document.createElement('a');
           link.download = `${label.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.png`;
@@ -1124,9 +1124,9 @@ document.addEventListener('contextmenu', (e) => {
           showToast(toastFmt('toast.snapshot_exported'));
         }
       }, disabled: !canvas },
-      { icon: '&#128203;', label: 'Copy Tile Name', action: () => typeof copyToClipboard === 'function' && copyToClipboard(label) },
+      { icon: '&#128203;', label: appFmt('menu.copy_tile_name'), ..._noEcho, action: () => typeof copyToClipboard === 'function' && copyToClipboard(label) },
       '---',
-      { icon: '&#128260;', label: 'Toggle Fullscreen', action: () => {
+      { icon: '&#128260;', label: appFmt('menu.toggle_fullscreen'), action: () => {
         vizTile.classList.toggle('viz-fullscreen');
         if (vizTile.classList.contains('viz-fullscreen')) {
           vizTile.requestFullscreen?.().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
@@ -1144,15 +1144,15 @@ document.addEventListener('contextmenu', (e) => {
   if (settingsSection) {
     const heading = settingsSection.querySelector('.settings-heading')?.textContent?.trim() || 'Section';
     const items = [
-      { icon: '&#128203;', label: 'Copy Section Name', action: () => typeof copyToClipboard === 'function' && copyToClipboard(heading) },
-      { icon: '&#9650;', label: 'Move Up', action: () => {
+      { icon: '&#128203;', label: appFmt('menu.copy_section_name'), ..._noEcho, action: () => typeof copyToClipboard === 'function' && copyToClipboard(heading) },
+      { icon: '&#9650;', label: appFmt('menu.move_up'), action: () => {
         const prev = settingsSection.previousElementSibling;
         if (prev && prev.classList.contains('settings-section')) {
           settingsSection.parentNode.insertBefore(settingsSection, prev);
           showToast(toastFmt('toast.moved_heading_up', { heading }));
         }
       }},
-      { icon: '&#9660;', label: 'Move Down', action: () => {
+      { icon: '&#9660;', label: appFmt('menu.move_down'), action: () => {
         const next = settingsSection.nextElementSibling;
         if (next && next.classList.contains('settings-section')) {
           next.parentNode.insertBefore(next, settingsSection);
@@ -1160,7 +1160,7 @@ document.addEventListener('contextmenu', (e) => {
         }
       }},
       '---',
-      { icon: '&#128065;', label: settingsSection.classList.contains('collapsed') ? 'Expand Section' : 'Collapse Section', action: () => {
+      { icon: '&#128065;', label: settingsSection.classList.contains('collapsed') ? appFmt('menu.section_expand') : appFmt('menu.section_collapse'), action: () => {
         settingsSection.classList.toggle('collapsed');
         const body = settingsSection.querySelectorAll('.settings-row');
         body.forEach(r => r.style.display = settingsSection.classList.contains('collapsed') ? 'none' : '');

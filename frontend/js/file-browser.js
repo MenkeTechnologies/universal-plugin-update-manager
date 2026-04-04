@@ -1,4 +1,5 @@
 // ── File Browser ──
+const _ctxMenuNoEcho = { skipEchoToast: true };
 
 let _fileBrowserPath = null;
 let _fileBrowserEntries = [];
@@ -517,35 +518,35 @@ document.addEventListener('contextmenu', (e) => {
 
   const items = [];
   if (isDir) {
-    items.push({ icon: '&#128193;', label: 'Open Folder', action: () => loadDirectory(path) });
-    items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => window.vstUpdater.openPresetFolder(path) });
+    items.push({ icon: '&#128193;', label: appFmt('menu.open_folder'), ..._ctxMenuNoEcho, action: () => loadDirectory(path) });
+    items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._ctxMenuNoEcho, action: () => window.vstUpdater.openPresetFolder(path) });
     const dirFav = isFavDir(path);
-    items.push({ icon: dirFav ? '&#9734;' : '&#9733;', label: dirFav ? 'Remove Bookmark' : 'Bookmark Directory',
+    items.push({ icon: dirFav ? '&#9734;' : '&#9733;', label: dirFav ? appFmt('menu.remove_bookmark') : appFmt('menu.bookmark_directory'), ..._ctxMenuNoEcho,
       action: () => dirFav ? removeFavDir(path) : addFavDir(path) });
   } else {
     if (AUDIO_EXTS.includes(ext)) {
-      items.push({ icon: '&#9654;', label: 'Play', action: () => previewAudio(path) });
+      items.push({ icon: '&#9654;', label: appFmt('menu.play'), ..._ctxMenuNoEcho, action: () => previewAudio(path) });
     }
-    items.push({ icon: '&#128194;', label: 'Open', action: () => opener_open(path) });
-    items.push({ icon: '&#128193;', label: 'Reveal in Finder', action: () => {
+    items.push({ icon: '&#128194;', label: appFmt('menu.open'), ..._ctxMenuNoEcho, action: () => opener_open(path) });
+    items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._ctxMenuNoEcho, action: () => {
       const dir = path.replace(/\/[^/]+$/, '');
       window.vstUpdater.openPresetFolder(path);
     }});
   }
   items.push('---');
-  items.push({ icon: '&#128203;', label: 'Copy Path', action: () => copyToClipboard(path) });
-  items.push({ icon: '&#128203;', label: 'Copy Name', action: () => copyToClipboard(name.replace(/^[\u{1F4DD}]/u, '').trim()) });
+  items.push({ icon: '&#128203;', label: appFmt('menu.copy_path'), ..._ctxMenuNoEcho, action: () => copyToClipboard(path) });
+  items.push({ icon: '&#128203;', label: appFmt('menu.copy_name'), ..._ctxMenuNoEcho, action: () => copyToClipboard(name.replace(/^[\u{1F4DD}]/u, '').trim()) });
   items.push('---');
 
   // ALS XML viewer
   if (ext === 'als' && typeof showAlsViewer === 'function') {
-    items.push({ icon: '&#128196;', label: 'Explore XML Contents', action: () => showAlsViewer(path, name) });
+    items.push({ icon: '&#128196;', label: appFmt('menu.explore_xml_contents'), action: () => showAlsViewer(path, name) });
     items.push('---');
   }
 
   // Tags & notes
   const note = getNote(path);
-  items.push({ icon: '&#128221;', label: note ? 'Edit Note' : 'Add Note', action: () => showNoteEditor(path, name) });
+  items.push({ icon: '&#128221;', label: note ? appFmt('menu.edit_note') : appFmt('menu.add_note'), action: () => showNoteEditor(path, name) });
 
   const allTags = getAllTags();
   const currentTags = note?.tags || [];
@@ -553,7 +554,7 @@ document.addEventListener('contextmenu', (e) => {
     items.push('---');
     for (const tag of allTags.slice(0, 6)) {
       const has = currentTags.includes(tag);
-      items.push({ icon: has ? '&#10003;' : '&#9634;', label: `${has ? 'Remove' : 'Add'} tag: ${tag}`,
+      items.push({ icon: has ? '&#10003;' : '&#9634;', label: has ? appFmt('menu.remove_tag_named', { tag }) : appFmt('menu.add_tag_named', { tag }), ..._ctxMenuNoEcho,
         action: () => { if (has) removeTagFromItem(path, tag); else addTagToItem(path, tag); showToast(has ? toastFmt('toast.tag_removed', { tag }) : toastFmt('toast.tag_added', { tag })); renderFileList(); }
       });
     }
@@ -561,12 +562,12 @@ document.addEventListener('contextmenu', (e) => {
 
   items.push('---');
   const fav = isFavorite(path);
-  items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? 'Remove from Favorites' : 'Add to Favorites',
+  items.push({ icon: fav ? '&#9734;' : '&#9733;', label: fav ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._ctxMenuNoEcho,
     action: () => fav ? removeFavorite(path) : addFavorite(isDir ? 'folder' : (AUDIO_EXTS.includes(ext) ? 'sample' : 'file'), path, name, { format: ext.toUpperCase() })
   });
 
   items.push('---');
-  items.push({ icon: '&#128465;', label: 'Delete', action: async () => {
+  items.push({ icon: '&#128465;', label: appFmt('menu.delete'), action: async () => {
     if (!confirm(appFmt('confirm.delete_file_browser', { name }))) return;
     try {
       await window.vstUpdater.deleteFile(path);

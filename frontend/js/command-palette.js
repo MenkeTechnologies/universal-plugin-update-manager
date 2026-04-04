@@ -12,66 +12,66 @@ function collectPaletteItems() {
 
   // Tabs — always available
   const tabs = [
-    { type: 'tab', name: 'Plugins', icon: '&#9889;', action: () => switchTab('plugins') },
-    { type: 'tab', name: 'Samples', icon: '&#127925;', action: () => switchTab('samples') },
-    { type: 'tab', name: 'DAW Projects', icon: '&#127911;', action: () => switchTab('daw') },
-    { type: 'tab', name: 'Presets', icon: '&#127924;', action: () => switchTab('presets') },
-    { type: 'tab', name: 'Favorites', icon: '&#9733;', action: () => switchTab('favorites') },
-    { type: 'tab', name: 'Notes', icon: '&#128221;', action: () => switchTab('notes') },
-    { type: 'tab', name: 'Tags', icon: '&#127991;', action: () => switchTab('tags') },
-    { type: 'tab', name: 'History', icon: '&#128197;', action: () => switchTab('history') },
-    { type: 'tab', name: 'Files', icon: '&#128193;', action: () => switchTab('files') },
-    { type: 'tab', name: 'Visualizer', icon: '&#127911;', action: () => switchTab('visualizer') },
-    { type: 'tab', name: 'Walkers', icon: '&#128270;', action: () => switchTab('walkers') },
-    { type: 'tab', name: 'MIDI', icon: '&#127924;', action: () => switchTab('midi') },
-    { type: 'tab', name: 'Settings', icon: '&#9881;', action: () => switchTab('settings') },
+    { type: 'tab', name: appFmt('menu.tab_plugins'), icon: '&#9889;', action: () => switchTab('plugins') },
+    { type: 'tab', name: appFmt('menu.tab_samples'), icon: '&#127925;', action: () => switchTab('samples') },
+    { type: 'tab', name: appFmt('menu.tab_daw'), icon: '&#127911;', action: () => switchTab('daw') },
+    { type: 'tab', name: appFmt('menu.tab_presets'), icon: '&#127924;', action: () => switchTab('presets') },
+    { type: 'tab', name: appFmt('menu.tab_favorites'), icon: '&#9733;', action: () => switchTab('favorites') },
+    { type: 'tab', name: appFmt('menu.tab_notes'), icon: '&#128221;', action: () => switchTab('notes') },
+    { type: 'tab', name: appFmt('menu.tab_tags'), icon: '&#127991;', action: () => switchTab('tags') },
+    { type: 'tab', name: appFmt('menu.tab_history'), icon: '&#128197;', action: () => switchTab('history') },
+    { type: 'tab', name: appFmt('menu.tab_files'), icon: '&#128193;', action: () => switchTab('files') },
+    { type: 'tab', name: appFmt('menu.tab_visualizer'), icon: '&#127911;', action: () => switchTab('visualizer') },
+    { type: 'tab', name: appFmt('menu.tab_walkers'), icon: '&#128270;', action: () => switchTab('walkers') },
+    { type: 'tab', name: appFmt('menu.tab_midi'), icon: '&#127924;', action: () => switchTab('midi') },
+    { type: 'tab', name: appFmt('menu.tab_settings'), icon: '&#9881;', action: () => switchTab('settings') },
   ];
   items.push(...tabs);
 
   // Actions — all trigger toast confirmation
-  items.push({ type: 'action', name: 'Scan Plugins', icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_plugins')); scanPlugins(); } });
-  items.push({ type: 'action', name: 'Scan Samples', icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_samples')); scanAudioSamples(); } });
-  items.push({ type: 'action', name: 'Scan DAW Projects', icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_daw_projects')); scanDawProjects(); } });
-  items.push({ type: 'action', name: 'Scan Presets', icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_presets')); scanPresets(); } });
-  items.push({ type: 'action', name: 'Check Updates', icon: '&#9889;', action: () => { showToast(toastFmt('toast.checking_updates')); checkUpdates(); } });
-  items.push({ type: 'action', name: 'Find Duplicates', icon: '&#128270;', action: () => { showToast(toastFmt('toast.scanning_duplicates')); showDuplicateReport(); } });
-  items.push({ type: 'action', name: 'Reset All Scans', icon: '&#128465;', action: () => { showToast(toastFmt('toast.resetting_scans')); resetAllScans(); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_plugins'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_plugins')); scanPlugins(); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_samples'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_samples')); scanAudioSamples(); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_daw'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_daw_projects')); scanDawProjects(); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_presets'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_presets')); scanPresets(); } });
+  items.push({ type: 'action', name: appFmt('menu.check_updates'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.checking_updates')); checkUpdates(); } });
+  items.push({ type: 'action', name: appFmt('menu.find_duplicates'), icon: '&#128270;', action: () => { showToast(toastFmt('toast.scanning_duplicates')); showDuplicateReport(); } });
+  items.push({ type: 'action', name: appFmt('menu.reset_all_scans'), icon: '&#128465;', action: () => { showToast(toastFmt('toast.resetting_scans')); resetAllScans(); } });
   if (typeof buildXrefIndex === 'function') {
-    items.push({ type: 'action', name: 'Build Plugin Index', icon: '&#9889;', action: () => { showToast(toastFmt('toast.building_plugin_index')); buildXrefIndex(); } });
+    items.push({ type: 'action', name: appFmt('menu.build_plugin_index'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.building_plugin_index')); buildXrefIndex(); } });
   }
   if (typeof showDepGraph === 'function') {
-    items.push({ type: 'action', name: 'Plugin Dependency Graph', icon: '&#128200;', action: () => { showToast(toastFmt('toast.opening_dep_graph')); showDepGraph(); } });
+    items.push({ type: 'action', name: appFmt('menu.dep_graph'), icon: '&#128200;', action: () => { showToast(toastFmt('toast.opening_dep_graph')); showDepGraph(); } });
   }
   if (typeof findSimilarSamples === 'function' && typeof audioPlayerPath !== 'undefined' && audioPlayerPath) {
-    items.push({ type: 'action', name: 'Find Similar to Current Track', icon: '&#128270;', action: () => { showToast(toastFmt('toast.finding_similar')); findSimilarSamples(audioPlayerPath); } });
+    items.push({ type: 'action', name: appFmt('menu.find_similar_current'), icon: '&#128270;', action: () => { showToast(toastFmt('toast.finding_similar')); findSimilarSamples(audioPlayerPath); } });
   }
   if (typeof showPlayer === 'function') {
     const np = document.getElementById('audioNowPlaying');
     const visible = np && np.classList.contains('active');
-    items.push({ type: 'action', name: visible ? 'Hide Audio Player' : 'Show Audio Player', icon: '&#9835;', action: () => { visible ? hidePlayer() : showPlayer(); showToast(visible ? toastFmt('toast.player_hidden') : toastFmt('toast.player_shown')); } });
+    items.push({ type: 'action', name: visible ? appFmt('menu.hide_audio_player') : appFmt('menu.show_audio_player'), icon: '&#9835;', action: () => { visible ? hidePlayer() : showPlayer(); showToast(visible ? toastFmt('toast.player_hidden') : toastFmt('toast.player_shown')); } });
   }
   if (typeof showHeatmapDashboard === 'function') {
-    items.push({ type: 'action', name: 'Heatmap Dashboard', icon: '&#128202;', action: () => { showToast(toastFmt('toast.opening_dashboard')); showHeatmapDashboard(); } });
+    items.push({ type: 'action', name: appFmt('menu.heatmap_dashboard'), icon: '&#128202;', action: () => { showToast(toastFmt('toast.opening_dashboard')); showHeatmapDashboard(); } });
   }
   if (typeof showSmartPlaylistEditor === 'function') {
-    items.push({ type: 'action', name: 'New Smart Playlist', icon: '&#127926;', action: () => { showToast(toastFmt('toast.creating_smart_playlist')); showSmartPlaylistEditor(null); } });
+    items.push({ type: 'action', name: appFmt('menu.new_smart_playlist'), icon: '&#127926;', action: () => { showToast(toastFmt('toast.creating_smart_playlist')); showSmartPlaylistEditor(null); } });
   }
   if (typeof exportSettingsPdf === 'function') {
-    items.push({ type: 'action', name: 'Export Settings & Keybindings', icon: '&#128196;', action: () => { showToast(toastFmt('toast.exporting_settings_pdf')); exportSettingsPdf(); } });
+    items.push({ type: 'action', name: appFmt('menu.export_settings_keybindings'), icon: '&#128196;', action: () => { showToast(toastFmt('toast.exporting_settings_pdf')); exportSettingsPdf(); } });
   }
   if (typeof exportLogPdf === 'function') {
-    items.push({ type: 'action', name: 'Export App Log', icon: '&#128196;', action: () => { showToast(toastFmt('toast.exporting_log')); exportLogPdf(); } });
+    items.push({ type: 'action', name: appFmt('menu.export_app_log'), icon: '&#128196;', action: () => { showToast(toastFmt('toast.exporting_log')); exportLogPdf(); } });
   }
   if (typeof exportMidi === 'function') {
-    items.push({ type: 'action', name: 'Export MIDI Files', icon: '&#127924;', action: () => { showToast(toastFmt('toast.exporting_midi')); exportMidi(); } });
+    items.push({ type: 'action', name: appFmt('menu.export_midi_files'), icon: '&#127924;', action: () => { showToast(toastFmt('toast.exporting_midi')); exportMidi(); } });
   }
   if (typeof exportXref === 'function') {
-    items.push({ type: 'action', name: 'Export Plugin Cross-Reference', icon: '&#9889;', action: () => { showToast(toastFmt('toast.exporting_xref')); exportXref(); } });
+    items.push({ type: 'action', name: appFmt('menu.export_plugin_xref'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.exporting_xref')); exportXref(); } });
   }
   if (typeof exportSmartPlaylists === 'function') {
-    items.push({ type: 'action', name: 'Export Smart Playlists', icon: '&#127926;', action: () => { showToast(toastFmt('toast.exporting_playlists')); exportSmartPlaylists(); } });
+    items.push({ type: 'action', name: appFmt('menu.export_smart_playlists'), icon: '&#127926;', action: () => { showToast(toastFmt('toast.exporting_playlists')); exportSmartPlaylists(); } });
   }
-  items.push({ type: 'action', name: 'Clear All Caches', icon: '&#128465;', action: () => {
+  items.push({ type: 'action', name: appFmt('menu.clear_all_caches'), icon: '&#128465;', action: () => {
     showToast(toastFmt('toast.clearing_caches'));
     window.vstUpdater.dbClearCaches().then(() => {
       if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; }
@@ -80,96 +80,96 @@ function collectPaletteItems() {
     }).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error'));
   }});
   if (typeof settingToggleTheme === 'function') {
-    items.push({ type: 'action', name: 'Toggle Dark/Light Theme', icon: '&#127912;', action: () => settingToggleTheme() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_dark_light_theme'), icon: '&#127912;', action: () => settingToggleTheme() });
   }
-  items.push({ type: 'action', name: 'Scan All', icon: '&#9889;', action: () => { showToast(toastFmt('toast.scanning_all')); typeof scanAll === 'function' && scanAll(); } });
-  items.push({ type: 'action', name: 'Stop All Scans', icon: '&#9632;', action: () => { showToast(toastFmt('toast.stopping_scans')); typeof stopAll === 'function' && stopAll(); } });
-  items.push({ type: 'action', name: 'Export Current Tab', icon: '&#8615;', action: () => { typeof _exportCurrentTab === 'function' && _exportCurrentTab(); } });
-  items.push({ type: 'action', name: 'Import to Current Tab', icon: '&#8613;', action: () => { typeof _importCurrentTab === 'function' && _importCurrentTab(); } });
-  items.push({ type: 'action', name: 'Help / Keyboard Shortcuts', icon: '&#10068;', action: () => { typeof toggleHelpOverlay === 'function' && toggleHelpOverlay(); } });
-  items.push({ type: 'action', name: 'Open Log File', icon: '&#128196;', action: () => { showToast(toastFmt('toast.opening_log')); window.vstUpdater.getPrefsPath().then(p => { const lp = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(lp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_all'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.scanning_all')); typeof scanAll === 'function' && scanAll(); } });
+  items.push({ type: 'action', name: appFmt('menu.stop_all_scans'), icon: '&#9632;', action: () => { showToast(toastFmt('toast.stopping_scans')); typeof stopAll === 'function' && stopAll(); } });
+  items.push({ type: 'action', name: appFmt('menu.export_current_tab'), icon: '&#8615;', action: () => { typeof _exportCurrentTab === 'function' && _exportCurrentTab(); } });
+  items.push({ type: 'action', name: appFmt('menu.import_to_current_tab'), icon: '&#8613;', action: () => { typeof _importCurrentTab === 'function' && _importCurrentTab(); } });
+  items.push({ type: 'action', name: appFmt('menu.help_keyboard_shortcuts'), icon: '&#10068;', action: () => { typeof toggleHelpOverlay === 'function' && toggleHelpOverlay(); } });
+  items.push({ type: 'action', name: appFmt('menu.open_log_file'), icon: '&#128196;', action: () => { showToast(toastFmt('toast.opening_log')); window.vstUpdater.getPrefsPath().then(p => { const lp = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(lp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); } });
 
   // Toggles
-  if (typeof settingToggleCrt === 'function') items.push({ type: 'action', name: 'Toggle CRT Effects', icon: '&#128187;', action: () => settingToggleCrt() });
-  if (typeof settingToggleNeonGlow === 'function') items.push({ type: 'action', name: 'Toggle Neon Glow', icon: '&#10024;', action: () => settingToggleNeonGlow() });
-  if (typeof settingToggleAutoScan === 'function') items.push({ type: 'action', name: 'Toggle Auto-Scan on Launch', icon: '&#8635;', action: () => settingToggleAutoScan() });
-  if (typeof settingToggleAutoUpdate === 'function') items.push({ type: 'action', name: 'Toggle Auto-Check Updates', icon: '&#9889;', action: () => settingToggleAutoUpdate() });
-  if (typeof settingToggleFolderWatch === 'function') items.push({ type: 'action', name: 'Toggle Folder Watch', icon: '&#128065;', action: () => settingToggleFolderWatch() });
-  if (typeof settingToggleSingleClickPlay === 'function') items.push({ type: 'action', name: 'Toggle Single-Click Play', icon: '&#9654;', action: () => settingToggleSingleClickPlay() });
-  if (typeof settingToggleAutoplayNext === 'function') items.push({ type: 'action', name: 'Toggle Autoplay Next', icon: '&#9197;', action: () => settingToggleAutoplayNext() });
-  if (typeof settingToggleShowPlayerOnStartup === 'function') items.push({ type: 'action', name: 'Toggle Show Player on Startup', icon: '&#9835;', action: () => settingToggleShowPlayerOnStartup() });
-  if (typeof settingToggleExpandOnClick === 'function') items.push({ type: 'action', name: 'Toggle Expand on Click', icon: '&#8597;', action: () => settingToggleExpandOnClick() });
-  if (typeof settingToggleIncludeBackups === 'function') items.push({ type: 'action', name: 'Toggle Include Ableton Backups', icon: '&#128190;', action: () => settingToggleIncludeBackups() });
+  if (typeof settingToggleCrt === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_crt'), icon: '&#128187;', action: () => settingToggleCrt() });
+  if (typeof settingToggleNeonGlow === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_neon_glow'), icon: '&#10024;', action: () => settingToggleNeonGlow() });
+  if (typeof settingToggleAutoScan === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_auto_scan_launch'), icon: '&#8635;', action: () => settingToggleAutoScan() });
+  if (typeof settingToggleAutoUpdate === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_auto_check_updates'), icon: '&#9889;', action: () => settingToggleAutoUpdate() });
+  if (typeof settingToggleFolderWatch === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_folder_watch'), icon: '&#128065;', action: () => settingToggleFolderWatch() });
+  if (typeof settingToggleSingleClickPlay === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_single_click_play'), icon: '&#9654;', action: () => settingToggleSingleClickPlay() });
+  if (typeof settingToggleAutoplayNext === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_autoplay_next'), icon: '&#9197;', action: () => settingToggleAutoplayNext() });
+  if (typeof settingToggleShowPlayerOnStartup === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_show_player_startup'), icon: '&#9835;', action: () => settingToggleShowPlayerOnStartup() });
+  if (typeof settingToggleExpandOnClick === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_expand_on_click'), icon: '&#8597;', action: () => settingToggleExpandOnClick() });
+  if (typeof settingToggleIncludeBackups === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_include_ableton_backups'), icon: '&#128190;', action: () => settingToggleIncludeBackups() });
 
   // Resets & Clears
-  if (typeof resetTabOrder === 'function') items.push({ type: 'action', name: 'Reset Tab Order', icon: '&#8634;', action: () => { resetTabOrder(); showToast(toastFmt('toast.tab_order_reset')); } });
-  if (typeof resetSettingsSectionOrder === 'function') items.push({ type: 'action', name: 'Reset Settings Layout', icon: '&#8634;', action: () => { resetSettingsSectionOrder(); showToast(toastFmt('toast.settings_layout_reset')); } });
-  if (typeof resetFzfParams === 'function') items.push({ type: 'action', name: 'Reset Search Weights', icon: '&#8634;', action: () => { resetFzfParams(); showToast(toastFmt('toast.search_weights_reset')); } });
-  if (typeof settingResetAllUI === 'function') items.push({ type: 'action', name: 'Reset All UI Layout', icon: '&#9888;', action: () => { settingResetAllUI(); showToast(toastFmt('toast.all_ui_layout_reset')); } });
-  if (typeof settingResetColumns === 'function') items.push({ type: 'action', name: 'Reset Column Widths', icon: '&#8634;', action: () => { settingResetColumns(); showToast(toastFmt('toast.column_widths_reset')); } });
-  if (typeof settingClearAllHistory === 'function') items.push({ type: 'action', name: 'Clear All Scan History', icon: '&#128465;', action: () => { settingClearAllHistory(); showToast(toastFmt('toast.all_history_cleared')); } });
-  if (typeof settingClearKvrCache === 'function') items.push({ type: 'action', name: 'Clear KVR Cache', icon: '&#128465;', action: () => { settingClearKvrCache(); showToast(toastFmt('toast.kvr_cache_cleared_palette')); } });
-  items.push({ type: 'action', name: 'Clear App Log', icon: '&#128465;', action: () => { window.vstUpdater.clearLog().then(() => showToast(toastFmt('toast.log_cleared'))).catch(() => showToast(toastFmt('toast.failed_clear_log'), 4000, 'error')); } });
-  items.push({ type: 'action', name: 'Open Preferences File', icon: '&#128196;', action: () => { showToast(toastFmt('toast.opening_preferences')); typeof openPrefsFile === 'function' && openPrefsFile(); } });
-  items.push({ type: 'action', name: 'Open Data Directory', icon: '&#128193;', action: () => { showToast(toastFmt('toast.opening_data_dir')); window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir); }); } });
-  if (typeof clearRecentlyPlayed === 'function') items.push({ type: 'action', name: 'Clear Play History', icon: '&#128465;', action: () => clearRecentlyPlayed() });
-  if (typeof clearFavorites === 'function') items.push({ type: 'action', name: 'Clear All Favorites', icon: '&#128465;', action: () => clearFavorites() });
-  if (typeof clearAllNotes === 'function') items.push({ type: 'action', name: 'Clear All Notes & Tags', icon: '&#128465;', action: () => clearAllNotes() });
-  items.push({ type: 'action', name: 'Open Preferences File', icon: '&#128196;', action: () => typeof window.vstUpdater.openPrefsFile === 'function' && window.vstUpdater.openPrefsFile() });
-  items.push({ type: 'action', name: 'Focus Search', icon: '&#128269;', action: () => { const tab = document.querySelector('.tab-content.active'); const input = tab?.querySelector('input[type="text"]'); if (input) { input.focus(); input.select(); } } });
+  if (typeof resetTabOrder === 'function') items.push({ type: 'action', name: appFmt('menu.reset_tabs'), icon: '&#8634;', action: () => { resetTabOrder(); showToast(toastFmt('toast.tab_order_reset')); } });
+  if (typeof resetSettingsSectionOrder === 'function') items.push({ type: 'action', name: appFmt('menu.reset_settings_layout'), icon: '&#8634;', action: () => { resetSettingsSectionOrder(); showToast(toastFmt('toast.settings_layout_reset')); } });
+  if (typeof resetFzfParams === 'function') items.push({ type: 'action', name: appFmt('menu.reset_search_weights'), icon: '&#8634;', action: () => { resetFzfParams(); showToast(toastFmt('toast.search_weights_reset')); } });
+  if (typeof settingResetAllUI === 'function') items.push({ type: 'action', name: appFmt('menu.reset_all_ui_layout'), icon: '&#9888;', action: () => { settingResetAllUI(); showToast(toastFmt('toast.all_ui_layout_reset')); } });
+  if (typeof settingResetColumns === 'function') items.push({ type: 'action', name: appFmt('menu.reset_columns'), icon: '&#8634;', action: () => { settingResetColumns(); showToast(toastFmt('toast.column_widths_reset')); } });
+  if (typeof settingClearAllHistory === 'function') items.push({ type: 'action', name: appFmt('menu.clear_all_scan_history'), icon: '&#128465;', action: () => { settingClearAllHistory(); showToast(toastFmt('toast.all_history_cleared')); } });
+  if (typeof settingClearKvrCache === 'function') items.push({ type: 'action', name: appFmt('menu.clear_kvr'), icon: '&#128465;', action: () => { settingClearKvrCache(); showToast(toastFmt('toast.kvr_cache_cleared_palette')); } });
+  items.push({ type: 'action', name: appFmt('menu.clear_app_log'), icon: '&#128465;', action: () => { window.vstUpdater.clearLog().then(() => showToast(toastFmt('toast.log_cleared'))).catch(() => showToast(toastFmt('toast.failed_clear_log'), 4000, 'error')); } });
+  items.push({ type: 'action', name: appFmt('menu.preferences'), icon: '&#128196;', action: () => { showToast(toastFmt('toast.opening_preferences')); typeof openPrefsFile === 'function' && openPrefsFile(); } });
+  items.push({ type: 'action', name: appFmt('menu.open_data_directory'), icon: '&#128193;', action: () => { showToast(toastFmt('toast.opening_data_dir')); window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir); }); } });
+  if (typeof clearRecentlyPlayed === 'function') items.push({ type: 'action', name: appFmt('menu.clear_play_history'), icon: '&#128465;', action: () => clearRecentlyPlayed() });
+  if (typeof clearFavorites === 'function') items.push({ type: 'action', name: appFmt('menu.clear_favorites'), icon: '&#128465;', action: () => clearFavorites() });
+  if (typeof clearAllNotes === 'function') items.push({ type: 'action', name: appFmt('menu.clear_all_notes_tags'), icon: '&#128465;', action: () => clearAllNotes() });
+  items.push({ type: 'action', name: appFmt('menu.preferences'), icon: '&#128196;', action: () => typeof window.vstUpdater.openPrefsFile === 'function' && window.vstUpdater.openPrefsFile() });
+  items.push({ type: 'action', name: appFmt('menu.focus_search'), icon: '&#128269;', action: () => { const tab = document.querySelector('.tab-content.active'); const input = tab?.querySelector('input[type="text"]'); if (input) { input.focus(); input.select(); } } });
 
   // Player controls
   if (typeof toggleAudioPlayback === 'function') {
-    items.push({ type: 'action', name: 'Play / Pause', icon: '&#9654;', action: () => toggleAudioPlayback() });
+    items.push({ type: 'action', name: appFmt('menu.play_pause'), icon: '&#9654;', action: () => toggleAudioPlayback() });
   }
   if (typeof nextTrack === 'function') {
-    items.push({ type: 'action', name: 'Next Track', icon: '&#9193;', action: () => nextTrack() });
+    items.push({ type: 'action', name: appFmt('menu.next_track'), icon: '&#9193;', action: () => nextTrack() });
   }
   if (typeof prevTrack === 'function') {
-    items.push({ type: 'action', name: 'Previous Track', icon: '&#9194;', action: () => prevTrack() });
+    items.push({ type: 'action', name: appFmt('menu.prev_track'), icon: '&#9194;', action: () => prevTrack() });
   }
   if (typeof toggleAudioLoop === 'function') {
-    items.push({ type: 'action', name: 'Toggle Loop', icon: '&#128257;', action: () => toggleAudioLoop() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_loop'), icon: '&#128257;', action: () => toggleAudioLoop() });
   }
   if (typeof toggleShuffle === 'function') {
-    items.push({ type: 'action', name: 'Toggle Shuffle', icon: '&#128256;', action: () => toggleShuffle() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_shuffle'), icon: '&#128256;', action: () => toggleShuffle() });
   }
   if (typeof toggleMute === 'function') {
-    items.push({ type: 'action', name: 'Toggle Mute', icon: '&#128263;', action: () => toggleMute() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_mute'), icon: '&#128263;', action: () => toggleMute() });
   }
   if (typeof toggleMono === 'function') {
-    items.push({ type: 'action', name: 'Toggle Mono', icon: '&#127897;', action: () => toggleMono() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_mono'), icon: '&#127897;', action: () => toggleMono() });
   }
   if (typeof toggleEqSection === 'function') {
-    items.push({ type: 'action', name: 'Toggle EQ Panel', icon: '&#127900;', action: () => toggleEqSection() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_eq_panel'), icon: '&#127900;', action: () => toggleEqSection() });
   }
   if (typeof togglePlayerExpanded === 'function') {
-    items.push({ type: 'action', name: 'Expand / Collapse Player', icon: '&#9744;', action: () => togglePlayerExpanded() });
+    items.push({ type: 'action', name: appFmt('menu.expand_player'), icon: '&#9744;', action: () => togglePlayerExpanded() });
   }
   if (typeof setAbLoopStart === 'function') {
-    items.push({ type: 'action', name: 'Toggle A-B Loop', icon: '&#128260;', action: () => {
+    items.push({ type: 'action', name: appFmt('menu.toggle_ab_loop'), icon: '&#128260;', action: () => {
       if (typeof _abLoop !== 'undefined' && _abLoop) { if (typeof clearAbLoop === 'function') clearAbLoop(); }
       else { setAbLoopStart(); }
     }});
   }
   if (typeof clearRecentlyPlayed === 'function') {
-    items.push({ type: 'action', name: 'Clear Play History', icon: '&#128465;', action: () => clearRecentlyPlayed() });
+    items.push({ type: 'action', name: appFmt('menu.clear_play_history'), icon: '&#128465;', action: () => clearRecentlyPlayed() });
   }
 
   // Selection
   if (typeof selectAllVisible === 'function') {
-    items.push({ type: 'action', name: 'Select All Visible', icon: '&#9745;', action: () => selectAllVisible() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_select_all_visible'), icon: '&#9745;', action: () => selectAllVisible() });
   }
   if (typeof deselectAll === 'function') {
-    items.push({ type: 'action', name: 'Deselect All', icon: '&#9744;', action: () => deselectAll() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_deselect_all'), icon: '&#9744;', action: () => deselectAll() });
   }
 
   // Effects toggles
   if (typeof settingToggleCrt === 'function') {
-    items.push({ type: 'action', name: 'Toggle CRT Effects', icon: '&#128250;', action: () => settingToggleCrt() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_crt'), icon: '&#128250;', action: () => settingToggleCrt() });
   }
   if (typeof settingToggleNeonGlow === 'function') {
-    items.push({ type: 'action', name: 'Toggle Neon Glow', icon: '&#10024;', action: () => settingToggleNeonGlow() });
+    items.push({ type: 'action', name: appFmt('menu.toggle_neon_glow'), icon: '&#10024;', action: () => settingToggleNeonGlow() });
   }
 
   // Data items (plugins, samples, DAW, presets) are searched lazily
@@ -191,7 +191,7 @@ function collectPaletteItems() {
   if (typeof getAllTags === 'function') {
     for (const t of getAllTags()) {
       items.push({
-        type: 'tag', name: t, detail: 'Tag',
+        type: 'tag', name: t, detail: typeof appFmt === 'function' ? appFmt('ui.palette.type_tag') : 'Tag',
         icon: '&#127991;', fields: [t],
         action: () => { if (typeof setGlobalTag === 'function') setGlobalTag(t); switchTab('plugins'); }
       });
@@ -237,25 +237,29 @@ function openPalette() {
   _paletteQuery = '';
   _paletteSelected = 0;
 
+  const ph = typeof appFmt === 'function' ? appFmt('ui.palette.placeholder') : 'Search everything… (plugins, samples, projects, actions)';
   const html = `<div class="palette-overlay" id="paletteOverlay">
     <div class="palette-box">
-      <input type="text" class="palette-input" id="paletteInput" placeholder="Search everything... (plugins, samples, projects, actions)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <input type="text" class="palette-input" id="paletteInput" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <div class="palette-results" id="paletteResults"></div>
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
 
   const input = document.getElementById('paletteInput');
-  input.focus();
+  if (input) input.placeholder = ph;
+  if (input) input.focus();
   renderPaletteResults();
 
   let _palTimer;
-  input.addEventListener('input', () => {
-    _paletteQuery = input.value;
-    _paletteSelected = 0;
-    clearTimeout(_palTimer);
-    _palTimer = setTimeout(renderPaletteResults, 150);
-  });
+  if (input) {
+    input.addEventListener('input', () => {
+      _paletteQuery = input.value;
+      _paletteSelected = 0;
+      clearTimeout(_palTimer);
+      _palTimer = setTimeout(renderPaletteResults, 150);
+    });
+  }
 }
 
 function closePalette() {
@@ -273,14 +277,30 @@ function renderPaletteResults() {
   _paletteResults = filterPaletteItems(_paletteQuery, allItems);
 
   if (_paletteResults.length === 0) {
-    container.innerHTML = '<div class="palette-empty">No results</div>';
+    const empty = typeof appFmt === 'function' ? appFmt('ui.palette.empty') : 'No results';
+    container.innerHTML = '<div class="palette-empty">' + escapeHtml(empty) + '</div>';
     return;
   }
 
   container.innerHTML = _paletteResults.map((item, i) => {
     const typeCls = 'palette-type-' + item.type;
     const sel = i === _paletteSelected ? ' palette-selected' : '';
-    const typeLabel = { tab: 'Tab', action: 'Action', plugin: 'Plugin', sample: 'Sample', daw: 'DAW', preset: 'Preset', bookmark: 'Dir', tag: 'Tag' }[item.type] || item.type;
+    const typeLabel = (() => {
+      if (typeof appFmt !== 'function') {
+        return { tab: 'Tab', action: 'Action', plugin: 'Plugin', sample: 'Sample', daw: 'DAW', preset: 'Preset', bookmark: 'Dir', tag: 'Tag' }[item.type] || item.type;
+      }
+      const m = {
+        tab: appFmt('ui.palette.type_tab'),
+        action: appFmt('ui.palette.type_action'),
+        plugin: appFmt('ui.palette.type_plugin'),
+        sample: appFmt('ui.palette.type_sample'),
+        daw: appFmt('ui.palette.type_daw'),
+        preset: appFmt('ui.palette.type_preset'),
+        bookmark: appFmt('ui.palette.type_bookmark'),
+        tag: appFmt('ui.palette.type_tag'),
+      };
+      return m[item.type] || item.type;
+    })();
     const detail = item.detail ? `<span class="palette-detail">${escapeHtml(item.detail)}</span>` : '';
     return `<div class="palette-row${sel}" data-palette-idx="${i}">
       <span class="palette-icon">${item.icon}</span>
