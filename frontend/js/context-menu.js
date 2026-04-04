@@ -1,14 +1,21 @@
 // ── Context Menu ──
 const ctxMenu = document.getElementById('ctxMenu');
+/** Spread into menu items that already toast or should not echo the label (locale-safe; no English heuristics). */
+const _noEcho = { skipEchoToast: true };
 
 function showContextMenu(e, items) {
   e.preventDefault();
   // Store callbacks and render
   ctxMenu._actions = {};
   ctxMenu._labels = {};
+  ctxMenu._skipEcho = {};
   ctxMenu.innerHTML = items.map((item, i) => {
     if (item === '---') return '<div class="ctx-menu-sep"></div>';
-    if (item.action) { ctxMenu._actions[i] = item.action; ctxMenu._labels[i] = item.label; }
+    if (item.action) {
+      ctxMenu._actions[i] = item.action;
+      ctxMenu._labels[i] = item.label;
+      if (item.skipEchoToast) ctxMenu._skipEcho[i] = true;
+    }
     const cls = item.disabled ? ' ctx-disabled' : '';
     return `<div class="ctx-menu-item${cls}" data-ctx-idx="${i}">
       <span class="ctx-icon">${item.icon || ''}</span>${item.label}
@@ -29,6 +36,8 @@ function showContextMenu(e, items) {
 function hideContextMenu() {
   ctxMenu.classList.remove('visible');
   ctxMenu._actions = {};
+  ctxMenu._labels = {};
+  ctxMenu._skipEcho = {};
 }
 
 // Click on menu item
@@ -38,12 +47,10 @@ ctxMenu.addEventListener('click', (e) => {
   const idx = item.dataset.ctxIdx;
   const action = ctxMenu._actions[idx];
   const label = ctxMenu._labels?.[idx];
+  const skipEcho = ctxMenu._skipEcho?.[idx];
   hideContextMenu();
   if (action) action();
-  // Toast for actions whose functions don't already toast
-  if (label && !/Copy|Reveal|Favorite|Open in|Play|Pause|Loop|Mute/i.test(label)) {
-    showToast(label);
-  }
+  if (label && !skipEcho) showToast(label);
 });
 
 // Dismiss on click outside or Escape
@@ -261,7 +268,7 @@ document.addEventListener('contextmenu', (e) => {
       '---',
       { icon: '&#128270;', label: appFmt('menu.find_similar_samples'), action: () => typeof findSimilarSamples === 'function' && findSimilarSamples(path) },
       '---',
-      ...[(() => { const on = prefs.getItem('expandOnClick') !== 'off'; return { icon: on ? '&#9660;' : '&#9654;', label: on ? appFmt('menu.disable_row_expand') : appFmt('menu.enable_row_expand'),
+      ...[(() => { const on = prefs.getItem('expandOnClick') !== 'off'; return { icon: on ? '&#9660;' : '&#9654;', label: on ? appFmt('menu.disable_row_expand') : appFmt('menu.enable_row_expand'), ..._noEcho,
         action: () => {
           if (on) {
             // Disable: close any expanded row
@@ -280,7 +287,7 @@ document.addEventListener('contextmenu', (e) => {
           if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
           showToast(on ? toastFmt('toast.row_expand_disabled') : toastFmt('toast.row_expand_enabled'));
         } }; })()],
-      ...[(() => { const ap = prefs.getItem('autoplayNext') !== 'off'; return { icon: ap ? '&#9209;' : '&#9654;', label: ap ? appFmt('menu.disable_autoplay_next') : appFmt('menu.enable_autoplay_next'),
+      ...[(() => { const ap = prefs.getItem('autoplayNext') !== 'off'; return { icon: ap ? '&#9209;' : '&#9654;', label: ap ? appFmt('menu.disable_autoplay_next') : appFmt('menu.enable_autoplay_next'), ..._noEcho,
         action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? toastFmt('toast.autoplay_next_disabled') : toastFmt('toast.autoplay_next_enabled')); } }; })()],
     ];
     showContextMenu(e, items);
@@ -925,7 +932,7 @@ document.addEventListener('contextmenu', (e) => {
     if (isAudio) {
       items.push('---');
       const ap = prefs.getItem('autoplayNext') !== 'off';
-      items.push({ icon: ap ? '&#9209;' : '&#9654;', label: ap ? appFmt('menu.disable_autoplay_next') : appFmt('menu.enable_autoplay_next'),
+      items.push({ icon: ap ? '&#9209;' : '&#9654;', label: ap ? appFmt('menu.disable_autoplay_next') : appFmt('menu.enable_autoplay_next'), ..._noEcho,
         action: () => { prefs.setItem('autoplayNext', ap ? 'off' : 'on'); if (typeof refreshSettingsUI === 'function') refreshSettingsUI(); showToast(ap ? toastFmt('toast.autoplay_next_disabled') : toastFmt('toast.autoplay_next_enabled')); } });
     }
     showContextMenu(e, items);

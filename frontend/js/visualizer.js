@@ -418,10 +418,10 @@ document.addEventListener('contextmenu', (e) => {
   if (!tile) return;
   e.preventDefault();
   const mode = tile.dataset.vizTile;
-  const label = tile.querySelector('.viz-tile-label')?.textContent?.trim() || (typeof appFmt === 'function' ? appFmt('menu.tab_visualizer') : 'Visualizer');
+  const label = tile.querySelector('.viz-tile-label')?.textContent?.trim() || appFmt('menu.tab_visualizer');
   const canvas = tile.querySelector('canvas');
   const items = [
-    { icon: '&#128247;', label: typeof appFmt === 'function' ? appFmt('menu.export_snapshot_png') : 'Export Snapshot (PNG)', action: () => {
+    { icon: '&#128247;', label: appFmt('menu.export_snapshot_png'), action: () => {
       if (canvas) {
         const link = document.createElement('a');
         link.download = `${label.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.png`;
@@ -430,9 +430,9 @@ document.addEventListener('contextmenu', (e) => {
         if (typeof showToast === 'function') showToast(toastFmt('toast.snapshot_exported'));
       }
     }, disabled: !canvas },
-    { icon: '&#128203;', label: typeof appFmt === 'function' ? appFmt('menu.copy_tile_name') : 'Copy Tile Name', ..._vizMenuNoEcho, action: () => typeof copyToClipboard === 'function' && copyToClipboard(label) },
+    { icon: '&#128203;', label: appFmt('menu.copy_tile_name'), ..._vizMenuNoEcho, action: () => typeof copyToClipboard === 'function' && copyToClipboard(label) },
     '---',
-    { icon: '&#128260;', label: typeof appFmt === 'function' ? appFmt('menu.toggle_fullscreen') : 'Toggle Fullscreen', action: () => {
+    { icon: '&#128260;', label: appFmt('menu.toggle_fullscreen'), action: () => {
       tile.classList.toggle('viz-fullscreen');
       if (tile.classList.contains('viz-fullscreen')) {
         tile.requestFullscreen?.().catch(err => { if (typeof showToast === 'function') showToast(String(err), 4000, 'error'); });
