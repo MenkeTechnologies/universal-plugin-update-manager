@@ -1,6 +1,7 @@
 /**
  * `frontend/js/ipc.js` substitutes `\{(\w+)\}` (ASCII word chars only). Any `{…}` in a catalog
  * value must be a single token like `{name}` or `{n}` — not `{a-b}` or nested `{{x}}`.
+ * After stripping valid `{token}` segments, no `{` or `}` may remain (balanced, ipc-only braces).
  */
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -36,6 +37,22 @@ test('locale JSON: brace placeholders match ipc.js appFmt token pattern', () => 
     for (const [k, v] of Object.entries(map)) {
       assert.equal(typeof v, 'string', `${name} ${k}`);
       assertPlaceholdersOk(name, k, v);
+    }
+  }
+});
+
+test('locale JSON: no stray { or } outside ipc {token} placeholders', () => {
+  const files = readdirSync(i18nDir).filter((n) => n.startsWith('app_i18n_') && n.endsWith('.json'));
+  assert.ok(files.length > 0, 'expected i18n/app_i18n_*.json files');
+  for (const name of files.sort()) {
+    const map = JSON.parse(readFileSync(join(i18nDir, name), 'utf8'));
+    for (const [k, v] of Object.entries(map)) {
+      assert.equal(typeof v, 'string', `${name} ${k}`);
+      const rest = v.replace(/\{\w+\}/g, '');
+      assert.ok(
+        !rest.includes('{') && !rest.includes('}'),
+        `${name} key ${k}: stray { or } after removing {token} placeholders — rest: ${JSON.stringify(rest.slice(0, 120))}`
+      );
     }
   }
 });
