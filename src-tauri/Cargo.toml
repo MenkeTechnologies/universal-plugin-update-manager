@@ -43,6 +43,7 @@ crate-type = ["rlib"]
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+seq-macro = "0.3"
 
 [[bench]]
 name = "benchmarks"
