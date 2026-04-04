@@ -4,7 +4,8 @@
 //! Seed JSON parity (key sets, placeholders, native menu keys) is covered by unit tests in
 //! `app_i18n::tests`. These tests assert `get_app_strings` through the real DB matches that model.
 
-use std::collections::HashSet;
+use serde_json::from_str;
+use std::collections::{HashMap, HashSet};
 use std::sync::Once;
 
 static INIT_DB: Once = Once::new();
@@ -37,7 +38,7 @@ fn app_strings_en_contains_core_menu_keys() {
 #[test]
 fn app_strings_all_supported_locales_have_substantial_maps() {
     ensure_db();
-    for loc in ["en", "de", "es", "sv", "fr"] {
+    for loc in ["en", "de", "es", "sv", "fr", "pt"] {
         let m = app_lib::db::global()
             .get_app_strings(loc)
             .unwrap_or_else(|e| panic!("get_app_strings {loc}: {e}"));
@@ -76,7 +77,7 @@ fn app_strings_all_locales_share_same_key_set_as_en_in_db() {
         .get_app_strings("en")
         .expect("en");
     let keys_en: HashSet<_> = en.keys().cloned().collect();
-    for loc in ["de", "es", "sv", "fr"] {
+    for loc in ["de", "es", "sv", "fr", "pt"] {
         let m = app_lib::db::global()
             .get_app_strings(loc)
             .unwrap_or_else(|e| panic!("get_app_strings {loc}: {e}"));
@@ -121,6 +122,96 @@ fn app_strings_en_contains_tray_keys() {
         assert!(
             m.get(key).map(|s| !s.is_empty()).unwrap_or(false),
             "missing or empty tray key: {key}"
+        );
+    }
+}
+
+#[test]
+fn app_strings_ui_palette_keys_nonempty_all_locales() {
+    ensure_db();
+    let en: HashMap<String, String> =
+        from_str(include_str!("../../i18n/app_i18n_en.json")).expect("parse en json");
+    let keys: Vec<_> = en
+        .keys()
+        .filter(|k| k.starts_with("ui.palette."))
+        .cloned()
+        .collect();
+    assert!(
+        !keys.is_empty(),
+        "expected ui.palette.* keys in English seed"
+    );
+    for loc in ["en", "de", "es", "sv", "fr", "pt"] {
+        let m = app_lib::db::global()
+            .get_app_strings(loc)
+            .unwrap_or_else(|e| panic!("get_app_strings {loc}: {e}"));
+        for k in &keys {
+            assert!(
+                m.get(k).map(|s| !s.is_empty()).unwrap_or(false),
+                "locale {loc} missing or empty ui.palette key {k}"
+            );
+        }
+    }
+}
+
+#[test]
+fn app_strings_confirm_keys_nonempty_all_locales() {
+    ensure_db();
+    let en: HashMap<String, String> =
+        from_str(include_str!("../../i18n/app_i18n_en.json")).expect("parse en json");
+    let keys: Vec<_> = en
+        .keys()
+        .filter(|k| k.starts_with("confirm."))
+        .cloned()
+        .collect();
+    assert!(!keys.is_empty(), "expected confirm.* keys in English seed");
+    for loc in ["en", "de", "es", "sv", "fr", "pt"] {
+        let m = app_lib::db::global()
+            .get_app_strings(loc)
+            .unwrap_or_else(|e| panic!("get_app_strings {loc}: {e}"));
+        for k in &keys {
+            assert!(
+                m.get(k).map(|s| !s.is_empty()).unwrap_or(false),
+                "locale {loc} missing or empty confirm key {k}"
+            );
+        }
+    }
+}
+
+#[test]
+fn app_strings_help_keys_nonempty_all_locales() {
+    ensure_db();
+    let en: HashMap<String, String> =
+        from_str(include_str!("../../i18n/app_i18n_en.json")).expect("parse en json");
+    let keys: Vec<_> = en
+        .keys()
+        .filter(|k| k.starts_with("help."))
+        .cloned()
+        .collect();
+    assert!(!keys.is_empty(), "expected help.* keys in English seed");
+    for loc in ["en", "de", "es", "sv", "fr", "pt"] {
+        let m = app_lib::db::global()
+            .get_app_strings(loc)
+            .unwrap_or_else(|e| panic!("get_app_strings {loc}: {e}"));
+        for k in &keys {
+            assert!(
+                m.get(k).map(|s| !s.is_empty()).unwrap_or(false),
+                "locale {loc} missing or empty help key {k}"
+            );
+        }
+    }
+}
+
+#[test]
+fn app_strings_toast_failed_contains_err_placeholder_all_locales() {
+    ensure_db();
+    for loc in ["en", "de", "es", "sv", "fr", "pt"] {
+        let m = app_lib::db::global()
+            .get_app_strings(loc)
+            .unwrap_or_else(|e| panic!("get_app_strings {loc}: {e}"));
+        let v = m.get("toast.failed").expect("toast.failed should exist");
+        assert!(
+            v.contains("{err}"),
+            "locale {loc} toast.failed must keep {{err}} for appFmt: {v:?}"
         );
     }
 }

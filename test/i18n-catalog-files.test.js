@@ -13,12 +13,13 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const i18nDir = join(root, 'i18n');
 
-/** Same five locales as `app_i18n.rs` `SEED_JSON_*` and `i18n-locales-and-shape.test.js`. */
+/** Same locales as `app_i18n.rs` `SEED_JSON_*` and `i18n-locales-and-shape.test.js`. */
 const SHIPPED_APP_I18N = [
   'app_i18n_de.json',
   'app_i18n_en.json',
   'app_i18n_es.json',
   'app_i18n_fr.json',
+  'app_i18n_pt.json',
   'app_i18n_sv.json',
 ];
 

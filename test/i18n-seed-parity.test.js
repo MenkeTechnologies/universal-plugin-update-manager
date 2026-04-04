@@ -1,7 +1,7 @@
 /**
  * Mirrors `src-tauri/src/app_i18n.rs` seed invariants that are not covered by
  * `i18n-locales-and-shape.test.js` / `i18n-placeholders.test.js`:
- * - `seed_json_appfmt_placeholders_preserved_de_fr_sv` (here: strict token multiset parity)
+ * - `seed_json_appfmt_placeholders_preserved_de_fr_pt_sv` (Rust; here: strict token multiset parity for `de`/`fr`/`pt`/`sv`)
  * - `seed_json_es_critical_prefixes_match_en_placeholders`
  * - `seed_json_en_defines_all_native_menu_bar_keys` + `seed_json_en_defines_all_tray_keys`
  *
@@ -114,9 +114,9 @@ function isEsCriticalPrefix(k) {
   );
 }
 
-test('de, fr, sv: appFmt placeholder token multiset matches English for every key', () => {
+test('de, fr, pt, sv: appFmt placeholder token multiset matches English for every key', () => {
   const en = loadMap('app_i18n_en.json');
-  for (const loc of ['de', 'fr', 'sv']) {
+  for (const loc of ['de', 'fr', 'pt', 'sv']) {
     const m = loadMap(`app_i18n_${loc}.json`);
     const bad = [];
     for (const k of Object.keys(en)) {
