@@ -4058,6 +4058,20 @@ mod tests {
     }
 
     #[test]
+    fn test_clear_audio_history_removes_all_audio_scans() {
+        let db = test_db();
+        let mut fc = HashMap::new();
+        fc.insert("WAV".into(), 1);
+        db.save_scan("s1", "2024-06-01T00:00:00", 1, 100, &fc, &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &[sample("x.wav", "/x.wav", "WAV", 100)])
+            .unwrap();
+        db.clear_audio_history().unwrap();
+        assert!(db.get_latest_audio_scan().unwrap().is_none());
+        assert!(db.list_scans().unwrap().is_empty());
+    }
+
+    #[test]
     fn test_query_daw_multi_scan_returns_latest_only() {
         let db = test_db();
         // First (older) scan with 3 projects

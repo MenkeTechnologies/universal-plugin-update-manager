@@ -699,6 +699,33 @@ mod tests {
     }
 
     #[test]
+    fn test_walk_for_audio_exclude_directory_name_skips_subtree() {
+        let tmp = std::env::temp_dir().join("upum_test_walk_exclude_dirname");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("skipme")).unwrap();
+        fs::create_dir_all(tmp.join("keep")).unwrap();
+        fs::write(tmp.join("skipme/hidden.wav"), b"fake wav data").unwrap();
+        fs::write(tmp.join("keep/show.wav"), b"fake wav data").unwrap();
+
+        let mut ex = HashSet::new();
+        ex.insert("skipme".into());
+
+        let mut found = Vec::new();
+        walk_for_audio(
+            from_ref(&tmp),
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+            },
+            &|| false,
+            Some(ex),
+            None,
+        );
+        assert_eq!(found.len(), 1);
+        assert!(found[0].path.contains("show.wav"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn test_walk_for_audio_stop() {
         let tmp = std::env::temp_dir().join("upum_test_walk_stop");
         let _ = fs::remove_dir_all(&tmp);
