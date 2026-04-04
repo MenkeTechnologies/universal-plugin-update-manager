@@ -96,10 +96,7 @@ function initMultiFilters() {
       updateMultiFilterLabel(wrapper, allLabel);
       // Sync back to hidden select for compat
       syncMultiToSelect(wrapper);
-      // Trigger filter — mark as dropdown-triggered so applyFilter skips autoSelectDropdown
-      window._dropdownTriggered = true;
       triggerFilter(wrapper._action);
-      window._dropdownTriggered = false;
     });
 
     // Prevent dropdown close on click inside
