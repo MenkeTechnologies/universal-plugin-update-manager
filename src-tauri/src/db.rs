@@ -3976,6 +3976,88 @@ mod tests {
     }
 
     #[test]
+    fn test_delete_daw_scan_removes_rows_and_get_latest_falls_back() {
+        let db = test_db();
+        db.save_daw_scan(&daw_snap(
+            "daw-old",
+            "2024-01-01T00:00:00",
+            vec![daw_project("old.als", "Ableton")],
+        ))
+        .unwrap();
+        db.save_daw_scan(&daw_snap(
+            "daw-new",
+            "2024-06-01T00:00:00",
+            vec![daw_project("new.als", "Ableton")],
+        ))
+        .unwrap();
+        assert_eq!(db.get_latest_daw_scan().unwrap().unwrap().id, "daw-new");
+
+        db.delete_daw_scan("daw-new").unwrap();
+
+        assert!(db.get_daw_scan_detail("daw-new").is_err());
+        let latest = db.get_latest_daw_scan().unwrap().unwrap();
+        assert_eq!(latest.id, "daw-old");
+        assert_eq!(latest.projects[0].name, "old.als");
+    }
+
+    #[test]
+    fn test_clear_daw_history_removes_all_daw_scans() {
+        let db = test_db();
+        db.save_daw_scan(&daw_snap(
+            "daw1",
+            "2024-06-01T00:00:00",
+            vec![daw_project("x.als", "Ableton")],
+        ))
+        .unwrap();
+        db.clear_daw_history().unwrap();
+        assert!(db.get_latest_daw_scan().unwrap().is_none());
+        assert!(db.get_daw_scans().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_clear_preset_history_removes_all_preset_scans() {
+        let db = test_db();
+        let mut fc = HashMap::new();
+        fc.insert("FXP".into(), 1);
+        db.save_preset_scan(&PresetScanSnapshot {
+            id: "pr-clear-1".into(),
+            timestamp: "2024-06-01T00:00:00".into(),
+            preset_count: 1,
+            total_bytes: 1000,
+            format_counts: fc,
+            presets: vec![preset_file("x.fxp", "FXP")],
+            roots: vec![],
+        })
+        .unwrap();
+        db.clear_preset_history().unwrap();
+        assert!(db.get_latest_preset_scan().unwrap().is_none());
+        assert!(db.get_preset_scans().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_delete_audio_scan_removes_samples_and_get_latest_falls_back() {
+        let db = test_db();
+        let mut fc = HashMap::new();
+        fc.insert("WAV".into(), 1);
+        db.save_scan("au-old", "2024-01-01T00:00:00", 1, 100, &fc, &[])
+            .unwrap();
+        db.insert_audio_batch("au-old", &[sample("a.wav", "/a.wav", "WAV", 100)])
+            .unwrap();
+        db.save_scan("au-new", "2024-06-01T00:00:00", 1, 200, &fc, &[])
+            .unwrap();
+        db.insert_audio_batch("au-new", &[sample("b.wav", "/b.wav", "WAV", 200)])
+            .unwrap();
+        assert_eq!(db.get_latest_audio_scan().unwrap().unwrap().id, "au-new");
+
+        db.delete_audio_scan("au-new").unwrap();
+
+        assert!(db.get_audio_scan_detail("au-new").is_err());
+        let latest = db.get_latest_audio_scan().unwrap().unwrap();
+        assert_eq!(latest.id, "au-old");
+        assert_eq!(latest.samples[0].name, "a.wav");
+    }
+
+    #[test]
     fn test_query_daw_multi_scan_returns_latest_only() {
         let db = test_db();
         // First (older) scan with 3 projects
