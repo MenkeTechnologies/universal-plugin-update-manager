@@ -384,7 +384,7 @@ function applyFilter(action) {
   const input = document.getElementById(cfg.inputId);
   const search = input ? input.value.trim() : '';
   const mode = cfg.regexToggleId ? getSearchMode(cfg.regexToggleId) : 'fuzzy';
-  if (cfg.formatDropdownId) {
+  if (cfg.formatDropdownId && search) {
     const el = document.getElementById(cfg.formatDropdownId);
     if (el && typeof autoSelectDropdown === 'function') autoSelectDropdown(el, search);
   }
