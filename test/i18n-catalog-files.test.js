@@ -1,6 +1,8 @@
 /**
  * Filesystem invariants for `i18n/app_i18n_*.json` — must stay aligned with
  * `src-tauri/src/app_i18n.rs` `include_str!` seeds and CI expectations.
+ * Also: strict UTF-8 (no invalid byte sequences) and lexicographically sorted
+ * top-level keys (stable diffs / merge scripts).
  */
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -36,5 +38,26 @@ test('shipped locale JSON files do not start with a UTF-8 / Unicode BOM', () => 
   for (const name of SHIPPED_APP_I18N) {
     const text = readFileSync(join(i18nDir, name), 'utf8');
     assert.ok(!text.startsWith('\uFEFF'), `${name} must not start with BOM (breaks parsers / seeds)`);
+  }
+});
+
+test('shipped locale JSON files are well-formed UTF-8 (strict decode)', () => {
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  for (const name of SHIPPED_APP_I18N) {
+    const buf = readFileSync(join(i18nDir, name));
+    decoder.decode(buf);
+  }
+});
+
+test('shipped locale maps have lexicographically sorted keys', () => {
+  for (const name of SHIPPED_APP_I18N) {
+    const map = JSON.parse(readFileSync(join(i18nDir, name), 'utf8'));
+    const keys = Object.keys(map);
+    for (let i = 1; i < keys.length; i++) {
+      assert.ok(
+        keys[i] >= keys[i - 1],
+        `${name}: keys must be sorted — ${JSON.stringify(keys[i - 1])} then ${JSON.stringify(keys[i])}`
+      );
+    }
   }
 });
