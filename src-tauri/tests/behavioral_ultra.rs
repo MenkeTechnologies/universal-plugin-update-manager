@@ -3707,3 +3707,155 @@ fn ext_matches_nuendo_npr_lowercase_filename() {
         Some("NPR")
     );
 }
+
+// ── Wave 17: radix 36⁷, xref missing `.song`/`.ptx`/`.reason`, `find_similar` 6/8,
+//    five-sample audio remove, triple DAW/preset adds, exact 512 KB, KVR major ordering ─
+
+#[test]
+fn radix_string_78364164096_base36_is_ten_million() {
+    assert_eq!(radix_string(78_364_164_096, 36), "10000000");
+}
+
+#[test]
+fn extract_plugins_nonexistent_song_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_studio_one.song");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn extract_plugins_nonexistent_ptx_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_protools.ptx");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn extract_plugins_nonexistent_reason_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_reason.reason");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_eight_candidates_max_six() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..8).map(|i| fp(&format!("/c{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 6);
+    assert_eq!(out.len(), 6);
+}
+
+#[test]
+fn compute_audio_diff_five_removed_to_empty() {
+    let samples: Vec<_> = (0..5)
+        .map(|i| sample(&format!("/gone{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&samples, &[]);
+    let new = build_audio_snapshot(&[], &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.removed.len(), 5);
+    assert!(d.added.is_empty());
+}
+
+#[test]
+fn compute_daw_diff_three_added_from_empty() {
+    let new = build_daw_snapshot(
+        &[
+            dawproj("/a.dawproject"),
+            dawproj("/b.dawproject"),
+            dawproj("/c.dawproject"),
+        ],
+        &[],
+    );
+    let old = build_daw_snapshot(&[], &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 3);
+    assert!(d.removed.is_empty());
+}
+
+#[test]
+fn compute_preset_diff_empty_to_four_presets() {
+    let presets: Vec<_> = (0..4)
+        .map(|i| preset(&format!("/p{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 4);
+}
+
+#[test]
+fn ext_matches_ableton_als_deep_nested_path() {
+    assert_eq!(
+        ext_matches(Path::new("/Volumes/Audio/WIP/2026/tours/live_main_set.als")).as_deref(),
+        Some("ALS")
+    );
+}
+
+#[test]
+fn format_size_exactly_512_kilobytes() {
+    assert_eq!(app_lib::format_size(512 * 1024), "512.0 KB");
+}
+
+#[test]
+fn kvr_compare_versions_shorter_major_less_than_longer() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("3", "12"),
+        Ordering::Less
+    );
+}
+
+#[test]
+fn compute_plugin_diff_three_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &[plug("/x.vst3", "1"), plug("/y.vst3", "1"), plug("/z.vst3", "1")],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 3);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn fingerprint_distance_zero_crossing_rate_only_change_nonzero() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.zero_crossing_rate = 0.88;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn is_package_ext_logicx_deep_path_true() {
+    assert!(is_package_ext(Path::new(
+        "/Users/me/Music/Logic/Projects/Album/Session.logicx"
+    )));
+}
+
+#[test]
+fn kvr_parse_version_triple_dot_empty_segments() {
+    assert_eq!(app_lib::kvr::parse_version("1..2"), vec![1, 0, 2]);
+}
+
+#[test]
+fn compute_preset_diff_four_removed_to_empty() {
+    let old = build_preset_snapshot(
+        &[
+            preset("/p0.fxp"),
+            preset("/p1.fxp"),
+            preset("/p2.fxp"),
+            preset("/p3.fxp"),
+        ],
+        &[],
+    );
+    let new = build_preset_snapshot(&[], &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.removed.len(), 4);
+    assert!(d.added.is_empty());
+}
+
+#[test]
+fn ext_matches_fl_studio_flp_deep_path_lowercase() {
+    assert_eq!(
+        ext_matches(Path::new("/Music/FL/Projects/2026/drill_beat_v3.flp")).as_deref(),
+        Some("FLP")
+    );
+}
