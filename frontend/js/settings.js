@@ -1240,10 +1240,14 @@ function refreshSettingsUI() {
           section('Export Formats', [tag(app.exportFormats)]),
         ].join('');
       }
-      // Re-balance columns now that async content has loaded
-      if (typeof balanceSettingsColumns === 'function') {
-        _columnsBalanced = false;
-        requestAnimationFrame(balanceSettingsColumns);
+      // Show panes now that content is loaded, then rebalance columns
+      const sysPane = perfInfo.closest('.settings-section');
+      const appPane = appInfo?.closest('.settings-section');
+      if (sysPane) sysPane.style.display = '';
+      if (appPane) appPane.style.display = '';
+      if (typeof window.balanceSettingsColumns === 'function') {
+        window._columnsBalanced = false;
+        requestAnimationFrame(window.balanceSettingsColumns);
       }
     }).catch((err) => {
       const cpus = navigator.hardwareConcurrency || '?';
@@ -1487,7 +1491,7 @@ function restoreSettingsSectionOrder() {
 function resetSettingsSectionOrder() {
   prefs.removeItem('settingsSectionOrder');
   const container = document.querySelector('.settings-container');
-  const defaultOrder = ['appearance', 'colorscheme', 'scanning', 'scan-behavior', 'playback', 'exclusions', 'performance', 'visualizer-settings', 'shortcuts', 'sorting', 'data', 'storage', 'files'];
+  const defaultOrder = ['appearance', 'colorscheme', 'scanning', 'scan-behavior', 'playback', 'exclusions', 'performance', 'visualizer-settings', 'shortcuts', 'sorting', 'data', 'storage', 'caches', 'danger-zone', 'system-info', 'app-info', 'files'];
   const sectionMap = {};
   container.querySelectorAll('.settings-section[data-section]').forEach(s => {
     sectionMap[s.dataset.section] = s;
