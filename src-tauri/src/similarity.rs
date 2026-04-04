@@ -374,6 +374,47 @@ mod tests {
         let _ = std::fs::remove_file(&tmp);
     }
 
+    /// Same file read twice should yield identical fingerprints (decode + feature path is deterministic).
+    #[test]
+    fn test_compute_fingerprint_wav_deterministic_repeat_reads() {
+        let tmp = std::env::temp_dir().join("sim_test_deterministic.wav");
+        let sample_rate = 44100u32;
+        let num_samples = sample_rate as usize;
+        let mut data = vec![0u8; 44 + num_samples * 2];
+        data[0..4].copy_from_slice(b"RIFF");
+        let file_size = (36 + num_samples * 2) as u32;
+        data[4..8].copy_from_slice(&file_size.to_le_bytes());
+        data[8..12].copy_from_slice(b"WAVE");
+        data[12..16].copy_from_slice(b"fmt ");
+        data[16..20].copy_from_slice(&16u32.to_le_bytes());
+        data[20..22].copy_from_slice(&1u16.to_le_bytes());
+        data[22..24].copy_from_slice(&1u16.to_le_bytes());
+        data[24..28].copy_from_slice(&sample_rate.to_le_bytes());
+        data[28..32].copy_from_slice(&(sample_rate * 2).to_le_bytes());
+        data[32..34].copy_from_slice(&2u16.to_le_bytes());
+        data[34..36].copy_from_slice(&16u16.to_le_bytes());
+        data[36..40].copy_from_slice(b"data");
+        data[40..44].copy_from_slice(&(num_samples as u32 * 2).to_le_bytes());
+        for i in 0..num_samples {
+            let t = i as f64 / sample_rate as f64;
+            let sample = (t * 220.0 * 2.0 * std::f64::consts::PI).sin() * 12000.0;
+            let s = sample as i16;
+            let offset = 44 + i * 2;
+            data[offset..offset + 2].copy_from_slice(&s.to_le_bytes());
+        }
+        std::fs::write(&tmp, &data).unwrap();
+        let path = tmp.to_str().unwrap();
+        let a = compute_fingerprint(path).expect("first read");
+        let b = compute_fingerprint(path).expect("second read");
+        let d = fingerprint_distance(&a, &b);
+        assert!(
+            d < 1e-9,
+            "same WAV twice should give identical features, distance={}",
+            d
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
     #[test]
     fn test_fingerprint_all_zeros() {
         // All-zero features should produce valid fingerprint with zero distance to itself

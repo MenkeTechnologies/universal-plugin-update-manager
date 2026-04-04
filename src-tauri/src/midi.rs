@@ -698,4 +698,27 @@ mod tests {
         assert_eq!(info.note_count, 2);
         let _ = std::fs::remove_file(&tmp);
     }
+
+    /// Single track: name, tempo, time signature, key signature, one note-on — exercises meta + channel path together.
+    #[test]
+    fn test_parse_midi_flow_track_name_tempo_time_sig_key_sig_one_note() {
+        let track = vec![
+            0x00, 0xFF, 0x03, 0x04, b'T', b'e', b's', b't',
+            0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20,
+            0x00, 0xFF, 0x58, 0x04, 0x06, 0x03, 0x18, 0x08, // 6/8
+            0x00, 0xFF, 0x59, 0x02, 0xFF, 0x01, // D minor (sf = -1)
+            0x00, 0x90, 60, 100,
+            0x00, 0xFF, 0x2F, 0x00,
+        ];
+        let data = make_midi(0, 1, 480, &track);
+        let tmp = std::env::temp_dir().join("test_midi_flow_meta.mid");
+        std::fs::write(&tmp, &data).unwrap();
+        let info = parse_midi(&tmp).unwrap();
+        assert_eq!(info.track_names, vec!["Test"]);
+        assert!((info.tempo - 120.0).abs() < 0.5);
+        assert_eq!(info.time_signature, "6/8");
+        assert_eq!(info.key_signature, "D minor");
+        assert_eq!(info.note_count, 1);
+        let _ = std::fs::remove_file(&tmp);
+    }
 }

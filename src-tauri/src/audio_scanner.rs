@@ -576,6 +576,7 @@ fn parse_flac(path: &Path, meta: &mut AudioMetadata) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
     use std::fs;
     use std::io::Write;
     use std::slice::from_ref;
@@ -669,6 +670,31 @@ mod tests {
         );
         assert_eq!(found.len(), 1);
         assert!(found[0].path.contains("test.wav"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_walk_for_audio_exclude_full_path_skips_file() {
+        let tmp = std::env::temp_dir().join("upum_test_walk_exclude_path");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        fs::write(tmp.join("keep.wav"), b"fake wav data").unwrap();
+        fs::write(tmp.join("skip.wav"), b"fake wav data").unwrap();
+        let mut ex = HashSet::new();
+        ex.insert(tmp.join("skip.wav").to_string_lossy().into_owned());
+
+        let mut found = Vec::new();
+        walk_for_audio(
+            from_ref(&tmp),
+            &mut |batch, _count| {
+                found.extend_from_slice(batch);
+            },
+            &|| false,
+            Some(ex),
+            None,
+        );
+        assert_eq!(found.len(), 1);
+        assert!(found[0].path.contains("keep.wav"));
         let _ = fs::remove_dir_all(&tmp);
     }
 

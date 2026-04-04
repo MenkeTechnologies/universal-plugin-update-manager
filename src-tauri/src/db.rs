@@ -3615,6 +3615,60 @@ mod tests {
         assert_eq!(res.total_unfiltered, 3);
     }
 
+    /// Subsequence search on name + sort by size DESC (full `query_presets` path).
+    #[test]
+    fn test_query_presets_search_subsequence_and_sort_size_desc() {
+        let db = test_db();
+        let mut format_counts = HashMap::new();
+        format_counts.insert("FXP".into(), 3);
+        let snap = PresetScanSnapshot {
+            id: "pr-sort-1".into(),
+            timestamp: "2024-06-01T00:00:00".into(),
+            preset_count: 3,
+            total_bytes: 10_200,
+            format_counts,
+            presets: vec![
+                PresetFile {
+                    name: "small_lead.fxp".into(),
+                    path: "/p/small_lead.fxp".into(),
+                    directory: "/p".into(),
+                    format: "FXP".into(),
+                    size: 100,
+                    size_formatted: "100 B".into(),
+                    modified: "2024-01-01".into(),
+                },
+                PresetFile {
+                    name: "big_lead.fxp".into(),
+                    path: "/p/big_lead.fxp".into(),
+                    directory: "/p".into(),
+                    format: "FXP".into(),
+                    size: 10_000,
+                    size_formatted: "10 KB".into(),
+                    modified: "2024-01-01".into(),
+                },
+                PresetFile {
+                    name: "snare.fxp".into(),
+                    path: "/p/snare.fxp".into(),
+                    directory: "/p".into(),
+                    format: "FXP".into(),
+                    size: 5000,
+                    size_formatted: "5 KB".into(),
+                    modified: "2024-01-01".into(),
+                },
+            ],
+            roots: vec!["/p".into()],
+        };
+        db.save_preset_scan(&snap).unwrap();
+
+        let res = db
+            .query_presets(Some("lead"), None, "size", false, 0, 100)
+            .unwrap();
+        assert_eq!(res.total_count, 2);
+        assert_eq!(res.presets[0].name, "big_lead.fxp");
+        assert_eq!(res.presets[0].size, 10_000);
+        assert_eq!(res.presets[1].name, "small_lead.fxp");
+    }
+
     #[test]
     fn test_query_presets_total_unfiltered_empty_db() {
         let db = test_db();

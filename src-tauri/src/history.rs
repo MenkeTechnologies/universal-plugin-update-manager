@@ -2820,6 +2820,56 @@ mod tests {
         assert_eq!(d.removed[0].path, "/tmp/kick.wav");
     }
 
+    /// One path stable, one removed, one added — same set logic as plugin/DAW diffs.
+    #[test]
+    fn test_compute_audio_diff_keep_add_remove_flow() {
+        let old = AudioScanSnapshot {
+            id: "o".into(),
+            timestamp: "t1".into(),
+            sample_count: 2,
+            total_bytes: 2048,
+            format_counts: std::collections::HashMap::new(),
+            samples: vec![
+                make_sample("shared", "/lib/shared.wav", "WAV"),
+                make_sample("gone", "/old/gone.wav", "WAV"),
+            ],
+            roots: vec![],
+        };
+        let new = AudioScanSnapshot {
+            id: "n".into(),
+            timestamp: "t2".into(),
+            sample_count: 2,
+            total_bytes: 2048,
+            format_counts: std::collections::HashMap::new(),
+            samples: vec![
+                make_sample("shared", "/lib/shared.wav", "WAV"),
+                make_sample("fresh", "/new/fresh.wav", "WAV"),
+            ],
+            roots: vec![],
+        };
+        let d = compute_audio_diff(&old, &new);
+        assert_eq!(d.added.len(), 1);
+        assert_eq!(d.removed.len(), 1);
+        assert_eq!(d.added[0].path, "/new/fresh.wav");
+        assert_eq!(d.removed[0].path, "/old/gone.wav");
+    }
+
+    #[test]
+    fn test_build_daw_snapshot_aggregates_daw_counts_and_total_bytes() {
+        let projects = vec![
+            make_daw_project("A", "/p/a.als", "ALS", "Ableton Live"),
+            make_daw_project("B", "/p/b.flp", "FLP", "FL Studio"),
+            make_daw_project("C", "/p/c.flp", "FLP", "FL Studio"),
+        ];
+        let roots = vec!["/projects".into()];
+        let snap = build_daw_snapshot(&projects, &roots);
+        assert_eq!(snap.project_count, 3);
+        assert_eq!(snap.total_bytes, 2048 * 3);
+        assert_eq!(snap.daw_counts.get("Ableton Live"), Some(&1));
+        assert_eq!(snap.daw_counts.get("FL Studio"), Some(&2));
+        assert_eq!(snap.roots, roots);
+    }
+
     #[test]
     fn test_compute_daw_diff_added_removed_by_path() {
         let old = DawScanSnapshot {
