@@ -2855,6 +2855,9 @@ impl Database {
 mod tests {
     use super::*;
 
+    /// `history::set_test_data_dir_path` is process-global; serialize migrate JSON tests.
+    static MIGRATE_JSON_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_audio_query_params_json_empty_object_uses_defaults() {
         let v = serde_json::json!({});
@@ -3131,6 +3134,46 @@ mod tests {
         assert_eq!(analysis["bpm"], 120.0);
         assert_eq!(analysis["key"], "C minor");
         assert_eq!(analysis["lufs"], -14.5);
+    }
+
+    #[test]
+    fn test_batch_update_analysis_updates_latest_scan_and_audio_stats() {
+        let db = test_db();
+        let samples = vec![
+            sample("a.wav", "/a.wav", "WAV", 100),
+            sample("b.wav", "/b.wav", "WAV", 200),
+        ];
+        db.save_scan("s1", "2024-01-01T00:00:00", 2, 300, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &samples).unwrap();
+
+        assert_eq!(db.audio_stats(Some("s1")).unwrap().analyzed_count, 0);
+
+        let rows: Vec<AnalysisBatchRow> = vec![
+            ("/a.wav".into(), Some(128.0), Some("D".into()), Some(-12.0)),
+            (
+                "/b.wav".into(),
+                Some(90.0),
+                Some("A minor".into()),
+                Some(-15.5),
+            ),
+        ];
+        assert_eq!(db.batch_update_analysis(&rows).unwrap(), 2);
+
+        let stats = db.audio_stats(Some("s1")).unwrap();
+        assert_eq!(stats.analyzed_count, 2);
+        assert_eq!(stats.sample_count, 2);
+        assert_eq!(stats.total_bytes, 300);
+
+        let ja = db.get_analysis("/a.wav").unwrap();
+        assert_eq!(ja["bpm"], 128.0);
+        assert_eq!(ja["key"], "D");
+        assert_eq!(ja["lufs"], -12.0);
+
+        let jb = db.get_analysis("/b.wav").unwrap();
+        assert_eq!(jb["bpm"], 90.0);
+        assert_eq!(jb["key"], "A minor");
+        assert_eq!(jb["lufs"], -15.5);
     }
 
     #[test]
@@ -4114,6 +4157,150 @@ mod tests {
         assert!(db.get_audio_scan_detail("s2").is_err());
         assert!(db.get_audio_scan_detail("s3").is_ok());
         assert!(db.get_audio_scan_detail("s4").is_ok());
+    }
+
+    #[test]
+    fn test_save_audio_scan_full_roundtrip_and_get_audio_scans_list() {
+        let db = test_db();
+        let mut fc = HashMap::new();
+        fc.insert("WAV".into(), 1);
+        let roots = vec!["/Music/Samples".into()];
+        let snap = AudioScanSnapshot {
+            id: "full-1".into(),
+            timestamp: "2024-05-01T12:00:00".into(),
+            sample_count: 1,
+            total_bytes: 100,
+            format_counts: fc.clone(),
+            samples: vec![sample("kick.wav", "/x/kick.wav", "WAV", 100)],
+            roots: roots.clone(),
+        };
+        db.save_audio_scan_full(&snap).unwrap();
+
+        let list = db.get_audio_scans_list().unwrap();
+        assert_eq!(list.len(), 1);
+        let row = &list[0];
+        assert_eq!(row["id"].as_str(), Some("full-1"));
+        assert_eq!(row["sampleCount"].as_u64(), Some(1));
+        assert_eq!(row["totalBytes"].as_u64(), Some(100));
+
+        let detail = db.get_audio_scan_detail("full-1").unwrap();
+        assert_eq!(detail.id, "full-1");
+        assert_eq!(detail.samples.len(), 1);
+        assert_eq!(detail.samples[0].name, "kick.wav");
+        assert_eq!(detail.roots, roots);
+        assert_eq!(detail.format_counts.get("WAV"), Some(&1usize));
+    }
+
+    #[test]
+    fn test_migrate_from_json_imports_audio_scan_when_no_prior_scans() {
+        let _lock = MIGRATE_JSON_TEST_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_db_migrate_json_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        history::set_test_data_dir_path(tmp.clone());
+
+        let json = r#"{"scans":[{"id":"json-mig-1","timestamp":"2024-01-01T00:00:00","sampleCount":1,"totalBytes":100,"formatCounts":{"WAV":1},"samples":[{"name":"x.wav","path":"/a/x.wav","directory":"/a","format":"WAV","size":100,"sizeFormatted":"100 B","modified":"2024-01-01"}],"roots":["/root"]}]}"#;
+        std::fs::write(tmp.join("audio-scan-history.json"), json).unwrap();
+
+        let db = test_db();
+        let migrated = db.migrate_from_json().expect("migrate");
+        assert!(migrated >= 1, "expected migrated sample count >= 1");
+
+        let latest = db.get_latest_audio_scan().unwrap().expect("scan");
+        assert_eq!(latest.id, "json-mig-1");
+        assert_eq!(latest.samples.len(), 1);
+        assert_eq!(latest.samples[0].name, "x.wav");
+        assert_eq!(latest.roots, vec!["/root".to_string()]);
+
+        assert_eq!(
+            db.migrate_from_json().unwrap(),
+            0,
+            "second call must no-op once any scan table has rows"
+        );
+
+        history::clear_test_data_dir_path();
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_migrate_from_json_imports_plugin_scan_when_no_prior_scans() {
+        let _lock = MIGRATE_JSON_TEST_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_db_migrate_plugin_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        history::set_test_data_dir_path(tmp.clone());
+
+        let json = r#"{"scans":[{"id":"pl-mig-1","timestamp":"2024-01-01T00:00:00","pluginCount":1,"plugins":[{"name":"TestPlug","path":"/p/Test.vst3","type":"VST3","version":"1.0","manufacturer":"Co","manufacturerUrl":null,"size":"1 KB","sizeBytes":1024,"modified":"2024-01-01","architectures":["ARM64"]}],"directories":["/VST"],"roots":[]}]}"#;
+        std::fs::write(tmp.join("scan-history.json"), json).unwrap();
+
+        let db = test_db();
+        let migrated = db.migrate_from_json().expect("migrate");
+        assert!(migrated >= 1, "expected at least one migrated row");
+
+        let latest = db.get_latest_plugin_scan().unwrap().expect("plugin scan");
+        assert_eq!(latest.id, "pl-mig-1");
+        assert_eq!(latest.plugins.len(), 1);
+        assert_eq!(latest.plugins[0].name, "TestPlug");
+        assert_eq!(latest.plugins[0].path, "/p/Test.vst3");
+
+        assert_eq!(db.migrate_from_json().unwrap(), 0);
+
+        history::clear_test_data_dir_path();
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_migrate_from_json_returns_zero_when_scans_already_exist() {
+        let _lock = MIGRATE_JSON_TEST_LOCK.lock().unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_db_migrate_skip_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        history::set_test_data_dir_path(tmp.clone());
+
+        let json = r#"{"scans":[{"id":"json-mig-2","timestamp":"2024-02-01T00:00:00","sampleCount":1,"totalBytes":50,"formatCounts":{"WAV":1},"samples":[{"name":"ignore.wav","path":"/i/ignore.wav","directory":"/i","format":"WAV","size":50,"sizeFormatted":"50 B","modified":"2024-01-01"}],"roots":[]}]}"#;
+        std::fs::write(tmp.join("audio-scan-history.json"), json).unwrap();
+
+        let db = test_db();
+        let mut fc = HashMap::new();
+        fc.insert("WAV".into(), 1);
+        db.save_scan("existing", "2024-01-01T00:00:00", 1, 100, &fc, &[])
+            .unwrap();
+        db.insert_audio_batch("existing", &[sample("a.wav", "/a.wav", "WAV", 100)])
+            .unwrap();
+
+        assert_eq!(
+            db.migrate_from_json().unwrap(),
+            0,
+            "must skip JSON import when DB already has scan rows"
+        );
+
+        let latest = db.get_latest_audio_scan().unwrap().expect("scan");
+        assert_eq!(latest.id, "existing");
+        assert_eq!(latest.samples[0].name, "a.wav");
+
+        history::clear_test_data_dir_path();
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
