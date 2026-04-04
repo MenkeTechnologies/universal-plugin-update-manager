@@ -743,8 +743,11 @@ mod tests {
 
     #[test]
     fn test_get_audio_metadata_nonexistent() {
-        let meta = get_audio_metadata("/nonexistent/path/fake.wav");
-        assert!(meta.error.is_some());
+        let path = "/nonexistent/audio_haxor_test_path/no_such_file.wav";
+        let meta = get_audio_metadata(path);
+        assert!(meta.error.is_some(), "missing file should surface io error");
+        assert_eq!(meta.size_bytes, 0);
+        assert_eq!(meta.full_path, path);
     }
 
     #[test]

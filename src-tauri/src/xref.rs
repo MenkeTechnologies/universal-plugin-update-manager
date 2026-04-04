@@ -878,6 +878,19 @@ mod tests {
     use std::io::Write;
 
     #[test]
+    fn test_plugin_ref_json_roundtrip() {
+        let p = PluginRef {
+            name: "Serum".into(),
+            normalized_name: "serum".into(),
+            manufacturer: "Xfer Records".into(),
+            plugin_type: "VST3".into(),
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let back: PluginRef = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, back);
+    }
+
+    #[test]
     fn test_extract_empty_for_unsupported() {
         let result = extract_plugins("/some/file.flp");
         assert!(result.is_empty());

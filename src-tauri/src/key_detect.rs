@@ -558,6 +558,31 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_profile_correlation_identical_chroma_and_profile_is_one() {
+        let chroma = MAJOR_PROFILE;
+        let r = profile_correlation(&chroma, &MAJOR_PROFILE, 0);
+        assert!((r - 1.0).abs() < 1e-9, "expected 1.0, got {}", r);
+    }
+
+    #[test]
+    fn test_profile_correlation_rotated_chroma_matches_at_correct_root() {
+        // chroma[k] = MAJOR_PROFILE[(k+5)%12] so at root 7, x_i = chroma[(i+7)%12] = MAJOR_PROFILE[i]
+        let mut chroma = [0.0f64; 12];
+        for k in 0..12 {
+            chroma[k] = MAJOR_PROFILE[(k + 5) % 12];
+        }
+        let r = profile_correlation(&chroma, &MAJOR_PROFILE, 7);
+        assert!((r - 1.0).abs() < 1e-9, "rotated major should match at root 7, got {}", r);
+    }
+
+    #[test]
+    fn test_profile_correlation_constant_chroma_zero_variance_returns_zero() {
+        let c = [0.25f64; 12];
+        let r = profile_correlation(&c, &MAJOR_PROFILE, 0);
+        assert_eq!(r, 0.0);
+    }
+
     fn write_test_wav(path: &Path, samples: &[f32], sample_rate: u32) {
         let n = samples.len() as u32;
         let data_size = n * 2;

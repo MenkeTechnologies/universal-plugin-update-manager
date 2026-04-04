@@ -2204,4 +2204,156 @@ mod tests {
         let back = toml_to_flat(&toml_str);
         assert_eq!(back.get("theme"), Some(&serde_json::json!("cyberpunk")));
     }
+
+    // ── Pure diffs (no JSON file I/O): invariants for SQLite / command paths ──
+
+    #[test]
+    fn test_compute_plugin_diff_duplicate_path_last_old_entry_wins_for_version_compare() {
+        let old = ScanSnapshot {
+            id: "old".into(),
+            timestamp: "t1".into(),
+            plugin_count: 2,
+            plugins: vec![
+                make_plugin("Plug", "1.0", "/tmp/dup_path.vst3"),
+                make_plugin("Plug", "2.0", "/tmp/dup_path.vst3"),
+            ],
+            directories: vec![],
+            roots: vec![],
+        };
+        let new = ScanSnapshot {
+            id: "new".into(),
+            timestamp: "t2".into(),
+            plugin_count: 1,
+            plugins: vec![make_plugin("Plug", "3.0", "/tmp/dup_path.vst3")],
+            directories: vec![],
+            roots: vec![],
+        };
+        let d = compute_plugin_diff(&old, &new);
+        assert_eq!(d.version_changed.len(), 1);
+        assert_eq!(d.version_changed[0].previous_version, "2.0");
+        assert_eq!(d.version_changed[0].plugin.version, "3.0");
+    }
+
+    #[test]
+    fn test_compute_plugin_diff_both_empty_snapshots() {
+        let old = ScanSnapshot {
+            id: "a".into(),
+            timestamp: "t1".into(),
+            plugin_count: 0,
+            plugins: vec![],
+            directories: vec![],
+            roots: vec![],
+        };
+        let new = ScanSnapshot {
+            id: "b".into(),
+            timestamp: "t2".into(),
+            plugin_count: 0,
+            plugins: vec![],
+            directories: vec![],
+            roots: vec![],
+        };
+        let d = compute_plugin_diff(&old, &new);
+        assert!(d.added.is_empty());
+        assert!(d.removed.is_empty());
+        assert!(d.version_changed.is_empty());
+    }
+
+    #[test]
+    fn test_compute_plugin_diff_version_downgrade_emits_version_changed() {
+        let old = ScanSnapshot {
+            id: "old".into(),
+            timestamp: "t1".into(),
+            plugin_count: 1,
+            plugins: vec![make_plugin("X", "2.0", "/p/down.vst3")],
+            directories: vec![],
+            roots: vec![],
+        };
+        let new = ScanSnapshot {
+            id: "new".into(),
+            timestamp: "t2".into(),
+            plugin_count: 1,
+            plugins: vec![make_plugin("X", "1.0", "/p/down.vst3")],
+            directories: vec![],
+            roots: vec![],
+        };
+        let d = compute_plugin_diff(&old, &new);
+        assert_eq!(d.version_changed.len(), 1);
+        assert_eq!(d.version_changed[0].previous_version, "2.0");
+        assert_eq!(d.version_changed[0].plugin.version, "1.0");
+    }
+
+    #[test]
+    fn test_compute_audio_diff_both_empty() {
+        let old = AudioScanSnapshot {
+            id: "a".into(),
+            timestamp: "t1".into(),
+            sample_count: 0,
+            total_bytes: 0,
+            format_counts: std::collections::HashMap::new(),
+            samples: vec![],
+            roots: vec![],
+        };
+        let new = AudioScanSnapshot {
+            id: "b".into(),
+            timestamp: "t2".into(),
+            sample_count: 0,
+            total_bytes: 0,
+            format_counts: std::collections::HashMap::new(),
+            samples: vec![],
+            roots: vec![],
+        };
+        let d = compute_audio_diff(&old, &new);
+        assert!(d.added.is_empty());
+        assert!(d.removed.is_empty());
+    }
+
+    #[test]
+    fn test_compute_daw_diff_both_empty() {
+        let old = DawScanSnapshot {
+            id: "a".into(),
+            timestamp: "t1".into(),
+            project_count: 0,
+            total_bytes: 0,
+            daw_counts: std::collections::HashMap::new(),
+            projects: vec![],
+            roots: vec![],
+        };
+        let new = DawScanSnapshot {
+            id: "b".into(),
+            timestamp: "t2".into(),
+            project_count: 0,
+            total_bytes: 0,
+            daw_counts: std::collections::HashMap::new(),
+            projects: vec![],
+            roots: vec![],
+        };
+        let d = compute_daw_diff(&old, &new);
+        assert!(d.added.is_empty());
+        assert!(d.removed.is_empty());
+    }
+
+    #[test]
+    fn test_compute_preset_diff_both_empty() {
+        let old = PresetScanSnapshot {
+            id: "a".into(),
+            timestamp: "t1".into(),
+            preset_count: 0,
+            total_bytes: 0,
+            format_counts: std::collections::HashMap::new(),
+            presets: vec![],
+            roots: vec![],
+        };
+        let new = PresetScanSnapshot {
+            id: "b".into(),
+            timestamp: "t2".into(),
+            preset_count: 0,
+            total_bytes: 0,
+            format_counts: std::collections::HashMap::new(),
+            presets: vec![],
+            roots: vec![],
+        };
+        let d = compute_preset_diff(&old, &new);
+        assert!(d.added.is_empty());
+        assert!(d.removed.is_empty());
+    }
 }

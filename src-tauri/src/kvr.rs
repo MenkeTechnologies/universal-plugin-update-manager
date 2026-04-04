@@ -625,6 +625,33 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_parse_version_double_dot_empty_segment() {
+        assert_eq!(parse_version("1..2"), vec![1, 0, 2]);
+    }
+
+    #[test]
+    fn test_compare_versions_transitive_major_minor() {
+        assert_eq!(
+            compare_versions("3.0", "1.0"),
+            std::cmp::Ordering::Greater
+        );
+        assert_eq!(
+            compare_versions("1.0", "0.5"),
+            std::cmp::Ordering::Greater
+        );
+        assert_eq!(
+            compare_versions("3.0", "0.5"),
+            std::cmp::Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn test_extract_version_rejects_year_like_semver() {
+        let html = r#"<div>Version: 2024.12.1</div>"#;
+        assert_eq!(extract_version(html), None);
+    }
+
     /// Many assertions in one test: compare_versions(x, x) is always Equal.
     #[test]
     fn bulk_compare_versions_reflexive() {
