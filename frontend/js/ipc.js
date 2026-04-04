@@ -146,6 +146,7 @@ document.addEventListener('click', (e) => {
     case 'exportAudio': exportAudio(); break;
     case 'importAudio': importAudio(); break;
     case 'exportDaw': exportDaw(); break;
+    case 'exportXrefPlugins': if (typeof exportXrefPlugins === 'function') exportXrefPlugins(); break;
     case 'importDaw': importDaw(); break;
     case 'exportPresets': exportPresets(); break;
     case 'importPresets': importPresets(); break;

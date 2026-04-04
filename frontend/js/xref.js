@@ -97,10 +97,17 @@ function showXrefModal(projectName, plugins) {
     }).join('')}</ul>`;
   }
 
+  const exportBtn = plugins.length > 0
+    ? `<button class="btn btn-secondary" data-action="exportXrefPlugins" style="margin-left:auto;font-size:11px;" title="Export plugin list">&#8615; Export</button>`
+    : '';
+  window._xrefExportPlugins = plugins;
+  window._xrefExportProjectName = projectName;
+
   const html = `<div class="modal-overlay" id="xrefModal" data-action-modal="closeXref">
     <div class="modal-content modal-wide">
-      <div class="modal-header">
+      <div class="modal-header" style="display:flex;align-items:center;gap:8px;">
         <h2>Plugins in ${escapeHtml(projectName)}</h2>
+        ${exportBtn}
         <button class="modal-close" data-action-modal="closeXref" title="Close">&#10005;</button>
       </div>
       <div class="modal-body">${body}</div>

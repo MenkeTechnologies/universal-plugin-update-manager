@@ -448,3 +448,30 @@ async function importPresets() {
     showToast(`Imported ${imported.length} presets`);
   } catch (err) { await showImportError('presets', err.message || String(err)); } finally { hideGlobalProgress(); }
 }
+
+function exportXrefPlugins() {
+  const plugins = window._xrefExportPlugins || [];
+  const projectName = window._xrefExportProjectName || 'Project';
+  if (plugins.length === 0) { showToast('No plugins to export'); return; }
+  _exportCtx = {
+    title: `Plugins in ${projectName}`,
+    defaultName: exportFileName('project-plugins'),
+    exportFn: async (fmt, filePath) => {
+      const headers = ['Name', 'Type', 'Manufacturer'];
+      const rows = plugins.map(p => [p.name, p.pluginType, p.manufacturer || '']);
+      if (fmt === 'pdf') {
+        await window.vstUpdater.exportPdf(`Plugins in ${projectName}`, headers, rows, filePath);
+      } else if (fmt === 'csv' || fmt === 'tsv') {
+        const sep = fmt === 'tsv' ? '\t' : ',';
+        const esc = (s) => s.includes(sep) || s.includes('"') ? '"' + s.replace(/"/g, '""') + '"' : s;
+        const lines = [headers.join(sep), ...rows.map(r => r.map(esc).join(sep))].join('\n');
+        await window.vstUpdater.writeTextFile(filePath, lines);
+      } else if (fmt === 'toml') {
+        await window.vstUpdater.exportToml({ project: projectName, plugins }, filePath);
+      } else {
+        await window.vstUpdater.writeTextFile(filePath, JSON.stringify({ project: projectName, plugins }, null, 2));
+      }
+    }
+  };
+  showExportModal('xref', `Plugins in ${projectName}`, plugins.length);
+}
