@@ -8,18 +8,19 @@
     "tauri:build": "tauri build",
     "tauri:build:ci": "tauri build --ci --no-sign",
     "ship-check": "bash scripts/ship-check.sh",
-    "test": "node scripts/run-js-tests.mjs && cargo test --manifest-path src-tauri/Cargo.toml --lib && cargo test --manifest-path src-tauri/Cargo.toml --test behavioral_ultra",
+    "test": "bash scripts/test.sh",
     "test:js": "node scripts/run-js-tests.mjs",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --lib",
     "doc": "cargo doc --manifest-path src-tauri/Cargo.toml --no-deps --document-private-items",
     "doc:open": "cargo doc --manifest-path src-tauri/Cargo.toml --no-deps --document-private-items --open",
-    "doc:sync": "pnpm run doc && rm -rf docs/api && mkdir -p docs && cp -R src-tauri/target/doc docs/api",
+    "doc:sync": "pnpm run doc && command rm -rf docs/api && mkdir -p docs && cp -R src-tauri/target/doc docs/api",
     "clean": "bash scripts/clean.sh",
     "bust": "bash scripts/bust.sh",
     "rebuild": "bash scripts/rebuild.sh",
     "nuke": "bash scripts/nuke.sh",
     "deploy": "bash scripts/deploy.sh",
-    "db:vacuum": "sqlite3 \"$HOME/Library/Application Support/com.menketechnologies.audio-haxor/audio_haxor.db\" 'VACUUM;' && echo 'DB vacuumed'",
-    "db:stats": "sqlite3 \"$HOME/Library/Application Support/com.menketechnologies.audio-haxor/audio_haxor.db\" \"SELECT 'plugins', COUNT(*) FROM plugins UNION ALL SELECT 'samples', COUNT(*) FROM audio_samples UNION ALL SELECT 'daw', COUNT(*) FROM daw_projects UNION ALL SELECT 'presets', COUNT(*) FROM presets;\" && ls -lh \"$HOME/Library/Application Support/com.menketechnologies.audio-haxor/audio_haxor.db\""
+    "db:vacuum": "bash scripts/db-vacuum.sh",
+    "db:stats": "bash scripts/db-stats.sh"
   },
   "keywords": [
     "vst",
