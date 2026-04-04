@@ -60,8 +60,8 @@ listen('menu-action', (event) => {
     case 'cmd_palette': openPalette(); break;
     case 'help_overlay': toggleHelpOverlay(); break;
     // Help
-    case 'github': openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
-    case 'docs': openUpdate('https://menketechnologies.github.io/universal-plugin-update-manager/'); break;
+    case 'github': showToast('Opening GitHub...'); openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
+    case 'docs': showToast('Opening docs...'); openUpdate('https://menketechnologies.github.io/universal-plugin-update-manager/'); break;
     // Find (handled by existing Cmd+F)
     case 'find': {
       const activeTab = document.querySelector('.tab-content.active');
@@ -105,7 +105,7 @@ document.addEventListener('click', (e) => {
     case 'seekAudio': seekAudio(e); break;
     case 'seekMetaWaveform': seekMetaWaveform(e); break;
     case 'stopAudioPlayback': stopAudioPlayback(); break;
-    case 'openUpdate': openUpdate(el.dataset.url); break;
+    case 'openUpdate': showToast('Opening link...'); openUpdate(el.dataset.url); break;
     case 'openKvr': openKvr(el, el.dataset.url, el.dataset.name); break;
     case 'openFolder': openFolder(el.dataset.path); break;
     case 'openAudioFolder': openAudioFolder(el.dataset.path); break;
