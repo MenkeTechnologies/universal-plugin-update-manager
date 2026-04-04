@@ -7,6 +7,7 @@ use std::collections::HashMap;
 static SEED_JSON_EN: &str = include_str!("../app_i18n_en.json");
 static SEED_JSON_DE: &str = include_str!("../app_i18n_de.json");
 static SEED_JSON_ES: &str = include_str!("../app_i18n_es.json");
+static SEED_JSON_SV: &str = include_str!("../app_i18n_sv.json");
 
 /// Insert default locale rows (`INSERT OR IGNORE`) so new app versions can add keys without
 /// overwriting user-edited translations.
@@ -14,6 +15,7 @@ pub fn seed_defaults(conn: &Connection) -> Result<(), String> {
     seed_locale(conn, "en", SEED_JSON_EN)?;
     seed_locale(conn, "de", SEED_JSON_DE)?;
     seed_locale(conn, "es", SEED_JSON_ES)?;
+    seed_locale(conn, "sv", SEED_JSON_SV)?;
     Ok(())
 }
 

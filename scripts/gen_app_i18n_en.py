@@ -282,6 +282,7 @@ SETTINGS_UI_EN: dict[str, str] = {
     "ui.opt.lang_en": "English",
     "ui.opt.lang_de": "Deutsch",
     "ui.opt.lang_es": "Español",
+    "ui.opt.lang_sv": "Svenska",
 }
 
 CONFIRM_EN: dict[str, str] = {
@@ -317,7 +318,7 @@ def main() -> None:
     merged.update(ui_en)
     merged.update(SETTINGS_UI_EN)
     # Locale <option> text also creates ui.opt.english etc.; canonical keys are ui.opt.lang_*.
-    for dup in ("ui.opt.english", "ui.opt.deutsch", "ui.opt.espa_ol"):
+    for dup in ("ui.opt.english", "ui.opt.deutsch", "ui.opt.espa_ol", "ui.opt.svenska"):
         merged.pop(dup, None)
     merged.pop("ui.tt.interface_language", None)
 
