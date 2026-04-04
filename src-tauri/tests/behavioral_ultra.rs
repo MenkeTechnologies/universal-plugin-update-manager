@@ -5304,3 +5304,180 @@ fn kvr_compare_versions_fifth_component_patch_bump() {
         Ordering::Less
     );
 }
+
+// ── Wave 26: radix 36³−1 (`zzz`), `find_similar` 16/18, fourteen-sample / twelve-DAW /
+//    thirteen-preset / twelve-plugin-removed batches, DAW net 10/7, `format_size` 512 B ─
+
+#[test]
+fn radix_string_46655_base36_is_three_z_digits() {
+    assert_eq!(radix_string(46_655, 36), "zzz");
+}
+
+#[test]
+fn extract_plugins_nonexistent_foobar_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_a_daw.foobar");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_eighteen_candidates_max_sixteen() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..18).map(|i| fp(&format!("/take{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 16);
+    assert_eq!(out.len(), 16);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_fourteen_samples_added() {
+    let samples: Vec<_> = (0..14)
+        .map(|i| sample(&format!("/bounce{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 14);
+}
+
+#[test]
+fn compute_daw_diff_twelve_added_from_empty() {
+    let projects: Vec<_> = (0..12)
+        .map(|i| dawproj(&format!("/sessions/sess{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 12);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_thirteen_presets() {
+    let presets: Vec<_> = (0..13)
+        .map(|i| preset(&format!("/uhe/preset{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 13);
+}
+
+#[test]
+fn compute_plugin_diff_twelve_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &(0..12)
+            .map(|i| plug(&format!("/slot{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 12);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_512_bytes() {
+    assert_eq!(app_lib::format_size(512), "512.0 B");
+}
+
+#[test]
+fn compute_daw_diff_ten_removed_seven_added_net() {
+    let old = build_daw_snapshot(
+        &(0..10)
+            .map(|i| dawproj(&format!("/archive/x{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &(0..7)
+            .map(|i| dawproj(&format!("/active/y{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 10);
+    assert_eq!(d.added.len(), 7);
+}
+
+#[test]
+fn ext_matches_fl_studio_flp_nested_versioned_folder() {
+    assert_eq!(
+        ext_matches(Path::new(
+            "/Music/FL_Studio/Projects/2026/v3.2/drill/drill_final.flp"
+        ))
+        .as_deref(),
+        Some("FLP")
+    );
+}
+
+#[test]
+fn fingerprint_distance_mid_band_energy_only_change_nonzero_alt2() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.mid_band_energy = 0.03;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_negative_second_component_vs_zero() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.-2", "1.0"),
+        Ordering::Less
+    );
+}
+
+#[test]
+fn audio_sample_serde_roundtrip_bits_per_sample_none() {
+    let mut s = sample("/hq/master.wav");
+    s.bits_per_sample = None;
+    let j = serde_json::to_string(&s).unwrap();
+    let back: AudioSample = serde_json::from_str(&j).unwrap();
+    assert!(back.bits_per_sample.is_none());
+}
+
+#[test]
+fn kvr_parse_version_double_leading_empty_then_numeric() {
+    assert_eq!(app_lib::kvr::parse_version("..1.2"), vec![0, 0, 1, 2]);
+}
+
+#[test]
+fn normalize_plugin_name_gate_aax_bracket_suffix() {
+    assert_eq!(normalize_plugin_name("Noise Gate [AAX]"), "noise gate");
+}
+
+#[test]
+fn compute_plugin_diff_six_added_four_removed_net_two() {
+    let old = build_plugin_snapshot(
+        &[
+            plug("/w.vst3", "1"),
+            plug("/x.vst3", "1"),
+            plug("/y.vst3", "1"),
+            plug("/z.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &(0..6)
+            .map(|i| plug(&format!("/new{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 4);
+    assert_eq!(d.added.len(), 6);
+}
+
+#[test]
+fn kvr_compare_versions_sixth_component_padding_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.0.0.0", "1.0.0.0.0.0"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn kvr_parse_version_i32_overflow_segment_becomes_zero() {
+    assert_eq!(app_lib::kvr::parse_version("2147483648"), vec![0]);
+}
