@@ -4018,3 +4018,173 @@ fn is_package_ext_band_deep_path_true() {
         "/Music/GarageBand/2026/jam_session.band"
     )));
 }
+
+// ── Wave 19: radix 36⁹, xref missing `.aup`/`.aup3`, `find_similar` 8/10, larger snapshot
+//    batches, `format_size` 256 KB, Reason deep path, DAW/plugin net swaps ─────────────
+
+#[test]
+fn radix_string_101559956668416_base36_is_billion() {
+    assert_eq!(radix_string(101_559_956_668_416, 36), "1000000000");
+}
+
+#[test]
+fn extract_plugins_nonexistent_aup_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_audacity.aup");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn extract_plugins_nonexistent_aup3_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_audacity3.aup3");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_ten_candidates_max_eight() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..10).map(|i| fp(&format!("/c{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 8);
+    assert_eq!(out.len(), 8);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_seven_samples_added() {
+    let samples: Vec<_> = (0..7)
+        .map(|i| sample(&format!("/track{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 7);
+}
+
+#[test]
+fn compute_daw_diff_five_added_from_empty() {
+    let projects: Vec<_> = (0..5)
+        .map(|i| dawproj(&format!("/proj{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 5);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_six_presets() {
+    let presets: Vec<_> = (0..6)
+        .map(|i| preset(&format!("/bank/preset{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 6);
+}
+
+#[test]
+fn compute_plugin_diff_five_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &[
+            plug("/p0.vst3", "1"),
+            plug("/p1.vst3", "1"),
+            plug("/p2.vst3", "1"),
+            plug("/p3.vst3", "1"),
+            plug("/p4.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 5);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_256_kilobytes() {
+    assert_eq!(app_lib::format_size(256 * 1024), "256.0 KB");
+}
+
+#[test]
+fn kvr_compare_versions_one_zero_zero_vs_one_padding_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("1.0.0", "1"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn ext_matches_reason_deep_path_lowercase() {
+    assert_eq!(
+        ext_matches(Path::new("/Audio/Reason/Projects/2026/combinator_rack.reason")).as_deref(),
+        Some("REASON")
+    );
+}
+
+#[test]
+fn fingerprint_distance_attack_time_only_change_nonzero_alt() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.attack_time = 0.88;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn compute_daw_diff_three_removed_two_added_net() {
+    let old = build_daw_snapshot(
+        &[
+            dawproj("/x.dawproject"),
+            dawproj("/y.dawproject"),
+            dawproj("/z.dawproject"),
+        ],
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &[dawproj("/a.dawproject"), dawproj("/b.dawproject")],
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 3);
+    assert_eq!(d.added.len(), 2);
+}
+
+#[test]
+fn normalize_plugin_name_strips_universal_then_au() {
+    assert_eq!(
+        normalize_plugin_name("EQ Eight (Universal) (AU)"),
+        "eq eight"
+    );
+}
+
+#[test]
+fn ext_matches_audacity_aup_deep_path_lowercase() {
+    assert_eq!(
+        ext_matches(Path::new("/home/user/podcasts/ep42_raw/session_edit.aup")).as_deref(),
+        Some("AUP")
+    );
+}
+
+#[test]
+fn ext_matches_ardour_deep_path_lowercase_ext() {
+    assert_eq!(
+        ext_matches(Path::new("/srv/audio/jams/2026/winter_mix.ardour")).as_deref(),
+        Some("ARDOUR")
+    );
+}
+
+#[test]
+fn kvr_parse_version_only_non_numeric_segments() {
+    assert_eq!(app_lib::kvr::parse_version("a.b.c"), vec![0, 0, 0]);
+}
+
+#[test]
+fn plugin_ref_serde_roundtrip_long_manufacturer_name() {
+    let p = PluginRef {
+        name: "Comp".into(),
+        normalized_name: "comp".into(),
+        manufacturer: "Very Long Manufacturer Name GmbH & Co.".into(),
+        plugin_type: "VST3".into(),
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: PluginRef = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.manufacturer, "Very Long Manufacturer Name GmbH & Co.");
+}
