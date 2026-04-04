@@ -752,4 +752,10 @@ mod tests {
             std::cmp::Ordering::Less
         );
     }
+
+    /// `parse_version` splits on `.` only — leading spaces make the first segment non-numeric → 0.
+    #[test]
+    fn test_parse_version_leading_space_first_segment_zero() {
+        assert_eq!(parse_version(" 1.2.3"), vec![0, 2, 3]);
+    }
 }

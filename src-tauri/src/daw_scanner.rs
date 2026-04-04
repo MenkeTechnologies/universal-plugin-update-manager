@@ -562,6 +562,12 @@ mod tests {
     }
 
     #[test]
+    fn test_ext_matches_pro_tools_ptf_vs_ptx() {
+        assert_eq!(ext_matches(Path::new("session.ptf")), Some("PTF".into()));
+        assert_eq!(ext_matches(Path::new("session.ptx")), Some("PTX".into()));
+    }
+
+    #[test]
     fn test_daw_name_for_format_all_known_tokens() {
         assert_eq!(daw_name_for_format("ALS"), "Ableton Live");
         assert_eq!(daw_name_for_format("LOGICX"), "Logic Pro");

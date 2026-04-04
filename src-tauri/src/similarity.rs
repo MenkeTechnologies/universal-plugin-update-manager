@@ -232,6 +232,18 @@ mod tests {
     }
 
     #[test]
+    fn test_fingerprint_distance_zero_rms_identical() {
+        let a = make_fp("a.wav", 0.0, 0.1, 0.1, 0.5, 0.3, 0.2);
+        let b = make_fp("b.wav", 0.0, 0.1, 0.1, 0.5, 0.3, 0.2);
+        let d = fingerprint_distance(&a, &b);
+        assert!(
+            d < 1e-9,
+            "RMS norm uses max(1e-10); both zero RMS should match, got {}",
+            d
+        );
+    }
+
+    #[test]
     fn test_different_fingerprints_nonzero_distance() {
         let kick = make_fp("kick.wav", 0.8, 0.02, 0.05, 0.9, 0.08, 0.02);
         let hihat = make_fp("hihat.wav", 0.3, 0.4, 0.4, 0.05, 0.15, 0.8);

@@ -348,6 +348,13 @@ mod tests {
         assert_eq!(read_var_len(&data, 0), (0x2000, 2));
     }
 
+    /// Maximum SMF variable-length quantity: 4 bytes ending with high bit clear (28 data bits all 1).
+    #[test]
+    fn test_read_var_len_max_28bit_value() {
+        let data = [0xFFu8, 0xFF, 0xFF, 0x7F];
+        assert_eq!(read_var_len(&data, 0), (268_435_455, 4));
+    }
+
     #[test]
     fn test_read_var_len_fifth_byte_triggers_safety_break() {
         // Four continuation bytes then a final byte — 5 bytes total consumed before break

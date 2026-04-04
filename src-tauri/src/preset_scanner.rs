@@ -389,6 +389,26 @@ mod tests {
     }
 
     #[test]
+    fn test_walk_for_presets_finds_nksn_kontakt_snapshot() {
+        let tmp = std::env::temp_dir().join("upum_test_preset_nksn");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        fs::write(tmp.join("snap.nksn"), b"kontakt").unwrap();
+
+        let mut found = Vec::new();
+        walk_for_presets(
+            from_ref(&tmp),
+            &mut |batch, _count| found.extend_from_slice(batch),
+            &|| false,
+            None,
+            None,
+        );
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].format, "NKSN");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn test_walk_for_presets_finds_files() {
         let tmp = std::env::temp_dir().join("upum_test_preset_find");
         let _ = fs::remove_dir_all(&tmp);

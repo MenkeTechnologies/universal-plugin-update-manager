@@ -1319,6 +1319,11 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_strips_apple_silicon_bracket() {
+        assert_eq!(normalize_plugin_name("Melodyne (Apple Silicon)"), "melodyne");
+    }
+
+    #[test]
     fn test_normalize_equivalent_after_strip() {
         assert_eq!(
             normalize_plugin_name("Massive (x64)"),

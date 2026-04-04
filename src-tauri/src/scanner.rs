@@ -410,6 +410,21 @@ mod tests {
     }
 
     #[test]
+    fn test_discover_plugins_uppercase_extension_normalized() {
+        let tmp = std::env::temp_dir().join("upum_test_discover_upper");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let plug = tmp.join("UpperCase.VST3");
+        fs::create_dir_all(&plug).unwrap();
+
+        let mut result = discover_plugins(&[tmp.to_string_lossy().to_string()]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].extension().and_then(|e| e.to_str()), Some("VST3"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn test_discover_plugins_nonexistent_dir() {
         let dirs = vec!["/nonexistent/path/that/does/not/exist".to_string()];
         let result = discover_plugins(&dirs);
