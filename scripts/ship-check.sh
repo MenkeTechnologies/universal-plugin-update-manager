@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ship readiness check — run before deploying a release build
-set -euo pipefail
+set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
@@ -48,9 +48,9 @@ echo
 
 # Rust tests
 echo -e "${C}RUST TESTS${N}"
-RUST_OUT=$(cargo test --manifest-path src-tauri/Cargo.toml --lib 2>&1 | tail -1)
-RUST_PASS=$(echo "$RUST_OUT" | grep -o '[0-9]* passed' | grep -o '[0-9]*' || echo 0)
-RUST_FAIL=$(echo "$RUST_OUT" | grep -o '[0-9]* failed' | grep -o '[0-9]*' || echo 0)
+RUST_OUT=$(cargo test --manifest-path src-tauri/Cargo.toml --lib 2>&1 | grep 'test result' | tail -1)
+RUST_PASS=$(echo "$RUST_OUT" | grep -o '[0-9]* passed' | grep -o '[0-9]*' || echo "0")
+RUST_FAIL=$(echo "$RUST_OUT" | grep -o '[0-9]* failed' | grep -o '[0-9]*' || echo "0")
 echo "  $RUST_OUT"
 if [ "$RUST_FAIL" = "0" ]; then
   echo -e "  ${G}✓ All Rust tests pass${N}"
@@ -116,7 +116,8 @@ LOG_PATH="$HOME/Library/Application Support/com.menketechnologies.audio-haxor/ap
 if [ -f "$LOG_PATH" ]; then
   LOG_SIZE=$(ls -lh "$LOG_PATH" | awk '{print $5}')
   LOG_LINES=$(wc -l < "$LOG_PATH" | tr -d ' ')
-  ERRORS=$(grep -c 'ERROR\|PANIC\|FAILED' "$LOG_PATH" 2>/dev/null || echo 0)
+  ERRORS=$(grep -c -E 'ERROR|PANIC|FAILED' "$LOG_PATH" 2>/dev/null || true)
+  ERRORS=${ERRORS:-0}
   STARTS=$(grep -c 'APP START' "$LOG_PATH" 2>/dev/null || echo 0)
   SHUTDOWNS=$(grep -c 'APP SHUTDOWN' "$LOG_PATH" 2>/dev/null || echo 0)
   echo "  Size: $LOG_SIZE ($LOG_LINES lines)"
