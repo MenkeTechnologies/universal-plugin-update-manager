@@ -136,11 +136,11 @@ function syncMultiToSelect(wrapper) {
 }
 
 function triggerFilter(action) {
-  if (action === 'filterPlugins') filterPlugins();
-  else if (action === 'filterAudioSamples') filterAudioSamples();
-  else if (action === 'filterDawProjects') filterDawProjects();
-  else if (action === 'filterPresets') filterPresets();
-  else if (action === 'filterFavorites') renderFavorites();
+  if (_filterRegistry && _filterRegistry[action]) {
+    applyFilter(action);
+  } else if (action === 'filterFavorites' && typeof renderFavorites === 'function') {
+    renderFavorites();
+  }
 }
 
 // Get selected values for a multi-filter. Returns null if "all", or a Set of values.
