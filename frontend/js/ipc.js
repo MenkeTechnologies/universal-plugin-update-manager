@@ -224,8 +224,8 @@ document.addEventListener('click', (e) => {
     case 'clearAppLog': window.vstUpdater.clearLog().then(() => showToast('Log cleared')).catch(() => showToast('Failed to clear log', 4000, 'error')); break;
     case 'openLogFile': window.vstUpdater.getPrefsPath().then(p => { const logPath = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(logPath, 'TextEdit').catch(() => window.vstUpdater.openDawProject(logPath).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); })); }); break;
     case 'openDataDir': window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); break;
-    case 'refreshCacheList': if (typeof renderCacheFilesList === 'function') renderCacheFilesList(); break;
-    case 'refreshCacheStats': if (typeof renderCacheStats === 'function') renderCacheStats(); break;
+    case 'refreshCacheList': if (typeof renderCacheFilesList === 'function') { renderCacheFilesList(); showToast('Cache list refreshed'); } break;
+    case 'refreshCacheStats': if (typeof renderCacheStats === 'function') { renderCacheStats(); showToast('Cache stats refreshed'); } break;
     case 'revealDataFile': if (el.dataset.path) { const dir = el.dataset.path.replace(/\/[^/]+$/, ''); window.vstUpdater.openAudioFolder(el.dataset.path).catch(() => showToast('Failed to reveal file', 4000, 'error')); } break;
     case 'deleteDataFile': if (el.dataset.name && confirm(`Delete ${el.dataset.name}?`)) { window.vstUpdater.deleteDataFile(el.dataset.name).then(() => { showToast(`Deleted ${el.dataset.name}`); if (typeof renderCacheFilesList === 'function') renderCacheFilesList(); }).catch(e => showToast('Delete failed: ' + e, 4000, 'error')); } break;
     case 'resetAllScans': resetAllScans(); break;

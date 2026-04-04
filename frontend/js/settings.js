@@ -941,24 +941,28 @@ function saveCustomDirs() {
   const val = document.getElementById('settingCustomDirs').value.trim();
   prefs.setItem('customDirs', val);
   showSavedMsg('savedMsgCustomDirs');
+  showToast('Plugin scan directories saved');
 }
 
 function saveAudioScanDirs() {
   const val = document.getElementById('settingAudioScanDirs').value.trim();
   prefs.setItem('audioScanDirs', val);
   showSavedMsg('savedMsgAudioScanDirs');
+  showToast('Audio scan directories saved');
 }
 
 function saveDawScanDirs() {
   const val = document.getElementById('settingDawScanDirs').value.trim();
   prefs.setItem('dawScanDirs', val);
   showSavedMsg('savedMsgDawScanDirs');
+  showToast('DAW scan directories saved');
 }
 
 function savePresetScanDirs() {
   const val = document.getElementById('settingPresetScanDirs').value.trim();
   prefs.setItem('presetScanDirs', val);
   showSavedMsg('savedMsgPresetScanDirs');
+  showToast('Preset scan directories saved');
 }
 
 function openPrefsFile() {
