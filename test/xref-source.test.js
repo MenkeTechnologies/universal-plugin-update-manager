@@ -3,13 +3,15 @@
  */
 const { describe, it, before } = require('node:test');
 const assert = require('node:assert/strict');
-const { loadFrontendScripts } = require('./frontend-vm-harness.js');
+const { loadFrontendScripts, defaultDocument } = require('./frontend-vm-harness.js');
 
 describe('frontend/js/xref.js (vm-loaded)', () => {
   let X;
 
   before(() => {
-    X = loadFrontendScripts(['utils.js', 'xref.js']);
+    X = loadFrontendScripts(['utils.js', 'xref.js'], {
+      window: { vstUpdater: {} },
+    });
   });
 
   it('isXrefSupported accepts all DAW formats wired for extraction', () => {
@@ -46,5 +48,63 @@ describe('frontend/js/xref.js (vm-loaded)', () => {
   it('isXrefSupported is case-sensitive (matches Set keys from project format field)', () => {
     assert.strictEqual(X.isXrefSupported('als'), false);
     assert.strictEqual(X.isXrefSupported('ALS'), true);
+  });
+});
+
+describe('frontend/js/xref.js _searchTreeNodes (vm-loaded)', () => {
+  let X;
+
+  before(() => {
+    X = loadFrontendScripts(['utils.js', 'xref.js'], {
+      window: { vstUpdater: {} },
+      document: {
+        ...defaultDocument(),
+        createTextNode: (t) => ({ nodeType: 3, textContent: t }),
+      },
+    });
+  });
+
+  it('empty query clears display and strips search-hl wrappers', () => {
+    const node = { style: { display: 'none' }, querySelectorAll: () => [], firstChild: null };
+    let hlReplaced = false;
+    const hl = {
+      textContent: 'hit',
+      replaceWith() {
+        hlReplaced = true;
+      },
+    };
+    const container = {
+      querySelectorAll(sel) {
+        if (sel === '.xml-node') return [node];
+        if (sel === '.search-hl') return [hl];
+        return [];
+      },
+    };
+    X._searchTreeNodes(container, '');
+    assert.strictEqual(node.style.display, '');
+    assert.strictEqual(hlReplaced, true);
+  });
+
+  it('non-empty query shows only matching nodes and highlights text', () => {
+    const textEl = { textContent: 'SerumPlugin', innerHTML: '' };
+    const node = {
+      style: { display: 'none' },
+      querySelectorAll(sel) {
+        if (sel.includes('xml-tag') || sel.includes('json')) return [textEl];
+        return [];
+      },
+      firstChild: null,
+      parentElement: null,
+    };
+    const container = {
+      querySelectorAll(sel) {
+        if (sel === '.xml-node') return [node];
+        if (sel === '.search-hl') return [];
+        return [];
+      },
+    };
+    X._searchTreeNodes(container, 'serum');
+    assert.strictEqual(node.style.display, '');
+    assert.ok(textEl.innerHTML.includes('mark') || textEl.innerHTML.includes('fzf-hl'));
   });
 });

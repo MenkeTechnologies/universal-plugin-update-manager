@@ -68,3 +68,67 @@ describe('frontend/js/drag-reorder.js initDragReorder (vm-loaded)', () => {
     );
   });
 });
+
+function loadDragReorderForTableRows() {
+  let tableRef = null;
+  const document = {
+    ...defaultDocument(),
+    getElementById(id) {
+      if (id === 'testTable') return tableRef;
+      return null;
+    },
+    createDocumentFragment() {
+      return {
+        _children: [],
+        appendChild(child) {
+          this._children.push(child);
+        },
+      };
+    },
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: () => {},
+    body: { style: {}, appendChild: () => {}, removeChild: () => {} },
+  };
+  const D = loadFrontendScripts(['utils.js', 'drag-reorder.js'], {
+    document,
+    prefs: { _cache: {}, getObject: () => null, setItem: () => {} },
+  });
+  return { D, setTable(t) { tableRef = t; } };
+}
+
+describe('frontend/js/drag-reorder.js reorderNewTableRows (vm-loaded)', () => {
+  it('returns early when table has no _colOrder flag', () => {
+    const { D, setTable } = loadDragReorderForTableRows();
+    setTable({ id: 'x' });
+    D.reorderNewTableRows('testTable');
+  });
+
+  it('permutes tbody cells when thead column keys differ from default order', () => {
+    const { D, setTable } = loadDragReorderForTableRows();
+    const cbCell = { id: 'cb' };
+    const nameCell = { id: 'name' };
+    const row = {
+      _colReordered: false,
+      cells: [cbCell, nameCell],
+      appendChild(frag) {
+        this._finalOrder = frag._children.map((c) => c.id);
+      },
+    };
+    const tbody = { rows: [row] };
+    const thName = { dataset: { thKey: 'name' } };
+    const thCb = { dataset: { thKey: 'col-cb' } };
+    const thead = { children: [thName, thCb] };
+    setTable({
+      _colOrder: true,
+      _getColKey: (th) => th.dataset.thKey,
+      querySelector(sel) {
+        if (sel === 'thead tr') return thead;
+        if (sel === 'tbody') return tbody;
+        return null;
+      },
+    });
+    D.reorderNewTableRows('testTable');
+    assert.strictEqual(row._finalOrder.join(','), 'name,cb');
+  });
+});
