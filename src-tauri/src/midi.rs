@@ -288,6 +288,21 @@ mod tests {
         data
     }
 
+    fn build_midi_with_track_bodies(format: u16, ppqn: u16, track_bodies: &[Vec<u8>]) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(b"MThd");
+        data.extend_from_slice(&6u32.to_be_bytes());
+        data.extend_from_slice(&format.to_be_bytes());
+        data.extend_from_slice(&(track_bodies.len() as u16).to_be_bytes());
+        data.extend_from_slice(&ppqn.to_be_bytes());
+        for body in track_bodies {
+            data.extend_from_slice(b"MTrk");
+            data.extend_from_slice(&(body.len() as u32).to_be_bytes());
+            data.extend_from_slice(body);
+        }
+        data
+    }
+
     #[test]
     fn test_read_var_len_single_byte() {
         let data = [0x40u8];
@@ -586,6 +601,30 @@ mod tests {
         let info = parse_midi(&tmp).unwrap();
         assert_eq!(info.note_count, 0);
         assert!(info.channels_used >= 1);
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
+    fn test_parse_midi_format_1_two_tracks_merges_track_names() {
+        let tr1 = vec![
+            0x00, 0xFF, 0x03, 0x05, b'A', b'l', b'p', b'h', b'a',
+            0x00, 0xFF, 0x2F, 0x00,
+        ];
+        let tr2 = vec![
+            0x00, 0xFF, 0x03, 0x04, b'B', b'e', b't', b'a',
+            0x00, 0xFF, 0x2F, 0x00,
+        ];
+        let data = build_midi_with_track_bodies(1, 480, &[tr1, tr2]);
+        let tmp = std::env::temp_dir().join("test_midi_two_tracks.mid");
+        std::fs::write(&tmp, &data).unwrap();
+        let info = parse_midi(&tmp).unwrap();
+        assert_eq!(info.format, 1);
+        assert_eq!(info.track_count, 2);
+        assert!(
+            info.track_names.contains(&"Alpha".into()) && info.track_names.contains(&"Beta".into()),
+            "expected Alpha and Beta in {:?}",
+            info.track_names
+        );
         let _ = std::fs::remove_file(&tmp);
     }
 

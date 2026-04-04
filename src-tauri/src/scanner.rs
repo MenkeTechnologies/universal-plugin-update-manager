@@ -672,6 +672,23 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_architectures_macho64_unknown_cpu_type_label() {
+        let tmp = std::env::temp_dir().join("upum_test_macho_unknown64.vst3");
+        let macos = tmp.join("Contents").join("MacOS");
+        let _ = fs::create_dir_all(&macos);
+        let mut header = vec![0u8; 8];
+        header[0..4].copy_from_slice(&0xFEEDFACFu32.to_le_bytes());
+        header[4..8].copy_from_slice(&0xDEADBEEFu32.to_le_bytes());
+        fs::write(macos.join("binary"), &header).unwrap();
+
+        assert_eq!(
+            super::detect_architectures(&tmp),
+            vec![format!("cpu:{}", 0xDEADBEEFu32)]
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn test_detect_architectures_pe_unknown_machine_label() {
         let tmp = std::env::temp_dir().join("upum_test_pe_unknown.dll");
         let _ = fs::remove_file(&tmp);

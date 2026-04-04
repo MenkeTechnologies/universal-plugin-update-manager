@@ -1618,6 +1618,24 @@ mod tests {
     }
 
     #[test]
+    fn test_json_to_toml_value_bool() {
+        assert!(matches!(
+            json_to_toml_value(&serde_json::Value::Bool(true)),
+            toml::Value::Boolean(true)
+        ));
+        assert!(matches!(
+            json_to_toml_value(&serde_json::Value::Bool(false)),
+            toml::Value::Boolean(false)
+        ));
+    }
+
+    #[test]
+    fn test_toml_value_to_json_bool_round_trips() {
+        let j = toml_value_to_json(&toml::Value::Boolean(true));
+        assert_eq!(j, serde_json::Value::Bool(true));
+    }
+
+    #[test]
     fn test_toml_value_to_json_integer_round_trips() {
         let t = toml::Value::Integer(-42);
         let j = toml_value_to_json(&t);

@@ -2901,6 +2901,15 @@ mod tests {
         assert_eq!(p.limit, 200);
     }
 
+    #[test]
+    fn test_audio_query_params_explicit_zero_offset_keeps_default_limit() {
+        let v = serde_json::json!({ "offset": 0, "limit": 25 });
+        let p: AudioQueryParams = serde_json::from_value(v).expect("deserialize");
+        assert_eq!(p.offset, 0);
+        assert_eq!(p.limit, 25);
+        assert_eq!(p.sort_key, "name");
+    }
+
     fn test_db() -> Database {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")

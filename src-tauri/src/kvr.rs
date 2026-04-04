@@ -717,4 +717,14 @@ mod tests {
     fn test_parse_version_positive_sign_first_segment() {
         assert_eq!(parse_version("+1.2.3"), vec![1, 2, 3]);
     }
+
+    #[test]
+    fn test_parse_version_prerelease_suffix_yields_zero_segment() {
+        assert_eq!(parse_version("1.0.0-rc1"), vec![1, 0, 0]);
+        assert_eq!(
+            parse_version("2.1.0"),
+            parse_version("2.1.0-beta"),
+            "non-numeric tail segment parses as 0 — semver text not preserved"
+        );
+    }
 }

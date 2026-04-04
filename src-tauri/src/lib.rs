@@ -3239,6 +3239,12 @@ mod tests {
     }
 
     #[test]
+    fn test_dsv_escape_semicolon_field_when_sep_is_semicolon() {
+        assert_eq!(dsv_escape("a;b", ';'), "\"a;b\"");
+        assert_eq!(dsv_escape("plain", ';'), "plain");
+    }
+
+    #[test]
     fn test_dsv_escape_quote_only() {
         assert_eq!(dsv_escape("\"", ','), "\"\"\"\"");
     }
@@ -4280,7 +4286,7 @@ fn db_query_audio(params: db::AudioQueryParams) -> Result<db::AudioQueryResult, 
     db::global().query_audio(&params)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 fn db_query_plugins(
     search: Option<String>,
     type_filter: Option<String>,
@@ -4299,7 +4305,7 @@ fn db_query_plugins(
     )
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 fn db_query_daw(
     search: Option<String>,
     daw_filter: Option<String>,
@@ -4318,7 +4324,7 @@ fn db_query_daw(
     )
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 fn db_query_presets(
     search: Option<String>,
     format_filter: Option<String>,
