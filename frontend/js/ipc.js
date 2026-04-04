@@ -222,11 +222,11 @@ document.addEventListener('click', (e) => {
     case 'exportSettingsPdf': if (typeof exportSettingsPdf === 'function') exportSettingsPdf(); break;
     case 'exportLogPdf': if (typeof exportLogPdf === 'function') exportLogPdf(); break;
     case 'clearAppLog': window.vstUpdater.clearLog().then(() => showToast('Log cleared')).catch(() => showToast('Failed to clear log', 4000, 'error')); break;
-    case 'openLogFile': window.vstUpdater.getPrefsPath().then(p => { const logPath = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(logPath, 'TextEdit').catch(() => window.vstUpdater.openDawProject(logPath).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); })); }); break;
-    case 'openDataDir': window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); break;
+    case 'openLogFile': showToast('Opening log file...'); window.vstUpdater.getPrefsPath().then(p => { const logPath = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(logPath, 'TextEdit').catch(() => window.vstUpdater.openDawProject(logPath).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); })); }); break;
+    case 'openDataDir': showToast('Opening data directory...'); window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); break;
     case 'refreshCacheList': if (typeof renderCacheFilesList === 'function') { renderCacheFilesList(); showToast('Cache list refreshed'); } break;
     case 'refreshCacheStats': if (typeof renderCacheStats === 'function') { renderCacheStats(); showToast('Cache stats refreshed'); } break;
-    case 'revealDataFile': if (el.dataset.path) { const dir = el.dataset.path.replace(/\/[^/]+$/, ''); window.vstUpdater.openAudioFolder(el.dataset.path).catch(() => showToast('Failed to reveal file', 4000, 'error')); } break;
+    case 'revealDataFile': if (el.dataset.path) { showToast('Revealing file...'); window.vstUpdater.openAudioFolder(el.dataset.path).catch(() => showToast('Failed to reveal file', 4000, 'error')); } break;
     case 'deleteDataFile': if (el.dataset.name && confirm(`Delete ${el.dataset.name}?`)) { window.vstUpdater.deleteDataFile(el.dataset.name).then(() => { showToast(`Deleted ${el.dataset.name}`); if (typeof renderCacheFilesList === 'function') renderCacheFilesList(); }).catch(e => showToast('Delete failed: ' + e, 4000, 'error')); } break;
     case 'resetAllScans': resetAllScans(); break;
     case 'settingColorScheme': settingColorScheme(el.dataset.scheme); break;
@@ -251,7 +251,7 @@ document.addEventListener('click', (e) => {
     case 'saveAudioScanDirs': saveAudioScanDirs(); break;
     case 'saveDawScanDirs': saveDawScanDirs(); break;
     case 'savePresetScanDirs': savePresetScanDirs(); break;
-    case 'openPrefsFile': openPrefsFile(); break;
+    case 'openPrefsFile': showToast('Opening preferences...'); openPrefsFile(); break;
     case 'toggleRegex': toggleRegex(el); break;
     case 'collapsePlayer': collapsePlayer(); break;
     case 'hidePlayer': hidePlayer(); break;
@@ -345,11 +345,11 @@ document.addEventListener('input', (e) => {
 document.addEventListener('change', (e) => {
   const action = e.target.dataset.action;
   if (_filterRegistry[action]) { applyFilter(action); return; }
-  if (action === 'setPlaybackSpeed') setPlaybackSpeed(e.target.value);
-  else if (action === 'settingDefaultTypeFilter') settingSaveSelect('defaultTypeFilter', e.target.value);
-  else if (action === 'settingPluginSort') settingSaveSelect('pluginSort', e.target.value);
-  else if (action === 'settingAudioSort') settingSaveSelect('audioSort', e.target.value);
-  else if (action === 'settingDawSort') settingSaveSelect('dawSort', e.target.value);
+  if (action === 'setPlaybackSpeed') { setPlaybackSpeed(e.target.value); showToast('Speed: ' + e.target.value + 'x'); }
+  else if (action === 'settingDefaultTypeFilter') { settingSaveSelect('defaultTypeFilter', e.target.value); showToast('Default type filter: ' + e.target.value); }
+  else if (action === 'settingPluginSort') { settingSaveSelect('pluginSort', e.target.value); showToast('Plugin sort: ' + e.target.value); }
+  else if (action === 'settingAudioSort') { settingSaveSelect('audioSort', e.target.value); showToast('Audio sort: ' + e.target.value); }
+  else if (action === 'settingDawSort') { settingSaveSelect('dawSort', e.target.value); showToast('DAW sort: ' + e.target.value); }
   else if (action === 'settingTagBarPosition') {
     const pos = e.target.value || 'top';
     prefs.setItem('tagBarPosition', pos);
