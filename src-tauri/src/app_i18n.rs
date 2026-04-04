@@ -10,8 +10,9 @@ static SEED_JSON_ES: &str = include_str!("../../i18n/app_i18n_es.json");
 static SEED_JSON_SV: &str = include_str!("../../i18n/app_i18n_sv.json");
 static SEED_JSON_FR: &str = include_str!("../../i18n/app_i18n_fr.json");
 
-/// Insert default locale rows (`INSERT OR IGNORE`) so new app versions can add keys without
-/// overwriting user-edited translations.
+/// Insert default locale rows (`INSERT OR REPLACE` on `(key, locale)` primary key) on every
+/// migration so shipped `i18n/app_i18n_*.json` values stay current. There is no separate UI to
+/// edit `app_i18n` rows; the catalog is the source of truth.
 pub fn seed_defaults(conn: &Connection) -> Result<(), String> {
     seed_locale(conn, "en", SEED_JSON_EN)?;
     seed_locale(conn, "de", SEED_JSON_DE)?;
@@ -24,7 +25,7 @@ pub fn seed_defaults(conn: &Connection) -> Result<(), String> {
 fn seed_locale(conn: &Connection, locale: &str, json: &str) -> Result<(), String> {
     let map: HashMap<String, String> = serde_json::from_str(json).map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare_cached("INSERT OR IGNORE INTO app_i18n (key, locale, value) VALUES (?1, ?2, ?3)")
+        .prepare_cached("INSERT OR REPLACE INTO app_i18n (key, locale, value) VALUES (?1, ?2, ?3)")
         .map_err(|e| e.to_string())?;
     for (k, v) in map {
         stmt.execute(params![k, locale, v]).map_err(|e| e.to_string())?;
