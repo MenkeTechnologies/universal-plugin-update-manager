@@ -3451,3 +3451,137 @@ fn kvr_compare_versions_patch_09_vs_10_numeric() {
         Ordering::Less
     );
 }
+
+// ── Wave 15: radix 36⁵, xref missing `.flp`, dual `version_changed`, KVR empty/Unknown,
+//    `find_similar` 4/6 cap, high-band fingerprint, deep DAW paths ─────────────────────
+
+#[test]
+fn radix_string_60466176_base36_is_one_hundred_thousand() {
+    assert_eq!(radix_string(60_466_176, 36), "100000");
+}
+
+#[test]
+fn extract_plugins_nonexistent_flp_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_missing_project.flp");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn format_size_exactly_ten_mebibytes() {
+    assert_eq!(app_lib::format_size(10 * 1024 * 1024), "10.0 MB");
+}
+
+#[test]
+fn compute_plugin_diff_two_paths_both_version_changed() {
+    let old = build_plugin_snapshot(
+        &[plug("/a.vst3", "1.0"), plug("/b.vst3", "1.0")],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &[plug("/a.vst3", "2.0"), plug("/b.vst3", "3.0")],
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.version_changed.len(), 2);
+}
+
+#[test]
+fn kvr_compare_versions_empty_string_vs_unknown_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("", "Unknown"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn find_similar_six_candidates_max_four() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..6).map(|i| fp(&format!("/c{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 4);
+    assert_eq!(out.len(), 4);
+}
+
+#[test]
+fn fingerprint_distance_high_band_energy_only_change_nonzero() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.high_band_energy = 0.91;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_parse_version_seven_components() {
+    assert_eq!(
+        app_lib::kvr::parse_version("1.2.3.4.5.6.7"),
+        vec![1, 2, 3, 4, 5, 6, 7]
+    );
+}
+
+#[test]
+fn ext_matches_audacity_aup3_deep_path_uppercase() {
+    assert_eq!(
+        ext_matches(Path::new("/Users/Audio/Projects/2025/Session.AUP3")).as_deref(),
+        Some("AUP3")
+    );
+}
+
+#[test]
+fn ext_matches_logicx_uppercase_package_ext() {
+    assert_eq!(
+        ext_matches(Path::new("/Music/Albums/2024/MySong.LOGICX")).as_deref(),
+        Some("LOGICX")
+    );
+}
+
+#[test]
+fn ext_matches_bitwig_bwproject_uppercase_filename() {
+    assert_eq!(
+        ext_matches(Path::new("/Projects/EDM/Drop.BWPROJECT")).as_deref(),
+        Some("BWPROJECT")
+    );
+}
+
+#[test]
+fn compute_plugin_diff_four_added_from_empty_scan() {
+    let old = build_plugin_snapshot(&[], &[], &[]);
+    let new = build_plugin_snapshot(
+        &[
+            plug("/p1.vst3", "1"),
+            plug("/p2.vst3", "1"),
+            plug("/p3.vst3", "1"),
+            plug("/p4.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.added.len(), 4);
+}
+
+#[test]
+fn compute_daw_diff_remove_one_add_two_projects() {
+    let old = build_daw_snapshot(&[dawproj("/one.dawproject")], &[]);
+    let new = build_daw_snapshot(
+        &[dawproj("/two.dawproject"), dawproj("/three.dawproject")],
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 1);
+    assert_eq!(d.added.len(), 2);
+}
+
+#[test]
+fn compute_preset_diff_swap_three_presets_rotated() {
+    let old = build_preset_snapshot(
+        &[preset("/a.fxp"), preset("/b.fxp"), preset("/c.fxp")],
+        &[],
+    );
+    let new = build_preset_snapshot(
+        &[preset("/a.fxp"), preset("/c.fxp"), preset("/b.fxp")],
+        &[],
+    );
+    let d = compute_preset_diff(&old, &new);
+    assert!(d.added.is_empty() && d.removed.is_empty());
+}
