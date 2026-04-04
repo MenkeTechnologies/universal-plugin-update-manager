@@ -1533,6 +1533,50 @@ mod tests {
     }
 
     #[test]
+    fn test_toml_key_to_flat_maps_data_widths_to_flat_column_widths() {
+        assert_eq!(
+            toml_key_to_flat("data", "widths").as_deref(),
+            Some("columnWidths")
+        );
+    }
+
+    #[test]
+    fn test_toml_key_to_flat_unknown_returns_none() {
+        assert_eq!(toml_key_to_flat("not_a_section", "theme"), None);
+    }
+
+    #[test]
+    fn test_toml_to_flat_promotes_data_widths_key() {
+        let toml = "[data]\nwidths = [120, 240]\n";
+        let flat = toml_to_flat(toml);
+        assert_eq!(flat.get("columnWidths"), Some(&serde_json::json!([120, 240])));
+    }
+
+    #[test]
+    fn test_migrate_json_string_parses_bracketed_json_array() {
+        let v = migrate_json_string(serde_json::json!("[1, 2, 3]"));
+        assert_eq!(v, serde_json::json!([1, 2, 3]));
+    }
+
+    #[test]
+    fn test_migrate_json_string_parses_braced_json_object() {
+        let v = migrate_json_string(serde_json::json!(r#"{"x":1}"#));
+        assert_eq!(v, serde_json::json!({"x": 1}));
+    }
+
+    #[test]
+    fn test_migrate_json_string_invalid_json_keeps_original_string() {
+        let v = migrate_json_string(serde_json::json!("{broken"));
+        assert_eq!(v, serde_json::json!("{broken"));
+    }
+
+    #[test]
+    fn test_migrate_json_string_plain_text_not_migrated() {
+        let v = migrate_json_string(serde_json::json!("just text"));
+        assert_eq!(v, serde_json::json!("just text"));
+    }
+
+    #[test]
     fn test_build_audio_snapshot_aggregates_formats_and_total_bytes() {
         let samples = vec![
             AudioSample {

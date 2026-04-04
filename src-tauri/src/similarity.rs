@@ -393,6 +393,20 @@ mod tests {
     }
 
     #[test]
+    fn test_fingerprint_distance_attack_time_contributes_when_other_features_match() {
+        let mut a = make_fp("a.wav", 0.5, 0.1, 0.1, 0.5, 0.3, 0.2);
+        let mut b = make_fp("b.wav", 0.5, 0.1, 0.1, 0.5, 0.3, 0.2);
+        a.attack_time = 0.05;
+        b.attack_time = 1.5;
+        let d = fingerprint_distance(&a, &b);
+        assert!(
+            d > 0.01,
+            "attack_time norm uses divisor 2.0; large gap should move distance, got {}",
+            d
+        );
+    }
+
+    #[test]
     fn test_find_similar_empty_candidates() {
         let reference = make_fp("ref.wav", 0.5, 0.1, 0.1, 0.5, 0.3, 0.2);
         let results = find_similar(&reference, &[], 10);

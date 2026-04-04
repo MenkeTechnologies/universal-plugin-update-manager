@@ -661,6 +661,14 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_pcm_16bit_truncates_trailing_odd_byte() {
+        let data = [0x00u8, 0x40, 0xFF];
+        let samples = decode_pcm(&data, 16, 1, true);
+        assert_eq!(samples.len(), 1);
+        assert!((samples[0] - 0.5).abs() < 0.001);
+    }
+
+    #[test]
     fn test_read_wav_invalid_header() {
         let tmp = std::env::temp_dir().join("test_bpm_invalid_header.wav");
         // Write data that is NOT a valid RIFF header

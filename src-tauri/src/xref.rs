@@ -1319,6 +1319,36 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_plugin_from_string_embedded_windows_path() {
+        let s = r"C:\VSTPlugins\Xfer\Serum.vst3";
+        let p = extract_plugin_from_string(s).expect("vst3 in path");
+        assert_eq!(p.name, "Serum");
+        assert_eq!(p.plugin_type, "VST3");
+        assert_eq!(p.normalized_name, "serum");
+    }
+
+    #[test]
+    fn test_extract_plugin_from_string_skips_vstplugins_substring_in_stem() {
+        // `name` is the file stem; embedded "VstPlugins" skips generic installer noise
+        let s = r"C:\Plugins\SerumVstPluginsBundle.vst3";
+        assert!(extract_plugin_from_string(s).is_none());
+    }
+
+    #[test]
+    fn test_extract_plugin_from_string_short_stem_skipped() {
+        let s = r"C:\p\X.vst3";
+        assert!(extract_plugin_from_string(s).is_none());
+    }
+
+    #[test]
+    fn test_extract_plugin_from_string_clap_suffix() {
+        let s = "/lib/CLAP/Pigments.clap";
+        let p = extract_plugin_from_string(s).unwrap();
+        assert_eq!(p.name, "Pigments");
+        assert_eq!(p.plugin_type, "CLAP");
+    }
+
+    #[test]
     fn test_dedup_case_insensitive() {
         let rpp = r#"<REAPER_PROJECT
   <TRACK
