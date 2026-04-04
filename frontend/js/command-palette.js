@@ -28,50 +28,51 @@ function collectPaletteItems() {
   ];
   items.push(...tabs);
 
-  // Actions
-  items.push({ type: 'action', name: 'Scan Plugins', icon: '&#8635;', action: () => scanPlugins() });
-  items.push({ type: 'action', name: 'Scan Samples', icon: '&#8635;', action: () => scanAudioSamples() });
-  items.push({ type: 'action', name: 'Scan DAW Projects', icon: '&#8635;', action: () => scanDawProjects() });
-  items.push({ type: 'action', name: 'Scan Presets', icon: '&#8635;', action: () => scanPresets() });
-  items.push({ type: 'action', name: 'Check Updates', icon: '&#9889;', action: () => checkUpdates() });
-  items.push({ type: 'action', name: 'Find Duplicates', icon: '&#128270;', action: () => showDuplicateReport() });
-  items.push({ type: 'action', name: 'Reset All Scans', icon: '&#128465;', action: () => resetAllScans() });
+  // Actions — all trigger toast confirmation
+  items.push({ type: 'action', name: 'Scan Plugins', icon: '&#8635;', action: () => { showToast('Scanning plugins...'); scanPlugins(); } });
+  items.push({ type: 'action', name: 'Scan Samples', icon: '&#8635;', action: () => { showToast('Scanning samples...'); scanAudioSamples(); } });
+  items.push({ type: 'action', name: 'Scan DAW Projects', icon: '&#8635;', action: () => { showToast('Scanning DAW projects...'); scanDawProjects(); } });
+  items.push({ type: 'action', name: 'Scan Presets', icon: '&#8635;', action: () => { showToast('Scanning presets...'); scanPresets(); } });
+  items.push({ type: 'action', name: 'Check Updates', icon: '&#9889;', action: () => { showToast('Checking for updates...'); checkUpdates(); } });
+  items.push({ type: 'action', name: 'Find Duplicates', icon: '&#128270;', action: () => { showToast('Scanning for duplicates...'); showDuplicateReport(); } });
+  items.push({ type: 'action', name: 'Reset All Scans', icon: '&#128465;', action: () => { showToast('Resetting all scans...'); resetAllScans(); } });
   if (typeof buildXrefIndex === 'function') {
-    items.push({ type: 'action', name: 'Build Plugin Index', icon: '&#9889;', action: () => buildXrefIndex() });
+    items.push({ type: 'action', name: 'Build Plugin Index', icon: '&#9889;', action: () => { showToast('Building plugin index...'); buildXrefIndex(); } });
   }
   if (typeof showDepGraph === 'function') {
-    items.push({ type: 'action', name: 'Plugin Dependency Graph', icon: '&#128200;', action: () => showDepGraph() });
+    items.push({ type: 'action', name: 'Plugin Dependency Graph', icon: '&#128200;', action: () => { showToast('Opening dependency graph...'); showDepGraph(); } });
   }
   if (typeof findSimilarSamples === 'function' && typeof audioPlayerPath !== 'undefined' && audioPlayerPath) {
-    items.push({ type: 'action', name: 'Find Similar to Current Track', icon: '&#128270;', action: () => findSimilarSamples(audioPlayerPath) });
+    items.push({ type: 'action', name: 'Find Similar to Current Track', icon: '&#128270;', action: () => { showToast('Finding similar samples...'); findSimilarSamples(audioPlayerPath); } });
   }
   if (typeof showPlayer === 'function') {
     const np = document.getElementById('audioNowPlaying');
     const visible = np && np.classList.contains('active');
-    items.push({ type: 'action', name: visible ? 'Hide Audio Player' : 'Show Audio Player', icon: '&#9835;', action: () => { visible ? hidePlayer() : showPlayer(); } });
+    items.push({ type: 'action', name: visible ? 'Hide Audio Player' : 'Show Audio Player', icon: '&#9835;', action: () => { visible ? hidePlayer() : showPlayer(); showToast(visible ? 'Player hidden' : 'Player shown'); } });
   }
   if (typeof showHeatmapDashboard === 'function') {
-    items.push({ type: 'action', name: 'Heatmap Dashboard', icon: '&#128202;', action: () => showHeatmapDashboard() });
+    items.push({ type: 'action', name: 'Heatmap Dashboard', icon: '&#128202;', action: () => { showToast('Opening dashboard...'); showHeatmapDashboard(); } });
   }
   if (typeof showSmartPlaylistEditor === 'function') {
-    items.push({ type: 'action', name: 'New Smart Playlist', icon: '&#127926;', action: () => showSmartPlaylistEditor(null) });
+    items.push({ type: 'action', name: 'New Smart Playlist', icon: '&#127926;', action: () => { showToast('Creating smart playlist...'); showSmartPlaylistEditor(null); } });
   }
   if (typeof exportSettingsPdf === 'function') {
-    items.push({ type: 'action', name: 'Export Settings & Keybindings', icon: '&#128196;', action: () => exportSettingsPdf() });
+    items.push({ type: 'action', name: 'Export Settings & Keybindings', icon: '&#128196;', action: () => { showToast('Exporting settings...'); exportSettingsPdf(); } });
   }
   if (typeof exportLogPdf === 'function') {
-    items.push({ type: 'action', name: 'Export App Log', icon: '&#128196;', action: () => exportLogPdf() });
+    items.push({ type: 'action', name: 'Export App Log', icon: '&#128196;', action: () => { showToast('Exporting log...'); exportLogPdf(); } });
   }
   if (typeof exportMidi === 'function') {
-    items.push({ type: 'action', name: 'Export MIDI Files', icon: '&#127924;', action: () => exportMidi() });
+    items.push({ type: 'action', name: 'Export MIDI Files', icon: '&#127924;', action: () => { showToast('Exporting MIDI...'); exportMidi(); } });
   }
   if (typeof exportXref === 'function') {
-    items.push({ type: 'action', name: 'Export Plugin Cross-Reference', icon: '&#9889;', action: () => exportXref() });
+    items.push({ type: 'action', name: 'Export Plugin Cross-Reference', icon: '&#9889;', action: () => { showToast('Exporting cross-reference...'); exportXref(); } });
   }
   if (typeof exportSmartPlaylists === 'function') {
-    items.push({ type: 'action', name: 'Export Smart Playlists', icon: '&#127926;', action: () => exportSmartPlaylists() });
+    items.push({ type: 'action', name: 'Export Smart Playlists', icon: '&#127926;', action: () => { showToast('Exporting playlists...'); exportSmartPlaylists(); } });
   }
   items.push({ type: 'action', name: 'Clear All Caches', icon: '&#128465;', action: () => {
+    showToast('Clearing caches...');
     window.vstUpdater.dbClearCaches().then(() => {
       if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; }
       if (typeof _waveformCache !== 'undefined') { _waveformCache = {}; _spectrogramCache = {}; }
@@ -81,12 +82,12 @@ function collectPaletteItems() {
   if (typeof settingToggleTheme === 'function') {
     items.push({ type: 'action', name: 'Toggle Dark/Light Theme', icon: '&#127912;', action: () => settingToggleTheme() });
   }
-  items.push({ type: 'action', name: 'Scan All', icon: '&#9889;', action: () => typeof scanAll === 'function' && scanAll() });
-  items.push({ type: 'action', name: 'Stop All Scans', icon: '&#9632;', action: () => typeof stopAll === 'function' && stopAll() });
-  items.push({ type: 'action', name: 'Export Current Tab', icon: '&#8615;', action: () => typeof _exportCurrentTab === 'function' && _exportCurrentTab() });
-  items.push({ type: 'action', name: 'Import to Current Tab', icon: '&#8613;', action: () => typeof _importCurrentTab === 'function' && _importCurrentTab() });
-  items.push({ type: 'action', name: 'Help / Keyboard Shortcuts', icon: '&#10068;', action: () => typeof toggleHelpOverlay === 'function' && toggleHelpOverlay() });
-  items.push({ type: 'action', name: 'Open Log File', icon: '&#128196;', action: () => window.vstUpdater.getPrefsPath().then(p => { const lp = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(lp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }) });
+  items.push({ type: 'action', name: 'Scan All', icon: '&#9889;', action: () => { showToast('Scanning all...'); typeof scanAll === 'function' && scanAll(); } });
+  items.push({ type: 'action', name: 'Stop All Scans', icon: '&#9632;', action: () => { showToast('Stopping all scans...'); typeof stopAll === 'function' && stopAll(); } });
+  items.push({ type: 'action', name: 'Export Current Tab', icon: '&#8615;', action: () => { typeof _exportCurrentTab === 'function' && _exportCurrentTab(); } });
+  items.push({ type: 'action', name: 'Import to Current Tab', icon: '&#8613;', action: () => { typeof _importCurrentTab === 'function' && _importCurrentTab(); } });
+  items.push({ type: 'action', name: 'Help / Keyboard Shortcuts', icon: '&#10068;', action: () => { typeof toggleHelpOverlay === 'function' && toggleHelpOverlay(); } });
+  items.push({ type: 'action', name: 'Open Log File', icon: '&#128196;', action: () => { showToast('Opening log...'); window.vstUpdater.getPrefsPath().then(p => { const lp = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(lp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); } });
 
   // Toggles
   if (typeof settingToggleCrt === 'function') items.push({ type: 'action', name: 'Toggle CRT Effects', icon: '&#128187;', action: () => settingToggleCrt() });
