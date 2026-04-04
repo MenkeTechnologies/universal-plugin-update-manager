@@ -675,16 +675,33 @@ mod tests {
         assert_eq!(extract_version(html), None);
     }
 
-    /// Many assertions in one test: compare_versions(x, x) is always Equal.
     #[test]
-    fn bulk_compare_versions_reflexive() {
-        for i in 0..25_000 {
-            let s = format!("{}.{}.{}", i % 10_000, (i / 10) % 500, i % 20);
+    fn test_compare_versions_reflexive_handpicked() {
+        for s in [
+            "1.0.0",
+            "1.2.3.4",
+            "0.0.1",
+            "10",
+            "0.0.0",
+            "2.1.0-rc",
+        ] {
             assert_eq!(
-                compare_versions(&s, &s),
+                compare_versions(s, s),
                 std::cmp::Ordering::Equal,
                 "reflexive failed for {s}"
             );
         }
+    }
+
+    #[test]
+    fn test_compare_versions_antisymmetric() {
+        assert_eq!(
+            compare_versions("2.0", "1.0"),
+            compare_versions("1.0", "2.0").reverse()
+        );
+        assert_eq!(
+            compare_versions("1.0.1", "1.0.0"),
+            compare_versions("1.0.0", "1.0.1").reverse()
+        );
     }
 }

@@ -531,6 +531,20 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_midi_ppqn_960_standard_division() {
+        let track = vec![0x00, 0xFF, 0x2F, 0x00];
+        let data = make_midi(0, 1, 960, &track);
+        let tmp = std::env::temp_dir().join("test_midi_ppqn_960.mid");
+        std::fs::write(&tmp, &data).unwrap();
+        let info = parse_midi(&tmp).unwrap();
+        assert_eq!(
+            info.ppqn, 960,
+            "PPQN ticks/quarter when division bit 15 is clear"
+        );
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[test]
     fn test_var_len() {
         assert_eq!(read_var_len(&[0x00], 0), (0, 1));
         assert_eq!(read_var_len(&[0x7F], 0), (127, 1));

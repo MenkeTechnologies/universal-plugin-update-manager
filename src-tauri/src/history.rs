@@ -1676,6 +1676,17 @@ mod tests {
     }
 
     #[test]
+    fn test_gen_id_is_base36_alphanumeric() {
+        let id = gen_id();
+        assert!(
+            id.chars()
+                .all(|c| c.is_ascii_digit() || ('a'..='z').contains(&c)),
+            "gen_id must be radix-36 digits only, got {:?}",
+            id
+        );
+    }
+
+    #[test]
     fn test_now_iso_format() {
         let ts = now_iso();
         // Should be RFC3339 format
