@@ -4,17 +4,24 @@
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
 
-static SEED_JSON: &str = include_str!("../app_i18n_en.json");
+static SEED_JSON_EN: &str = include_str!("../app_i18n_en.json");
+static SEED_JSON_DE: &str = include_str!("../app_i18n_de.json");
 
-/// Insert default English rows (`INSERT OR IGNORE`) so new app versions can add keys without
-/// overwriting user-edited translations.
+/// Insert default English and German rows (`INSERT OR IGNORE`) so new app versions can add keys
+/// without overwriting user-edited translations.
 pub fn seed_defaults(conn: &Connection) -> Result<(), String> {
-    let map: HashMap<String, String> = serde_json::from_str(SEED_JSON).map_err(|e| e.to_string())?;
+    seed_locale(conn, "en", SEED_JSON_EN)?;
+    seed_locale(conn, "de", SEED_JSON_DE)?;
+    Ok(())
+}
+
+fn seed_locale(conn: &Connection, locale: &str, json: &str) -> Result<(), String> {
+    let map: HashMap<String, String> = serde_json::from_str(json).map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare_cached("INSERT OR IGNORE INTO app_i18n (key, locale, value) VALUES (?1, 'en', ?2)")
+        .prepare_cached("INSERT OR IGNORE INTO app_i18n (key, locale, value) VALUES (?1, ?2, ?3)")
         .map_err(|e| e.to_string())?;
     for (k, v) in map {
-        stmt.execute(params![k, v]).map_err(|e| e.to_string())?;
+        stmt.execute(params![k, locale, v]).map_err(|e| e.to_string())?;
     }
     Ok(())
 }

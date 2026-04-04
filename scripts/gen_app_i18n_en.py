@@ -276,6 +276,13 @@ HELP_EN: dict[str, str] = {
     "help.mouse.drag_player_desc": "Dock to any corner",
 }
 
+SETTINGS_UI_EN: dict[str, str] = {
+    "ui.settings.interface_language": "Interface language",
+    "ui.settings.interface_language_desc": "UI text (restart the app to apply the native menu bar language)",
+    "ui.opt.lang_en": "English",
+    "ui.opt.lang_de": "Deutsch",
+}
+
 CONFIRM_EN: dict[str, str] = {
     "confirm.delete_smart_playlist": 'Delete "{name}"?',
     "confirm.delete_all_notes": "Delete all notes and tags?",
@@ -306,9 +313,12 @@ def main() -> None:
     merged.update(TRAY_EN)
     merged.update(HELP_EN)
     merged.update(CONFIRM_EN)
+    merged.update(SETTINGS_UI_EN)
     merged.update(ui_en)
 
-    overlap = set(toast_en) & (set(MENU_EN) | set(TRAY_EN) | set(HELP_EN) | set(CONFIRM_EN) | set(ui_en))
+    overlap = set(toast_en) & (
+        set(MENU_EN) | set(TRAY_EN) | set(HELP_EN) | set(CONFIRM_EN) | set(SETTINGS_UI_EN) | set(ui_en)
+    )
     if overlap:
         raise SystemExit(f"duplicate keys across sections: {sorted(overlap)[:20]}")
 

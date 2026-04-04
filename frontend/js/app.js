@@ -45,6 +45,10 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   await (window.__toastReady || Promise.resolve());
   // Load file-backed preferences before anything else
   await prefs.load();
+  const uiLoc = prefs.getItem('uiLocale');
+  if (typeof reloadAppStrings === 'function') {
+    await reloadAppStrings(uiLoc === 'de' ? 'de' : 'en');
+  }
   // Ensure stop/resume buttons are hidden on fresh start
   const _stopAll = document.getElementById('btnStopAll');
   const _resumeAll = document.getElementById('btnResumeAll');

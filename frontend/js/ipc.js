@@ -23,6 +23,17 @@ window.__appReady = invoke('get_app_strings', { locale: null }).then((m) => {
 }).catch(() => {});
 window.__toastReady = window.__appReady;
 
+async function reloadAppStrings(locale) {
+  const loc = locale === 'de' || locale === 'en' ? locale : null;
+  try {
+    const m = await invoke('get_app_strings', { locale: loc });
+    window.__appStr = m || {};
+    window.__toastStr = window.__appStr;
+    if (typeof applyUiI18n === 'function') applyUiI18n();
+  } catch (_) {}
+}
+window.reloadAppStrings = reloadAppStrings;
+
 // ── Menu bar event handler ──
 listen('menu-action', (event) => {
   const id = event.payload;
@@ -385,6 +396,11 @@ document.addEventListener('change', (e) => {
       }
     }
     showToast(toastFmt('toast.tag_bar_moved', { pos }));
+  } else if (action === 'settingUiLocale') {
+    const v = e.target.value || 'en';
+    prefs.setItem('uiLocale', v);
+    reloadAppStrings(v);
+    showToast(toastFmt('toast.locale_changed'), 4000, '');
   }
 });
 document.addEventListener('blur', (e) => {}, true);

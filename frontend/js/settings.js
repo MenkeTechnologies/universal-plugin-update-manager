@@ -1361,6 +1361,10 @@ function restoreSettings() {
   DAW_PAGE_SIZE = pageSize;
   PRESET_PAGE_SIZE = pageSize;
 
+  const uiLoc = prefs.getItem('uiLocale');
+  const localeSel = document.getElementById('settingUiLocale');
+  if (localeSel && (uiLoc === 'de' || uiLoc === 'en')) localeSel.value = uiLoc;
+
   // Restore tag bar position
   const tagPos = prefs.getItem('tagBarPosition');
   if (tagPos === 'bottom') {

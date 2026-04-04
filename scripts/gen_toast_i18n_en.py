@@ -200,6 +200,7 @@ TOAST_EN: dict[str, str] = {
     "toast.midi_load_failed": "MIDI load failed: {err}",
     # —— utils ——
     # —— app ——
+    "toast.locale_changed": "Interface language updated. Restart the app to apply the menu bar language.",
     "toast.window_listener_failed": "Window listener setup failed: {err}",
     "toast.files_changed_rescan": "Files changed: {cats} — re-scanning...",
     "toast.failed_load_audio_scan": "Failed to load audio scan — {err}",
