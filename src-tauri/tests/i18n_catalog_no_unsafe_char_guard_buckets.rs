@@ -1,5 +1,6 @@
-//! Bucketed NUL-byte guards for every `i18n/app_i18n_*.json` value (SQLite / JSON safety).
-//! Mirrors the hygiene goal of `test/i18n-value-safety.test.js` at the Rust seed boundary.
+//! Bucketed guards: no C0 controls (U+0000–U+001F), DEL (U+007F), or U+2028/U+2029 in any
+//! `i18n/app_i18n_*.json` value — matches `test/i18n-value-safety.test.js` `UNSAFE_CHAR` at the
+//! Rust `include_str!` seed boundary (NUL is a subset of C0; still asserted per char).
 
 use seq_macro::seq;
 use std::collections::hash_map::DefaultHasher;
@@ -15,11 +16,19 @@ fn bucket_id(k: &str) -> usize {
     (h.finish() as usize) % BUCKETS
 }
 
+#[inline]
+fn is_unsafe_catalog_char(c: char) -> bool {
+    matches!(c as u32, 0x0000..=0x001F | 0x007F | 0x2028 | 0x2029)
+}
+
 fn guard_value(v: &str, locale: &str, key: &str) {
-    assert!(
-        !v.contains('\0'),
-        "locale `{locale}` key `{key}` must not contain NUL"
-    );
+    for c in v.chars() {
+        assert!(
+            !is_unsafe_catalog_char(c),
+            "locale `{locale}` key `{key}` must not contain U+{:04X}",
+            c as u32
+        );
+    }
 }
 
 fn check_bucket(m: &HashMap<String, String>, locale: &str, bucket: usize) {
