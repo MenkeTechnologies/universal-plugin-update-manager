@@ -235,11 +235,12 @@ async function updateHeaderInfo() {
     set('headerFds', s.openFds);
     set('headerUptime', formatUptime(s.uptimeSecs));
     set('headerPid', s.pid);
-    // Scan counts
-    set('headerPlugins', typeof _pluginTotalCount !== 'undefined' && _pluginTotalCount > 0 ? _pluginTotalCount : (typeof allPlugins !== 'undefined' ? allPlugins.length : 0));
-    set('headerSamples', typeof audioTotalUnfiltered !== 'undefined' && audioTotalUnfiltered > 0 ? audioTotalUnfiltered : (typeof allAudioSamples !== 'undefined' ? allAudioSamples.length : 0));
-    set('headerDaw', typeof _dawTotalCount !== 'undefined' && _dawTotalCount > 0 ? _dawTotalCount : (typeof allDawProjects !== 'undefined' ? allDawProjects.length : 0));
-    set('headerPresets', typeof _presetTotalCount !== 'undefined' && _presetTotalCount > 0 ? _presetTotalCount : (typeof allPresets !== 'undefined' ? allPresets.length : 0));
+    // Scan counts — use DB table counts from process stats (always accurate)
+    const tc = s.database?.tables || {};
+    set('headerPlugins', _pluginTotalCount || tc.plugins || 0);
+    set('headerSamples', audioTotalUnfiltered || tc.audio_samples || 0);
+    set('headerDaw', _dawTotalCount || tc.daw_projects || 0);
+    set('headerPresets', _presetTotalCount || tc.presets || 0);
     set('headerMidi', typeof getMidiCount === 'function' ? getMidiCount() : 0);
 
     // Scan status badge
