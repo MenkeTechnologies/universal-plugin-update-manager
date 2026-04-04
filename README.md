@@ -247,20 +247,10 @@ pnpm run doc:sync   # Regenerate rustdoc and copy to docs/api/ + use docs/index.
 ## // TESTING //
 
 ```bash
-# Run all tests (JS + Rust `app_lib` unit tests — see `scripts/test.sh`; integration binaries like `behavioral_ultra` / `app_i18n_test` use `cargo test --tests` or per-`--test` flags)
 pnpm test
-
-# Run Rust backend tests only
 cd src-tauri && cargo test
-
-# Run all JavaScript tests (`test/*.test.js`; `scripts/run-js-tests.mjs` batches argv so Windows stays under the ~8191-char command-line limit)
 pnpm run test:js
-
-# Spot-check a few files only
-node --test test/scanner.test.js test/update-worker.test.js test/ui.test.js
 ```
-
-GitHub Actions (`.github/workflows/ci.yml`) runs `pnpm run test:js`, `cargo test --lib`, and `cargo test --test behavioral_ultra --test app_i18n_test --test i18n_catalog_html_guard_buckets --test i18n_catalog_no_nul_guard_buckets --test i18n_catalog_no_unsafe_char_guard_buckets` in `src-tauri/`, then `pnpm run tauri:build:ci` (`tauri build --ci --no-sign`) for unsigned release bundles on each OS. `db::init_global` is idempotent: a process-wide mutex serializes the first `Database::open` + migrations on the on-disk `audio_haxor.db` so parallel test threads do not run migrations concurrently (which would raise SQLite `database is locked` on busy CI runners). The global handle is still stored in `OnceLock`. On each `migrate()`, `app_i18n::seed_defaults` runs `INSERT OR REPLACE` from `i18n/app_i18n_*.json` into `app_i18n` so shipped locale strings stay aligned with the repo (no separate per-user translation editor in SQLite).
 
 ---
 
@@ -445,22 +435,6 @@ frontend/
     smart-playlists.js -- Rule-based auto-playlists (10 rule types)
     drag-reorder.js    -- Unified Trello-style drag/drop + table column reorder
     modal-drag.js      -- Modal drag/resize with geometry persistence
-
-test/
-  scanner.test.js      -- Plugin/audio/DAW type mapping, size formatting
-  update-worker.test.js -- Version comparison, KVR URL builder
-  ui.test.js           -- UI helper functions, HTML builders
-  i18n-appfmt.test.js  -- appFmt/toastFmt placeholder contract (ipc.js semantics)
-  i18n-html-keys.test.js -- index.html data-i18n* keys present in app_i18n_en.json
-  i18n-js-keys.test.js    -- frontend/js literal catalog keys present in app_i18n_en.json
-  i18n-placeholders.test.js -- app_i18n JSON {token} segments + no stray braces vs ipc.js
-  i18n-batch-parity.test.js -- i18n_batches/*.json matches app_i18n_en.json
-  i18n-locales-and-shape.test.js -- locale JSON key parity vs en, non-empty strings, key naming
-  i18n-seed-parity.test.js -- de/fr/sv {token} multiset vs en; es critical placeholders; menu/tray keys
-  i18n-catalog-files.test.js -- exact app_i18n_*.json set; no BOM; UTF-8; sorted keys
-  i18n-value-safety.test.js -- no control/line-sep chars in catalog values
-  i18n-anchor-keys.test.js -- safe menu/tray keys (auto-discovered) differ from English per locale
-  i18n-html-injection-guard.test.js -- no script/iframe tag openers in catalog strings
 ```
 
 ---
