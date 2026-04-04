@@ -70,6 +70,11 @@ describe('frontend/js/utils.js (vm-loaded source)', () => {
     assert.strictEqual(U.searchScore('', ['x'], 'fuzzy'), 1);
   });
 
+  it('searchMatch is true iff searchScore is positive', () => {
+    assert.strictEqual(U.searchMatch('serum', ['Serum'], 'fuzzy'), true);
+    assert.strictEqual(U.searchMatch('serum', ['Massive'], 'fuzzy'), false);
+  });
+
   it('searchScore: negate removes rows that match the term', () => {
     assert.strictEqual(U.searchScore('!serum', ['Serum'], 'fuzzy'), 0);
     assert.ok(U.searchScore('!serum', ['Massive'], 'fuzzy') > 0);
