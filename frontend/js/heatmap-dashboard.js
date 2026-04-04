@@ -190,7 +190,7 @@ function buildBpmCard() {
   if (bpms.length === 0) {
     return `<div class="hm-card" data-hm-card="bpm"><h3 class="hm-card-title">BPM Distribution</h3><span class="hm-empty">Expand sample rows to populate BPM data</span></div>`;
   }
-  return `<div class="hm-card" data-hm-card="bpm"><h3 class="hm-card-title">BPM Distribution (${bpms.length} analyzed)</h3><canvas id="hmBpmCanvas" width="400" height="120" style="width:100%;height:120px;" title="BPM histogram — expand sample rows to populate more data"></canvas></div>`;
+  return `<div class="hm-card" data-hm-card="bpm"><h3 class="hm-card-title">BPM Distribution (${bpms.length} analyzed)</h3><canvas id="hmBpmCanvas" width="400" height="120" style="width:100%;height:120px;" title="BPM histogram — wait for background process to populate data"></canvas></div>`;
 }
 
 function buildKeyCard() {

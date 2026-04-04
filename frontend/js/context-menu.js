@@ -5,9 +5,10 @@ function showContextMenu(e, items) {
   e.preventDefault();
   // Store callbacks and render
   ctxMenu._actions = {};
+  ctxMenu._labels = {};
   ctxMenu.innerHTML = items.map((item, i) => {
     if (item === '---') return '<div class="ctx-menu-sep"></div>';
-    if (item.action) ctxMenu._actions[i] = item.action;
+    if (item.action) { ctxMenu._actions[i] = item.action; ctxMenu._labels[i] = item.label; }
     const cls = item.disabled ? ' ctx-disabled' : '';
     return `<div class="ctx-menu-item${cls}" data-ctx-idx="${i}">
       <span class="ctx-icon">${item.icon || ''}</span>${item.label}
@@ -36,8 +37,13 @@ ctxMenu.addEventListener('click', (e) => {
   if (!item || item.classList.contains('ctx-disabled')) return;
   const idx = item.dataset.ctxIdx;
   const action = ctxMenu._actions[idx];
+  const label = ctxMenu._labels?.[idx];
   hideContextMenu();
   if (action) action();
+  // Toast for actions whose functions don't already toast
+  if (label && !/Copy|Reveal|Favorite|Open in|Play|Pause|Loop|Mute/i.test(label)) {
+    showToast(label);
+  }
 });
 
 // Dismiss on click outside or Escape
