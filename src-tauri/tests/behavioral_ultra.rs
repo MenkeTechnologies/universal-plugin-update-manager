@@ -5661,3 +5661,190 @@ fn normalize_plugin_name_strips_au_suffix_in_parens_chain() {
         "wavetable"
     );
 }
+
+// ── Wave 28: radix 36¹²−1 (twelve `z`), `find_similar` 18/20, sixteen-sample / fourteen-DAW /
+//    fifteen-preset / fourteen-plugin-removed batches, DAW net 12/9, `format_size` 128 B ───
+
+#[test]
+fn radix_string_4738381338321616895_base36_is_twelve_z_digits() {
+    assert_eq!(
+        radix_string(4_738_381_338_321_616_895, 36),
+        "zzzzzzzzzzzz"
+    );
+}
+
+#[test]
+fn extract_plugins_nonexistent_nope_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_real.nope");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_twenty_candidates_max_eighteen() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..20).map(|i| fp(&format!("/mix{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 18);
+    assert_eq!(out.len(), 18);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_sixteen_samples_added() {
+    let samples: Vec<_> = (0..16)
+        .map(|i| sample(&format!("/master{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 16);
+}
+
+#[test]
+fn compute_daw_diff_fourteen_added_from_empty() {
+    let projects: Vec<_> = (0..14)
+        .map(|i| dawproj(&format!("/albums/a{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 14);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_fifteen_presets() {
+    let presets: Vec<_> = (0..15)
+        .map(|i| preset(&format!("/valhalla/preset{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 15);
+}
+
+#[test]
+fn compute_plugin_diff_fourteen_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &(0..14)
+            .map(|i| plug(&format!("/bus{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 14);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_128_bytes() {
+    assert_eq!(app_lib::format_size(128), "128.0 B");
+}
+
+#[test]
+fn compute_daw_diff_twelve_removed_nine_added_net() {
+    let old = build_daw_snapshot(
+        &(0..12)
+            .map(|i| dawproj(&format!("/cold/c{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &(0..9)
+            .map(|i| dawproj(&format!("/warm/w{i}.dawproject")))
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 12);
+    assert_eq!(d.added.len(), 9);
+}
+
+#[test]
+fn ext_matches_reaper_rpp_session_nested_year_path() {
+    assert_eq!(
+        ext_matches(Path::new(
+            "/Audio/REAPER/Sessions/2026/Q1/vocals/main_session.rpp"
+        ))
+        .as_deref(),
+        Some("RPP")
+    );
+}
+
+#[test]
+fn fingerprint_distance_low_energy_ratio_only_change_nonzero_alt2() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.low_energy_ratio = 0.02;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_eighth_component_padding_equal() {
+    assert_eq!(
+        app_lib::kvr::compare_versions(
+            "1.0.0.0.0.0.0",
+            "1.0.0.0.0.0.0.0"
+        ),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn audio_sample_serde_roundtrip_modified_field_empty() {
+    let mut s = sample("/tmp/x.wav");
+    s.modified = String::new();
+    let j = serde_json::to_string(&s).unwrap();
+    let back: AudioSample = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.modified, "");
+}
+
+#[test]
+fn kvr_parse_version_triple_dot_gap_between_numbers() {
+    assert_eq!(app_lib::kvr::parse_version("1...2"), vec![1, 0, 0, 2]);
+}
+
+#[test]
+fn compute_plugin_diff_eight_added_six_removed_net_two() {
+    let old = build_plugin_snapshot(
+        &(0..6)
+            .map(|i| plug(&format!("/old{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &(0..8)
+            .map(|i| plug(&format!("/new{i}.vst3"), "1"))
+            .collect::<Vec<_>>(),
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 6);
+    assert_eq!(d.added.len(), 8);
+}
+
+#[test]
+fn normalize_plugin_name_strips_intel_then_aax_brackets() {
+    assert_eq!(
+        normalize_plugin_name("Limiter (Intel) [AAX]"),
+        "limiter"
+    );
+}
+
+#[test]
+fn kvr_compare_versions_leading_zeros_in_negative_component() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("-02", "-2"),
+        Ordering::Equal
+    );
+}
+
+#[test]
+fn daw_project_serde_roundtrip_format_field_variation() {
+    let mut p = dawproj("/p.dawproject");
+    p.format = "open-daw".into();
+    let j = serde_json::to_string(&p).unwrap();
+    let back: DawProject = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.format, "open-daw");
+}
