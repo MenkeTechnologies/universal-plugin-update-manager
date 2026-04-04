@@ -4733,3 +4733,208 @@ fn export_payload_plugins_two_roundtrip_mixed_types() {
     assert_eq!(back.plugins[1].plugin_type, "CLAP");
     assert_eq!(back.plugins[1].architectures.len(), 2);
 }
+
+// ── Wave 23: radix 36⁶−1 (`zzzzzz`), `find_similar` 12/14, unknown ext `extract_plugins`,
+//    eleven-sample audio / nine-DAW / ten-preset / nine-plugin batches, DAW net 7/4 ───
+
+#[test]
+fn radix_string_2176782335_base36_is_six_z_digits() {
+    assert_eq!(radix_string(2_176_782_335, 36), "zzzzzz");
+}
+
+#[test]
+fn extract_plugins_nonexistent_xyz_returns_empty() {
+    let p = std::env::temp_dir().join("audio_haxor_not_project.xyz");
+    assert!(extract_plugins(p.to_str().expect("utf8 temp path")).is_empty());
+}
+
+#[test]
+fn find_similar_fourteen_candidates_max_twelve() {
+    let r = fp("/ref.wav");
+    let cands: Vec<_> = (0..14).map(|i| fp(&format!("/m{i}.wav"))).collect();
+    let out = find_similar(&r, &cands, 12);
+    assert_eq!(out.len(), 12);
+}
+
+#[test]
+fn compute_audio_diff_empty_to_eleven_samples_added() {
+    let samples: Vec<_> = (0..11)
+        .map(|i| sample(&format!("/loop{i}.wav")))
+        .collect();
+    let old = build_audio_snapshot(&[], &[]);
+    let new = build_audio_snapshot(&samples, &[]);
+    let d = compute_audio_diff(&old, &new);
+    assert_eq!(d.added.len(), 11);
+}
+
+#[test]
+fn compute_daw_diff_nine_added_from_empty() {
+    let projects: Vec<_> = (0..9)
+        .map(|i| dawproj(&format!("/sess{i}.dawproject")))
+        .collect();
+    let old = build_daw_snapshot(&[], &[]);
+    let new = build_daw_snapshot(&projects, &[]);
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.added.len(), 9);
+}
+
+#[test]
+fn compute_preset_diff_empty_to_ten_presets() {
+    let presets: Vec<_> = (0..10)
+        .map(|i| preset(&format!("/vst/preset{i}.fxp")))
+        .collect();
+    let old = build_preset_snapshot(&[], &[]);
+    let new = build_preset_snapshot(&presets, &[]);
+    let d = compute_preset_diff(&old, &new);
+    assert_eq!(d.added.len(), 10);
+}
+
+#[test]
+fn compute_plugin_diff_nine_paths_all_removed() {
+    let old = build_plugin_snapshot(
+        &[
+            plug("/t0.vst3", "1"),
+            plug("/t1.vst3", "1"),
+            plug("/t2.vst3", "1"),
+            plug("/t3.vst3", "1"),
+            plug("/t4.vst3", "1"),
+            plug("/t5.vst3", "1"),
+            plug("/t6.vst3", "1"),
+            plug("/t7.vst3", "1"),
+            plug("/t8.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(&[], &[], &[]);
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 9);
+    assert!(d.added.is_empty() && d.version_changed.is_empty());
+}
+
+#[test]
+fn format_size_exactly_16_kilobytes() {
+    assert_eq!(app_lib::format_size(16 * 1024), "16.0 KB");
+}
+
+#[test]
+fn kvr_compare_versions_patch_bump_same_major_minor() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("2.0.0", "2.0.1"),
+        Ordering::Less
+    );
+}
+
+#[test]
+fn ext_matches_bitwig_bwproject_uppercase_ext_deep_path() {
+    assert_eq!(
+        ext_matches(Path::new("/srv/backups/EDM/DropFinal.BWPROJECT")).as_deref(),
+        Some("BWPROJECT")
+    );
+}
+
+#[test]
+fn compute_daw_diff_seven_removed_four_added_net() {
+    let old = build_daw_snapshot(
+        &[
+            dawproj("/o0.dawproject"),
+            dawproj("/o1.dawproject"),
+            dawproj("/o2.dawproject"),
+            dawproj("/o3.dawproject"),
+            dawproj("/o4.dawproject"),
+            dawproj("/o5.dawproject"),
+            dawproj("/o6.dawproject"),
+        ],
+        &[],
+    );
+    let new = build_daw_snapshot(
+        &[
+            dawproj("/n0.dawproject"),
+            dawproj("/n1.dawproject"),
+            dawproj("/n2.dawproject"),
+            dawproj("/n3.dawproject"),
+        ],
+        &[],
+    );
+    let d = compute_daw_diff(&old, &new);
+    assert_eq!(d.removed.len(), 7);
+    assert_eq!(d.added.len(), 4);
+}
+
+#[test]
+fn normalize_plugin_name_strips_apple_silicon_then_vst3_parens() {
+    assert_eq!(
+        normalize_plugin_name("Synth (Apple Silicon) (VST3)"),
+        "synth"
+    );
+}
+
+#[test]
+fn kvr_parse_version_plus_signs_single_segment_yield_zero() {
+    assert_eq!(app_lib::kvr::parse_version("+++"), vec![0]);
+}
+
+#[test]
+fn plugin_info_serde_roundtrip_three_architectures() {
+    let p = PluginInfo {
+        name: "P".into(),
+        path: "/p.vst3".into(),
+        plugin_type: "VST3".into(),
+        version: "1".into(),
+        manufacturer: "M".into(),
+        manufacturer_url: None,
+        size: "1 B".into(),
+        size_bytes: 1,
+        modified: "m".into(),
+        architectures: vec!["x64".into(), "arm64".into(), "universal".into()],
+    };
+    let j = serde_json::to_string(&p).unwrap();
+    let back: PluginInfo = serde_json::from_str(&j).unwrap();
+    assert_eq!(back.architectures.len(), 3);
+}
+
+#[test]
+fn ext_matches_garageband_band_deep_path_lowercase_ext() {
+    assert_eq!(
+        ext_matches(Path::new("/Users/me/Music/GarageBand/2026/summer_jam.band")).as_deref(),
+        Some("BAND")
+    );
+}
+
+#[test]
+fn fingerprint_distance_rms_only_change_nonzero_second_alt() {
+    let a = fp("/a.wav");
+    let mut b = fp("/b.wav");
+    b.rms = 0.97;
+    assert!(fingerprint_distance(&a, &b) > 0.01);
+}
+
+#[test]
+fn kvr_compare_versions_double_digit_major_greater_than_single_digit() {
+    assert_eq!(
+        app_lib::kvr::compare_versions("10.0", "2.0"),
+        Ordering::Greater
+    );
+}
+
+#[test]
+fn compute_plugin_diff_three_added_one_removed_net_two() {
+    let old = build_plugin_snapshot(
+        &[plug("/gone.vst3", "1"), plug("/stay.vst3", "1")],
+        &[],
+        &[],
+    );
+    let new = build_plugin_snapshot(
+        &[
+            plug("/stay.vst3", "1"),
+            plug("/a.vst3", "1"),
+            plug("/b.vst3", "1"),
+            plug("/c.vst3", "1"),
+        ],
+        &[],
+        &[],
+    );
+    let d = compute_plugin_diff(&old, &new);
+    assert_eq!(d.removed.len(), 1);
+    assert_eq!(d.added.len(), 3);
+}
