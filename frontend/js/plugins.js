@@ -62,11 +62,14 @@ async function fetchPluginPage() {
     // Keep allPlugins in sync for KVR/export compat
     if (_pluginOffset === 0) {
       allPlugins = plugins;
+      _renderedPlugins = plugins;
+      renderPlugins(allPlugins);
     } else {
       allPlugins.push(...plugins);
+      _renderedPlugins = allPlugins;
+      // Append new batch to DOM without re-rendering everything
+      loadMorePlugins();
     }
-
-    renderPlugins(allPlugins);
     document.getElementById('totalCount').textContent = _pluginTotalCount;
   } catch (e) {
     showToast('Plugin query failed: ' + e, 4000, 'error');
@@ -392,8 +395,31 @@ function renderPlugins(plugins) {
 }
 
 function loadMorePlugins() {
-  _pluginOffset = allPlugins.length;
-  fetchPluginPage();
+  // Remove the load-more button
+  const loadMore = document.getElementById('pluginLoadMore');
+  if (loadMore) loadMore.remove();
+
+  // Render next batch from already-loaded plugins
+  const list = document.getElementById('pluginList');
+  const BATCH = 50;
+  const nextBatch = _renderedPlugins.slice(_pluginRenderCount, _pluginRenderCount + BATCH);
+  list.insertAdjacentHTML('beforeend', nextBatch.map(p => buildPluginCardHtml(p)).join(''));
+  _pluginRenderCount += nextBatch.length;
+
+  // If more plugins exist in DB beyond what we've fetched, fetch next page
+  if (_pluginRenderCount >= allPlugins.length && allPlugins.length < _pluginTotalCount) {
+    _pluginOffset = allPlugins.length;
+    fetchPluginPage();
+    return;
+  }
+
+  // If more to render locally, show load more
+  if (_pluginRenderCount < _renderedPlugins.length || allPlugins.length < _pluginTotalCount) {
+    list.insertAdjacentHTML('beforeend',
+      `<div class="plugin-load-more" id="pluginLoadMore" data-action="loadMorePlugins" style="text-align:center;padding:16px;color:var(--text-muted);cursor:pointer;font-size:12px;">
+        Showing ${_pluginRenderCount} of ${_pluginTotalCount} — click to load more
+      </div>`);
+  }
 }
 
 
