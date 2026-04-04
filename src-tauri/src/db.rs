@@ -3497,6 +3497,54 @@ mod tests {
     }
 
     #[test]
+    fn test_delete_plugin_scan_removes_rows_and_get_latest_falls_back() {
+        let db = test_db();
+        db.save_plugin_scan(&ScanSnapshot {
+            id: "pl-old".into(),
+            timestamp: "2024-01-01T00:00:00".into(),
+            plugin_count: 1,
+            plugins: vec![plugin_info("Old", "VST3", "Xfer")],
+            directories: vec!["/vst".into()],
+            roots: vec!["/vst".into()],
+        })
+        .unwrap();
+        db.save_plugin_scan(&ScanSnapshot {
+            id: "pl-new".into(),
+            timestamp: "2024-06-01T00:00:00".into(),
+            plugin_count: 1,
+            plugins: vec![plugin_info("New", "VST3", "Y")],
+            directories: vec!["/vst".into()],
+            roots: vec!["/vst".into()],
+        })
+        .unwrap();
+        assert_eq!(db.get_latest_plugin_scan().unwrap().unwrap().id, "pl-new");
+
+        db.delete_plugin_scan("pl-new").unwrap();
+
+        assert!(db.get_plugin_scan_detail("pl-new").is_err());
+        let latest = db.get_latest_plugin_scan().unwrap().unwrap();
+        assert_eq!(latest.id, "pl-old");
+        assert_eq!(latest.plugins[0].name, "Old");
+    }
+
+    #[test]
+    fn test_clear_plugin_history_removes_all_plugin_scans() {
+        let db = test_db();
+        db.save_plugin_scan(&ScanSnapshot {
+            id: "pc1".into(),
+            timestamp: "2024-06-01T00:00:00".into(),
+            plugin_count: 1,
+            plugins: vec![plugin_info("One", "VST3", "Z")],
+            directories: vec![],
+            roots: vec![],
+        })
+        .unwrap();
+        db.clear_plugin_history().unwrap();
+        assert!(db.get_latest_plugin_scan().unwrap().is_none());
+        assert!(db.get_plugin_scans().unwrap().is_empty());
+    }
+
+    #[test]
     fn test_query_plugins_total_unfiltered_with_filter_match_none() {
         let db = test_db();
         let snap = ScanSnapshot {
@@ -3645,6 +3693,41 @@ mod tests {
             size_formatted: "1 KB".into(),
             modified: "2024-01-01".into(),
         }
+    }
+
+    #[test]
+    fn test_delete_preset_scan_removes_rows_and_get_latest_falls_back() {
+        let db = test_db();
+        let mut fc = HashMap::new();
+        fc.insert("FXP".into(), 1);
+        db.save_preset_scan(&PresetScanSnapshot {
+            id: "pr-old".into(),
+            timestamp: "2024-01-01T00:00:00".into(),
+            preset_count: 1,
+            total_bytes: 1000,
+            format_counts: fc.clone(),
+            presets: vec![preset_file("old.fxp", "FXP")],
+            roots: vec![],
+        })
+        .unwrap();
+        db.save_preset_scan(&PresetScanSnapshot {
+            id: "pr-new".into(),
+            timestamp: "2024-06-01T00:00:00".into(),
+            preset_count: 1,
+            total_bytes: 2000,
+            format_counts: fc,
+            presets: vec![preset_file("new.fxp", "FXP")],
+            roots: vec![],
+        })
+        .unwrap();
+        assert_eq!(db.get_latest_preset_scan().unwrap().unwrap().id, "pr-new");
+
+        db.delete_preset_scan("pr-new").unwrap();
+
+        assert!(db.get_preset_scan_detail("pr-new").is_err());
+        let latest = db.get_latest_preset_scan().unwrap().unwrap();
+        assert_eq!(latest.id, "pr-old");
+        assert_eq!(latest.presets[0].name, "old.fxp");
     }
 
     #[test]
