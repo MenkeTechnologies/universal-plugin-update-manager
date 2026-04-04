@@ -27,6 +27,10 @@ const ANCHOR_KEYS = [
   'tray.next_track',
   'menu.edit',
   'menu.view',
+  'menu.scan_plugins',
+  'menu.tools',
+  'menu.window',
+  'tray.show',
 ];
 
 const NON_EN = /** @type {const} */ (['de', 'es', 'fr', 'nl', 'pt', 'sv']);

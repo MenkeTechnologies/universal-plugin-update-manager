@@ -420,6 +420,72 @@ mod tests {
     }
 
     #[test]
+    fn seed_json_de_tray_show_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let de: HashMap<String, String> = serde_json::from_str(SEED_JSON_DE).expect("de json");
+        assert_ne!(
+            en.get("tray.show"),
+            de.get("tray.show"),
+            "German seed should translate tray.show (same key, different value)"
+        );
+    }
+
+    #[test]
+    fn seed_json_es_tray_show_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let es: HashMap<String, String> = serde_json::from_str(SEED_JSON_ES).expect("es json");
+        assert_ne!(
+            en.get("tray.show"),
+            es.get("tray.show"),
+            "Spanish seed should translate tray.show (same key, different value)"
+        );
+    }
+
+    #[test]
+    fn seed_json_sv_tray_show_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let sv: HashMap<String, String> = serde_json::from_str(SEED_JSON_SV).expect("sv json");
+        assert_ne!(
+            en.get("tray.show"),
+            sv.get("tray.show"),
+            "Swedish seed should translate tray.show (same key, different value)"
+        );
+    }
+
+    #[test]
+    fn seed_json_fr_tray_show_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let fr: HashMap<String, String> = serde_json::from_str(SEED_JSON_FR).expect("fr json");
+        assert_ne!(
+            en.get("tray.show"),
+            fr.get("tray.show"),
+            "French seed should translate tray.show (same key, different value)"
+        );
+    }
+
+    #[test]
+    fn seed_json_pt_tray_show_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let pt: HashMap<String, String> = serde_json::from_str(SEED_JSON_PT).expect("pt json");
+        assert_ne!(
+            en.get("tray.show"),
+            pt.get("tray.show"),
+            "Portuguese seed should translate tray.show (same key, different value)"
+        );
+    }
+
+    #[test]
+    fn seed_json_nl_tray_show_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let nl: HashMap<String, String> = serde_json::from_str(SEED_JSON_NL).expect("nl json");
+        assert_ne!(
+            en.get("tray.show"),
+            nl.get("tray.show"),
+            "Dutch seed should translate tray.show (same key, different value)"
+        );
+    }
+
+    #[test]
     fn seed_json_all_locales_share_exact_key_set() {
         let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
         let keys_en: HashSet<_> = en.keys().cloned().collect();
