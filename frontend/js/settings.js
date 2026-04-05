@@ -705,6 +705,7 @@ async function settingClearAllHistory() {
       window.vstUpdater.clearAudioHistory(),
       window.vstUpdater.clearDawHistory(),
       window.vstUpdater.clearPresetHistory(),
+      window.vstUpdater.clearPdfHistory(),
     ]);
     showToast(toastFmt('toast.all_scan_history_cleared'));
   } catch (e) {
@@ -722,6 +723,7 @@ async function resetAllScans() {
       window.vstUpdater.stopAudioScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
       window.vstUpdater.stopDawScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
       window.vstUpdater.stopPresetScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
+      window.vstUpdater.stopPdfScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
     ]);
     // Clear backend history + KVR cache
     await Promise.all([
@@ -729,6 +731,7 @@ async function resetAllScans() {
       window.vstUpdater.clearAudioHistory(),
       window.vstUpdater.clearDawHistory(),
       window.vstUpdater.clearPresetHistory(),
+      window.vstUpdater.clearPdfHistory(),
       window.vstUpdater.updateKvrCache([]),
     ]);
     // Clear in-memory data
@@ -1486,7 +1489,7 @@ function restoreSettings() {
   const localeSel = document.getElementById('settingUiLocale');
   if (
     localeSel &&
-    (uiLoc === 'de' || uiLoc === 'es' || uiLoc === 'sv' || uiLoc === 'fr' || uiLoc === 'nl' || uiLoc === 'pt' || uiLoc === 'it' || uiLoc === 'el' || uiLoc === 'pl' || uiLoc === 'ru' || uiLoc === 'en')
+    (uiLoc === 'de' || uiLoc === 'es' || uiLoc === 'sv' || uiLoc === 'fr' || uiLoc === 'nl' || uiLoc === 'pt' || uiLoc === 'it' || uiLoc === 'el' || uiLoc === 'pl' || uiLoc === 'ru' || uiLoc === 'zh' || uiLoc === 'en')
   ) {
     localeSel.value = uiLoc;
   }

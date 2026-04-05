@@ -47,7 +47,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   await prefs.load();
   const uiLoc = prefs.getItem('uiLocale');
   if (typeof reloadAppStrings === 'function') {
-    await reloadAppStrings(['de', 'es', 'sv', 'fr', 'nl', 'pt', 'it', 'el', 'pl', 'ru'].includes(uiLoc) ? uiLoc : 'en');
+    await reloadAppStrings(['de', 'es', 'sv', 'fr', 'nl', 'pt', 'it', 'el', 'pl', 'ru', 'zh'].includes(uiLoc) ? uiLoc : 'en');
   }
   // Ensure stop/resume buttons are hidden on fresh start
   const _stopAll = document.getElementById('btnStopAll');
@@ -334,6 +334,7 @@ async function stopAll() {
     window.vstUpdater.stopAudioScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
     window.vstUpdater.stopDawScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
     window.vstUpdater.stopPresetScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
+    window.vstUpdater.stopPdfScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
   ]);
 }
 

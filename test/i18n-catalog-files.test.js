@@ -26,6 +26,7 @@ const SHIPPED_APP_I18N = [
   'app_i18n_pt.json',
   'app_i18n_ru.json',
   'app_i18n_sv.json',
+  'app_i18n_zh.json',
 ];
 
 test('i18n/ has exactly the shipped app_i18n_*.json locale files (no extras, none missing)', () => {
