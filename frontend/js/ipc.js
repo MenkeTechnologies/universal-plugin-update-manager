@@ -32,6 +32,7 @@ async function reloadAppStrings(locale) {
     locale === 'pt' ||
     locale === 'nl' ||
     locale === 'it' ||
+    locale === 'el' ||
     locale === 'en'
       ? locale
       : null;
@@ -633,6 +634,13 @@ window.vstUpdater = {
   // Similarity
   findSimilarSamples: (filePath, candidatePaths, maxResults) => invoke('find_similar_samples', { filePath, candidatePaths, maxResults: maxResults || 20 }),
   buildFingerprintCache: (candidatePaths) => invoke('build_fingerprint_cache', { candidatePaths }),
+  pdfMetadataGet: (paths) => invoke('pdf_metadata_get', { paths }),
+  pdfMetadataExtractBatch: (paths) => invoke('pdf_metadata_extract_batch', { paths }),
+  pdfMetadataUnindexed: (limit) => invoke('pdf_metadata_unindexed', { limit: limit || 100000 }),
+  onPdfMetadataProgress: (callback) => {
+    const p = listen('pdf-metadata-progress', (event) => callback(event.payload));
+    return () => { p.then(fn => fn()); };
+  },
   readAlsXml: (filePath) => invoke('read_als_xml', { filePath }),
   readProjectFile: (filePath) => invoke('read_project_file', { filePath }),
   // Preferences (file-backed)

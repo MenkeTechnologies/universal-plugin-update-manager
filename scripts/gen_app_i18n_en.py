@@ -565,6 +565,7 @@ SETTINGS_UI_EN: dict[str, str] = {
     "ui.settings.interface_language_desc": "UI text (restart the app to apply the native menu bar language)",
     "ui.opt.lang_en": "English",
     "ui.opt.lang_de": "Deutsch",
+    "ui.opt.lang_el": "Ελληνικά",
     "ui.opt.lang_es": "Español",
     "ui.opt.lang_sv": "Svenska",
     "ui.opt.lang_fr": "Français",
@@ -626,6 +627,7 @@ def main() -> None:
         "ui.opt.portugu_s",
         "ui.opt.nederlands",
         "ui.opt.italiano",
+        "ui.opt.ellinika",
     ):
         merged.pop(dup, None)
     merged.pop("ui.tt.interface_language", None)

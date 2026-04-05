@@ -16,6 +16,7 @@ const i18nDir = join(root, 'i18n');
 /** Same locales as `app_i18n.rs` `SEED_JSON_*` and `i18n-locales-and-shape.test.js`. */
 const SHIPPED_APP_I18N = [
   'app_i18n_de.json',
+  'app_i18n_el.json',
   'app_i18n_en.json',
   'app_i18n_es.json',
   'app_i18n_fr.json',

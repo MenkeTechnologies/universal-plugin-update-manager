@@ -15,6 +15,7 @@ const i18nDir = join(root, 'i18n');
 const LOCALE_FILES = [
   ['en', 'app_i18n_en.json'],
   ['de', 'app_i18n_de.json'],
+  ['el', 'app_i18n_el.json'],
   ['es', 'app_i18n_es.json'],
   ['sv', 'app_i18n_sv.json'],
   ['fr', 'app_i18n_fr.json'],
