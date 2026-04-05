@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use app_lib::history::{
-    AudioHistory, AudioSample, AudioScanDiff, AudioScanSnapshot, AudioScanSummary, DawHistory,
+    AudioHistory, AudioSample, AudioScanDiff, AudioScanSummary, DawHistory,
     DawProject, DawScanDiff, DawScanSnapshot, DawScanSummary, PdfFile, PdfScanDiff, PdfScanSnapshot,
     PdfScanSummary, PresetFile, PresetHistory, PresetScanDiff, PresetScanSnapshot,
     PresetScanSummary, ScanDiff, ScanHistory, ScanSnapshot, ScanSummary, VersionChangedPlugin,
@@ -345,10 +345,13 @@ fn pdf_meta_extract_page_count_missing_file() {
 // ── Scanner: roots + similarity failure path ────────────────────────────────────
 
 #[test]
-fn scanner_get_vst_directories_returns_vec() {
-    let dirs = app_lib::scanner::get_vst_directories();
-    assert!(dirs.iter().all(|s| !s.is_empty() || s.is_empty()));
-    let _ = dirs.len();
+fn scanner_get_vst_directories_only_lists_existing_paths() {
+    for d in app_lib::scanner::get_vst_directories() {
+        assert!(
+            Path::new(&d).exists(),
+            "get_vst_directories filters with exists(); got stale path: {d}"
+        );
+    }
 }
 
 #[test]
