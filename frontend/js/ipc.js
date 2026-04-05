@@ -102,6 +102,9 @@ listen('menu-action', (event) => {
     case 'reset_tabs': settingResetTabOrder(); break;
     // Data
     case 'clear_history': settingClearAllHistory(); break;
+    case 'clear_all_databases':
+      if (typeof settingClearAllDatabases === 'function') settingClearAllDatabases();
+      break;
     case 'clear_kvr': settingClearKvrCache(); break;
     case 'clear_favorites': clearFavorites(); break;
     case 'reset_all': resetAllScans(); break;
@@ -292,6 +295,7 @@ document.addEventListener('click', (e) => {
     case 'settingClearAllHistory': settingClearAllHistory(); break;
     case 'settingClearKvrCache': settingClearKvrCache(); break;
     case 'settingClearAnalysisCache': window.vstUpdater.dbClearCaches().then(() => { if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; } if (typeof _waveformCache !== 'undefined') { _waveformCache = {}; _spectrogramCache = {}; } showToast(toastFmt('toast.all_caches_cleared')); if (typeof renderCacheStats === 'function') renderCacheStats(); }).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error')); break;
+    case 'settingClearAllDatabases': if (typeof settingClearAllDatabases === 'function') settingClearAllDatabases(); break;
     case 'clearCacheTable': { const c = el.dataset.cache; if (c) window.vstUpdater.dbClearCacheTable(c).then(() => { if (c === 'bpm' && typeof _bpmCache !== 'undefined') _bpmCache = {}; if (c === 'key' && typeof _keyCache !== 'undefined') _keyCache = {}; if (c === 'lufs' && typeof _lufsCache !== 'undefined') _lufsCache = {}; if (c === 'waveform' && typeof _waveformCache !== 'undefined') _waveformCache = {}; if (c === 'spectrogram' && typeof _spectrogramCache !== 'undefined') _spectrogramCache = {}; showToast(toastFmt('toast.cache_type_cleared', { cache: c.toUpperCase() })); if (typeof renderCacheStats === 'function') renderCacheStats(); }).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error')); } break;
     case 'buildCacheTable': {
       const c = el.dataset.cache;

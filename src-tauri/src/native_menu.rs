@@ -450,6 +450,13 @@ pub fn build_native_menu_bar<R: Runtime>(
         true,
         Some("CmdOrCtrl+Shift+Delete"),
     )?;
+    let clear_all_databases = MenuItem::with_id(
+        handle,
+        "clear_all_databases",
+        t("menu.clear_all_databases", "Clear All Databases"),
+        true,
+        None::<&str>,
+    )?;
     let clear_kvr = MenuItem::with_id(
         handle,
         "clear_kvr",
@@ -509,6 +516,7 @@ pub fn build_native_menu_bar<R: Runtime>(
         true,
         &[
             &clear_history,
+            &clear_all_databases,
             &clear_kvr,
             &clear_favorites,
             &data_sep,

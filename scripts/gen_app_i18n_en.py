@@ -422,6 +422,7 @@ MENU_EN: dict[str, str] = {
     "menu.toggle_mute": "Mute / Unmute",
     "menu.data": "Data",
     "menu.clear_history": "Clear All History...",
+    "menu.clear_all_databases": "Clear All Databases",
     "menu.clear_kvr": "Clear KVR Cache...",
     "menu.clear_favorites": "Clear Favorites...",
     "menu.reset_all_scans": "Reset All Scans...",

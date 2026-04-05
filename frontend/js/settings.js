@@ -676,6 +676,43 @@ async function renderCacheFilesList() {
   }
 }
 
+async function settingClearAllDatabases() {
+  // Wipe every scan-history DB table (plugins, audio, DAW, presets, MIDI, PDF).
+  // Caches (BPM/Key/LUFS/Waveform/Spectrogram/Xref/Fingerprint/KVR) are NOT
+  // touched here — those are handled by settingClearAnalysisCache.
+  const msg = typeof appFmt === 'function'
+    ? appFmt('confirm.clear_all_scan_databases')
+    : 'Clear all scan history databases? This wipes every tab\u2019s scanned file list.';
+  const title = typeof appFmt === 'function'
+    ? appFmt('ui.btn.clear_all_databases')
+    : 'Clear All Databases';
+  const ok = typeof confirmAction === 'function'
+    ? await confirmAction(msg, title)
+    : window.confirm(msg);
+  if (!ok) return;
+  const clears = [
+    ['menu.tab_plugins', () => window.vstUpdater.clearHistory()],
+    ['menu.tab_samples', () => window.vstUpdater.clearAudioHistory()],
+    ['menu.tab_daw', () => window.vstUpdater.clearDawHistory()],
+    ['menu.tab_presets', () => window.vstUpdater.clearPresetHistory()],
+    ['menu.tab_midi', () => window.vstUpdater.clearMidiHistory()],
+    ['menu.tab_pdf', () => window.vstUpdater.clearPdfHistory()],
+  ];
+  for (const [labelKey, fn] of clears) {
+    try { await fn(); } catch (e) {
+      const label = typeof appFmt === 'function' ? appFmt(labelKey) : labelKey;
+      const errLine = typeof appFmt === 'function'
+        ? appFmt('toast.failed_clear_scan_db_history', { label, err: e.message || e })
+        : `Failed to clear ${label} history: ${e.message || e}`;
+      if (typeof showToast === 'function') showToast(errLine, 4000, 'error');
+    }
+  }
+  if (typeof showToast === 'function') {
+    showToast(typeof toastFmt === 'function' ? toastFmt('toast.all_scan_databases_cleared') : 'All scan databases cleared');
+  }
+  if (typeof renderCacheStats === 'function') renderCacheStats();
+}
+
 async function settingClearAnalysisCache() {
   // Delete separate cache files
   const files = ['bpm-cache.json', 'key-cache.json', 'lufs-cache.json', 'waveform-cache.json', 'spectrogram-cache.json', 'xref-cache.json'];
@@ -1374,7 +1411,7 @@ function refreshSettingsUI() {
           }),
         ]),
         section('ui.perf.section_scanner_state', [
-          `${dot(sc.pluginScanning)} ${f('ui.perf.scan_plugins')}  ${dot(sc.audioScanning)} ${f('ui.perf.scan_samples')}  ${dot(sc.dawScanning)} ${f('ui.perf.scan_daw')}  ${dot(sc.presetScanning)} ${f('ui.perf.scan_presets')}  ${dot(sc.updateChecking)} ${f('ui.perf.scan_updates')}`,
+          `${dot(sc.pluginScanning)} ${f('ui.perf.scan_plugins')}  ${dot(sc.audioScanning)} ${f('ui.perf.scan_samples')}  ${dot(sc.dawScanning)} ${f('ui.perf.scan_daw')}  ${dot(sc.presetScanning)} ${f('ui.perf.scan_presets')}  ${dot(sc.midiScanning)} ${f('ui.perf.scan_midi')}  ${dot(sc.pdfScanning)} ${f('ui.perf.scan_pdf')}  ${dot(sc.updateChecking)} ${f('ui.perf.scan_updates')}`,
         ]),
         section('ui.perf.section_scan_results', [
           f('ui.perf.line_scan_results', {
@@ -1382,6 +1419,8 @@ function refreshSettingsUI() {
             sample_count: sampleCount.toLocaleString(),
             daw_count: dawCount.toLocaleString(),
             preset_count: presetCount.toLocaleString(),
+            midi_count: (typeof allMidiFiles !== 'undefined' ? allMidiFiles.length : 0).toLocaleString(),
+            pdf_count: (typeof allPdfs !== 'undefined' ? allPdfs.length : 0).toLocaleString(),
           }),
         ]),
         section('ui.perf.section_database', [
@@ -1391,6 +1430,8 @@ function refreshSettingsUI() {
             plugins: (tc.plugins || 0).toLocaleString(),
             daw: (tc.daw_projects || 0).toLocaleString(),
             presets: (tc.presets || 0).toLocaleString(),
+            midi: (tc.midi_files || 0).toLocaleString(),
+            pdfs: (tc.pdfs || 0).toLocaleString(),
           }),
           f('ui.perf.line_db_caches', {
             kvr: (tc.kvr_cache || 0).toLocaleString(),
@@ -1404,6 +1445,8 @@ function refreshSettingsUI() {
             audio_scans: String(tc.audio_scans || 0),
             daw_scans: String(tc.daw_scans || 0),
             preset_scans: String(tc.preset_scans || 0),
+            midi_scans: String(tc.midi_scans || 0),
+            pdf_scans: String(tc.pdf_scans || 0),
           }),
         ]),
         section('ui.perf.section_storage', [
