@@ -760,8 +760,13 @@ window.vstUpdater.getVersion().then(v => {
   const vStr = 'v' + v;
   const el = document.getElementById('appVersion');
   if (el) el.textContent = vStr;
-  const sv = document.getElementById('settingsVersion');
-  if (sv) sv.textContent = vStr;
+  const runAboutLine = () => {
+    if (typeof window.updateSettingsAboutVersionLine === 'function') {
+      window.updateSettingsAboutVersionLine();
+    }
+  };
+  runAboutLine();
+  setTimeout(runAboutLine, 0);
 }).catch(() => {});
 
 function showStopButton() {

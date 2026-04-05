@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "Threads par cœur de processeur pour les analyses parallèles. Plus élevé = plus de débit d’E/S. Redémarrage requis.",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "Regardez les répertoires d'analyse pour les fichiers nouveaux/modifiés et indexez-les automatiquement",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "Effacez tous les résultats d’analyse, l’historique et le cache KVR. Recommencer complètement à neuf",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "Clair",
   "ui.settings.cache_files_col_file": "Déposer",
   "ui.settings.cache_files_col_modified": "Modifié",

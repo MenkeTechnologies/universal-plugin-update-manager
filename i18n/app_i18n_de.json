@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "Threads pro CPU-Kern für parallele Scans. Höher = mehr E/A-Durchsatz. Neustart erforderlich.",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "Durchsuchen Sie Verzeichnisse nach neuen/geänderten Dateien und indizieren Sie diese automatisch",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "Löschen Sie alle Scanergebnisse, den Verlauf und den KVR-Cache. Beginnen Sie völlig neu",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "Klar",
   "ui.settings.cache_files_col_file": "Datei",
   "ui.settings.cache_files_col_modified": "Geändert",

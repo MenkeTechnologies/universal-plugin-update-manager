@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "Νήματα ανά πυρήνα CPU για παράλληλες σαρώσεις. Υψηλότερο = μεγαλύτερη απόδοση I/O. Απαιτείται επανεκκίνηση.",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "Παρακολουθήστε σάρωση καταλόγων για νέα/αλλαγμένα αρχεία και ευρετηριάστε τα αυτόματα",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "Διαγράψτε όλα τα αποτελέσματα σάρωσης, το ιστορικό και την κρυφή μνήμη KVR. Ξεκινήστε εντελώς φρέσκο",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "Σαφής",
   "ui.settings.cache_files_col_file": "Αρχείο",
   "ui.settings.cache_files_col_modified": "Τροποποιήθηκε",

@@ -1033,6 +1033,20 @@ function getSettingValue(key, defaultVal) {
   return prefs.getItem(key) || defaultVal;
 }
 
+/** Settings → About: version line (uses `ui.settings.about_version_line` + `ui.logo.author_line`). */
+function updateSettingsAboutVersionLine() {
+  const line = document.getElementById('settingsAboutVersionLine');
+  if (!line) return;
+  const ver = document.getElementById('appVersion')?.textContent?.trim() || '';
+  if (typeof appFmt === 'function') {
+    const author = appFmt('ui.logo.author_line');
+    line.textContent = appFmt('ui.settings.about_version_line', { version: ver, author });
+  } else {
+    line.textContent = `Version ${ver} · by MenkeTechnologies · `;
+  }
+}
+window.updateSettingsAboutVersionLine = updateSettingsAboutVersionLine;
+
 function refreshSettingsUI() {
   // Theme
   const theme = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -1444,10 +1458,8 @@ function refreshSettingsUI() {
     }
   });
 
-  // Version
-  const ver = document.getElementById('appVersion')?.textContent || '';
-  const settingsVer = document.getElementById('settingsVersion');
-  if (settingsVer) settingsVer.textContent = ver;
+  // About: version line (i18n)
+  if (typeof updateSettingsAboutVersionLine === 'function') updateSettingsAboutVersionLine();
 
   // Prefs file path
   const prefsPathEl = document.getElementById('prefsFilePath');

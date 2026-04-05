@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "Threads por núcleo da CPU para varreduras paralelas. Maior = mais rendimento de E/S. É necessário reiniciar.",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "Observe os diretórios de varredura em busca de arquivos novos/alterados e indexe-os automaticamente",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "Limpe todos os resultados da verificação, histórico e cache KVR. Comece completamente novo",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "Claro",
   "ui.settings.cache_files_col_file": "Arquivo",
   "ui.settings.cache_files_col_modified": "Modificado",

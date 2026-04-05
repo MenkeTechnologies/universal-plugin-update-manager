@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "用于并行扫描的每个 CPU 核心的线程。更高=更多的 I/O 吞吐量。需要重新启动。",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "监视扫描目录中的新文件/更改文件并自动索引它们",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "擦除所有扫描结果、历史记录和 KVR 缓存。全新开始",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "清除",
   "ui.settings.cache_files_col_file": "文件",
   "ui.settings.cache_files_col_modified": "修改的",

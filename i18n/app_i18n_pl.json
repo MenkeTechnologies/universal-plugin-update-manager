@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "Wątki na rdzeń procesora w przypadku skanowania równoległego. Wyższa = większa przepustowość we/wy. Wymagane ponowne uruchomienie.",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "Obserwuj skanowanie katalogów w poszukiwaniu nowych/zmienionych plików i automatycznie je indeksuj",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "Wyczyść wszystkie wyniki skanowania, historię i pamięć podręczną KVR. Zacznij zupełnie od nowa",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "Jasne",
   "ui.settings.cache_files_col_file": "Plik",
   "ui.settings.cache_files_col_modified": "Zmodyfikowany",

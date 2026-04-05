@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "Число потоков на ядро ​​ЦП для параллельного сканирования. Выше = больше пропускная способность ввода-вывода. Требуется перезагрузка.",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "Следите за сканированием каталогов на наличие новых/измененных файлов и автоматически индексируйте их.",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "Сотрите все результаты сканирования, историю и кеш KVR. Начни совершенно заново",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "Прозрачный",
   "ui.settings.cache_files_col_file": "Файл",
   "ui.settings.cache_files_col_modified": "Модифицированный",

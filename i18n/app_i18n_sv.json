@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "Trådar per CPU-kärna för parallella skanningar. Högre = mer I/O-genomströmning. Omstart krävs.",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "Titta på skanna kataloger efter nya/ändrade filer och autoindexera dem",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "Rensa alla skanningsresultat, historik och KVR-cache. Börja helt fräsch",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "Rensa",
   "ui.settings.cache_files_col_file": "Fil",
   "ui.settings.cache_files_col_modified": "Ändrad",

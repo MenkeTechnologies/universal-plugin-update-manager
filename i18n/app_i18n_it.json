@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "Thread per core della CPU per scansioni parallele. Maggiore = maggiore throughput I/O. È necessario riavviare.",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "Guarda la scansione delle directory per file nuovi/modificati e indicizzali automaticamente",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "Cancella tutti i risultati della scansione, la cronologia e la cache KVR. Inizia completamente nuovo",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "Chiaro",
   "ui.settings.cache_files_col_file": "File",
   "ui.settings.cache_files_col_modified": "Modificato",

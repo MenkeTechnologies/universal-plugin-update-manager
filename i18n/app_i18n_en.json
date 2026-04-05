@@ -1186,6 +1186,7 @@
   "ui.settings.dialog_select_folder": "Select folder to scan",
   "ui.settings.interface_language": "Interface language",
   "ui.settings.interface_language_desc": "Chosen language applies to the UI and menu bar after you restart the app",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.saved": "Saved",
   "ui.sh.9776_about": "About",
   "ui.sh.9776_app_info": "App Info",

@@ -1172,6 +1172,7 @@
   "ui.sd.threads_per_cpu_core_for_parallel_scans_higher_mor": "並列スキャンの CPU コアごとのスレッド数。高い = より多くの I/O スループット。再起動が必要です。",
   "ui.sd.watch_scan_directories_for_new_changed_files_and_a": "新規/変更されたファイルのスキャン ディレクトリを監視し、自動インデックスを作成します",
   "ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_": "すべてのスキャン結果、履歴、KVR キャッシュを消去します。完全に新しくスタートする",
+  "ui.settings.about_version_line": "Version {version} · {author} · ",
   "ui.settings.cache_clear": "クリア",
   "ui.settings.cache_files_col_file": "ファイル",
   "ui.settings.cache_files_col_modified": "修正済み",
