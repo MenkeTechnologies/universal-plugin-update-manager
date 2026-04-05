@@ -272,8 +272,8 @@ function renderDawTable() {
   if (filteredDawProjects.length === 0 && _dawTotalCount === 0 && _dawTotalUnfiltered === 0) {
     if (wrap) {
       const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s);
-      const h2 = esc(typeof appFmt === 'function' ? appFmt('ui.h2.daw_project_index') : 'DAW Project Index');
-      const p = esc(typeof appFmt === 'function' ? appFmt('ui.p.daw_empty') : 'Click "Scan DAW Projects" to find DAW project files on your system.');
+      const h2 = esc(catalogFmt('ui.h2.daw_project_index'));
+      const p = esc(catalogFmt('ui.p.daw_empty'));
       wrap.innerHTML = `<div class="state-message" id="dawEmptyState">
         <div class="state-icon">&#127911;</div>
         <h2>${h2}</h2>
@@ -298,7 +298,7 @@ function renderDawTable() {
   // Filter active + no matches: inline row with a clear message instead of a blank table body.
   if (_dawOffset === 0 && filteredDawProjects.length === 0 && _dawTotalUnfiltered > 0) {
     const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s);
-    const msg = esc(typeof appFmt === 'function' ? appFmt('ui.daw.no_filter_matches') : 'No DAW projects match the current filter.');
+    const msg = esc(catalogFmt('ui.daw.no_filter_matches'));
     tbody.insertAdjacentHTML('beforeend',
       `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-dim);"><span style="font-size:24px;display:block;margin-bottom:8px;">&#128269;</span>${msg}</td></tr>`);
     return;
@@ -309,12 +309,10 @@ function renderDawTable() {
 }
 
 function appendDawLoadMore(tbody) {
-  const line = typeof appFmt === 'function'
-    ? appFmt('ui.js.load_more_hint', {
-        shown: dawRenderCount.toLocaleString(),
-        total: _dawTotalCount.toLocaleString(),
-      })
-    : `Showing ${dawRenderCount} of ${_dawTotalCount} — click to load more`;
+  const line = catalogFmt('ui.js.load_more_hint', {
+    shown: dawRenderCount.toLocaleString(),
+    total: _dawTotalCount.toLocaleString(),
+  });
   tbody.insertAdjacentHTML('beforeend',
     `<tr id="dawLoadMore"><td colspan="7" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" data-action="loadMoreDaw">
       ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}

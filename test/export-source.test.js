@@ -11,6 +11,7 @@ function loadExportSandbox() {
   const sandbox = {
     console,
     appFmt: (key, vars) => (vars ? `${key}:${JSON.stringify(vars)}` : key),
+    catalogFmt: (key, vars) => (vars ? `${key}:${JSON.stringify(vars)}` : key),
     document: { addEventListener: () => {} },
     showToast: () => {},
     window: {},

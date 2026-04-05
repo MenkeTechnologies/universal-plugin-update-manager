@@ -822,7 +822,7 @@ document.addEventListener('contextmenu', (e) => {
     const scanFn = scanMap[tab];
     if (scanFn && typeof window[scanFn] === 'function') {
       const scanKey = scanLabelKeyByTab[tab] || 'menu.rescan_tab_data';
-      const scanLabel = typeof appFmt === 'function' ? appFmt(scanKey) : scanKey;
+      const scanLabel = catalogFmt(scanKey);
       items.push({ icon: '&#9889;', label: scanLabel, action: () => window[scanFn]() });
     }
     const exportFn = exportMap[tab];
@@ -1161,7 +1161,7 @@ document.addEventListener('contextmenu', (e) => {
     const body = walkerTile.querySelector('.walker-tile-body');
     const dirs = body ? [...body.querySelectorAll('.walker-dir')].map(d => d.textContent).join('\n') : '';
     const title = walkerTile.querySelector('.walker-tile-title, h4, h3')?.textContent?.trim()
-      || (typeof appFmt === 'function' ? appFmt('menu.context_walker_fallback') : 'Walker');
+      || catalogFmt('menu.context_walker_fallback');
     const items = [
       { icon: '&#128203;', label: appFmt('menu.copy_all_paths'), ..._noEcho, action: () => copyToClipboard(dirs), disabled: !dirs },
       { icon: '&#128203;', label: appFmt('menu.copy_tile_title'), ..._noEcho, action: () => copyToClipboard(title) },
@@ -1178,7 +1178,7 @@ document.addEventListener('contextmenu', (e) => {
   const settingsSection = e.target.closest('.settings-section');
   if (settingsSection) {
     const heading = settingsSection.querySelector('.settings-heading')?.textContent?.trim()
-      || (typeof appFmt === 'function' ? appFmt('menu.context_settings_section_fallback') : 'Section');
+      || catalogFmt('menu.context_settings_section_fallback');
     const items = [
       { icon: '&#128203;', label: appFmt('menu.copy_section_name'), ..._noEcho, action: () => typeof copyToClipboard === 'function' && copyToClipboard(heading) },
       { icon: '&#9650;', label: appFmt('menu.move_up'), action: () => {

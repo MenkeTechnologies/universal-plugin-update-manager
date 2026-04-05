@@ -206,7 +206,7 @@ function collectPaletteItems() {
   if (typeof getAllTags === 'function') {
     for (const t of getAllTags()) {
       items.push({
-        type: 'tag', name: t, detail: typeof appFmt === 'function' ? appFmt('ui.palette.type_tag') : 'Tag',
+        type: 'tag', name: t, detail: catalogFmt('ui.palette.type_tag'),
         icon: '&#127991;', fields: [t],
         action: () => { if (typeof setGlobalTag === 'function') setGlobalTag(t); switchTab('plugins'); }
       });
@@ -253,7 +253,7 @@ function openPalette() {
   _paletteQuery = '';
   _paletteSelected = 0;
 
-  const ph = typeof appFmt === 'function' ? appFmt('ui.palette.placeholder') : 'Search everything… (plugins, samples, projects, actions)';
+  const ph = catalogFmt('ui.palette.placeholder');
   const html = `<div class="palette-overlay" id="paletteOverlay">
     <div class="palette-box">
       <input type="text" class="palette-input" id="paletteInput" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -293,7 +293,7 @@ function renderPaletteResults() {
   _paletteResults = filterPaletteItems(_paletteQuery, allItems);
 
   if (_paletteResults.length === 0) {
-    const empty = typeof appFmt === 'function' ? appFmt('ui.palette.empty') : 'No results';
+    const empty = catalogFmt('ui.palette.empty');
     container.innerHTML = '<div class="palette-empty">' + escapeHtml(empty) + '</div>';
     return;
   }
@@ -301,22 +301,16 @@ function renderPaletteResults() {
   container.innerHTML = _paletteResults.map((item, i) => {
     const typeCls = 'palette-type-' + item.type;
     const sel = i === _paletteSelected ? ' palette-selected' : '';
-    const typeLabel = (() => {
-      if (typeof appFmt !== 'function') {
-        return { tab: 'Tab', action: 'Action', plugin: 'Plugin', sample: 'Sample', daw: 'DAW', preset: 'Preset', bookmark: 'Dir', tag: 'Tag' }[item.type] || item.type;
-      }
-      const m = {
-        tab: appFmt('ui.palette.type_tab'),
-        action: appFmt('ui.palette.type_action'),
-        plugin: appFmt('ui.palette.type_plugin'),
-        sample: appFmt('ui.palette.type_sample'),
-        daw: appFmt('ui.palette.type_daw'),
-        preset: appFmt('ui.palette.type_preset'),
-        bookmark: appFmt('ui.palette.type_bookmark'),
-        tag: appFmt('ui.palette.type_tag'),
-      };
-      return m[item.type] || item.type;
-    })();
+    const typeLabel = ({
+      tab: catalogFmt('ui.palette.type_tab'),
+      action: catalogFmt('ui.palette.type_action'),
+      plugin: catalogFmt('ui.palette.type_plugin'),
+      sample: catalogFmt('ui.palette.type_sample'),
+      daw: catalogFmt('ui.palette.type_daw'),
+      preset: catalogFmt('ui.palette.type_preset'),
+      bookmark: catalogFmt('ui.palette.type_bookmark'),
+      tag: catalogFmt('ui.palette.type_tag'),
+    })[item.type] || item.type;
     const detail = item.detail ? `<span class="palette-detail">${escapeHtml(item.detail)}</span>` : '';
     return `<div class="palette-row${sel}" data-palette-idx="${i}">
       <span class="palette-icon">${item.icon}</span>

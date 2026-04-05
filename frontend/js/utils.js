@@ -4,6 +4,24 @@ function escapeHtml(str) {
   return _escDiv.innerHTML;
 }
 
+/**
+ * Resolve a catalog key to the current locale string. No English fallbacks — if `appFmt`
+ * is unavailable (e.g. VM tests), returns the key string. See `test/i18n-proof-contract.test.js`.
+ */
+function catalogFmt(key, vars) {
+  if (typeof appFmt === 'function') return appFmt(key, vars);
+  return key;
+}
+
+/**
+ * Unit/abbreviation only (B, KB, s, m). When `appFmt` is absent, uses ASCII `asciiFallback`
+ * so VM tests still show compact suffixes. Do not use for full phrases — use `catalogFmt`.
+ */
+function catalogFmtOrUnit(key, asciiFallback) {
+  if (typeof appFmt === 'function') return appFmt(key);
+  return asciiFallback;
+}
+
 /** Table column header label — uses `appFmt` when IPC strings are loaded. */
 function appTableCol(key) {
   if (typeof appFmt !== 'function') return key;

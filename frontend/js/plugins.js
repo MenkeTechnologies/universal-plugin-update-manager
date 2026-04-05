@@ -394,14 +394,10 @@ async function checkUpdates() {
       const bc = document.getElementById('pluginBatchUpdateCount');
       if (bc) {
         const n = pluginsWithUpdates.length;
-        if (typeof appFmt === 'function') {
-          bc.textContent =
-            n === 1
-              ? appFmt('menu.plugins_with_updates_one')
-              : appFmt('menu.plugins_with_updates', { n });
-        } else {
-          bc.textContent = `${n} plugin${n > 1 ? 's' : ''} with updates`;
-        }
+        bc.textContent =
+          n === 1
+            ? catalogFmt('menu.plugins_with_updates_one')
+            : catalogFmt('menu.plugins_with_updates', { n });
       }
       batchIndex = 0;
       updateBatchUI();
@@ -409,7 +405,7 @@ async function checkUpdates() {
 
     renderPlugins(allPlugins);
   } catch (err) {
-    const updateErr = err.message || err || 'Unknown error';
+    const updateErr = err.message || err || catalogFmt('toast.unknown_error');
     if (updateErr !== 'stopped') {
       showToast(toastFmt('toast.update_check_failed', { updateErr }), 4000, 'error');
     }

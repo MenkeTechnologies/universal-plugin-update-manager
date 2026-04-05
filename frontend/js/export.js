@@ -1,7 +1,7 @@
 // ── Export / Import ──
 
 function _exportFmt(key, vars) {
-  return typeof appFmt === 'function' ? appFmt(key, vars) : key;
+  return catalogFmt(key, vars);
 }
 
 function resolveExportTitle(ctx) {

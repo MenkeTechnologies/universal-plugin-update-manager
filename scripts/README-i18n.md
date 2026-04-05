@@ -97,6 +97,7 @@ python3 scripts/merge_batch_into_locales.py scripts/i18n_batches/your_batch.json
 - `test/i18n-prove-all-locales-complete.test.js` — exhaustive proof: every English key exists in every locale with a non-empty value; every HTML- and JS-referenced catalog key exists in **every** locale (not only `en`).
 - `test/i18n-anchor-keys.test.js` — for keys where **cs/da/de/el/es/fi/fr/hu/it/ja/ko/nb/nl/pl/pt/ro/ru/sv/tr/zh** all differ from English, none of those locales may copy `en` verbatim.
 - `test/i18n-no-raw-showtoast.test.js` — `showToast` is not called with a raw `'…'` / `"…"` first argument (use `toastFmt('toast.*')` or `String(err)`).
+- `test/i18n-proof-contract.test.js` — no `? appFmt('…') : 'English'` / `toastFmt` patterns in `frontend/js`; use `catalogFmt` / `catalogFmtOrUnit` (`utils.js`) so strings resolve through the catalog (or the key when `appFmt` is missing in VM tests). Byte/time unit suffixes (`B`, `s`, …) use `catalogFmtOrUnit` only.
 - `test/i18n-catalog-files.test.js` — shipped locale JSON files match `app_i18n.rs` seeds, UTF-8, and **lexicographically sorted keys** (stable merges).
 
 Run `node scripts/run-js-tests.mjs` (or `pnpm run test:js` if wired) after catalog edits.

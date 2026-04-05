@@ -213,12 +213,10 @@ function renderPdfTable() {
     tbody.insertAdjacentHTML('beforeend', filteredPdfs.map(buildPdfRow).join(''));
   }
   if (pdfRenderCount < _pdfTotalCount) {
-    const line = typeof appFmt === 'function'
-      ? appFmt('ui.js.load_more_hint', {
-          shown: pdfRenderCount.toLocaleString(),
-          total: _pdfTotalCount.toLocaleString(),
-        })
-      : `Showing ${pdfRenderCount} of ${_pdfTotalCount} — click to load more`;
+    const line = catalogFmt('ui.js.load_more_hint', {
+      shown: pdfRenderCount.toLocaleString(),
+      total: _pdfTotalCount.toLocaleString(),
+    });
     tbody.insertAdjacentHTML('beforeend',
       `<tr><td colspan="7" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMorePdfs">
         ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
@@ -299,9 +297,7 @@ async function scanPdfs(resume = false, unifiedResult = null) {
 
   if (scanBtn) {
     scanBtn.disabled = true;
-    scanBtn.innerHTML = '&#8635; ' + (typeof appFmt === 'function'
-      ? appFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn')
-      : (resume ? 'Resuming...' : 'Scanning...'));
+    scanBtn.innerHTML = '&#8635; ' + catalogFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn');
   }
   if (resumeBtn) resumeBtn.style.display = 'none';
   if (stopBtn) stopBtn.style.display = '';
@@ -362,12 +358,10 @@ async function scanPdfs(resume = false, unifiedResult = null) {
     rebuildPdfStats();
     const elapsed = pdfEta.elapsed();
     if (scanBtn) {
-      scanBtn.innerHTML = typeof appFmt === 'function'
-        ? appFmt('ui.audio.scan_progress_line', {
-            n: pendingFound.toLocaleString(),
-            elapsed: elapsed ? ' — ' + elapsed : '',
-          })
-        : `&#8635; ${pendingFound} found${elapsed ? ' — ' + elapsed : ''}`;
+      scanBtn.innerHTML = catalogFmt('ui.audio.scan_progress_line', {
+        n: pendingFound.toLocaleString(),
+        elapsed: elapsed ? ' — ' + elapsed : '',
+      });
     }
   }
 
@@ -423,7 +417,7 @@ async function scanPdfs(resume = false, unifiedResult = null) {
   } catch (err) {
     if (pdfScanProgressCleanup) { pdfScanProgressCleanup(); pdfScanProgressCleanup = null; }
     flushPending();
-    const errMsg = err.message || err || (typeof appFmt === 'function' ? appFmt('toast.unknown_error') : 'Unknown error');
+    const errMsg = err.message || err || catalogFmt('toast.unknown_error');
     const errTitle = typeof escapeHtml === 'function' ? escapeHtml(_pdfFmt('ui.audio.scan_error_title')) : _pdfFmt('ui.audio.scan_error_title');
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>${errTitle}</h2><p>${escapeHtml(errMsg)}</p></div>`;
     showToast(toastFmt('toast.pdf_scan_failed', { err: errMsg }), 4000, 'error');
@@ -432,7 +426,7 @@ async function scanPdfs(resume = false, unifiedResult = null) {
   hideGlobalProgress();
   if (scanBtn) {
     scanBtn.disabled = false;
-    scanBtn.innerHTML = '&#8635; ' + (typeof appFmt === 'function' ? appFmt('ui.btn.scan_pdfs') : 'Scan PDFs');
+    scanBtn.innerHTML = '&#8635; ' + catalogFmt('ui.btn.scan_pdfs');
   }
   if (stopBtn) stopBtn.style.display = 'none';
   progressBar.classList.remove('active');

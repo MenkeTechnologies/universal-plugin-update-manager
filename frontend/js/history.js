@@ -11,8 +11,7 @@ let historyPdfScanList = [];
 let historyMidiScanList = [];
 
 function historyFmt(key, vars) {
-  if (typeof appFmt === 'function') return appFmt(key, vars);
-  return key;
+  return catalogFmt(key, vars);
 }
 
 function historyCount(n, oneKey, otherKey) {
@@ -56,8 +55,7 @@ function historyScanTypeLabel(scanType) {
     scanType === 'pdf' ? 'menu.tab_pdf' :
     scanType === 'midi' ? 'menu.tab_midi' :
     'menu.tab_plugins';
-  if (typeof appFmt === 'function') return appFmt(key);
-  return scanType === 'preset' ? 'Presets' : scanType === 'daw' ? 'DAW Projects' : scanType === 'audio' ? 'Samples' : scanType === 'pdf' ? 'PDFs' : scanType === 'midi' ? 'MIDI' : 'Plugins';
+  return catalogFmt(key);
 }
 
 async function loadHistory() {
@@ -866,8 +864,8 @@ async function deleteScanEntry(id) {
 
 async function clearAllHistory() {
   if (!await confirmAction(
-    typeof appFmt === 'function' ? appFmt('confirm.clear_all_history_tab') : 'Clear all scan history? This cannot be undone.',
-    typeof appFmt === 'function' ? appFmt('ui.history.confirm_clear_title') : 'Clear History',
+    catalogFmt('confirm.clear_all_history_tab'),
+    catalogFmt('ui.history.confirm_clear_title'),
   )) return;
   await Promise.all([
     window.vstUpdater.clearHistory(),

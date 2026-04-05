@@ -223,16 +223,15 @@ function renderWelcomeDashboard() {
   const noteCount = Object.keys(getNotes()).length;
   const tagCount = getAllTags().length;
   const recentCount = recentlyPlayed.length;
-  const wf = typeof appFmt === 'function' ? appFmt : (k) => k;
   el.innerHTML = [
-    { value: allPlugins.length, label: wf('ui.welcome.plugins'), color: 'var(--cyan)' },
-    { value: allAudioSamples.length, label: wf('ui.welcome.samples'), color: 'var(--yellow)' },
-    { value: allDawProjects.length, label: wf('ui.welcome.daw_projects'), color: 'var(--magenta)' },
-    { value: allPresets.length, label: wf('ui.welcome.presets'), color: 'var(--orange)' },
-    { value: favCount, label: wf('ui.welcome.favorites'), color: 'var(--yellow)' },
-    { value: noteCount, label: wf('ui.welcome.notes'), color: 'var(--green)' },
-    { value: tagCount, label: wf('ui.welcome.tags'), color: 'var(--accent)' },
-    { value: recentCount, label: wf('ui.welcome.recently_played'), color: 'var(--cyan)' },
+    { value: allPlugins.length, label: catalogFmt('ui.welcome.plugins'), color: 'var(--cyan)' },
+    { value: allAudioSamples.length, label: catalogFmt('ui.welcome.samples'), color: 'var(--yellow)' },
+    { value: allDawProjects.length, label: catalogFmt('ui.welcome.daw_projects'), color: 'var(--magenta)' },
+    { value: allPresets.length, label: catalogFmt('ui.welcome.presets'), color: 'var(--orange)' },
+    { value: favCount, label: catalogFmt('ui.welcome.favorites'), color: 'var(--yellow)' },
+    { value: noteCount, label: catalogFmt('ui.welcome.notes'), color: 'var(--green)' },
+    { value: tagCount, label: catalogFmt('ui.welcome.tags'), color: 'var(--accent)' },
+    { value: recentCount, label: catalogFmt('ui.welcome.recently_played'), color: 'var(--cyan)' },
   ].filter(s => s.value > 0).map(s =>
     `<div class="welcome-stat" style="border-left-color: ${s.color};">
       <div class="welcome-stat-value" style="color: ${s.color};">${s.value}</div>
@@ -242,7 +241,7 @@ function renderWelcomeDashboard() {
 }
 
 function formatBytes(bytes) {
-  const u = (k, fb) => (typeof appFmt === 'function' ? appFmt(k) : fb);
+  const u = (k, fb) => catalogFmtOrUnit(k, fb);
   if (!bytes || bytes === 0) return '0 ' + u('ui.unit.byte', 'B');
   const keys = ['ui.unit.byte', 'ui.unit.kb', 'ui.unit.mb', 'ui.unit.gb', 'ui.unit.tb'];
   const fallbacks = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -251,7 +250,7 @@ function formatBytes(bytes) {
 }
 
 function formatUptime(secs) {
-  const u = (k, fb) => (typeof appFmt === 'function' ? appFmt(k) : fb);
+  const u = (k, fb) => catalogFmtOrUnit(k, fb);
   if (!secs) return '0' + u('ui.unit.sec', 's');
   if (secs < 60) return secs + u('ui.unit.sec', 's');
   if (secs < 3600) return Math.floor(secs / 60) + u('ui.unit.min', 'm') + ' ' + (secs % 60) + u('ui.unit.sec', 's');
@@ -286,13 +285,12 @@ async function updateHeaderInfo() {
     // Scan status badge
     const sc = s.scanner || {};
     const active = [];
-    const _lbl = (k, fb) => (typeof appFmt === 'function' ? appFmt(k) : fb);
-    if (sc.pluginScanning) active.push(_lbl('ui.scan_status.plugins', 'Plugins'));
-    if (sc.audioScanning) active.push(_lbl('ui.scan_status.samples', 'Samples'));
-    if (sc.dawScanning) active.push(_lbl('ui.scan_status.daw', 'DAW'));
-    if (sc.presetScanning) active.push(_lbl('ui.scan_status.presets', 'Presets'));
-    if (sc.pdfScanning) active.push(_lbl('ui.scan_status.pdfs', 'PDFs'));
-    if (sc.updateChecking) active.push(_lbl('ui.scan_status.updates', 'Updates'));
+    if (sc.pluginScanning) active.push(catalogFmt('ui.scan_status.plugins'));
+    if (sc.audioScanning) active.push(catalogFmt('ui.scan_status.samples'));
+    if (sc.dawScanning) active.push(catalogFmt('ui.scan_status.daw'));
+    if (sc.presetScanning) active.push(catalogFmt('ui.scan_status.presets'));
+    if (sc.pdfScanning) active.push(catalogFmt('ui.scan_status.pdfs'));
+    if (sc.updateChecking) active.push(catalogFmt('ui.scan_status.updates'));
     const badge = document.getElementById('scanStatusBadge');
     if (badge) {
       if (active.length > 0) {
@@ -321,8 +319,7 @@ async function scanAll(resume = false) {
   const resumeBtn = document.getElementById('btnResumeAll');
   btn.disabled = true;
   {
-    const _s = (k, fb) => (typeof appFmt === 'function' ? appFmt(k) : fb);
-    btn.textContent = resume ? _s('ui.js.resuming_btn', 'Resuming...') : _s('ui.js.scanning_btn', 'Scanning...');
+    btn.textContent = resume ? catalogFmt('ui.js.resuming_btn') : catalogFmt('ui.js.scanning_btn');
   }
   stopBtn.style.display = '';
   resumeBtn.style.display = 'none';
@@ -401,7 +398,7 @@ async function scanAll(resume = false) {
 
   scanAllRunning = false;
   btn.disabled = false;
-  btn.innerHTML = typeof appFmt === 'function' ? appFmt('ui.btn.9889_scan_all') : '&#9889; Scan All';
+  btn.innerHTML = catalogFmt('ui.btn.9889_scan_all');
   stopBtn.style.display = 'none';
 
   // Show resume only if any per-tab resume button is visible (scan was stopped)

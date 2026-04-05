@@ -46,10 +46,7 @@ function updateBatchBar() {
   bar.style.display = 'flex';
   const bc = document.getElementById('batchSelectionCount');
   if (bc) {
-    bc.textContent =
-      typeof appFmt === 'function'
-        ? appFmt('menu.batch_selected', { n: batchSelected.size })
-        : `${batchSelected.size} selected`;
+    bc.textContent = catalogFmt('menu.batch_selected', { n: batchSelected.size });
   }
 
   // Update header checkbox state (checked if all visible are selected)

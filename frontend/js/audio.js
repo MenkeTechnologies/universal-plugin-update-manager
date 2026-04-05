@@ -175,11 +175,11 @@ function resetEq() {
   if (pan) { pan.value = 0; pan.disabled = false; }
   const mono = document.getElementById('npBtnMono');
   if (mono) mono.classList.remove('active');
-  document.getElementById('npEqLowVal').textContent = typeof appFmt === 'function' ? appFmt('ui.audio.eq_val_db') : '0 dB';
-  document.getElementById('npEqMidVal').textContent = typeof appFmt === 'function' ? appFmt('ui.audio.eq_val_db') : '0 dB';
-  document.getElementById('npEqHighVal').textContent = typeof appFmt === 'function' ? appFmt('ui.audio.eq_val_db') : '0 dB';
-  document.getElementById('npGainVal').textContent = typeof appFmt === 'function' ? appFmt('ui.audio.eq_gain_pct') : '100%';
-  document.getElementById('npPanVal').textContent = typeof appFmt === 'function' ? appFmt('ui.audio.pan_center') : 'C';
+  document.getElementById('npEqLowVal').textContent = catalogFmt('ui.audio.eq_val_db');
+  document.getElementById('npEqMidVal').textContent = catalogFmt('ui.audio.eq_val_db');
+  document.getElementById('npEqHighVal').textContent = catalogFmt('ui.audio.eq_val_db');
+  document.getElementById('npGainVal').textContent = catalogFmt('ui.audio.eq_gain_pct');
+  document.getElementById('npPanVal').textContent = catalogFmt('ui.audio.pan_center');
   showToast(toastFmt('toast.eq_reset'));
 }
 
@@ -630,9 +630,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
   const excludePaths = resume ? allAudioSamples.map(s => s.path) : null;
 
   btn.disabled = true;
-  btn.innerHTML = '&#8635; ' + (typeof appFmt === 'function'
-    ? appFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn')
-    : (resume ? 'Resuming...' : 'Scanning...'));
+  btn.innerHTML = '&#8635; ' + catalogFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn');
   resumeBtn.style.display = 'none';
   stopBtn.style.display = '';
   progressBar.classList.add('active');
@@ -681,9 +679,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
     if (_bgQueue.length > 50000) _bgQueue = _bgQueue.slice(-50000); // keep newest
     if (!_bgAnalysisRunning) startBackgroundAnalysis();
     const audioElapsed = audioEta.elapsed();
-    btn.innerHTML = typeof appFmt === 'function'
-      ? appFmt('ui.audio.scan_progress_line', { n: pendingFound.toLocaleString(), elapsed: audioElapsed ? ' — ' + audioElapsed : '' })
-      : `&#8635; ${pendingFound.toLocaleString()} found${audioElapsed ? ' — ' + audioElapsed : ''}`;
+    btn.innerHTML = catalogFmt('ui.audio.scan_progress_line', { n: pendingFound.toLocaleString(), elapsed: audioElapsed ? ' — ' + audioElapsed : '' });
     progressFill.style.width = '';
     progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
 
@@ -749,7 +745,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
   } catch (err) {
     if (audioScanProgressCleanup) { audioScanProgressCleanup(); audioScanProgressCleanup = null; }
     flushPendingSamples();
-    const errMsg = err.message || err || 'Unknown error';
+    const errMsg = err.message || err || catalogFmt('toast.unknown_error');
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>${typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.scan_error_title')) : _audioFmt('ui.audio.scan_error_title')}</h2><p>${typeof escapeHtml === 'function' ? escapeHtml(errMsg) : errMsg}</p></div>`;
     showToast(toastFmt('toast.audio_scan_failed', { errMsg }), 4000, 'error');
   }
@@ -757,7 +753,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
   _audioScanActive = false;
   hideGlobalProgress();
   btn.disabled = false;
-  btn.innerHTML = typeof appFmt === 'function' ? appFmt('ui.btn.127925_scan_samples') : '&#127925; Scan Samples';
+  btn.innerHTML = catalogFmt('ui.btn.127925_scan_samples');
   stopBtn.style.display = 'none';
   progressBar.classList.remove('active');
   progressFill.style.width = '0%';
@@ -985,12 +981,10 @@ function renderAudioTable() {
 }
 
 function appendLoadMore(tbody) {
-  const line = typeof appFmt === 'function'
-    ? appFmt('ui.audio.load_more_hint', {
-        shown: audioRenderCount.toLocaleString(),
-        total: audioTotalCount.toLocaleString(),
-      })
-    : `Showing ${audioRenderCount.toLocaleString()} of ${audioTotalCount.toLocaleString()} — click to load more`;
+  const line = catalogFmt('ui.audio.load_more_hint', {
+    shown: audioRenderCount.toLocaleString(),
+    total: audioTotalCount.toLocaleString(),
+  });
   tbody.insertAdjacentHTML('beforeend',
     `<tr id="audioLoadMore"><td colspan="12" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" data-action="loadMoreAudio">
       ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
@@ -1178,7 +1172,7 @@ function clearAudioPlaybackUI() {
   np.classList.remove('expanded');
   np.classList.remove('np-playing');
   document.getElementById('npProgress').style.width = '0%';
-  document.getElementById('npTime').textContent = typeof appFmt === 'function' ? appFmt('ui.audio.player_time_zero') : '0:00 / 0:00';
+  document.getElementById('npTime').textContent = catalogFmt('ui.audio.player_time_zero');
   const npCursor = document.getElementById('npCursor');
   if (npCursor) npCursor.style.display = 'none';
   const pill = document.getElementById('audioRestorePill');
@@ -1947,7 +1941,7 @@ function toggleMute() {
     audioMuted = true;
     if (btn) btn.innerHTML = '&#128263;';
     if (slider) slider.value = 0;
-    document.getElementById('npVolumePct').textContent = typeof appFmt === 'function' ? appFmt('ui.audio.volume_zero') : '0%';
+    document.getElementById('npVolumePct').textContent = catalogFmt('ui.audio.volume_zero');
   }
 }
 

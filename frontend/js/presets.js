@@ -252,9 +252,7 @@ function _legacyFilterPresets() {
 
   if (filteredPresets.length > PRESET_PAGE_SIZE) {
     const rem = filteredPresets.length - PRESET_PAGE_SIZE;
-    const btnLabel = typeof appFmt === 'function'
-      ? appFmt('ui.preset.load_more_btn', { n: rem.toLocaleString() })
-      : `Load more (${rem} remaining)`;
+    const btnLabel = catalogFmt('ui.preset.load_more_btn', { n: rem.toLocaleString() });
     const btnTitle = typeof escapeHtml === 'function'
       ? escapeHtml(_presetFmt('ui.tt.load_next_preset_batch'))
       : _presetFmt('ui.tt.load_next_preset_batch');
@@ -295,12 +293,10 @@ function renderPresetTable() {
     tbody.insertAdjacentHTML('beforeend', filteredPresets.map(buildPresetRow).join(''));
   }
   if (presetRenderCount < _presetTotalCount) {
-    const line = typeof appFmt === 'function'
-      ? appFmt('ui.js.load_more_hint', {
-          shown: presetRenderCount.toLocaleString(),
-          total: _presetTotalCount.toLocaleString(),
-        })
-      : `Showing ${presetRenderCount} of ${_presetTotalCount} — click to load more`;
+    const line = catalogFmt('ui.js.load_more_hint', {
+      shown: presetRenderCount.toLocaleString(),
+      total: _presetTotalCount.toLocaleString(),
+    });
     tbody.insertAdjacentHTML('beforeend',
       `<tr><td colspan="7" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMorePresets">
         ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}

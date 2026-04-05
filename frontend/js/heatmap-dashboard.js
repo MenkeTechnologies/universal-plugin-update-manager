@@ -3,7 +3,7 @@
 // folder heatmap, BPM histogram, key wheel, activity timeline.
 
 function _hmFmt(key, vars) {
-  return typeof appFmt === 'function' ? appFmt(key, vars) : key;
+  return catalogFmt(key, vars);
 }
 
 function showHeatmapDashboard() {

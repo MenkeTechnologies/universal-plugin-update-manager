@@ -129,9 +129,7 @@ async function scanMidi(resume = false) {
 
   if (typeof btnLoading === 'function') btnLoading(btn, true);
   setBtn(
-    '&#8635; ' + (typeof appFmt === 'function'
-      ? appFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn')
-      : (resume ? 'Resuming...' : 'Scanning...')),
+    '&#8635; ' + catalogFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn'),
     true,
   );
   if (resumeBtn) resumeBtn.style.display = 'none';
@@ -254,7 +252,7 @@ async function scanMidi(resume = false) {
   if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
   if (typeof btnLoading === 'function') btnLoading(btn, false);
   setBtn(
-    '&#127924; ' + (typeof appFmt === 'function' ? appFmt('ui.btn.127924_scan_midi') : 'Scan MIDI'),
+    '&#127924; ' + catalogFmt('ui.btn.127924_scan_midi'),
     false,
   );
   if (stopBtn) stopBtn.style.display = 'none';
@@ -435,12 +433,10 @@ function renderMidiTable() {
 
 function appendMidiLoadMoreRow(tbody) {
   const total = _midiScanProgressCleanup ? filteredMidi.length : _midiTotalCount;
-  const line = typeof appFmt === 'function'
-    ? appFmt('ui.js.load_more_hint', {
-        shown: _midiRenderCount.toLocaleString(),
-        total: total.toLocaleString(),
-      })
-    : `Showing ${_midiRenderCount} of ${total} — click to load more`;
+  const line = catalogFmt('ui.js.load_more_hint', {
+    shown: _midiRenderCount.toLocaleString(),
+    total: total.toLocaleString(),
+  });
   tbody.insertAdjacentHTML('beforeend',
     `<tr id="midiLoadMore"><td colspan="12" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMoreMidi">
       ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}

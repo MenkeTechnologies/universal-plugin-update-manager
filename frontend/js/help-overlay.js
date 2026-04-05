@@ -5,7 +5,7 @@ function toggleHelpOverlay() {
   let existing = document.getElementById('helpOverlay');
   if (existing) { existing.remove(); return; }
 
-  const h = (key) => (typeof appFmt === 'function' ? appFmt(key) : key);
+  const h = (key) => catalogFmt(key);
 
   const html = `<div class="modal-overlay" id="helpOverlay" data-action-modal="closeHelp">
     <div class="modal-content">

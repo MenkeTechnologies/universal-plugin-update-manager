@@ -210,7 +210,7 @@ function rebuildSchemeButtons() {
   const grid = document.getElementById('schemeGrid');
   if (!grid) return;
   const dotKeys = ['--accent', '--cyan', '--magenta', '--green', '--yellow', '--orange', '--red', '--text'];
-  const fmt = typeof appFmt === 'function' ? appFmt : (k) => k;
+  const fmt = catalogFmt;
   const meta = {
     cyberpunk: { labelKey: 'ui.scheme.cyberpunk.label', descKey: 'ui.scheme.cyberpunk.desc' },
     midnight: { labelKey: 'ui.scheme.midnight.label', descKey: 'ui.scheme.midnight.desc' },
@@ -506,7 +506,7 @@ async function renderCacheStats() {
   if (!grid) return;
   try {
     const stats = await window.vstUpdater.dbCacheStats();
-    const _cf = typeof appFmt === 'function' ? appFmt : (k) => k;
+    const _cf = catalogFmt;
     grid.innerHTML = `<table style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;">
       <thead><tr style="color:var(--cyan);font-size:10px;text-transform:uppercase;letter-spacing:1px;">
         <th style="text-align:left;padding:4px 8px;">${_cf('ui.settings.cache_table_cache')}</th>
@@ -549,9 +549,7 @@ async function renderCacheStats() {
       }).join('')}</tbody>
     </table>`;
   } catch (e) {
-    const msg = typeof appFmt === 'function'
-      ? appFmt('ui.settings.cache_load_failed', { err: e.message || String(e) })
-      : `Failed to load stats: ${e}`;
+    const msg = catalogFmt('ui.settings.cache_load_failed', { err: e.message || String(e) });
     grid.innerHTML = `<span style="color:var(--red);font-size:11px;">${typeof escapeHtml === 'function' ? escapeHtml(msg) : msg}</span>`;
   }
 }
@@ -642,17 +640,15 @@ async function renderCacheFilesList() {
   try {
     const files = await window.vstUpdater.listDataFiles();
     if (files.length === 0) {
-      const msg = typeof appFmt === 'function' ? appFmt('ui.settings.cache_files_empty') : 'No data files found';
+      const msg = catalogFmt('ui.settings.cache_files_empty');
       const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s);
       container.innerHTML = `<div class="state-message"><div class="state-icon">&#128193;</div><h2>${esc(msg)}</h2></div>`;
       return;
     }
     const totalSize = files.reduce((s, f) => s + (f.size || 0), 0);
     const sz = typeof formatAudioSize === 'function' ? formatAudioSize(totalSize) : Math.round(totalSize / 1024) + ' KB';
-    const summary = typeof appFmt === 'function'
-      ? appFmt('ui.settings.cache_files_summary', { n: files.length, size: sz })
-      : `${files.length} files — ${sz} total`;
-    const _h = typeof appFmt === 'function' ? appFmt : (k) => k;
+    const summary = catalogFmt('ui.settings.cache_files_summary', { n: files.length, size: sz });
+    const _h = catalogFmt;
     container.innerHTML = `<div style="margin-bottom:6px;color:var(--text-muted);font-size:10px;">${typeof escapeHtml === 'function' ? escapeHtml(summary) : summary}</div>` +
       `<table style="width:100%;border-collapse:collapse;font-size:10px;">
         <tr style="color:var(--text-dim);border-bottom:1px solid var(--border);">
@@ -669,9 +665,7 @@ async function renderCacheFilesList() {
         </tr>`).join('')}
       </table>`;
   } catch (e) {
-    const errLine = typeof appFmt === 'function'
-      ? appFmt('ui.settings.cache_files_error', { err: e.message || String(e) })
-      : `Error: ${e.message || e}`;
+    const errLine = catalogFmt('ui.settings.cache_files_error', { err: e.message || String(e) });
     container.innerHTML = `<div style="color:var(--red);padding:8px;">${typeof escapeHtml === 'function' ? escapeHtml(errLine) : errLine}</div>`;
   }
 }
@@ -680,12 +674,8 @@ async function settingClearAllDatabases() {
   // Wipe every scan-history DB table (plugins, audio, DAW, presets, MIDI, PDF).
   // Caches (BPM/Key/LUFS/Waveform/Spectrogram/Xref/Fingerprint/KVR) are NOT
   // touched here — those are handled by settingClearAnalysisCache.
-  const msg = typeof appFmt === 'function'
-    ? appFmt('confirm.clear_all_scan_databases')
-    : 'Clear all scan history databases? This wipes every tab\u2019s scanned file list.';
-  const title = typeof appFmt === 'function'
-    ? appFmt('ui.btn.clear_all_databases')
-    : 'Clear All Databases';
+  const msg = catalogFmt('confirm.clear_all_scan_databases');
+  const title = catalogFmt('ui.btn.clear_all_databases');
   const ok = typeof confirmAction === 'function'
     ? await confirmAction(msg, title)
     : window.confirm(msg);
@@ -700,15 +690,13 @@ async function settingClearAllDatabases() {
   ];
   for (const [labelKey, fn] of clears) {
     try { await fn(); } catch (e) {
-      const label = typeof appFmt === 'function' ? appFmt(labelKey) : labelKey;
-      const errLine = typeof appFmt === 'function'
-        ? appFmt('toast.failed_clear_scan_db_history', { label, err: e.message || e })
-        : `Failed to clear ${label} history: ${e.message || e}`;
+      const label = catalogFmt(labelKey);
+      const errLine = catalogFmt('toast.failed_clear_scan_db_history', { label, err: e.message || e });
       if (typeof showToast === 'function') showToast(errLine, 4000, 'error');
     }
   }
   if (typeof showToast === 'function') {
-    showToast(typeof toastFmt === 'function' ? toastFmt('toast.all_scan_databases_cleared') : 'All scan databases cleared');
+    showToast(catalogFmt('toast.all_scan_databases_cleared'));
   }
   if (typeof renderCacheStats === 'function') renderCacheStats();
 }
@@ -773,8 +761,8 @@ function settingResetColumns() {
 
 async function settingClearAllHistory() {
   if (!await confirmAction(
-    typeof appFmt === 'function' ? appFmt('confirm.clear_all_history_settings') : 'Clear all plugin, audio, DAW, preset, PDF, and MIDI scan history? This cannot be undone.',
-    typeof appFmt === 'function' ? appFmt('ui.history.confirm_clear_title') : 'Clear History',
+    catalogFmt('confirm.clear_all_history_settings'),
+    catalogFmt('ui.history.confirm_clear_title'),
   )) return;
   showGlobalProgress();
   try {
@@ -1042,7 +1030,7 @@ function settingSaveSelect(key, value) {
 function showSavedMsg(id) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.textContent = typeof appFmt === 'function' ? appFmt('ui.settings.saved') : 'Saved';
+  el.textContent = catalogFmt('ui.settings.saved');
   el.classList.add('visible');
   setTimeout(() => el.classList.remove('visible'), 2000);
 }
@@ -1056,7 +1044,7 @@ async function browseDir(targetId) {
   const selected = await dialogApi.open({
     directory: true,
     multiple: false,
-    title: typeof appFmt === 'function' ? appFmt('ui.settings.dialog_select_folder') : 'Select folder to scan',
+    title: catalogFmt('ui.settings.dialog_select_folder'),
   });
   if (!selected) return;
   const textarea = document.getElementById(targetId);
@@ -1103,7 +1091,7 @@ function saveMidiScanDirs() {
   const val = document.getElementById('settingMidiScanDirs').value.trim();
   prefs.setItem('midiScanDirs', val);
   showSavedMsg('savedMsgMidiScanDirs');
-  if (typeof showToast === 'function') showToast(typeof toastFmt === 'function' ? toastFmt('toast.midi_scan_dirs_saved') : 'MIDI scan directories saved');
+  if (typeof showToast === 'function') showToast(catalogFmt('toast.midi_scan_dirs_saved'));
 }
 
 function savePdfScanDirs() {
@@ -1126,12 +1114,8 @@ function updateSettingsAboutVersionLine() {
   const line = document.getElementById('settingsAboutVersionLine');
   if (!line) return;
   const ver = document.getElementById('appVersion')?.textContent?.trim() || '';
-  if (typeof appFmt === 'function') {
-    const author = appFmt('ui.logo.author_line');
-    line.textContent = appFmt('ui.settings.about_version_line', { version: ver, author });
-  } else {
-    line.textContent = `Version ${ver} · by MenkeTechnologies · `;
-  }
+  const author = catalogFmt('ui.logo.author_line');
+  line.textContent = catalogFmt('ui.settings.about_version_line', { version: ver, author });
 }
 window.updateSettingsAboutVersionLine = updateSettingsAboutVersionLine;
 
@@ -1341,13 +1325,7 @@ function refreshSettingsUI() {
   // System perf info — get real stats from Rust backend
   const perfInfo = document.getElementById('settingPerfInfo');
   if (perfInfo) {
-    const f = typeof appFmt === 'function' ? appFmt : (key, vars) => {
-      let s = key;
-      if (vars && typeof vars === 'object') {
-        s = s.replace(/\{(\w+)\}/g, (_, name) => (vars[name] != null && vars[name] !== '') ? String(vars[name]) : '');
-      }
-      return s;
-    };
+    const f = catalogFmt;
     window.vstUpdater.getProcessStats().then(stats => {
       const cpus = stats.numCpus || navigator.hardwareConcurrency || '?';
       const fmtMem = (bytes) => {
@@ -1617,7 +1595,7 @@ function restoreSettings() {
 function renderFzfSettings() {
   const grid = document.getElementById('fzfSettingsGrid');
   if (!grid) return;
-  const fmt = typeof appFmt === 'function' ? appFmt : (k) => k;
+  const fmt = catalogFmt;
   const params = [
     { key: 'SCORE_MATCH', labelKey: 'ui.fzf.score_match.label', descKey: 'ui.fzf.score_match.desc', min: 1, max: 50 },
     { key: 'SCORE_GAP_START', labelKey: 'ui.fzf.gap_start.label', descKey: 'ui.fzf.gap_start.desc', min: -20, max: 0 },

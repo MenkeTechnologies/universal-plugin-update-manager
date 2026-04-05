@@ -116,7 +116,7 @@ const TAB_MAP = ['plugins', 'samples', 'daw', 'presets', 'midi', 'pdf', 'favorit
 
 function getShortcuts() {
   const saved = prefs.getObject('customShortcuts', null);
-  const fmt = typeof appFmt === 'function' ? appFmt : (k) => k;
+  const fmt = catalogFmt;
   const merged = {};
   for (const [id, def] of Object.entries(DEFAULT_SHORTCUT_DEFS)) {
     const lk = SHORTCUT_LABEL_KEYS[id];
@@ -185,7 +185,7 @@ function renderShortcutSettings(filter) {
   list.innerHTML = entries.map(([id, sc]) =>
     `<div class="shortcut-row" data-sc-id="${id}">
       <span class="shortcut-name">${hl(sc.label)}</span>
-      <span class="shortcut-key" data-shortcut-id="${id}" title="${typeof appFmt === 'function' ? escapeHtml(appFmt('menu.rebind_shortcut')) : 'Rebind'}">${q ? hl(formatKey(sc)) : formatKey(sc)}</span>
+      <span class="shortcut-key" data-shortcut-id="${id}" title="${escapeHtml(catalogFmt('menu.rebind_shortcut'))}">${q ? hl(formatKey(sc)) : formatKey(sc)}</span>
     </div>`
   ).join('');
   if (!q && typeof initDragReorder === 'function') {
@@ -215,7 +215,7 @@ document.addEventListener('click', (e) => {
     }
     _recordingId = keyEl.dataset.shortcutId;
     keyEl.classList.add('recording');
-    keyEl.textContent = typeof appFmt === 'function' ? appFmt('ui.shortcut.press_key') : 'Press key…';
+    keyEl.textContent = catalogFmt('ui.shortcut.press_key');
     e.stopPropagation();
     return;
   }

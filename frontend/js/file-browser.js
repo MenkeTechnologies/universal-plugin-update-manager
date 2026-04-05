@@ -46,9 +46,7 @@ function renderFavDirs() {
     return;
   }
   container.style.display = '';
-  const rmTitle = typeof appFmt === 'function'
-    ? appFmt('ui.tt.remove_bookmark_from_chip')
-    : 'Remove bookmark';
+  const rmTitle = catalogFmt('ui.tt.remove_bookmark_from_chip');
   grid.innerHTML = dirs.map(d =>
     `<div class="file-fav-chip" data-fav-dir="${escapeHtml(d.path)}" title="${escapeHtml(d.path)}">
       <span class="fav-chip-icon">&#128193;</span>
@@ -62,7 +60,7 @@ function updateBookmarkBtn() {
   const btn = document.getElementById('btnFileFav');
   if (!btn || !_fileBrowserPath) return;
   const fav = isFavDir(_fileBrowserPath);
-  const fmt = typeof appFmt === 'function' ? appFmt : (k) => k;
+  const fmt = catalogFmt;
   const label = fav ? fmt('ui.btn.9733_unbookmark') : fmt('ui.btn.9733_bookmark');
   btn.innerHTML = `&#9733; <span>${escapeHtml(label)}</span>`;
   btn.title = fav ? fmt('ui.tt.remove_current_directory_from_bookmarks') : fmt('ui.tt.bookmark_current_directory');
