@@ -139,7 +139,7 @@ async function scanMidi(resume = false) {
     // Save to DB — the scan isn't persistent until this runs.
     if (!result.stopped) {
       try { await window.vstUpdater.saveMidiScan(allMidiFiles, result.roots); }
-      catch (e) { if (typeof showToast === 'function') showToast('Failed to save MIDI history: ' + (e.message || e), 4000, 'error'); }
+      catch (e) { if (typeof showToast === 'function' && typeof toastFmt === 'function') showToast(toastFmt('toast.failed_save_midi_history', { err: e.message || e }), 4000, 'error'); }
     }
     if (_midiScanProgressCleanup) { _midiScanProgressCleanup(); _midiScanProgressCleanup = null; }
     _midiTableInit = false;
@@ -156,7 +156,7 @@ async function scanMidi(resume = false) {
     if (_midiScanProgressCleanup) { _midiScanProgressCleanup(); _midiScanProgressCleanup = null; }
     const errMsg = err.message || err || 'Unknown error';
     if (tableWrap) tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;
-    if (typeof showToast === 'function') showToast('MIDI scan failed: ' + errMsg, 4000, 'error');
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') showToast(toastFmt('toast.midi_scan_failed', { err: errMsg }), 4000, 'error');
   }
 
   if (typeof hideGlobalProgress === 'function') hideGlobalProgress();

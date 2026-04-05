@@ -204,6 +204,8 @@ TOAST_EN: dict[str, str] = {
     "toast.no_plugins_export": "No plugins to export",
     # —— midi ——
     "toast.midi_load_failed": "MIDI load failed: {err}",
+    "toast.failed_save_midi_history": "Failed to save MIDI history — {err}",
+    "toast.midi_scan_failed": "MIDI scan failed — {err}",
     # —— utils ——
     # —— app ——
     "toast.locale_changed": "Interface language updated. Restart the app to apply the menu bar language.",
