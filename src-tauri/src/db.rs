@@ -384,21 +384,40 @@ impl Database {
     /// VACUUM if >20% of pages are free (dead space from deleted rows).
     pub fn vacuum_if_needed(&self) {
         let conn = self.conn.lock().unwrap();
-        let page_size: u64 = conn.query_row("PRAGMA page_size", [], |r| r.get(0)).unwrap_or(4096);
-        let page_count: u64 = conn.query_row("PRAGMA page_count", [], |r| r.get(0)).unwrap_or(0);
-        let free_count: u64 = conn.query_row("PRAGMA freelist_count", [], |r| r.get(0)).unwrap_or(0);
-        let pct = if page_count > 0 { free_count * 100 / page_count } else { 0 };
+        let page_size: u64 = conn
+            .query_row("PRAGMA page_size", [], |r| r.get(0))
+            .unwrap_or(4096);
+        let page_count: u64 = conn
+            .query_row("PRAGMA page_count", [], |r| r.get(0))
+            .unwrap_or(0);
+        let free_count: u64 = conn
+            .query_row("PRAGMA freelist_count", [], |r| r.get(0))
+            .unwrap_or(0);
+        let pct = if page_count > 0 {
+            free_count * 100 / page_count
+        } else {
+            0
+        };
         if pct > 20 {
             let before = page_count * page_size;
             crate::append_log(format!(
                 "DB VACUUM — {}% free ({} / {} pages) | before: {}",
-                pct, free_count, page_count, crate::format_size(before),
+                pct,
+                free_count,
+                page_count,
+                crate::format_size(before),
             ));
             drop(conn);
             let conn = self.conn.lock().unwrap();
             let _ = conn.execute_batch("VACUUM;");
-            let after: u64 = conn.query_row("PRAGMA page_count", [], |r| r.get(0)).unwrap_or(0) * page_size;
-            crate::append_log(format!("DB VACUUM DONE — after: {}", crate::format_size(after)));
+            let after: u64 = conn
+                .query_row("PRAGMA page_count", [], |r| r.get(0))
+                .unwrap_or(0)
+                * page_size;
+            crate::append_log(format!(
+                "DB VACUUM DONE — after: {}",
+                crate::format_size(after)
+            ));
         }
     }
 
@@ -636,11 +655,8 @@ impl Database {
                 )
                 .map_err(|e| format!("Migration v5 failed: {e}"))?;
             }
-            conn.execute(
-                "INSERT INTO schema_version (version) VALUES (5)",
-                [],
-            )
-            .map_err(|e| format!("Migration v5 schema_version failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (5)", [])
+                .map_err(|e| format!("Migration v5 schema_version failed: {e}"))?;
         }
 
         if current < 6 {
@@ -668,11 +684,8 @@ impl Database {
                 );",
             )
             .map_err(|e| format!("Migration v6 (PDF tables) failed: {e}"))?;
-            conn.execute(
-                "INSERT INTO schema_version (version) VALUES (6)",
-                [],
-            )
-            .map_err(|e| format!("Migration v6 schema_version failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (6)", [])
+                .map_err(|e| format!("Migration v6 schema_version failed: {e}"))?;
         }
 
         if current < 7 {
@@ -684,11 +697,8 @@ impl Database {
                 );",
             )
             .map_err(|e| format!("Migration v7 (pdf_metadata) failed: {e}"))?;
-            conn.execute(
-                "INSERT INTO schema_version (version) VALUES (7)",
-                [],
-            )
-            .map_err(|e| format!("Migration v7 schema_version failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (7)", [])
+                .map_err(|e| format!("Migration v7 schema_version failed: {e}"))?;
         }
 
         if current < 8 {
@@ -719,11 +729,8 @@ impl Database {
                 );",
             )
             .map_err(|e| format!("Migration v8 (MIDI tables) failed: {e}"))?;
-            conn.execute(
-                "INSERT INTO schema_version (version) VALUES (8)",
-                [],
-            )
-            .map_err(|e| format!("Migration v8 schema_version failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (8)", [])
+                .map_err(|e| format!("Migration v8 schema_version failed: {e}"))?;
         }
 
         if conn
@@ -907,7 +914,10 @@ impl Database {
         if let Some(fmt) = &params.format_filter {
             if !fmt.is_empty() && fmt != "all" {
                 if fmt.contains(',') {
-                    let vals: Vec<String> = fmt.split(',').map(|s| format!("'{}'", s.trim().replace('\'', "''"))).collect();
+                    let vals: Vec<String> = fmt
+                        .split(',')
+                        .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
+                        .collect();
                     conditions.push(format!("format IN ({})", vals.join(",")));
                 } else {
                     conditions.push(format!("format = ?{bind_idx}"));
@@ -1371,7 +1381,10 @@ impl Database {
         if let Some(tf) = type_filter {
             if !tf.is_empty() && tf != "all" {
                 if tf.contains(',') {
-                    let vals: Vec<String> = tf.split(',').map(|s| format!("'{}'", s.trim().replace('\'', "''"))).collect();
+                    let vals: Vec<String> = tf
+                        .split(',')
+                        .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
+                        .collect();
                     where_parts.push(format!("plugin_type IN ({})", vals.join(",")));
                 } else {
                     where_parts.push(format!("plugin_type = ?{bind_idx}"));
@@ -1397,27 +1410,60 @@ impl Database {
             let sql = format!("SELECT COUNT(*) FROM plugins WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?; bi += 1;
-            if let Some(ref p) = search_pat { stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?; bi += 1; }
-            if let Some(tf) = type_filter { if !tf.is_empty() && tf != "all" && !tf.contains(',') { stmt.raw_bind_parameter(bi, tf).map_err(|e| e.to_string())?; bi += 1; } }
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
+            bi += 1;
+            if let Some(ref p) = search_pat {
+                stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+            if let Some(tf) = type_filter {
+                if !tf.is_empty() && tf != "all" && !tf.contains(',') {
+                    stmt.raw_bind_parameter(bi, tf).map_err(|e| e.to_string())?;
+                    bi += 1;
+                }
+            }
             let _ = bi;
             let mut rows = stmt.raw_query();
-            rows.next().map_err(|e| e.to_string())?.map(|r| r.get::<_, u64>(0).unwrap_or(0)).unwrap_or(0)
+            rows.next()
+                .map_err(|e| e.to_string())?
+                .map(|r| r.get::<_, u64>(0).unwrap_or(0))
+                .unwrap_or(0)
         };
 
         let mut bi;
         let mut bind_offset = 2usize;
-        if search_pat.is_some() { bind_offset += 1; }
+        if search_pat.is_some() {
+            bind_offset += 1;
+        }
         // Comma-separated filters are inlined into `IN (...)` — no placeholder, so no offset shift.
-        if type_filter.map(|t| !t.is_empty() && t != "all" && !t.contains(',')).unwrap_or(false) { bind_offset += 1; }
+        if type_filter
+            .map(|t| !t.is_empty() && t != "all" && !t.contains(','))
+            .unwrap_or(false)
+        {
+            bind_offset += 1;
+        }
         let sql = format!("SELECT name, path, plugin_type, version, manufacturer, manufacturer_url, size, size_bytes, modified, architectures FROM plugins WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_offset} OFFSET ?{}", bind_offset + 1);
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?; bi += 1;
-        if let Some(ref p) = search_pat { stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?; bi += 1; }
-        if let Some(tf) = type_filter { if !tf.is_empty() && tf != "all" && !tf.contains(',') { stmt.raw_bind_parameter(bi, tf).map_err(|e| e.to_string())?; bi += 1; } }
-        stmt.raw_bind_parameter(bi, limit as i64).map_err(|e| e.to_string())?; bi += 1;
-        stmt.raw_bind_parameter(bi, offset as i64).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi, &scan_id)
+            .map_err(|e| e.to_string())?;
+        bi += 1;
+        if let Some(ref p) = search_pat {
+            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if let Some(tf) = type_filter {
+            if !tf.is_empty() && tf != "all" && !tf.contains(',') {
+                stmt.raw_bind_parameter(bi, tf).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+        }
+        stmt.raw_bind_parameter(bi, limit as i64)
+            .map_err(|e| e.to_string())?;
+        bi += 1;
+        stmt.raw_bind_parameter(bi, offset as i64)
+            .map_err(|e| e.to_string())?;
 
         let mut plugins = Vec::new();
         let mut rows = stmt.raw_query();
@@ -1505,7 +1551,10 @@ impl Database {
         if let Some(f) = daw_filter {
             if !f.is_empty() && f != "all" {
                 if f.contains(',') {
-                    let vals: Vec<String> = f.split(',').map(|s| format!("'{}'", s.trim().replace('\'', "''"))).collect();
+                    let vals: Vec<String> = f
+                        .split(',')
+                        .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
+                        .collect();
                     where_parts.push(format!("daw IN ({})", vals.join(",")));
                 } else {
                     where_parts.push(format!("daw = ?{bind_idx}"));
@@ -1657,7 +1706,10 @@ impl Database {
         if let Some(f) = format_filter {
             if !f.is_empty() && f != "all" {
                 if f.contains(',') {
-                    let vals: Vec<String> = f.split(',').map(|s| format!("'{}'", s.trim().replace('\'', "''"))).collect();
+                    let vals: Vec<String> = f
+                        .split(',')
+                        .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
+                        .collect();
                     where_parts.push(format!("format IN ({})", vals.join(",")));
                 } else {
                     where_parts.push(format!("format = ?{bind_idx}"));
@@ -2224,8 +2276,11 @@ impl Database {
         ).map_err(|e| e.to_string())?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
-            tx.execute("DELETE FROM midi_files WHERE scan_id = ?1", params![snap.id])
-                .map_err(|e| e.to_string())?;
+            tx.execute(
+                "DELETE FROM midi_files WHERE scan_id = ?1",
+                params![snap.id],
+            )
+            .map_err(|e| e.to_string())?;
             let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO midi_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
             for m in &snap.midi_files {
                 stmt.execute(params![
@@ -2371,7 +2426,10 @@ impl Database {
             } else {
                 Some(format!(
                     "%{}%",
-                    t.chars().map(|c| c.to_string()).collect::<Vec<_>>().join("%")
+                    t.chars()
+                        .map(|c| c.to_string())
+                        .collect::<Vec<_>>()
+                        .join("%")
                 ))
             }
         });
@@ -2414,7 +2472,8 @@ impl Database {
             let sql = format!("SELECT COUNT(*) FROM midi_files WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
             if let Some(ref p) = search_pat {
                 stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
@@ -2441,7 +2500,8 @@ impl Database {
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi, &scan_id)
+            .map_err(|e| e.to_string())?;
         bi += 1;
         if let Some(ref p) = search_pat {
             stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
@@ -2453,8 +2513,10 @@ impl Database {
                 bi += 1;
             }
         }
-        stmt.raw_bind_parameter(bi, limit as i64).map_err(|e| e.to_string())?;
-        stmt.raw_bind_parameter(bi + 1, offset as i64).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi, limit as i64)
+            .map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi + 1, offset as i64)
+            .map_err(|e| e.to_string())?;
         let mut rows = stmt.raw_query();
         let mut out = Vec::new();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
@@ -2524,7 +2586,8 @@ impl Database {
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi, &scan_id)
+            .map_err(|e| e.to_string())?;
         bi += 1;
         if let Some(ref p) = search_pat {
             stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
@@ -2591,17 +2654,20 @@ impl Database {
     pub fn get_pdf_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT id, timestamp, pdf_count, total_bytes, roots FROM pdf_scans ORDER BY timestamp DESC").map_err(|e| e.to_string())?;
-        let rows = stmt.query_map([], |row| {
-            let roots_str: String = row.get(4)?;
-            Ok(serde_json::json!({
-                "id": row.get::<_,String>(0)?,
-                "timestamp": row.get::<_,String>(1)?,
-                "pdfCount": row.get::<_,u64>(2)?,
-                "totalBytes": row.get::<_,u64>(3)?,
-                "roots": serde_json::from_str::<Vec<String>>(&roots_str).unwrap_or_default(),
-            }))
-        }).map_err(|e| e.to_string())?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+        let rows = stmt
+            .query_map([], |row| {
+                let roots_str: String = row.get(4)?;
+                Ok(serde_json::json!({
+                    "id": row.get::<_,String>(0)?,
+                    "timestamp": row.get::<_,String>(1)?,
+                    "pdfCount": row.get::<_,u64>(2)?,
+                    "totalBytes": row.get::<_,u64>(3)?,
+                    "roots": serde_json::from_str::<Vec<String>>(&roots_str).unwrap_or_default(),
+                }))
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
     }
 
     pub fn get_pdf_scan_detail(&self, id: &str) -> Result<PdfScanSnapshot, String> {
@@ -2689,16 +2755,21 @@ impl Database {
         if scan_id.is_empty() {
             return Ok(vec![]);
         }
-        let mut stmt = conn.prepare(
-            "SELECT p.path FROM pdfs p
+        let mut stmt = conn
+            .prepare(
+                "SELECT p.path FROM pdfs p
              LEFT JOIN pdf_metadata m ON m.path = p.path
              WHERE p.scan_id = ?1 AND m.path IS NULL
              LIMIT ?2",
-        ).map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map(params![scan_id, limit as i64], |row| row.get::<_, String>(0))
+            )
             .map_err(|e| e.to_string())?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+        let rows = stmt
+            .query_map(params![scan_id, limit as i64], |row| {
+                row.get::<_, String>(0)
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
     }
 
     /// Batch upsert PDF page counts. Entries with None page count are still
@@ -2708,7 +2779,9 @@ impl Database {
             return Ok(());
         }
         let conn = self.conn.lock().unwrap();
-        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+        let now = chrono::Utc::now()
+            .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+            .to_string();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
             let mut stmt = tx
@@ -2735,21 +2808,24 @@ impl Database {
         let mut out = std::collections::HashMap::new();
         // SQLite IN clause with ~999 param limit — chunk to be safe.
         for chunk in paths.chunks(500) {
-            let placeholders: Vec<String> =
-                (1..=chunk.len()).map(|i| format!("?{i}")).collect();
+            let placeholders: Vec<String> = (1..=chunk.len()).map(|i| format!("?{i}")).collect();
             let sql = format!(
                 "SELECT path, pages FROM pdf_metadata WHERE path IN ({})",
                 placeholders.join(",")
             );
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             for (i, p) in chunk.iter().enumerate() {
-                stmt.raw_bind_parameter(i + 1, p).map_err(|e| e.to_string())?;
+                stmt.raw_bind_parameter(i + 1, p)
+                    .map_err(|e| e.to_string())?;
             }
             let mut rows = stmt.raw_query();
             while let Some(row) = rows.next().map_err(|e| e.to_string())? {
                 let path: String = row.get(0).unwrap_or_default();
                 let pages: Option<i64> = row.get(1).ok();
-                out.insert(path, pages.and_then(|n| if n >= 0 { Some(n as u32) } else { None }));
+                out.insert(
+                    path,
+                    pages.and_then(|n| if n >= 0 { Some(n as u32) } else { None }),
+                );
             }
         }
         Ok(out)
@@ -2805,7 +2881,10 @@ impl Database {
             } else {
                 Some(format!(
                     "%{}%",
-                    t.chars().map(|c| c.to_string()).collect::<Vec<_>>().join("%")
+                    t.chars()
+                        .map(|c| c.to_string())
+                        .collect::<Vec<_>>()
+                        .join("%")
                 ))
             }
         });
@@ -2830,7 +2909,8 @@ impl Database {
             let sql = format!("SELECT COUNT(*) FROM pdfs WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
             if let Some(ref p) = search_pat {
                 stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
@@ -2845,14 +2925,17 @@ impl Database {
         let sql = format!("SELECT name, path, directory, size, size_formatted, modified FROM pdfs WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}", bind_idx + 1);
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi, &scan_id)
+            .map_err(|e| e.to_string())?;
         bi += 1;
         if let Some(ref p) = search_pat {
             stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
             bi += 1;
         }
-        stmt.raw_bind_parameter(bi, limit as i64).map_err(|e| e.to_string())?;
-        stmt.raw_bind_parameter(bi + 1, offset as i64).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi, limit as i64)
+            .map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi + 1, offset as i64)
+            .map_err(|e| e.to_string())?;
 
         let mut pdfs = Vec::new();
         let mut rows = stmt.raw_query();
@@ -2908,7 +2991,10 @@ impl Database {
                 |row| row.get(0),
             )
             .map_err(|e| e.to_string())?;
-        Ok(PdfStatsResult { pdf_count, total_bytes })
+        Ok(PdfStatsResult {
+            pdf_count,
+            total_bytes,
+        })
     }
 
     // ── Filter-aware aggregate stats ──
@@ -2918,18 +3004,25 @@ impl Database {
     fn fzf_like(s: Option<&str>) -> Option<String> {
         s.and_then(|t| {
             let t = t.trim();
-            if t.is_empty() { return None; }
-            let esc: String = t.chars().map(|c| match c {
-                '%' => "\\%".to_string(),
-                '_' => "\\_".to_string(),
-                _ => c.to_string(),
-            }).collect::<Vec<_>>().join("%");
+            if t.is_empty() {
+                return None;
+            }
+            let esc: String = t
+                .chars()
+                .map(|c| match c {
+                    '%' => "\\%".to_string(),
+                    '_' => "\\_".to_string(),
+                    _ => c.to_string(),
+                })
+                .collect::<Vec<_>>()
+                .join("%");
             Some(format!("%{esc}%"))
         })
     }
 
     fn in_list_sql(values: &str) -> String {
-        values.split(',')
+        values
+            .split(',')
             .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
             .collect::<Vec<_>>()
             .join(",")
@@ -2943,143 +3036,277 @@ impl Database {
         ).optional().map_err(|e| e.to_string())?.unwrap_or_default())
     }
 
-    pub fn audio_filter_stats(&self, search: Option<&str>, format_filter: Option<&str>) -> Result<FilterStatsResult, String> {
+    pub fn audio_filter_stats(
+        &self,
+        search: Option<&str>,
+        format_filter: Option<&str>,
+    ) -> Result<FilterStatsResult, String> {
         let scan_id = self.get_latest_scan_id("audio_scans", "sample_count")?;
         if scan_id.is_empty() {
-            return Ok(FilterStatsResult { count: 0, total_bytes: 0, by_type: HashMap::new(), bytes_by_type: HashMap::new(), total_unfiltered: 0 });
+            return Ok(FilterStatsResult {
+                count: 0,
+                total_bytes: 0,
+                by_type: HashMap::new(),
+                bytes_by_type: HashMap::new(),
+                total_unfiltered: 0,
+            });
         }
         let conn = self.conn.lock().unwrap();
-        let total_unfiltered: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM audio_samples WHERE scan_id = ?1",
-            params![scan_id], |r| r.get(0)
-        ).unwrap_or(0);
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM audio_samples WHERE scan_id = ?1",
+                params![scan_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
         let search_pat = Self::fzf_like(search);
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
-        if search_pat.is_some() { where_parts.push(format!("name LIKE ?{bind_idx} ESCAPE '\\'")); bind_idx += 1; }
-        if let Some(f) = format_filter { if !f.is_empty() && f != "all" {
-            if f.contains(',') { where_parts.push(format!("format IN ({})", Self::in_list_sql(f))); }
-            else { where_parts.push(format!("format = ?{bind_idx}")); bind_idx += 1; }
-        }}
+        if search_pat.is_some() {
+            where_parts.push(format!("name LIKE ?{bind_idx} ESCAPE '\\'"));
+            bind_idx += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" {
+                if f.contains(',') {
+                    where_parts.push(format!("format IN ({})", Self::in_list_sql(f)));
+                } else {
+                    where_parts.push(format!("format = ?{bind_idx}"));
+                    bind_idx += 1;
+                }
+            }
+        }
         let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!("SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM audio_samples WHERE {where_cl} GROUP BY format");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?; bi += 1;
-        if let Some(ref p) = search_pat { stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?; bi += 1; }
-        if let Some(f) = format_filter { if !f.is_empty() && f != "all" && !f.contains(',') { stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?; } }
+        stmt.raw_bind_parameter(bi, &scan_id)
+            .map_err(|e| e.to_string())?;
+        bi += 1;
+        if let Some(ref p) = search_pat {
+            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" && !f.contains(',') {
+                stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+            }
+        }
         let mut rows = stmt.raw_query();
-        let mut count = 0u64; let mut total_bytes = 0u64;
-        let mut by_type = HashMap::new(); let mut bytes_by_type = HashMap::new();
+        let mut count = 0u64;
+        let mut total_bytes = 0u64;
+        let mut by_type = HashMap::new();
+        let mut bytes_by_type = HashMap::new();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
             let fmt: String = row.get(0).unwrap_or_default();
             let n: u64 = row.get::<_, i64>(1).unwrap_or(0) as u64;
             let sz: u64 = row.get::<_, i64>(2).unwrap_or(0) as u64;
-            count += n; total_bytes += sz;
+            count += n;
+            total_bytes += sz;
             by_type.insert(fmt.clone(), n);
             bytes_by_type.insert(fmt, sz);
         }
-        Ok(FilterStatsResult { count, total_bytes, by_type, bytes_by_type, total_unfiltered })
+        Ok(FilterStatsResult {
+            count,
+            total_bytes,
+            by_type,
+            bytes_by_type,
+            total_unfiltered,
+        })
     }
 
-    pub fn daw_filter_stats(&self, search: Option<&str>, daw_filter: Option<&str>) -> Result<FilterStatsResult, String> {
+    pub fn daw_filter_stats(
+        &self,
+        search: Option<&str>,
+        daw_filter: Option<&str>,
+    ) -> Result<FilterStatsResult, String> {
         let scan_id = self.get_latest_scan_id("daw_scans", "project_count")?;
         if scan_id.is_empty() {
-            return Ok(FilterStatsResult { count: 0, total_bytes: 0, by_type: HashMap::new(), bytes_by_type: HashMap::new(), total_unfiltered: 0 });
+            return Ok(FilterStatsResult {
+                count: 0,
+                total_bytes: 0,
+                by_type: HashMap::new(),
+                bytes_by_type: HashMap::new(),
+                total_unfiltered: 0,
+            });
         }
         let conn = self.conn.lock().unwrap();
-        let total_unfiltered: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM daw_projects WHERE scan_id = ?1",
-            params![scan_id], |r| r.get(0)
-        ).unwrap_or(0);
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM daw_projects WHERE scan_id = ?1",
+                params![scan_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
         let search_pat = Self::fzf_like(search);
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
         if search_pat.is_some() {
-            where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
+            where_parts.push(format!(
+                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+            ));
             bind_idx += 1;
         }
-        if let Some(f) = daw_filter { if !f.is_empty() && f != "all" {
-            if f.contains(',') { where_parts.push(format!("daw IN ({})", Self::in_list_sql(f))); }
-            else { where_parts.push(format!("daw = ?{bind_idx}")); bind_idx += 1; }
-        }}
+        if let Some(f) = daw_filter {
+            if !f.is_empty() && f != "all" {
+                if f.contains(',') {
+                    where_parts.push(format!("daw IN ({})", Self::in_list_sql(f)));
+                } else {
+                    where_parts.push(format!("daw = ?{bind_idx}"));
+                    bind_idx += 1;
+                }
+            }
+        }
         let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!("SELECT daw, COUNT(*), COALESCE(SUM(size),0) FROM daw_projects WHERE {where_cl} GROUP BY daw");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?; bi += 1;
-        if let Some(ref p) = search_pat { stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?; bi += 1; }
-        if let Some(f) = daw_filter { if !f.is_empty() && f != "all" && !f.contains(',') { stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?; } }
+        stmt.raw_bind_parameter(bi, &scan_id)
+            .map_err(|e| e.to_string())?;
+        bi += 1;
+        if let Some(ref p) = search_pat {
+            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if let Some(f) = daw_filter {
+            if !f.is_empty() && f != "all" && !f.contains(',') {
+                stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+            }
+        }
         let mut rows = stmt.raw_query();
-        let mut count = 0u64; let mut total_bytes = 0u64;
-        let mut by_type = HashMap::new(); let mut bytes_by_type = HashMap::new();
+        let mut count = 0u64;
+        let mut total_bytes = 0u64;
+        let mut by_type = HashMap::new();
+        let mut bytes_by_type = HashMap::new();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
             let daw: String = row.get(0).unwrap_or_default();
             let n: u64 = row.get::<_, i64>(1).unwrap_or(0) as u64;
             let sz: u64 = row.get::<_, i64>(2).unwrap_or(0) as u64;
-            count += n; total_bytes += sz;
+            count += n;
+            total_bytes += sz;
             by_type.insert(daw.clone(), n);
             bytes_by_type.insert(daw, sz);
         }
-        Ok(FilterStatsResult { count, total_bytes, by_type, bytes_by_type, total_unfiltered })
+        Ok(FilterStatsResult {
+            count,
+            total_bytes,
+            by_type,
+            bytes_by_type,
+            total_unfiltered,
+        })
     }
 
-    pub fn preset_filter_stats(&self, search: Option<&str>, format_filter: Option<&str>) -> Result<FilterStatsResult, String> {
+    pub fn preset_filter_stats(
+        &self,
+        search: Option<&str>,
+        format_filter: Option<&str>,
+    ) -> Result<FilterStatsResult, String> {
         let scan_id = self.get_latest_scan_id("preset_scans", "preset_count")?;
         if scan_id.is_empty() {
-            return Ok(FilterStatsResult { count: 0, total_bytes: 0, by_type: HashMap::new(), bytes_by_type: HashMap::new(), total_unfiltered: 0 });
+            return Ok(FilterStatsResult {
+                count: 0,
+                total_bytes: 0,
+                by_type: HashMap::new(),
+                bytes_by_type: HashMap::new(),
+                total_unfiltered: 0,
+            });
         }
         let conn = self.conn.lock().unwrap();
-        let total_unfiltered: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM presets WHERE scan_id = ?1 AND format NOT IN ('MID','MIDI')",
-            params![scan_id], |r| r.get(0)
-        ).unwrap_or(0);
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM presets WHERE scan_id = ?1 AND format NOT IN ('MID','MIDI')",
+                params![scan_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
         let search_pat = Self::fzf_like(search);
         // Presets always exclude MIDI (lives in its own tab)
-        let mut where_parts = vec!["scan_id = ?1".to_string(), "format NOT IN ('MID','MIDI')".to_string()];
+        let mut where_parts = vec![
+            "scan_id = ?1".to_string(),
+            "format NOT IN ('MID','MIDI')".to_string(),
+        ];
         let mut bind_idx = 2usize;
         if search_pat.is_some() {
-            where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
+            where_parts.push(format!(
+                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+            ));
             bind_idx += 1;
         }
-        if let Some(f) = format_filter { if !f.is_empty() && f != "all" {
-            if f.contains(',') { where_parts.push(format!("format IN ({})", Self::in_list_sql(f))); }
-            else { where_parts.push(format!("format = ?{bind_idx}")); bind_idx += 1; }
-        }}
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" {
+                if f.contains(',') {
+                    where_parts.push(format!("format IN ({})", Self::in_list_sql(f)));
+                } else {
+                    where_parts.push(format!("format = ?{bind_idx}"));
+                    bind_idx += 1;
+                }
+            }
+        }
         let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!("SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM presets WHERE {where_cl} GROUP BY format");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?; bi += 1;
-        if let Some(ref p) = search_pat { stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?; bi += 1; }
-        if let Some(f) = format_filter { if !f.is_empty() && f != "all" && !f.contains(',') { stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?; } }
+        stmt.raw_bind_parameter(bi, &scan_id)
+            .map_err(|e| e.to_string())?;
+        bi += 1;
+        if let Some(ref p) = search_pat {
+            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" && !f.contains(',') {
+                stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+            }
+        }
         let mut rows = stmt.raw_query();
-        let mut count = 0u64; let mut total_bytes = 0u64;
-        let mut by_type = HashMap::new(); let mut bytes_by_type = HashMap::new();
+        let mut count = 0u64;
+        let mut total_bytes = 0u64;
+        let mut by_type = HashMap::new();
+        let mut bytes_by_type = HashMap::new();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
             let fmt: String = row.get(0).unwrap_or_default();
             let n: u64 = row.get::<_, i64>(1).unwrap_or(0) as u64;
             let sz: u64 = row.get::<_, i64>(2).unwrap_or(0) as u64;
-            count += n; total_bytes += sz;
+            count += n;
+            total_bytes += sz;
             by_type.insert(fmt.clone(), n);
             bytes_by_type.insert(fmt, sz);
         }
-        Ok(FilterStatsResult { count, total_bytes, by_type, bytes_by_type, total_unfiltered })
+        Ok(FilterStatsResult {
+            count,
+            total_bytes,
+            by_type,
+            bytes_by_type,
+            total_unfiltered,
+        })
     }
 
-    pub fn plugin_filter_stats(&self, search: Option<&str>, type_filter: Option<&str>) -> Result<FilterStatsResult, String> {
+    pub fn plugin_filter_stats(
+        &self,
+        search: Option<&str>,
+        type_filter: Option<&str>,
+    ) -> Result<FilterStatsResult, String> {
         let scan_id = self.get_latest_scan_id("plugin_scans", "plugin_count")?;
         if scan_id.is_empty() {
-            return Ok(FilterStatsResult { count: 0, total_bytes: 0, by_type: HashMap::new(), bytes_by_type: HashMap::new(), total_unfiltered: 0 });
+            return Ok(FilterStatsResult {
+                count: 0,
+                total_bytes: 0,
+                by_type: HashMap::new(),
+                bytes_by_type: HashMap::new(),
+                total_unfiltered: 0,
+            });
         }
         let conn = self.conn.lock().unwrap();
-        let total_unfiltered: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM plugins WHERE scan_id = ?1",
-            params![scan_id], |r| r.get(0)
-        ).unwrap_or(0);
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM plugins WHERE scan_id = ?1",
+                params![scan_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
         let search_pat = Self::fzf_like(search);
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
@@ -3087,56 +3314,107 @@ impl Database {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR manufacturer LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
         }
-        if let Some(tf) = type_filter { if !tf.is_empty() && tf != "all" {
-            if tf.contains(',') { where_parts.push(format!("plugin_type IN ({})", Self::in_list_sql(tf))); }
-            else { where_parts.push(format!("plugin_type = ?{bind_idx}")); bind_idx += 1; }
-        }}
+        if let Some(tf) = type_filter {
+            if !tf.is_empty() && tf != "all" {
+                if tf.contains(',') {
+                    where_parts.push(format!("plugin_type IN ({})", Self::in_list_sql(tf)));
+                } else {
+                    where_parts.push(format!("plugin_type = ?{bind_idx}"));
+                    bind_idx += 1;
+                }
+            }
+        }
         let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!("SELECT plugin_type, COUNT(*), COALESCE(SUM(size_bytes),0) FROM plugins WHERE {where_cl} GROUP BY plugin_type");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?; bi += 1;
-        if let Some(ref p) = search_pat { stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?; bi += 1; }
-        if let Some(tf) = type_filter { if !tf.is_empty() && tf != "all" && !tf.contains(',') { stmt.raw_bind_parameter(bi, tf).map_err(|e| e.to_string())?; } }
+        stmt.raw_bind_parameter(bi, &scan_id)
+            .map_err(|e| e.to_string())?;
+        bi += 1;
+        if let Some(ref p) = search_pat {
+            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if let Some(tf) = type_filter {
+            if !tf.is_empty() && tf != "all" && !tf.contains(',') {
+                stmt.raw_bind_parameter(bi, tf).map_err(|e| e.to_string())?;
+            }
+        }
         let mut rows = stmt.raw_query();
-        let mut count = 0u64; let mut total_bytes = 0u64;
-        let mut by_type = HashMap::new(); let mut bytes_by_type = HashMap::new();
+        let mut count = 0u64;
+        let mut total_bytes = 0u64;
+        let mut by_type = HashMap::new();
+        let mut bytes_by_type = HashMap::new();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
             let t: String = row.get(0).unwrap_or_default();
             let n: u64 = row.get::<_, i64>(1).unwrap_or(0) as u64;
             let sz: u64 = row.get::<_, i64>(2).unwrap_or(0) as u64;
-            count += n; total_bytes += sz;
+            count += n;
+            total_bytes += sz;
             by_type.insert(t.clone(), n);
             bytes_by_type.insert(t, sz);
         }
-        Ok(FilterStatsResult { count, total_bytes, by_type, bytes_by_type, total_unfiltered })
+        Ok(FilterStatsResult {
+            count,
+            total_bytes,
+            by_type,
+            bytes_by_type,
+            total_unfiltered,
+        })
     }
 
     pub fn pdf_filter_stats(&self, search: Option<&str>) -> Result<FilterStatsResult, String> {
         let scan_id = self.get_latest_scan_id("pdf_scans", "pdf_count")?;
         if scan_id.is_empty() {
-            return Ok(FilterStatsResult { count: 0, total_bytes: 0, by_type: HashMap::new(), bytes_by_type: HashMap::new(), total_unfiltered: 0 });
+            return Ok(FilterStatsResult {
+                count: 0,
+                total_bytes: 0,
+                by_type: HashMap::new(),
+                bytes_by_type: HashMap::new(),
+                total_unfiltered: 0,
+            });
         }
         let conn = self.conn.lock().unwrap();
-        let total_unfiltered: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM pdfs WHERE scan_id = ?1",
-            params![scan_id], |r| r.get(0)
-        ).unwrap_or(0);
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pdfs WHERE scan_id = ?1",
+                params![scan_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
         let search_pat = Self::fzf_like(search);
         let (sql, has_search) = if search_pat.is_some() {
             ("SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1 AND (name LIKE ?2 ESCAPE '\\' OR path LIKE ?2 ESCAPE '\\')", true)
         } else {
-            ("SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1", false)
+            (
+                "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1",
+                false,
+            )
         };
         let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
-        stmt.raw_bind_parameter(1, &scan_id).map_err(|e| e.to_string())?;
-        if has_search { stmt.raw_bind_parameter(2, search_pat.as_ref().unwrap()).map_err(|e| e.to_string())?; }
+        stmt.raw_bind_parameter(1, &scan_id)
+            .map_err(|e| e.to_string())?;
+        if has_search {
+            stmt.raw_bind_parameter(2, search_pat.as_ref().unwrap())
+                .map_err(|e| e.to_string())?;
+        }
         let mut rows = stmt.raw_query();
         let (count, total_bytes) = if let Some(row) = rows.next().map_err(|e| e.to_string())? {
-            (row.get::<_, i64>(0).unwrap_or(0) as u64, row.get::<_, i64>(1).unwrap_or(0) as u64)
-        } else { (0, 0) };
-        Ok(FilterStatsResult { count, total_bytes, by_type: HashMap::new(), bytes_by_type: HashMap::new(), total_unfiltered })
+            (
+                row.get::<_, i64>(0).unwrap_or(0) as u64,
+                row.get::<_, i64>(1).unwrap_or(0) as u64,
+            )
+        } else {
+            (0, 0)
+        };
+        Ok(FilterStatsResult {
+            count,
+            total_bytes,
+            by_type: HashMap::new(),
+            bytes_by_type: HashMap::new(),
+            total_unfiltered,
+        })
     }
 
     // ── KVR cache ──
@@ -3488,10 +3766,7 @@ impl Database {
     }
 
     /// Batch update BPM/Key/LUFS for multiple files in a single transaction.
-    pub fn batch_update_analysis(
-        &self,
-        results: &[AnalysisBatchRow],
-    ) -> Result<u32, String> {
+    pub fn batch_update_analysis(&self, results: &[AnalysisBatchRow]) -> Result<u32, String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut count = 0u32;
@@ -4085,15 +4360,8 @@ mod tests {
             sample("big_kick.wav", "/test/big_kick.wav", "WAV", 9_999),
             sample("snare.wav", "/test/snare.wav", "WAV", 500),
         ];
-        db.save_scan(
-            "s1",
-            "2024-01-01T00:00:00",
-            3,
-            10_599,
-            &HashMap::new(),
-            &[],
-        )
-        .unwrap();
+        db.save_scan("s1", "2024-01-01T00:00:00", 3, 10_599, &HashMap::new(), &[])
+            .unwrap();
         db.insert_audio_batch("s1", &samples).unwrap();
 
         let result = db
@@ -4456,10 +4724,7 @@ mod tests {
         db.save_plugin_scan(&plugin_snap(
             "ps-fs2",
             "2024-06-01T00:00:00",
-            vec![
-                plugin_info("A", "VST3", "X"),
-                plugin_info("B", "AU", "X"),
-            ],
+            vec![plugin_info("A", "VST3", "X"), plugin_info("B", "AU", "X")],
         ))
         .unwrap();
 
@@ -5512,7 +5777,10 @@ mod tests {
             "MIDI files must be excluded from preset header count"
         );
         assert_eq!(res.total_count, 1);
-        assert!(res.presets.iter().all(|p| p.format != "MID" && p.format != "MIDI"));
+        assert!(res
+            .presets
+            .iter()
+            .all(|p| p.format != "MID" && p.format != "MIDI"));
     }
 
     #[test]
@@ -5654,10 +5922,12 @@ mod tests {
 
         let mut fc = HashMap::new();
         fc.insert("WAV".into(), 1);
-        db.save_scan("au-old", "2024-01-01T00:00:00", 1, 100, &fc, &[]).unwrap();
+        db.save_scan("au-old", "2024-01-01T00:00:00", 1, 100, &fc, &[])
+            .unwrap();
         db.insert_audio_batch("au-old", &[sample("a.wav", "/a.wav", "WAV", 100)])
             .unwrap();
-        db.save_scan("au-new", "2024-06-01T00:00:00", 1, 200, &fc, &[]).unwrap();
+        db.save_scan("au-new", "2024-06-01T00:00:00", 1, 200, &fc, &[])
+            .unwrap();
         db.insert_audio_batch("au-new", &[sample("b.wav", "/b.wav", "WAV", 200)])
             .unwrap();
         assert_eq!(db.get_latest_audio_scan().unwrap().unwrap().id, "au-new");
@@ -5825,11 +6095,8 @@ mod tests {
             ("s4", "2024-04-01T00:00:00", "n4.wav"),
         ] {
             db.save_scan(id, ts, 1, 100, &fc, &[]).unwrap();
-            db.insert_audio_batch(
-                id,
-                &[sample(name, &format!("/{name}"), "WAV", 100)],
-            )
-            .unwrap();
+            db.insert_audio_batch(id, &[sample(name, &format!("/{name}"), "WAV", 100)])
+                .unwrap();
         }
         db.prune_old_scans(2);
         let scans = db.list_scans().unwrap();
@@ -6109,8 +6376,15 @@ mod tests {
             .unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.total_unfiltered, 4);
-        assert_eq!(res.projects.len(), 2, "main SELECT must return matching rows");
-        assert!(res.projects.iter().all(|p| p.daw == "Ableton" || p.daw == "Logic"));
+        assert_eq!(
+            res.projects.len(),
+            2,
+            "main SELECT must return matching rows"
+        );
+        assert!(res
+            .projects
+            .iter()
+            .all(|p| p.daw == "Ableton" || p.daw == "Logic"));
     }
 
     #[test]
@@ -6228,7 +6502,10 @@ mod tests {
         assert_eq!(res.total_count, 3);
         assert_eq!(res.total_unfiltered, 4);
         assert_eq!(res.presets.len(), 3);
-        assert!(res.presets.iter().all(|p| p.format == "FXP" || p.format == "H2P"));
+        assert!(res
+            .presets
+            .iter()
+            .all(|p| p.format == "FXP" || p.format == "H2P"));
     }
 
     #[test]
@@ -6317,7 +6594,10 @@ mod tests {
             4,
             "main SELECT must return the 4 matching rows, not 0"
         );
-        assert!(res.plugins.iter().all(|p| p.plugin_type == "VST3" || p.plugin_type == "AU"));
+        assert!(res
+            .plugins
+            .iter()
+            .all(|p| p.plugin_type == "VST3" || p.plugin_type == "AU"));
     }
 
     #[test]
@@ -6487,7 +6767,10 @@ mod tests {
             .unwrap();
 
         let stats = db.daw_stats(None).unwrap();
-        assert_eq!(stats.project_count, 1, "empty scan must not clobber real one");
+        assert_eq!(
+            stats.project_count, 1,
+            "empty scan must not clobber real one"
+        );
     }
 
     #[test]
@@ -6496,7 +6779,10 @@ mod tests {
         db.save_daw_scan(&daw_snap(
             "ds-a",
             "2024-01-01T00:00:00",
-            vec![daw_project("x.als", "Ableton"), daw_project("y.als", "Ableton")],
+            vec![
+                daw_project("x.als", "Ableton"),
+                daw_project("y.als", "Ableton"),
+            ],
         ))
         .unwrap();
         db.save_daw_scan(&daw_snap(
@@ -6707,21 +6993,19 @@ mod tests {
         let db = test_db();
         let data = serde_json::json!({"/a.wav": "spectrogram_payload"});
         db.write_cache("spectrogram-cache.json", &data).unwrap();
-        assert!(
-            db.read_cache("spectrogram-cache.json")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .contains_key("/a.wav")
-        );
+        assert!(db
+            .read_cache("spectrogram-cache.json")
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .contains_key("/a.wav"));
         db.clear_cache_table("spectrogram").unwrap();
-        assert!(
-            db.read_cache("spectrogram-cache.json")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .is_empty()
-        );
+        assert!(db
+            .read_cache("spectrogram-cache.json")
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
@@ -6730,13 +7014,12 @@ mod tests {
         let data = serde_json::json!({"/sample.wav": "fpabc"});
         db.write_cache("fingerprint-cache.json", &data).unwrap();
         db.clear_cache_table("fingerprint").unwrap();
-        assert!(
-            db.read_cache("fingerprint-cache.json")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .is_empty()
-        );
+        assert!(db
+            .read_cache("fingerprint-cache.json")
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

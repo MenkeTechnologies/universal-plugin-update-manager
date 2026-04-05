@@ -358,10 +358,7 @@ fn extract_plugins_utf16le(data: &[u8]) -> Vec<PluginRef> {
         if hi == 0 && (0x20..=0x7E).contains(&lo) {
             let run_start = start;
             let mut end = start;
-            while end + 1 < data.len()
-                && data[end + 1] == 0
-                && (0x20..=0x7E).contains(&data[end])
-            {
+            while end + 1 < data.len() && data[end + 1] == 0 && (0x20..=0x7E).contains(&data[end]) {
                 end += 2;
             }
             let char_count = (end - run_start) / 2;
@@ -1320,7 +1317,10 @@ mod tests {
 
     #[test]
     fn test_normalize_strips_apple_silicon_bracket() {
-        assert_eq!(normalize_plugin_name("Melodyne (Apple Silicon)"), "melodyne");
+        assert_eq!(
+            normalize_plugin_name("Melodyne (Apple Silicon)"),
+            "melodyne"
+        );
     }
 
     #[test]
@@ -1375,11 +1375,7 @@ mod tests {
     fn test_extract_plugins_from_xml_regex_capture() {
         // Avoid attributes like deviceName= — substring `name="` would match inside it first
         let xml = r#"<Plugin name="Serum" />"#;
-        let patterns = &[(
-            r#"name="([^"]+)""#,
-            "Xfer Records",
-            "VST3",
-        )];
+        let patterns = &[(r#"name="([^"]+)""#, "Xfer Records", "VST3")];
         let refs = extract_plugins_from_xml(xml, patterns);
         assert_eq!(refs.len(), 1);
         assert_eq!(refs[0].name, "Serum");

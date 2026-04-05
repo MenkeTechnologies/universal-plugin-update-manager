@@ -643,10 +643,7 @@ mod tests {
 
     #[test]
     fn test_compare_versions_unknown_vs_numeric() {
-        assert_eq!(
-            compare_versions("Unknown", "2.0"),
-            std::cmp::Ordering::Less
-        );
+        assert_eq!(compare_versions("Unknown", "2.0"), std::cmp::Ordering::Less);
         assert_eq!(
             compare_versions("2.0", "Unknown"),
             std::cmp::Ordering::Greater
@@ -655,18 +652,9 @@ mod tests {
 
     #[test]
     fn test_compare_versions_transitive_major_minor() {
-        assert_eq!(
-            compare_versions("3.0", "1.0"),
-            std::cmp::Ordering::Greater
-        );
-        assert_eq!(
-            compare_versions("1.0", "0.5"),
-            std::cmp::Ordering::Greater
-        );
-        assert_eq!(
-            compare_versions("3.0", "0.5"),
-            std::cmp::Ordering::Greater
-        );
+        assert_eq!(compare_versions("3.0", "1.0"), std::cmp::Ordering::Greater);
+        assert_eq!(compare_versions("1.0", "0.5"), std::cmp::Ordering::Greater);
+        assert_eq!(compare_versions("3.0", "0.5"), std::cmp::Ordering::Greater);
     }
 
     #[test]
@@ -677,14 +665,7 @@ mod tests {
 
     #[test]
     fn test_compare_versions_reflexive_handpicked() {
-        for s in [
-            "1.0.0",
-            "1.2.3.4",
-            "0.0.1",
-            "10",
-            "0.0.0",
-            "2.1.0-rc",
-        ] {
+        for s in ["1.0.0", "1.2.3.4", "0.0.1", "10", "0.0.0", "2.1.0-rc"] {
             assert_eq!(
                 compare_versions(s, s),
                 std::cmp::Ordering::Equal,

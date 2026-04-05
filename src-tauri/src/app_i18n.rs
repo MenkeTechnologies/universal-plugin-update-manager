@@ -48,7 +48,8 @@ fn seed_locale(conn: &Connection, locale: &str, json: &str) -> Result<(), String
         .prepare_cached("INSERT OR REPLACE INTO app_i18n (key, locale, value) VALUES (?1, ?2, ?3)")
         .map_err(|e| e.to_string())?;
     for (k, v) in map {
-        stmt.execute(params![k, locale, v]).map_err(|e| e.to_string())?;
+        stmt.execute(params![k, locale, v])
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -60,7 +61,9 @@ pub fn load_merged(conn: &Connection, locale: &str) -> Result<HashMap<String, St
         .prepare("SELECT key, value FROM app_i18n WHERE locale = 'en'")
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
         .map_err(|e| e.to_string())?;
     for row in rows {
         let (k, v) = row.map_err(|e| e.to_string())?;
@@ -87,9 +90,9 @@ pub fn load_merged(conn: &Connection, locale: &str) -> Result<HashMap<String, St
 #[cfg(test)]
 mod tests {
     use super::{
-        load_merged, SEED_JSON_DE, SEED_JSON_EL, SEED_JSON_EN, SEED_JSON_ES, SEED_JSON_FR, SEED_JSON_FI,
-        SEED_JSON_IT, SEED_JSON_JA, SEED_JSON_KO, SEED_JSON_NL, SEED_JSON_PL, SEED_JSON_PT, SEED_JSON_RU,
-        SEED_JSON_SV, SEED_JSON_ZH,
+        load_merged, SEED_JSON_DE, SEED_JSON_EL, SEED_JSON_EN, SEED_JSON_ES, SEED_JSON_FI,
+        SEED_JSON_FR, SEED_JSON_IT, SEED_JSON_JA, SEED_JSON_KO, SEED_JSON_NL, SEED_JSON_PL,
+        SEED_JSON_PT, SEED_JSON_RU, SEED_JSON_SV, SEED_JSON_ZH,
     };
     use regex::Regex;
     use rusqlite::Connection;
@@ -170,11 +173,9 @@ mod tests {
     ];
 
     fn key_matches_catalog_prefix(k: &str) -> bool {
-        [
-            "menu.", "tray.", "confirm.", "toast.", "help.", "ui.",
-        ]
-        .iter()
-        .any(|p| k.starts_with(p))
+        ["menu.", "tray.", "confirm.", "toast.", "help.", "ui."]
+            .iter()
+            .any(|p| k.starts_with(p))
     }
 
     fn setup_minimal_i18n(conn: &Connection) {
@@ -305,10 +306,8 @@ mod tests {
     #[test]
     fn seed_json_fr_menu_scan_all_differs_from_en() {
         let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
-        let fr: HashMap<String, String> = serde_json::from_str(include_str!(
-            "../../i18n/app_i18n_fr.json"
-        ))
-        .expect("fr json");
+        let fr: HashMap<String, String> =
+            serde_json::from_str(include_str!("../../i18n/app_i18n_fr.json")).expect("fr json");
         assert_ne!(
             en.get("menu.scan_all"),
             fr.get("menu.scan_all"),
@@ -1166,7 +1165,9 @@ mod tests {
             if placeholders.is_empty() {
                 continue;
             }
-            let v = m.get(k).unwrap_or_else(|| panic!("key {k} missing in {loc}"));
+            let v = m
+                .get(k)
+                .unwrap_or_else(|| panic!("key {k} missing in {loc}"));
             for p in &placeholders {
                 assert!(
                     v.contains(p.as_str()),

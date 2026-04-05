@@ -194,10 +194,8 @@ mod macos {
         alist.bitmapcount = ATTR_BIT_MAP_COUNT;
         // ATTR_CMN_ERROR intentionally omitted — it's a flag on the returned
         // attribute_set_t, not an inline u32 value in the data buffer.
-        alist.commonattr = ATTR_CMN_RETURNED_ATTRS
-            | ATTR_CMN_NAME
-            | ATTR_CMN_OBJTYPE
-            | ATTR_CMN_MODTIME;
+        alist.commonattr =
+            ATTR_CMN_RETURNED_ATTRS | ATTR_CMN_NAME | ATTR_CMN_OBJTYPE | ATTR_CMN_MODTIME;
         alist.fileattr = ATTR_FILE_DATALENGTH;
 
         // 64KB buffer ~= 200-500 entries per call depending on name lengths.
@@ -297,10 +295,7 @@ mod macos {
                     // timespec is 16 bytes, 8-byte aligned. Cursor should already
                     // be aligned because packed(4) plus preceding fields sum right.
                     if cursor + 16 > buf.len() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "timespec oob",
-                        ));
+                        return Err(io::Error::new(io::ErrorKind::InvalidData, "timespec oob"));
                     }
                     mtime_secs = i64::from_ne_bytes(
                         buf[cursor..cursor + 8]
@@ -321,10 +316,7 @@ mod macos {
                 let mut size: u64 = 0;
                 if returned.fileattr & ATTR_FILE_DATALENGTH != 0 {
                     if cursor + 8 > buf.len() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "datalength oob",
-                        ));
+                        return Err(io::Error::new(io::ErrorKind::InvalidData, "datalength oob"));
                     }
                     let sz = i64::from_ne_bytes(
                         buf[cursor..cursor + 8]

@@ -6,13 +6,11 @@ use std::cmp::Ordering;
 use std::path::Path;
 
 use app_lib::db::AudioQueryParams;
-use app_lib::xref::normalize_plugin_name;
-use app_lib::history::{
-    build_pdf_snapshot, compute_pdf_diff, PdfFile, PdfScanSnapshot,
-};
+use app_lib::history::{build_pdf_snapshot, compute_pdf_diff, PdfFile, PdfScanSnapshot};
 use app_lib::kvr::{compare_versions, extract_version, parse_version};
-use app_lib::similarity::{find_similar, fingerprint_distance, AudioFingerprint};
 use app_lib::scanner::PluginInfo;
+use app_lib::similarity::{find_similar, fingerprint_distance, AudioFingerprint};
+use app_lib::xref::normalize_plugin_name;
 
 fn pdf_file(path: &str, size: u64) -> PdfFile {
     PdfFile {
@@ -45,10 +43,7 @@ fn pdf_snap(id: &str, pdfs: Vec<PdfFile>, roots: Vec<String>) -> PdfScanSnapshot
 
 #[test]
 fn build_pdf_snapshot_aggregates_count_bytes_and_roots() {
-    let pdfs = vec![
-        pdf_file("/vault/a.pdf", 100),
-        pdf_file("/vault/b.pdf", 400),
-    ];
+    let pdfs = vec![pdf_file("/vault/a.pdf", 100), pdf_file("/vault/b.pdf", 400)];
     let s = build_pdf_snapshot(&pdfs, &["/vault".into()]);
     assert_eq!(s.pdf_count, 2);
     assert_eq!(s.total_bytes, 500);
@@ -75,16 +70,8 @@ fn compute_pdf_diff_same_paths_both_sides_no_added_or_removed() {
 
 #[test]
 fn compute_pdf_diff_detects_added_and_removed_paths() {
-    let old = pdf_snap(
-        "o",
-        vec![pdf_file("/only/old.pdf", 1)],
-        vec![],
-    );
-    let new = pdf_snap(
-        "n",
-        vec![pdf_file("/only/new.pdf", 2)],
-        vec![],
-    );
+    let old = pdf_snap("o", vec![pdf_file("/only/old.pdf", 1)], vec![]);
+    let new = pdf_snap("n", vec![pdf_file("/only/new.pdf", 2)], vec![]);
     let d = compute_pdf_diff(&old, &new);
     assert_eq!(d.added.len(), 1);
     assert_eq!(d.removed.len(), 1);
@@ -326,10 +313,8 @@ fn lufs_measure_missing_file_returns_none() {
 
 #[test]
 fn midi_parse_short_file_returns_none() {
-    let tmp = std::env::temp_dir().join(format!(
-        "ah_contracts_bad_midi_{}.mid",
-        std::process::id()
-    ));
+    let tmp =
+        std::env::temp_dir().join(format!("ah_contracts_bad_midi_{}.mid", std::process::id()));
     std::fs::write(&tmp, b"xx").expect("write temp");
     let got = app_lib::midi::parse_midi(&tmp);
     let _ = std::fs::remove_file(&tmp);
@@ -340,10 +325,7 @@ fn midi_parse_short_file_returns_none() {
 
 #[test]
 fn normalize_plugin_name_strips_bracket_vst3_suffix() {
-    assert_eq!(
-        normalize_plugin_name("ChannelStrip [VST3]"),
-        "channelstrip"
-    );
+    assert_eq!(normalize_plugin_name("ChannelStrip [VST3]"), "channelstrip");
 }
 
 #[test]
@@ -353,8 +335,5 @@ fn normalize_plugin_name_strips_bare_x64_without_parens() {
 
 #[test]
 fn normalize_plugin_name_triple_stacked_arch_suffixes() {
-    assert_eq!(
-        normalize_plugin_name("Tape  x64  (VST3)  (AU)"),
-        "tape"
-    );
+    assert_eq!(normalize_plugin_name("Tape  x64  (VST3)  (AU)"), "tape");
 }

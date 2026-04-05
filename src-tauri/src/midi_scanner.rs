@@ -77,7 +77,7 @@ pub fn walk_for_midi(
                     return;
                 }
                 walk_dir_parallel(
-                    root, 0, &visited, &tx, &found2, batch_size, &stop2, &exclude, &active,
+                    root, 0, None, &visited, &tx, &found2, batch_size, &stop2, &exclude, &active,
                 );
             });
         });
@@ -106,6 +106,7 @@ pub fn walk_for_midi(
 fn walk_dir_parallel(
     dir: &Path,
     depth: u32,
+    parent_dev: Option<u64>,
     visited: &Arc<Mutex<HashSet<PathBuf>>>,
     tx: &std::sync::mpsc::SyncSender<Vec<MidiFile>>,
     found: &Arc<AtomicUsize>,
@@ -118,14 +119,57 @@ fn walk_dir_parallel(
         return;
     }
 
+    // Mount-point detection — on Unix, a dir whose st_dev differs from its
+    // parent's sits on a different filesystem (network mount, external drive,
+    // overlayfs, etc.). Log the boundary so the user can see which mounts
+    // the walker actually entered.
+    #[cfg(unix)]
+    let current_dev: Option<u64> = {
+        use std::os::unix::fs::MetadataExt;
+        match fs::metadata(dir) {
+            Ok(m) => {
+                let d = m.dev();
+                if let Some(pd) = parent_dev {
+                    if pd != d {
+                        crate::write_app_log(format!(
+                            "SCAN MOUNT — midi | {} | parent_dev={} current_dev={}",
+                            dir.display(),
+                            pd,
+                            d
+                        ));
+                    }
+                }
+                Some(d)
+            }
+            Err(_) => None,
+        }
+    };
+    #[cfg(not(unix))]
+    let current_dev: Option<u64> = None;
+    let _ = parent_dev;
+
     // Canonicalize OUTSIDE the mutex — it's a syscall (network roundtrip on
     // SMB) and must not block other workers while in flight.
     {
         let orig = normalize_macos_path(dir.to_path_buf());
         let canon = fs::canonicalize(dir).ok().map(normalize_macos_path);
-        let key = canon.unwrap_or_else(|| orig.clone());
+        let key = canon.clone().unwrap_or_else(|| orig.clone());
         let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
-        if !vis.insert(key) {
+        if !vis.insert(key.clone()) {
+            // Dedup hit — already visited via another path. Log if this is
+            // something the user might care about (network mounts, /mnt).
+            let s = dir.to_string_lossy();
+            if s.contains("/mnt/") || s.ends_with("/mnt") {
+                crate::write_app_log(format!(
+                    "SCAN DEDUP SKIP — midi | orig={} | canon={} | key={}",
+                    orig.display(),
+                    canon
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "<canonicalize failed>".into()),
+                    key.display(),
+                ));
+            }
             return;
         }
         vis.insert(orig);
@@ -141,10 +185,27 @@ fn walk_dir_parallel(
         }
     }
 
+    // Diagnostic: log when we enter /mnt/ paths (SMB mounts typically).
+    {
+        let s = dir.to_string_lossy();
+        if s.contains("/mnt/") || s.ends_with("/mnt") {
+            crate::write_app_log(format!("SCAN ENTER — midi | {}", dir.display()));
+        }
+    }
+
     let entries: Vec<_> = match fs::read_dir(dir) {
         Ok(e) => e.flatten().collect(),
-        Err(_) => return,
+        Err(_e) => {
+            return;
+        }
     };
+    // Diagnostic: log how many entries came back from /mnt/ paths.
+    {
+        let s = dir.to_string_lossy();
+        if s.contains("/mnt/") || s.ends_with("/mnt") {
+            crate::write_app_log(format!("{} {}", dir.display(), entries.len()));
+        }
+    }
 
     let mut files = Vec::new();
     let mut subdirs = Vec::new();
@@ -225,6 +286,7 @@ fn walk_dir_parallel(
         walk_dir_parallel(
             subdir,
             depth + 1,
+            current_dev,
             visited,
             tx,
             found,

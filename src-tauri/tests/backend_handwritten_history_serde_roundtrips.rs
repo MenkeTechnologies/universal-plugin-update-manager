@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use app_lib::history::{
-    AudioHistory, AudioSample, AudioScanDiff, AudioScanSummary, DawHistory,
-    DawProject, DawScanDiff, DawScanSnapshot, DawScanSummary, PdfFile, PdfScanDiff, PdfScanSnapshot,
+    AudioHistory, AudioSample, AudioScanDiff, AudioScanSummary, DawHistory, DawProject,
+    DawScanDiff, DawScanSnapshot, DawScanSummary, PdfFile, PdfScanDiff, PdfScanSnapshot,
     PdfScanSummary, PresetFile, PresetHistory, PresetScanDiff, PresetScanSnapshot,
     PresetScanSummary, ScanDiff, ScanHistory, ScanSnapshot, ScanSummary, VersionChangedPlugin,
 };
@@ -358,7 +358,9 @@ fn scanner_get_vst_directories_only_lists_existing_paths() {
 fn similarity_compute_fingerprint_non_audio_returns_none() {
     let p = std::env::temp_dir().join("ah_not_audio.txt");
     std::fs::write(&p, b"hello").unwrap();
-    let got = p.to_str().and_then(|s| app_lib::similarity::compute_fingerprint(s));
+    let got = p
+        .to_str()
+        .and_then(|s| app_lib::similarity::compute_fingerprint(s));
     let _ = std::fs::remove_file(&p);
     assert!(got.is_none());
 }

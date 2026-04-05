@@ -1722,7 +1722,10 @@ mod tests {
     fn test_toml_to_flat_promotes_data_widths_key() {
         let toml = "[data]\nwidths = [120, 240]\n";
         let flat = toml_to_flat(toml);
-        assert_eq!(flat.get("columnWidths"), Some(&serde_json::json!([120, 240])));
+        assert_eq!(
+            flat.get("columnWidths"),
+            Some(&serde_json::json!([120, 240]))
+        );
     }
 
     #[test]

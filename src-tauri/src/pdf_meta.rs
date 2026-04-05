@@ -56,10 +56,8 @@ mod tests {
         use std::fs::File;
         use std::io::BufWriter;
 
-        let tmp = std::env::temp_dir().join(format!(
-            "ah_pdf_meta_three_{}.pdf",
-            std::process::id()
-        ));
+        let tmp =
+            std::env::temp_dir().join(format!("ah_pdf_meta_three_{}.pdf", std::process::id()));
         let (doc, _p1, _l1) = PdfDocument::new("pdf_meta_test", Mm(40.0), Mm(40.0), "L1");
         let _ = doc.add_page(Mm(40.0), Mm(40.0), "L2");
         let _ = doc.add_page(Mm(40.0), Mm(40.0), "L3");

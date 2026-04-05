@@ -564,7 +564,10 @@ mod tests {
         data.extend_from_slice(&0x8001u16.to_be_bytes());
         std::fs::write(&tmp, &data).unwrap();
         let info = parse_midi(&tmp).unwrap();
-        assert_eq!(info.ppqn, 480, "SMPTE timecode division → internal PPQN default");
+        assert_eq!(
+            info.ppqn, 480,
+            "SMPTE timecode division → internal PPQN default"
+        );
         let _ = std::fs::remove_file(&tmp);
     }
 
@@ -630,12 +633,10 @@ mod tests {
     #[test]
     fn test_parse_midi_format_1_two_tracks_merges_track_names() {
         let tr1 = vec![
-            0x00, 0xFF, 0x03, 0x05, b'A', b'l', b'p', b'h', b'a',
-            0x00, 0xFF, 0x2F, 0x00,
+            0x00, 0xFF, 0x03, 0x05, b'A', b'l', b'p', b'h', b'a', 0x00, 0xFF, 0x2F, 0x00,
         ];
         let tr2 = vec![
-            0x00, 0xFF, 0x03, 0x04, b'B', b'e', b't', b'a',
-            0x00, 0xFF, 0x2F, 0x00,
+            0x00, 0xFF, 0x03, 0x04, b'B', b'e', b't', b'a', 0x00, 0xFF, 0x2F, 0x00,
         ];
         let data = build_midi_with_track_bodies(1, 480, &[tr1, tr2]);
         let tmp = std::env::temp_dir().join("test_midi_two_tracks.mid");
@@ -695,8 +696,8 @@ mod tests {
     #[test]
     fn test_parse_midi_flow_track_name_tempo_notes_and_counts() {
         let track = vec![
-            0x00, 0xFF, 0x03, 0x07, b'M', b'y', b'T', b'r', b'a', b'c', b'k',
-            0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20, // 500000 µs/qn → 120 BPM
+            0x00, 0xFF, 0x03, 0x07, b'M', b'y', b'T', b'r', b'a', b'c', b'k', 0x00, 0xFF, 0x51,
+            0x03, 0x07, 0xA1, 0x20, // 500000 µs/qn → 120 BPM
             0x00, 0x90, 60, 100, // note on C4
             0x00, 0x90, 64, 100, // note on E4
             0x00, 0xFF, 0x2F, 0x00,
@@ -719,12 +720,10 @@ mod tests {
     #[test]
     fn test_parse_midi_flow_track_name_tempo_time_sig_key_sig_one_note() {
         let track = vec![
-            0x00, 0xFF, 0x03, 0x04, b'T', b'e', b's', b't',
-            0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20,
-            0x00, 0xFF, 0x58, 0x04, 0x06, 0x03, 0x18, 0x08, // 6/8
+            0x00, 0xFF, 0x03, 0x04, b'T', b'e', b's', b't', 0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1,
+            0x20, 0x00, 0xFF, 0x58, 0x04, 0x06, 0x03, 0x18, 0x08, // 6/8
             0x00, 0xFF, 0x59, 0x02, 0xFF, 0x01, // D minor (sf = -1)
-            0x00, 0x90, 60, 100,
-            0x00, 0xFF, 0x2F, 0x00,
+            0x00, 0x90, 60, 100, 0x00, 0xFF, 0x2F, 0x00,
         ];
         let data = make_midi(0, 1, 480, &track);
         let tmp = std::env::temp_dir().join("test_midi_flow_meta.mid");

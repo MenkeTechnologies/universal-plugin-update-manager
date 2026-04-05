@@ -154,7 +154,9 @@ fn is_valid_band_package(path: &Path) -> bool {
     } else {
         return false;
     }
-    path.join("Media").is_dir() || path.join("Output").is_dir() || path.join("Freeze Files").is_dir()
+    path.join("Media").is_dir()
+        || path.join("Output").is_dir()
+        || path.join("Freeze Files").is_dir()
 }
 
 fn get_directory_size(path: &Path) -> u64 {
@@ -296,18 +298,8 @@ pub fn walk_unified(
                     return;
                 }
                 walk_dir_parallel(
-                    root,
-                    0,
-                    &visited,
-                    &tx,
-                    &audio_f2,
-                    &daw_f2,
-                    &preset_f2,
-                    &pdf_f2,
-                    batch_size,
-                    &stop2,
-                    &spec,
-                    &active,
+                    root, 0, &visited, &tx, &audio_f2, &daw_f2, &preset_f2, &pdf_f2, batch_size,
+                    &stop2, &spec, &active,
                 );
             });
         });
@@ -389,7 +381,14 @@ fn walk_dir_parallel(
     // per entry — critical for SMB where each syscall is a network roundtrip.
     let entries: Vec<BulkEntry> = match read_dir_bulk(dir) {
         Ok(e) => e,
-        Err(_) => return,
+        Err(e) => {
+            crate::write_app_log(format!(
+                "SCAN READDIR ERROR — unified | {} | {}",
+                dir.display(),
+                e
+            ));
+            return;
+        }
     };
 
     // Per-type batches collected in this directory before being flushed.
@@ -405,10 +404,7 @@ fn walk_dir_parallel(
         // folder on a Synology share — alone it can double a scan's file
         // count). Also handles @tmp, @syno*, @appstore, @docker, @database,
         // @SynoDrive, @SynologyCloudSync, etc.
-        if name_str.starts_with('.')
-            || name_str.starts_with('@')
-            || SKIP_DIRS.contains(&name_str)
-        {
+        if name_str.starts_with('.') || name_str.starts_with('@') || SKIP_DIRS.contains(&name_str) {
             continue;
         }
         if !spec.daw_include_backups && DAW_BACKUP_DIRS.contains(&name_str) {
@@ -481,7 +477,10 @@ fn walk_dir_parallel(
             if is_plugin_bundle {
                 // Plugin bundles: DAW skips entirely. Others may still want to
                 // find presets/pdfs inside — descend for them.
-                if !spec.preset_roots.is_empty() || !spec.pdf_roots.is_empty() || !spec.audio_roots.is_empty() {
+                if !spec.preset_roots.is_empty()
+                    || !spec.pdf_roots.is_empty()
+                    || !spec.audio_roots.is_empty()
+                {
                     subdirs.push(path);
                 }
                 continue;
@@ -509,19 +508,14 @@ fn walk_dir_parallel(
         let modified = fmt_mtime_ymd(entry.mtime_secs);
 
         // Audio
-        if AUDIO_EXTENSIONS.contains(&ext_with_dot)
-            && under_any_root(&path, &spec.audio_roots)
-        {
+        if AUDIO_EXTENSIONS.contains(&ext_with_dot) && under_any_root(&path, &spec.audio_roots) {
             let path_str = path.to_string_lossy().to_string();
             if !spec.audio_exclude.contains(&path_str) && size > 0 {
                 let sample_name = path
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
                     .unwrap_or_default();
-                let fast_fmt = matches!(
-                    ext_with_dot,
-                    ".wav" | ".aiff" | ".aif" | ".flac"
-                );
+                let fast_fmt = matches!(ext_with_dot, ".wav" | ".aiff" | ".aif" | ".flac");
                 let (dur, ch, sr, bps) = if fast_fmt {
                     let am = crate::audio_scanner::get_audio_metadata(&path_str);
                     (am.duration, am.channels, am.sample_rate, am.bits_per_sample)
@@ -546,9 +540,7 @@ fn walk_dir_parallel(
         }
 
         // DAW (single-file formats — packages handled above for directories)
-        if DAW_EXTENSIONS.contains(&ext_with_dot)
-            && under_any_root(&path, &spec.daw_roots)
-        {
+        if DAW_EXTENSIONS.contains(&ext_with_dot) && under_any_root(&path, &spec.daw_roots) {
             let path_str = path.to_string_lossy().to_string();
             if !spec.daw_exclude.contains(&path_str) {
                 let format = ext_with_dot.strip_prefix('.').unwrap_or("").to_uppercase();
@@ -575,9 +567,7 @@ fn walk_dir_parallel(
         }
 
         // Preset (and midi — same bucket)
-        if PRESET_EXTENSIONS.contains(&ext_with_dot)
-            && under_any_root(&path, &spec.preset_roots)
-        {
+        if PRESET_EXTENSIONS.contains(&ext_with_dot) && under_any_root(&path, &spec.preset_roots) {
             let path_str = path.to_string_lossy().to_string();
             if !spec.preset_exclude.contains(&path_str) {
                 let preset_name = path
@@ -976,6 +966,9 @@ mod tests {
     #[test]
     fn normalize_macos_path_noop_when_not_data_volume() {
         let p = PathBuf::from("/home/user/Projects");
-        assert_eq!(normalize_macos_path(p), PathBuf::from("/home/user/Projects"));
+        assert_eq!(
+            normalize_macos_path(p),
+            PathBuf::from("/home/user/Projects")
+        );
     }
 }

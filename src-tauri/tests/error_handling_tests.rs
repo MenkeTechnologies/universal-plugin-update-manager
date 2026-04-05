@@ -83,9 +83,7 @@ fn test_similarity_non_audio_file() {
     let non_audio = std::env::temp_dir().join("document.txt");
     let _ = std::fs::write(&non_audio, b"PDF content");
 
-    let result = non_audio
-        .to_str()
-        .and_then(similarity::compute_fingerprint);
+    let result = non_audio.to_str().and_then(similarity::compute_fingerprint);
     assert!(result.is_none(), "Should return None for non-audio files");
 }
 

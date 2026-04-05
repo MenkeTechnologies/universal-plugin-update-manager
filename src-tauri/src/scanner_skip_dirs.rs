@@ -19,24 +19,24 @@ pub const SCANNER_SKIP_DIRS: &[&str] = &[
     "__pycache__",
     "__pypackages__",
     // Never contain user audio/preset/pdf/daw content.
-    "Caches",           // ~/Library/Caches, /Library/Caches, app caches
-    "DerivedData",      // Xcode build artifacts
-    "Backups.backupdb", // Time Machine bundle
-    "__MACOSX",         // zip-extract artifact
-    "target",           // Rust/Cargo (and some other tools) build output
-    "Pods",             // CocoaPods
-    "Carthage",         // Carthage / iOS dependency checkouts + builds
-    "vendor",           // Composer, Bundler, etc.
-    "jspm_packages",    // legacy JSPM (like node_modules)
-    "elm-stuff",        // Elm build cache
-    "zig-cache",        // Zig compiler cache
-    "zig-out",          // Zig default output dir
-    "cmake-build-debug",   // CMake / CLion / VS default build trees
+    "Caches",            // ~/Library/Caches, /Library/Caches, app caches
+    "DerivedData",       // Xcode build artifacts
+    "Backups.backupdb",  // Time Machine bundle
+    "__MACOSX",          // zip-extract artifact
+    "target",            // Rust/Cargo (and some other tools) build output
+    "Pods",              // CocoaPods
+    "Carthage",          // Carthage / iOS dependency checkouts + builds
+    "vendor",            // Composer, Bundler, etc.
+    "jspm_packages",     // legacy JSPM (like node_modules)
+    "elm-stuff",         // Elm build cache
+    "zig-cache",         // Zig compiler cache
+    "zig-out",           // Zig default output dir
+    "cmake-build-debug", // CMake / CLion / VS default build trees
     "cmake-build-release",
     "cmake-build-relwithdebinfo",
     "cmake-build-minsizerel",
-    "buck-out",         // Buck build output
-    "bazel-bin",        // Bazel convenience symlinks / trees under workspace
+    "buck-out",  // Buck build output
+    "bazel-bin", // Bazel convenience symlinks / trees under workspace
     "bazel-out",
     "bazel-testlogs",
     "_build",           // Mix / Rebar / Erlang build (Elixir deps tree)

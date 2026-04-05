@@ -313,7 +313,9 @@ fn walk_dir_parallel(
 
     let entries: Vec<_> = match fs::read_dir(dir) {
         Ok(e) => e.flatten().collect(),
-        Err(_) => return,
+        Err(_e) => {
+            return;
+        }
     };
 
     let mut files_and_packages = Vec::new();
@@ -495,7 +497,10 @@ mod tests {
 
     #[test]
     fn test_ext_matches_ardour_and_dawproject() {
-        assert_eq!(ext_matches(Path::new("session.ardour")), Some("ARDOUR".into()));
+        assert_eq!(
+            ext_matches(Path::new("session.ardour")),
+            Some("ARDOUR".into())
+        );
         assert_eq!(
             ext_matches(Path::new("openstd.dawproject")),
             Some("DAWPROJECT".into())
@@ -531,27 +536,18 @@ mod tests {
 
     #[test]
     fn test_ext_matches_case_insensitive_file_name() {
-        assert_eq!(
-            ext_matches(Path::new("LIVE.SET.ALS")),
-            Some("ALS".into())
-        );
+        assert_eq!(ext_matches(Path::new("LIVE.SET.ALS")), Some("ALS".into()));
     }
 
     #[test]
     fn test_ext_matches_audacity_aup3_suffix() {
-        assert_eq!(
-            ext_matches(Path::new("podcast.aup3")),
-            Some("AUP3".into())
-        );
+        assert_eq!(ext_matches(Path::new("podcast.aup3")), Some("AUP3".into()));
     }
 
     #[test]
     fn test_ext_matches_aup3_not_matched_as_aup_prefix() {
         // `.aup` appears before `.aup3` in `DAW_EXTENSIONS`; `ends_with` must still pick the longer suffix.
-        assert_eq!(
-            ext_matches(Path::new("session.aup3")),
-            Some("AUP3".into())
-        );
+        assert_eq!(ext_matches(Path::new("session.aup3")), Some("AUP3".into()));
         assert_eq!(ext_matches(Path::new("legacy.aup")), Some("AUP".into()));
     }
 
@@ -856,8 +852,15 @@ mod tests {
             None,
         );
         let overlap_count = found.iter().filter(|d| d.name == "overlap").count();
-        assert_eq!(overlap_count, 1, "overlap.rpp should be found once despite overlapping roots, got {}", overlap_count);
-        assert!(found.iter().any(|d| d.name == "top"), "top.als should be found");
+        assert_eq!(
+            overlap_count, 1,
+            "overlap.rpp should be found once despite overlapping roots, got {}",
+            overlap_count
+        );
+        assert!(
+            found.iter().any(|d| d.name == "top"),
+            "top.als should be found"
+        );
         let _ = fs::remove_dir_all(&tmp);
     }
 
@@ -874,11 +877,29 @@ mod tests {
         }
 
         let mut count1 = 0;
-        walk_for_daw(&[tmp.clone()], &mut |batch, _| count1 += batch.len(), &|| false, None, false, None);
+        walk_for_daw(
+            &[tmp.clone()],
+            &mut |batch, _| count1 += batch.len(),
+            &|| false,
+            None,
+            false,
+            None,
+        );
         let mut count2 = 0;
-        walk_for_daw(&[tmp.clone()], &mut |batch, _| count2 += batch.len(), &|| false, None, false, None);
+        walk_for_daw(
+            &[tmp.clone()],
+            &mut |batch, _| count2 += batch.len(),
+            &|| false,
+            None,
+            false,
+            None,
+        );
 
-        assert_eq!(count1, count2, "two scans of same dirs should find same count: {} vs {}", count1, count2);
+        assert_eq!(
+            count1, count2,
+            "two scans of same dirs should find same count: {} vs {}",
+            count1, count2
+        );
         assert_eq!(count1, 10, "should find 10 projects");
         let _ = fs::remove_dir_all(&tmp);
     }

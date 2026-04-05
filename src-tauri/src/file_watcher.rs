@@ -176,10 +176,7 @@ pub fn start_watching(
     let mut watched = Vec::new();
     for dir in &dirs {
         let path = Path::new(dir);
-        if path.exists()
-            && path.is_dir()
-            && watcher.watch(path, RecursiveMode::Recursive).is_ok()
-        {
+        if path.exists() && path.is_dir() && watcher.watch(path, RecursiveMode::Recursive).is_ok() {
             watched.push(dir.clone());
         }
     }

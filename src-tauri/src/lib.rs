@@ -1378,9 +1378,16 @@ async fn scan_pdfs(
         Ok(v) => append_log(format!(
             "SCAN END — pdfs | {}s | {} found",
             elapsed.as_secs(),
-            v.get("pdfs").and_then(|p| p.as_array()).map(|a| a.len()).unwrap_or(0)
+            v.get("pdfs")
+                .and_then(|p| p.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0)
         )),
-        Err(e) => append_log(format!("SCAN ERROR — pdfs | {}s | {}", elapsed.as_secs(), e)),
+        Err(e) => append_log(format!(
+            "SCAN ERROR — pdfs | {}s | {}",
+            elapsed.as_secs(),
+            e
+        )),
     }
     result.map_err(|e| e.to_string())
 }
@@ -1445,7 +1452,9 @@ async fn scan_unified(
     preset_state.stop_scan.store(false, Ordering::SeqCst);
     pdf_state.stop_scan.store(false, Ordering::SeqCst);
     // Signal walker-status tiles to collapse 4 → 1 while we hold the walker.
-    app.state::<WalkerStatus>().unified_scanning.store(true, Ordering::SeqCst);
+    app.state::<WalkerStatus>()
+        .unified_scanning
+        .store(true, Ordering::SeqCst);
 
     // Kick off four status messages on the same event streams so the tabs
     // show "scanning" immediately.
@@ -1466,14 +1475,20 @@ async fn scan_unified(
 
     let app_handle = app.clone();
     let result = tokio::task::spawn_blocking(move || {
-        let resolve = |custom: Option<Vec<String>>, default: &dyn Fn() -> Vec<std::path::PathBuf>| -> Vec<std::path::PathBuf> {
+        let resolve = |custom: Option<Vec<String>>,
+                       default: &dyn Fn() -> Vec<std::path::PathBuf>|
+         -> Vec<std::path::PathBuf> {
             if let Some(extra) = custom {
                 let v: Vec<std::path::PathBuf> = extra
                     .into_iter()
                     .map(std::path::PathBuf::from)
                     .filter(|p| p.exists())
                     .collect();
-                if v.is_empty() { default() } else { v }
+                if v.is_empty() {
+                    default()
+                } else {
+                    v
+                }
             } else {
                 default()
             }
@@ -1616,19 +1631,37 @@ async fn scan_unified(
     daw_state.scanning.store(false, Ordering::SeqCst);
     preset_state.scanning.store(false, Ordering::SeqCst);
     pdf_state.scanning.store(false, Ordering::SeqCst);
-    app.state::<WalkerStatus>().unified_scanning.store(false, Ordering::SeqCst);
+    app.state::<WalkerStatus>()
+        .unified_scanning
+        .store(false, Ordering::SeqCst);
 
     let elapsed = scan_start.elapsed();
     match &result {
         Ok(v) => append_log(format!(
             "SCAN END — unified | {}s | audio:{} daw:{} preset:{} pdf:{}",
             elapsed.as_secs(),
-            v.get("audio").and_then(|x| x.as_array()).map(|a| a.len()).unwrap_or(0),
-            v.get("daw").and_then(|x| x.as_array()).map(|a| a.len()).unwrap_or(0),
-            v.get("preset").and_then(|x| x.as_array()).map(|a| a.len()).unwrap_or(0),
-            v.get("pdf").and_then(|x| x.as_array()).map(|a| a.len()).unwrap_or(0),
+            v.get("audio")
+                .and_then(|x| x.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0),
+            v.get("daw")
+                .and_then(|x| x.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0),
+            v.get("preset")
+                .and_then(|x| x.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0),
+            v.get("pdf")
+                .and_then(|x| x.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0),
         )),
-        Err(e) => append_log(format!("SCAN ERROR — unified | {}s | {}", elapsed.as_secs(), e)),
+        Err(e) => append_log(format!(
+            "SCAN ERROR — unified | {}s | {}",
+            elapsed.as_secs(),
+            e
+        )),
     }
     result.map_err(|e| e.to_string())
 }
@@ -1638,10 +1671,18 @@ async fn scan_unified(
 #[tauri::command]
 async fn stop_unified_scan(app: AppHandle) -> Result<(), String> {
     append_log("SCAN STOP — unified (user requested)".into());
-    app.state::<AudioScanState>().stop_scan.store(true, Ordering::SeqCst);
-    app.state::<DawScanState>().stop_scan.store(true, Ordering::SeqCst);
-    app.state::<PresetScanState>().stop_scan.store(true, Ordering::SeqCst);
-    app.state::<PdfScanState>().stop_scan.store(true, Ordering::SeqCst);
+    app.state::<AudioScanState>()
+        .stop_scan
+        .store(true, Ordering::SeqCst);
+    app.state::<DawScanState>()
+        .stop_scan
+        .store(true, Ordering::SeqCst);
+    app.state::<PresetScanState>()
+        .stop_scan
+        .store(true, Ordering::SeqCst);
+    app.state::<PdfScanState>()
+        .stop_scan
+        .store(true, Ordering::SeqCst);
     Ok(())
 }
 
@@ -1741,7 +1782,14 @@ async fn pdf_metadata_extract_batch(
             let mut rows: Vec<(String, Option<u32>)> = Vec::with_capacity(chunk.len());
             for p in chunk {
                 let found = pairs.iter().find(|(pp, _)| pp == p).map(|(_, n)| *n);
-                rows.push((p.clone(), if extracted_set.contains(p) { found } else { None }));
+                rows.push((
+                    p.clone(),
+                    if extracted_set.contains(p) {
+                        found
+                    } else {
+                        None
+                    },
+                ));
             }
             let _ = db::global().save_pdf_metadata(&rows);
             extracted += pairs.len();
@@ -2238,6 +2286,13 @@ fn write_cache_file(name: String, data: serde_json::Value) -> Result<(), String>
 
 #[tauri::command]
 fn append_log(msg: String) {
+    write_app_log(msg);
+}
+
+/// Public log-append entry point callable from any module. Writes a
+/// timestamped line to `<data-dir>/app.log`, rotating to `.log.1` at 5MB.
+/// The `append_log` Tauri command delegates to this.
+pub fn write_app_log(msg: String) {
     let path = history::get_data_dir().join("app.log");
     // Ensure dir exists
     if let Some(parent) = path.parent() {
@@ -4191,7 +4246,10 @@ mod tests {
             plugins.contains(&"/Library/Audio/Plug-Ins/VST3/PluginA.vst3"),
             "plugins={plugins:?}"
         );
-        assert!(plugins.contains(&"C:\\VSTPlugins\\PluginB.dll"), "plugins={plugins:?}");
+        assert!(
+            plugins.contains(&"C:\\VSTPlugins\\PluginB.dll"),
+            "plugins={plugins:?}"
+        );
         let _ = fs::remove_file(&tmp);
     }
 
@@ -5267,10 +5325,8 @@ mod tests {
 
     #[test]
     fn test_export_pdf_writes_pdf_magic_bytes() {
-        let tmp = std::env::temp_dir().join(format!(
-            "ah_export_pdf_test_{}.pdf",
-            std::process::id()
-        ));
+        let tmp =
+            std::env::temp_dir().join(format!("ah_export_pdf_test_{}.pdf", std::process::id()));
         let _ = fs::remove_file(&tmp);
         export_pdf(
             "Unit test".into(),

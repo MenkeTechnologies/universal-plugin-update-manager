@@ -5894,10 +5894,7 @@ fn preset_file_serde_roundtrip_name_empty_string() {
 
 #[test]
 fn radix_string_3656158440062975_base36_is_ten_z_digits() {
-    assert_eq!(
-        radix_string(3_656_158_440_062_975, 36),
-        "zzzzzzzzzz"
-    );
+    assert_eq!(radix_string(3_656_158_440_062_975, 36), "zzzzzzzzzz");
 }
 
 #[test]
@@ -6008,10 +6005,7 @@ fn fingerprint_distance_spectral_centroid_only_change_nonzero_alt2() {
 #[test]
 fn kvr_compare_versions_tenth_component_padding_equal() {
     assert_eq!(
-        app_lib::kvr::compare_versions(
-            "1.0.0.0.0.0.0.0.0",
-            "1.0.0.0.0.0.0.0.0.0"
-        ),
+        app_lib::kvr::compare_versions("1.0.0.0.0.0.0.0.0", "1.0.0.0.0.0.0.0.0.0"),
         Ordering::Equal
     );
 }
@@ -6093,10 +6087,7 @@ fn ext_matches_pro_tools_ptx_deep_path_wave30() {
 
 #[test]
 fn radix_string_101559956668415_base36_is_nine_z_digits() {
-    assert_eq!(
-        radix_string(101_559_956_668_415, 36),
-        "zzzzzzzzz"
-    );
+    assert_eq!(radix_string(101_559_956_668_415, 36), "zzzzzzzzz");
 }
 
 #[test]
@@ -6207,10 +6198,7 @@ fn fingerprint_distance_high_band_energy_only_change_nonzero_alt3() {
 #[test]
 fn kvr_compare_versions_eleventh_component_padding_equal() {
     assert_eq!(
-        app_lib::kvr::compare_versions(
-            "1.0.0.0.0.0.0.0.0.0",
-            "1.0.0.0.0.0.0.0.0.0.0"
-        ),
+        app_lib::kvr::compare_versions("1.0.0.0.0.0.0.0.0.0", "1.0.0.0.0.0.0.0.0.0.0"),
         Ordering::Equal
     );
 }
@@ -6251,10 +6239,7 @@ fn normalize_plugin_name_strips_intel_then_stereo_then_vst3() {
 
 #[test]
 fn kvr_compare_versions_empty_string_vs_triple_zero_equal() {
-    assert_eq!(
-        app_lib::kvr::compare_versions("", "0.0.0"),
-        Ordering::Equal
-    );
+    assert_eq!(app_lib::kvr::compare_versions("", "0.0.0"), Ordering::Equal);
 }
 
 #[test]
@@ -6392,10 +6377,7 @@ fn fingerprint_distance_zero_crossing_rate_only_change_nonzero_alt2() {
 #[test]
 fn kvr_compare_versions_twelfth_component_padding_equal() {
     assert_eq!(
-        app_lib::kvr::compare_versions(
-            "1.0.0.0.0.0.0.0.0.0.0",
-            "1.0.0.0.0.0.0.0.0.0.0.0"
-        ),
+        app_lib::kvr::compare_versions("1.0.0.0.0.0.0.0.0.0.0", "1.0.0.0.0.0.0.0.0.0.0.0"),
         Ordering::Equal
     );
 }
@@ -6428,10 +6410,7 @@ fn compute_plugin_diff_twelve_added_ten_removed_net_two() {
 
 #[test]
 fn normalize_plugin_name_strips_arm64_then_vst3_parens() {
-    assert_eq!(
-        normalize_plugin_name("Bass (arm64) (VST3)"),
-        "bass"
-    );
+    assert_eq!(normalize_plugin_name("Bass (arm64) (VST3)"), "bass");
 }
 
 #[test]
@@ -6601,10 +6580,7 @@ fn fingerprint_distance_low_band_energy_only_change_nonzero_alt2() {
 #[test]
 fn kvr_compare_versions_thirteenth_component_padding_equal() {
     assert_eq!(
-        app_lib::kvr::compare_versions(
-            "1.0.0.0.0.0.0.0.0.0.0.0",
-            "1.0.0.0.0.0.0.0.0.0.0.0.0"
-        ),
+        app_lib::kvr::compare_versions("1.0.0.0.0.0.0.0.0.0.0.0", "1.0.0.0.0.0.0.0.0.0.0.0.0"),
         Ordering::Equal
     );
 }
@@ -6616,10 +6592,7 @@ fn kvr_parse_version_leading_gaps_then_eight() {
 
 #[test]
 fn kvr_compare_versions_two_vs_two_dot_zero_equal() {
-    assert_eq!(
-        app_lib::kvr::compare_versions("2", "2.0"),
-        Ordering::Equal
-    );
+    assert_eq!(app_lib::kvr::compare_versions("2", "2.0"), Ordering::Equal);
 }
 
 #[test]
@@ -6797,10 +6770,7 @@ fn fingerprint_distance_spectral_centroid_only_change_nonzero_alt3() {
 #[test]
 fn kvr_compare_versions_fourteenth_component_padding_equal() {
     assert_eq!(
-        app_lib::kvr::compare_versions(
-            "1.0.0.0.0.0.0.0.0.0.0.0.0",
-            "1.0.0.0.0.0.0.0.0.0.0.0.0.0"
-        ),
+        app_lib::kvr::compare_versions("1.0.0.0.0.0.0.0.0.0.0.0.0", "1.0.0.0.0.0.0.0.0.0.0.0.0.0"),
         Ordering::Equal
     );
 }
@@ -6820,10 +6790,7 @@ fn kvr_compare_versions_three_vs_three_dot_zero_zero_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_aarch64_then_vst3_parens() {
-    assert_eq!(
-        normalize_plugin_name("Synth (aarch64) (VST3)"),
-        "synth"
-    );
+    assert_eq!(normalize_plugin_name("Synth (aarch64) (VST3)"), "synth");
 }
 
 #[test]
@@ -6975,10 +6942,7 @@ fn compute_plugin_diff_fifteen_added_thirteen_removed_net_two() {
 #[test]
 fn ext_matches_cubase_cpr_deep_path_wave35() {
     assert_eq!(
-        ext_matches(Path::new(
-            "/Volumes/Projects/2026/Album/Mix/Master_v3.cpr"
-        ))
-        .as_deref(),
+        ext_matches(Path::new("/Volumes/Projects/2026/Album/Mix/Master_v3.cpr")).as_deref(),
         Some("CPR")
     );
 }
@@ -7195,10 +7159,7 @@ fn kvr_compare_versions_sixteenth_component_padding_equal() {
 
 #[test]
 fn kvr_parse_version_triple_gap_five_five_five() {
-    assert_eq!(
-        app_lib::kvr::parse_version("5..5..5"),
-        vec![5, 0, 5, 0, 5]
-    );
+    assert_eq!(app_lib::kvr::parse_version("5..5..5"), vec![5, 0, 5, 0, 5]);
 }
 
 #[test]
@@ -7398,10 +7359,7 @@ fn kvr_compare_versions_seventeenth_component_padding_equal() {
 
 #[test]
 fn kvr_parse_version_triple_gap_nine_nine_nine() {
-    assert_eq!(
-        app_lib::kvr::parse_version("9..9..9"),
-        vec![9, 0, 9, 0, 9]
-    );
+    assert_eq!(app_lib::kvr::parse_version("9..9..9"), vec![9, 0, 9, 0, 9]);
 }
 
 #[test]
@@ -7414,10 +7372,7 @@ fn kvr_compare_versions_nine_vs_nine_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_mono_then_vst3_parens() {
-    assert_eq!(
-        normalize_plugin_name("De-Esser (Mono) (VST3)"),
-        "de-esser"
-    );
+    assert_eq!(normalize_plugin_name("De-Esser (Mono) (VST3)"), "de-esser");
 }
 
 #[test]
@@ -7616,10 +7571,7 @@ fn kvr_compare_versions_ten_vs_ten_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_x86_64_then_au_parens() {
-    assert_eq!(
-        normalize_plugin_name("Gate (x86_64) (AU)"),
-        "gate"
-    );
+    assert_eq!(normalize_plugin_name("Gate (x86_64) (AU)"), "gate");
 }
 
 #[test]
@@ -7817,10 +7769,7 @@ fn kvr_compare_versions_eleven_vs_eleven_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_aarch64_then_au_parens() {
-    assert_eq!(
-        normalize_plugin_name("EQ (aarch64) (AU)"),
-        "eq"
-    );
+    assert_eq!(normalize_plugin_name("EQ (aarch64) (AU)"), "eq");
 }
 
 #[test]
@@ -8232,10 +8181,7 @@ fn kvr_compare_versions_thirteen_vs_thirteen_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_stereo_then_aax_parens() {
-    assert_eq!(
-        normalize_plugin_name("Limiter (Stereo) (AAX)"),
-        "limiter"
-    );
+    assert_eq!(normalize_plugin_name("Limiter (Stereo) (AAX)"), "limiter");
 }
 
 #[test]
@@ -8455,7 +8401,10 @@ fn kvr_cache_entry_serde_roundtrip_both_urls_wave42() {
         back.kvr_url.as_deref(),
         Some("https://www.kvraudio.com/p/42")
     );
-    assert_eq!(back.update_url.as_deref(), Some("https://cdn.example/u.bin"));
+    assert_eq!(
+        back.update_url.as_deref(),
+        Some("https://cdn.example/u.bin")
+    );
 }
 
 #[test]
@@ -9250,10 +9199,7 @@ fn kvr_compare_versions_eighteen_vs_eighteen_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_arm64_then_au_parens() {
-    assert_eq!(
-        normalize_plugin_name("Wavetable (arm64) (AU)"),
-        "wavetable"
-    );
+    assert_eq!(normalize_plugin_name("Wavetable (arm64) (AU)"), "wavetable");
 }
 
 #[test]
@@ -9481,10 +9427,7 @@ fn kvr_cache_entry_serde_roundtrip_update_url_only_wave47() {
     };
     let j = serde_json::to_string(&e).unwrap();
     let back: KvrCacheEntry = serde_json::from_str(&j).unwrap();
-    assert_eq!(
-        back.update_url.as_deref(),
-        Some("https://dl.example/patch")
-    );
+    assert_eq!(back.update_url.as_deref(), Some("https://dl.example/patch"));
     assert!(back.kvr_url.is_none());
 }
 
@@ -9651,10 +9594,7 @@ fn kvr_compare_versions_twenty_vs_twenty_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_64bit_then_vst3_parens() {
-    assert_eq!(
-        normalize_plugin_name("Sampler (64-bit) (VST3)"),
-        "sampler"
-    );
+    assert_eq!(normalize_plugin_name("Sampler (64-bit) (VST3)"), "sampler");
 }
 
 #[test]
@@ -9852,10 +9792,7 @@ fn kvr_compare_versions_twentyone_vs_twentyone_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_32bit_then_au_parens() {
-    assert_eq!(
-        normalize_plugin_name("EQ (32-bit) (AU)"),
-        "eq"
-    );
+    assert_eq!(normalize_plugin_name("EQ (32-bit) (AU)"), "eq");
 }
 
 #[test]
@@ -10039,10 +9976,7 @@ fn kvr_compare_versions_twentytwo_vs_twentytwo_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_stereo_then_au_parens_wave50() {
-    assert_eq!(
-        normalize_plugin_name("Strings (Stereo) (AU)"),
-        "strings"
-    );
+    assert_eq!(normalize_plugin_name("Strings (Stereo) (AU)"), "strings");
 }
 
 #[test]
@@ -10425,10 +10359,7 @@ fn kvr_compare_versions_twentyfour_vs_twentyfour_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_stereo_then_aax_parens_wave52() {
-    assert_eq!(
-        normalize_plugin_name("Clipper (Stereo) (AAX)"),
-        "clipper"
-    );
+    assert_eq!(normalize_plugin_name("Clipper (Stereo) (AAX)"), "clipper");
 }
 
 #[test]
@@ -11012,10 +10943,7 @@ fn kvr_compare_versions_twentyseven_vs_twentyseven_dot_zeros_equal() {
 
 #[test]
 fn normalize_plugin_name_strips_x86_then_au_parens_wave55() {
-    assert_eq!(
-        normalize_plugin_name("Lead Stack (x86) (AU)"),
-        "lead stack"
-    );
+    assert_eq!(normalize_plugin_name("Lead Stack (x86) (AU)"), "lead stack");
 }
 
 #[test]

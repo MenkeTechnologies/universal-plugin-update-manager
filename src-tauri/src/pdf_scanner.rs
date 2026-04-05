@@ -131,7 +131,9 @@ fn walk_dir_parallel(
 
     let entries: Vec<_> = match fs::read_dir(dir) {
         Ok(e) => e.flatten().collect(),
-        Err(_) => return,
+        Err(_e) => {
+            return;
+        }
     };
 
     let mut files = Vec::new();
@@ -363,9 +365,21 @@ mod tests {
             fs::write(d.join(format!("p{i}.pdf")), b"x").unwrap();
         }
         let mut a = 0;
-        walk_for_pdfs(&[tmp.clone()], &mut |b, _| a += b.len(), &|| false, None, None);
+        walk_for_pdfs(
+            &[tmp.clone()],
+            &mut |b, _| a += b.len(),
+            &|| false,
+            None,
+            None,
+        );
         let mut b = 0;
-        walk_for_pdfs(&[tmp.clone()], &mut |b2, _| b += b2.len(), &|| false, None, None);
+        walk_for_pdfs(
+            &[tmp.clone()],
+            &mut |b2, _| b += b2.len(),
+            &|| false,
+            None,
+            None,
+        );
         assert_eq!(a, b);
         assert_eq!(a, 5);
         let _ = fs::remove_dir_all(&tmp);

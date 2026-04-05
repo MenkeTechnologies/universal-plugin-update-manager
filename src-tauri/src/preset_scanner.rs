@@ -39,9 +39,9 @@ const PRESET_EXTENSIONS: &[&str] = &[
     ".syx",       // MIDI SysEx dump
     ".tfx",       // Tone2 preset
     ".pjunoxl",   // TAL preset
-    // .mid / .midi deliberately excluded — MIDI has its own dedicated scanner
-    // (midi_scanner.rs) and lives in the midi_files table. Including them here
-    // would double-count MIDI files into both presets and midi_files tables.
+                  // .mid / .midi deliberately excluded — MIDI has its own dedicated scanner
+                  // (midi_scanner.rs) and lives in the midi_files table. Including them here
+                  // would double-count MIDI files into both presets and midi_files tables.
 ];
 
 fn format_size(bytes: u64) -> String {
@@ -166,7 +166,9 @@ fn walk_dir_parallel(
 
     let entries: Vec<_> = match fs::read_dir(dir) {
         Ok(e) => e.flatten().collect(),
-        Err(_) => return,
+        Err(_e) => {
+            return;
+        }
     };
 
     let mut files = Vec::new();
@@ -549,7 +551,11 @@ mod tests {
             None,
         );
         let overlap_count = found.iter().filter(|p| p.name == "overlap").count();
-        assert_eq!(overlap_count, 1, "overlap.fxp found {} times", overlap_count);
+        assert_eq!(
+            overlap_count, 1,
+            "overlap.fxp found {} times",
+            overlap_count
+        );
         assert!(found.iter().any(|p| p.name == "top"));
         let _ = fs::remove_dir_all(&tmp);
     }
@@ -564,9 +570,21 @@ mod tests {
             fs::write(d.join(format!("p{}.fxp", i)), b"preset").unwrap();
         }
         let mut c1 = 0;
-        walk_for_presets(&[tmp.clone()], &mut |b, _| c1 += b.len(), &|| false, None, None);
+        walk_for_presets(
+            &[tmp.clone()],
+            &mut |b, _| c1 += b.len(),
+            &|| false,
+            None,
+            None,
+        );
         let mut c2 = 0;
-        walk_for_presets(&[tmp.clone()], &mut |b, _| c2 += b.len(), &|| false, None, None);
+        walk_for_presets(
+            &[tmp.clone()],
+            &mut |b, _| c2 += b.len(),
+            &|| false,
+            None,
+            None,
+        );
         assert_eq!(c1, c2, "two scans should match: {} vs {}", c1, c2);
         assert_eq!(c1, 5);
         let _ = fs::remove_dir_all(&tmp);

@@ -436,7 +436,11 @@ mod tests {
         // n=1 is a degenerate frame; must not panic and should yield a finite power.
         let samples = vec![1.0f64];
         let p = goertzel(&samples, 440.0, 44100.0);
-        assert!(p.is_finite(), "goertzel power should be finite for n=1, got {}", p);
+        assert!(
+            p.is_finite(),
+            "goertzel power should be finite for n=1, got {}",
+            p
+        );
     }
 
     #[test]
@@ -581,7 +585,11 @@ mod tests {
             chroma[k] = MAJOR_PROFILE[(k + 5) % 12];
         }
         let r = profile_correlation(&chroma, &MAJOR_PROFILE, 7);
-        assert!((r - 1.0).abs() < 1e-9, "rotated major should match at root 7, got {}", r);
+        assert!(
+            (r - 1.0).abs() < 1e-9,
+            "rotated major should match at root 7, got {}",
+            r
+        );
     }
 
     #[test]

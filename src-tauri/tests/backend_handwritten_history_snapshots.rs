@@ -5,13 +5,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use app_lib::daw_scanner::{daw_name_for_format, ext_matches, is_package_ext};
 use app_lib::history::{
     build_audio_snapshot, build_daw_snapshot, build_preset_snapshot, compute_audio_diff,
     compute_daw_diff, compute_plugin_diff, compute_preset_diff, AudioSample, AudioScanSnapshot,
     DawProject, DawScanSnapshot, PresetFile, PresetScanSnapshot, ScanDiff, ScanSnapshot,
 };
 use app_lib::scanner::PluginInfo;
-use app_lib::daw_scanner::{daw_name_for_format, ext_matches, is_package_ext};
 use app_lib::{ExportPayload, ExportPlugin};
 
 fn plugin(path: &str, ver: &str) -> PluginInfo {
@@ -187,17 +187,11 @@ fn compute_plugin_diff_add_and_remove_distinct_paths_no_version_changed() {
 fn compute_plugin_diff_two_paths_both_version_bump() {
     let old = scan_snap(
         "a",
-        vec![
-            plugin("/p/a.vst3", "1.0.0"),
-            plugin("/p/b.vst3", "2.0.0"),
-        ],
+        vec![plugin("/p/a.vst3", "1.0.0"), plugin("/p/b.vst3", "2.0.0")],
     );
     let new = scan_snap(
         "b",
-        vec![
-            plugin("/p/a.vst3", "1.1.0"),
-            plugin("/p/b.vst3", "3.0.0"),
-        ],
+        vec![plugin("/p/a.vst3", "1.1.0"), plugin("/p/b.vst3", "3.0.0")],
     );
     let d = compute_plugin_diff(&old, &new);
     assert_eq!(d.version_changed.len(), 2);
@@ -248,11 +242,7 @@ fn compute_audio_diff_empty_to_nonempty_all_added() {
 
 #[test]
 fn compute_audio_diff_nonempty_to_empty_all_removed() {
-    let old = audio_snap(
-        "o",
-        vec![audio_sample("/gone.wav", "WAV", 10)],
-        vec![],
-    );
+    let old = audio_snap("o", vec![audio_sample("/gone.wav", "WAV", 10)], vec![]);
     let new = audio_snap("n", vec![], vec![]);
     let d = compute_audio_diff(&old, &new);
     assert_eq!(d.removed.len(), 1);
@@ -315,11 +305,7 @@ fn compute_daw_diff_same_project_paths_stable() {
 
 #[test]
 fn compute_daw_diff_two_daw_types_in_one_diff() {
-    let old = daw_snap(
-        "o",
-        vec![daw_project("/a/rpp.RPP", "REAPER", 100)],
-        vec![],
-    );
+    let old = daw_snap("o", vec![daw_project("/a/rpp.RPP", "REAPER", 100)], vec![]);
     let new = daw_snap(
         "n",
         vec![
@@ -337,16 +323,8 @@ fn compute_daw_diff_two_daw_types_in_one_diff() {
 
 #[test]
 fn compute_preset_diff_swap_reciprocates_added_removed() {
-    let a = preset_snap(
-        "a",
-        vec![preset_file("/bank/a.fxp", "FXP", 50)],
-        vec![],
-    );
-    let b = preset_snap(
-        "b",
-        vec![preset_file("/bank/b.h2p", "H2P", 60)],
-        vec![],
-    );
+    let a = preset_snap("a", vec![preset_file("/bank/a.fxp", "FXP", 50)], vec![]);
+    let b = preset_snap("b", vec![preset_file("/bank/b.h2p", "H2P", 60)], vec![]);
     let ab = compute_preset_diff(&a, &b);
     let ba = compute_preset_diff(&b, &a);
     assert_eq!(ab.added.len(), ba.removed.len());
@@ -365,11 +343,7 @@ fn compute_preset_diff_identical_paths_empty_delta() {
 
 #[test]
 fn compute_preset_diff_second_file_on_new_scan_is_added() {
-    let a = preset_snap(
-        "a",
-        vec![preset_file("/one/a.fxp", "FXP", 10)],
-        vec![],
-    );
+    let a = preset_snap("a", vec![preset_file("/one/a.fxp", "FXP", 10)], vec![]);
     let b = preset_snap(
         "b",
         vec![
@@ -539,11 +513,7 @@ fn daw_scan_snapshot_serde_roundtrip() {
 
 #[test]
 fn preset_scan_snapshot_serde_roundtrip() {
-    let s = preset_snap(
-        "pid",
-        vec![preset_file("/b/a.fxp", "FXP", 10)],
-        vec![],
-    );
+    let s = preset_snap("pid", vec![preset_file("/b/a.fxp", "FXP", 10)], vec![]);
     let json = serde_json::to_string(&s).unwrap();
     let t: PresetScanSnapshot = serde_json::from_str(&json).unwrap();
     assert_eq!(t.preset_count, 1);

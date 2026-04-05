@@ -6,8 +6,7 @@ use std::collections::HashSet;
 
 use app_lib::history::{gen_id, radix_string};
 use app_lib::kvr::{
-    compare_versions, extract_download_url, extract_version, parse_version, KvrResult,
-    UpdateResult,
+    compare_versions, extract_download_url, extract_version, parse_version, KvrResult, UpdateResult,
 };
 use app_lib::similarity::{fingerprint_distance, AudioFingerprint};
 use app_lib::xref::{normalize_plugin_name, PluginRef};
@@ -139,8 +138,7 @@ fn gen_id_unique_in_batch_and_base36_chars() {
         let id = gen_id();
         assert!(!id.is_empty());
         assert!(
-            id.chars()
-                .all(|c| matches!(c, '0'..='9' | 'a'..='z')),
+            id.chars().all(|c| matches!(c, '0'..='9' | 'a'..='z')),
             "unexpected char in {id:?}"
         );
         assert!(set.insert(id));

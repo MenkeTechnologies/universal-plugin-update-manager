@@ -442,7 +442,11 @@ mod tests {
         let a = make_fp("a.wav", 0.5, 0.1, 0.1, 0.5, 0.3, 0.2);
         let b = make_fp("b.wav", 0.3, 0.4, 0.4, 0.05, 0.15, 0.8);
         let d = fingerprint_distance(&a, &b);
-        assert!(d >= 0.0 && d.is_finite(), "distance must be finite and ≥0, got {}", d);
+        assert!(
+            d >= 0.0 && d.is_finite(),
+            "distance must be finite and ≥0, got {}",
+            d
+        );
     }
 
     #[test]

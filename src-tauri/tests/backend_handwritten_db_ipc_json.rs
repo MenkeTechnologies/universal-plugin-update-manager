@@ -37,7 +37,10 @@ fn plugin_row_serializes_type_and_size_bytes_camel_case() {
     let o = as_obj(&v);
     assert_eq!(o.get("type"), Some(&serde_json::json!("VST3")));
     assert_eq!(o.get("sizeBytes"), Some(&serde_json::json!(1024)));
-    assert_eq!(o.get("manufacturerUrl"), Some(&serde_json::json!("https://m.example")));
+    assert_eq!(
+        o.get("manufacturerUrl"),
+        Some(&serde_json::json!("https://m.example"))
+    );
 }
 
 #[test]
@@ -151,7 +154,10 @@ fn audio_stats_result_shape() {
     let v = serde_json::to_value(&s).unwrap();
     let o = as_obj(&v);
     assert_eq!(o.get("sampleCount"), Some(&serde_json::json!(5)));
-    assert_eq!(o.get("formatCounts").unwrap().get("WAV"), Some(&serde_json::json!(5)));
+    assert_eq!(
+        o.get("formatCounts").unwrap().get("WAV"),
+        Some(&serde_json::json!(5))
+    );
     assert_eq!(o.get("analyzedCount"), Some(&serde_json::json!(2)));
 }
 
@@ -170,7 +176,10 @@ fn daw_row_and_query_result_shape() {
         modified: "t".into(),
     };
     let v = serde_json::to_value(&row).unwrap();
-    assert_eq!(as_obj(&v).get("sizeFormatted"), Some(&serde_json::json!("99.0 B")));
+    assert_eq!(
+        as_obj(&v).get("sizeFormatted"),
+        Some(&serde_json::json!("99.0 B"))
+    );
 
     let q = DawQueryResult {
         projects: vec![row],
@@ -265,7 +274,10 @@ fn daw_stats_preset_stats_scan_info_shapes() {
         roots: vec!["/r".into()],
     };
     let v = serde_json::to_value(&si).unwrap();
-    assert_eq!(as_obj(&v).get("roots").unwrap().as_array().unwrap().len(), 1);
+    assert_eq!(
+        as_obj(&v).get("roots").unwrap().as_array().unwrap().len(),
+        1
+    );
 }
 
 #[test]
@@ -402,7 +414,10 @@ fn audio_metadata_serializes_camel_case_paths_and_size_bytes() {
     };
     let v = serde_json::to_value(&m).unwrap();
     let o = as_obj(&v);
-    assert_eq!(o.get("fullPath"), Some(&serde_json::json!("/Music/kick.wav")));
+    assert_eq!(
+        o.get("fullPath"),
+        Some(&serde_json::json!("/Music/kick.wav"))
+    );
     assert_eq!(o.get("fileName"), Some(&serde_json::json!("kick.wav")));
     assert_eq!(o.get("sizeBytes"), Some(&serde_json::json!(2048)));
     assert_eq!(o.get("sampleRate"), Some(&serde_json::json!(48000)));
@@ -494,7 +509,12 @@ fn audio_stats_empty_format_counts() {
     };
     let v = serde_json::to_value(&s).unwrap();
     assert_eq!(
-        as_obj(&v).get("formatCounts").unwrap().as_object().unwrap().len(),
+        as_obj(&v)
+            .get("formatCounts")
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .len(),
         0
     );
 }

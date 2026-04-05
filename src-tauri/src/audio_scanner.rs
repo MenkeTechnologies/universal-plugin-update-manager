@@ -182,7 +182,9 @@ fn walk_dir_parallel(
 
     let entries: Vec<_> = match fs::read_dir(dir) {
         Ok(e) => e.flatten().collect(),
-        Err(_) => return,
+        Err(_e) => {
+            return;
+        }
     };
 
     let mut files = Vec::new();
@@ -1006,7 +1008,11 @@ mod tests {
             None,
         );
         let overlap_count = found.iter().filter(|s| s.name == "overlap").count();
-        assert_eq!(overlap_count, 1, "overlap.wav found {} times", overlap_count);
+        assert_eq!(
+            overlap_count, 1,
+            "overlap.wav found {} times",
+            overlap_count
+        );
         assert!(found.iter().any(|s| s.name == "top"));
         let _ = fs::remove_dir_all(&tmp);
     }
@@ -1021,9 +1027,21 @@ mod tests {
             fs::write(d.join(format!("s{}.wav", i)), b"fake wav").unwrap();
         }
         let mut c1 = 0;
-        walk_for_audio(&[tmp.clone()], &mut |b, _| c1 += b.len(), &|| false, None, None);
+        walk_for_audio(
+            &[tmp.clone()],
+            &mut |b, _| c1 += b.len(),
+            &|| false,
+            None,
+            None,
+        );
         let mut c2 = 0;
-        walk_for_audio(&[tmp.clone()], &mut |b, _| c2 += b.len(), &|| false, None, None);
+        walk_for_audio(
+            &[tmp.clone()],
+            &mut |b, _| c2 += b.len(),
+            &|| false,
+            None,
+            None,
+        );
         assert_eq!(c1, c2, "two scans should match: {} vs {}", c1, c2);
         assert_eq!(c1, 5);
         let _ = fs::remove_dir_all(&tmp);

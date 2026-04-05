@@ -106,4 +106,3 @@ fn test_payload_with_multiple_plugins() {
 
     assert_eq!(plugins.len(), 3);
 }
-
