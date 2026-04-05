@@ -11,6 +11,8 @@
 python3 scripts/merge_i18n_keys.py scripts/i18n_batches/your_batch.json
 ```
 
+  Example: History tab strings live in `scripts/i18n_batches/history_tab_i18n.json` (`ui.history.*`, `confirm.clear_all_history_*`); merge into English, then run `sync_locale_keys_from_en.py`.
+
 The script fails if a key already exists (prevents accidental overwrites). Rebuild the Tauri app after changing English so the DB seed updates.
 
 **Settings → Interface language** only saves `uiLocale` to prefs. The **next app launch** runs `reloadAppStrings` (and `refresh_native_menu`) so the UI and native menu bar match the saved locale. Changing the dropdown does **not** reload strings in the current session. Editing `i18n/app_i18n_*.json` still requires a rebuild (and restart) for the bundled SQLite seed to change.

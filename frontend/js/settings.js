@@ -772,7 +772,10 @@ function settingResetColumns() {
 }
 
 async function settingClearAllHistory() {
-  if (!await confirmAction('Clear all plugin, audio, DAW, preset, PDF, and MIDI scan history? This cannot be undone.', 'Clear History')) return;
+  if (!await confirmAction(
+    typeof appFmt === 'function' ? appFmt('confirm.clear_all_history_settings') : 'Clear all plugin, audio, DAW, preset, PDF, and MIDI scan history? This cannot be undone.',
+    typeof appFmt === 'function' ? appFmt('ui.history.confirm_clear_title') : 'Clear History',
+  )) return;
   showGlobalProgress();
   try {
     await Promise.all([

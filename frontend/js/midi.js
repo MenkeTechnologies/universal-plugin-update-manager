@@ -494,7 +494,7 @@ function buildMidiRow(s) {
     <td style="text-align:center;">${info ? info.channelsUsed : ''}</td>
     <td style="text-align:center;">${dur}</td>
     <td class="col-size">${s.sizeFormatted}</td>
-    <td class="col-path" title="${hp}">${typeof escapeHtml === 'function' ? escapeHtml(s.directory) : s.directory}</td>
+    <td class="col-path" title="${hp}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.directory, _midiSearch, 'fuzzy') : (typeof escapeHtml === 'function' ? escapeHtml(s.directory) : s.directory)}</td>
     <td class="col-actions" data-action-stop>
       <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${hp}" title="${revealT}">&#128193;</button>
     </td>

@@ -31,6 +31,23 @@ function withFixedNow(sandbox, past, offsetMs, fn) {
   }
 }
 
+/** Mirrors ipc.js appFmt substitution for ui.history.time_ago_* keys used by timeAgo(). */
+function mockAppFmt(key, vars) {
+  const map = {
+    'ui.history.time_ago_just_now': 'just now',
+    'ui.history.time_ago_minutes': '{n}m ago',
+    'ui.history.time_ago_hours': '{n}h ago',
+    'ui.history.time_ago_days': '{n}d ago',
+    'ui.history.time_ago_months': '{n}mo ago',
+  };
+  let s = map[key];
+  if (s == null) return key;
+  if (vars && typeof vars === 'object') {
+    s = s.replace(/\{(\w+)\}/g, (_, name) => (vars[name] != null && vars[name] !== '') ? String(vars[name]) : '');
+  }
+  return s;
+}
+
 describe('frontend/js/history.js timeAgo (vm-loaded)', () => {
   let H;
 
@@ -38,6 +55,7 @@ describe('frontend/js/history.js timeAgo (vm-loaded)', () => {
     H = loadFrontendScripts(['utils.js', 'history.js'], {
       showToast: () => {},
       toastFmt: (k) => k,
+      appFmt: mockAppFmt,
       window: { vstUpdater: {} },
     });
   });
