@@ -50,9 +50,12 @@ async function fetchPdfPage() {
     return;
   }
   try {
+    // Backend only knows filesystem sort keys. When user picks 'pages' (client-side),
+    // fetch by name and re-sort in renderPdfTable using the _pdfPagesCache.
+    const backendSortKey = pdfSortKey === 'pages' ? 'name' : pdfSortKey;
     const result = await window.vstUpdater.dbQueryPdfs({
       search: search || null,
-      sort_key: pdfSortKey,
+      sort_key: backendSortKey,
       sort_asc: pdfSortAsc,
       offset: _pdfOffset,
       limit: PDF_PAGE_SIZE,
@@ -73,6 +76,8 @@ async function fetchPdfPage() {
     _pdfTotalCount = result.totalCount || 0;
     _pdfTotalUnfiltered = result.totalUnfiltered || 0;
     renderPdfTable();
+    // Hydrate the pages cache for visible rows, then kick off background extract.
+    loadPdfPagesForVisible();
   } catch (e) {
     showToast(toastFmt('toast.pdf_query_failed', { err: e && e.message ? e.message : e }), 4000, 'error');
   } finally {
@@ -107,17 +112,29 @@ function rebuildPdfStats() {
   if (headerEl) headerEl.textContent = displayCount.toLocaleString();
 }
 
+function pdfPagesUnknownHtml() {
+  const t = typeof escapeHtml === 'function'
+    ? escapeHtml(_pdfFmt('ui.tt.pdf_could_not_parse_pages'))
+    : _pdfFmt('ui.tt.pdf_could_not_parse_pages');
+  return `<span style="color:var(--text-dim);" title="${t}">?</span>`;
+}
+
 function buildPdfRow(p) {
   const hp = escapeHtml(p.path);
   const checked = batchSelected.has(p.path) ? ' checked' : '';
   const rowTt = typeof escapeHtml === 'function'
     ? escapeHtml(_pdfFmt('ui.tt.row_double_click_reveal_finder'))
     : _pdfFmt('ui.tt.row_double_click_reveal_finder');
+  const cached = _pdfPagesCache[p.path];
+  const pagesCell = cached === undefined ? '<span style="color:var(--text-dim);">—</span>'
+    : cached === null ? pdfPagesUnknownHtml()
+    : cached.toLocaleString();
   return `<tr data-pdf-path="${hp}" data-pdf-name="${escapeHtml((p.name || '').toLowerCase())}" style="cursor: pointer;" title="${rowTt}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td>${_lastPdfSearch ? highlightMatch(p.name, _lastPdfSearch, _lastPdfMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
     <td title="${hp}">${escapeHtml(p.directory)}</td>
     <td class="col-size">${p.sizeFormatted}</td>
+    <td class="col-pages" data-pdf-pages-cell="${hp}" style="text-align:right;">${pagesCell}</td>
     <td class="col-date">${p.modified}</td>
     <td class="col-actions">
       <button class="btn-small btn-folder" data-action="openPdfFile" data-path="${hp}" title="${hp}">&#128193;</button>
@@ -135,6 +152,16 @@ function renderPdfTable() {
       if (typeof initTableColumnReorder === 'function') initTableColumnReorder('pdfTable', 'pdfColumnOrder');
     }
   }
+  // Pages sort is client-side only (the backend doesn't JOIN pdf_metadata).
+  // We sort the already-fetched page, values the user hasn't extracted show as -1.
+  if (pdfSortKey === 'pages') {
+    const dir = pdfSortAsc ? 1 : -1;
+    filteredPdfs.sort((a, b) => {
+      const av = _pdfPagesCache[a.path] ?? -1;
+      const bv = _pdfPagesCache[b.path] ?? -1;
+      return (av - bv) * dir;
+    });
+  }
   const tbody = document.getElementById('pdfTableBody');
   if (!tbody) return;
   tbody.innerHTML = filteredPdfs.map(buildPdfRow).join('');
@@ -147,7 +174,7 @@ function renderPdfTable() {
         })
       : `Showing ${pdfRenderCount} of ${_pdfTotalCount} — click to load more`;
     tbody.insertAdjacentHTML('beforeend',
-      `<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMorePdfs">
+      `<tr><td colspan="7" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMorePdfs">
         ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
       </td></tr>`);
   }
@@ -162,6 +189,7 @@ function buildPdfTableHtml() {
       <th data-action="sortPdf" data-key="name" style="width: 30%;">${tc('ui.export.col_name')} <span class="sort-arrow" id="pdfSortArrowName">&#9660;</span><span class="col-resize"></span></th>
       <th data-action="sortPdf" data-key="directory" style="width: 40%;">${tc('ui.export.col_path')} <span class="sort-arrow" id="pdfSortArrowDirectory"></span><span class="col-resize"></span></th>
       <th data-action="sortPdf" data-key="size" class="col-size" style="width: 90px;">${tc('ui.export.col_size')} <span class="sort-arrow" id="pdfSortArrowSize"></span><span class="col-resize"></span></th>
+      <th data-action="sortPdf" data-key="pages" class="col-pages" style="width: 70px;text-align:right;">Pages <span class="sort-arrow" id="pdfSortArrowPages"></span><span class="col-resize"></span></th>
       <th data-action="sortPdf" data-key="modified" class="col-date" style="width: 100px;">${tc('ui.export.col_modified')} <span class="sort-arrow" id="pdfSortArrowModified"></span><span class="col-resize"></span></th>
       <th class="col-actions" style="width: 50px;"></th>
     </tr></thead>
@@ -181,7 +209,7 @@ function sortPdf(key) {
     pdfSortKey = key;
     pdfSortAsc = true;
   }
-  ['Name', 'Size', 'Modified', 'Directory'].forEach(k => {
+  ['Name', 'Size', 'Pages', 'Modified', 'Directory'].forEach(k => {
     const el = document.getElementById('pdfSortArrow' + k);
     if (el) {
       const isActive = k.toLowerCase() === pdfSortKey;
@@ -333,6 +361,8 @@ async function scanPdfs(resume = false) {
     if (!result.stopped) {
       try {
         await window.vstUpdater.savePdfScan(allPdfs, result.roots);
+        // Scan saved — hydrate pages cache + kick background extraction
+        loadPdfPagesForVisible();
       } catch (e) { showToast(toastFmt('toast.failed_save_pdf_history', { err: e && e.message ? e.message : e }), 4000, 'error'); }
     }
     if (result.stopped && allPdfs.length > 0 && resumeBtn) {
@@ -359,4 +389,80 @@ async function scanPdfs(resume = false) {
 
 async function stopPdfScan() {
   await window.vstUpdater.stopPdfScan();
+}
+
+// ── PDF metadata (page counts) ──
+
+// Patch a single row's Pages cell without re-rendering the whole table.
+function patchPdfPagesCell(path, pages) {
+  const tbody = document.getElementById('pdfTableBody');
+  if (!tbody) return;
+  // Escape matches the attribute format set in buildPdfRow
+  const escaped = typeof escapeHtml === 'function' ? escapeHtml(path) : path;
+  const cell = tbody.querySelector('[data-pdf-pages-cell="' + CSS.escape(escaped) + '"]');
+  if (!cell) return;
+  if (pages == null) {
+    cell.innerHTML = pdfPagesUnknownHtml();
+  } else {
+    cell.textContent = Number(pages).toLocaleString();
+  }
+}
+
+// Load cached page counts from DB for currently-visible rows, then trigger a
+// background extraction pass for any paths still uncached.
+async function loadPdfPagesForVisible() {
+  const rows = filteredPdfs.slice(0, 2000);
+  const paths = rows.map(r => r.path);
+  if (paths.length === 0) return;
+  try {
+    const map = await window.vstUpdater.pdfMetadataGet(paths);
+    for (const [path, pages] of Object.entries(map || {})) {
+      _pdfPagesCache[path] = pages; // null if extraction previously failed
+      patchPdfPagesCell(path, pages);
+    }
+  } catch { /* ignore — rows stay at "—" */ }
+  // Fire-and-forget: kick the background extractor for paths still missing.
+  startPdfMetadataExtraction();
+}
+
+async function startPdfMetadataExtraction() {
+  if (_pdfMetaRunning) return;
+  _pdfMetaRunning = true;
+  try {
+    const uncached = await window.vstUpdater.pdfMetadataUnindexed(100000);
+    if (!Array.isArray(uncached) || uncached.length === 0) return;
+    // Listen to progress events to patch cells as they resolve
+    if (_pdfMetaProgressCleanup) { _pdfMetaProgressCleanup(); _pdfMetaProgressCleanup = null; }
+    _pdfMetaProgressCleanup = window.vstUpdater.onPdfMetadataProgress(() => {
+      // After each progress event, re-fetch the visible paths that are still missing
+      const missing = filteredPdfs.slice(0, 2000).map(r => r.path).filter(p => _pdfPagesCache[p] === undefined);
+      if (missing.length === 0) return;
+      window.vstUpdater.pdfMetadataGet(missing).then(map => {
+        for (const [path, pages] of Object.entries(map || {})) {
+          _pdfPagesCache[path] = pages;
+          patchPdfPagesCell(path, pages);
+        }
+      }).catch(() => {});
+    });
+    await window.vstUpdater.pdfMetadataExtractBatch(uncached);
+  } catch (e) {
+    if (typeof showToast === 'function') {
+      showToast(toastFmt('toast.pdf_page_extract_failed', { err: e && e.message ? e.message : e }), 4000, 'error');
+    }
+  } finally {
+    if (_pdfMetaProgressCleanup) { _pdfMetaProgressCleanup(); _pdfMetaProgressCleanup = null; }
+    _pdfMetaRunning = false;
+    // Final reload for any rows we missed via progress events
+    loadPdfPagesForVisible();
+  }
+}
+
+// Triggered from command palette / context menu to force re-extraction.
+async function buildPdfPagesCache() {
+  // Force re-scan of ALL latest-scan paths
+  for (const p of allPdfs) delete _pdfPagesCache[p.path];
+  _pdfMetaRunning = false;
+  if (typeof showToast === 'function') showToast(toastFmt('toast.pdf_extracting_page_counts'), 3000);
+  await startPdfMetadataExtraction();
+  if (typeof showToast === 'function') showToast(toastFmt('toast.pdf_page_extract_complete'), 2500);
 }
