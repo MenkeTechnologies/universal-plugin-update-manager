@@ -57,6 +57,20 @@ test('appFmt does not replace brace segments that are not {word}', () => {
   assert.equal(appFmt(map, 't', { not: 1 }), 'x {not-a-token} y');
 });
 
+test('appFmt replaces the same placeholder multiple times', () => {
+  const map = { t: '{x}-{x}' };
+  assert.equal(appFmt(map, 't', { x: 'ab' }), 'ab-ab');
+});
+
+test('appFmt ignores extra vars not referenced in template', () => {
+  assert.equal(appFmt({ t: 'ok' }, 't', { unused: 99 }), 'ok');
+});
+
+test('appFmt substitutes boolean', () => {
+  const map = { t: 'b={v}' };
+  assert.equal(appFmt(map, 't', { v: false }), 'b=false');
+});
+
 /**
  * Per-field lookup used by `applyUiI18n` (`frontend/js/i18n-ui.js`): only non-null, non-empty map values apply.
  */

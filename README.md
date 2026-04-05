@@ -252,7 +252,7 @@ cd src-tauri && cargo test
 pnpm run test:js
 ```
 
-`test/*.test.js` includes i18n catalog guards, static source checks, and VM-loaded `frontend/js` suites that exercise real implementations (for example `utils.js` fuzzy search, `createETA`, `buildKvrUrl`, `findByPath`). Rust `pdf_meta` tests validate `lopdf` page counts using temporary PDFs generated with `printpdf`.
+`test/*.test.js` includes i18n catalog guards, static source checks, and VM-loaded `frontend/js` suites that exercise real implementations: `utils.js` (fuzzy search, `createETA`, `buildKvrUrl`, `findByPath`, `buildDirsTable`, `btnLoading`, regex highlight), `smart-playlists.js` (`matchesSmartRule` / `evaluateSmartPlaylist` with stubs), and extended `parseFzfQuery` / `parseToken` cases. Rust `pdf_meta` tests validate `lopdf` page counts using temporary PDFs generated with `printpdf`.
 
 ---
 
