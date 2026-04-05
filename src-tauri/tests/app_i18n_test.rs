@@ -204,6 +204,30 @@ fn app_strings_help_keys_nonempty_all_locales() {
 }
 
 #[test]
+fn app_strings_toast_keys_nonempty_all_locales() {
+    ensure_db();
+    let en: HashMap<String, String> =
+        from_str(include_str!("../../i18n/app_i18n_en.json")).expect("parse en json");
+    let keys: Vec<_> = en
+        .keys()
+        .filter(|k| k.starts_with("toast."))
+        .cloned()
+        .collect();
+    assert!(!keys.is_empty(), "expected toast.* keys in English seed");
+    for loc in ["en", "de", "es", "sv", "fr", "nl", "pt", "it", "el", "pl", "ru", "zh", "ja", "ko"] {
+        let m = app_lib::db::global()
+            .get_app_strings(loc)
+            .unwrap_or_else(|e| panic!("get_app_strings {loc}: {e}"));
+        for k in &keys {
+            assert!(
+                m.get(k).map(|s| !s.is_empty()).unwrap_or(false),
+                "locale {loc} missing or empty toast key {k}"
+            );
+        }
+    }
+}
+
+#[test]
 fn app_strings_toast_failed_contains_err_placeholder_all_locales() {
     ensure_db();
     for loc in ["en", "de", "es", "sv", "fr", "nl", "pt", "it", "el", "pl", "ru", "zh", "ja", "ko"] {
