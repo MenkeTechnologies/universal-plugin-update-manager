@@ -8,6 +8,17 @@ let selectedScanType = null; // 'plugin' or 'audio'
 let historyDawScanList = [];
 let historyPresetScanList = [];
 
+/** Sidebar tag: which scanner produced this history row (reuses main tab labels). */
+function historyScanTypeLabel(scanType) {
+  const key =
+    scanType === 'preset' ? 'menu.tab_presets' :
+    scanType === 'daw' ? 'menu.tab_daw' :
+    scanType === 'audio' ? 'menu.tab_samples' :
+    'menu.tab_plugins';
+  if (typeof appFmt === 'function') return appFmt(key);
+  return scanType === 'preset' ? 'Presets' : scanType === 'daw' ? 'DAW Projects' : scanType === 'audio' ? 'Samples' : 'Plugins';
+}
+
 async function loadHistory() {
   showGlobalProgress();
   try {
@@ -56,7 +67,7 @@ function renderHistoryList() {
       : isAudio
       ? `${s.sampleCount} sample${s.sampleCount !== 1 ? 's' : ''}`
       : `${s.pluginCount} plugin${s.pluginCount !== 1 ? 's' : ''}`;
-    const typeTag = isPreset ? 'Presets' : isDaw ? 'DAW Projects' : isAudio ? 'Samples' : 'Plugins';
+    const typeTag = historyScanTypeLabel(s._type);
     const typeColor = isPreset ? 'var(--orange)' : isDaw ? 'var(--magenta)' : isAudio ? 'var(--yellow)' : 'var(--cyan)';
     const rootsHint = s.roots && s.roots.length > 0
       ? `<div class="history-item-roots" title="${s.roots.map(r => escapeHtml(r)).join('\n')}">${s.roots.map(r => escapeHtml(r)).join(', ')}</div>`
