@@ -78,4 +78,29 @@ describe('frontend/js/command-palette.js filterPaletteItems (vm-loaded)', () => 
     assert.ok(pluginRow);
     assert.strictEqual(pluginRow.name, 'Serum');
   });
+
+  it('single-char query does not lazy-load plugins (length < 2)', () => {
+    const items = [{ type: 'tab', name: 'Tabs' }];
+    const out = P.filterPaletteItems('s', items);
+    assert.strictEqual(out.find((i) => i.type === 'plugin'), undefined);
+  });
+
+});
+
+describe('frontend/js/command-palette.js filterPaletteItems limits (no lazy plugin rows)', () => {
+  let P;
+
+  before(() => {
+    P = loadPaletteSandbox({ allPlugins: [] });
+  });
+
+  it('truncates to PALETTE_MAX (50) when many rows match', () => {
+    const items = Array.from({ length: 60 }, (_, i) => ({
+      type: 'action',
+      name: `Row${i}`,
+      fields: [`match-${i}-token`],
+    }));
+    const out = P.filterPaletteItems('token', items);
+    assert.strictEqual(out.length, 50);
+  });
 });

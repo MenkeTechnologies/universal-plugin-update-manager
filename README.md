@@ -252,7 +252,7 @@ cd src-tauri && cargo test
 pnpm run test:js
 ```
 
-`test/*.test.js` includes i18n catalog guards, static source checks, and VM-loaded `frontend/js` suites that exercise real implementations: `utils.js` (fzf-style `fzfMatch` / `scoreToken` / `searchScore` with deterministic score checks, `createETA`, `buildKvrUrl`, `findByPath`, `buildDirsTable`, `btnLoading`, regex highlight), `filters-registry-fzf.test.js` (every `registerFilter` tab calls `searchScore` or `searchMatch`), `smart-playlists.js` (`matchesSmartRule` / `evaluateSmartPlaylist` with stubs), and extended `parseFzfQuery` / `parseToken` cases. Rust `pdf_meta` tests validate `lopdf` page counts using temporary PDFs generated with `printpdf`.
+`test/*.test.js` includes i18n catalog guards, static source checks, and VM-loaded `frontend/js` suites that exercise real implementations: `utils.js` (fzf-style `fzfMatch` / `scoreToken` / `searchScore` with deterministic score checks, `createETA`, `buildKvrUrl`, `findByPath`, `buildDirsTable`, `btnLoading`, regex highlight), `utils-fzf-comprehensive.test.js` (AND/OR aggregation, negation, regex vs fuzzy, gap scoring, `highlightMatch`, `slugify`, `buildDirsTable`), `filters-registry-fzf.test.js` (every `registerFilter` tab calls `searchScore` or `searchMatch`), `command-palette-source.test.js` (lazy plugin rows, `PALETTE_MAX` truncation), `smart-playlists.js` (`matchesSmartRule` / `evaluateSmartPlaylist` with stubs and edge cases for BPM, tags, size, duration, unicode), and extended `parseFzfQuery` / `parseToken` cases. Rust `pdf_meta` tests validate `lopdf` page counts using temporary PDFs generated with `printpdf`.
 
 ---
 

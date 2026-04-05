@@ -230,4 +230,101 @@ describe('evaluateSmartPlaylist', () => {
     assert.strictEqual(r.length, 1);
     assert.strictEqual(r[0].name, 'Snare Room');
   });
+
+  it('matchMode any with no passing rules yields empty', () => {
+    const pl = {
+      rules: [
+        { type: 'name_contains', value: 'ZZZ' },
+        { type: 'name_contains', value: 'YYY' },
+      ],
+      matchMode: 'any',
+    };
+    assert.deepStrictEqual(evaluateSmartPlaylist(pl, samples), []);
+  });
+
+  it('empty samples yields empty', () => {
+    const pl = { rules: [{ type: 'format', value: 'WAV' }], matchMode: 'all' };
+    assert.deepStrictEqual(evaluateSmartPlaylist(pl, []), []);
+  });
+});
+
+describe('matchesSmartRule bpm_range edge cases', () => {
+  it('false when min/max parse to NaN', () => {
+    const ctx = { bpmCache: { '/a/kick.wav': 120 } };
+    assert.strictEqual(
+      matchesSmartRule(S1, { type: 'bpm_range', value: 'x-y' }, ctx),
+      false
+    );
+  });
+
+  it('boundary inclusive at min and max', () => {
+    const ctx = { bpmCache: { '/a/kick.wav': 100 } };
+    assert.strictEqual(
+      matchesSmartRule(S1, { type: 'bpm_range', value: '100-100' }, ctx),
+      true
+    );
+  });
+});
+
+describe('matchesSmartRule key edge cases', () => {
+  it('false when key is empty string in cache', () => {
+    const ctx = { keyCache: { '/c/v.mp3': '' } };
+    assert.strictEqual(matchesSmartRule(S3, { type: 'key', value: 'minor' }, ctx), false);
+  });
+});
+
+describe('matchesSmartRule tag edge cases', () => {
+  it('false when tags array missing tag', () => {
+    const ctx = {
+      getNote: () => ({ tags: ['other'] }),
+    };
+    assert.strictEqual(matchesSmartRule(S1, { type: 'tag', value: 'drums' }, ctx), false);
+  });
+
+  it('false when note has empty tags array', () => {
+    const ctx = { getNote: () => ({ tags: [] }) };
+    assert.strictEqual(matchesSmartRule(S1, { type: 'tag', value: 'x' }, ctx), false);
+  });
+});
+
+describe('matchesSmartRule size edge cases', () => {
+  it('size_max zero MB only matches zero-byte', () => {
+    assert.strictEqual(
+      matchesSmartRule({ ...S1, sizeBytes: 0 }, { type: 'size_max', value: '0' }),
+      true
+    );
+    assert.strictEqual(matchesSmartRule(S1, { type: 'size_max', value: '0' }), false);
+  });
+
+  it('size_min boundary: exactly at threshold matches', () => {
+    const twoMb = 2 * 1024 * 1024;
+    assert.strictEqual(
+      matchesSmartRule({ ...S1, sizeBytes: twoMb }, { type: 'size_min', value: '2' }),
+      true
+    );
+  });
+});
+
+describe('matchesSmartRule duration_max edge cases', () => {
+  it('true when duration equals max exactly', () => {
+    assert.strictEqual(
+      matchesSmartRule({ ...S1, duration: 60 }, { type: 'duration_max', value: '60' }),
+      true
+    );
+  });
+
+  it('false when duration is NaN on sample', () => {
+    assert.strictEqual(
+      matchesSmartRule({ ...S1, duration: NaN }, { type: 'duration_max', value: '60' }),
+      false
+    );
+  });
+});
+
+describe('matchesSmartRule name_contains unicode', () => {
+  it('matches by code unit substring', () => {
+    const s = { ...S1, name: 'Café' };
+    assert.strictEqual(matchesSmartRule(s, { type: 'name_contains', value: 'caf' }), true);
+    assert.strictEqual(matchesSmartRule(s, { type: 'name_contains', value: 'é' }), true);
+  });
 });
