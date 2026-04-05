@@ -42,4 +42,13 @@ describe('frontend/js/duplicates.js findDuplicates (vm-loaded)', () => {
     const sizes = groups.map((g) => g.length).sort((a, b) => a - b);
     assert.strictEqual(sizes.join(','), '2,2');
   });
+
+  it('returns one group of length three when three items share a key', () => {
+    const groups = D.findDuplicates(
+      [{ k: 'a' }, { k: 'a' }, { k: 'a' }, { k: 'b' }],
+      (x) => x.k,
+    );
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].length, 3);
+  });
 });

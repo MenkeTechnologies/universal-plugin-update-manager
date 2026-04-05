@@ -85,4 +85,23 @@ describe('frontend/js/utils.js tab order (vm-loaded)', () => {
     U.saveTabOrder();
     assert.strictEqual(U.prefs._cache.tabOrder, JSON.stringify(['a', 'b', 'c']));
   });
+
+  it('restoreTabOrder leaves DOM order when prefs JSON is invalid', () => {
+    const nav = createTabNav(['plugins', 'samples', 'daw']);
+    const U = loadTabOrderSandbox(nav);
+    U.prefs._cache.tabOrder = '{broken';
+    U.restoreTabOrder();
+    assert.strictEqual(
+      nav._children.map((b) => b.dataset.tab).join(','),
+      'plugins,samples,daw',
+    );
+  });
+
+  it('restoreTabOrder no-ops when parsed value is not an array', () => {
+    const nav = createTabNav(['a', 'b']);
+    const U = loadTabOrderSandbox(nav);
+    U.prefs._cache.tabOrder = JSON.stringify({ not: 'array' });
+    U.restoreTabOrder();
+    assert.strictEqual(nav._children.map((b) => b.dataset.tab).join(','), 'a,b');
+  });
 });

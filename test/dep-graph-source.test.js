@@ -147,4 +147,27 @@ describe('frontend/js/dep-graph.js buildDepGraphData (vm-loaded)', () => {
     assert.strictEqual(d.totalProjects, 0);
     assert.strictEqual(d.pluginsByUsage.length, 0);
   });
+
+  it('returns empty orphaned list when allPlugins is undefined (guard)', () => {
+    G.allDawProjects = [{ path: '/p/a.als', name: 'A', daw: 'Live', format: 'ALS' }];
+    G._xrefCache = {
+      '/p/a.als': [
+        { name: 'Used', normalizedName: 'used', manufacturer: 'M', pluginType: 'VST3' },
+      ],
+    };
+    G.allPlugins = undefined;
+    const d = G.buildDepGraphData();
+    assert.strictEqual(d.orphaned.length, 0);
+  });
+
+  it('buildAnalyticsHtml shows empty-state when no plugin usage rows', () => {
+    const html = G.buildAnalyticsHtml({
+      pluginsByUsage: [],
+      projectsByCount: [],
+      orphaned: [],
+      totalProjects: 0,
+    });
+    assert.ok(html.includes('dep-empty'));
+    assert.ok(html.includes('No data to analyze'));
+  });
 });

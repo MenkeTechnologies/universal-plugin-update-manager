@@ -96,4 +96,20 @@ describe('frontend/js/shortcuts.js (vm-loaded)', () => {
     assert.strictEqual(S.formatKey({ key: 'z', mod: false }), 'Z');
     assert.ok(!S.formatKey({ key: 'z', mod: false }).includes('Ctrl'));
   });
+
+  it('getShortcuts uses defaults when customShortcuts absent', () => {
+    const S = loadShortcutsSandbox('MacIntel');
+    assert.strictEqual(S.prefs._cache.customShortcuts, undefined);
+    const sc = S.getShortcuts();
+    assert.strictEqual(sc.tab11.key, 'F3');
+    assert.strictEqual(sc.tab11.mod, false);
+    assert.strictEqual(sc.search.key, 'f');
+    assert.strictEqual(sc.search.mod, true);
+  });
+
+  it('formatKey leaves function keys as uppercase token (F3, F4)', () => {
+    const S = loadShortcutsSandbox('Win32');
+    assert.strictEqual(S.formatKey({ key: 'F3', mod: false }), 'F3');
+    assert.strictEqual(S.formatKey({ key: 'F4', mod: true }), 'Ctrl+F4');
+  });
 });

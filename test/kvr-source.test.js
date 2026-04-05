@@ -60,4 +60,62 @@ describe('frontend/js/kvr.js (vm-loaded)', () => {
     K.applyKvrCache(plugins, {});
     assert.strictEqual(plugins[0].kvrUrl, null);
   });
+
+  it('kvrCacheKey treats missing manufacturer as Unknown', () => {
+    assert.strictEqual(
+      K.kvrCacheKey({ name: 'NoMfg', manufacturer: null }),
+      'unknown|||nomfg'
+    );
+  });
+
+  it('applyKvrCache merges kvrUrl without touching version fields when latestVersion matches version', () => {
+    const plugins = [
+      {
+        name: 'Stable',
+        manufacturer: 'Co',
+        version: '2.0',
+        path: '/s',
+        kvrUrl: null,
+        hasUpdate: false,
+      },
+    ];
+    const cache = {
+      'co|||stable': {
+        kvrUrl: 'https://kvraudio.com/stable',
+        source: 'kvr',
+        latestVersion: '2.0',
+        hasUpdate: true,
+      },
+    };
+    K.applyKvrCache(plugins, cache);
+    assert.strictEqual(plugins[0].kvrUrl, 'https://kvraudio.com/stable');
+    assert.strictEqual(plugins[0].source, 'kvr');
+    assert.strictEqual(plugins[0].latestVersion, undefined);
+    assert.strictEqual(plugins[0].hasUpdate, false);
+  });
+
+  it('applyKvrCache does not set updateUrl when hasUpdate is false even if cache has updateUrl', () => {
+    const plugins = [
+      {
+        name: 'P',
+        manufacturer: 'M',
+        version: '1',
+        path: '/p',
+        kvrUrl: null,
+        hasUpdate: false,
+      },
+    ];
+    const cache = {
+      'm|||p': {
+        kvrUrl: 'https://kvr/p',
+        latestVersion: '9',
+        hasUpdate: false,
+        updateUrl: 'https://dl',
+      },
+    };
+    K.applyKvrCache(plugins, cache);
+    assert.strictEqual(plugins[0].latestVersion, '9');
+    assert.strictEqual(plugins[0].hasUpdate, false);
+    assert.strictEqual(plugins[0].updateUrl, undefined);
+  });
 });

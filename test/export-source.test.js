@@ -99,5 +99,19 @@ describe('frontend/js/export.js (vm-loaded)', () => {
     assert.strictEqual(opts.length, 5);
     assert.ok(opts.every((o) => typeof o.desc === 'string' && o.desc.length > 0));
   });
+
+  it('resolveExportTitle prefers titleKey when both titleKey and title are set', () => {
+    assert.strictEqual(
+      E.resolveExportTitle({ titleKey: 'k', title: 'fallback', titleVars: { n: 1 } }),
+      'k:{"n":1}',
+    );
+  });
+
+  it('ALL_IMPORT_FILTERS getter returns same three entries as getAllImportFilters()', () => {
+    const a = E.getAllImportFilters();
+    const b = E.ALL_IMPORT_FILTERS;
+    assert.strictEqual(a.length, b.length);
+    assert.strictEqual(a.map((x) => x.extensions.join(',')).join('|'), b.map((x) => x.extensions.join(',')).join('|'));
+  });
 });
 
