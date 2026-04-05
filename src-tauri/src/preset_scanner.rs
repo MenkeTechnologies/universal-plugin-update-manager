@@ -2,8 +2,9 @@
 //!
 //! Discovers preset files (FXP, FXB, VSTPRESET, AUPRESET, etc.) across
 //! the user home directory (`~`, resolved via [`dirs::home_dir`]) plus
-//! platform-specific preset locations. Supports parallel traversal
-//! and stop signaling.
+//! system-wide locations outside `~` (e.g. `/Library/Audio/Presets` on
+//! macOS, `Program Files\\Common Files\\VST3 Presets` on Windows).
+//! Supports parallel traversal and stop signaling.
 
 use crate::history::PresetFile;
 use rayon::prelude::*;
@@ -66,31 +67,14 @@ pub fn get_preset_roots() -> Vec<PathBuf> {
 
     #[cfg(target_os = "macos")]
     {
-        roots.push(home.join("Library/Audio/Presets"));
         roots.push(PathBuf::from("/Library/Audio/Presets"));
-        roots.push(home.join("Music"));
-        roots.push(home.join("Documents"));
     }
 
     #[cfg(target_os = "windows")]
     {
-        roots.push(home.join("Documents"));
         if let Ok(pf) = std::env::var("ProgramFiles") {
             roots.push(PathBuf::from(&pf).join("Common Files").join("VST3 Presets"));
         }
-        if let Ok(appdata) = std::env::var("APPDATA") {
-            roots.push(PathBuf::from(&appdata));
-        }
-        if let Ok(local) = std::env::var("LOCALAPPDATA") {
-            roots.push(PathBuf::from(&local));
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        roots.push(home.join(".vst3/presets"));
-        roots.push(home.join(".local/share"));
-        roots.push(home.join("Documents"));
     }
 
     roots.sort();
