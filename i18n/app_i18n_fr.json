@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Ouverture du fichier journal...",
   "toast.opening_name": "Ouverture de \"{name}\"...",
   "toast.opening_name_in_daw": "Ouverture de \"{name}\" dans {daw}...",
+  "toast.opening_pdf_default_app": "Ouverture de « {name} » avec l'application par défaut…",
   "toast.opening_preferences": "Ouverture des préférences...",
   "toast.pdf_export_failed": "Échec de l'exportation PDF : {err}",
   "toast.pdf_extracting_page_counts": "L'extraction du nombre de pages PDF...",

@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Åbner logfil...",
   "toast.opening_name": "Åbner \"{name}\"...",
   "toast.opening_name_in_daw": "Åbner \"{name}\" i {daw}...",
+  "toast.opening_pdf_default_app": "Åbner «{name}» med standardprogrammet…",
   "toast.opening_preferences": "Åbner præferencer...",
   "toast.pdf_export_failed": "PDF-eksport mislykkedes: {err}",
   "toast.pdf_extracting_page_counts": "Udtrækker PDF-sideantal...",

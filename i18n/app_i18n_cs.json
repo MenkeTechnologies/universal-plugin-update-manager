@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Otevírání souboru protokolu...",
   "toast.opening_name": "Otevírání „{name}“...",
   "toast.opening_name_in_daw": "Otevírání „{name}“ v {daw}...",
+  "toast.opening_pdf_default_app": "Otevírání „{name}“ ve výchozí aplikaci…",
   "toast.opening_preferences": "Otevírání předvoleb...",
   "toast.pdf_export_failed": "Export PDF se nezdařil: {err}",
   "toast.pdf_extracting_page_counts": "Extrahování počtu stránek PDF...",

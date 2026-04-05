@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Άνοιγμα αρχείου καταγραφής...",
   "toast.opening_name": "Άνοιγμα \"{name}\"...",
   "toast.opening_name_in_daw": "Άνοιγμα \"{name}\" στο {daw}...",
+  "toast.opening_pdf_default_app": "Άνοιγμα «{name}» με την προεπιλεγμένη εφαρμογή…",
   "toast.opening_preferences": "Άνοιγμα προτιμήσεων...",
   "toast.pdf_export_failed": "Η εξαγωγή PDF απέτυχε: {err}",
   "toast.pdf_extracting_page_counts": "Extracting PDF page counts...",

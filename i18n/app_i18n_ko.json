@@ -492,6 +492,7 @@
   "toast.opening_log_file": "로그 파일을 여는 중...",
   "toast.opening_name": "\"{name}\" 여는 중...",
   "toast.opening_name_in_daw": "{name}에서 \"{daw}\" 여는 중...",
+  "toast.opening_pdf_default_app": "기본 앱으로 «{name}» 열기…",
   "toast.opening_preferences": "환경설정을 여는 중...",
   "toast.pdf_export_failed": "PDF 내보내기 실패: {err}",
   "toast.pdf_extracting_page_counts": "PDF 페이지 수를 추출하는 중...",

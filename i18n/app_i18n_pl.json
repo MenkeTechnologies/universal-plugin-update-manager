@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Otwieram plik dziennika...",
   "toast.opening_name": "Otwieram „{name}”...",
   "toast.opening_name_in_daw": "Otwarcie „{name}” w {daw}...",
+  "toast.opening_pdf_default_app": "Otwieranie „{name}” w domyślnej aplikacji…",
   "toast.opening_preferences": "Otwieram preferencje...",
   "toast.pdf_export_failed": "Eksport do pliku PDF nie powiódł się: {err}",
   "toast.pdf_extracting_page_counts": "Wyodrębnianie liczników stron PDF...",

@@ -934,7 +934,10 @@ document.addEventListener('dblclick', (e) => {
     const pdfRow = e.target.closest('#pdfTableBody tr[data-pdf-path]');
     if (pdfRow && !e.target.closest('.col-actions')) {
         e.preventDefault();
+        const name = pdfRow.querySelector('td:nth-child(2)')?.textContent?.trim()
+            || pdfRow.dataset.pdfPath?.split('/').pop() || 'PDF';
         window.vstUpdater.openFileDefault(pdfRow.dataset.pdfPath)
+            .then(() => showToast(toastFmt('toast.opening_pdf_default_app', { name })))
             .catch(err => showToast(toastFmt('toast.failed_open_pdf', {err: err.message || err}), 4000, 'error'));
         return;
     }

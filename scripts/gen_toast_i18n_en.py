@@ -114,6 +114,7 @@ TOAST_EN: dict[str, str] = {
     "toast.failed_save_pdf_history": "Failed to save PDF scan — {err}",
     "toast.pdf_scan_failed": "PDF scan failed — {err}",
     "toast.pdf_scan_dirs_saved": "PDF scan directories saved",
+    "toast.opening_pdf_default_app": "Opening \"{name}\" with the default application...",
     # —— daw ——
     "toast.daw_query_failed": "DAW query failed: {err}",
     "toast.failed_save_daw_history": "Failed to save DAW history — {err}",

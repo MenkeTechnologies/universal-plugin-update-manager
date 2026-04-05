@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Открытие файла журнала...",
   "toast.opening_name": "Открытие \"{name}\"...",
   "toast.opening_name_in_daw": "Открытие \"{name}\" в {daw}...",
+  "toast.opening_pdf_default_app": "Открытие «{name}» в приложении по умолчанию…",
   "toast.opening_preferences": "Открытие настроек...",
   "toast.pdf_export_failed": "Ошибка экспорта PDF: {err}",
   "toast.pdf_extracting_page_counts": "Извлечение количества страниц PDF...",

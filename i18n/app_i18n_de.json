@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Protokolldatei wird geöffnet...",
   "toast.opening_name": "„{name}“ wird geöffnet...",
   "toast.opening_name_in_daw": "„{name}“ wird in {daw} geöffnet...",
+  "toast.opening_pdf_default_app": "Öffne „{name}“ mit der Standardanwendung …",
   "toast.opening_preferences": "Einstellungen öffnen...",
   "toast.pdf_export_failed": "PDF-Export fehlgeschlagen: {err}",
   "toast.pdf_extracting_page_counts": "Extracting PDF page counts...",

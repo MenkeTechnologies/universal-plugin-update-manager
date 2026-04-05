@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Logbestand openen...",
   "toast.opening_name": "\"{name}\" openen...",
   "toast.opening_name_in_daw": "\"{name}\" openen in {daw}...",
+  "toast.opening_pdf_default_app": "«{name}» openen met de standaardapp…",
   "toast.opening_preferences": "Voorkeuren openen...",
   "toast.pdf_export_failed": "PDF-export mislukt: {err}",
   "toast.pdf_extracting_page_counts": "Extracting PDF page counts...",

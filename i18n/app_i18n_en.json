@@ -492,6 +492,7 @@
   "toast.opening_log_file": "Opening log file...",
   "toast.opening_name": "Opening \"{name}\"...",
   "toast.opening_name_in_daw": "Opening \"{name}\" in {daw}...",
+  "toast.opening_pdf_default_app": "Opening \"{name}\" with the default application...",
   "toast.opening_preferences": "Opening preferences...",
   "toast.pdf_export_failed": "PDF export failed: {err}",
   "toast.pdf_extracting_page_counts": "Extracting PDF page counts...",
