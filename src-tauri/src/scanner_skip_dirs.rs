@@ -25,7 +25,15 @@ pub const SCANNER_SKIP_DIRS: &[&str] = &[
     "__MACOSX",         // zip-extract artifact
     "target",           // Rust/Cargo (and some other tools) build output
     "Pods",             // CocoaPods
+    "Carthage",         // Carthage / iOS dependency checkouts + builds
     "vendor",           // Composer, Bundler, etc.
+    "jspm_packages",    // legacy JSPM (like node_modules)
+    "elm-stuff",        // Elm build cache
+    "zig-cache",        // Zig compiler cache
+    "zig-out",          // Zig default output dir
+    "cmake-build-debug",   // CMake / CLion / VS default build trees
+    "cmake-build-release",
+    "htmlcov",          // Python coverage HTML reports (often huge)
     // Synology NAS (`#recycle` already listed). `@`-prefixed dirs use traversal guard.
     "#snapshot",
 ];
@@ -47,6 +55,9 @@ mod tests {
             "vendor",
             "lost+found",
             "__pypackages__",
+            "Carthage",
+            "zig-cache",
+            "htmlcov",
             "#snapshot",
         ] {
             assert!(
