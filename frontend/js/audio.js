@@ -835,20 +835,24 @@ async function rebuildAudioStats() {
 function initAudioTable() {
   const tableWrap = document.getElementById('audioTableWrap');
   const t = _audioFmt;
+  const tAttr = (key) => {
+    const s = t(key);
+    return typeof escapeHtml === 'function' ? escapeHtml(s) : s;
+  };
   tableWrap.innerHTML = `<table class="audio-table" id="audioTable">
     <thead>
       <tr>
-        <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="${typeof escapeHtml === 'function' ? escapeHtml(t('ui.audio.th_select_all')) : t('ui.audio.th_select_all')}"></th>
-        <th data-action="sortAudio" data-key="name" style="width: 22%;" title="File name — click to sort">${t('ui.audio.th_name')} <span class="sort-arrow" id="sortArrowName">&#9660;</span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="format" class="col-format" style="width: 60px;" title="Audio format — click to sort">${t('ui.audio.th_format')} <span class="sort-arrow" id="sortArrowFormat"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="size" class="col-size" style="width: 75px;" title="File size — click to sort">${t('ui.audio.th_size')} <span class="sort-arrow" id="sortArrowSize"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="bpm" class="col-bpm" style="width: 55px;" title="Estimated BPM — click to sort">${t('ui.audio.th_bpm')} <span class="sort-arrow" id="sortArrowBpm"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="key" class="col-key" style="width: 75px;" title="Musical key — click to sort">${t('ui.audio.th_key')} <span class="sort-arrow" id="sortArrowKey"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="duration" class="col-dur" style="width: 55px;" title="Duration — click to sort">${t('ui.audio.th_dur')} <span class="sort-arrow" id="sortArrowDuration"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="channels" class="col-ch" style="width: 40px;" title="Channels — click to sort">${t('ui.audio.th_ch')} <span class="sort-arrow" id="sortArrowChannels"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="lufs" class="col-lufs" style="width: 55px;" title="Integrated loudness (LUFS) — click to sort">${t('ui.audio.th_lufs')} <span class="sort-arrow" id="sortArrowLufs"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="modified" class="col-date" style="width: 90px;" title="Last modified date — click to sort">${t('ui.audio.th_modified')} <span class="sort-arrow" id="sortArrowModified"></span><span class="col-resize"></span></th>
-        <th data-action="sortAudio" data-key="directory" style="width: 22%;" title="Directory path — click to sort">${t('ui.audio.th_path')} <span class="sort-arrow" id="sortArrowDirectory"></span><span class="col-resize"></span></th>
+        <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="${tAttr('ui.audio.th_select_all')}"></th>
+        <th data-action="sortAudio" data-key="name" style="width: 22%;" title="${tAttr('ui.audio.tt_sort_name')}">${t('ui.audio.th_name')} <span class="sort-arrow" id="sortArrowName">&#9660;</span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="format" class="col-format" style="width: 60px;" title="${tAttr('ui.audio.tt_sort_format')}">${t('ui.audio.th_format')} <span class="sort-arrow" id="sortArrowFormat"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="size" class="col-size" style="width: 75px;" title="${tAttr('ui.audio.tt_sort_size')}">${t('ui.audio.th_size')} <span class="sort-arrow" id="sortArrowSize"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="bpm" class="col-bpm" style="width: 55px;" title="${tAttr('ui.audio.tt_sort_bpm')}">${t('ui.audio.th_bpm')} <span class="sort-arrow" id="sortArrowBpm"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="key" class="col-key" style="width: 75px;" title="${tAttr('ui.audio.tt_sort_key')}">${t('ui.audio.th_key')} <span class="sort-arrow" id="sortArrowKey"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="duration" class="col-dur" style="width: 55px;" title="${tAttr('ui.audio.tt_sort_duration')}">${t('ui.audio.th_dur')} <span class="sort-arrow" id="sortArrowDuration"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="channels" class="col-ch" style="width: 40px;" title="${tAttr('ui.audio.tt_sort_channels')}">${t('ui.audio.th_ch')} <span class="sort-arrow" id="sortArrowChannels"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="lufs" class="col-lufs" style="width: 55px;" title="${tAttr('ui.audio.tt_sort_lufs')}">${t('ui.audio.th_lufs')} <span class="sort-arrow" id="sortArrowLufs"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="modified" class="col-date" style="width: 90px;" title="${tAttr('ui.audio.tt_sort_modified')}">${t('ui.audio.th_modified')} <span class="sort-arrow" id="sortArrowModified"></span><span class="col-resize"></span></th>
+        <th data-action="sortAudio" data-key="directory" style="width: 22%;" title="${tAttr('ui.audio.tt_sort_path')}">${t('ui.audio.th_path')} <span class="sort-arrow" id="sortArrowDirectory"></span><span class="col-resize"></span></th>
         <th class="col-actions" style="width: 130px;"></th>
       </tr>
     </thead>

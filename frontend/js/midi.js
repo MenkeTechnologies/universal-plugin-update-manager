@@ -142,16 +142,16 @@ function renderMidiTable() {
       <thead>
         <tr>
           <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="${selTitle}"></th>
-          <th data-action="sortMidi" data-key="name" style="width:22%;" title="File name">${tc('ui.export.col_name')} ${arrow('Name')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="tracks" style="width:55px;" title="Track count">${tc('ui.export.col_tracks')} ${arrow('Tracks')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="bpm" style="width:65px;" title="Tempo (BPM)">${tc('ui.export.col_bpm')} ${arrow('Bpm')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="time" style="width:55px;" title="Time signature">${tc('ui.midi.th_time')} ${arrow('Time')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="key" style="width:80px;" title="Key signature">${tc('ui.export.col_key')} ${arrow('Key')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="notes" style="width:60px;" title="Note count">${tc('ui.export.col_notes')} ${arrow('Notes')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="ch" style="width:45px;" title="MIDI channels used">${tc('ui.export.col_ch')} ${arrow('Ch')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="duration" style="width:65px;" title="Duration">${tc('ui.audio.th_dur')} ${arrow('Duration')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="size" style="width:60px;" title="File size">${tc('ui.export.col_size')} ${arrow('Size')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="path" style="width:22%;" title="Directory path">${tc('ui.export.col_path')} ${arrow('Path')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="name" style="width:22%;" title="${esc(tc('ui.midi.tt_sort_name'))}">${tc('ui.export.col_name')} ${arrow('Name')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="tracks" style="width:55px;" title="${esc(tc('ui.midi.tt_sort_tracks'))}">${tc('ui.export.col_tracks')} ${arrow('Tracks')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="bpm" style="width:65px;" title="${esc(tc('ui.midi.tt_sort_bpm'))}">${tc('ui.export.col_bpm')} ${arrow('Bpm')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="time" style="width:55px;" title="${esc(tc('ui.midi.tt_sort_time_sig'))}">${tc('ui.midi.th_time')} ${arrow('Time')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="key" style="width:80px;" title="${esc(tc('ui.midi.tt_sort_key'))}">${tc('ui.export.col_key')} ${arrow('Key')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="notes" style="width:60px;" title="${esc(tc('ui.midi.tt_sort_notes'))}">${tc('ui.export.col_notes')} ${arrow('Notes')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="ch" style="width:45px;" title="${esc(tc('ui.midi.tt_sort_ch'))}">${tc('ui.export.col_ch')} ${arrow('Ch')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="duration" style="width:65px;" title="${esc(tc('ui.midi.tt_sort_duration'))}">${tc('ui.audio.th_dur')} ${arrow('Duration')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="size" style="width:60px;" title="${esc(tc('ui.midi.tt_sort_size'))}">${tc('ui.export.col_size')} ${arrow('Size')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="path" style="width:22%;" title="${esc(tc('ui.midi.tt_sort_path'))}">${tc('ui.export.col_path')} ${arrow('Path')}<span class="col-resize"></span></th>
           <th class="col-actions" style="width:50px;"></th>
         </tr>
       </thead>
