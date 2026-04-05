@@ -1117,11 +1117,12 @@ mod tests {
     }
 
     #[test]
-    fn seed_json_appfmt_placeholders_preserved_de_el_fr_it_nl_pl_pt_ru_sv_zh_ja_ko() {
+    fn seed_json_appfmt_placeholders_preserved_de_el_es_fr_it_nl_pl_pt_ru_sv_zh_ja_ko() {
         let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
         for (loc, json) in [
             ("de", SEED_JSON_DE),
             ("el", SEED_JSON_EL),
+            ("es", SEED_JSON_ES),
             ("fr", SEED_JSON_FR),
             ("it", SEED_JSON_IT),
             ("nl", SEED_JSON_NL),

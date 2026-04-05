@@ -57,6 +57,10 @@ python3 scripts/sync_locale_keys_from_en.py
 
 Run the stub sync after adding keys to `app_i18n_en.json` if you cannot run the generators yet.
 
+### `appFmt` placeholders (`{token}`)
+
+Dynamic strings substitute **English token names** from `ipc.js` / Rust callers (e.g. `{name}`, `{err}`, `{n}`). Non-English catalogs must use the **same** `{token}` spellings as `app_i18n_en.json` for each key — translated prose around them is fine, but renaming a token to a localized word (e.g. `{nombre}` for `{name}`) breaks substitution. `node --test test/i18n-seed-parity.test.js` and `test/i18n-per-key-placeholder-parity.test.js` enforce multiset parity vs English for every shipped locale (including `es`).
+
 ## Batch merge into non-English locales only
 
 If English already contains new keys and you need the same keys in `de`/`es`/`sv`/`fr`/`nl`/`pt`/`it`/`el`/`pl`/`ru`/`zh`/`ja`/`ko` with English placeholder text until a full `gen_app_i18n_*` run:
