@@ -128,6 +128,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Filter Persistence** | All 6 filter dropdowns (plugin type, status, favorite type, audio format, DAW, preset format) saved to prefs and restored on startup. Multi-select values preserved |
 | **Plugin Name Normalization** | Cross-reference matching normalizes plugin names: strips arch suffixes (x64, ARM64, Stereo), case-folds, collapses whitespace. "Serum", "SERUM (x64)", "serum" all match |
 | **macOS Firmlink Dedup** | Scanners normalize /System/Volumes/Data paths to prevent duplicate file discovery when scanning / |
+| **Scanner skip dirs** | Shared `scanner_skip_dirs::SCANNER_SKIP_DIRS` skips dependency trees (`node_modules`, `bower_components`, `Pods`, `vendor`), build output (`target`, `DerivedData`), caches, OS metadata (`lost+found`), and Time Machine / Synology dirs; hidden (`.`) and Synology `@` directories are skipped at traversal. Settings can add more directory names |
 | **Browse Button** | Native folder picker in scan directory settings to grant macOS TCC permissions for mounted volumes |
 | **Error Logging** | Global JS error handler logs uncaught errors and unhandled rejections to `app.log` in the data directory. Export/clear via Settings → Data. Includes timestamps |
 | **Sortable Analysis Columns** | BPM, Key, Duration, Channels, LUFS columns in sample table are all clickable to sort ascending/descending. All column headers have tooltips |
@@ -386,6 +387,7 @@ src-tauri/
     lib.rs             -- IPC command handlers, export/import, file ops
     bpm.rs             -- BPM estimation via onset-strength autocorrelation
     scanner.rs         -- Plugin filesystem scanner (VST2/VST3/AU)
+    scanner_skip_dirs.rs -- Shared directory-name blocklist for all recursive scanners
     audio_scanner.rs   -- Audio sample discovery + metadata extraction
     daw_scanner.rs     -- DAW project scanner (14+ formats)
     preset_scanner.rs  -- Plugin preset discovery

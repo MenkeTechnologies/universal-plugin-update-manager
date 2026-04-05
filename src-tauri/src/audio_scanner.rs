@@ -6,6 +6,7 @@
 //! symlink deduplication and parallel directory traversal via Rayon.
 
 use crate::history::AudioSample;
+use crate::scanner_skip_dirs::SCANNER_SKIP_DIRS as SKIP_DIRS;
 
 /// Normalize macOS firmlink paths: /System/Volumes/Data/Users/... → /Users/...
 /// On macOS, / and /System/Volumes/Data are the same volume linked via firmlinks.
@@ -31,26 +32,6 @@ use std::sync::{Arc, Mutex};
 const AUDIO_EXTENSIONS: &[&str] = &[
     ".wav", ".mp3", ".aiff", ".aif", ".flac", ".ogg", ".m4a", ".wma", ".aac", ".opus", ".rex",
     ".rx2", ".sf2", ".sfz",
-];
-
-const SKIP_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    ".Trash",
-    "$RECYCLE.BIN",
-    "#recycle",
-    "System Volume Information",
-    ".cache",
-    "__pycache__",
-    // Never contain user audio/preset/pdf/daw content.
-    "Caches",           // ~/Library/Caches, /Library/Caches, app caches
-    "DerivedData",      // Xcode build artifacts
-    "Backups.backupdb", // Time Machine bundle
-    "__MACOSX",         // zip-extract artifact
-    // Synology NAS system dirs. All `@`-prefixed dirs are handled by the
-    // `starts_with('@')` guard at the traversal site — this list only needs
-    // the `#`-prefixed user-visible Synology dirs.
-    "#snapshot",        // Synology Btrfs snapshots (#recycle already listed)
 ];
 
 pub fn format_size(bytes: u64) -> String {
@@ -635,22 +616,6 @@ mod tests {
         assert_eq!(n, PathBuf::from("/tmp/audio"));
         #[cfg(not(target_os = "macos"))]
         assert_eq!(n, PathBuf::from("/System/Volumes/Data/tmp/audio"));
-    }
-
-    #[test]
-    fn test_skip_dirs_complete() {
-        for dir in &[
-            "node_modules",
-            ".git",
-            ".Trash",
-            "Caches",
-            "DerivedData",
-            "Backups.backupdb",
-            "__MACOSX",
-            "#snapshot",
-        ] {
-            assert!(SKIP_DIRS.contains(dir), "SKIP_DIRS should contain {}", dir);
-        }
     }
 
     #[test]

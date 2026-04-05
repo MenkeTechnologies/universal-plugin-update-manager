@@ -4,6 +4,7 @@
 //! traversal and stop signaling (mirrors preset_scanner.rs structure).
 
 use crate::history::PdfFile;
+use crate::scanner_skip_dirs::SCANNER_SKIP_DIRS as SKIP_DIRS;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fs;
@@ -23,24 +24,6 @@ fn normalize_macos_path(p: PathBuf) -> PathBuf {
 }
 
 const PDF_EXTENSION: &str = ".pdf";
-
-const SKIP_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    ".Trash",
-    "$RECYCLE.BIN",
-    "#recycle",
-    "System Volume Information",
-    ".cache",
-    "__pycache__",
-    // Never contain user audio/preset/pdf/daw content.
-    "Caches",           // ~/Library/Caches, /Library/Caches, app caches
-    "DerivedData",      // Xcode build artifacts
-    "Backups.backupdb", // Time Machine bundle
-    "__MACOSX",         // zip-extract artifact
-    // Synology NAS system dirs. `@`-prefixed ones caught by traversal guard.
-    "#snapshot",        // Synology Btrfs snapshots (#recycle already listed)
-];
 
 fn format_size(bytes: u64) -> String {
     crate::format_size(bytes)

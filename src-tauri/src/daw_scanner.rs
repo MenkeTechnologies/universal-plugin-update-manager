@@ -6,6 +6,7 @@
 //! and validates GarageBand bundles by internal structure.
 
 use crate::history::DawProject;
+use crate::scanner_skip_dirs::SCANNER_SKIP_DIRS as SKIP_DIRS;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fs;
@@ -64,24 +65,6 @@ const PLUGIN_BUNDLE_EXTENSIONS: &[&str] = &[
     ".plugin",
     ".dpm",
     ".clap",
-];
-
-const SKIP_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    ".Trash",
-    "$RECYCLE.BIN",
-    "#recycle",
-    "System Volume Information",
-    ".cache",
-    "__pycache__",
-    // Never contain user audio/preset/pdf/daw content.
-    "Caches",           // ~/Library/Caches, /Library/Caches, app caches
-    "DerivedData",      // Xcode build artifacts
-    "Backups.backupdb", // Time Machine bundle
-    "__MACOSX",         // zip-extract artifact
-    // Synology NAS system dirs. `@`-prefixed ones caught by traversal guard.
-    "#snapshot",        // Synology Btrfs snapshots (#recycle already listed)
 ];
 
 /// Additional directories to skip when not including Ableton backups/crashes.
@@ -496,22 +479,6 @@ mod tests {
                 "DAW_EXTENSIONS should contain {}",
                 ext
             );
-        }
-    }
-
-    #[test]
-    fn test_skip_dirs_complete() {
-        for dir in &[
-            "node_modules",
-            ".git",
-            ".Trash",
-            "Caches",
-            "DerivedData",
-            "Backups.backupdb",
-            "__MACOSX",
-            "#snapshot",
-        ] {
-            assert!(SKIP_DIRS.contains(dir), "SKIP_DIRS should contain {}", dir);
         }
     }
 

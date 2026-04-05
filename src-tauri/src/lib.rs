@@ -7,6 +7,7 @@
 //! # Modules
 //!
 //! - [`scanner`] — Plugin filesystem scanner with architecture detection
+//! - [`scanner_skip_dirs`] — Shared directory-name blocklist for recursive scans
 //! - [`audio_scanner`] — Audio sample discovery and metadata extraction
 //! - [`daw_scanner`] — DAW project scanner (14+ formats)
 //! - [`preset_scanner`] — Plugin preset discovery
@@ -30,6 +31,7 @@ pub mod pdf_meta;
 pub mod pdf_scanner;
 pub mod preset_scanner;
 pub mod scanner;
+pub mod scanner_skip_dirs;
 pub mod similarity;
 pub mod unified_walker;
 pub mod xref;

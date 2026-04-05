@@ -23,6 +23,7 @@
 
 use crate::bulk_stat::{read_dir_bulk, BulkEntry};
 use crate::history::{AudioSample, DawProject, PdfFile, PresetFile};
+use crate::scanner_skip_dirs::SCANNER_SKIP_DIRS as SKIP_DIRS;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fs;
@@ -115,23 +116,6 @@ const PRESET_EXTENSIONS: &[&str] = &[
 ];
 
 const PDF_EXTENSION: &str = ".pdf";
-
-const SKIP_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    ".Trash",
-    "$RECYCLE.BIN",
-    "#recycle",
-    "System Volume Information",
-    ".cache",
-    "__pycache__",
-    "Caches",
-    "DerivedData",
-    "Backups.backupdb",
-    "__MACOSX",
-    // Synology NAS: `@`-prefixed dirs caught by traversal guard below.
-    "#snapshot", // Synology Btrfs snapshots (#recycle already listed)
-];
 
 fn format_size(bytes: u64) -> String {
     crate::format_size(bytes)
@@ -823,6 +807,8 @@ mod tests {
         touch(&root.join("keep.wav"), b"RIFF");
         touch(&root.join(".hidden.wav"), b"RIFF");
         touch(&root.join("node_modules/dep.wav"), b"RIFF");
+        touch(&root.join("bower_components/legacy.wav"), b"RIFF");
+        touch(&root.join("target/debug.wav"), b"RIFF");
         touch(&root.join("Caches/thing.wav"), b"RIFF");
         touch(&root.join("DerivedData/build.wav"), b"RIFF");
         // Synology system dirs — @-prefixed (dir guard) and #snapshot (list).
