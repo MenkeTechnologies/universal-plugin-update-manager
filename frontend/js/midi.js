@@ -58,11 +58,20 @@ async function scanMidi(resume = false) {
 
   const excludePaths = resume ? allMidiFiles.map(m => m.path) : null;
 
-  setBtn(resume ? '&#8635; Resuming...' : '&#8635; Scanning...', true);
+  if (typeof btnLoading === 'function') btnLoading(btn, true);
+  setBtn(
+    '&#8635; ' + (typeof appFmt === 'function'
+      ? appFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn')
+      : (resume ? 'Resuming...' : 'Scanning...')),
+    true,
+  );
   if (resumeBtn) resumeBtn.style.display = 'none';
   if (stopBtn) stopBtn.style.display = '';
   if (progressBar) progressBar.classList.add('active');
-  if (progressFill) progressFill.style.width = '0%';
+  if (progressFill) {
+    progressFill.style.width = '';
+    progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
+  }
 
   if (!resume) {
     allMidiFiles = [];
@@ -107,6 +116,10 @@ async function scanMidi(resume = false) {
     }
     updateMidiCount();
     updateMidiHeaderCount();
+    if (progressFill) {
+      progressFill.style.width = '';
+      progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
+    }
   }
 
   const scheduleMidiFlush = createScanFlusher(flushPendingMidi, FLUSH_INTERVAL);
@@ -160,10 +173,17 @@ async function scanMidi(resume = false) {
   }
 
   if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
-  setBtn('&#127924; Scan MIDI', false);
+  if (typeof btnLoading === 'function') btnLoading(btn, false);
+  setBtn(
+    '&#127924; ' + (typeof appFmt === 'function' ? appFmt('ui.btn.127924_scan_midi') : 'Scan MIDI'),
+    false,
+  );
   if (stopBtn) stopBtn.style.display = 'none';
   if (progressBar) progressBar.classList.remove('active');
-  if (progressFill) progressFill.style.width = '0%';
+  if (progressFill) {
+    progressFill.style.width = '0%';
+    progressFill.style.animation = '';
+  }
 }
 
 function getMidiCount() { return allMidiFiles.length; }
