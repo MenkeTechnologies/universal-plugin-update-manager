@@ -3,6 +3,7 @@
 ## English catalog
 
 - **Source of truth:** `i18n/app_i18n_en.json` (sorted keys).
+- **Action vs. noun compounds:** English strings like **“Scan Plugins”** (and the matching keys `menu.scan_plugins`, `ui.btn.8635_scan_plugins`, `ui.js.scan_plugins_btn`) describe a **button action** — *scan for plugins* — not a category of plugin (“scanning plugins”, “analysis plugins”, etc.). Automated translation often inverts word order or picks the wrong sense; keep `toast.scanning_plugins` consistent (progress wording).
 - **Runtime:** Strings are seeded into SQLite (`app_i18n`) from the bundled JSON at build time (`src-tauri/src/app_i18n.rs`).
 - **Adding keys:** Prefer a small JSON batch file under `scripts/i18n_batches/` and merge:
 
