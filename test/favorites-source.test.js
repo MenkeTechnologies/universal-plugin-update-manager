@@ -78,4 +78,9 @@ describe('frontend/js/favorites.js (vm-loaded)', () => {
     assert.strictEqual(S.getFavorites().length, 1);
     assert.strictEqual(S.getFavorites()[0].path, '/b.wav');
   });
+
+  it('exportFavorites with empty list only toasts and does not require showExportModal', () => {
+    S.exportFavorites();
+    assert.ok(S._toasts.some((t) => String(t).includes('toast.no_favorites_export')));
+  });
 });

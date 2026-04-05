@@ -67,6 +67,83 @@ describe('frontend/js/drag-reorder.js initDragReorder (vm-loaded)', () => {
       'gamma,alpha,beta',
     );
   });
+
+  it('does not reorder when prefsKey is null (no saved order lookup)', () => {
+    const items = [
+      { dataset: { dragKey: 'a' } },
+      { dataset: { dragKey: 'b' } },
+    ];
+    const container = {
+      _children: [],
+      querySelectorAll(sel) {
+        if (sel === '[data-drag-key]') return [...this._children];
+        return [];
+      },
+      appendChild(node) {
+        const i = this._children.indexOf(node);
+        if (i >= 0) this._children.splice(i, 1);
+        this._children.push(node);
+      },
+      addEventListener: () => {},
+      contains: () => true,
+    };
+    items.forEach((n) => container.appendChild(n));
+    const D = loadFrontendScripts(['utils.js', 'drag-reorder.js'], {
+      prefs: { getObject: () => ['b', 'a'], setItem: () => {} },
+      document: {
+        ...defaultDocument(),
+        getElementById: () => null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener: () => {},
+        body: { style: {}, appendChild: () => {}, removeChild: () => {} },
+      },
+    });
+    D.initDragReorder(container, '[data-drag-key]', null, {
+      getKey: (el) => el.dataset.dragKey,
+    });
+    assert.strictEqual(container._children.map((n) => n.dataset.dragKey).join(','), 'a,b');
+  });
+
+  it('does not reorder when saved prefs value is not an array', () => {
+    const items = [
+      { dataset: { dragKey: 'x' } },
+      { dataset: { dragKey: 'y' } },
+    ];
+    const container = {
+      _children: [],
+      querySelectorAll(sel) {
+        if (sel === '[data-drag-key]') return [...this._children];
+        return [];
+      },
+      appendChild(node) {
+        const i = this._children.indexOf(node);
+        if (i >= 0) this._children.splice(i, 1);
+        this._children.push(node);
+      },
+      addEventListener: () => {},
+      contains: () => true,
+    };
+    items.forEach((n) => container.appendChild(n));
+    const D = loadFrontendScripts(['utils.js', 'drag-reorder.js'], {
+      prefs: {
+        getObject: () => ({ order: ['y', 'x'] }),
+        setItem: () => {},
+      },
+      document: {
+        ...defaultDocument(),
+        getElementById: () => null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener: () => {},
+        body: { style: {}, appendChild: () => {}, removeChild: () => {} },
+      },
+    });
+    D.initDragReorder(container, '[data-drag-key]', 'rowOrder', {
+      getKey: (el) => el.dataset.dragKey,
+    });
+    assert.strictEqual(container._children.map((n) => n.dataset.dragKey).join(','), 'x,y');
+  });
 });
 
 function loadDragReorderForTableRows() {

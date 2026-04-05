@@ -83,4 +83,21 @@ describe('frontend/js/notes.js (vm-loaded)', () => {
     assert.ok(!N.getStandaloneTags().includes('gone'));
     assert.ok(N.getStandaloneTags().includes('stay'));
   });
+
+  it('addTagToItem does not duplicate an existing tag', () => {
+    N.setNote('/dup.wav', 'x', ['a']);
+    N.addTagToItem('/dup.wav', 'a');
+    assert.strictEqual(N.getNote('/dup.wav').tags.join(','), 'a');
+  });
+
+  it('removeTagFromItem returns early when path has no note', () => {
+    assert.doesNotThrow(() => N.removeTagFromItem('/missing.wav', 't'));
+  });
+
+  it('setNote keeps entry when note is whitespace-only but tags are non-empty (note text stored verbatim)', () => {
+    N.setNote('/ws.wav', '   ', ['only-tag']);
+    const n = N.getNote('/ws.wav');
+    assert.strictEqual(n.note, '   ');
+    assert.strictEqual(n.tags.join(','), 'only-tag');
+  });
 });

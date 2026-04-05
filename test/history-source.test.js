@@ -76,4 +76,21 @@ describe('frontend/js/history.js timeAgo (vm-loaded)', () => {
       assert.strictEqual(H.timeAgo(past), '2mo ago');
     });
   });
+
+  it('59s span is just now; 60s span is 1m ago', () => {
+    const past = new Date('2025-06-01T15:00:00.000Z');
+    withFixedNow(H, past, 59 * 1000, () => {
+      assert.strictEqual(H.timeAgo(past), 'just now');
+    });
+    withFixedNow(H, past, 60 * 1000, () => {
+      assert.strictEqual(H.timeAgo(past), '1m ago');
+    });
+  });
+
+  it('exactly 30 days uses month bucket (not day)', () => {
+    const past = new Date('2025-01-01T12:00:00.000Z');
+    withFixedNow(H, past, 30 * 24 * 60 * 60 * 1000, () => {
+      assert.strictEqual(H.timeAgo(past), '1mo ago');
+    });
+  });
 });

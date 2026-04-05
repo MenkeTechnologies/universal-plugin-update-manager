@@ -98,4 +98,13 @@ describe('frontend/js/sort-persist.js (vm-loaded)', () => {
     S.prefs._cache.sort_plugin = '';
     assert.strictEqual(S.restoreSortState('plugin'), null);
   });
+
+  it('initSortPersistence delegates to restoreAllSortStates', () => {
+    S.prefs._cache.sort_plugin = JSON.stringify({ key: 'path', asc: true });
+    S._pluginSortKey = 'name';
+    S._pluginSortAsc = false;
+    S.initSortPersistence();
+    assert.strictEqual(S._pluginSortKey, 'path');
+    assert.strictEqual(S._pluginSortAsc, true);
+  });
 });

@@ -87,4 +87,35 @@ describe('frontend/js/heatmap-dashboard.js card builders (vm-loaded)', () => {
     const html = H.buildBpmCard();
     assert.ok(html.includes('ui.hm.card_bpm_empty'));
   });
+
+  it('buildKeyCard shows empty state when _keyCache absent', () => {
+    const html = H.buildKeyCard();
+    assert.ok(html.includes('ui.hm.card_key_empty'));
+  });
+
+  it('buildKeyCard renders canvas when _keyCache has values', () => {
+    const S = loadHmSandbox({ _keyCache: { a: 'C', b: 'D' } });
+    const html = S.buildKeyCard();
+    assert.ok(html.includes('hmKeyCanvas'));
+    assert.ok(html.includes('ui.hm.card_key_title_analyzed'));
+  });
+
+  it('buildTimelineCard returns empty string for no samples', () => {
+    assert.strictEqual(H.buildTimelineCard([]), '');
+  });
+
+  it('buildTimelineCard includes canvas when samples exist', () => {
+    const html = H.buildTimelineCard([{ path: '/a.wav' }]);
+    assert.ok(html.includes('hmTimelineCanvas'));
+    assert.ok(html.includes('data-hm-card="timeline"'));
+  });
+
+  it('buildPluginTypeCard returns empty string for no plugins', () => {
+    assert.strictEqual(H.buildPluginTypeCard([]), '');
+  });
+
+  it('buildFolderCard shows hm-empty when samples array is empty', () => {
+    const html = H.buildFolderCard([]);
+    assert.ok(html.includes('ui.hm.empty_no_data'));
+  });
 });
