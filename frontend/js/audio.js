@@ -1005,24 +1005,36 @@ function buildAudioRow(s) {
   const dur = s.duration ? (typeof formatTime === 'function' ? formatTime(s.duration) : s.duration.toFixed(1) + 's') : '';
   const ch = s.channels ? (s.channels === 1 ? 'M' : s.channels === 2 ? 'S' : s.channels + 'ch') : (s.sampleRate ? '?' : '');
   const lufs = s.lufs != null ? s.lufs : (typeof _lufsCache !== 'undefined' && _lufsCache[s.path] != null) ? _lufsCache[s.path] : '';
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (x) => String(x);
+  const bpmTitle = bpm ? esc(_audioFmt('ui.audio.tt_cell_bpm', { bpm })) : esc(_audioFmt('ui.audio.tt_cell_click_analyze'));
+  const keyTitle = key ? esc(key) : esc(_audioFmt('ui.audio.tt_cell_click_analyze'));
+  const lufsTitle = lufs !== ''
+    ? (lufs < -25
+      ? esc(_audioFmt('ui.audio.tt_lufs_quiet', { lufs }))
+      : esc(_audioFmt('ui.audio.tt_lufs_line', { lufs })))
+    : esc(_audioFmt('ui.audio.tt_cell_click_analyze'));
+  const chTitle = ch === 'M' ? esc(_audioFmt('ui.tt.mono')) : ch === 'S' ? esc(_audioFmt('ui.btn.stereo')) : esc(String(ch));
+  const previewBtnT = esc(_audioFmt('ui.audio.row_btn_preview'));
+  const loopBtnT = esc(_audioFmt('ui.audio.row_btn_loop'));
+  const revealBtnT = esc(_audioFmt('menu.reveal_in_finder'));
   return `<tr${rowClass} data-audio-path="${hp}" data-audio-format="${escapeHtml(s.format)}" data-audio-name="${escapeHtml((s.name || '').toLowerCase())}" data-action="toggleMetadata" data-path="${hp}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(s.name)}">${_lastAudioSearch ? highlightMatch(s.name, _lastAudioSearch, _lastAudioMode) : escapeHtml(s.name)}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
     <td class="col-format"><span class="format-badge ${fmtClass}">${s.format}</span></td>
     <td class="col-size">${s.sizeFormatted}</td>
-    <td class="col-bpm" title="${bpm ? bpm + ' BPM' : 'Click to analyze'}">${bpm}</td>
-    <td class="col-key" title="${key || 'Click to analyze'}">${escapeHtml(key)}</td>
-    <td class="col-dur" title="${dur || ''}">${dur}</td>
-    <td class="col-ch" title="${ch === 'M' ? 'Mono' : ch === 'S' ? 'Stereo' : ch}">${ch}</td>
-    <td class="col-lufs${lufs !== '' && lufs < -25 ? ' lufs-low' : ''}" title="${lufs ? lufs + ' LUFS' + (lufs < -25 ? ' ⚠ abnormally quiet' : '') : 'Click to analyze'}">${lufs}</td>
+    <td class="col-bpm" title="${bpmTitle}">${bpm}</td>
+    <td class="col-key" title="${keyTitle}">${escapeHtml(key)}</td>
+    <td class="col-dur" title="${dur ? esc(dur) : ''}">${dur}</td>
+    <td class="col-ch" title="${chTitle}">${ch}</td>
+    <td class="col-lufs${lufs !== '' && lufs < -25 ? ' lufs-low' : ''}" title="${lufsTitle}">${lufs}</td>
     <td class="col-date">${s.modified}</td>
     <td class="col-path" title="${hp}">${escapeHtml(s.directory)}</td>
     <td class="col-actions" data-action-stop>
-      <button class="btn-small btn-play${isPlaying ? ' playing' : ''}" data-action="previewAudio" data-path="${hp}" title="Preview">
+      <button class="btn-small btn-play${isPlaying ? ' playing' : ''}" data-action="previewAudio" data-path="${hp}" title="${previewBtnT}">
         ${isPlaying && !audioPlayer.paused ? '&#9646;&#9646;' : '&#9654;'}
       </button>
-      <button class="btn-small btn-loop${isPlaying && audioLooping ? ' active' : ''}" data-action="toggleRowLoop" data-path="${hp}" title="Loop">&#8634;</button>
-      <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${hp}" title="Reveal in Finder">&#128193;</button>
+      <button class="btn-small btn-loop${isPlaying && audioLooping ? ' active' : ''}" data-action="toggleRowLoop" data-path="${hp}" title="${loopBtnT}">&#8634;</button>
+      <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${hp}" title="${revealBtnT}">&#128193;</button>
     </td>
   </tr>`;
 }

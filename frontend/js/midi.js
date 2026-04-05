@@ -1,6 +1,11 @@
 // ── MIDI Tab ──
 // Dedicated tab for MIDI files with sortable/draggable columns and MIDI-specific metadata.
 
+function _midiFmt(key, vars) {
+  if (typeof appFmt !== 'function') return key;
+  return vars ? appFmt(key, vars) : appFmt(key);
+}
+
 let allMidiFiles = [];
 let filteredMidi = [];
 let _midiInfoCache = {};
@@ -128,7 +133,10 @@ function renderMidiTable() {
   const wrap = document.getElementById('midiTableWrap');
   if (!wrap) return;
   if (filteredMidi.length === 0 && allMidiFiles.length === 0) {
-    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim);">No MIDI files found. Run a preset scan to discover .mid files.</div>';
+    const emptyMsg = typeof escapeHtml === 'function'
+      ? escapeHtml(_midiFmt('ui.midi.empty_state'))
+      : _midiFmt('ui.midi.empty_state');
+    wrap.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-dim);">${emptyMsg}</div>`;
     return;
   }
   if (!_midiTableInit) {
@@ -166,12 +174,22 @@ function renderMidiTable() {
   tbody.innerHTML = filteredMidi.slice(0, MIDI_PAGE).map(buildMidiRow).join('');
   _midiRenderCount = Math.min(filteredMidi.length, MIDI_PAGE);
   if (_midiRenderCount < filteredMidi.length) {
-    tbody.insertAdjacentHTML('beforeend',
-      `<tr id="midiLoadMore"><td colspan="12" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMoreMidi">
-        Showing ${_midiRenderCount} of ${filteredMidi.length} — click to load more
-      </td></tr>`);
+    appendMidiLoadMoreRow(tbody);
   }
   if (!_midiMetadataRunning) loadMidiMetadata();
+}
+
+function appendMidiLoadMoreRow(tbody) {
+  const line = typeof appFmt === 'function'
+    ? appFmt('ui.js.load_more_hint', {
+        shown: _midiRenderCount.toLocaleString(),
+        total: filteredMidi.length.toLocaleString(),
+      })
+    : `Showing ${_midiRenderCount} of ${filteredMidi.length} — click to load more`;
+  tbody.insertAdjacentHTML('beforeend',
+    `<tr id="midiLoadMore"><td colspan="12" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMoreMidi">
+      ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
+    </td></tr>`);
 }
 
 function loadMoreMidi() {
@@ -183,10 +201,7 @@ function loadMoreMidi() {
   tbody.insertAdjacentHTML('beforeend', next.map(buildMidiRow).join(''));
   _midiRenderCount += next.length;
   if (_midiRenderCount < filteredMidi.length) {
-    tbody.insertAdjacentHTML('beforeend',
-      `<tr id="midiLoadMore"><td colspan="12" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMoreMidi">
-        Showing ${_midiRenderCount} of ${filteredMidi.length} — click to load more
-      </td></tr>`);
+    appendMidiLoadMoreRow(tbody);
   }
   if (!_midiMetadataRunning) loadMidiMetadata();
 }
@@ -198,7 +213,15 @@ function buildMidiRow(s) {
   const dur = info && info.duration ? (typeof formatTime === 'function' ? formatTime(info.duration) : info.duration.toFixed(1) + 's') : '';
   const trackNames = info && info.trackNames && info.trackNames.length > 0 ? info.trackNames.join(', ') : '';
   const checked = typeof batchSelected !== 'undefined' && batchSelected.has(s.path) ? ' checked' : '';
-  return `<tr data-midi-path="${hp}" title="${trackNames ? 'Tracks: ' + (typeof escapeHtml === 'function' ? escapeHtml(trackNames) : trackNames) : ''}">
+  const rowTitle = trackNames
+    ? (typeof escapeHtml === 'function'
+      ? escapeHtml(_midiFmt('ui.midi.tracks_tooltip', { names: trackNames }))
+      : _midiFmt('ui.midi.tracks_tooltip', { names: trackNames }))
+    : '';
+  const revealT = typeof escapeHtml === 'function'
+    ? escapeHtml(_midiFmt('menu.reveal_in_finder'))
+    : _midiFmt('menu.reveal_in_finder');
+  return `<tr data-midi-path="${hp}" title="${rowTitle}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${hn}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.name, _midiSearch, 'fuzzy') : hn}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
     <td style="text-align:center;">${info ? info.trackCount : ''}</td>
@@ -211,7 +234,7 @@ function buildMidiRow(s) {
     <td class="col-size">${s.sizeFormatted}</td>
     <td class="col-path" title="${hp}">${typeof escapeHtml === 'function' ? escapeHtml(s.directory) : s.directory}</td>
     <td class="col-actions" data-action-stop>
-      <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${hp}" title="Reveal in Finder">&#128193;</button>
+      <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${hp}" title="${revealT}">&#128193;</button>
     </td>
   </tr>`;
 }

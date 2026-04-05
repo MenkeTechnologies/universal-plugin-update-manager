@@ -1,4 +1,9 @@
 // ── DAW Projects ──
+function _dawFmt(key, vars) {
+  if (typeof appFmt !== 'function') return key;
+  return vars ? appFmt(key, vars) : appFmt(key);
+}
+
 let allDawProjects = [];
 let filteredDawProjects = [];
 let dawSortKey = 'name';
@@ -171,10 +176,19 @@ function buildDawRow(p) {
   const checked = batchSelected.has(p.path) ? ' checked' : '';
   const xrefSupported = typeof isXrefSupported === 'function' && isXrefSupported(p.format);
   const cached = typeof _xrefCache !== 'undefined' && _xrefCache[p.path];
+  const xrefTitle = typeof escapeHtml === 'function'
+    ? escapeHtml(_dawFmt('ui.tt.daw_xref_show_plugins'))
+    : _dawFmt('ui.tt.daw_xref_show_plugins');
   const xrefBtn = xrefSupported
-    ? `<button class="xref-badge${cached && cached.length > 0 ? ' has-plugins' : ''}" data-action="showXref" data-path="${hp}" data-name="${escapeHtml(p.name)}" title="Show plugins used in this project">&#9889;${cached ? ' ' + cached.length : ''}</button>`
+    ? `<button class="xref-badge${cached && cached.length > 0 ? ' has-plugins' : ''}" data-action="showXref" data-path="${hp}" data-name="${escapeHtml(p.name)}" title="${xrefTitle}">&#9889;${cached ? ' ' + cached.length : ''}</button>`
     : '';
-  return `<tr data-daw-path="${hp}" data-daw-name="${escapeHtml(p.daw)}" data-daw-search="${escapeHtml((p.name || '').toLowerCase())}" title="Double-click to open in ${escapeHtml(p.daw)}" style="cursor: pointer;">
+  const rowTt = typeof escapeHtml === 'function'
+    ? escapeHtml(_dawFmt('ui.tt.daw_open_in_project', { daw: p.daw }))
+    : _dawFmt('ui.tt.daw_open_in_project', { daw: p.daw });
+  const revealT = typeof escapeHtml === 'function'
+    ? escapeHtml(_dawFmt('menu.reveal_in_finder'))
+    : _dawFmt('menu.reveal_in_finder');
+  return `<tr data-daw-path="${hp}" data-daw-name="${escapeHtml(p.daw)}" data-daw-search="${escapeHtml((p.name || '').toLowerCase())}" title="${rowTt}" style="cursor: pointer;">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(p.name)}">${_lastDawSearch ? highlightMatch(p.name, _lastDawSearch, _lastDawMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
     <td class="col-format"><span class="format-badge ${dawClass}">${escapeHtml(p.daw)}</span></td>
@@ -183,7 +197,7 @@ function buildDawRow(p) {
     <td class="col-date">${p.modified}</td>
     <td class="col-path" title="${escapeHtml(p.path)}">${escapeHtml(p.directory)}</td>
     <td class="col-actions" data-action-stop>
-      <button class="btn-small btn-folder" data-action="openDawFolder" data-path="${hp}" title="Reveal in Finder">&#128193;</button>
+      <button class="btn-small btn-folder" data-action="openDawFolder" data-path="${hp}" title="${revealT}">&#128193;</button>
     </td>
   </tr>`;
 }
@@ -250,9 +264,15 @@ function renderDawTable() {
 }
 
 function appendDawLoadMore(tbody) {
+  const line = typeof appFmt === 'function'
+    ? appFmt('ui.js.load_more_hint', {
+        shown: dawRenderCount.toLocaleString(),
+        total: _dawTotalCount.toLocaleString(),
+      })
+    : `Showing ${dawRenderCount} of ${_dawTotalCount} — click to load more`;
   tbody.insertAdjacentHTML('beforeend',
     `<tr id="dawLoadMore"><td colspan="7" style="text-align: center; padding: 12px; color: var(--text-muted); cursor: pointer;" data-action="loadMoreDaw">
-      Showing ${dawRenderCount} of ${filteredDawProjects.length} &#8212; click to load more
+      ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
     </td></tr>`);
 }
 

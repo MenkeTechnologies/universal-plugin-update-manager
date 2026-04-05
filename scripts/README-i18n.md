@@ -62,6 +62,7 @@ python3 scripts/merge_batch_into_locales.py scripts/i18n_batches/your_batch.json
 Run `node scripts/run-js-tests.mjs` (or `pnpm run test:js` if wired) after catalog edits.
 
 - **PDF tab:** `frontend/js/pdf.js` builds table rows and scan/load-more UI with `appFmt` / shared keys (`ui.js.load_more_hint`, `ui.audio.scan_progress_line`, etc.); `index.html` uses `data-i18n` on `ui.pdf.*` for the stats bar and PDF walker tile header.
+- **Sample / MIDI / preset / DAW tables:** Row tooltips and action buttons use `appFmt` / `_audioFmt` / `_midiFmt` / `_presetFmt` / `_dawFmt` (e.g. `ui.audio.row_btn_*`, `menu.reveal_in_finder`, `ui.js.load_more_hint`, `ui.tt.daw_open_in_project`). Cell text is still file metadata (paths, formats, BPM numbers).
 
 ## Deprecated
 

@@ -13,6 +13,11 @@ let _presetTotalUnfiltered = 0;
 let _presetStatsTotalBytes = 0;
 let _presetStatsFormatCounts = {};
 
+function _presetFmt(key, vars) {
+  if (typeof appFmt !== 'function') return key;
+  return vars ? appFmt(key, vars) : appFmt(key);
+}
+
 function presetTableHeadHtml() {
   const tc = typeof appTableCol === 'function' ? appTableCol : (k) => k;
   const sel = typeof escapeHtml === 'function' ? escapeHtml(tc('ui.audio.th_select_all')) : tc('ui.audio.th_select_all');
@@ -96,7 +101,10 @@ function formatPresetSize(bytes) {
 function buildPresetRow(p) {
   const hp = escapeHtml(p.path);
   const checked = batchSelected.has(p.path) ? ' checked' : '';
-  return `<tr data-preset-path="${hp}" data-preset-format="${escapeHtml(p.format)}" data-preset-name="${escapeHtml((p.name || '').toLowerCase())}" style="cursor: pointer;" title="Double-click to reveal in Finder">
+  const rowTt = typeof escapeHtml === 'function'
+    ? escapeHtml(_presetFmt('ui.tt.row_double_click_reveal_finder'))
+    : _presetFmt('ui.tt.row_double_click_reveal_finder');
+  return `<tr data-preset-path="${hp}" data-preset-format="${escapeHtml(p.format)}" data-preset-name="${escapeHtml((p.name || '').toLowerCase())}" style="cursor: pointer;" title="${rowTt}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td>${_lastPresetSearch ? highlightMatch(p.name, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
     <td class="col-format"><span class="format-badge format-default">${p.format}</span></td>
@@ -217,9 +225,17 @@ function _legacyFilterPresets() {
   presetRenderCount = page.length;
 
   if (filteredPresets.length > PRESET_PAGE_SIZE) {
+    const rem = filteredPresets.length - PRESET_PAGE_SIZE;
+    const btnLabel = typeof appFmt === 'function'
+      ? appFmt('ui.preset.load_more_btn', { n: rem.toLocaleString() })
+      : `Load more (${rem} remaining)`;
+    const btnTitle = typeof escapeHtml === 'function'
+      ? escapeHtml(_presetFmt('ui.tt.load_next_preset_batch'))
+      : _presetFmt('ui.tt.load_next_preset_batch');
+    const safeLabel = typeof escapeHtml === 'function' ? escapeHtml(btnLabel) : btnLabel;
     tbody.insertAdjacentHTML('beforeend',
       `<tr><td colspan="7" style="text-align:center; padding: 12px;">
-        <button class="btn btn-secondary" data-action="loadMorePresets" title="Load next batch of presets">Load more (${filteredPresets.length - PRESET_PAGE_SIZE} remaining)</button>
+        <button class="btn btn-secondary" data-action="loadMorePresets" title="${btnTitle}">${safeLabel}</button>
       </td></tr>`);
   }
 
@@ -246,9 +262,15 @@ function renderPresetTable() {
   tbody.innerHTML = filteredPresets.map(buildPresetRow).join('');
   presetRenderCount = filteredPresets.length;
   if (presetRenderCount < _presetTotalCount) {
+    const line = typeof appFmt === 'function'
+      ? appFmt('ui.js.load_more_hint', {
+          shown: presetRenderCount.toLocaleString(),
+          total: _presetTotalCount.toLocaleString(),
+        })
+      : `Showing ${presetRenderCount} of ${_presetTotalCount} — click to load more`;
     tbody.insertAdjacentHTML('beforeend',
       `<tr><td colspan="7" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMorePresets">
-        Showing ${presetRenderCount} of ${_presetTotalCount} — click to load more
+        ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
       </td></tr>`);
   }
   const fc = document.getElementById('presetFilteredCount');
