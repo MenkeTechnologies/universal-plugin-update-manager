@@ -302,7 +302,7 @@ fn walk_dir_parallel(
     {
         let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
         let orig = normalize_macos_path(dir.to_path_buf());
-        let canon = fs::canonicalize(dir).ok().map(|p| normalize_macos_path(p));
+        let canon = fs::canonicalize(dir).ok().map(normalize_macos_path);
         // Dedup on canonical path (resolves symlinks), fall back to original
         let key = canon.unwrap_or_else(|| orig.clone());
         if !vis.insert(key) {

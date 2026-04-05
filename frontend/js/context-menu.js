@@ -543,7 +543,7 @@ document.addEventListener('contextmenu', (e) => {
       { icon: '&#128202;', label: appFmt('menu.heatmap_dashboard'), action: () => { if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard(); } },
       { icon: '&#128200;', label: appFmt('menu.dep_graph'), action: () => { if (typeof showDepGraph === 'function') showDepGraph(); } },
       '---',
-      { icon: '&#127760;', label: appFmt('menu.open_github_repository'), action: () => openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager') },
+      { icon: '&#127760;', label: appFmt('menu.open_github_repository'), action: () => openUpdate('https://github.com/MenkeTechnologies/Audio-Haxor') },
       { icon: '&#9881;', label: appFmt('menu.tab_settings'), action: () => switchTab('settings') },
       '---',
       { icon: '&#9889;', label: appFmt('menu.scan_all'), action: () => scanAll() },

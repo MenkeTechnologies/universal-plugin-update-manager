@@ -17,9 +17,9 @@ describe('frontend/js/smart-playlists.js matchesSmartRule / evaluateSmartPlaylis
         getItem: () => null,
       },
       allAudioSamples: [
-        { path: '/k.wav', name: 'Kick.wav', format: 'WAV', sizeBytes: 2 * 1024 * 1024 },
-        { path: '/loops/hihat.aiff', name: 'HiHat', format: 'AIFF', sizeBytes: 400 * 1024 },
-        { path: '/big.wav', name: 'Big', format: 'WAV', sizeBytes: 20 * 1024 * 1024 },
+        { path: '/k.wav', name: 'Kick.wav', format: 'WAV', sizeBytes: 2 * 1024 * 1024, duration: 30 },
+        { path: '/loops/hihat.aiff', name: 'HiHat', format: 'AIFF', sizeBytes: 400 * 1024, duration: 400 },
+        { path: '/big.wav', name: 'Big', format: 'WAV', sizeBytes: 20 * 1024 * 1024, duration: 12 },
       ],
       _bpmCache: {
         '/k.wav': 118,
@@ -107,6 +107,23 @@ describe('frontend/js/smart-playlists.js matchesSmartRule / evaluateSmartPlaylis
     assert.strictEqual(
       U.evaluateSmartPlaylist({ rules: [], matchMode: 'all' }).length,
       0
+    );
+  });
+
+  it('duration_max: seconds, requires sample.duration', () => {
+    const short = U.allAudioSamples[0];
+    assert.strictEqual(U.matchesSmartRule(short, { type: 'duration_max', value: '60' }), true);
+    assert.strictEqual(U.matchesSmartRule(short, { type: 'duration_max', value: '10' }), false);
+    assert.strictEqual(
+      U.matchesSmartRule({ path: '/x.wav', name: 'x', format: 'WAV', sizeBytes: 1 }, { type: 'duration_max', value: '60' }),
+      false
+    );
+  });
+
+  it('unknown rule type does not match', () => {
+    assert.strictEqual(
+      U.matchesSmartRule(U.allAudioSamples[0], { type: 'not_a_real_type', value: '' }),
+      false
     );
   });
 });

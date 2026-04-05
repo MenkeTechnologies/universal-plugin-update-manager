@@ -4938,6 +4938,43 @@ fn db_pdf_stats(scan_id: Option<String>) -> Result<db::PdfStatsResult, String> {
     db::global().pdf_stats(scan_id.as_deref())
 }
 
+#[tauri::command(rename_all = "snake_case")]
+fn db_audio_filter_stats(
+    search: Option<String>,
+    format_filter: Option<String>,
+) -> Result<db::FilterStatsResult, String> {
+    db::global().audio_filter_stats(search.as_deref(), format_filter.as_deref())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn db_daw_filter_stats(
+    search: Option<String>,
+    daw_filter: Option<String>,
+) -> Result<db::FilterStatsResult, String> {
+    db::global().daw_filter_stats(search.as_deref(), daw_filter.as_deref())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn db_preset_filter_stats(
+    search: Option<String>,
+    format_filter: Option<String>,
+) -> Result<db::FilterStatsResult, String> {
+    db::global().preset_filter_stats(search.as_deref(), format_filter.as_deref())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn db_plugin_filter_stats(
+    search: Option<String>,
+    type_filter: Option<String>,
+) -> Result<db::FilterStatsResult, String> {
+    db::global().plugin_filter_stats(search.as_deref(), type_filter.as_deref())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn db_pdf_filter_stats(search: Option<String>) -> Result<db::FilterStatsResult, String> {
+    db::global().pdf_filter_stats(search.as_deref())
+}
+
 #[tauri::command]
 fn db_list_scans() -> Result<Vec<db::ScanInfo>, String> {
     db::global().list_scans()
@@ -5384,6 +5421,11 @@ pub fn run() {
             db_preset_stats,
             db_query_pdfs,
             db_pdf_stats,
+            db_audio_filter_stats,
+            db_daw_filter_stats,
+            db_preset_filter_stats,
+            db_plugin_filter_stats,
+            db_pdf_filter_stats,
             db_list_scans,
             db_update_bpm,
             db_update_key,
@@ -5438,7 +5480,7 @@ pub fn run() {
                     .to_string()
             };
             let menu =
-                native_menu::build_native_menu_bar(&handle, &strings).map_err(|e| e.to_string())?;
+                native_menu::build_native_menu_bar(handle, &strings).map_err(|e| e.to_string())?;
             app.set_menu(menu).map_err(|e| e.to_string())?;
 
             // Handle menu events — emit to frontend JS

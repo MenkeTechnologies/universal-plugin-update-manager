@@ -83,11 +83,14 @@ function matchesSmartRule(sample, rule) {
       return key.toLowerCase().includes((rule.value || '').toLowerCase());
     }
     case 'duration_max': {
-      if (typeof _bpmCache === 'undefined') return true;
-      // Duration not directly on sample object; skip if no data
-      return true;
+      const maxSec = parseFloat(rule.value || '0');
+      if (!(maxSec > 0) || !Number.isFinite(maxSec)) return false;
+      const dur = sample.duration;
+      if (dur == null || !Number.isFinite(dur) || dur <= 0) return false;
+      return dur <= maxSec;
     }
-    default: return true;
+    default:
+      return false;
   }
 }
 
@@ -188,6 +191,7 @@ function showSmartPlaylistEditor(existingId) {
     { value: 'path_contains', label: appFmt('ui.sp_rule_path_contains') },
     { value: 'size_max', label: appFmt('ui.sp_rule_size_max') },
     { value: 'size_min', label: appFmt('ui.sp_rule_size_min') },
+    { value: 'duration_max', label: appFmt('ui.sp_rule_duration_max') },
     { value: 'key', label: appFmt('ui.sp_rule_key') },
   ];
 

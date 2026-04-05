@@ -50,10 +50,15 @@ function matchesSmartRule(sample, rule, ctx = {}) {
       if (!key) return false;
       return key.toLowerCase().includes((rule.value || '').toLowerCase());
     }
-    case 'duration_max':
-      return true;
+    case 'duration_max': {
+      const maxSec = parseFloat(rule.value || '0');
+      if (!(maxSec > 0) || !Number.isFinite(maxSec)) return false;
+      const dur = sample.duration;
+      if (dur == null || !Number.isFinite(dur) || dur <= 0) return false;
+      return dur <= maxSec;
+    }
     default:
-      return true;
+      return false;
   }
 }
 
@@ -166,12 +171,27 @@ describe('matchesSmartRule tag / favorite / recently_played', () => {
 });
 
 describe('matchesSmartRule default', () => {
-  it('unknown rule type returns true', () => {
-    assert.strictEqual(matchesSmartRule(S1, { type: 'future_rule', value: 'x' }), true);
+  it('unknown rule type returns false', () => {
+    assert.strictEqual(matchesSmartRule(S1, { type: 'future_rule', value: 'x' }), false);
+  });
+});
+
+describe('matchesSmartRule duration_max', () => {
+  it('matches when duration is within max (seconds)', () => {
+    assert.strictEqual(
+      matchesSmartRule({ ...S1, duration: 45 }, { type: 'duration_max', value: '60' }),
+      true
+    );
+    assert.strictEqual(
+      matchesSmartRule({ ...S1, duration: 90 }, { type: 'duration_max', value: '60' }),
+      false
+    );
   });
 
-  it('duration_max returns true', () => {
-    assert.strictEqual(matchesSmartRule(S1, { type: 'duration_max', value: '60' }), true);
+  it('false when duration unknown or invalid max', () => {
+    assert.strictEqual(matchesSmartRule(S1, { type: 'duration_max', value: '60' }), false);
+    assert.strictEqual(matchesSmartRule({ ...S1, duration: 10 }, { type: 'duration_max', value: '' }), false);
+    assert.strictEqual(matchesSmartRule({ ...S1, duration: 10 }, { type: 'duration_max', value: '0' }), false);
   });
 });
 

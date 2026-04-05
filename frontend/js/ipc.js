@@ -34,6 +34,7 @@ async function reloadAppStrings(locale) {
     locale === 'it' ||
     locale === 'el' ||
     locale === 'pl' ||
+    locale === 'ru' ||
     locale === 'en'
       ? locale
       : null;
@@ -113,8 +114,8 @@ listen('menu-action', (event) => {
     case 'cmd_palette': openPalette(); break;
     case 'help_overlay': toggleHelpOverlay(); break;
     // Help
-    case 'github': showToast(toastFmt('toast.opening_github')); openUpdate('https://github.com/MenkeTechnologies/universal-plugin-update-manager'); break;
-    case 'docs': showToast(toastFmt('toast.opening_docs')); openUpdate('https://menketechnologies.github.io/universal-plugin-update-manager/'); break;
+    case 'github': showToast(toastFmt('toast.opening_github')); openUpdate('https://github.com/MenkeTechnologies/Audio-Haxor'); break;
+    case 'docs': showToast(toastFmt('toast.opening_docs')); openUpdate('https://github.com/MenkeTechnologies/Audio-Haxor'); break;
     // Find (handled by existing Cmd+F)
     case 'find': {
       const activeTab = document.querySelector('.tab-content.active');
@@ -676,6 +677,11 @@ window.vstUpdater = {
   dbQueryPresets: (params) => invoke('db_query_presets', params || {}),
   dbQueryPdfs: (params) => invoke('db_query_pdfs', params || {}),
   dbPdfStats: (scanId) => invoke('db_pdf_stats', { scanId: scanId || null }),
+  dbAudioFilterStats: (search, formatFilter) => invoke('db_audio_filter_stats', { search: search || null, format_filter: formatFilter || null }),
+  dbDawFilterStats: (search, dawFilter) => invoke('db_daw_filter_stats', { search: search || null, daw_filter: dawFilter || null }),
+  dbPresetFilterStats: (search, formatFilter) => invoke('db_preset_filter_stats', { search: search || null, format_filter: formatFilter || null }),
+  dbPluginFilterStats: (search, typeFilter) => invoke('db_plugin_filter_stats', { search: search || null, type_filter: typeFilter || null }),
+  dbPdfFilterStats: (search) => invoke('db_pdf_filter_stats', { search: search || null }),
 };
 
 // ── Preferences layer (file-backed, survives reboots) ──
