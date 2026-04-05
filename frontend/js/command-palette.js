@@ -24,6 +24,7 @@ function collectPaletteItems() {
     { type: 'tab', name: appFmt('menu.tab_visualizer'), icon: '&#127911;', action: () => switchTab('visualizer') },
     { type: 'tab', name: appFmt('menu.tab_walkers'), icon: '&#128270;', action: () => switchTab('walkers') },
     { type: 'tab', name: appFmt('menu.tab_midi'), icon: '&#127924;', action: () => switchTab('midi') },
+    { type: 'tab', name: appFmt('menu.tab_pdf'), icon: '&#128196;', action: () => switchTab('pdf') },
     { type: 'tab', name: appFmt('menu.tab_settings'), icon: '&#9881;', action: () => switchTab('settings') },
   ];
   items.push(...tabs);
@@ -33,7 +34,18 @@ function collectPaletteItems() {
   items.push({ type: 'action', name: appFmt('menu.scan_samples'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_samples')); scanAudioSamples(); } });
   items.push({ type: 'action', name: appFmt('menu.scan_daw'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_daw_projects')); scanDawProjects(); } });
   items.push({ type: 'action', name: appFmt('menu.scan_presets'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_presets')); scanPresets(); } });
-  items.push({ type: 'action', name: 'Scan PDFs', icon: '&#8635;', action: () => { showToast('Scanning for PDFs...'); scanPdfs(); } });
+  items.push({ type: 'action', name: appFmt('ui.btn.scan_pdfs'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_pdfs_progress')); scanPdfs(); } });
+  items.push({ type: 'action', name: appFmt('menu.stop_pdf_scan'), icon: '&#9632;', action: () => { if (typeof stopPdfScan === 'function') stopPdfScan(); } });
+  items.push({ type: 'action', name: appFmt('menu.export_pdfs'), icon: '&#8615;', action: () => { if (typeof exportPdfs === 'function') exportPdfs(); } });
+  items.push({ type: 'action', name: appFmt('menu.import_pdfs'), icon: '&#8613;', action: () => { if (typeof importPdfs === 'function') importPdfs(); } });
+  items.push({ type: 'action', name: appFmt('menu.build_fingerprint_cache'), icon: '&#127925;', action: () => {
+    const paths = (typeof allAudioSamples !== 'undefined' ? allAudioSamples : []).map(s => s.path);
+    if (paths.length === 0) { showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error'); return; }
+    showToast(toastFmt('toast.fingerprint_building_n', { n: paths.length.toLocaleString() }), 4000);
+    window.vstUpdater.buildFingerprintCache(paths)
+      .then(res => showToast(toastFmt('toast.fingerprint_build_complete_n', { n: res.built.toLocaleString() })))
+      .catch(e => showToast(toastFmt('toast.fingerprint_build_failed', { err: e.message || e }), 4000, 'error'));
+  } });
   items.push({ type: 'action', name: appFmt('menu.check_updates'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.checking_updates')); checkUpdates(); } });
   items.push({ type: 'action', name: appFmt('menu.find_duplicates'), icon: '&#128270;', action: () => { showToast(toastFmt('toast.scanning_duplicates')); showDuplicateReport(); } });
   items.push({ type: 'action', name: appFmt('menu.reset_all_scans'), icon: '&#128465;', action: () => { showToast(toastFmt('toast.resetting_scans')); resetAllScans(); } });
@@ -227,6 +239,7 @@ function filterPaletteItems(query, items) {
     if (typeof allPlugins !== 'undefined') dataSearch(allPlugins, 'plugin', '&#9889;', p => ({ name: p.name, detail: p.type + (p.manufacturer ? ' · ' + p.manufacturer : ''), fields: [p.name, p.type, p.manufacturer || ''], action: () => { switchTab('plugins'); setTimeout(() => { const el = document.getElementById('pluginSearchInput'); if (el) { el.value = p.name; filterPlugins(); } }, 100); } }));
     if (typeof allDawProjects !== 'undefined') dataSearch(allDawProjects, 'daw', '&#127911;', d => ({ name: d.name, detail: d.daw + ' · ' + d.sizeFormatted, fields: [d.name, d.daw, d.format], action: () => { switchTab('daw'); setTimeout(() => { const el = document.getElementById('dawSearchInput'); if (el) { el.value = d.name; filterDawProjects(); } }, 100); } }));
     if (typeof allPresets !== 'undefined') dataSearch(allPresets.slice(0, 5000), 'preset', '&#127924;', p => ({ name: p.name, detail: p.format, fields: [p.name, p.format], action: () => { switchTab('presets'); setTimeout(() => { const el = document.getElementById('presetSearchInput'); if (el) { el.value = p.name; filterPresets(); } }, 100); } }));
+    if (typeof allPdfs !== 'undefined') dataSearch(allPdfs.slice(0, 5000), 'pdf', '&#128196;', p => ({ name: p.name, detail: p.sizeFormatted || '', fields: [p.name, p.directory || ''], action: () => { switchTab('pdf'); setTimeout(() => { const el = document.getElementById('pdfSearchInput'); if (el) { el.value = p.name; filterPdfs(); } }, 100); } }));
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, PALETTE_MAX).map(s => s.item);

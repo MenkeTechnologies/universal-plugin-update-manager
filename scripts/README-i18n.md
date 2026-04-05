@@ -51,6 +51,15 @@ If English already contains new keys and you need the same keys in `de`/`es`/`sv
 python3 scripts/merge_batch_into_locales.py scripts/i18n_batches/your_batch.json
 ```
 
+## Automated checks (CI)
+
+- `test/i18n-html-keys.test.js` — every `data-i18n*` key in `frontend/index.html` exists in `app_i18n_en.json`.
+- `test/i18n-js-keys.test.js` — string literals that look like catalog keys (`ui.*`, `menu.*`, `toast.*`, …) under `frontend/js` are defined in English.
+- `test/i18n-no-raw-showtoast.test.js` — `showToast` is not called with a raw `'…'` / `"…"` first argument (use `toastFmt('toast.*')` or `String(err)`).
+- `test/i18n-catalog-files.test.js` — shipped locale JSON files match `app_i18n.rs` seeds, UTF-8, and **lexicographically sorted keys** (stable merges).
+
+Run `node scripts/run-js-tests.mjs` (or `pnpm run test:js` if wired) after catalog edits.
+
 ## Deprecated
 
 - `merge_ui_i18n_keys.py` — stub only; prints instructions and exits with code 1. Use `merge_i18n_keys.py` + `scripts/i18n_batches/*.json` instead.

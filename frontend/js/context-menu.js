@@ -377,9 +377,9 @@ document.addEventListener('contextmenu', (e) => {
     const name = pdfRow.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
     const items = [
       { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openPdfFile(path) },
-      { icon: '&#9889;', label: 'Open with default app', ..._noEcho, action: () => window.vstUpdater.openFileDefault(path).catch(err => showToast('Failed to open: ' + (err.message || err), 4000, 'error')) },
-      { icon: '&#128195;', label: 'Open in Preview', ..._noEcho, action: () => openWithApp(path, 'Preview') },
-      { icon: '&#128196;', label: 'Open in Adobe Acrobat', ..._noEcho, action: () => openWithApp(path, 'Adobe Acrobat') },
+      { icon: '&#9889;', label: appFmt('menu.open_with_default_app'), ..._noEcho, action: () => window.vstUpdater.openFileDefault(path).catch(err => showToast(toastFmt('toast.failed_open_file', { err: err.message || err }), 4000, 'error')) },
+      { icon: '&#128195;', label: appFmt('menu.open_in_preview'), ..._noEcho, action: () => openWithApp(path, 'Preview') },
+      { icon: '&#128196;', label: appFmt('menu.open_in_adobe_acrobat'), ..._noEcho, action: () => openWithApp(path, 'Adobe Acrobat') },
       { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
       '---',
       { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
@@ -632,12 +632,18 @@ document.addEventListener('contextmenu', (e) => {
         items.push({ icon: '&#9889;', label: appFmt('menu.find_projects_using'), action: () => { const projects = findProjectsUsingPlugin(name); showReverseXrefModal(name, projects); } });
       }
       items.push('---');
+    } else if (type === 'pdf') {
+      items.push({ icon: '&#9889;', label: appFmt('menu.open_with_default_app'), ..._noEcho, action: () => window.vstUpdater.openFileDefault(path).catch(err => showToast(toastFmt('toast.failed_open_file', { err: err.message || err }), 4000, 'error')) });
+      items.push({ icon: '&#128195;', label: appFmt('menu.open_in_preview'), ..._noEcho, action: () => openWithApp(path, 'Preview') });
+      items.push({ icon: '&#128196;', label: appFmt('menu.open_in_adobe_acrobat'), ..._noEcho, action: () => openWithApp(path, 'Adobe Acrobat') });
+      items.push('---');
     }
 
     items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => {
       if (type === 'sample') openAudioFolder(path);
       else if (type === 'daw') openDawFolder(path);
       else if (type === 'preset') openPresetFolder(path);
+      else if (type === 'pdf') openPdfFile(path);
       else openFolder(path);
     }});
     items.push({ icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } });
@@ -786,8 +792,8 @@ document.addEventListener('contextmenu', (e) => {
   const tabBtn = e.target.closest('.tab-btn');
   if (tabBtn) {
     const tab = tabBtn.dataset.tab;
-    const exportMap = { plugins: 'exportPlugins', samples: 'exportAudio', daw: 'exportDaw', presets: 'exportPresets' };
-    const scanMap = { plugins: 'scanPlugins', samples: 'scanAudioSamples', daw: 'scanDawProjects', presets: 'scanPresets' };
+    const exportMap = { plugins: 'exportPlugins', samples: 'exportAudio', daw: 'exportDaw', presets: 'exportPresets', pdf: 'exportPdfs' };
+    const scanMap = { plugins: 'scanPlugins', samples: 'scanAudioSamples', daw: 'scanDawProjects', presets: 'scanPresets', pdf: 'scanPdfs' };
     const items = [
       { icon: '&#8635;', label: appFmt('menu.switch_to_tab'), action: () => switchTab(tab) },
       '---',

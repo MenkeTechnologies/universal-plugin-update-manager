@@ -284,15 +284,15 @@ document.addEventListener('click', (e) => {
     case 'buildCacheTable': {
       const c = el.dataset.cache;
       if (c === 'xref' && typeof buildXrefIndex === 'function') {
-        showToast('Building xref index for all DAW projects...');
+        showToast(toastFmt('toast.building_xref_index_all_daw'));
         buildXrefIndex().then(() => { if (typeof renderCacheStats === 'function') renderCacheStats(); });
       } else if (c === 'fingerprint') {
         const paths = (typeof allAudioSamples !== 'undefined' ? allAudioSamples : []).map(s => s.path);
-        if (paths.length === 0) { showToast('No audio samples loaded. Scan samples first.', 4000, 'error'); break; }
-        showToast('Building fingerprints for ' + paths.length.toLocaleString() + ' samples (this will take a while)...', 4000);
+        if (paths.length === 0) { showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error'); break; }
+        showToast(toastFmt('toast.fingerprint_building_n_slow', { n: paths.length.toLocaleString() }), 4000);
         window.vstUpdater.buildFingerprintCache(paths)
-          .then(res => { showToast('Fingerprint build complete — ' + res.built.toLocaleString() + ' computed, ' + res.cached.toLocaleString() + ' cached total'); if (typeof renderCacheStats === 'function') renderCacheStats(); })
-          .catch(e => showToast('Fingerprint build failed: ' + (e.message || e), 4000, 'error'));
+          .then(res => { showToast(toastFmt('toast.fingerprint_build_complete_n_cached', { built: res.built.toLocaleString(), cached: res.cached.toLocaleString() })); if (typeof renderCacheStats === 'function') renderCacheStats(); })
+          .catch(e => showToast(toastFmt('toast.fingerprint_build_failed', { err: e.message || e }), 4000, 'error'));
       }
       break;
     }
@@ -405,7 +405,7 @@ document.addEventListener('dblclick', (e) => {
   if (pdfRow && !e.target.closest('.col-actions')) {
     e.preventDefault();
     window.vstUpdater.openFileDefault(pdfRow.dataset.pdfPath)
-      .catch(err => showToast('Failed to open PDF: ' + (err.message || err), 4000, 'error'));
+      .catch(err => showToast(toastFmt('toast.failed_open_pdf', { err: err.message || err }), 4000, 'error'));
     return;
   }
 });
