@@ -476,6 +476,30 @@ function formatCacheSize(bytes) {
   return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
 }
 
+/** Maps `db_cache_stats` row `key` → `appFmt` catalog key (Database Caches table). */
+const CACHE_STAT_I18N_KEYS = {
+  bpm: 'ui.settings.cache_row_bpm',
+  key: 'ui.settings.cache_row_key',
+  lufs: 'ui.settings.cache_row_lufs',
+  waveform: 'ui.settings.cache_row_waveform',
+  spectrogram: 'ui.settings.cache_row_spectrogram',
+  xref: 'ui.settings.cache_row_xref',
+  fingerprint: 'ui.settings.cache_row_fingerprint',
+  kvr: 'ui.settings.cache_row_kvr',
+  plugin_scans: 'ui.settings.cache_row_plugin_scans',
+  audio_scans: 'ui.settings.cache_row_audio_scans',
+  daw_scans: 'ui.settings.cache_row_daw_scans',
+  preset_scans: 'ui.settings.cache_row_preset_scans',
+  pdf_scans: 'ui.settings.cache_row_pdf_scans',
+  database: 'ui.settings.cache_row_database',
+};
+
+function cacheStatRowLabel(statKey, fallbackLabel, _cf) {
+  const k = CACHE_STAT_I18N_KEYS[statKey];
+  if (k && typeof _cf === 'function') return _cf(k);
+  return fallbackLabel;
+}
+
 async function renderCacheStats() {
   const grid = document.getElementById('cacheStatsGrid');
   if (!grid) return;
@@ -490,7 +514,18 @@ async function renderCacheStats() {
         <th style="text-align:center;padding:4px 8px;width:60px;"></th>
       </tr></thead>
       <tbody>${stats.map(s => {
-        const countStr = s.count > 0 ? s.count.toLocaleString() + (s.total > 0 && s.key !== 'database' && !s.key.includes('_scans') ? ` / ${s.total.toLocaleString()}` : s.key.includes('_scans') ? ` (${s.total} scans)` : '') : (s.key === 'database' ? '' : '0');
+        let countStr = '';
+        if (s.count > 0) {
+          if (s.total > 0 && s.key !== 'database' && !s.key.includes('_scans')) {
+            countStr = s.count.toLocaleString() + ` / ${s.total.toLocaleString()}`;
+          } else if (s.key.includes('_scans')) {
+            countStr = `${s.count.toLocaleString()} (${_cf('ui.settings.cache_scans_suffix', { n: s.total.toLocaleString() })})`;
+          } else {
+            countStr = s.count.toLocaleString();
+          }
+        } else {
+          countStr = s.key === 'database' ? '' : '0';
+        }
         const sizeStr = formatCacheSize(s.sizeBytes);
         const canClear = s.key !== 'database' && !s.key.includes('_scans');
         // On-demand caches: expose a BUILD action when the cache is empty so users
@@ -498,12 +533,14 @@ async function renderCacheStats() {
         const canBuild = s.count === 0 && (s.key === 'xref' || s.key === 'fingerprint');
         let action = '';
         if (canBuild) {
-          action = `<button class="btn btn-secondary" data-action="buildCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">BUILD</button>`;
+          action = `<button class="btn btn-secondary" data-action="buildCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">${_cf('ui.settings.cache_build')}</button>`;
         } else if (canClear && s.count > 0) {
           action = `<button class="btn btn-secondary" data-action="clearCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">${_cf('ui.settings.cache_clear')}</button>`;
         }
+        const rowLabel = cacheStatRowLabel(s.key, s.label, _cf);
+        const safeLabel = typeof escapeHtml === 'function' ? escapeHtml(rowLabel) : rowLabel;
         return `<tr style="border-bottom:1px solid rgba(26,26,62,0.2);">
-          <td style="padding:4px 8px;color:var(--text);">${s.label}</td>
+          <td style="padding:4px 8px;color:var(--text);">${safeLabel}</td>
           <td style="padding:4px 8px;text-align:right;color:var(--text-muted);">${countStr}</td>
           <td style="padding:4px 8px;text-align:right;color:${s.sizeBytes > 10*1024*1024 ? 'var(--yellow)' : 'var(--text-muted)'};">${sizeStr}</td>
           <td style="padding:4px 8px;text-align:center;">${action}</td>
