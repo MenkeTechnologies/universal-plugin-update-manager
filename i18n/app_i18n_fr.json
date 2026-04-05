@@ -729,6 +729,7 @@
   "ui.export.col_modified": "Modifié",
   "ui.export.col_name": "Nom",
   "ui.export.col_notes": "Remarques",
+  "ui.export.col_pages": "Pages",
   "ui.export.col_path": "Chemin",
   "ui.export.col_plugin": "Plugin",
   "ui.export.col_project": "Projet",
