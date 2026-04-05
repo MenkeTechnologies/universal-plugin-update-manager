@@ -756,7 +756,11 @@ mod tests {
         assert_eq!(pdf.len(), 1, "expected 1 pdf");
         assert_eq!(daw.len(), 1, "expected 1 daw");
         assert_eq!(daw[0].format, "ALS");
-        assert_eq!(preset.len(), 2, "expected 2 presets (fxp + mid)");
+        assert_eq!(
+            preset.len(),
+            1,
+            "expected 1 preset (fxp) — .mid routes to MIDI bucket"
+        );
     }
 
     #[test]

@@ -6,36 +6,105 @@ function _midiFmt(key, vars) {
   return vars ? appFmt(key, vars) : appFmt(key);
 }
 
-let allMidiFiles = [];
-let filteredMidi = [];
+let allMidiFiles = [];        // streaming buffer during scan (capped at 100K)
+let filteredMidi = [];        // current DB page only (page-at-a-time model)
 let _midiInfoCache = {};
 let _midiLoaded = false;
 let _midiTableInit = false;
-let _midiRenderCount = 0;
+let _midiRenderCount = 0;     // cumulative rows in DOM (offset + current page size)
 let _midiMetadataRunning = false;
 let midiSortKey = 'name';
 let midiSortAsc = true;
+let _midiOffset = 0;
+let _midiTotalCount = 0;      // filtered count from DB
+let _midiTotalUnfiltered = 0; // unfiltered count from DB
+let _midiStatsSnapshot = null;
+const MIDI_PAGE_SIZE = 500;
 
 async function loadMidiFiles() {
-  try {
-    // Load from the MIDI scanner's own DB — completely independent of presets.
-    const latest = await window.vstUpdater.getLatestMidiScan();
-    if (latest && latest.midiFiles) {
-      allMidiFiles = latest.midiFiles;
-    } else {
-      allMidiFiles = [];
+  // Initial paginated load from SQLite — mirrors audio.js pattern. Memory stays
+  // bounded at one page regardless of scan size (6M+ safe).
+  _midiLoaded = true;
+  _midiTableInit = false;
+  _midiRenderCount = 0;
+  _midiOffset = 0;
+  await fetchMidiPage();
+  await refreshMidiStatsSnapshot(true);
+  updateMidiHeaderCount();
+}
+
+async function fetchMidiPage() {
+  const search = _midiSearch || '';
+  // Active scan: DOM-toggle filter rendered rows instead of re-querying the DB
+  // (same pattern as audio.js). Scan streaming already filters incoming batches.
+  if (_midiScanProgressCleanup) {
+    const tbody = document.getElementById('midiTableBody');
+    if (tbody) {
+      const needle = search ? search.trim().toLowerCase() : '';
+      const rows = tbody.rows;
+      let visible = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r.dataset.midiPath) continue;
+        const name = (r.querySelector('.col-name')?.textContent || '').toLowerCase();
+        const match = !needle || name.includes(needle);
+        r.style.display = match ? '' : 'none';
+        if (match) visible++;
+      }
+      _midiTotalCount = visible;
     }
-    filteredMidi = allMidiFiles.slice();
-    _midiLoaded = true;
-    _midiTableInit = false;
-    _midiRenderCount = 0;
-    sortMidiArray();
+    return;
+  }
+  try {
+    const result = await window.vstUpdater.dbQueryMidi({
+      search: search || null,
+      format_filter: null,
+      sort_key: midiSortKey,
+      sort_asc: midiSortAsc,
+      offset: _midiOffset,
+      limit: MIDI_PAGE_SIZE,
+    });
+    let files = result.midiFiles || [];
+    // Re-sort by fzf relevance when searching
+    if (search && files.length > 1 && typeof searchScore === 'function') {
+      const mode = typeof getSearchMode === 'function' ? getSearchMode('regexMidi') : 'fuzzy';
+      const scored = files.map(s => ({ s, score: searchScore(search, [s.name, s.directory || ''], mode) }));
+      scored.sort((a, b) => b.score - a.score);
+      files = scored.map(x => x.s);
+    }
+    filteredMidi = files;
+    _midiTotalCount = result.totalCount || 0;
+    _midiTotalUnfiltered = result.totalUnfiltered || 0;
+    // Metadata-based sorts (tracks/bpm/time/key/notes/ch/duration) aren't stored in
+    // the DB — SQL can only sort by name/size/modified/directory. For metadata sorts
+    // we re-sort the current page client-side using _midiInfoCache (partial by design).
+    const metadataKeys = new Set(['tracks', 'bpm', 'time', 'key', 'notes', 'ch', 'duration']);
+    if (metadataKeys.has(midiSortKey)) {
+      sortMidiArray();
+    }
     renderMidiTable();
     updateMidiCount();
-    updateMidiHeaderCount();
-    syncMidiStatsBarCount();
   } catch (e) {
     if (typeof showToast === 'function') showToast(toastFmt('toast.midi_load_failed', { err: e.message || e }), 4000, 'error');
+  }
+}
+
+async function refreshMidiStatsSnapshot(force) {
+  if (_midiScanProgressCleanup) { updateMidiCount(); return; }
+  try {
+    const search = _midiSearch || '';
+    const agg = await window.vstUpdater.dbMidiFilterStats(search, null);
+    _midiStatsSnapshot = {
+      count: agg.count || 0,
+      totalBytes: agg.totalBytes || 0,
+      totalUnfiltered: agg.totalUnfiltered || 0,
+    };
+    _midiTotalCount = agg.count || 0;
+    _midiTotalUnfiltered = agg.totalUnfiltered || 0;
+    updateMidiCount();
+  } catch {
+    _midiStatsSnapshot = null;
+    updateMidiCount();
   }
 }
 
@@ -95,6 +164,9 @@ async function scanMidi(resume = false) {
     pendingMidi = [];
     if (firstMidiBatch) { firstMidiBatch = false; _midiTableInit = false; _midiRenderCount = 0; }
     allMidiFiles.push(...toAdd);
+    // Cap in-memory array to prevent OOM on 1M+ scans — DB has authoritative data.
+    if (allMidiFiles.length > 100000) allMidiFiles = allMidiFiles.slice(-100000);
+    if (filteredMidi.length > 100000) filteredMidi = filteredMidi.slice(-100000);
     // Apply active search so streamed rows respect the user's current filter.
     const q = (typeof _midiSearch === 'string' && _midiSearch) ? _midiSearch : '';
     const mode = typeof getSearchMode === 'function' ? getSearchMode('regexMidi') : 'fuzzy';
@@ -161,12 +233,15 @@ async function scanMidi(resume = false) {
     if (_midiScanProgressCleanup) { _midiScanProgressCleanup(); _midiScanProgressCleanup = null; }
     _midiTableInit = false;
     _midiRenderCount = 0;
-    sortMidiArray();
-    renderMidiTable();
-    updateMidiCount();
+    _midiOffset = 0;
+    // After scan, drop the in-memory streaming buffer and reload first page from DB.
+    // The DB has authoritative data — JS memory stays bounded regardless of scan size.
+    allMidiFiles = [];
+    await fetchMidiPage();
+    await refreshMidiStatsSnapshot(true);
     updateMidiHeaderCount();
-    syncMidiStatsBarCount();
-    if (result.stopped && allMidiFiles.length > 0 && resumeBtn) {
+    syncMidiStatsBarCount(_midiTotalUnfiltered);
+    if (result.stopped && _midiTotalUnfiltered > 0 && resumeBtn) {
       resumeBtn.style.display = '';
     }
   } catch (err) {
@@ -190,21 +265,27 @@ async function scanMidi(resume = false) {
   }
 }
 
-function getMidiCount() { return allMidiFiles.length; }
+function getMidiCount() {
+  return _midiScanProgressCleanup ? allMidiFiles.length : _midiTotalUnfiltered;
+}
 
 /** Stats bar "MIDI Found" — must not rely on preset scan (MIDI has its own walker/DB). */
 function syncMidiStatsBarCount(total) {
   const el = document.getElementById('midiScanCount');
   if (!el) return;
-  const n = typeof total === 'number' ? total : allMidiFiles.length;
+  const n = typeof total === 'number'
+    ? total
+    : (_midiScanProgressCleanup ? allMidiFiles.length : _midiTotalUnfiltered);
   el.textContent = n.toLocaleString();
 }
 
 function updateMidiCount() {
   // Match audio/daw/preset/pdf convention: "Total:" shows "filtered / total"
-  // when a filter is active, and just the total when unfiltered.
-  const filtered = filteredMidi.length;
-  const total = allMidiFiles.length;
+  // when a filter is active, and just the total when unfiltered. During a scan
+  // we fall back to allMidiFiles (streaming buffer); post-scan uses DB totals.
+  const scanning = !!_midiScanProgressCleanup;
+  const filtered = scanning ? filteredMidi.length : _midiTotalCount;
+  const total = scanning ? allMidiFiles.length : _midiTotalUnfiltered;
   const isFiltered = total > 0 && filtered < total;
   const totalEl = document.getElementById('midiTotalCount');
   if (totalEl) {
@@ -216,7 +297,9 @@ function updateMidiCount() {
   if (count) count.textContent = filtered.toLocaleString();
   const sizeEl = document.getElementById('midiTotalSize');
   if (sizeEl) {
-    const bytes = filteredMidi.reduce((s, f) => s + (f.size || 0), 0);
+    const bytes = scanning
+      ? filteredMidi.reduce((s, f) => s + (f.size || 0), 0)
+      : (_midiStatsSnapshot ? _midiStatsSnapshot.totalBytes : 0);
     sizeEl.textContent = typeof formatAudioSize === 'function' ? formatAudioSize(bytes) : Math.round(bytes / 1024) + ' KB';
   }
   const statsBar = document.getElementById('midiStats');
@@ -225,7 +308,10 @@ function updateMidiCount() {
 
 function updateMidiHeaderCount() {
   const el = document.getElementById('headerMidi');
-  if (el) el.textContent = allMidiFiles.length;
+  if (el) {
+    const n = _midiScanProgressCleanup ? allMidiFiles.length : _midiTotalUnfiltered;
+    el.textContent = n.toLocaleString();
+  }
 }
 
 let _midiSearch = '';
@@ -233,24 +319,11 @@ let _midiSearch = '';
 registerFilter('filterMidi', {
   inputId: 'midiSearchInput',
   regexToggleId: 'regexMidi',
-  resetOffset() { _midiRenderCount = 0; },
+  resetOffset() { _midiOffset = 0; _midiRenderCount = 0; },
   fetchFn() {
-    const q = this.lastSearch || '';
-    const mode = this.lastMode || 'fuzzy';
-    _midiSearch = q;
-    if (!q) {
-      filteredMidi = allMidiFiles.slice();
-    } else {
-      const scored = allMidiFiles
-        .map(s => ({ s, score: searchScore(q, [s.name, s.directory || ''], mode) }))
-        .filter(x => x.score > 0);
-      scored.sort((a, b) => b.score - a.score);
-      filteredMidi = scored.map(x => x.s);
-    }
-    sortMidiArray();
-    _midiTableInit = false;
-    renderMidiTable();
-    updateMidiCount();
+    _midiSearch = this.lastSearch || '';
+    fetchMidiPage();
+    refreshMidiStatsSnapshot();
   },
 });
 function filterMidi() { applyFilter('filterMidi'); }
@@ -265,10 +338,9 @@ function sortMidi(key) {
       el.closest('th')?.classList.toggle('sort-active', isActive);
     }
   });
-  sortMidiArray();
-  _midiTableInit = false;
+  _midiOffset = 0;
   _midiRenderCount = 0;
-  renderMidiTable();
+  fetchMidiPage();
   if (typeof saveSortState === 'function') saveSortState('midi', midiSortKey, midiSortAsc);
 }
 
@@ -299,7 +371,8 @@ function sortMidiArray() {
 function renderMidiTable() {
   const wrap = document.getElementById('midiTableWrap');
   if (!wrap) return;
-  if (filteredMidi.length === 0 && allMidiFiles.length === 0) {
+  const hasAny = filteredMidi.length > 0 || allMidiFiles.length > 0 || _midiTotalUnfiltered > 0;
+  if (!hasAny) {
     const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s);
     const h2 = esc(_midiFmt('ui.h2.midi_index'));
     const p = esc(_midiFmt('ui.midi.empty_state'));
@@ -339,24 +412,35 @@ function renderMidiTable() {
     if (typeof initColumnResize === 'function') initColumnResize(document.getElementById('midiTable'));
     if (typeof initTableColumnReorder === 'function') initTableColumnReorder('midiTable', 'midiColumnOrder');
   }
-  const MIDI_PAGE = 200;
   const tbody = document.getElementById('midiTableBody');
   if (!tbody) return;
-  tbody.innerHTML = filteredMidi.slice(0, MIDI_PAGE).map(buildMidiRow).join('');
-  _midiRenderCount = Math.min(filteredMidi.length, MIDI_PAGE);
-  if (_midiRenderCount < filteredMidi.length) {
+  // Page-at-a-time: offset=0 replaces DOM, subsequent pages append. Matches audio.js.
+  // During active scan, filteredMidi is the cumulative streaming buffer and _midiOffset
+  // stays 0 — so we do a full replace every flush (existing scan behavior preserved).
+  const scanning = !!_midiScanProgressCleanup;
+  _midiRenderCount = scanning ? filteredMidi.length : (_midiOffset + filteredMidi.length);
+  if (scanning || _midiOffset === 0) {
+    tbody.innerHTML = filteredMidi.map(buildMidiRow).join('');
+  } else {
+    const more = document.getElementById('midiLoadMore');
+    if (more) more.remove();
+    tbody.insertAdjacentHTML('beforeend', filteredMidi.map(buildMidiRow).join(''));
+  }
+  const total = scanning ? filteredMidi.length : _midiTotalCount;
+  if (_midiRenderCount < total) {
     appendMidiLoadMoreRow(tbody);
   }
   if (!_midiMetadataRunning) loadMidiMetadata();
 }
 
 function appendMidiLoadMoreRow(tbody) {
+  const total = _midiScanProgressCleanup ? filteredMidi.length : _midiTotalCount;
   const line = typeof appFmt === 'function'
     ? appFmt('ui.js.load_more_hint', {
         shown: _midiRenderCount.toLocaleString(),
-        total: filteredMidi.length.toLocaleString(),
+        total: total.toLocaleString(),
       })
-    : `Showing ${_midiRenderCount} of ${filteredMidi.length} — click to load more`;
+    : `Showing ${_midiRenderCount} of ${total} — click to load more`;
   tbody.insertAdjacentHTML('beforeend',
     `<tr id="midiLoadMore"><td colspan="12" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMoreMidi">
       ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
@@ -364,17 +448,24 @@ function appendMidiLoadMoreRow(tbody) {
 }
 
 function loadMoreMidi() {
-  const MIDI_PAGE = 200;
-  const tbody = document.getElementById('midiTableBody');
-  const more = document.getElementById('midiLoadMore');
-  if (more) more.remove();
-  const next = filteredMidi.slice(_midiRenderCount, _midiRenderCount + MIDI_PAGE);
-  tbody.insertAdjacentHTML('beforeend', next.map(buildMidiRow).join(''));
-  _midiRenderCount += next.length;
-  if (_midiRenderCount < filteredMidi.length) {
-    appendMidiLoadMoreRow(tbody);
+  // During scan, still render from in-memory filteredMidi (scan stream). Post-scan,
+  // advance DB offset and fetch next page.
+  if (_midiScanProgressCleanup) {
+    const MIDI_PAGE = 200;
+    const tbody = document.getElementById('midiTableBody');
+    const more = document.getElementById('midiLoadMore');
+    if (more) more.remove();
+    const next = filteredMidi.slice(_midiRenderCount, _midiRenderCount + MIDI_PAGE);
+    tbody.insertAdjacentHTML('beforeend', next.map(buildMidiRow).join(''));
+    _midiRenderCount += next.length;
+    if (_midiRenderCount < filteredMidi.length) {
+      appendMidiLoadMoreRow(tbody);
+    }
+    if (!_midiMetadataRunning) loadMidiMetadata();
+    return;
   }
-  if (!_midiMetadataRunning) loadMidiMetadata();
+  _midiOffset = _midiRenderCount;
+  fetchMidiPage();
 }
 
 function buildMidiRow(s) {

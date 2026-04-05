@@ -75,13 +75,8 @@ async function fetchPresetPage() {
       scored.sort((a, b) => b.score - a.score);
       presets = scored.map(x => x.p);
     }
-    if (_presetOffset === 0) {
-      filteredPresets = presets;
-      allPresets = filteredPresets;
-    } else {
-      filteredPresets.push(...presets);
-      allPresets.push(...presets);
-    }
+    // Page-at-a-time: filteredPresets only holds the LATEST page, DOM accumulates.
+    filteredPresets = presets;
     _presetTotalCount = result.totalCount || 0;
     _presetTotalUnfiltered = result.totalUnfiltered || 0;
     renderPresetTable();
@@ -227,7 +222,6 @@ registerFilter('filterPresets', {
     _lastPresetSearch = this.lastSearch || '';
     _lastPresetMode = this.lastMode || 'fuzzy';
     fetchPresetPage();
-    if (typeof loadMidiFiles === 'function') { _midiLoaded = false; loadMidiFiles(); }
   },
 });
 function filterPresets() { applyFilter('filterPresets'); }
@@ -291,8 +285,15 @@ function renderPresetTable() {
   }
   const tbody = document.getElementById('presetTableBody');
   if (!tbody) return;
-  tbody.innerHTML = filteredPresets.map(buildPresetRow).join('');
-  presetRenderCount = filteredPresets.length;
+  // Page-at-a-time: offset=0 replaces DOM, subsequent pages append. Matches audio.js.
+  presetRenderCount = _presetOffset + filteredPresets.length;
+  if (_presetOffset === 0) {
+    tbody.innerHTML = filteredPresets.map(buildPresetRow).join('');
+  } else {
+    const loadMore = tbody.querySelector('tr [data-action="loadMorePresets"]')?.closest('tr');
+    if (loadMore) loadMore.remove();
+    tbody.insertAdjacentHTML('beforeend', filteredPresets.map(buildPresetRow).join(''));
+  }
   if (presetRenderCount < _presetTotalCount) {
     const line = typeof appFmt === 'function'
       ? appFmt('ui.js.load_more_hint', {
@@ -311,7 +312,7 @@ function renderPresetTable() {
 }
 
 function loadMorePresets() {
-  _presetOffset = allPresets.length;
+  _presetOffset = presetRenderCount;
   fetchPresetPage();
 }
 
@@ -381,12 +382,16 @@ async function scanPresets(resume = false, unifiedResult = null) {
     const midiBatch = batch.filter(p => midiFormats.has(p.format));
     const presetBatch = batch.filter(p => !midiFormats.has(p.format));
     allPresets.push(...batch); // keep all in allPresets for export/history
+    // Cap in-memory array to prevent OOM on 1M+ scans — DB has authoritative data.
+    if (allPresets.length > 100000) allPresets = allPresets.slice(-100000);
+    if (filteredPresets.length > 100000) filteredPresets = filteredPresets.slice(-100000);
     filteredPresets.push(...presetBatch);
     // Incrementally update stats — O(batch) not O(total).
     accumulatePresetStats(batch);
     // Stream MIDI files to MIDI tab incrementally
     if (midiBatch.length > 0 && typeof allMidiFiles !== 'undefined') {
       allMidiFiles.push(...midiBatch);
+      if (allMidiFiles.length > 100000) allMidiFiles = allMidiFiles.slice(-100000);
       if (typeof filteredMidi !== 'undefined') filteredMidi.push(...midiBatch);
       // Append rows instead of full rebuild
       const midiTbody = document.getElementById('midiTableBody');
@@ -469,8 +474,7 @@ async function scanPresets(resume = false, unifiedResult = null) {
     if (presetScanProgressCleanup) { presetScanProgressCleanup(); presetScanProgressCleanup = null; }
     rebuildPresetStats(true);
     filterPresets();
-    // Reload MIDI tab from preset data
-    if (typeof loadMidiFiles === 'function') { _midiLoaded = false; loadMidiFiles(); }
+    // MIDI tab has its own independent scanner/DB — don't reload from preset scan.
     if (result.stopped && allPresets.length > 0) {
       setBtnDisplay(resumeBtn, '');
     }

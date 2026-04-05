@@ -88,6 +88,20 @@ fn default_limit() -> u64 {
     200
 }
 
+/// Convert a user search string into an FTS5 phrase query for the trigram
+/// tokenizer. Returns `None` for empty/whitespace input. The result is wrapped
+/// in double quotes (phrase match) with internal quotes doubled per FTS5 syntax.
+/// Trigram tokenizer indexes substrings, so `"foo"` matches any row containing
+/// "foo" as a substring in any indexed column.
+fn fts_phrase(search: &str) -> Option<String> {
+    let trimmed = search.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    // Escape FTS5 phrase syntax: double any `"` in the input.
+    Some(format!("\"{}\"", trimmed.replace('"', "\"\"")))
+}
+
 /// A single row returned from a paginated query, with analysis data inline.
 #[derive(Debug, Serialize)]
 pub struct AudioSampleRow {
@@ -733,6 +747,65 @@ impl Database {
                 .map_err(|e| format!("Migration v8 schema_version failed: {e}"))?;
         }
 
+        if current < 9 {
+            // Composite sort indexes: turn ORDER BY + LIMIT into an index range
+            // scan instead of a full sort, plus FTS5 virtual tables with the
+            // trigram tokenizer for fast substring search at millions of rows.
+            conn.execute_batch(
+                "-- audio_samples composite sort indexes
+                 CREATE INDEX IF NOT EXISTS idx_samples_scan_name     ON audio_samples(scan_id, name COLLATE NOCASE, id);
+                 CREATE INDEX IF NOT EXISTS idx_samples_scan_size     ON audio_samples(scan_id, size, id);
+                 CREATE INDEX IF NOT EXISTS idx_samples_scan_modified ON audio_samples(scan_id, modified, id);
+                 CREATE INDEX IF NOT EXISTS idx_samples_scan_format   ON audio_samples(scan_id, format, id);
+                 CREATE INDEX IF NOT EXISTS idx_samples_scan_duration ON audio_samples(scan_id, duration, id);
+
+                 -- daw_projects composite sort indexes
+                 CREATE INDEX IF NOT EXISTS idx_daw_scan_name     ON daw_projects(scan_id, name COLLATE NOCASE, id);
+                 CREATE INDEX IF NOT EXISTS idx_daw_scan_size     ON daw_projects(scan_id, size, id);
+                 CREATE INDEX IF NOT EXISTS idx_daw_scan_modified ON daw_projects(scan_id, modified, id);
+                 CREATE INDEX IF NOT EXISTS idx_daw_scan_daw      ON daw_projects(scan_id, daw, id);
+                 CREATE INDEX IF NOT EXISTS idx_daw_scan_format   ON daw_projects(scan_id, format, id);
+
+                 -- presets composite sort indexes
+                 CREATE INDEX IF NOT EXISTS idx_presets_scan_name     ON presets(scan_id, name COLLATE NOCASE, id);
+                 CREATE INDEX IF NOT EXISTS idx_presets_scan_size     ON presets(scan_id, size, id);
+                 CREATE INDEX IF NOT EXISTS idx_presets_scan_modified ON presets(scan_id, modified, id);
+                 CREATE INDEX IF NOT EXISTS idx_presets_scan_format   ON presets(scan_id, format, id);
+
+                 -- midi_files composite sort indexes
+                 CREATE INDEX IF NOT EXISTS idx_midi_scan_name     ON midi_files(scan_id, name COLLATE NOCASE, id);
+                 CREATE INDEX IF NOT EXISTS idx_midi_scan_size     ON midi_files(scan_id, size, id);
+                 CREATE INDEX IF NOT EXISTS idx_midi_scan_modified ON midi_files(scan_id, modified, id);
+                 CREATE INDEX IF NOT EXISTS idx_midi_scan_format   ON midi_files(scan_id, format, id);
+
+                 -- pdfs composite sort indexes
+                 CREATE INDEX IF NOT EXISTS idx_pdfs_scan_name     ON pdfs(scan_id, name COLLATE NOCASE, id);
+                 CREATE INDEX IF NOT EXISTS idx_pdfs_scan_size     ON pdfs(scan_id, size, id);
+                 CREATE INDEX IF NOT EXISTS idx_pdfs_scan_modified ON pdfs(scan_id, modified, id);
+
+                 -- FTS5 virtual tables with trigram tokenizer (substring search, O(log n)).
+                 -- Contentless w/ scan_id so we can DELETE per-scan without scanning the whole FTS.
+                 CREATE VIRTUAL TABLE IF NOT EXISTS audio_samples_fts USING fts5(
+                    name, path, scan_id UNINDEXED, tokenize='trigram'
+                 );
+                 CREATE VIRTUAL TABLE IF NOT EXISTS daw_projects_fts USING fts5(
+                    name, path, daw, scan_id UNINDEXED, tokenize='trigram'
+                 );
+                 CREATE VIRTUAL TABLE IF NOT EXISTS presets_fts USING fts5(
+                    name, path, format, scan_id UNINDEXED, tokenize='trigram'
+                 );
+                 CREATE VIRTUAL TABLE IF NOT EXISTS midi_files_fts USING fts5(
+                    name, path, scan_id UNINDEXED, tokenize='trigram'
+                 );
+                 CREATE VIRTUAL TABLE IF NOT EXISTS pdfs_fts USING fts5(
+                    name, path, scan_id UNINDEXED, tokenize='trigram'
+                 );",
+            )
+            .map_err(|e| format!("Migration v9 (indexes + FTS5) failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (9)", [])
+                .map_err(|e| format!("Migration v9 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
@@ -765,6 +838,11 @@ impl Database {
             params![id],
         )
         .map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM audio_samples_fts WHERE scan_id = ?1",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -788,31 +866,47 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
+            // INSERT OR IGNORE (not REPLACE) so auto-increment ids stay stable —
+            // FTS5 rowid is linked to audio_samples.id and REPLACE would break that
+            // link. parent_create clears rows per scan, so conflicts only occur
+            // within a scan (same path emitted twice) — safe to ignore duplicates.
             let mut stmt = tx
                 .prepare_cached(
-                    "INSERT OR REPLACE INTO audio_samples
+                    "INSERT OR IGNORE INTO audio_samples
                      (name, path, directory, format, size, size_formatted, modified,
                       duration, channels, sample_rate, bits_per_sample, scan_id)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 )
                 .map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO audio_samples_fts(rowid, name, path, scan_id) VALUES (?1, ?2, ?3, ?4)",
+                )
+                .map_err(|e| e.to_string())?;
 
             for s in samples {
-                stmt.execute(params![
-                    s.name,
-                    s.path,
-                    s.directory,
-                    s.format,
-                    s.size,
-                    s.size_formatted,
-                    s.modified,
-                    s.duration,
-                    s.channels,
-                    s.sample_rate,
-                    s.bits_per_sample,
-                    scan_id,
-                ])
-                .map_err(|e| e.to_string())?;
+                let changed = stmt
+                    .execute(params![
+                        s.name,
+                        s.path,
+                        s.directory,
+                        s.format,
+                        s.size,
+                        s.size_formatted,
+                        s.modified,
+                        s.duration,
+                        s.channels,
+                        s.sample_rate,
+                        s.bits_per_sample,
+                        scan_id,
+                    ])
+                    .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt
+                        .execute(params![id, s.name, s.path, scan_id])
+                        .map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())?;
@@ -918,33 +1012,16 @@ impl Database {
         let mut conditions = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2;
 
-        // Search: convert to subsequence LIKE pattern
-        let search_pattern = params.search.as_ref().and_then(|s| {
-            let trimmed = s.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                // Build fzf-style subsequence: "abc" → "%a%b%c%"
-                let pattern: String = trimmed
-                    .chars()
-                    .map(|c| {
-                        // Escape SQL LIKE special chars
-                        match c {
-                            '%' => "\\%".to_string(),
-                            '_' => "\\_".to_string(),
-                            _ => c.to_string(),
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join("%");
-                Some(format!("%{pattern}%"))
-            }
-        });
-
-        if search_pattern.is_some() {
-            // Only match against name (short) — path LIKE is too slow at millions of rows
-            conditions.push(format!("name LIKE ?{bind_idx} ESCAPE '\\'"));
-            bind_idx += 1;
+        // FTS5 trigram substring match via join-on-rowid subquery — O(log n) vs
+        // LIKE's full-table scan. Must also filter by scan_id (UNINDEXED column)
+        // since FTS holds rows from every scan ever performed.
+        let fts_match = params.search.as_deref().and_then(fts_phrase);
+        if fts_match.is_some() {
+            conditions.push(format!(
+                "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
+            ));
+            bind_idx += 2;
         }
 
         if let Some(fmt) = &params.format_filter {
@@ -1009,8 +1086,11 @@ impl Database {
         stmt.raw_bind_parameter(idx, &scan_id)
             .map_err(|e| e.to_string())?;
         idx += 1;
-        if let Some(ref pat) = search_pattern {
-            stmt.raw_bind_parameter(idx, pat)
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(idx, m)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+            stmt.raw_bind_parameter(idx, &scan_id)
                 .map_err(|e| e.to_string())?;
             idx += 1;
         }
@@ -1564,25 +1644,13 @@ impl Database {
 
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
-        let search_pat = search.and_then(|s| {
-            let t = s.trim();
-            if t.is_empty() {
-                None
-            } else {
-                Some(format!(
-                    "%{}%",
-                    t.chars()
-                        .map(|c| c.to_string())
-                        .collect::<Vec<_>>()
-                        .join("%")
-                ))
-            }
-        });
-        if search_pat.is_some() {
+        let fts_match = search.and_then(fts_phrase);
+        if fts_match.is_some() {
             where_parts.push(format!(
-                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+                "id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
             ));
-            bind_idx += 1;
+            bind_idx += 2;
         }
         if let Some(f) = daw_filter {
             if !f.is_empty() && f != "all" {
@@ -1618,8 +1686,11 @@ impl Database {
             stmt.raw_bind_parameter(bi, &scan_id)
                 .map_err(|e| e.to_string())?;
             bi += 1;
-            if let Some(ref p) = search_pat {
-                stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            if let Some(ref m) = fts_match {
+                stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+                bi += 1;
+                stmt.raw_bind_parameter(bi, &scan_id)
+                    .map_err(|e| e.to_string())?;
                 bi += 1;
             }
             if let Some(f) = daw_filter {
@@ -1640,8 +1711,11 @@ impl Database {
         stmt.raw_bind_parameter(bi, &scan_id)
             .map_err(|e| e.to_string())?;
         bi += 1;
-        if let Some(ref p) = search_pat {
-            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = daw_filter {
@@ -1717,25 +1791,13 @@ impl Database {
 
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
-        let search_pat = search.and_then(|s| {
-            let t = s.trim();
-            if t.is_empty() {
-                None
-            } else {
-                Some(format!(
-                    "%{}%",
-                    t.chars()
-                        .map(|c| c.to_string())
-                        .collect::<Vec<_>>()
-                        .join("%")
-                ))
-            }
-        });
-        if search_pat.is_some() {
+        let fts_match = search.and_then(fts_phrase);
+        if fts_match.is_some() {
             where_parts.push(format!(
-                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+                "id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
             ));
-            bind_idx += 1;
+            bind_idx += 2;
         }
         // Exclude MIDI files from presets
         where_parts.push("format NOT IN ('MID', 'MIDI')".into());
@@ -1772,8 +1834,11 @@ impl Database {
             stmt.raw_bind_parameter(bi, &scan_id)
                 .map_err(|e| e.to_string())?;
             bi += 1;
-            if let Some(ref p) = search_pat {
-                stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            if let Some(ref m) = fts_match {
+                stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+                bi += 1;
+                stmt.raw_bind_parameter(bi, &scan_id)
+                    .map_err(|e| e.to_string())?;
                 bi += 1;
             }
             if let Some(f) = format_filter {
@@ -1794,8 +1859,11 @@ impl Database {
         stmt.raw_bind_parameter(bi, &scan_id)
             .map_err(|e| e.to_string())?;
         bi += 1;
-        if let Some(ref p) = search_pat {
-            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter {
@@ -2081,6 +2149,8 @@ impl Database {
         ).map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM daw_projects WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM daw_projects_fts WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -2110,9 +2180,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO daw_projects (name, path, directory, format, daw, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO daw_projects (name, path, directory, format, daw, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx.prepare_cached("INSERT INTO daw_projects_fts(rowid, name, path, daw, scan_id) VALUES (?1,?2,?3,?4,?5)").map_err(|e| e.to_string())?;
             for p in projects {
-                stmt.execute(params![
+                let changed = stmt.execute(params![
                     p.name,
                     p.path,
                     p.directory,
@@ -2124,6 +2195,10 @@ impl Database {
                     scan_id
                 ])
                 .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt.execute(params![id, p.name, p.path, p.daw, scan_id]).map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())
@@ -2144,9 +2219,15 @@ impl Database {
                 params![snap.id],
             )
             .map_err(|e| e.to_string())?;
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO daw_projects (name, path, directory, format, daw, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").map_err(|e| e.to_string())?;
+            tx.execute(
+                "DELETE FROM daw_projects_fts WHERE scan_id = ?1",
+                params![snap.id],
+            )
+            .map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO daw_projects (name, path, directory, format, daw, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx.prepare_cached("INSERT INTO daw_projects_fts(rowid, name, path, daw, scan_id) VALUES (?1,?2,?3,?4,?5)").map_err(|e| e.to_string())?;
             for p in &snap.projects {
-                stmt.execute(params![
+                let changed = stmt.execute(params![
                     p.name,
                     p.path,
                     p.directory,
@@ -2158,6 +2239,10 @@ impl Database {
                     snap.id
                 ])
                 .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt.execute(params![id, p.name, p.path, p.daw, snap.id]).map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())
@@ -2264,6 +2349,8 @@ impl Database {
         ).map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM presets WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM presets_fts WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -2291,9 +2378,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO presets (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO presets (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx.prepare_cached("INSERT INTO presets_fts(rowid, name, path, format, scan_id) VALUES (?1,?2,?3,?4,?5)").map_err(|e| e.to_string())?;
             for p in presets {
-                stmt.execute(params![
+                let changed = stmt.execute(params![
                     p.name,
                     p.path,
                     p.directory,
@@ -2304,6 +2392,10 @@ impl Database {
                     scan_id
                 ])
                 .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt.execute(params![id, p.name, p.path, p.format, scan_id]).map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())
@@ -2321,9 +2413,12 @@ impl Database {
         {
             tx.execute("DELETE FROM presets WHERE scan_id = ?1", params![snap.id])
                 .map_err(|e| e.to_string())?;
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO presets (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            tx.execute("DELETE FROM presets_fts WHERE scan_id = ?1", params![snap.id])
+                .map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO presets (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx.prepare_cached("INSERT INTO presets_fts(rowid, name, path, format, scan_id) VALUES (?1,?2,?3,?4,?5)").map_err(|e| e.to_string())?;
             for p in &snap.presets {
-                stmt.execute(params![
+                let changed = stmt.execute(params![
                     p.name,
                     p.path,
                     p.directory,
@@ -2334,6 +2429,10 @@ impl Database {
                     snap.id
                 ])
                 .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt.execute(params![id, p.name, p.path, p.format, snap.id]).map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())
@@ -2439,6 +2538,8 @@ impl Database {
         ).map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM midi_files WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM midi_files_fts WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -2466,9 +2567,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO midi_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO midi_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx.prepare_cached("INSERT INTO midi_files_fts(rowid, name, path, scan_id) VALUES (?1,?2,?3,?4)").map_err(|e| e.to_string())?;
             for m in midi_files {
-                stmt.execute(params![
+                let changed = stmt.execute(params![
                     m.name,
                     m.path,
                     m.directory,
@@ -2479,6 +2581,10 @@ impl Database {
                     scan_id
                 ])
                 .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt.execute(params![id, m.name, m.path, scan_id]).map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())
@@ -2499,9 +2605,15 @@ impl Database {
                 params![snap.id],
             )
             .map_err(|e| e.to_string())?;
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO midi_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            tx.execute(
+                "DELETE FROM midi_files_fts WHERE scan_id = ?1",
+                params![snap.id],
+            )
+            .map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO midi_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx.prepare_cached("INSERT INTO midi_files_fts(rowid, name, path, scan_id) VALUES (?1,?2,?3,?4)").map_err(|e| e.to_string())?;
             for m in &snap.midi_files {
-                stmt.execute(params![
+                let changed = stmt.execute(params![
                     m.name,
                     m.path,
                     m.directory,
@@ -2512,6 +2624,10 @@ impl Database {
                     snap.id
                 ])
                 .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt.execute(params![id, m.name, m.path, snap.id]).map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())
@@ -2637,25 +2753,13 @@ impl Database {
 
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
-        let search_pat = search.and_then(|s| {
-            let t = s.trim();
-            if t.is_empty() {
-                None
-            } else {
-                Some(format!(
-                    "%{}%",
-                    t.chars()
-                        .map(|c| c.to_string())
-                        .collect::<Vec<_>>()
-                        .join("%")
-                ))
-            }
-        });
-        if search_pat.is_some() {
+        let fts_match = search.and_then(fts_phrase);
+        if fts_match.is_some() {
             where_parts.push(format!(
-                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+                "id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
             ));
-            bind_idx += 1;
+            bind_idx += 2;
         }
         if let Some(f) = format_filter {
             if !f.is_empty() && f != "all" {
@@ -2673,7 +2777,6 @@ impl Database {
                 }
             }
         }
-        let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
 
         let sort_col = match sort_key {
@@ -2693,8 +2796,11 @@ impl Database {
             stmt.raw_bind_parameter(bi, &scan_id)
                 .map_err(|e| e.to_string())?;
             bi += 1;
-            if let Some(ref p) = search_pat {
-                stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            if let Some(ref m) = fts_match {
+                stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+                bi += 1;
+                stmt.raw_bind_parameter(bi, &scan_id)
+                    .map_err(|e| e.to_string())?;
                 bi += 1;
             }
             if let Some(f) = format_filter {
@@ -2721,8 +2827,11 @@ impl Database {
         stmt.raw_bind_parameter(bi, &scan_id)
             .map_err(|e| e.to_string())?;
         bi += 1;
-        if let Some(ref p) = search_pat {
-            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter {
@@ -2778,14 +2887,15 @@ impl Database {
                 |r| r.get(0),
             )
             .unwrap_or(0);
-        let search_pat = Self::fzf_like(search);
+        let fts_match = search.and_then(fts_phrase);
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
-        if search_pat.is_some() {
+        if fts_match.is_some() {
             where_parts.push(format!(
-                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+                "id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
             ));
-            bind_idx += 1;
+            bind_idx += 2;
         }
         if let Some(f) = format_filter {
             if !f.is_empty() && f != "all" {
@@ -2807,8 +2917,11 @@ impl Database {
         stmt.raw_bind_parameter(bi, &scan_id)
             .map_err(|e| e.to_string())?;
         bi += 1;
-        if let Some(ref p) = search_pat {
-            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter {
@@ -2855,6 +2968,8 @@ impl Database {
         ).map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM pdfs WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM pdfs_fts WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -2877,9 +2992,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO pdfs (name, path, directory, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7)").map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO pdfs (name, path, directory, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx.prepare_cached("INSERT INTO pdfs_fts(rowid, name, path, scan_id) VALUES (?1,?2,?3,?4)").map_err(|e| e.to_string())?;
             for p in pdfs {
-                stmt.execute(params![
+                let changed = stmt.execute(params![
                     p.name,
                     p.path,
                     p.directory,
@@ -2889,6 +3005,10 @@ impl Database {
                     scan_id
                 ])
                 .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt.execute(params![id, p.name, p.path, scan_id]).map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())
@@ -2905,9 +3025,12 @@ impl Database {
         {
             tx.execute("DELETE FROM pdfs WHERE scan_id = ?1", params![snap.id])
                 .map_err(|e| e.to_string())?;
-            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO pdfs (name, path, directory, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7)").map_err(|e| e.to_string())?;
+            tx.execute("DELETE FROM pdfs_fts WHERE scan_id = ?1", params![snap.id])
+                .map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO pdfs (name, path, directory, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx.prepare_cached("INSERT INTO pdfs_fts(rowid, name, path, scan_id) VALUES (?1,?2,?3,?4)").map_err(|e| e.to_string())?;
             for p in &snap.pdfs {
-                stmt.execute(params![
+                let changed = stmt.execute(params![
                     p.name,
                     p.path,
                     p.directory,
@@ -2917,6 +3040,10 @@ impl Database {
                     snap.id
                 ])
                 .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt.execute(params![id, p.name, p.path, snap.id]).map_err(|e| e.to_string())?;
+                }
             }
         }
         tx.commit().map_err(|e| e.to_string())
@@ -3145,25 +3272,13 @@ impl Database {
 
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
-        let search_pat = search.and_then(|s| {
-            let t = s.trim();
-            if t.is_empty() {
-                None
-            } else {
-                Some(format!(
-                    "%{}%",
-                    t.chars()
-                        .map(|c| c.to_string())
-                        .collect::<Vec<_>>()
-                        .join("%")
-                ))
-            }
-        });
-        if search_pat.is_some() {
+        let fts_match = search.and_then(fts_phrase);
+        if fts_match.is_some() {
             where_parts.push(format!(
-                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+                "id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
             ));
-            bind_idx += 1;
+            bind_idx += 2;
         }
         let where_cl = where_parts.join(" AND ");
 
@@ -3183,8 +3298,11 @@ impl Database {
             stmt.raw_bind_parameter(bi, &scan_id)
                 .map_err(|e| e.to_string())?;
             bi += 1;
-            if let Some(ref p) = search_pat {
-                stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            if let Some(ref m) = fts_match {
+                stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+                bi += 1;
+                stmt.raw_bind_parameter(bi, &scan_id)
+                    .map_err(|e| e.to_string())?;
             }
             let mut rows = stmt.raw_query();
             rows.next()
@@ -3199,8 +3317,11 @@ impl Database {
         stmt.raw_bind_parameter(bi, &scan_id)
             .map_err(|e| e.to_string())?;
         bi += 1;
-        if let Some(ref p) = search_pat {
-            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
         }
         stmt.raw_bind_parameter(bi, limit as i64)
@@ -3330,12 +3451,15 @@ impl Database {
                 |r| r.get(0),
             )
             .unwrap_or(0);
-        let search_pat = Self::fzf_like(search);
+        let fts_match = search.and_then(fts_phrase);
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
-        if search_pat.is_some() {
-            where_parts.push(format!("name LIKE ?{bind_idx} ESCAPE '\\'"));
-            bind_idx += 1;
+        if fts_match.is_some() {
+            where_parts.push(format!(
+                "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
+            ));
+            bind_idx += 2;
         }
         if let Some(f) = format_filter {
             if !f.is_empty() && f != "all" {
@@ -3355,8 +3479,11 @@ impl Database {
         stmt.raw_bind_parameter(bi, &scan_id)
             .map_err(|e| e.to_string())?;
         bi += 1;
-        if let Some(ref p) = search_pat {
-            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter {
@@ -3410,14 +3537,15 @@ impl Database {
                 |r| r.get(0),
             )
             .unwrap_or(0);
-        let search_pat = Self::fzf_like(search);
+        let fts_match = search.and_then(fts_phrase);
         let mut where_parts = vec!["scan_id = ?1".to_string()];
         let mut bind_idx = 2usize;
-        if search_pat.is_some() {
+        if fts_match.is_some() {
             where_parts.push(format!(
-                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+                "id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
             ));
-            bind_idx += 1;
+            bind_idx += 2;
         }
         if let Some(f) = daw_filter {
             if !f.is_empty() && f != "all" {
@@ -3437,8 +3565,11 @@ impl Database {
         stmt.raw_bind_parameter(bi, &scan_id)
             .map_err(|e| e.to_string())?;
         bi += 1;
-        if let Some(ref p) = search_pat {
-            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = daw_filter {
@@ -3492,18 +3623,19 @@ impl Database {
                 |r| r.get(0),
             )
             .unwrap_or(0);
-        let search_pat = Self::fzf_like(search);
+        let fts_match = search.and_then(fts_phrase);
         // Presets always exclude MIDI (lives in its own tab)
         let mut where_parts = vec![
             "scan_id = ?1".to_string(),
             "format NOT IN ('MID','MIDI')".to_string(),
         ];
         let mut bind_idx = 2usize;
-        if search_pat.is_some() {
+        if fts_match.is_some() {
             where_parts.push(format!(
-                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+                "id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                scan_idx = bind_idx + 1,
             ));
-            bind_idx += 1;
+            bind_idx += 2;
         }
         if let Some(f) = format_filter {
             if !f.is_empty() && f != "all" {
@@ -3523,8 +3655,11 @@ impl Database {
         stmt.raw_bind_parameter(bi, &scan_id)
             .map_err(|e| e.to_string())?;
         bi += 1;
-        if let Some(ref p) = search_pat {
-            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            stmt.raw_bind_parameter(bi, &scan_id)
+                .map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter {
@@ -3654,20 +3789,18 @@ impl Database {
                 |r| r.get(0),
             )
             .unwrap_or(0);
-        let search_pat = Self::fzf_like(search);
-        let (sql, has_search) = if search_pat.is_some() {
-            ("SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1 AND (name LIKE ?2 ESCAPE '\\' OR path LIKE ?2 ESCAPE '\\')", true)
+        let fts_match = search.and_then(fts_phrase);
+        let sql = if fts_match.is_some() {
+            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1 AND id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?2 AND scan_id = ?3)"
         } else {
-            (
-                "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1",
-                false,
-            )
+            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1"
         };
         let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
         stmt.raw_bind_parameter(1, &scan_id)
             .map_err(|e| e.to_string())?;
-        if has_search {
-            stmt.raw_bind_parameter(2, search_pat.as_ref().unwrap())
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(2, m).map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(3, &scan_id)
                 .map_err(|e| e.to_string())?;
         }
         let mut rows = stmt.raw_query();
@@ -4606,11 +4739,11 @@ mod tests {
             .unwrap();
         db.insert_audio_batch("s1", &samples).unwrap();
 
-        // "kck" should match "kick" via subsequence
+        // "kick" should match both "kick_hard.wav" and "kick_808.wav" via FTS5 substring.
         let result = db
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
-                search: Some("kck".into()),
+                search: Some("kick".into()),
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -4837,7 +4970,7 @@ mod tests {
             .unwrap();
         db.insert_audio_batch("s1", &samples).unwrap();
 
-        let st = db.audio_filter_stats(Some("kck"), None).unwrap();
+        let st = db.audio_filter_stats(Some("kick"), None).unwrap();
         assert_eq!(st.total_unfiltered, 3);
         assert_eq!(st.count, 2);
         assert_eq!(st.total_bytes, 400);
@@ -4956,7 +5089,7 @@ mod tests {
         ))
         .unwrap();
 
-        let st = db.preset_filter_stats(Some("brss"), None).unwrap();
+        let st = db.preset_filter_stats(Some("brass"), None).unwrap();
         assert_eq!(st.count, 1);
         assert_eq!(st.total_unfiltered, 2);
     }

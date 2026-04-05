@@ -66,13 +66,8 @@ async function fetchPdfPage() {
       scored.sort((a, b) => b.score - a.score);
       pdfs = scored.map(x => x.p);
     }
-    if (_pdfOffset === 0) {
-      filteredPdfs = pdfs;
-      allPdfs = filteredPdfs;
-    } else {
-      filteredPdfs.push(...pdfs);
-      allPdfs.push(...pdfs);
-    }
+    // Page-at-a-time: filteredPdfs only holds the LATEST page, DOM accumulates.
+    filteredPdfs = pdfs;
     _pdfTotalCount = result.totalCount || 0;
     _pdfTotalUnfiltered = result.totalUnfiltered || 0;
     renderPdfTable();
@@ -208,8 +203,15 @@ function renderPdfTable() {
   }
   const tbody = document.getElementById('pdfTableBody');
   if (!tbody) return;
-  tbody.innerHTML = filteredPdfs.map(buildPdfRow).join('');
-  pdfRenderCount = filteredPdfs.length;
+  // Page-at-a-time: offset=0 replaces DOM, subsequent pages append. Matches audio.js.
+  pdfRenderCount = _pdfOffset + filteredPdfs.length;
+  if (_pdfOffset === 0) {
+    tbody.innerHTML = filteredPdfs.map(buildPdfRow).join('');
+  } else {
+    const loadMoreRow = tbody.querySelector('tr [data-action="loadMorePdfs"]')?.closest('tr');
+    if (loadMoreRow) loadMoreRow.remove();
+    tbody.insertAdjacentHTML('beforeend', filteredPdfs.map(buildPdfRow).join(''));
+  }
   if (pdfRenderCount < _pdfTotalCount) {
     const line = typeof appFmt === 'function'
       ? appFmt('ui.js.load_more_hint', {
@@ -242,7 +244,7 @@ function buildPdfTableHtml() {
 }
 
 function loadMorePdfs() {
-  _pdfOffset = allPdfs.length;
+  _pdfOffset = pdfRenderCount;
   fetchPdfPage();
 }
 
@@ -339,6 +341,9 @@ async function scanPdfs(resume = false, unifiedResult = null) {
     }
 
     allPdfs.push(...batch);
+    // Cap in-memory array to prevent OOM on 1M+ scans — DB has authoritative data.
+    if (allPdfs.length > 100000) allPdfs = allPdfs.slice(-100000);
+    if (filteredPdfs.length > 100000) filteredPdfs = filteredPdfs.slice(-100000);
     filteredPdfs.push(...batch);
     accumulatePdfStats(batch);
 

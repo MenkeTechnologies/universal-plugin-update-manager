@@ -186,26 +186,12 @@ fn walk_dir_parallel(
     }
 
     // Diagnostic: log when we enter /mnt/ paths (SMB mounts typically).
-    {
-        let s = dir.to_string_lossy();
-        if s.contains("/mnt/") || s.ends_with("/mnt") {
-            crate::write_app_log(format!("SCAN ENTER — midi | {}", dir.display()));
-        }
-    }
-
     let entries: Vec<_> = match fs::read_dir(dir) {
         Ok(e) => e.flatten().collect(),
         Err(_e) => {
             return;
         }
     };
-    // Diagnostic: log how many entries came back from /mnt/ paths.
-    {
-        let s = dir.to_string_lossy();
-        if s.contains("/mnt/") || s.ends_with("/mnt") {
-            crate::write_app_log(format!("{} {}", dir.display(), entries.len()));
-        }
-    }
 
     let mut files = Vec::new();
     let mut subdirs = Vec::new();

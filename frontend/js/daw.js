@@ -62,13 +62,9 @@ async function fetchDawPage() {
       scored.sort((a, b) => b.score - a.score);
       projects = scored.map(x => x.p);
     }
-    if (_dawOffset === 0) {
-      filteredDawProjects = projects;
-      allDawProjects = filteredDawProjects;
-    } else {
-      filteredDawProjects.push(...projects);
-      allDawProjects.push(...projects);
-    }
+    // Page-at-a-time: filteredDawProjects only holds the LATEST page, DOM accumulates.
+    // This keeps JS memory bounded at one page regardless of scan size (6M+ safe).
+    filteredDawProjects = projects;
     _dawTotalCount = result.totalCount || 0;
     _dawTotalUnfiltered = result.totalUnfiltered || 0;
     renderDawTable();
@@ -289,11 +285,18 @@ function renderDawTable() {
   if (!document.getElementById('dawTable')) initDawTable();
   const tbody = document.getElementById('dawTableBody');
   if (!tbody) return;
-  dawRenderCount = filteredDawProjects.length;
-  tbody.innerHTML = filteredDawProjects.map(buildDawRow).join('');
+  // Page-at-a-time: offset=0 replaces DOM, subsequent pages append. Matches audio.js.
+  dawRenderCount = _dawOffset + filteredDawProjects.length;
+  if (_dawOffset === 0) {
+    tbody.innerHTML = filteredDawProjects.map(buildDawRow).join('');
+  } else {
+    const loadMore = document.getElementById('dawLoadMore');
+    if (loadMore) loadMore.remove();
+    tbody.insertAdjacentHTML('beforeend', filteredDawProjects.map(buildDawRow).join(''));
+  }
 
   // Filter active + no matches: inline row with a clear message instead of a blank table body.
-  if (filteredDawProjects.length === 0 && _dawTotalUnfiltered > 0) {
+  if (_dawOffset === 0 && filteredDawProjects.length === 0 && _dawTotalUnfiltered > 0) {
     const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s);
     const msg = esc(typeof appFmt === 'function' ? appFmt('ui.daw.no_filter_matches') : 'No DAW projects match the current filter.');
     tbody.insertAdjacentHTML('beforeend',
@@ -319,7 +322,7 @@ function appendDawLoadMore(tbody) {
 }
 
 function loadMoreDaw() {
-  _dawOffset = allDawProjects.length;
+  _dawOffset = dawRenderCount;
   fetchDawPage();
 }
 
@@ -373,6 +376,8 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
     pendingProjects = [];
 
     allDawProjects.push(...toAdd);
+    // Cap in-memory array to prevent OOM on 1M+ scans — DB has authoritative data.
+    if (allDawProjects.length > 100000) allDawProjects = allDawProjects.slice(-100000);
     accumulateDawStats(toAdd);
     const dawElapsed = dawEta.elapsed();
     btn.innerHTML = `&#8635; ${pendingFound.toLocaleString()} found${dawElapsed ? ' — ' + dawElapsed : ''}`;
@@ -389,6 +394,7 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
     });
     if (matching.length > 0) {
       filteredDawProjects.push(...matching);
+      if (filteredDawProjects.length > 100000) filteredDawProjects = filteredDawProjects.slice(-100000);
       const tbody = document.getElementById('dawTableBody');
       if (tbody && dawRenderCount < 2000) {
         const loadMore = document.getElementById('dawLoadMore');
