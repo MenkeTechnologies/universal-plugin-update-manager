@@ -42,6 +42,11 @@ fn format_size(bytes: u64) -> String {
 pub fn get_pdf_roots() -> Vec<PathBuf> {
     let home = dirs::home_dir().unwrap_or_default();
     let mut roots = Vec::new();
+    // Include home (`~`) so paths like ~/mnt/... are scanned without custom prefs.
+    // Overlaps with Documents/Desktop/Downloads; `walk_for_pdfs` dedupes visited dirs.
+    if !home.as_os_str().is_empty() {
+        roots.push(home.clone());
+    }
 
     #[cfg(target_os = "macos")]
     {
