@@ -1,7 +1,8 @@
 //! Plugin preset file scanner.
 //!
 //! Discovers preset files (FXP, FXB, VSTPRESET, AUPRESET, etc.) across
-//! platform-specific preset directories. Supports parallel traversal
+//! the user home directory (`~`, resolved via [`dirs::home_dir`]) plus
+//! platform-specific preset locations. Supports parallel traversal
 //! and stop signaling.
 
 use crate::history::PresetFile;
@@ -58,6 +59,10 @@ fn format_size(bytes: u64) -> String {
 pub fn get_preset_roots() -> Vec<PathBuf> {
     let home = dirs::home_dir().unwrap_or_default();
     let mut roots = Vec::new();
+
+    if !home.as_os_str().is_empty() {
+        roots.push(home.clone());
+    }
 
     #[cfg(target_os = "macos")]
     {
