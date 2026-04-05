@@ -15,6 +15,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 I18N_DIR = ROOT / "i18n"
 
 LANG_SELECTOR_NATIVE = {
+    "ui.opt.lang_cs": "Čeština",
     "ui.opt.lang_da": "Dansk",
     "ui.opt.lang_de": "Deutsch",
     "ui.opt.lang_el": "Ελληνικά",
@@ -22,6 +23,7 @@ LANG_SELECTOR_NATIVE = {
     "ui.opt.lang_es": "Español",
     "ui.opt.lang_fi": "Suomi",
     "ui.opt.lang_fr": "Français",
+    "ui.opt.lang_hu": "Magyar",
     "ui.opt.lang_it": "Italiano",
     "ui.opt.lang_ja": "日本語",
     "ui.opt.lang_ko": "한국어",
@@ -29,6 +31,7 @@ LANG_SELECTOR_NATIVE = {
     "ui.opt.lang_nl": "Nederlands",
     "ui.opt.lang_pl": "Polski",
     "ui.opt.lang_pt": "Português",
+    "ui.opt.lang_ro": "Română",
     "ui.opt.lang_ru": "Русский",
     "ui.opt.lang_sv": "Svenska",
     "ui.opt.lang_tr": "Türkçe",
