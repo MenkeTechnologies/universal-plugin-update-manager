@@ -356,14 +356,11 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
   let firstDawBatch = true;
   let pendingProjects = [];
   let pendingFound = 0;
-  let flushScheduled = false;
   const dawEta = createETA();
   dawEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
-  let lastFlush = 0;
 
   function flushPendingProjects() {
-    flushScheduled = false;
     if (pendingProjects.length === 0) return;
 
     if (firstDawBatch) {
@@ -403,16 +400,9 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
     }
 
     updateDawStats();
-    lastFlush = performance.now();
   }
 
-  function scheduleFlush() {
-    if (flushScheduled) return;
-    flushScheduled = true;
-    const elapsed = performance.now() - lastFlush;
-    const delay = Math.max(0, FLUSH_INTERVAL - elapsed);
-    setTimeout(() => requestAnimationFrame(flushPendingProjects), delay);
-  }
+  const scheduleFlush = createScanFlusher(flushPendingProjects, FLUSH_INTERVAL);
 
   if (dawScanProgressCleanup) dawScanProgressCleanup();
   dawScanProgressCleanup = window.vstUpdater.onDawScanProgress((data) => {

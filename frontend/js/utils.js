@@ -379,6 +379,31 @@ function applyFilterDebounced(action) {
   _filterDebounceTimers[action] = setTimeout(() => applyFilter(action), 200);
 }
 
+/**
+ * Throttled scheduler used by every streaming scan's flush loop. Coalesces
+ * rapid scan-progress events into at-most one flush every `intervalMs` ms,
+ * aligned to a `requestAnimationFrame` so DOM writes land inside a browser
+ * paint tick. Returns the scheduler function — call it from every scan
+ * event; it is idempotent if a flush is already pending.
+ *
+ *   const scheduleFlush = createScanFlusher(flushPendingMidi, 100);
+ *   onScanProgress(...) { pending.push(...batch); scheduleFlush(); }
+ */
+function createScanFlusher(flushFn, intervalMs) {
+  let scheduled = false;
+  let last = 0;
+  return function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    const elapsed = performance.now() - last;
+    const delay = Math.max(0, intervalMs - elapsed);
+    setTimeout(() => requestAnimationFrame(() => {
+      scheduled = false;
+      try { flushFn(); } finally { last = performance.now(); }
+    }), delay);
+  };
+}
+
 function toggleRegex(btn) {
   btn.classList.toggle('active');
   const isRegex = btn.classList.contains('active');

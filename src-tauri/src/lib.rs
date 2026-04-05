@@ -26,6 +26,7 @@ pub mod key_detect;
 pub mod kvr;
 pub mod lufs;
 pub mod midi;
+pub mod midi_scanner;
 pub mod native_menu;
 pub mod pdf_meta;
 pub mod pdf_scanner;
@@ -108,6 +109,11 @@ struct PresetScanState {
     stop_scan: AtomicBool,
 }
 
+struct MidiScanState {
+    scanning: AtomicBool,
+    stop_scan: AtomicBool,
+}
+
 struct PdfScanState {
     scanning: AtomicBool,
     stop_scan: AtomicBool,
@@ -119,6 +125,7 @@ struct WalkerStatus {
     audio_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     daw_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     preset_dirs: Arc<std::sync::Mutex<Vec<String>>>,
+    midi_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     pdf_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     /// True while `scan_unified` is active. Frontend walker-status tiles
     /// collapse 4 → 1 display when this is true (the single walker fans its
@@ -177,6 +184,11 @@ fn get_walker_status(app: AppHandle) -> serde_json::Value {
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .clone();
+    let midi = ws
+        .midi_dirs
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     let pdf = ws
         .pdf_dirs
         .lock()
@@ -194,18 +206,24 @@ fn get_walker_status(app: AppHandle) -> serde_json::Value {
         .scanning
         .load(Ordering::Relaxed);
     let pdf_scanning = app.state::<PdfScanState>().scanning.load(Ordering::Relaxed);
+    let midi_scanning = app
+        .state::<MidiScanState>()
+        .scanning
+        .load(Ordering::Relaxed);
     let unified_scanning = ws.unified_scanning.load(Ordering::Relaxed);
     serde_json::json!({
         "plugin": plugin,
         "audio": audio,
         "daw": daw,
         "preset": preset,
+        "midi": midi,
         "pdf": pdf,
         "poolThreads": pool_threads,
         "pluginScanning": plugin_scanning,
         "audioScanning": audio_scanning,
         "dawScanning": daw_scanning,
         "presetScanning": preset_scanning,
+        "midiScanning": midi_scanning,
         "pdfScanning": pdf_scanning,
         "unifiedScanning": unified_scanning,
     })
@@ -1101,6 +1119,178 @@ fn preset_history_diff(old_id: String, new_id: String) -> Option<history::Preset
     let old = db::global().get_preset_scan_detail(&old_id).ok()?;
     let new = db::global().get_preset_scan_detail(&new_id).ok()?;
     Some(history::compute_preset_diff(&old, &new))
+}
+
+// MIDI scanner commands — dedicated MIDI walker, fully independent of preset scan.
+#[tauri::command]
+async fn scan_midi_files(
+    app: AppHandle,
+    custom_roots: Option<Vec<String>>,
+    exclude_paths: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    let state = app.state::<MidiScanState>();
+    let scan_start = Instant::now();
+    append_log(format!(
+        "SCAN START — midi | roots: {:?}",
+        custom_roots.as_deref().unwrap_or(&[])
+    ));
+    if state.scanning.swap(true, Ordering::SeqCst) {
+        return Err("MIDI scan already in progress".into());
+    }
+    state.stop_scan.store(false, Ordering::SeqCst);
+
+    let _ = app.emit(
+        "midi-scan-progress",
+        serde_json::json!({
+            "phase": "status",
+            "message": "Walking filesystem directories parallelized for MIDI files..."
+        }),
+    );
+
+    let app_handle = app.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let midi_state = app_handle.state::<MidiScanState>();
+        let roots = if let Some(ref extra) = custom_roots {
+            let custom: Vec<std::path::PathBuf> = extra
+                .iter()
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.exists())
+                .collect();
+            if custom.is_empty() {
+                midi_scanner::get_midi_roots()
+            } else {
+                custom
+            }
+        } else {
+            midi_scanner::get_midi_roots()
+        };
+        let mut all_midi: Vec<history::MidiFile> = Vec::new();
+        let exclude_set = exclude_paths.map(|v| v.into_iter().collect::<HashSet<String>>());
+
+        midi_scanner::walk_for_midi(
+            &roots,
+            &mut |batch, found| {
+                all_midi.extend_from_slice(batch);
+                let _ = app_handle.emit(
+                    "midi-scan-progress",
+                    serde_json::json!({
+                        "phase": "scanning",
+                        "midiFiles": batch,
+                        "found": found
+                    }),
+                );
+            },
+            &|| midi_state.stop_scan.load(Ordering::SeqCst),
+            exclude_set,
+            Some(Arc::clone(&app_handle.state::<WalkerStatus>().midi_dirs)),
+        );
+
+        {
+            let ws = app_handle.state::<WalkerStatus>();
+            let mut ad = ws.midi_dirs.lock().unwrap_or_else(|e| e.into_inner());
+            ad.clear();
+        }
+        let was_stopped = midi_state.stop_scan.load(Ordering::Relaxed);
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
+        all_midi.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        serde_json::json!({ "midiFiles": all_midi, "roots": root_strs, "stopped": was_stopped })
+    })
+    .await;
+
+    state.scanning.store(false, Ordering::SeqCst);
+    let elapsed = scan_start.elapsed();
+    match &result {
+        Ok(v) => append_log(format!(
+            "SCAN END — midi | {}s | {} found",
+            elapsed.as_secs(),
+            v.get("midiFiles")
+                .and_then(|p| p.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0)
+        )),
+        Err(e) => append_log(format!(
+            "SCAN ERROR — midi | {}s | {}",
+            elapsed.as_secs(),
+            e
+        )),
+    }
+    result.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn stop_midi_scan(app: AppHandle) -> Result<(), String> {
+    append_log("SCAN STOP — midi (user requested)".into());
+    let state = app.state::<MidiScanState>();
+    state.stop_scan.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+#[tauri::command]
+fn midi_history_save(
+    midi_files: Vec<history::MidiFile>,
+    roots: Option<Vec<String>>,
+) -> Result<history::MidiScanSnapshot, String> {
+    let snap = history::build_midi_snapshot(&midi_files, &roots.unwrap_or_default());
+    db::global().save_midi_scan(&snap)?;
+    db::global().checkpoint();
+    Ok(snap)
+}
+
+#[tauri::command]
+fn midi_history_get_scans() -> Result<Vec<serde_json::Value>, String> {
+    db::global().get_midi_scans()
+}
+
+#[tauri::command]
+fn midi_history_get_detail(id: String) -> Result<history::MidiScanSnapshot, String> {
+    db::global().get_midi_scan_detail(&id)
+}
+
+#[tauri::command]
+fn midi_history_delete(id: String) -> Result<(), String> {
+    db::global().delete_midi_scan(&id)
+}
+
+#[tauri::command]
+fn midi_history_clear() -> Result<(), String> {
+    #[cfg(not(test))]
+    append_log("HISTORY CLEAR — midi".into());
+    db::global().clear_midi_history()
+}
+
+#[tauri::command]
+fn midi_history_latest() -> Result<Option<history::MidiScanSnapshot>, String> {
+    db::global().get_latest_midi_scan()
+}
+
+#[tauri::command]
+fn db_query_midi(
+    search: Option<String>,
+    format_filter: Option<String>,
+    sort_key: Option<String>,
+    sort_asc: Option<bool>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> Result<db::MidiQueryResult, String> {
+    db::global().query_midi(
+        search.as_deref(),
+        format_filter.as_deref(),
+        sort_key.as_deref().unwrap_or("name"),
+        sort_asc.unwrap_or(true),
+        offset.unwrap_or(0),
+        limit.unwrap_or(500),
+    )
+}
+
+#[tauri::command]
+fn db_midi_filter_stats(
+    search: Option<String>,
+    format_filter: Option<String>,
+) -> Result<db::FilterStatsResult, String> {
+    db::global().midi_filter_stats(search.as_deref(), format_filter.as_deref())
 }
 
 // PDF scanner commands
@@ -5548,6 +5738,10 @@ pub fn run() {
             scanning: AtomicBool::new(false),
             stop_scan: AtomicBool::new(false),
         })
+        .manage(MidiScanState {
+            scanning: AtomicBool::new(false),
+            stop_scan: AtomicBool::new(false),
+        })
         .manage(PdfScanState {
             scanning: AtomicBool::new(false),
             stop_scan: AtomicBool::new(false),
@@ -5557,6 +5751,7 @@ pub fn run() {
             audio_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             daw_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             preset_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            midi_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             pdf_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             unified_scanning: AtomicBool::new(false),
         })
@@ -5640,6 +5835,16 @@ pub fn run() {
             preset_history_latest,
             preset_history_diff,
             open_preset_folder,
+            scan_midi_files,
+            stop_midi_scan,
+            midi_history_save,
+            midi_history_get_scans,
+            midi_history_get_detail,
+            midi_history_delete,
+            midi_history_clear,
+            midi_history_latest,
+            db_query_midi,
+            db_midi_filter_stats,
             scan_pdfs,
             stop_pdf_scan,
             scan_unified,

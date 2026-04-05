@@ -39,8 +39,9 @@ const PRESET_EXTENSIONS: &[&str] = &[
     ".syx",       // MIDI SysEx dump
     ".tfx",       // Tone2 preset
     ".pjunoxl",   // TAL preset
-    ".mid",       // Standard MIDI file
-    ".midi",      // Standard MIDI file
+    // .mid / .midi deliberately excluded — MIDI has its own dedicated scanner
+    // (midi_scanner.rs) and lives in the midi_files table. Including them here
+    // would double-count MIDI files into both presets and midi_files tables.
 ];
 
 fn format_size(bytes: u64) -> String {
@@ -292,11 +293,13 @@ mod tests {
     }
 
     #[test]
-    fn test_preset_extensions_includes_midi() {
+    fn test_preset_extensions_excludes_midi() {
+        // MIDI files belong to the dedicated midi_scanner/midi_files table —
+        // listing them here would double-count them into both tables.
         for ext in &[".mid", ".midi"] {
             assert!(
-                PRESET_EXTENSIONS.contains(ext),
-                "PRESET_EXTENSIONS should list MIDI {}",
+                !PRESET_EXTENSIONS.contains(ext),
+                "PRESET_EXTENSIONS must NOT list MIDI {} — use midi_scanner instead",
                 ext
             );
         }

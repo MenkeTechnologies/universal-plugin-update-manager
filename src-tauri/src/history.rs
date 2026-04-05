@@ -270,6 +270,35 @@ pub struct PresetScanDiff {
     pub removed: Vec<PresetFile>,
 }
 
+// MIDI scan types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MidiFile {
+    pub name: String,
+    pub path: String,
+    pub directory: String,
+    pub format: String, // "MID" or "MIDI"
+    pub size: u64,
+    #[serde(rename = "sizeFormatted")]
+    pub size_formatted: String,
+    pub modified: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MidiScanSnapshot {
+    pub id: String,
+    pub timestamp: String,
+    #[serde(rename = "midiCount")]
+    pub midi_count: usize,
+    #[serde(rename = "totalBytes")]
+    pub total_bytes: u64,
+    #[serde(rename = "formatCounts")]
+    pub format_counts: std::collections::HashMap<String, usize>,
+    #[serde(rename = "midiFiles")]
+    pub midi_files: Vec<MidiFile>,
+    #[serde(default)]
+    pub roots: Vec<String>,
+}
+
 // PDF scan types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PdfFile {
@@ -1400,6 +1429,24 @@ pub fn build_preset_snapshot(presets: &[PresetFile], roots: &[String]) -> Preset
         total_bytes,
         format_counts,
         presets: presets.to_vec(),
+        roots: roots.to_vec(),
+    }
+}
+
+pub fn build_midi_snapshot(midi_files: &[MidiFile], roots: &[String]) -> MidiScanSnapshot {
+    let mut format_counts = std::collections::HashMap::new();
+    let mut total_bytes = 0u64;
+    for m in midi_files {
+        *format_counts.entry(m.format.clone()).or_insert(0) += 1;
+        total_bytes += m.size;
+    }
+    MidiScanSnapshot {
+        id: gen_id(),
+        timestamp: now_iso(),
+        midi_count: midi_files.len(),
+        total_bytes,
+        format_counts,
+        midi_files: midi_files.to_vec(),
         roots: roots.to_vec(),
     }
 }

@@ -337,13 +337,16 @@ async function scanAll(resume = false) {
     const pdfP = unifiedP.then(r => ({ pdfs: r.pdf, roots: r.pdfRoots, stopped: r.stopped }));
 
     // Start per-tab scan functions — each registers its event listener + UI
-    // then awaits its derived promise.
+    // then awaits its derived promise. MIDI runs as its own independent scan
+    // (separate walker, separate DB) since scan_unified doesn't yet classify
+    // into the MIDI bucket.
     const scansP = Promise.all([
       scanPlugins(resume),
       scanAudioSamples(resume, audioP),
       scanDawProjects(resume, dawP),
       scanPresets(resume, presetP),
       typeof scanPdfs === 'function' ? scanPdfs(resume, pdfP) : Promise.resolve(),
+      typeof scanMidi === 'function' ? scanMidi(resume) : Promise.resolve(),
     ]);
 
     // Kick off the backend walker after listeners are up (100ms is imperceptible
@@ -386,6 +389,7 @@ async function stopAll() {
     window.vstUpdater.stopAudioScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
     window.vstUpdater.stopDawScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
     window.vstUpdater.stopPresetScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
+    window.vstUpdater.stopMidiScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
     window.vstUpdater.stopPdfScan().catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }),
   ]);
 }

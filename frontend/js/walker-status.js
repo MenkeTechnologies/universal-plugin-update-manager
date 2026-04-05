@@ -34,26 +34,23 @@ async function _updateWalkerTiles() {
     const status = await window.vstUpdater.getWalkerStatus();
     _renderTile('walkerPluginBody', 'walkerTilePlugin', status.plugin, 'var(--cyan)', status.poolThreads, status.pluginScanning);
 
-    // Unified tile shows when any file-walker (audio/daw/preset/pdf, unified
-    // or single-type) is active. The WalkerStatus lists are fed by whichever
-    // walker is running, so picking status.audio as the source covers both
-    // scan_unified (fan-out) and single-type scans.
+    // Unified tile stays visible at all times — during scans it streams the
+    // active dir list; when idle it shows the last dirs walked + "idle" status
+    // so users can see the final scan state without the tile vanishing.
     const unifiedTile = document.getElementById('walkerTileUnified');
     const fileWalkerActive = status.unifiedScanning || status.audioScanning
-      || status.dawScanning || status.presetScanning || status.pdfScanning;
-    if (fileWalkerActive) {
-      if (unifiedTile) unifiedTile.style.display = '';
-      // During single-type scans, WalkerStatus populates only the active
-      // type's dirs list — fall back through them in priority order.
-      const dirs = (status.audio && status.audio.length) ? status.audio
-        : (status.daw && status.daw.length) ? status.daw
-        : (status.preset && status.preset.length) ? status.preset
-        : (status.pdf && status.pdf.length) ? status.pdf
-        : [];
-      _renderTile('walkerUnifiedBody', 'walkerTileUnified', dirs, 'var(--accent)', status.poolThreads, true);
-    } else if (unifiedTile) {
-      unifiedTile.style.display = 'none';
-    }
+      || status.dawScanning || status.presetScanning || status.midiScanning
+      || status.pdfScanning;
+    if (unifiedTile) unifiedTile.style.display = '';
+    // Fall back through dir lists — whichever walker ran last populates
+    // its corresponding list.
+    const dirs = (status.audio && status.audio.length) ? status.audio
+      : (status.daw && status.daw.length) ? status.daw
+      : (status.preset && status.preset.length) ? status.preset
+      : (status.midi && status.midi.length) ? status.midi
+      : (status.pdf && status.pdf.length) ? status.pdf
+      : [];
+    _renderTile('walkerUnifiedBody', 'walkerTileUnified', dirs, 'var(--accent)', status.poolThreads, fileWalkerActive);
 
     // Stop polling after 10 consecutive idle checks (5 seconds)
     const allIdle = !status.pluginScanning && !fileWalkerActive;

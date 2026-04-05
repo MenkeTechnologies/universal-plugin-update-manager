@@ -322,14 +322,11 @@ async function scanPdfs(resume = false, unifiedResult = null) {
   let firstBatch = true;
   let pendingPdfs = [];
   let pendingFound = 0;
-  let flushScheduled = false;
   const pdfEta = createETA();
   pdfEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
-  let lastFlush = 0;
 
   function flushPending() {
-    flushScheduled = false;
     if (pendingPdfs.length === 0) return;
     const batch = pendingPdfs.splice(0);
 
@@ -367,16 +364,9 @@ async function scanPdfs(resume = false, unifiedResult = null) {
           })
         : `&#8635; ${pendingFound} found${elapsed ? ' — ' + elapsed : ''}`;
     }
-    lastFlush = performance.now();
   }
 
-  function scheduleFlush() {
-    if (flushScheduled) return;
-    flushScheduled = true;
-    const elapsed = performance.now() - lastFlush;
-    const delay = Math.max(0, FLUSH_INTERVAL - elapsed);
-    setTimeout(() => requestAnimationFrame(flushPending), delay);
-  }
+  const scheduleFlush = createScanFlusher(flushPending, FLUSH_INTERVAL);
 
   if (pdfScanProgressCleanup) pdfScanProgressCleanup();
   pdfScanProgressCleanup = window.vstUpdater.onPdfScanProgress((data) => {

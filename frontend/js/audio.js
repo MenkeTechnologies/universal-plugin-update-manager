@@ -655,14 +655,11 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
   let pendingSamples = [];
   let pendingFound = 0;
   _audioScanActive = true;
-  let flushScheduled = false;
   const audioEta = createETA();
   audioEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
-  let lastFlush = 0;
 
   function flushPendingSamples() {
-    flushScheduled = false;
     if (pendingSamples.length === 0) return;
 
     if (firstAudioBatch) {
@@ -710,16 +707,9 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
     }
 
     updateAudioStats();
-    lastFlush = performance.now();
   }
 
-  function scheduleFlush() {
-    if (flushScheduled) return;
-    flushScheduled = true;
-    const elapsed = performance.now() - lastFlush;
-    const delay = Math.max(0, FLUSH_INTERVAL - elapsed);
-    setTimeout(() => requestAnimationFrame(flushPendingSamples), delay);
-  }
+  const scheduleFlush = createScanFlusher(flushPendingSamples, FLUSH_INTERVAL);
 
   if (audioScanProgressCleanup) audioScanProgressCleanup();
   audioScanProgressCleanup = window.vstUpdater.onAudioScanProgress((data) => {

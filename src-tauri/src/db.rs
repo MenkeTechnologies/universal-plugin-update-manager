@@ -4,8 +4,8 @@
 
 use crate::history::{
     self, AudioHistory, AudioSample, AudioScanSnapshot, DawHistory, DawProject, DawScanSnapshot,
-    KvrCacheEntry, PdfFile, PdfScanSnapshot, PresetFile, PresetHistory, PresetScanSnapshot,
-    ScanHistory, ScanSnapshot,
+    KvrCacheEntry, MidiFile, MidiScanSnapshot, PdfFile, PdfScanSnapshot, PresetFile, PresetHistory,
+    PresetScanSnapshot, ScanHistory, ScanSnapshot,
 };
 use crate::scanner::PluginInfo;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -257,6 +257,16 @@ pub struct PresetQueryResult {
 }
 
 #[derive(Debug, Serialize)]
+pub struct MidiQueryResult {
+    #[serde(rename = "midiFiles")]
+    pub midi_files: Vec<MidiFile>,
+    #[serde(rename = "totalCount")]
+    pub total_count: u64,
+    #[serde(rename = "totalUnfiltered")]
+    pub total_unfiltered: u64,
+}
+
+#[derive(Debug, Serialize)]
 pub struct PdfRow {
     pub name: String,
     pub path: String,
@@ -344,6 +354,7 @@ impl Database {
             ("plugin_scans", "plugins", "scan_id"),
             ("daw_scans", "daw_projects", "scan_id"),
             ("preset_scans", "presets", "scan_id"),
+            ("midi_scans", "midi_files", "scan_id"),
             ("pdf_scans", "pdfs", "scan_id"),
         ] {
             let _ = conn.execute_batch(&format!(
@@ -678,6 +689,41 @@ impl Database {
                 [],
             )
             .map_err(|e| format!("Migration v7 schema_version failed: {e}"))?;
+        }
+
+        if current < 8 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS midi_files (
+                    id              INTEGER PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    path            TEXT NOT NULL,
+                    directory       TEXT NOT NULL,
+                    format          TEXT NOT NULL,
+                    size            INTEGER NOT NULL,
+                    size_formatted  TEXT NOT NULL,
+                    modified        TEXT NOT NULL,
+                    scan_id         TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_midi_files_path_scan ON midi_files(path, scan_id);
+                CREATE INDEX IF NOT EXISTS idx_midi_files_name ON midi_files(name COLLATE NOCASE);
+                CREATE INDEX IF NOT EXISTS idx_midi_files_scan_id ON midi_files(scan_id);
+                CREATE INDEX IF NOT EXISTS idx_midi_files_format ON midi_files(format);
+
+                CREATE TABLE IF NOT EXISTS midi_scans (
+                    id              TEXT PRIMARY KEY,
+                    timestamp       TEXT NOT NULL,
+                    midi_count      INTEGER NOT NULL,
+                    total_bytes     INTEGER NOT NULL,
+                    format_counts   TEXT NOT NULL,
+                    roots           TEXT NOT NULL
+                );",
+            )
+            .map_err(|e| format!("Migration v8 (MIDI tables) failed: {e}"))?;
+            conn.execute(
+                "INSERT INTO schema_version (version) VALUES (8)",
+                [],
+            )
+            .map_err(|e| format!("Migration v8 schema_version failed: {e}"))?;
         }
 
         if conn
@@ -2166,6 +2212,352 @@ impl Database {
             .map_err(|e| e.to_string())
     }
 
+    // ── MIDI scan CRUD ──
+
+    pub fn save_midi_scan(&self, snap: &MidiScanSnapshot) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
+        let roots_json = serde_json::to_string(&snap.roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO midi_scans (id, timestamp, midi_count, total_bytes, format_counts, roots) VALUES (?1,?2,?3,?4,?5,?6)",
+            params![snap.id, snap.timestamp, snap.midi_count, snap.total_bytes, fc_json, roots_json],
+        ).map_err(|e| e.to_string())?;
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            tx.execute("DELETE FROM midi_files WHERE scan_id = ?1", params![snap.id])
+                .map_err(|e| e.to_string())?;
+            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO midi_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            for m in &snap.midi_files {
+                stmt.execute(params![
+                    m.name,
+                    m.path,
+                    m.directory,
+                    m.format,
+                    m.size,
+                    m.size_formatted,
+                    m.modified,
+                    snap.id
+                ])
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
+    pub fn get_midi_scans(&self) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, timestamp, midi_count, total_bytes, format_counts, roots FROM midi_scans ORDER BY timestamp DESC").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            let fc_str: String = row.get(4)?;
+            let roots_str: String = row.get(5)?;
+            Ok(serde_json::json!({
+                "id": row.get::<_,String>(0)?,
+                "timestamp": row.get::<_,String>(1)?,
+                "midiCount": row.get::<_,u64>(2)?,
+                "totalBytes": row.get::<_,u64>(3)?,
+                "formatCounts": serde_json::from_str::<HashMap<String,usize>>(&fc_str).unwrap_or_default(),
+                "roots": serde_json::from_str::<Vec<String>>(&roots_str).unwrap_or_default(),
+            }))
+        }).map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn get_midi_scan_detail(&self, id: &str) -> Result<MidiScanSnapshot, String> {
+        let conn = self.conn.lock().unwrap();
+        let (ts, mc, tb, fc_str, roots_str): (String, usize, u64, String, String) = conn.query_row(
+            "SELECT timestamp, midi_count, total_bytes, format_counts, roots FROM midi_scans WHERE id = ?1",
+            params![id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+        ).map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT name, path, directory, format, size, size_formatted, modified FROM midi_files WHERE scan_id = ?1").map_err(|e| e.to_string())?;
+        let midi_files = stmt
+            .query_map(params![id], |row| {
+                Ok(MidiFile {
+                    name: row.get(0)?,
+                    path: row.get(1)?,
+                    directory: row.get(2)?,
+                    format: row.get(3)?,
+                    size: row.get::<_, i64>(4).unwrap_or(0) as u64,
+                    size_formatted: row.get(5)?,
+                    modified: row.get(6)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        Ok(MidiScanSnapshot {
+            id: id.to_string(),
+            timestamp: ts,
+            midi_count: mc,
+            total_bytes: tb,
+            format_counts: serde_json::from_str(&fc_str).unwrap_or_default(),
+            midi_files,
+            roots: serde_json::from_str(&roots_str).unwrap_or_default(),
+        })
+    }
+
+    pub fn get_latest_midi_scan(&self) -> Result<Option<MidiScanSnapshot>, String> {
+        let conn = self.conn.lock().unwrap();
+        let id: Option<String> = conn
+            .query_row(
+                "SELECT id FROM midi_scans WHERE midi_count > 0 ORDER BY timestamp DESC LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        drop(conn);
+        match id {
+            Some(id) => self.get_midi_scan_detail(&id).map(Some),
+            None => Ok(None),
+        }
+    }
+
+    pub fn delete_midi_scan(&self, id: &str) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM midi_files WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM midi_scans WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn clear_midi_history(&self) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch("DELETE FROM midi_files; DELETE FROM midi_scans;")
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn query_midi(
+        &self,
+        search: Option<&str>,
+        format_filter: Option<&str>,
+        sort_key: &str,
+        sort_asc: bool,
+        offset: u64,
+        limit: u64,
+    ) -> Result<MidiQueryResult, String> {
+        let conn = self.conn.lock().unwrap();
+        let scan_id: String = conn
+            .query_row(
+                "SELECT id FROM midi_scans WHERE midi_count > 0 ORDER BY timestamp DESC LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
+        if scan_id.is_empty() {
+            return Ok(MidiQueryResult {
+                midi_files: vec![],
+                total_count: 0,
+                total_unfiltered: 0,
+            });
+        }
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM midi_files WHERE scan_id = ?1",
+                params![scan_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        let mut where_parts = vec!["scan_id = ?1".to_string()];
+        let mut bind_idx = 2usize;
+        let search_pat = search.and_then(|s| {
+            let t = s.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(format!(
+                    "%{}%",
+                    t.chars().map(|c| c.to_string()).collect::<Vec<_>>().join("%")
+                ))
+            }
+        });
+        if search_pat.is_some() {
+            where_parts.push(format!(
+                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+            ));
+            bind_idx += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" {
+                if f.contains(',') {
+                    where_parts.push(format!(
+                        "format IN ({})",
+                        f.split(',')
+                            .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ));
+                } else {
+                    where_parts.push(format!("format = ?{bind_idx}"));
+                    bind_idx += 1;
+                }
+            }
+        }
+        let _ = bind_idx;
+        let where_cl = where_parts.join(" AND ");
+
+        let sort_col = match sort_key {
+            "name" => "name COLLATE NOCASE",
+            "size" => "size",
+            "modified" => "modified",
+            "directory" => "directory COLLATE NOCASE",
+            "format" => "format",
+            _ => "name COLLATE NOCASE",
+        };
+        let dir = if sort_asc { "ASC" } else { "DESC" };
+
+        let total_count: u64 = {
+            let sql = format!("SELECT COUNT(*) FROM midi_files WHERE {where_cl}");
+            let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+            let mut bi = 1;
+            stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+            bi += 1;
+            if let Some(ref p) = search_pat {
+                stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+            if let Some(f) = format_filter {
+                if !f.is_empty() && f != "all" && !f.contains(',') {
+                    stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                }
+            }
+            let mut rows = stmt.raw_query();
+            rows.next()
+                .map_err(|e| e.to_string())?
+                .map(|r| r.get::<_, u64>(0).unwrap_or(0))
+                .unwrap_or(0)
+        };
+
+        let sql = format!(
+            "SELECT name, path, directory, format, size, size_formatted, modified
+             FROM midi_files WHERE {where_cl}
+             ORDER BY {sort_col} {dir} LIMIT ?{limit_idx} OFFSET ?{off_idx}",
+            limit_idx = bind_idx,
+            off_idx = bind_idx + 1
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut bi = 1;
+        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+        bi += 1;
+        if let Some(ref p) = search_pat {
+            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" && !f.contains(',') {
+                stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+        }
+        stmt.raw_bind_parameter(bi, limit as i64).map_err(|e| e.to_string())?;
+        stmt.raw_bind_parameter(bi + 1, offset as i64).map_err(|e| e.to_string())?;
+        let mut rows = stmt.raw_query();
+        let mut out = Vec::new();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            out.push(MidiFile {
+                name: row.get(0).unwrap_or_default(),
+                path: row.get(1).unwrap_or_default(),
+                directory: row.get(2).unwrap_or_default(),
+                format: row.get(3).unwrap_or_default(),
+                size: row.get::<_, i64>(4).unwrap_or(0) as u64,
+                size_formatted: row.get(5).unwrap_or_default(),
+                modified: row.get(6).unwrap_or_default(),
+            });
+        }
+        Ok(MidiQueryResult {
+            midi_files: out,
+            total_count,
+            total_unfiltered,
+        })
+    }
+
+    pub fn midi_filter_stats(
+        &self,
+        search: Option<&str>,
+        format_filter: Option<&str>,
+    ) -> Result<FilterStatsResult, String> {
+        let scan_id = self.get_latest_scan_id("midi_scans", "midi_count")?;
+        if scan_id.is_empty() {
+            return Ok(FilterStatsResult {
+                count: 0,
+                total_bytes: 0,
+                by_type: HashMap::new(),
+                bytes_by_type: HashMap::new(),
+                total_unfiltered: 0,
+            });
+        }
+        let conn = self.conn.lock().unwrap();
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM midi_files WHERE scan_id = ?1",
+                params![scan_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let search_pat = Self::fzf_like(search);
+        let mut where_parts = vec!["scan_id = ?1".to_string()];
+        let mut bind_idx = 2usize;
+        if search_pat.is_some() {
+            where_parts.push(format!(
+                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+            ));
+            bind_idx += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" {
+                if f.contains(',') {
+                    where_parts.push(format!("format IN ({})", Self::in_list_sql(f)));
+                } else {
+                    where_parts.push(format!("format = ?{bind_idx}"));
+                    bind_idx += 1;
+                }
+            }
+        }
+        let _ = bind_idx;
+        let where_cl = where_parts.join(" AND ");
+        let sql = format!(
+            "SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM midi_files WHERE {where_cl} GROUP BY format"
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut bi = 1;
+        stmt.raw_bind_parameter(bi, &scan_id).map_err(|e| e.to_string())?;
+        bi += 1;
+        if let Some(ref p) = search_pat {
+            stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" && !f.contains(',') {
+                stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+            }
+        }
+        let mut rows = stmt.raw_query();
+        let mut count = 0u64;
+        let mut total_bytes = 0u64;
+        let mut by_type = HashMap::new();
+        let mut bytes_by_type = HashMap::new();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            let fmt: String = row.get(0).unwrap_or_default();
+            let n: u64 = row.get::<_, i64>(1).unwrap_or(0) as u64;
+            let sz: u64 = row.get::<_, i64>(2).unwrap_or(0) as u64;
+            count += n;
+            total_bytes += sz;
+            by_type.insert(fmt.clone(), n);
+            bytes_by_type.insert(fmt, sz);
+        }
+        Ok(FilterStatsResult {
+            count,
+            total_bytes,
+            by_type,
+            bytes_by_type,
+            total_unfiltered,
+        })
+    }
+
     // ── PDF scan CRUD ──
 
     pub fn save_pdf_scan(&self, snap: &PdfScanSnapshot) -> Result<(), String> {
@@ -3044,6 +3436,7 @@ impl Database {
             ("Audio Scans", "audio_scans", "audio_samples", "audio_scans"),
             ("DAW Scans", "daw_scans", "daw_projects", "daw_scans"),
             ("Preset Scans", "preset_scans", "presets", "preset_scans"),
+            ("MIDI Scans", "midi_scans", "midi_files", "midi_scans"),
             ("PDF Scans", "pdf_scans", "pdfs", "pdf_scans"),
         ] {
             let scan_count: u64 = conn
@@ -3140,7 +3533,8 @@ impl Database {
              DELETE FROM waveform_cache;
              DELETE FROM spectrogram_cache;
              DELETE FROM xref_cache;
-             DELETE FROM fingerprint_cache;",
+             DELETE FROM fingerprint_cache;
+             DELETE FROM kvr_cache;",
         )
         .map_err(|e| e.to_string())
     }

@@ -75,8 +75,41 @@ async function scanMidi(resume = false) {
 
   let pendingMidi = [];
   let pendingFound = 0;
+  let firstMidiBatch = true;
   const midiEta = typeof createETA === 'function' ? createETA() : null;
   if (midiEta) midiEta.start();
+  const FLUSH_INTERVAL = parseInt((typeof prefs !== 'undefined' ? prefs.getItem('flushInterval') : null) || '100', 10);
+
+  function flushPendingMidi() {
+    if (pendingMidi.length === 0) return;
+    const toAdd = pendingMidi;
+    pendingMidi = [];
+    if (firstMidiBatch) { firstMidiBatch = false; _midiTableInit = false; _midiRenderCount = 0; }
+    allMidiFiles.push(...toAdd);
+    // Apply active search so streamed rows respect the user's current filter.
+    const q = (typeof _midiSearch === 'string' && _midiSearch) ? _midiSearch : '';
+    const mode = typeof getSearchMode === 'function' ? getSearchMode('regexMidi') : 'fuzzy';
+    const matching = q
+      ? toAdd.filter(s => typeof searchMatch === 'function'
+          ? searchMatch(q, [s.name, s.directory || ''], mode)
+          : s.name.toLowerCase().includes(q.toLowerCase()))
+      : toAdd;
+    filteredMidi.push(...matching);
+    const tbody = document.getElementById('midiTableBody');
+    if (!tbody) {
+      renderMidiTable(); // first flush: builds the table shell
+    } else if (_midiRenderCount < 2000) {
+      const loadMore = document.getElementById('midiLoadMore');
+      if (loadMore) loadMore.remove();
+      const toRender = matching.slice(0, 2000 - _midiRenderCount);
+      tbody.insertAdjacentHTML('beforeend', toRender.map(buildMidiRow).join(''));
+      _midiRenderCount += toRender.length;
+    }
+    updateMidiCount();
+    updateMidiHeaderCount();
+  }
+
+  const scheduleMidiFlush = createScanFlusher(flushPendingMidi, FLUSH_INTERVAL);
 
   if (_midiScanProgressCleanup) _midiScanProgressCleanup();
   _midiScanProgressCleanup = window.vstUpdater.onMidiScanProgress((data) => {
@@ -87,12 +120,15 @@ async function scanMidi(resume = false) {
       const elapsed = midiEta ? midiEta.elapsed() : '';
       const timeSuffix = elapsed ? ' — ' + elapsed : '';
       setBtn(`&#8635; ${pendingFound.toLocaleString()} found${timeSuffix}`, true);
+      scheduleMidiFlush();
     }
   });
 
   try {
     const midiRoots = (typeof prefs !== 'undefined' ? (prefs.getItem('midiScanDirs') || '') : '').split('\n').map(s => s.trim()).filter(Boolean);
     const result = await window.vstUpdater.scanMidiFiles(midiRoots.length ? midiRoots : undefined, excludePaths);
+    // Drain any remaining buffered batch that didn't hit the flush timer.
+    flushPendingMidi();
     const files = result.midiFiles || [];
     if (resume) {
       allMidiFiles = [...allMidiFiles, ...files];
@@ -141,17 +177,26 @@ function syncMidiStatsBarCount(total) {
 }
 
 function updateMidiCount() {
+  // Match audio/daw/preset/pdf convention: "Total:" shows "filtered / total"
+  // when a filter is active, and just the total when unfiltered.
+  const filtered = filteredMidi.length;
+  const total = allMidiFiles.length;
+  const isFiltered = total > 0 && filtered < total;
+  const totalEl = document.getElementById('midiTotalCount');
+  if (totalEl) {
+    totalEl.textContent = isFiltered
+      ? filtered.toLocaleString() + ' / ' + total.toLocaleString()
+      : total.toLocaleString();
+  }
   const count = document.getElementById('midiCount');
-  if (count) count.textContent = filteredMidi.length;
-  const total = document.getElementById('midiTotalCount');
-  if (total) total.textContent = allMidiFiles.length;
+  if (count) count.textContent = filtered.toLocaleString();
   const sizeEl = document.getElementById('midiTotalSize');
   if (sizeEl) {
-    const bytes = allMidiFiles.reduce((s, f) => s + (f.size || 0), 0);
+    const bytes = filteredMidi.reduce((s, f) => s + (f.size || 0), 0);
     sizeEl.textContent = typeof formatAudioSize === 'function' ? formatAudioSize(bytes) : Math.round(bytes / 1024) + ' KB';
   }
   const statsBar = document.getElementById('midiStats');
-  if (statsBar && allMidiFiles.length > 0) statsBar.style.display = '';
+  if (statsBar && total > 0) statsBar.style.display = '';
 }
 
 function updateMidiHeaderCount() {

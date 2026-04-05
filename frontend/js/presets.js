@@ -357,14 +357,11 @@ async function scanPresets(resume = false, unifiedResult = null) {
   let firstBatch = true;
   let pendingPresets = [];
   let pendingFound = 0;
-  let flushScheduled = false;
   const presetEta = createETA();
   presetEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
-  let lastFlush = 0;
 
   function flushPending() {
-    flushScheduled = false;
     if (pendingPresets.length === 0) return;
     const batch = pendingPresets.splice(0);
 
@@ -427,16 +424,9 @@ async function scanPresets(resume = false, unifiedResult = null) {
     const presetElapsed = presetEta.elapsed();
     const timeSuffix = presetElapsed ? ' — ' + presetElapsed : '';
     setBtn(`&#8635; ${pendingFound.toLocaleString()} found${timeSuffix}`, true);
-    lastFlush = performance.now();
   }
 
-  function scheduleFlush() {
-    if (flushScheduled) return;
-    flushScheduled = true;
-    const elapsed = performance.now() - lastFlush;
-    const delay = Math.max(0, FLUSH_INTERVAL - elapsed);
-    setTimeout(() => requestAnimationFrame(flushPending), delay);
-  }
+  const scheduleFlush = createScanFlusher(flushPending, FLUSH_INTERVAL);
 
   if (presetScanProgressCleanup) presetScanProgressCleanup();
   presetScanProgressCleanup = window.vstUpdater.onPresetScanProgress((data) => {

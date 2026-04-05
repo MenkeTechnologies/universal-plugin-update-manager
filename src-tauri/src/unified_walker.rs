@@ -111,8 +111,7 @@ const PRESET_EXTENSIONS: &[&str] = &[
     ".syx",
     ".tfx",
     ".pjunoxl",
-    ".mid",
-    ".midi",
+    // .mid / .midi live in midi_files (separate walker/table) — NEVER here.
 ];
 
 const PDF_EXTENSION: &str = ".pdf";
