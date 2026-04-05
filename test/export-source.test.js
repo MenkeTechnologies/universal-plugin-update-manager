@@ -40,6 +40,13 @@ describe('frontend/js/export.js (vm-loaded)', () => {
     assert.strictEqual(E.resolveExportTitle(null), '');
   });
 
+  it('resolveExportTitle ignores plain title when titleKey is set', () => {
+    assert.strictEqual(
+      E.resolveExportTitle({ titleKey: 'ui.export.title_plugins', title: 'Ignored', titleVars: {} }),
+      'ui.export.title_plugins:{}'
+    );
+  });
+
   it('resolveExportTitle uses titleKey with empty vars object', () => {
     assert.strictEqual(
       E.resolveExportTitle({ titleKey: 'ui.export.title_pdfs', titleVars: {} }),
@@ -85,6 +92,12 @@ describe('frontend/js/export.js (vm-loaded)', () => {
     for (const id of ['json', 'toml', 'csv', 'tsv', 'pdf']) {
       assert.ok(ids.has(id), `missing format ${id}`);
     }
+  });
+
+  it('getExportFormatOptions returns five formats with desc for each', () => {
+    const opts = E.getExportFormatOptions();
+    assert.strictEqual(opts.length, 5);
+    assert.ok(opts.every((o) => typeof o.desc === 'string' && o.desc.length > 0));
   });
 });
 

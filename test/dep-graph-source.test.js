@@ -123,4 +123,28 @@ describe('frontend/js/dep-graph.js buildDepGraphData (vm-loaded)', () => {
     assert.strictEqual(d.projectsByCount[0].count, 3);
     assert.strictEqual(d.projectsByCount[1].count, 1);
   });
+
+  it('empty xref cache and no projects yields zero totals', () => {
+    G.allDawProjects = [];
+    G._xrefCache = {};
+    G.allPlugins = [];
+    const d = G.buildDepGraphData();
+    assert.strictEqual(d.totalProjects, 0);
+    assert.strictEqual(d.pluginsByUsage.length, 0);
+    assert.strictEqual(d.projectsByCount.length, 0);
+    assert.strictEqual(d.orphaned.length, 0);
+  });
+
+  it('xref entries without matching DAW project row are skipped', () => {
+    G.allDawProjects = [];
+    G._xrefCache = {
+      '/ghost/path.als': [
+        { name: 'Ghost', normalizedName: 'ghost', manufacturer: 'X', pluginType: 'VST3' },
+      ],
+    };
+    G.allPlugins = [];
+    const d = G.buildDepGraphData();
+    assert.strictEqual(d.totalProjects, 0);
+    assert.strictEqual(d.pluginsByUsage.length, 0);
+  });
 });

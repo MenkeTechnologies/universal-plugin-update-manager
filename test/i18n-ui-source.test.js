@@ -61,4 +61,59 @@ describe('frontend/js/i18n-ui.js applyUiI18n (vm-loaded)', () => {
     J.applyUiI18n();
     assert.strictEqual(el.textContent, 'unchanged');
   });
+
+  it('does not overwrite when map value is empty string', () => {
+    const el = { dataset: { i18n: 'k.empty' }, textContent: 'keep' };
+    const J = loadFrontendScripts(['i18n-ui.js'], {
+      __appStr: { 'k.empty': '' },
+      document: {
+        querySelectorAll(sel) {
+          if (sel === '[data-i18n]') return [el];
+          return [];
+        },
+        createElement: () => ({}),
+        getElementById: () => null,
+        addEventListener: () => {},
+        body: { insertAdjacentHTML: () => {} },
+      },
+    });
+    J.applyUiI18n();
+    assert.strictEqual(el.textContent, 'keep');
+  });
+
+  it('null __appStr falls back to {} so no keys apply', () => {
+    const el = { dataset: { i18n: 'x' }, textContent: 'orig' };
+    const J = loadFrontendScripts(['i18n-ui.js'], {
+      __appStr: null,
+      document: {
+        querySelectorAll() {
+          return [el];
+        },
+        createElement: () => ({}),
+        getElementById: () => null,
+        addEventListener: () => {},
+        body: { insertAdjacentHTML: () => {} },
+      },
+    });
+    J.applyUiI18n();
+    assert.strictEqual(el.textContent, 'orig');
+  });
+
+  it('returns early when __appStr is a non-object (e.g. string)', () => {
+    const el = { dataset: { i18n: 'x' }, textContent: 'orig' };
+    const J = loadFrontendScripts(['i18n-ui.js'], {
+      __appStr: 'bad',
+      document: {
+        querySelectorAll() {
+          return [el];
+        },
+        createElement: () => ({}),
+        getElementById: () => null,
+        addEventListener: () => {},
+        body: { insertAdjacentHTML: () => {} },
+      },
+    });
+    J.applyUiI18n();
+    assert.strictEqual(el.textContent, 'orig');
+  });
 });

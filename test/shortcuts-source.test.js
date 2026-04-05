@@ -77,4 +77,23 @@ describe('frontend/js/shortcuts.js (vm-loaded)', () => {
     assert.strictEqual(S.formatKey({ key: ' ', mod: false }), 'Space');
     assert.strictEqual(S.formatKey({ key: 'ArrowLeft', mod: false }).includes('\u2190'), true);
   });
+
+  it('formatKey maps Escape and all arrow directions', () => {
+    const S = loadShortcutsSandbox('MacIntel');
+    assert.strictEqual(S.formatKey({ key: 'Escape', mod: false }), 'Esc');
+    assert.strictEqual(S.formatKey({ key: 'ArrowRight', mod: false }), '\u2192');
+    assert.strictEqual(S.formatKey({ key: 'ArrowUp', mod: false }), '\u2191');
+    assert.strictEqual(S.formatKey({ key: 'ArrowDown', mod: false }), '\u2193');
+  });
+
+  it('formatKey uppercases single letter keys', () => {
+    const S = loadShortcutsSandbox('Win32');
+    assert.strictEqual(S.formatKey({ key: 'a', mod: false }), 'A');
+  });
+
+  it('formatKey no mod is only the key part', () => {
+    const S = loadShortcutsSandbox('Linux x86_64');
+    assert.strictEqual(S.formatKey({ key: 'z', mod: false }), 'Z');
+    assert.ok(!S.formatKey({ key: 'z', mod: false }).includes('Ctrl'));
+  });
 });
