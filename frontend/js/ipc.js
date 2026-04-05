@@ -616,6 +616,9 @@ document.addEventListener('click', (e) => {
             case 'runBpmKeyLufsAnalysis':
                 if (typeof triggerBackgroundBpmKeyLufsAnalysis === 'function') triggerBackgroundBpmKeyLufsAnalysis();
                 break;
+            case 'stopBpmKeyLufsAnalysis':
+                if (typeof triggerStopBackgroundBpmKeyLufsAnalysis === 'function') triggerStopBackgroundBpmKeyLufsAnalysis();
+                break;
             case 'settingClearAnalysisCache':
                 window.vstUpdater.dbClearCaches().then(() => {
                     if (typeof _bpmCache !== 'undefined') {

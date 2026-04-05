@@ -1667,6 +1667,16 @@ function triggerBackgroundBpmKeyLufsAnalysis() {
   if (typeof showToast === 'function') showToast(toastFmt('toast.bpm_key_lufs_analysis_started'));
 }
 
+/** Settings: request stop of background BPM/Key/LUFS batch (takes effect after current batch). */
+function triggerStopBackgroundBpmKeyLufsAnalysis() {
+  if (!_bgAnalysisRunning) {
+    if (typeof showToast === 'function') showToast(toastFmt('toast.bpm_key_lufs_analysis_not_running'));
+    return;
+  }
+  stopBackgroundAnalysis();
+  if (typeof showToast === 'function') showToast(toastFmt('toast.bpm_key_lufs_analysis_stopped'));
+}
+
 function metaItem(label, value, wide) {
   const cls = wide ? 'meta-item meta-item-wide' : 'meta-item';
   const val = String(value || '—');
