@@ -810,6 +810,7 @@ mod tests {
         touch(&root.join("bower_components/legacy.wav"), b"RIFF");
         touch(&root.join("target/debug.wav"), b"RIFF");
         touch(&root.join("htmlcov/cov.wav"), b"RIFF");
+        touch(&root.join("coverage/lcov.wav"), b"RIFF");
         touch(&root.join("Caches/thing.wav"), b"RIFF");
         touch(&root.join("DerivedData/build.wav"), b"RIFF");
         // Synology system dirs — @-prefixed (dir guard) and #snapshot (list).

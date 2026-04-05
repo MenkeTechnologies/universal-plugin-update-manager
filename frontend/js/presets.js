@@ -338,6 +338,14 @@ async function scanPresets(resume = false, unifiedResult = null) {
   };
   const resumeBtn = document.getElementById('btnResumePresets');
   const stopBtn = document.getElementById('btnStopPresets');
+  // Mirror resume/stop button visibility onto MIDI tab's copies so users on
+  // the MIDI tab can stop/resume without having to switch tabs.
+  const midiResumeBtn = document.getElementById('btnResumeMidi');
+  const midiStopBtn = document.getElementById('btnStopMidi');
+  const setBtnDisplay = (el, mirror, display) => {
+    if (el) el.style.display = display;
+    if (mirror) mirror.style.display = display;
+  };
   const progressBar = document.getElementById('presetProgressBar');
   const progressFill = document.getElementById('presetProgressFill');
   const tableWrap = document.getElementById('presetTableWrap');
@@ -345,8 +353,8 @@ async function scanPresets(resume = false, unifiedResult = null) {
   const excludePaths = resume ? allPresets.map(p => p.path) : null;
 
   setBtn(resume ? '&#8635; Resuming...' : '&#8635; Scanning...', true);
-  resumeBtn.style.display = 'none';
-  stopBtn.style.display = '';
+  setBtnDisplay(resumeBtn, midiResumeBtn, 'none');
+  setBtnDisplay(stopBtn, midiStopBtn, '');
   progressBar.classList.add('active');
   progressFill.style.width = '0%';
 
@@ -498,7 +506,7 @@ async function scanPresets(resume = false, unifiedResult = null) {
     // Reload MIDI tab from preset data
     if (typeof loadMidiFiles === 'function') { _midiLoaded = false; loadMidiFiles(); }
     if (result.stopped && allPresets.length > 0) {
-      resumeBtn.style.display = '';
+      setBtnDisplay(resumeBtn, midiResumeBtn, '');
     }
   } catch (err) {
     if (presetScanProgressCleanup) { presetScanProgressCleanup(); presetScanProgressCleanup = null; }
@@ -512,7 +520,7 @@ async function scanPresets(resume = false, unifiedResult = null) {
   btn.disabled = false;
   btn.innerHTML = '&#127924; Scan Presets';
   if (midiBtn) { midiBtn.disabled = false; midiBtn.innerHTML = '&#127924; Scan MIDI'; }
-  stopBtn.style.display = 'none';
+  setBtnDisplay(stopBtn, midiStopBtn, 'none');
   document.getElementById('btnExportPresets').style.display = allPresets.length > 0 ? '' : 'none';
   progressBar.classList.remove('active');
   progressFill.style.width = '0%';

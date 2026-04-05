@@ -33,7 +33,19 @@ pub const SCANNER_SKIP_DIRS: &[&str] = &[
     "zig-out",          // Zig default output dir
     "cmake-build-debug",   // CMake / CLion / VS default build trees
     "cmake-build-release",
+    "cmake-build-relwithdebinfo",
+    "cmake-build-minsizerel",
+    "buck-out",         // Buck build output
+    "bazel-bin",        // Bazel convenience symlinks / trees under workspace
+    "bazel-out",
+    "bazel-testlogs",
+    "_build",           // Mix / Rebar / Erlang build (Elixir deps tree)
+    "nimcache",         // Nim compiler cache
+    "nimbledeps",       // Nimble package dir
     "htmlcov",          // Python coverage HTML reports (often huge)
+    "coverage",         // JS/Rust/etc. test coverage output (common folder name)
+    "lcov-report",      // LCOV HTML report dir
+    "storybook-static", // Storybook static export
     // Synology NAS (`#recycle` already listed). `@`-prefixed dirs use traversal guard.
     "#snapshot",
 ];
@@ -58,6 +70,8 @@ mod tests {
             "Carthage",
             "zig-cache",
             "htmlcov",
+            "bazel-out",
+            "_build",
             "#snapshot",
         ] {
             assert!(
