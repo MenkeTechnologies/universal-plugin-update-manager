@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build i18n/app_i18n_tr.json from app_i18n_en.json (Turkish UI).
+"""Build i18n/app_i18n_ro.json from app_i18n_en.json (Romanian UI).
 
 Requires: pip install deep-translator (use a venv, e.g. .venv-i18n).
 """
@@ -39,17 +39,16 @@ LANG_SELECTOR_NATIVE = {
 }
 
 
-def align_placeholders(en_val: str, tr_val: str) -> str:
+def align_placeholders(en_val: str, loc_val: str) -> str:
     ph_en = re.findall(r"\{(\w+)\}", en_val)
-    ph_tr = re.findall(r"\{(\w+)\}", tr_val)
-    if len(ph_en) != len(ph_tr):
-        return tr_val
+    ph_loc = re.findall(r"\{(\w+)\}", loc_val)
+    if len(ph_en) != len(ph_loc):
+        return loc_val
     it = iter(ph_en)
-    return re.sub(r"\{[^}]+\}", lambda _: "{" + next(it) + "}", tr_val)
+    return re.sub(r"\{[^}]+\}", lambda _: "{" + next(it) + "}", loc_val)
 
 
 def restore_ipc_placeholders(en_val: str, loc_val: str) -> str:
-    """MT often turns `{hostname}` into `{ana bilgisayar adı}`; restore English token names."""
     re_en = re.compile(r"\{[a-zA-Z_][a-zA-Z0-9_]*\}")
     re_any = re.compile(r"\{[^}]+\}")
     en_phs = re_en.findall(en_val)
@@ -71,42 +70,42 @@ def main() -> None:
     except ImportError:
         print(
             "Install deep-translator in a venv: python3 -m venv .venv-i18n && "
-            ".venv-i18n/bin/pip install deep-translator && .venv-i18n/bin/python scripts/gen_app_i18n_tr.py",
+            ".venv-i18n/bin/pip install deep-translator && .venv-i18n/bin/python scripts/gen_app_i18n_ro.py",
             file=sys.stderr,
         )
         raise SystemExit(1) from None
 
     en_path = I18N_DIR / "app_i18n_en.json"
-    out_path = I18N_DIR / "app_i18n_tr.json"
+    out_path = I18N_DIR / "app_i18n_ro.json"
     en: dict[str, str] = json.loads(en_path.read_text(encoding="utf-8"))
-    translator = GoogleTranslator(source="en", target="tr")
+    translator = GoogleTranslator(source="en", target="ro")
 
     uniq_vals = list(dict.fromkeys(en.values()))
-    val_to_tr: dict[str, str] = {}
+    val_to: dict[str, str] = {}
     for i, v in enumerate(uniq_vals):
         try:
-            val_to_tr[v] = translator.translate(v)
+            val_to[v] = translator.translate(v)
         except Exception:
-            val_to_tr[v] = v
+            val_to[v] = v
         if (i + 1) % 80 == 0:
             print(f"{i + 1}/{len(uniq_vals)}", flush=True)
         time.sleep(0.06)
 
-    tr_map = {k: val_to_tr[v] for k, v in en.items()}
-    for k in tr_map:
-        tr_map[k] = align_placeholders(en[k], tr_map[k])
-        tr_map[k] = restore_ipc_placeholders(en[k], tr_map[k])
+    out_map = {k: val_to[v] for k, v in en.items()}
+    for k in out_map:
+        out_map[k] = align_placeholders(en[k], out_map[k])
+        out_map[k] = restore_ipc_placeholders(en[k], out_map[k])
     for k, native in LANG_SELECTOR_NATIVE.items():
-        if k in tr_map:
-            tr_map[k] = native
-    for k in list(tr_map.keys()):
-        if "{Name}" in tr_map[k]:
-            tr_map[k] = tr_map[k].replace("{Name}", "{name}")
-        if "{Wert}" in tr_map[k]:
-            tr_map[k] = tr_map[k].replace("{Wert}", "{value}")
+        if k in out_map:
+            out_map[k] = native
+    for k in list(out_map.keys()):
+        if "{Name}" in out_map[k]:
+            out_map[k] = out_map[k].replace("{Name}", "{name}")
+        if "{Wert}" in out_map[k]:
+            out_map[k] = out_map[k].replace("{Wert}", "{value}")
 
-    out_path.write_text(json.dumps(tr_map, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"Wrote {len(tr_map)} keys to {out_path}", file=sys.stderr)
+    out_path.write_text(json.dumps(out_map, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"Wrote {len(out_map)} keys to {out_path}", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -31,6 +31,9 @@ const LOCALE_FILES = [
   ['ru', 'app_i18n_ru.json'],
   ['it', 'app_i18n_it.json'],
   ['tr', 'app_i18n_tr.json'],
+  ['cs', 'app_i18n_cs.json'],
+  ['hu', 'app_i18n_hu.json'],
+  ['ro', 'app_i18n_ro.json'],
 ];
 
 /** Every key in shipped JSON must start with one of these prefixes (matches seed + `ipc.js` usage). */

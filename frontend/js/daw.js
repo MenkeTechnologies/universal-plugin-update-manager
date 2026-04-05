@@ -426,7 +426,9 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
       : await window.vstUpdater.scanDawProjects(dawRoots.length ? dawRoots : undefined, excludePaths);
     if (dawScanProgressCleanup) { dawScanProgressCleanup(); dawScanProgressCleanup = null; }
     flushPendingProjects();
-    if (resume) {
+    if (result.streamed) {
+      // Backend streamed results live — allDawProjects was built from progress events.
+    } else if (resume) {
       allDawProjects = [...allDawProjects, ...result.projects];
     } else {
       allDawProjects = result.projects;
@@ -434,8 +436,8 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
     rebuildDawStats();
     _dawTotalUnfiltered = allDawProjects.length;
     filterDawProjects();
-    // Only save if scan completed fully (not stopped/aborted with partial results)
-    if (!result.stopped) {
+    // Backend already streamed-saved when result.streamed
+    if (!result.streamed) {
       try { await window.vstUpdater.saveDawScan(allDawProjects, result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_daw_history', { err: e.message || e }), 4000, 'error'); }
     }
     // Pull authoritative unfiltered breakdown from DB so filter changes don't reset it.

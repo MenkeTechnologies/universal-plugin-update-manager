@@ -48,9 +48,28 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   const uiLoc = prefs.getItem('uiLocale');
   if (typeof reloadAppStrings === 'function') {
     await reloadAppStrings(
-      ['de', 'es', 'sv', 'fr', 'nl', 'pt', 'it', 'el', 'pl', 'ru', 'zh', 'ja', 'ko', 'fi', 'da', 'nb', 'tr'].includes(
-        uiLoc
-      )
+      [
+        'de',
+        'es',
+        'sv',
+        'fr',
+        'nl',
+        'pt',
+        'it',
+        'el',
+        'pl',
+        'ru',
+        'zh',
+        'ja',
+        'ko',
+        'fi',
+        'da',
+        'nb',
+        'tr',
+        'cs',
+        'hu',
+        'ro',
+      ].includes(uiLoc)
         ? uiLoc
         : 'en'
     );

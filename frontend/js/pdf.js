@@ -387,7 +387,9 @@ async function scanPdfs(resume = false, unifiedResult = null) {
       ? await unifiedResult
       : await window.vstUpdater.scanPdfs(pdfRoots.length ? pdfRoots : undefined, excludePaths);
     flushPending();
-    if (resume) {
+    if (result.streamed) {
+      // Backend streamed results live — allPdfs was built from progress events.
+    } else if (resume) {
       allPdfs = [...allPdfs, ...result.pdfs];
     } else {
       allPdfs = result.pdfs;
@@ -397,12 +399,15 @@ async function scanPdfs(resume = false, unifiedResult = null) {
     _lastPdfAggKey = null; _pdfAggCache = null;
     // Save BEFORE rebuildPdfStats/filterPdfs so the DB has the new rows; otherwise
     // the filter-stats query hits stale/empty data and the top counter flickers.
-    if (!result.stopped) {
+    if (!result.streamed) {
       try {
         await window.vstUpdater.savePdfScan(allPdfs, result.roots);
         // Scan saved — hydrate pages cache + kick background extraction
         loadPdfPagesForVisible();
       } catch (e) { showToast(toastFmt('toast.failed_save_pdf_history', { err: e && e.message ? e.message : e }), 4000, 'error'); }
+    } else {
+      // Backend already saved — still hydrate pages cache.
+      loadPdfPagesForVisible();
     }
     if (pdfScanProgressCleanup) { pdfScanProgressCleanup(); pdfScanProgressCleanup = null; }
     rebuildPdfStats(true);

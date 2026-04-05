@@ -51,7 +51,7 @@ pub fn format_size(bytes: u64) -> String {
 use history::{AudioSample, DawProject, KvrCacheUpdateEntry, PdfFile, PresetFile};
 use scanner::PluginInfo;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
@@ -1164,13 +1164,32 @@ async fn scan_midi_files(
         } else {
             midi_scanner::get_midi_roots()
         };
-        let mut all_midi: Vec<history::MidiFile> = Vec::new();
         let exclude_set = exclude_paths.map(|v| v.into_iter().collect::<HashSet<String>>());
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
+
+        // Streaming save: create parent row upfront, insert each batch directly
+        // to the DB, finalize totals at end. Keeps memory bounded at 6M+ scale.
+        let now_iso = history::now_iso();
+        let midi_scan_id = history::gen_id();
+        let db = db::global();
+        let _ = db.midi_scan_parent_create(&midi_scan_id, &now_iso, &root_strs);
+
+        let mut midi_count: u64 = 0;
+        let mut midi_bytes: u64 = 0;
+        let mut midi_format_counts: HashMap<String, usize> = HashMap::new();
 
         midi_scanner::walk_for_midi(
             &roots,
             &mut |batch, found| {
-                all_midi.extend_from_slice(batch);
+                for m in batch {
+                    midi_bytes += m.size;
+                    *midi_format_counts.entry(m.format.clone()).or_insert(0) += 1;
+                }
+                midi_count += batch.len() as u64;
+                let _ = db.insert_midi_batch(&midi_scan_id, batch);
                 let _ = app_handle.emit(
                     "midi-scan-progress",
                     serde_json::json!({
@@ -1191,12 +1210,20 @@ async fn scan_midi_files(
             ad.clear();
         }
         let was_stopped = midi_state.stop_scan.load(Ordering::Relaxed);
-        let root_strs: Vec<String> = roots
-            .iter()
-            .map(|r| r.to_string_lossy().to_string())
-            .collect();
-        all_midi.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        serde_json::json!({ "midiFiles": all_midi, "roots": root_strs, "stopped": was_stopped })
+        let _ = db.midi_scan_parent_finalize(
+            &midi_scan_id,
+            midi_count as usize,
+            midi_bytes,
+            &midi_format_counts,
+        );
+        db.checkpoint();
+        serde_json::json!({
+            "midiCount": midi_count,
+            "roots": root_strs,
+            "stopped": was_stopped,
+            "midiScanId": midi_scan_id,
+            "streamed": true
+        })
     })
     .await;
 
@@ -1206,10 +1233,7 @@ async fn scan_midi_files(
         Ok(v) => append_log(format!(
             "SCAN END — midi | {}s | {} found",
             elapsed.as_secs(),
-            v.get("midiFiles")
-                .and_then(|p| p.as_array())
-                .map(|a| a.len())
-                .unwrap_or(0)
+            v.get("midiCount").and_then(|x| x.as_u64()).unwrap_or(0)
         )),
         Err(e) => append_log(format!(
             "SCAN ERROR — midi | {}s | {}",
@@ -1510,10 +1534,40 @@ async fn scan_unified(
             pdf_exclude: pdf_exclude_paths.into_iter().flatten().collect(),
         };
 
-        let mut all_audio: Vec<AudioSample> = Vec::new();
-        let mut all_daw: Vec<DawProject> = Vec::new();
-        let mut all_preset: Vec<PresetFile> = Vec::new();
-        let mut all_pdf: Vec<PdfFile> = Vec::new();
+        // Streaming architecture: create 4 parent scan rows upfront, batch-insert
+        // rows into the DB during the walker callback, and finalize totals at end.
+        // This keeps memory O(batch_size) regardless of total file count.
+        let now_iso = history::now_iso();
+        let audio_scan_id = history::gen_id();
+        let daw_scan_id = history::gen_id();
+        let preset_scan_id = history::gen_id();
+        let pdf_scan_id = history::gen_id();
+
+        let to_strs = |v: &[std::path::PathBuf]| -> Vec<String> {
+            v.iter().map(|r| r.to_string_lossy().to_string()).collect()
+        };
+        let audio_roots_strs = to_strs(&audio_roots);
+        let daw_roots_strs = to_strs(&daw_roots);
+        let preset_roots_strs = to_strs(&preset_roots);
+        let pdf_roots_strs = to_strs(&pdf_roots);
+
+        let db = db::global();
+        let _ = db.audio_scan_parent_create(&audio_scan_id, &now_iso, &audio_roots_strs);
+        let _ = db.daw_scan_parent_create(&daw_scan_id, &now_iso, &daw_roots_strs);
+        let _ = db.preset_scan_parent_create(&preset_scan_id, &now_iso, &preset_roots_strs);
+        let _ = db.pdf_scan_parent_create(&pdf_scan_id, &now_iso, &pdf_roots_strs);
+
+        let mut audio_count: u64 = 0;
+        let mut daw_count: u64 = 0;
+        let mut preset_count: u64 = 0;
+        let mut pdf_count: u64 = 0;
+        let mut audio_bytes: u64 = 0;
+        let mut daw_bytes: u64 = 0;
+        let mut preset_bytes: u64 = 0;
+        let mut pdf_bytes: u64 = 0;
+        let mut audio_format_counts: HashMap<String, usize> = HashMap::new();
+        let mut daw_daw_counts: HashMap<String, usize> = HashMap::new();
+        let mut preset_format_counts: HashMap<String, usize> = HashMap::new();
 
         let audio_state2 = app_handle.state::<AudioScanState>();
         let daw_state2 = app_handle.state::<DawScanState>();
@@ -1534,7 +1588,12 @@ async fn scan_unified(
                                 "found": counts.audio,
                             }),
                         );
-                        all_audio.extend(b);
+                        for s in &b {
+                            audio_bytes += s.size;
+                            *audio_format_counts.entry(s.format.clone()).or_insert(0) += 1;
+                        }
+                        audio_count += b.len() as u64;
+                        let _ = db.insert_audio_batch(&audio_scan_id, &b);
                     }
                     ClassifiedBatch::Daw(b) => {
                         let _ = app_handle.emit(
@@ -1545,7 +1604,12 @@ async fn scan_unified(
                                 "found": counts.daw,
                             }),
                         );
-                        all_daw.extend(b);
+                        for p in &b {
+                            daw_bytes += p.size;
+                            *daw_daw_counts.entry(p.daw.clone()).or_insert(0) += 1;
+                        }
+                        daw_count += b.len() as u64;
+                        let _ = db.insert_daw_batch(&daw_scan_id, &b);
                     }
                     ClassifiedBatch::Preset(b) => {
                         let _ = app_handle.emit(
@@ -1556,7 +1620,12 @@ async fn scan_unified(
                                 "found": counts.preset,
                             }),
                         );
-                        all_preset.extend(b);
+                        for p in &b {
+                            preset_bytes += p.size;
+                            *preset_format_counts.entry(p.format.clone()).or_insert(0) += 1;
+                        }
+                        preset_count += b.len() as u64;
+                        let _ = db.insert_preset_batch(&preset_scan_id, &b);
                     }
                     ClassifiedBatch::Pdf(b) => {
                         let _ = app_handle.emit(
@@ -1567,7 +1636,11 @@ async fn scan_unified(
                                 "found": counts.pdf,
                             }),
                         );
-                        all_pdf.extend(b);
+                        for p in &b {
+                            pdf_bytes += p.size;
+                        }
+                        pdf_count += b.len() as u64;
+                        let _ = db.insert_pdf_batch(&pdf_scan_id, &b);
                     }
                 }
             },
@@ -1604,25 +1677,43 @@ async fn scan_unified(
             }
         }
 
-        all_audio.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        all_daw.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        all_preset.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        all_pdf.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-
-        let to_strs = |v: &[std::path::PathBuf]| -> Vec<String> {
-            v.iter().map(|r| r.to_string_lossy().to_string()).collect()
-        };
+        // Finalize parent scan rows with real totals now that streaming is done.
+        let _ = db.audio_scan_parent_finalize(
+            &audio_scan_id,
+            audio_count,
+            audio_bytes,
+            &audio_format_counts,
+        );
+        let _ = db.daw_scan_parent_finalize(
+            &daw_scan_id,
+            daw_count as usize,
+            daw_bytes,
+            &daw_daw_counts,
+        );
+        let _ = db.preset_scan_parent_finalize(
+            &preset_scan_id,
+            preset_count as usize,
+            preset_bytes,
+            &preset_format_counts,
+        );
+        let _ = db.pdf_scan_parent_finalize(&pdf_scan_id, pdf_count as usize, pdf_bytes);
+        db.checkpoint();
 
         serde_json::json!({
-            "audio": all_audio,
-            "daw": all_daw,
-            "preset": all_preset,
-            "pdf": all_pdf,
-            "audioRoots": to_strs(&audio_roots),
-            "dawRoots": to_strs(&daw_roots),
-            "presetRoots": to_strs(&preset_roots),
-            "pdfRoots": to_strs(&pdf_roots),
+            "audioCount": audio_count,
+            "dawCount": daw_count,
+            "presetCount": preset_count,
+            "pdfCount": pdf_count,
+            "audioRoots": audio_roots_strs,
+            "dawRoots": daw_roots_strs,
+            "presetRoots": preset_roots_strs,
+            "pdfRoots": pdf_roots_strs,
+            "audioScanId": audio_scan_id,
+            "dawScanId": daw_scan_id,
+            "presetScanId": preset_scan_id,
+            "pdfScanId": pdf_scan_id,
             "stopped": stopped,
+            "streamed": true,
         })
     })
     .await;
@@ -1640,22 +1731,10 @@ async fn scan_unified(
         Ok(v) => append_log(format!(
             "SCAN END — unified | {}s | audio:{} daw:{} preset:{} pdf:{}",
             elapsed.as_secs(),
-            v.get("audio")
-                .and_then(|x| x.as_array())
-                .map(|a| a.len())
-                .unwrap_or(0),
-            v.get("daw")
-                .and_then(|x| x.as_array())
-                .map(|a| a.len())
-                .unwrap_or(0),
-            v.get("preset")
-                .and_then(|x| x.as_array())
-                .map(|a| a.len())
-                .unwrap_or(0),
-            v.get("pdf")
-                .and_then(|x| x.as_array())
-                .map(|a| a.len())
-                .unwrap_or(0),
+            v.get("audioCount").and_then(|x| x.as_u64()).unwrap_or(0),
+            v.get("dawCount").and_then(|x| x.as_u64()).unwrap_or(0),
+            v.get("presetCount").and_then(|x| x.as_u64()).unwrap_or(0),
+            v.get("pdfCount").and_then(|x| x.as_u64()).unwrap_or(0),
         )),
         Err(e) => append_log(format!(
             "SCAN ERROR — unified | {}s | {}",

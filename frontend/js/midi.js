@@ -142,15 +142,19 @@ async function scanMidi(resume = false) {
     const result = await window.vstUpdater.scanMidiFiles(midiRoots.length ? midiRoots : undefined, excludePaths);
     // Drain any remaining buffered batch that didn't hit the flush timer.
     flushPendingMidi();
-    const files = result.midiFiles || [];
-    if (resume) {
-      allMidiFiles = [...allMidiFiles, ...files];
+    if (result.streamed) {
+      // Backend streamed results live — allMidiFiles was built from progress events.
     } else {
-      allMidiFiles = files;
+      const files = result.midiFiles || [];
+      if (resume) {
+        allMidiFiles = [...allMidiFiles, ...files];
+      } else {
+        allMidiFiles = files;
+      }
     }
     filteredMidi = allMidiFiles.slice();
-    // Save to DB — the scan isn't persistent until this runs.
-    if (!result.stopped) {
+    // Backend already streamed-saved when result.streamed
+    if (!result.streamed) {
       try { await window.vstUpdater.saveMidiScan(allMidiFiles, result.roots); }
       catch (e) { if (typeof showToast === 'function' && typeof toastFmt === 'function') showToast(toastFmt('toast.failed_save_midi_history', { err: e.message || e }), 4000, 'error'); }
     }

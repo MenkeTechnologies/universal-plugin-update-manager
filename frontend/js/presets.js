@@ -449,7 +449,9 @@ async function scanPresets(resume = false, unifiedResult = null) {
     // Drain final streamed batch with the scan-active guard still set so the
     // rebuild inside flushPending uses incremental accumulators.
     flushPending();
-    if (resume) {
+    if (result.streamed) {
+      // Backend streamed results live — allPresets was built from progress events.
+    } else if (resume) {
       allPresets = [...allPresets, ...result.presets];
     } else {
       allPresets = result.presets;
@@ -461,7 +463,7 @@ async function scanPresets(resume = false, unifiedResult = null) {
     // Save to the DB BEFORE rebuildPresetStats — otherwise the filter-stats
     // query hits stale/empty rows and the top counter flickers between the
     // previous scan's totals and zero/filtered values.
-    if (!result.stopped) {
+    if (!result.streamed) {
       try { await window.vstUpdater.savePresetScan(allPresets, result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_preset_history', { err: e.message || e }), 4000, 'error'); }
     }
     if (presetScanProgressCleanup) { presetScanProgressCleanup(); presetScanProgressCleanup = null; }

@@ -26,12 +26,14 @@ const CATALOG_PREFIXES = /** @type {const} */ ([
 ]);
 
 const NON_EN = /** @type {const} */ ([
+  'cs',
   'da',
   'de',
   'el',
   'es',
   'fi',
   'fr',
+  'hu',
   'it',
   'ja',
   'ko',
@@ -39,6 +41,7 @@ const NON_EN = /** @type {const} */ ([
   'nl',
   'pl',
   'pt',
+  'ro',
   'ru',
   'sv',
   'tr',

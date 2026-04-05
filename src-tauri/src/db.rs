@@ -748,6 +748,42 @@ impl Database {
     }
 
     /// Insert a batch of audio samples in a single transaction.
+    pub fn audio_scan_parent_create(
+        &self,
+        id: &str,
+        timestamp: &str,
+        roots: &[String],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let roots_json = serde_json::to_string(roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO audio_scans (id, timestamp, sample_count, total_bytes, format_counts, roots) VALUES (?1,?2,0,0,'{}',?3)",
+            params![id, timestamp, roots_json],
+        ).map_err(|e| e.to_string())?;
+        conn.execute(
+            "DELETE FROM audio_samples WHERE scan_id = ?1",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn audio_scan_parent_finalize(
+        &self,
+        id: &str,
+        sample_count: u64,
+        total_bytes: u64,
+        format_counts: &HashMap<String, usize>,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let fc_json = serde_json::to_string(format_counts).unwrap_or_default();
+        conn.execute(
+            "UPDATE audio_scans SET sample_count = ?2, total_bytes = ?3, format_counts = ?4 WHERE id = ?1",
+            params![id, sample_count, total_bytes, fc_json],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn insert_audio_batch(&self, scan_id: &str, samples: &[AudioSample]) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
@@ -2029,6 +2065,70 @@ impl Database {
 
     // ── DAW scan CRUD ──
 
+    /// Create (or re-create) a parent daw_scans row with zero counts. Used by
+    /// streaming scans that don't know totals up front.
+    pub fn daw_scan_parent_create(
+        &self,
+        id: &str,
+        timestamp: &str,
+        roots: &[String],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let roots_json = serde_json::to_string(roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots) VALUES (?1,?2,0,0,'{}',?3)",
+            params![id, timestamp, roots_json],
+        ).map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM daw_projects WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Finalize a parent daw_scans row with aggregate counts after streaming is complete.
+    pub fn daw_scan_parent_finalize(
+        &self,
+        id: &str,
+        project_count: usize,
+        total_bytes: u64,
+        daw_counts: &HashMap<String, usize>,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let dc_json = serde_json::to_string(daw_counts).unwrap_or_default();
+        conn.execute(
+            "UPDATE daw_scans SET project_count = ?2, total_bytes = ?3, daw_counts = ?4 WHERE id = ?1",
+            params![id, project_count, total_bytes, dc_json],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Stream-insert a batch of DawProject rows under an existing scan_id.
+    pub fn insert_daw_batch(
+        &self,
+        scan_id: &str,
+        projects: &[DawProject],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO daw_projects (name, path, directory, format, daw, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").map_err(|e| e.to_string())?;
+            for p in projects {
+                stmt.execute(params![
+                    p.name,
+                    p.path,
+                    p.directory,
+                    p.format,
+                    p.daw,
+                    p.size,
+                    p.size_formatted,
+                    p.modified,
+                    scan_id
+                ])
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
     pub fn save_daw_scan(&self, snap: &DawScanSnapshot) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         let daw_json = serde_json::to_string(&snap.daw_counts).unwrap_or_default();
@@ -2150,6 +2250,65 @@ impl Database {
 
     // ── Preset scan CRUD ──
 
+    pub fn preset_scan_parent_create(
+        &self,
+        id: &str,
+        timestamp: &str,
+        roots: &[String],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let roots_json = serde_json::to_string(roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots) VALUES (?1,?2,0,0,'{}',?3)",
+            params![id, timestamp, roots_json],
+        ).map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM presets WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn preset_scan_parent_finalize(
+        &self,
+        id: &str,
+        preset_count: usize,
+        total_bytes: u64,
+        format_counts: &HashMap<String, usize>,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let fc_json = serde_json::to_string(format_counts).unwrap_or_default();
+        conn.execute(
+            "UPDATE preset_scans SET preset_count = ?2, total_bytes = ?3, format_counts = ?4 WHERE id = ?1",
+            params![id, preset_count, total_bytes, fc_json],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn insert_preset_batch(
+        &self,
+        scan_id: &str,
+        presets: &[PresetFile],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO presets (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            for p in presets {
+                stmt.execute(params![
+                    p.name,
+                    p.path,
+                    p.directory,
+                    p.format,
+                    p.size,
+                    p.size_formatted,
+                    p.modified,
+                    scan_id
+                ])
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
+
     pub fn save_preset_scan(&self, snap: &PresetScanSnapshot) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
@@ -2265,6 +2424,65 @@ impl Database {
     }
 
     // ── MIDI scan CRUD ──
+
+    pub fn midi_scan_parent_create(
+        &self,
+        id: &str,
+        timestamp: &str,
+        roots: &[String],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let roots_json = serde_json::to_string(roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO midi_scans (id, timestamp, midi_count, total_bytes, format_counts, roots) VALUES (?1,?2,0,0,'{}',?3)",
+            params![id, timestamp, roots_json],
+        ).map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM midi_files WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn midi_scan_parent_finalize(
+        &self,
+        id: &str,
+        midi_count: usize,
+        total_bytes: u64,
+        format_counts: &HashMap<String, usize>,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let fc_json = serde_json::to_string(format_counts).unwrap_or_default();
+        conn.execute(
+            "UPDATE midi_scans SET midi_count = ?2, total_bytes = ?3, format_counts = ?4 WHERE id = ?1",
+            params![id, midi_count, total_bytes, fc_json],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn insert_midi_batch(
+        &self,
+        scan_id: &str,
+        midi_files: &[MidiFile],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO midi_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            for m in midi_files {
+                stmt.execute(params![
+                    m.name,
+                    m.path,
+                    m.directory,
+                    m.format,
+                    m.size,
+                    m.size_formatted,
+                    m.modified,
+                    scan_id
+                ])
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
 
     pub fn save_midi_scan(&self, snap: &MidiScanSnapshot) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
@@ -2622,6 +2840,59 @@ impl Database {
     }
 
     // ── PDF scan CRUD ──
+
+    pub fn pdf_scan_parent_create(
+        &self,
+        id: &str,
+        timestamp: &str,
+        roots: &[String],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let roots_json = serde_json::to_string(roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO pdf_scans (id, timestamp, pdf_count, total_bytes, roots) VALUES (?1,?2,0,0,?3)",
+            params![id, timestamp, roots_json],
+        ).map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM pdfs WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn pdf_scan_parent_finalize(
+        &self,
+        id: &str,
+        pdf_count: usize,
+        total_bytes: u64,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE pdf_scans SET pdf_count = ?2, total_bytes = ?3 WHERE id = ?1",
+            params![id, pdf_count, total_bytes],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn insert_pdf_batch(&self, scan_id: &str, pdfs: &[PdfFile]) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            let mut stmt = tx.prepare_cached("INSERT OR REPLACE INTO pdfs (name, path, directory, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7)").map_err(|e| e.to_string())?;
+            for p in pdfs {
+                stmt.execute(params![
+                    p.name,
+                    p.path,
+                    p.directory,
+                    p.size,
+                    p.size_formatted,
+                    p.modified,
+                    scan_id
+                ])
+                .map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    }
 
     pub fn save_pdf_scan(&self, snap: &PdfScanSnapshot) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();

@@ -730,8 +730,8 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
       : await window.vstUpdater.scanAudioSamples(audioRoots.length ? audioRoots : undefined, excludePaths);
     if (audioScanProgressCleanup) { audioScanProgressCleanup(); audioScanProgressCleanup = null; }
     flushPendingSamples();
-    // Save scan results to SQLite (skip if stopped with partial results)
-    if (!result.stopped) {
+    // Save scan results to SQLite (backend already streamed-saved when result.streamed)
+    if (!result.streamed) {
       try { await window.vstUpdater.saveAudioScan(result.samples || [], result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_audio_history', { err: e.message || e }), 4000, 'error'); }
     }
     // Fetch first page from DB (no in-memory array needed)

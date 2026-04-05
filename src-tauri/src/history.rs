@@ -761,7 +761,7 @@ pub fn radix_string(mut n: u64, base: u64) -> String {
     result.into_iter().collect()
 }
 
-fn now_iso() -> String {
+pub fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
