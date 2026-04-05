@@ -40,6 +40,13 @@ describe('frontend/js/export.js (vm-loaded)', () => {
     assert.strictEqual(E.resolveExportTitle(null), '');
   });
 
+  it('resolveExportTitle uses titleKey with empty vars object', () => {
+    assert.strictEqual(
+      E.resolveExportTitle({ titleKey: 'ui.export.title_pdfs', titleVars: {} }),
+      'ui.export.title_pdfs:{}'
+    );
+  });
+
   it('getExportFormatOptions lists json first and unique ids', () => {
     const opts = E.getExportFormatOptions();
     assert.strictEqual(opts[0].id, 'json');

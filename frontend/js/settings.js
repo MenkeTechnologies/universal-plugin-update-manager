@@ -493,11 +493,20 @@ async function renderCacheStats() {
         const countStr = s.count > 0 ? s.count.toLocaleString() + (s.total > 0 && s.key !== 'database' && !s.key.includes('_scans') ? ` / ${s.total.toLocaleString()}` : s.key.includes('_scans') ? ` (${s.total} scans)` : '') : (s.key === 'database' ? '' : '0');
         const sizeStr = formatCacheSize(s.sizeBytes);
         const canClear = s.key !== 'database' && !s.key.includes('_scans');
+        // On-demand caches: expose a BUILD action when the cache is empty so users
+        // don't have to hunt through the UI for the individual trigger.
+        const canBuild = s.count === 0 && (s.key === 'xref' || s.key === 'fingerprint');
+        let action = '';
+        if (canBuild) {
+          action = `<button class="btn btn-secondary" data-action="buildCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">BUILD</button>`;
+        } else if (canClear && s.count > 0) {
+          action = `<button class="btn btn-secondary" data-action="clearCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">${_cf('ui.settings.cache_clear')}</button>`;
+        }
         return `<tr style="border-bottom:1px solid rgba(26,26,62,0.2);">
           <td style="padding:4px 8px;color:var(--text);">${s.label}</td>
           <td style="padding:4px 8px;text-align:right;color:var(--text-muted);">${countStr}</td>
           <td style="padding:4px 8px;text-align:right;color:${s.sizeBytes > 10*1024*1024 ? 'var(--yellow)' : 'var(--text-muted)'};">${sizeStr}</td>
-          <td style="padding:4px 8px;text-align:center;">${canClear && s.count > 0 ? `<button class="btn btn-secondary" data-action="clearCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">${_cf('ui.settings.cache_clear')}</button>` : ''}</td>
+          <td style="padding:4px 8px;text-align:center;">${action}</td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;

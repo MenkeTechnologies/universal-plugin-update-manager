@@ -536,29 +536,6 @@ impl Database {
                     roots           TEXT NOT NULL
                 );
 
-                -- PDF history
-                CREATE TABLE IF NOT EXISTS pdfs (
-                    id              INTEGER PRIMARY KEY,
-                    name            TEXT NOT NULL,
-                    path            TEXT NOT NULL,
-                    directory       TEXT NOT NULL,
-                    size            INTEGER NOT NULL,
-                    size_formatted  TEXT NOT NULL,
-                    modified        TEXT NOT NULL,
-                    scan_id         TEXT NOT NULL
-                );
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_pdfs_path_scan ON pdfs(path, scan_id);
-                CREATE INDEX IF NOT EXISTS idx_pdfs_name ON pdfs(name COLLATE NOCASE);
-                CREATE INDEX IF NOT EXISTS idx_pdfs_scan_id ON pdfs(scan_id);
-
-                CREATE TABLE IF NOT EXISTS pdf_scans (
-                    id              TEXT PRIMARY KEY,
-                    timestamp       TEXT NOT NULL,
-                    pdf_count       INTEGER NOT NULL,
-                    total_bytes     INTEGER NOT NULL,
-                    roots           TEXT NOT NULL
-                );
-
                 -- KVR version cache
                 CREATE TABLE IF NOT EXISTS kvr_cache (
                     plugin_key      TEXT PRIMARY KEY,
@@ -638,6 +615,38 @@ impl Database {
                 [],
             )
             .map_err(|e| format!("Migration v5 schema_version failed: {e}"))?;
+        }
+
+        if current < 6 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS pdfs (
+                    id              INTEGER PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    path            TEXT NOT NULL,
+                    directory       TEXT NOT NULL,
+                    size            INTEGER NOT NULL,
+                    size_formatted  TEXT NOT NULL,
+                    modified        TEXT NOT NULL,
+                    scan_id         TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_pdfs_path_scan ON pdfs(path, scan_id);
+                CREATE INDEX IF NOT EXISTS idx_pdfs_name ON pdfs(name COLLATE NOCASE);
+                CREATE INDEX IF NOT EXISTS idx_pdfs_scan_id ON pdfs(scan_id);
+
+                CREATE TABLE IF NOT EXISTS pdf_scans (
+                    id              TEXT PRIMARY KEY,
+                    timestamp       TEXT NOT NULL,
+                    pdf_count       INTEGER NOT NULL,
+                    total_bytes     INTEGER NOT NULL,
+                    roots           TEXT NOT NULL
+                );",
+            )
+            .map_err(|e| format!("Migration v6 (PDF tables) failed: {e}"))?;
+            conn.execute(
+                "INSERT INTO schema_version (version) VALUES (6)",
+                [],
+            )
+            .map_err(|e| format!("Migration v6 schema_version failed: {e}"))?;
         }
 
         if conn

@@ -192,6 +192,10 @@ document.addEventListener('click', (e) => {
     case 'sortPdf': sortPdf(el.dataset.key); break;
     case 'loadMorePdfs': loadMorePdfs(); break;
     case 'filterPdfs': filterPdfs(); break;
+    case 'exportPdfs': if (typeof exportPdfs === 'function') exportPdfs(); break;
+    case 'importPdfs': if (typeof importPdfs === 'function') importPdfs(); break;
+    case 'filterSettings': if (typeof filterSettings === 'function') filterSettings(); break;
+    case 'clearSettingsSearch': if (typeof clearSettingsSearch === 'function') clearSettingsSearch(); break;
     case 'openDawFolder': openDawFolder(el.dataset.path); break;
     case 'sortDaw': sortDaw(el.dataset.key); break;
     case 'loadMoreDaw': loadMoreDaw(); break;
@@ -277,6 +281,21 @@ document.addEventListener('click', (e) => {
     case 'settingClearKvrCache': settingClearKvrCache(); break;
     case 'settingClearAnalysisCache': window.vstUpdater.dbClearCaches().then(() => { if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; } if (typeof _waveformCache !== 'undefined') { _waveformCache = {}; _spectrogramCache = {}; } showToast(toastFmt('toast.all_caches_cleared')); if (typeof renderCacheStats === 'function') renderCacheStats(); }).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error')); break;
     case 'clearCacheTable': { const c = el.dataset.cache; if (c) window.vstUpdater.dbClearCacheTable(c).then(() => { if (c === 'bpm' && typeof _bpmCache !== 'undefined') _bpmCache = {}; if (c === 'key' && typeof _keyCache !== 'undefined') _keyCache = {}; if (c === 'lufs' && typeof _lufsCache !== 'undefined') _lufsCache = {}; if (c === 'waveform' && typeof _waveformCache !== 'undefined') _waveformCache = {}; if (c === 'spectrogram' && typeof _spectrogramCache !== 'undefined') _spectrogramCache = {}; showToast(toastFmt('toast.cache_type_cleared', { cache: c.toUpperCase() })); if (typeof renderCacheStats === 'function') renderCacheStats(); }).catch(e => showToast(toastFmt('toast.failed', { err: e }), 4000, 'error')); } break;
+    case 'buildCacheTable': {
+      const c = el.dataset.cache;
+      if (c === 'xref' && typeof buildXrefIndex === 'function') {
+        showToast('Building xref index for all DAW projects...');
+        buildXrefIndex().then(() => { if (typeof renderCacheStats === 'function') renderCacheStats(); });
+      } else if (c === 'fingerprint') {
+        const paths = (typeof allAudioSamples !== 'undefined' ? allAudioSamples : []).map(s => s.path);
+        if (paths.length === 0) { showToast('No audio samples loaded. Scan samples first.', 4000, 'error'); break; }
+        showToast('Building fingerprints for ' + paths.length.toLocaleString() + ' samples (this will take a while)...', 4000);
+        window.vstUpdater.buildFingerprintCache(paths)
+          .then(res => { showToast('Fingerprint build complete — ' + res.built.toLocaleString() + ' computed, ' + res.cached.toLocaleString() + ' cached total'); if (typeof renderCacheStats === 'function') renderCacheStats(); })
+          .catch(e => showToast('Fingerprint build failed: ' + (e.message || e), 4000, 'error'));
+      }
+      break;
+    }
     case 'exportSettingsPdf': if (typeof exportSettingsPdf === 'function') exportSettingsPdf(); break;
     case 'exportLogPdf': if (typeof exportLogPdf === 'function') exportLogPdf(); break;
     case 'clearAppLog': window.vstUpdater.clearLog().then(() => showToast(toastFmt('toast.log_cleared'))).catch(() => showToast(toastFmt('toast.failed_clear_log'), 4000, 'error')); break;
@@ -381,17 +400,19 @@ document.addEventListener('dblclick', (e) => {
     return;
   }
 
-  // PDFs — reveal in Finder
+  // PDFs — open in default app (double-click)
   const pdfRow = e.target.closest('#pdfTableBody tr[data-pdf-path]');
   if (pdfRow && !e.target.closest('.col-actions')) {
     e.preventDefault();
-    openPdfFile(pdfRow.dataset.pdfPath);
+    window.vstUpdater.openFileDefault(pdfRow.dataset.pdfPath)
+      .catch(err => showToast('Failed to open PDF: ' + (err.message || err), 4000, 'error'));
     return;
   }
 });
 document.addEventListener('input', (e) => {
   const action = e.target.dataset.action;
   if (_filterRegistry[action]) { applyFilterDebounced(action); return; }
+  if (action === 'filterSettings') { if (typeof filterSettingsDebounced === 'function') filterSettingsDebounced(); return; }
   if (action === 'setVolume') setAudioVolume(e.target.value);
   else if (action === 'setEqLow') setEqBand('low', e.target.value);
   else if (action === 'setEqMid') setEqBand('mid', e.target.value);
@@ -544,6 +565,7 @@ window.vstUpdater = {
     return () => { p.then(fn => fn()); };
   },
   openPdfFile: (path) => invoke('open_pdf_file', { filePath: path }),
+  openFileDefault: (path) => invoke('open_file_default', { filePath: path }),
   savePdfScan: (pdfs, roots) => invoke('pdf_history_save', { pdfs, roots: roots || null }),
   getPdfScans: () => invoke('pdf_history_get_scans'),
   getPdfScanDetail: (id) => invoke('pdf_history_get_detail', { id }),
@@ -551,6 +573,9 @@ window.vstUpdater = {
   clearPdfHistory: () => invoke('pdf_history_clear'),
   getLatestPdfScan: () => invoke('pdf_history_latest'),
   diffPdfScans: (oldId, newId) => invoke('pdf_history_diff', { oldId, newId }),
+  exportPdfsJson: (pdfs, filePath) => invoke('export_pdfs_json', { pdfs, filePath }),
+  exportPdfsDsv: (pdfs, filePath) => invoke('export_pdfs_dsv', { pdfs, filePath }),
+  importPdfsJson: (filePath) => invoke('import_pdfs_json', { filePath }),
   exportPresetsJson: (presets, filePath) => invoke('export_presets_json', { presets, filePath }),
   importPresetsJson: (filePath) => invoke('import_presets_json', { filePath }),
   importAudioJson: (filePath) => invoke('import_audio_json', { filePath }),
@@ -607,6 +632,7 @@ window.vstUpdater = {
   getHomeDir: () => invoke('get_home_dir'),
   // Similarity
   findSimilarSamples: (filePath, candidatePaths, maxResults) => invoke('find_similar_samples', { filePath, candidatePaths, maxResults: maxResults || 20 }),
+  buildFingerprintCache: (candidatePaths) => invoke('build_fingerprint_cache', { candidatePaths }),
   readAlsXml: (filePath) => invoke('read_als_xml', { filePath }),
   readProjectFile: (filePath) => invoke('read_project_file', { filePath }),
   // Preferences (file-backed)

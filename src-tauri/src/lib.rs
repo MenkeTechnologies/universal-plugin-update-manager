@@ -1399,6 +1399,63 @@ async fn compute_fingerprint(
 }
 
 #[tauri::command]
+async fn build_fingerprint_cache(
+    app: AppHandle,
+    candidate_paths: Vec<String>,
+) -> Result<serde_json::Value, String> {
+    tokio::task::spawn_blocking(move || {
+        let fp_json = db::global()
+            .read_cache("fingerprint-cache.json")
+            .unwrap_or_default();
+        let mut cache: std::collections::HashMap<String, similarity::AudioFingerprint> =
+            serde_json::from_value(fp_json).unwrap_or_default();
+        use rayon::prelude::*;
+        let uncached: Vec<&String> = candidate_paths
+            .iter()
+            .filter(|p| !cache.contains_key(p.as_str()))
+            .collect();
+        let total = uncached.len();
+        if total == 0 {
+            return serde_json::json!({ "built": 0, "cached": cache.len() });
+        }
+        let _ = app.emit(
+            "fingerprint-build-progress",
+            serde_json::json!({
+                "phase": "start", "total": total, "cached": cache.len()
+            }),
+        );
+        const CHUNK: usize = 500;
+        let mut done = 0usize;
+        for chunk in uncached.chunks(CHUNK) {
+            let new_fps: Vec<similarity::AudioFingerprint> = chunk
+                .par_iter()
+                .filter_map(|p| similarity::compute_fingerprint(p))
+                .collect();
+            for fp in new_fps {
+                cache.insert(fp.path.clone(), fp);
+            }
+            done += chunk.len();
+            let _ = app.emit(
+                "fingerprint-build-progress",
+                serde_json::json!({
+                    "phase": "progress", "done": done, "total": total
+                }),
+            );
+            if let Ok(val) = serde_json::to_value(&cache) {
+                let _ = db::global().write_cache("fingerprint-cache.json", &val);
+            }
+        }
+        let _ = app.emit(
+            "fingerprint-build-progress",
+            serde_json::json!({ "phase": "done", "built": done, "cached": cache.len() }),
+        );
+        serde_json::json!({ "built": done, "cached": cache.len() })
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn find_similar_samples(
     app: AppHandle,
     file_path: String,
@@ -1477,6 +1534,46 @@ async fn find_similar_samples(
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn open_file_default(file_path: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("open")
+            .arg(&file_path)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("open failed: {}", stderr.trim()));
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("cmd")
+            .args(["/C", "start", "", &file_path])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err("start failed".into());
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let output = std::process::Command::new("xdg-open")
+            .arg(&file_path)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err("xdg-open failed".into());
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -2622,6 +2719,31 @@ fn gethostname() -> String {
     sysinfo::System::host_name().unwrap_or_default()
 }
 
+// ── PDF export/import ──
+
+#[tauri::command]
+fn export_pdfs_json(pdfs: Vec<PdfFile>, file_path: String) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(&pdfs).map_err(|e| e.to_string())?;
+    std::fs::write(&file_path, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn export_pdfs_dsv(pdfs: Vec<PdfFile>, file_path: String) -> Result<(), String> {
+    let sep = detect_separator(&file_path);
+    let mut out = format!("Name{s}Path{s}Directory{s}Size{s}Modified\n", s = sep);
+    for p in &pdfs {
+        out.push_str(&format!(
+            "{}{sep}{}{sep}{}{sep}{}{sep}{}\n",
+            dsv_escape(&p.name, sep),
+            dsv_escape(&p.path, sep),
+            dsv_escape(&p.directory, sep),
+            dsv_escape(&p.size_formatted, sep),
+            dsv_escape(&p.modified, sep),
+        ));
+    }
+    std::fs::write(&file_path, out).map_err(|e| e.to_string())
+}
+
 // ── Preset export/import ──
 
 #[tauri::command]
@@ -3261,6 +3383,19 @@ fn import_presets_json(file_path: String) -> Result<Vec<PresetFile>, String> {
         return serde_json::from_value(arr.clone()).map_err(|e| e.to_string());
     }
     Err("Expected a JSON array of presets or { \"presets\": [...] }".into())
+}
+
+#[tauri::command]
+fn import_pdfs_json(file_path: String) -> Result<Vec<PdfFile>, String> {
+    let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+    if let Ok(arr) = serde_json::from_str::<Vec<PdfFile>>(&data) {
+        return Ok(arr);
+    }
+    let val: serde_json::Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    if let Some(arr) = val.get("pdfs") {
+        return serde_json::from_value(arr.clone()).map_err(|e| e.to_string());
+    }
+    Err("Expected a JSON array of PDFs or { \"pdfs\": [...] }".into())
 }
 
 #[tauri::command]
@@ -5104,6 +5239,7 @@ pub fn run() {
             read_project_file,
             compute_fingerprint,
             find_similar_samples,
+            build_fingerprint_cache,
             open_update_url,
             open_plugin_folder,
             open_audio_folder,
@@ -5138,8 +5274,12 @@ pub fn run() {
             pdf_history_latest,
             pdf_history_diff,
             open_pdf_file,
+            open_file_default,
             export_presets_json,
             export_presets_dsv,
+            export_pdfs_json,
+            export_pdfs_dsv,
+            import_pdfs_json,
             export_toml,
             import_toml,
             export_pdf,

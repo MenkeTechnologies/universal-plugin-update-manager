@@ -370,6 +370,30 @@ document.addEventListener('contextmenu', (e) => {
     return;
   }
 
+  // ── PDF rows ──
+  const pdfRow = e.target.closest('#pdfTableBody tr[data-pdf-path]');
+  if (pdfRow) {
+    const path = pdfRow.dataset.pdfPath;
+    const name = pdfRow.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
+    const items = [
+      { icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, action: () => openPdfFile(path) },
+      { icon: '&#9889;', label: 'Open with default app', ..._noEcho, action: () => window.vstUpdater.openFileDefault(path).catch(err => showToast('Failed to open: ' + (err.message || err), 4000, 'error')) },
+      { icon: '&#128195;', label: 'Open in Preview', ..._noEcho, action: () => openWithApp(path, 'Preview') },
+      { icon: '&#128196;', label: 'Open in Adobe Acrobat', ..._noEcho, action: () => openWithApp(path, 'Adobe Acrobat') },
+      { icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => { switchTab('files'); setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200); } },
+      '---',
+      { icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name) },
+      { icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, action: () => copyToClipboard(path) },
+      '---',
+      ...[(() => { const f = typeof isFavorite === 'function' && isFavorite(path); return { icon: f ? '&#9734;' : '&#9733;', label: f ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho,
+        action: () => f ? removeFavorite(path) : addFavorite('pdf', path, name) }; })()],
+      { icon: '&#128221;', label: appFmt('menu.add_note'), action: () => showNoteEditor(path, name) },
+      ...quickTagItems(path, name),
+    ];
+    showContextMenu(e, items);
+    return;
+  }
+
   // ── Preset rows ──
   const presetRow = e.target.closest('#presetTableBody tr[data-preset-path]');
   if (presetRow) {
@@ -401,11 +425,13 @@ document.addEventListener('contextmenu', (e) => {
         if (action === 'sortAudio') { audioSortAsc = true; audioSortKey = key; sortAudio(key); }
         else if (action === 'sortDaw') { dawSortAsc = true; dawSortKey = key; sortDaw(key); }
         else if (action === 'sortPreset') { presetSortAsc = true; presetSortKey = key; sortPreset(key); }
+        else if (action === 'sortPdf') { pdfSortAsc = true; pdfSortKey = key; sortPdf(key); }
       }},
       { icon: '&#9660;', label: appFmt('menu.sort_descending'), action: () => {
         if (action === 'sortAudio') { audioSortAsc = false; audioSortKey = key; sortAudio(key); }
         else if (action === 'sortDaw') { dawSortAsc = false; dawSortKey = key; sortDaw(key); }
         else if (action === 'sortPreset') { presetSortAsc = false; presetSortKey = key; sortPreset(key); }
+        else if (action === 'sortPdf') { pdfSortAsc = false; pdfSortKey = key; sortPdf(key); }
       }},
       '---',
       { icon: '&#8596;', label: appFmt('menu.reset_columns'), action: () => settingResetColumns() },

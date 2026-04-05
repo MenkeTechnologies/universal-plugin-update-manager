@@ -103,6 +103,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
           else if (cat === 'daw' && typeof scanDawProjects === 'function') scanDawProjects();
           else if (cat === 'preset' && typeof scanPresets === 'function') scanPresets();
           else if (cat === 'plugin' && typeof scanPlugins === 'function') scanPlugins();
+          else if (cat === 'pdf' && typeof scanPdfs === 'function') scanPdfs();
         }
       });
     }
@@ -255,6 +256,7 @@ async function updateHeaderInfo() {
     set('headerDaw', _dawTotalUnfiltered || tc.daw_projects || 0);
     set('headerPresets', _presetTotalUnfiltered || tc.presets || 0);
     set('headerMidi', typeof getMidiCount === 'function' ? getMidiCount() : 0);
+    set('headerPdf', (typeof _pdfTotalUnfiltered !== 'undefined' && _pdfTotalUnfiltered) || tc.pdfs || 0);
 
     // Scan status badge
     const sc = s.scanner || {};
@@ -264,6 +266,7 @@ async function updateHeaderInfo() {
     if (sc.audioScanning) active.push(_lbl('ui.scan_status.samples', 'Samples'));
     if (sc.dawScanning) active.push(_lbl('ui.scan_status.daw', 'DAW'));
     if (sc.presetScanning) active.push(_lbl('ui.scan_status.presets', 'Presets'));
+    if (sc.pdfScanning) active.push(_lbl('ui.scan_status.pdfs', 'PDFs'));
     if (sc.updateChecking) active.push(_lbl('ui.scan_status.updates', 'Updates'));
     const badge = document.getElementById('scanStatusBadge');
     if (badge) {
@@ -306,6 +309,7 @@ async function scanAll(resume = false) {
       scanAudioSamples(resume),
       scanDawProjects(resume),
       scanPresets(resume),
+      typeof scanPdfs === 'function' ? scanPdfs(resume) : Promise.resolve(),
     ]);
   } catch (err) {
     showToast(toastFmt('toast.scan_all_failed', { err: err.message || err }), 4000, 'error');

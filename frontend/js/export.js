@@ -287,6 +287,62 @@ function exportDaw() {
   showExportModal('daw', 'ui.export.title_daw_projects', allDawProjects.length);
 }
 
+function exportPdfs() {
+  if (typeof allPdfs === 'undefined' || allPdfs.length === 0) return;
+  _exportCtx = {
+    titleKey: 'ui.export.title_pdfs',
+    defaultName: exportFileName('pdfs', allPdfs.length),
+    exportFn: async (fmt, filePath) => {
+      if (fmt === 'pdf') {
+        const headers = pdfHeaders(
+          'ui.export.col_name',
+          'ui.export.col_size',
+          'ui.export.col_modified',
+          'ui.export.col_path',
+        );
+        const rows = allPdfs.map(p => [p.name, p.sizeFormatted || '', p.modified, p.directory]);
+        await window.vstUpdater.exportPdf(_exportFmt('ui.export.title_pdfs'), headers, rows, filePath);
+      } else if (fmt === 'csv' || fmt === 'tsv') {
+        await window.vstUpdater.exportPdfsDsv(allPdfs, filePath);
+      } else if (fmt === 'toml') {
+        await window.vstUpdater.exportToml({ pdfs: allPdfs }, filePath);
+      } else {
+        await window.vstUpdater.exportPdfsJson(allPdfs, filePath.endsWith('.json') ? filePath : filePath + '.json');
+      }
+    }
+  };
+  showExportModal('pdfs', 'ui.export.title_pdfs', allPdfs.length);
+}
+
+async function importPdfs() {
+  const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+  if (!dialogApi) return;
+  const selected = await dialogApi.open({ title: _exportFmt('ui.export.dialog_import_pdfs'), multiple: false, filters: getAllImportFilters() });
+  if (!selected) return;
+  const filePath = typeof selected === 'string' ? selected : selected.path;
+  if (!filePath) return;
+  showGlobalProgress();
+  try {
+    let imported;
+    if (filePath.endsWith('.toml')) {
+      const data = await window.vstUpdater.importToml(filePath);
+      imported = data.pdfs || data;
+    } else {
+      imported = await window.vstUpdater.importPdfsJson(filePath);
+    }
+    if (!imported || !Array.isArray(imported) || imported.length === 0) {
+      await showImportError('pdfs', _exportFmt('ui.export.import_empty_pdfs'));
+      return;
+    }
+    allPdfs = imported;
+    if (typeof rebuildPdfStats === 'function') rebuildPdfStats();
+    if (typeof filterPdfs === 'function') filterPdfs();
+    const btn = document.getElementById('btnExportPdf');
+    if (btn) btn.style.display = '';
+    showToast(toastFmt('toast.imported_n_pdfs', { n: imported.length }));
+  } catch (err) { await showImportError('pdfs', err.message || String(err)); } finally { hideGlobalProgress(); }
+}
+
 function exportPresets() {
   if (allPresets.length === 0) return;
   _exportCtx = {

@@ -365,7 +365,8 @@ async function checkUpdates() {
       const pending = data.total - data.processed;
       document.getElementById('updateCount').textContent = withUpdates;
       document.getElementById('upToDateCount').textContent = upToDate;
-      document.getElementById('unknownCount').textContent = unknown;
+      const ucEl = document.getElementById('unknownCount');
+      if (ucEl) ucEl.textContent = unknown;
 
       statusStats.innerHTML =
         `<span class="stat-avail">${withUpdates} ${_ui('ui.js.stat_updates')}</span>` +
@@ -384,7 +385,8 @@ async function checkUpdates() {
     document.getElementById('upToDateCount').textContent =
       allPlugins.filter(p => !p.hasUpdate && p.source !== 'not-found').length;
     document.getElementById('updateCount').textContent = pluginsWithUpdates.length;
-    document.getElementById('unknownCount').textContent = finalUnknown;
+    const ucEl2 = document.getElementById('unknownCount');
+    if (ucEl2) ucEl2.textContent = finalUnknown;
 
     if (pluginsWithUpdates.length > 0) {
       const batchBar = document.getElementById('batchBar');

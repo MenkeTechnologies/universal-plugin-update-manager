@@ -66,6 +66,20 @@ describe('frontend/js/utils.js (vm-loaded source)', () => {
     U = loadUtilsSandbox();
   });
 
+  it('charClass classifies lower, upper, digit, non-word', () => {
+    assert.strictEqual(U.charClass('z'), 1);
+    assert.strictEqual(U.charClass('M'), 2);
+    assert.strictEqual(U.charClass('0'), 3);
+    assert.strictEqual(U.charClass('_'), 0);
+  });
+
+  it('positionBonus: boundary, camelCase, non-word class transitions', () => {
+    assert.strictEqual(U.positionBonus(' ', 'a'), 9);
+    assert.strictEqual(U.positionBonus('a', 'B'), 7);
+    assert.strictEqual(U.positionBonus('a', '1'), 8);
+    assert.strictEqual(U.positionBonus('a', 'b'), 0);
+  });
+
   it('searchScore: empty query matches any row (score > 0)', () => {
     assert.strictEqual(U.searchScore('', ['x'], 'fuzzy'), 1);
   });

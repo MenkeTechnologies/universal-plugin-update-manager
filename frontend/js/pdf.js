@@ -90,6 +90,11 @@ function rebuildPdfStats() {
     accumulatePdfStats(allPdfs);
   }
   document.getElementById('pdfTotalSize').textContent = formatAudioSize(_pdfStatsTotalBytes);
+  const btn = document.getElementById('btnExportPdf');
+  if (btn) btn.style.display = displayCount > 0 ? '' : 'none';
+  // Mirror into the global stats-bar counter (top of app)
+  const headerEl = document.getElementById('pdfCountHeader');
+  if (headerEl) headerEl.textContent = displayCount.toLocaleString();
 }
 
 function buildPdfRow(p) {
@@ -269,6 +274,8 @@ async function scanPdfs(resume = false) {
     } else if (data.phase === 'scanning') {
       pendingPdfs.push(...data.pdfs);
       pendingFound = data.found;
+      const headerEl = document.getElementById('pdfCountHeader');
+      if (headerEl) headerEl.textContent = pendingFound.toLocaleString();
       scheduleFlush();
     }
   });
