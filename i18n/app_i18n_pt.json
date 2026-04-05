@@ -241,6 +241,8 @@
   "menu.scan": "Digitalizar",
   "menu.scan_all": "Digitalizar tudo",
   "menu.scan_daw": "Digitalizar projetos DAW",
+  "menu.scan_midi": "Digitalizar MIDI",
+  "menu.scan_pdf": "Scan PDFs",
   "menu.scan_plugins": "Plug-ins de verificação",
   "menu.scan_presets": "Predefinições de digitalização",
   "menu.scan_samples": "Digitalizar amostras",

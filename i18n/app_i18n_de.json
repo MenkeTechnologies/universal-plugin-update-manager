@@ -241,6 +241,8 @@
   "menu.scan": "Scannen",
   "menu.scan_all": "Alle scannen",
   "menu.scan_daw": "Scannen Sie DAW-Projekte",
+  "menu.scan_midi": "MIDI scannen",
+  "menu.scan_pdf": "Scan PDFs",
   "menu.scan_plugins": "Scan-Plugins",
   "menu.scan_presets": "Scan-Voreinstellungen",
   "menu.scan_samples": "Proben scannen",

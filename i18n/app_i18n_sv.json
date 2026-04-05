@@ -241,6 +241,8 @@
   "menu.scan": "Avsöka",
   "menu.scan_all": "Skanna alla",
   "menu.scan_daw": "Skanna DAW-projekt",
+  "menu.scan_midi": "Skanna MIDI",
+  "menu.scan_pdf": "Skanna PDF-filer",
   "menu.scan_plugins": "Skanna plugins",
   "menu.scan_presets": "Skanna förinställningar",
   "menu.scan_samples": "Skanna prover",

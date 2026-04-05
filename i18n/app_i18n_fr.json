@@ -241,6 +241,8 @@
   "menu.scan": "Balayage",
   "menu.scan_all": "Scanner tout",
   "menu.scan_daw": "Scanner des projets DAW",
+  "menu.scan_midi": "Scanner MIDI",
+  "menu.scan_pdf": "Numériser des PDF",
   "menu.scan_plugins": "Plugins d'analyse",
   "menu.scan_presets": "Préréglages de numérisation",
   "menu.scan_samples": "Exemples de numérisation",

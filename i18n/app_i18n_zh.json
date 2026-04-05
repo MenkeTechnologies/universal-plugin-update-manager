@@ -241,6 +241,8 @@
   "menu.scan": "扫描",
   "menu.scan_all": "扫描全部",
   "menu.scan_daw": "扫描 DAW 项目",
+  "menu.scan_midi": "扫描MIDI",
+  "menu.scan_pdf": "扫描 PDF",
   "menu.scan_plugins": "扫描插件",
   "menu.scan_presets": "扫描预设",
   "menu.scan_samples": "扫描样品",

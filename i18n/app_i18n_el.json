@@ -241,6 +241,8 @@
   "menu.scan": "Σάρωση",
   "menu.scan_all": "Σάρωση όλων",
   "menu.scan_daw": "Σάρωση έργων DAW",
+  "menu.scan_midi": "Σάρωση MIDI",
+  "menu.scan_pdf": "Σάρωση αρχείων PDF",
   "menu.scan_plugins": "Σάρωση προσθηκών",
   "menu.scan_presets": "Σάρωση προεπιλογών",
   "menu.scan_samples": "Σάρωση δειγμάτων",

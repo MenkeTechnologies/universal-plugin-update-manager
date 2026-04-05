@@ -241,6 +241,8 @@
   "menu.scan": "Skannata",
   "menu.scan_all": "Skannaa kaikki",
   "menu.scan_daw": "Skannaa DAW Projects",
+  "menu.scan_midi": "Skannaa MIDI",
+  "menu.scan_pdf": "Skannaa PDF-tiedostoja",
   "menu.scan_plugins": "Scan Plugins",
   "menu.scan_presets": "Skannaa esiasetukset",
   "menu.scan_samples": "Skannaa näytteet",

@@ -241,6 +241,8 @@
   "menu.scan": "Сканировать",
   "menu.scan_all": "Сканировать все",
   "menu.scan_daw": "Сканирование проектов DAW",
+  "menu.scan_midi": "Сканировать MIDI",
+  "menu.scan_pdf": "Сканирование PDF-файлов",
   "menu.scan_plugins": "Плагины сканирования",
   "menu.scan_presets": "Предустановки сканирования",
   "menu.scan_samples": "Сканировать образцы",

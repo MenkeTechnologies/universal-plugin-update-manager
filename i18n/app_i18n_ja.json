@@ -241,6 +241,8 @@
   "menu.scan": "スキャン",
   "menu.scan_all": "すべてスキャン",
   "menu.scan_daw": "DAWプロジェクトをスキャンする",
+  "menu.scan_midi": "スキャンMIDI",
+  "menu.scan_pdf": "PDFをスキャンする",
   "menu.scan_plugins": "スキャンプラグイン",
   "menu.scan_presets": "スキャンプリセット",
   "menu.scan_samples": "スキャンサンプル",

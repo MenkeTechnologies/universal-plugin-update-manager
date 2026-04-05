@@ -794,13 +794,24 @@ document.addEventListener('contextmenu', (e) => {
     const tab = tabBtn.dataset.tab;
     const exportMap = { plugins: 'exportPlugins', samples: 'exportAudio', daw: 'exportDaw', presets: 'exportPresets', pdf: 'exportPdfs', midi: 'exportMidi' };
     const scanMap = { plugins: 'scanPlugins', samples: 'scanAudioSamples', daw: 'scanDawProjects', presets: 'scanPresets', pdf: 'scanPdfs', midi: 'scanMidi' };
+    /** Tab bar rescan: same labels as Scan menu / toolbar (not generic "Rescan Tab Data"). */
+    const scanLabelKeyByTab = {
+      plugins: 'menu.scan_plugins',
+      samples: 'menu.scan_samples',
+      daw: 'menu.scan_daw',
+      presets: 'menu.scan_presets',
+      pdf: 'menu.scan_pdf',
+      midi: 'menu.scan_midi',
+    };
     const items = [
       { icon: '&#8635;', label: appFmt('menu.switch_to_tab'), action: () => switchTab(tab) },
       '---',
     ];
     const scanFn = scanMap[tab];
     if (scanFn && typeof window[scanFn] === 'function') {
-      items.push({ icon: '&#9889;', label: appFmt('menu.rescan_tab_data'), action: () => window[scanFn]() });
+      const scanKey = scanLabelKeyByTab[tab] || 'menu.rescan_tab_data';
+      const scanLabel = typeof appFmt === 'function' ? appFmt(scanKey) : scanKey;
+      items.push({ icon: '&#9889;', label: scanLabel, action: () => window[scanFn]() });
     }
     const exportFn = exportMap[tab];
     if (exportFn && typeof window[exportFn] === 'function') {
