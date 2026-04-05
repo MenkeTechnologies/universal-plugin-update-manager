@@ -77,6 +77,22 @@ describe('frontend/js/settings.js (vm-loaded)', () => {
     assert.strictEqual(S.formatCacheSize(512), '512 B');
     assert.match(S.formatCacheSize(1536), /1\.5 KB/);
     assert.match(S.formatCacheSize(3 * 1024 * 1024), /3\.0 MB/);
+    assert.match(S.formatCacheSize(2.5 * 1024 * 1024 * 1024), /2\.5 GB/);
+  });
+
+  it('hexToRgba handles black and full-opacity', () => {
+    assert.strictEqual(S.hexToRgba('#000000', 1), 'rgba(0, 0, 0, 1)');
+  });
+
+  it('getSettingValue returns default when key missing or empty string', () => {
+    assert.strictEqual(S.getSettingValue('no_such_setting_xyz', 'fallback'), 'fallback');
+    S.prefs._cache.emptyPref = '';
+    assert.strictEqual(S.getSettingValue('emptyPref', 'fallback'), 'fallback');
+  });
+
+  it('getSettingValue returns stored value when truthy', () => {
+    S.prefs._cache.theme = 'light';
+    assert.strictEqual(S.getSettingValue('theme', 'dark'), 'light');
   });
 
   it('applyColorScheme stores scheme name and applies CSS variables', () => {

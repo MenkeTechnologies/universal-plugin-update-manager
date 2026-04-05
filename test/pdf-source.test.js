@@ -54,4 +54,16 @@ describe('frontend/js/pdf.js (vm-loaded)', () => {
     assert.ok(html.includes('id="pdfTableBody"'));
     assert.ok(html.includes('data-batch-action="toggleAll"'));
   });
+
+  it('buildPdfRow escapes double quotes in data-pdf-name (lower-cased)', () => {
+    const html = P.buildPdfRow({
+      path: '/Docs/x.pdf',
+      name: 'Say "Hello"',
+      directory: '/Docs',
+      sizeFormatted: '1 KB',
+      modified: 'd',
+      size: 1000,
+    });
+    assert.ok(html.includes('data-pdf-name="say &quot;hello&quot;"'));
+  });
 });

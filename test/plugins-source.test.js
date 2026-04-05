@@ -39,6 +39,12 @@ describe('frontend/js/plugins.js buildPluginCardHtml (vm-loaded)', () => {
     assert.ok(P.buildPluginCardHtml(basePlugin({ type: 'AU' })).includes('type-au'));
   });
 
+  it('maps non-VST2/VST3 types to the same badge class as AU (CLAP uses type-au)', () => {
+    const html = P.buildPluginCardHtml(basePlugin({ type: 'CLAP' }));
+    assert.ok(html.includes('type-au'));
+    assert.ok(html.includes('>CLAP<'));
+  });
+
   it('embeds data attributes for incremental scan filtering', () => {
     const html = P.buildPluginCardHtml(
       basePlugin({ name: 'MyPlugin', manufacturer: 'Big Co' })

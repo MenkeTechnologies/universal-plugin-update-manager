@@ -60,6 +60,10 @@ describe('frontend/js/file-browser.js (vm-loaded)', () => {
     assert.ok(F.fileIcon({ isDir: false, ext: 'unknownext' }).includes('128196'));
   });
 
+  it('fileIcon uses default doc glyph for .mid (not in AUDIO_EXTS)', () => {
+    assert.ok(F.fileIcon({ isDir: false, ext: 'mid' }).includes('128196'));
+  });
+
   it('addFavDir / removeFavDir / isFavDir persist under prefs.favDirs', () => {
     assert.strictEqual(F.getFavDirs().length, 0);
     F.addFavDir('/Users/me/Projects/beats');

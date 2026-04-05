@@ -11,8 +11,8 @@ function loadSpSandbox(overrides = {}) {
     toastFmt: (k, vars) => (vars ? `${k}:${JSON.stringify(vars)}` : k),
     appFmt: (k) => k,
     allAudioSamples: [
-      { path: '/kick.wav', name: 'Kick Drum', format: 'WAV', sizeBytes: 512 * 1024 },
-      { path: '/line.mp3', name: 'Bass line', format: 'MP3', sizeBytes: 3 * 1024 * 1024 },
+      { path: '/kick.wav', name: 'Kick Drum', format: 'WAV', sizeBytes: 512 * 1024, duration: 30 },
+      { path: '/line.mp3', name: 'Bass line', format: 'MP3', sizeBytes: 3 * 1024 * 1024, duration: 180 },
       { path: '/hidden.wav', name: 'Other', format: 'WAV', sizeBytes: 100 },
     ],
     recentlyPlayed: [{ path: '/kick.wav' }],
@@ -91,5 +91,27 @@ describe('frontend/js/smart-playlists.js (vm-loaded)', () => {
   it('evaluateSmartPlaylist returns empty when rules array is empty', () => {
     const S = loadSpSandbox();
     assert.strictEqual(S.evaluateSmartPlaylist({ rules: [], matchMode: 'all' }).length, 0);
+  });
+
+  it('matchesSmartRule duration_max compares sample.duration to max seconds', () => {
+    const S = loadSpSandbox();
+    const kick = S.allAudioSamples[0];
+    assert.strictEqual(S.matchesSmartRule(kick, { type: 'duration_max', value: '60' }), true);
+    assert.strictEqual(S.matchesSmartRule(kick, { type: 'duration_max', value: '10' }), false);
+  });
+
+  it('matchesSmartRule duration_max is false when duration missing or max invalid', () => {
+    const S = loadSpSandbox();
+    const noDur = S.allAudioSamples[2];
+    assert.strictEqual(S.matchesSmartRule(noDur, { type: 'duration_max', value: '999' }), false);
+    assert.strictEqual(S.matchesSmartRule(S.allAudioSamples[0], { type: 'duration_max', value: '0' }), false);
+    assert.strictEqual(S.matchesSmartRule(S.allAudioSamples[0], { type: 'duration_max', value: 'bad' }), false);
+  });
+
+  it('evaluateSmartPlaylist returns empty when allAudioSamples is undefined', () => {
+    const S = loadSpSandbox({ allAudioSamples: undefined });
+    const out = S.evaluateSmartPlaylist({ rules: [{ type: 'format', value: 'WAV' }], matchMode: 'all' });
+    assert.strictEqual(Array.isArray(out), true);
+    assert.strictEqual(out.length, 0);
   });
 });
