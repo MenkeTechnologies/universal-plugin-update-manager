@@ -893,8 +893,9 @@
 
     .settings-textarea {
       width: 100%;
-      max-width: 320px;
-      min-width: 160px;
+      max-width: min(560px, 100%);
+      min-width: 200px;
+      min-height: 7.5em;
       box-sizing: border-box;
       padding: 8px 10px;
       border-radius: 2px;
@@ -912,6 +913,9 @@
     }
     .settings-textarea::placeholder {
       color: var(--text-muted);
+    }
+    #settingBlacklist {
+      min-height: 14em;
     }
 
     .settings-saved-msg {
@@ -5567,7 +5571,7 @@
               <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_plugins_one_per">Additional directories to scan for plugins (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for VST/AU plugins, one path per line" data-i18n-placeholder="ui.ph.path_to_plugins_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_vst_au_plugins_"></textarea>
+              <textarea class="settings-textarea" id="settingCustomDirs" rows="6" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for VST/AU plugins, one path per line" data-i18n-placeholder="ui.ph.path_to_plugins_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_vst_au_plugins_"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingCustomDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="saveCustomDirs" style="margin-top: 6px;" title="Save custom plugin scan directories" data-i18n-title="ui.tt.save_custom_plugin_scan_directories" data-i18n="ui.btn.save">Save</button>
               <span class="settings-saved-msg" id="savedMsgCustomDirs"></span>
@@ -5579,7 +5583,7 @@
               <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_audio_samples_o">Additional directories to scan for audio samples (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for audio samples, one path per line" data-i18n-placeholder="ui.ph.path_to_samples_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_audio_samples_o"></textarea>
+              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="6" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for audio samples, one path per line" data-i18n-placeholder="ui.ph.path_to_samples_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_audio_samples_o"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingAudioScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="saveAudioScanDirs" style="margin-top: 6px;" title="Save custom audio sample scan directories" data-i18n-title="ui.tt.save_custom_audio_sample_scan_directories" data-i18n="ui.btn.save">Save</button>
               <span class="settings-saved-msg" id="savedMsgAudioScanDirs"></span>
@@ -5591,7 +5595,7 @@
               <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_daw_project_fil">Additional directories to scan for DAW project files (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for DAW project files, one path per line" data-i18n-placeholder="ui.ph.path_to_projects_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_daw_project_fil"></textarea>
+              <textarea class="settings-textarea" id="settingDawScanDirs" rows="6" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for DAW project files, one path per line" data-i18n-placeholder="ui.ph.path_to_projects_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_daw_project_fil"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingDawScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="saveDawScanDirs" style="margin-top: 6px;" title="Save custom DAW project scan directories" data-i18n-title="ui.tt.save_custom_daw_project_scan_directories" data-i18n="ui.btn.save">Save</button>
               <span class="settings-saved-msg" id="savedMsgDawScanDirs"></span>
@@ -5603,7 +5607,7 @@
               <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_plugin_presets_">Additional directories to scan for plugin presets (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for plugin presets, one path per line" data-i18n-placeholder="ui.ph.path_to_presets_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_plugin_presets_"></textarea>
+              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="6" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for plugin presets, one path per line" data-i18n-placeholder="ui.ph.path_to_presets_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_plugin_presets_"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPresetScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="savePresetScanDirs" style="margin-top: 6px;" title="Save custom preset scan directories" data-i18n-title="ui.tt.save_custom_preset_scan_directories" data-i18n="ui.btn.save">Save</button>
               <span class="settings-saved-msg" id="savedMsgPresetScanDirs"></span>
@@ -5615,7 +5619,7 @@
               <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_pdf_documents">Additional directories to scan for PDF documents (one per line)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingPdfScanDirs" rows="3" placeholder="/path/to/pdfs&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for PDF documents, one path per line" data-i18n-placeholder="ui.ph.path_to_pdfs_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_pdf_documents"></textarea>
+              <textarea class="settings-textarea" id="settingPdfScanDirs" rows="6" placeholder="/path/to/pdfs&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for PDF documents, one path per line" data-i18n-placeholder="ui.ph.path_to_pdfs_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_pdf_documents"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPdfScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
               <button class="btn btn-secondary btn-settings-action" data-action="savePdfScanDirs" style="margin-top: 6px;" title="Save custom PDF scan directories" data-i18n-title="ui.tt.save_custom_pdf_scan_directories" data-i18n="ui.btn.save">Save</button>
               <span class="settings-saved-msg" id="savedMsgPdfScanDirs"></span>
@@ -5707,7 +5711,7 @@
               <span class="settings-desc" data-i18n="ui.sd.directory_names_to_skip_during_scans_one_per_line_">Directory names to skip during scans (one per line). Applies to all scanners.</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingBlacklist" rows="4" placeholder="#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;System Volume Information&#10;node_modules&#10;.git&#10;.Trash" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Directory names to exclude from scanning, one per line" data-i18n-placeholder="ui.ph.recycle_10_eadir_10_spotlight_v100_10_recycle_bin_" data-i18n-title="ui.tt.directory_names_to_exclude_from_scanning_one_per_l"></textarea>
+              <textarea class="settings-textarea" id="settingBlacklist" rows="10" placeholder="#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;System Volume Information&#10;node_modules&#10;.git&#10;.Trash" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Directory names to exclude from scanning, one per line" data-i18n-placeholder="ui.ph.recycle_10_eadir_10_spotlight_v100_10_recycle_bin_" data-i18n-title="ui.tt.directory_names_to_exclude_from_scanning_one_per_l"></textarea>
               <button class="btn btn-secondary btn-settings-action" data-action="saveBlacklist" style="margin-top: 6px;" title="Save directory blacklist" data-i18n-title="ui.tt.save_directory_blacklist" data-i18n="ui.btn.save">Save</button>
               <span class="settings-saved-msg" id="savedMsgBlacklist"></span>
             </div>
@@ -6239,42 +6243,42 @@
     </div>
   </div>
 
-  <script src="js/i18n-ui.js?v=6519"></script>
-  <script src="js/ipc.js?v=6519"></script>
-  <script src="js/utils.js?v=6519"></script>
-  <script src="js/drag-reorder.js?v=6519"></script>
-  <script src="js/modal-drag.js?v=6519"></script>
-  <script src="js/columns.js?v=6519"></script>
-  <script src="js/notes.js?v=6519"></script>
-  <script src="js/favorites.js?v=6519"></script>
-  <script src="js/export.js?v=6519"></script>
-  <script src="js/plugins.js?v=6519"></script>
-  <script src="js/settings.js?v=6519"></script>
-  <script src="js/history.js?v=6519"></script>
-  <script src="js/kvr.js?v=6519"></script>
-  <script src="js/audio.js?v=6519"></script>
-  <script src="js/daw.js?v=6519"></script>
-  <script src="js/presets.js?v=6519"></script>
-  <script src="js/disk-usage.js?v=6519"></script>
-  <script src="js/batch-select.js?v=6519"></script>
-  <script src="js/sort-persist.js?v=6519"></script>
-  <script src="js/multi-filter.js?v=6519"></script>
-  <script src="js/file-browser.js?v=6519"></script>
-  <script src="js/duplicates.js?v=6519"></script>
-  <script src="js/command-palette.js?v=6519"></script>
-  <script src="js/xref.js?v=6519"></script>
-  <script src="js/dep-graph.js?v=6519"></script>
-  <script src="js/smart-playlists.js?v=6519"></script>
-  <script src="js/heatmap-dashboard.js?v=6519"></script>
-  <script src="js/midi.js?v=6519"></script>
-  <script src="js/pdf.js?v=6519"></script>
-  <script src="js/settings-search.js?v=6519"></script>
-  <script src="js/visualizer.js?v=6519"></script>
-  <script src="js/walker-status.js?v=6519"></script>
-  <script src="js/context-menu.js?v=6519"></script>
-  <script src="js/help-overlay.js?v=6519"></script>
-  <script src="js/shortcuts.js?v=6519"></script>
-  <script src="js/keyboard-nav.js?v=6519"></script>
-  <script src="js/app.js?v=6519"></script>
+  <script src="js/i18n-ui.js?v=3698"></script>
+  <script src="js/ipc.js?v=3698"></script>
+  <script src="js/utils.js?v=3698"></script>
+  <script src="js/drag-reorder.js?v=3698"></script>
+  <script src="js/modal-drag.js?v=3698"></script>
+  <script src="js/columns.js?v=3698"></script>
+  <script src="js/notes.js?v=3698"></script>
+  <script src="js/favorites.js?v=3698"></script>
+  <script src="js/export.js?v=3698"></script>
+  <script src="js/plugins.js?v=3698"></script>
+  <script src="js/settings.js?v=3698"></script>
+  <script src="js/history.js?v=3698"></script>
+  <script src="js/kvr.js?v=3698"></script>
+  <script src="js/audio.js?v=3698"></script>
+  <script src="js/daw.js?v=3698"></script>
+  <script src="js/presets.js?v=3698"></script>
+  <script src="js/disk-usage.js?v=3698"></script>
+  <script src="js/batch-select.js?v=3698"></script>
+  <script src="js/sort-persist.js?v=3698"></script>
+  <script src="js/multi-filter.js?v=3698"></script>
+  <script src="js/file-browser.js?v=3698"></script>
+  <script src="js/duplicates.js?v=3698"></script>
+  <script src="js/command-palette.js?v=3698"></script>
+  <script src="js/xref.js?v=3698"></script>
+  <script src="js/dep-graph.js?v=3698"></script>
+  <script src="js/smart-playlists.js?v=3698"></script>
+  <script src="js/heatmap-dashboard.js?v=3698"></script>
+  <script src="js/midi.js?v=3698"></script>
+  <script src="js/pdf.js?v=3698"></script>
+  <script src="js/settings-search.js?v=3698"></script>
+  <script src="js/visualizer.js?v=3698"></script>
+  <script src="js/walker-status.js?v=3698"></script>
+  <script src="js/context-menu.js?v=3698"></script>
+  <script src="js/help-overlay.js?v=3698"></script>
+  <script src="js/shortcuts.js?v=3698"></script>
+  <script src="js/keyboard-nav.js?v=3698"></script>
+  <script src="js/app.js?v=3698"></script>
 </body>
 </html>

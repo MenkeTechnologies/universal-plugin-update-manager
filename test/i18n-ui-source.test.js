@@ -116,4 +116,29 @@ describe('frontend/js/i18n-ui.js applyUiI18n (vm-loaded)', () => {
     J.applyUiI18n();
     assert.strictEqual(el.textContent, 'orig');
   });
+
+  it('decodes &#10; / &#13; in placeholder strings to newlines (settings textareas)', () => {
+    const ta = {
+      dataset: { i18nPlaceholder: 'ui.ph.path_to_plugins_10_another_path' },
+      placeholder: '',
+      title: '',
+    };
+    const J = loadFrontendScripts(['i18n-ui.js'], {
+      __appStr: {
+        'ui.ph.path_to_plugins_10_another_path': '/a&#10;/b',
+      },
+      document: {
+        querySelectorAll(sel) {
+          if (sel === '[data-i18n-placeholder]') return [ta];
+          return [];
+        },
+        createElement: () => ({}),
+        getElementById: () => null,
+        addEventListener: () => {},
+        body: { insertAdjacentHTML: () => {} },
+      },
+    });
+    J.applyUiI18n();
+    assert.strictEqual(ta.placeholder, '/a\n/b');
+  });
 });
