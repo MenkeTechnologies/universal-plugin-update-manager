@@ -8,6 +8,7 @@ let audioSortKey = 'name';
 let audioSortAsc = true;
 let audioScanProgressCleanup = null;
 let _audioScanActive = false;
+let _audioScanFound = 0; // backend's authoritative found count (survives 100K cap)
 
 /** `appFmt` wrapper — same pattern as `plugins.js` `_ui`. */
 function _audioFmt(key, vars) {
@@ -661,6 +662,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
   let firstAudioBatch = true;
   let pendingSamples = [];
   let pendingFound = 0;
+  _audioScanFound = 0;
   _audioScanActive = true;
   const audioEta = createETA();
   audioEta.start();
@@ -725,6 +727,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
     } else if (data.phase === 'scanning') {
       pendingSamples.push(...data.samples);
       pendingFound = data.found;
+      _audioScanFound = pendingFound;
       document.getElementById('sampleCount').textContent = pendingFound.toLocaleString();
       scheduleFlush();
     }
@@ -931,8 +934,8 @@ async function fetchAudioPage() {
         }
       }
       const hasFilter = !!(needle || fmtSet);
-      audioTotalUnfiltered = allAudioSamples.length;
-      audioTotalCount = hasFilter ? visible : allAudioSamples.length;
+      audioTotalUnfiltered = _audioScanFound || allAudioSamples.length;
+      audioTotalCount = hasFilter ? visible : audioTotalUnfiltered;
       updateAudioStats();
     }
     return;

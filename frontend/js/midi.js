@@ -18,6 +18,7 @@ let midiSortAsc = true;
 let _midiOffset = 0;
 let _midiTotalCount = 0;      // filtered count from DB
 let _midiTotalUnfiltered = 0; // unfiltered count from DB
+let _midiScanFound = 0;
 let _midiStatsSnapshot = null;
 const MIDI_PAGE_SIZE = 200;
 
@@ -57,8 +58,8 @@ async function fetchMidiPage() {
           if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, 'fuzzy', highlightMatch);
         }
       }
-      _midiTotalUnfiltered = allMidiFiles.length;
-      _midiTotalCount = needle ? visible : allMidiFiles.length;
+      _midiTotalUnfiltered = _midiScanFound || allMidiFiles.length;
+      _midiTotalCount = needle ? visible : _midiTotalUnfiltered;
       updateMidiCount();
     }
     return;
@@ -159,6 +160,7 @@ async function scanMidi(resume = false) {
 
   let pendingMidi = [];
   let pendingFound = 0;
+  _midiScanFound = 0;
   let firstMidiBatch = true;
   const midiEta = typeof createETA === 'function' ? createETA() : null;
   if (midiEta) midiEta.start();
@@ -207,6 +209,7 @@ async function scanMidi(resume = false) {
     if (data.phase === 'scanning') {
       if (data.midiFiles) pendingMidi.push(...data.midiFiles);
       pendingFound = data.found || 0;
+      _midiScanFound = pendingFound;
       syncMidiStatsBarCount(pendingFound);
       const elapsed = midiEta ? midiEta.elapsed() : '';
       const timeSuffix = elapsed ? ' — ' + elapsed : '';
@@ -272,7 +275,7 @@ async function scanMidi(resume = false) {
 }
 
 function getMidiCount() {
-  return _midiScanProgressCleanup ? allMidiFiles.length : _midiTotalUnfiltered;
+  return _midiScanProgressCleanup ? (_midiScanFound || allMidiFiles.length) : _midiTotalUnfiltered;
 }
 
 /** Stats bar "MIDI Found" — must not rely on preset scan (MIDI has its own walker/DB). */
@@ -281,7 +284,7 @@ function syncMidiStatsBarCount(total) {
   if (!el) return;
   const n = typeof total === 'number'
     ? total
-    : (_midiScanProgressCleanup ? allMidiFiles.length : _midiTotalUnfiltered);
+    : (_midiScanProgressCleanup ? (_midiScanFound || allMidiFiles.length) : _midiTotalUnfiltered);
   el.textContent = n.toLocaleString();
 }
 
@@ -292,10 +295,11 @@ function updateMidiCount() {
   const scanning = !!_midiScanProgressCleanup;
   const search = _midiSearch || '';
   const hasFilter = scanning && !!search.trim();
+  const scanTotal = _midiScanFound || allMidiFiles.length;
   const filtered = scanning
-    ? (hasFilter ? _midiTotalCount : allMidiFiles.length)
+    ? (hasFilter ? _midiTotalCount : scanTotal)
     : _midiTotalCount;
-  const total = scanning ? allMidiFiles.length : _midiTotalUnfiltered;
+  const total = scanning ? scanTotal : _midiTotalUnfiltered;
   const isFiltered = total > 0 && filtered < total;
   const totalEl = document.getElementById('midiTotalCount');
   if (totalEl) {
@@ -319,7 +323,7 @@ function updateMidiCount() {
 function updateMidiHeaderCount() {
   const el = document.getElementById('headerMidi');
   if (el) {
-    const n = _midiScanProgressCleanup ? allMidiFiles.length : _midiTotalUnfiltered;
+    const n = _midiScanProgressCleanup ? (_midiScanFound || allMidiFiles.length) : _midiTotalUnfiltered;
     el.textContent = n.toLocaleString();
   }
 }

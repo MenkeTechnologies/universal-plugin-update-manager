@@ -12,6 +12,7 @@ let dawScanProgressCleanup = null;
 let _dawOffset = 0;
 let _dawTotalCount = 0;
 let _dawTotalUnfiltered = 0;
+let _dawScanFound = 0;
 
 let dawStatCounts = {};
 let dawStatBytes = 0;
@@ -53,8 +54,8 @@ async function fetchDawPage() {
       // capped at 2000 rendered so counting them would mismatch the scan
       // button counter (pendingFound) when the filter box is empty.
       const hasFilter = !!(needle || dawSet);
-      _dawTotalUnfiltered = allDawProjects.length;
-      _dawTotalCount = hasFilter ? visible : allDawProjects.length;
+      _dawTotalUnfiltered = _dawScanFound || allDawProjects.length;
+      _dawTotalCount = hasFilter ? visible : _dawTotalUnfiltered;
       updateDawStats();
     }
     return;
@@ -373,6 +374,7 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
   let firstDawBatch = true;
   let pendingProjects = [];
   let pendingFound = 0;
+  _dawScanFound = 0;
   const dawEta = createETA();
   dawEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
@@ -431,6 +433,7 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
     } else if (data.phase === 'scanning') {
       pendingProjects.push(...data.projects);
       pendingFound = data.found;
+      _dawScanFound = pendingFound;
       // Immediately update header counter. Format with toLocaleString to
       // match updateDawStats's formatting — otherwise the counter flickers
       // between "1234" (here) and "1,234" (flush) as the two paths alternate.
@@ -454,7 +457,7 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
       allDawProjects = result.projects;
     }
     rebuildDawStats();
-    _dawTotalUnfiltered = allDawProjects.length;
+    _dawTotalUnfiltered = _dawScanFound || allDawProjects.length;
     filterDawProjects();
     // Backend already streamed-saved when result.streamed
     if (!result.streamed) {

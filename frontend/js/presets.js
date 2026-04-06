@@ -9,6 +9,7 @@ let presetRenderCount = 0;
 let _presetOffset = 0;
 let _presetTotalCount = 0;
 let _presetTotalUnfiltered = 0;
+let _presetScanFound = 0;
 // Incremental stats for presets — avoids O(N) rebuild on every scan flush.
 let _presetStatsTotalBytes = 0;
 let _presetStatsFormatCounts = {};
@@ -63,8 +64,8 @@ async function fetchPresetPage() {
         }
       }
       const hasFilter = !!(needle || fmtSet);
-      _presetTotalUnfiltered = allPresets.length;
-      _presetTotalCount = hasFilter ? visible : allPresets.length;
+      _presetTotalUnfiltered = _presetScanFound || allPresets.length;
+      _presetTotalCount = hasFilter ? visible : _presetTotalUnfiltered;
       rebuildPresetStats();
     }
     return;
@@ -368,6 +369,7 @@ async function scanPresets(resume = false, unifiedResult = null) {
   let firstBatch = true;
   let pendingPresets = [];
   let pendingFound = 0;
+  _presetScanFound = 0;
   const presetEta = createETA();
   presetEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
@@ -450,6 +452,7 @@ async function scanPresets(resume = false, unifiedResult = null) {
     } else if (data.phase === 'scanning') {
       pendingPresets.push(...data.presets);
       pendingFound = data.found;
+      _presetScanFound = pendingFound;
       // Preset scanner does not emit MIDI (dedicated midi_scanner); found = preset files only.
       document.getElementById('presetCountHeader').textContent = pendingFound.toLocaleString();
       scheduleFlush();
@@ -474,7 +477,9 @@ async function scanPresets(resume = false, unifiedResult = null) {
     // Refresh header count immediately — don't wait for next fetchPresetPage.
     // Exclude MIDI since they live in their own tab (matches backend `total_unfiltered` definition).
     const midiFormats = new Set(['MID', 'MIDI']);
-    _presetTotalUnfiltered = allPresets.filter(p => !midiFormats.has(p.format)).length;
+    // _presetScanFound already excludes MIDI (backend strips them); fall back
+    // to in-memory array for non-streamed scans.
+    _presetTotalUnfiltered = _presetScanFound || allPresets.filter(p => !midiFormats.has(p.format)).length;
     // Save to the DB BEFORE rebuildPresetStats — otherwise the filter-stats
     // query hits stale/empty rows and the top counter flickers between the
     // previous scan's totals and zero/filtered values.

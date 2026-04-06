@@ -14,6 +14,7 @@ let pdfRenderCount = 0;
 let _pdfOffset = 0;
 let _pdfTotalCount = 0;
 let _pdfTotalUnfiltered = 0;
+let _pdfScanFound = 0;
 // Incremental stats for PDFs — avoids O(N) rebuild on every scan flush.
 let _pdfStatsTotalBytes = 0;
 // Page-count cache: path -> number (or null if extraction failed).
@@ -51,8 +52,8 @@ async function fetchPdfPage() {
           if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, highlightMatch);
         }
       }
-      _pdfTotalUnfiltered = allPdfs.length;
-      _pdfTotalCount = needle ? visible : allPdfs.length;
+      _pdfTotalUnfiltered = _pdfScanFound || allPdfs.length;
+      _pdfTotalCount = needle ? visible : _pdfTotalUnfiltered;
       rebuildPdfStats();
     }
     if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
@@ -121,11 +122,11 @@ async function rebuildPdfStats(force) {
       }
       displayCount = c; displayBytes = b;
     } else {
-      displayCount = allPdfs.length;
+      displayCount = _pdfScanFound || allPdfs.length;
       if (_pdfStatsTotalBytes === 0 && allPdfs.length > 0) accumulatePdfStats(allPdfs);
       displayBytes = _pdfStatsTotalBytes;
     }
-    unfiltered = allPdfs.length;
+    unfiltered = _pdfScanFound || allPdfs.length;
     _pdfTotalCount = displayCount;
     _pdfTotalUnfiltered = unfiltered;
   } else {
@@ -330,6 +331,7 @@ async function scanPdfs(resume = false, unifiedResult = null) {
   let firstBatch = true;
   let pendingPdfs = [];
   let pendingFound = 0;
+  _pdfScanFound = 0;
   const pdfEta = createETA();
   pdfEta.start();
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
@@ -364,7 +366,7 @@ async function scanPdfs(resume = false, unifiedResult = null) {
       pdfRenderCount += toRender.length;
     }
 
-    _pdfTotalUnfiltered = allPdfs.length;
+    _pdfTotalUnfiltered = _pdfScanFound || allPdfs.length;
     rebuildPdfStats();
     const elapsed = pdfEta.elapsed();
     if (scanBtn) {
@@ -384,6 +386,7 @@ async function scanPdfs(resume = false, unifiedResult = null) {
     } else if (data.phase === 'scanning') {
       pendingPdfs.push(...data.pdfs);
       pendingFound = data.found;
+      _pdfScanFound = pendingFound;
       const headerEl = document.getElementById('pdfCountHeader');
       if (headerEl) headerEl.textContent = pendingFound.toLocaleString();
       scheduleFlush();
@@ -403,7 +406,7 @@ async function scanPdfs(resume = false, unifiedResult = null) {
     } else {
       allPdfs = result.pdfs;
     }
-    _pdfTotalUnfiltered = allPdfs.length;
+    _pdfTotalUnfiltered = _pdfScanFound || allPdfs.length;
     // Invalidate aggregate cache — fresh rows after save will be aggregated below.
     _lastPdfAggKey = null; _pdfAggCache = null;
     // Save BEFORE rebuildPdfStats/filterPdfs so the DB has the new rows; otherwise
