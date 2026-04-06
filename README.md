@@ -221,6 +221,11 @@ find ~/Library/WebKit/audio-haxor ~/Library/WebKit/com.menketechnologies.audio-h
 cargo clean --manifest-path src-tauri/Cargo.toml --release && pnpm tauri build
 ```
 
+**Rust compile errors**
+
+- **`couldn't read ... i18n/app_i18n_*.json`** — `src-tauri/src/app_i18n.rs` embeds every shipped locale at compile time (`include_str!`). Pull latest `main` so all `i18n/app_i18n_*.json` files are present; do not delete locale files locally.
+- **`failed to build archive` / `failed to open object file` (.rlib)** — corrupted or partial `src-tauri/target` (often after an interrupted build). Remove the directory and rebuild: `command rm -rf src-tauri/target` then `pnpm tauri build`.
+
 ### Data Location
 
 All data persists at:
