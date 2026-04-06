@@ -44,6 +44,7 @@ LOCALE_SCRIPTS: tuple[tuple[str, str], ...] = (
     ("uk", "gen_app_i18n_uk.py"),
     ("vi", "gen_app_i18n_vi.py"),
     ("id", "gen_app_i18n_id.py"),
+    ("hi", "gen_app_i18n_hi.py"),
 )
 
 

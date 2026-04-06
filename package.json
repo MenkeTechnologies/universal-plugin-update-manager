@@ -38,6 +38,6 @@
   },
   "packageManager": "pnpm@10.33.0",
   "dependencies": {
-    "@tauri-apps/plugin-dialog": "^2.6.0"
+    "@tauri-apps/plugin-dialog": "^2.7.0"
   }
 }

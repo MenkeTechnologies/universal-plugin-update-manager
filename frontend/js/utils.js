@@ -872,34 +872,43 @@ function settingResetTabOrder() {
 }
 
 // ── Tab switching ──
+// Cache tab panel elements once — avoids 14 getElementById calls per switch.
+const _tabPanels = {};
+const _tabPanelIds = [
+  'plugins', 'history', 'samples', 'daw', 'presets', 'favorites',
+  'notes', 'tags', 'files', 'midi', 'pdf', 'visualizer', 'walkers', 'settings',
+];
+function _ensureTabCache() {
+  if (_tabPanels._ready) return;
+  for (const t of _tabPanelIds) {
+    const id = 'tab' + t.charAt(0).toUpperCase() + t.slice(1);
+    _tabPanels[t] = document.getElementById(id);
+  }
+  _tabPanels._ready = true;
+}
+
 function switchTab(tab) {
+  _ensureTabCache();
+  // Toggle tab buttons + panels in one pass — pure class mutations, no layout reads.
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
-  document.getElementById('tabPlugins').classList.toggle('active', tab === 'plugins');
-  document.getElementById('tabHistory').classList.toggle('active', tab === 'history');
-  document.getElementById('tabSamples').classList.toggle('active', tab === 'samples');
-  document.getElementById('tabDaw').classList.toggle('active', tab === 'daw');
-  document.getElementById('tabPresets').classList.toggle('active', tab === 'presets');
-  document.getElementById('tabFavorites').classList.toggle('active', tab === 'favorites');
-  document.getElementById('tabNotes').classList.toggle('active', tab === 'notes');
-  document.getElementById('tabTags').classList.toggle('active', tab === 'tags');
-  document.getElementById('tabFiles').classList.toggle('active', tab === 'files');
-  document.getElementById('tabMidi')?.classList.toggle('active', tab === 'midi');
-  document.getElementById('tabPdf')?.classList.toggle('active', tab === 'pdf');
-  document.getElementById('tabVisualizer')?.classList.toggle('active', tab === 'visualizer');
-  if (tab === 'visualizer' && typeof startVisualizer === 'function') startVisualizer();
-  document.getElementById('tabWalkers')?.classList.toggle('active', tab === 'walkers');
-  document.getElementById('tabSettings').classList.toggle('active', tab === 'settings');
-  if (tab === 'walkers' && typeof startWalkerPolling === 'function') startWalkerPolling();
-  if (tab === 'history') loadHistory();
-  if (tab === 'favorites') renderFavorites();
-  if (tab === 'notes') renderNotesTab();
-  if (tab === 'tags') renderTagsManager();
-  if (tab === 'files') initFileBrowser();
-  if (tab === 'midi' && typeof loadMidiFiles === 'function' && !_midiLoaded) loadMidiFiles();
-  if (tab === 'settings') { refreshSettingsUI(); if (typeof renderCacheStats === 'function') renderCacheStats(); }
+  for (const t of _tabPanelIds) {
+    _tabPanels[t]?.classList.toggle('active', t === tab);
+  }
   prefs.setItem('activeTab', tab);
+  // Defer heavy tab-specific loads so the browser paints the tab switch first.
+  requestAnimationFrame(() => {
+    if (tab === 'visualizer' && typeof startVisualizer === 'function') startVisualizer();
+    if (tab === 'walkers' && typeof startWalkerPolling === 'function') startWalkerPolling();
+    if (tab === 'history') loadHistory();
+    if (tab === 'favorites') renderFavorites();
+    if (tab === 'notes') renderNotesTab();
+    if (tab === 'tags') renderTagsManager();
+    if (tab === 'files') initFileBrowser();
+    if (tab === 'midi' && typeof loadMidiFiles === 'function' && !_midiLoaded) loadMidiFiles();
+    if (tab === 'settings') { refreshSettingsUI(); if (typeof renderCacheStats === 'function') renderCacheStats(); }
+  });
 }
 
 // ── O(1) lookup by path for large arrays ──
