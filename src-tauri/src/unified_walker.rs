@@ -340,6 +340,7 @@ pub fn walk_unified(
         .build()
         .unwrap();
 
+    let tcc_denied: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
     std::thread::spawn(move || {
         pool.install(|| {
             union.par_iter().for_each(|root| {
@@ -348,7 +349,7 @@ pub fn walk_unified(
                 }
                 walk_dir_parallel(
                     root, 0, &visited, &tx, &audio_f2, &daw_f2, &preset_f2, &pdf_f2, batch_size,
-                    &stop2, &spec, &active,
+                    &stop2, &spec, &active, &tcc_denied,
                 );
             });
         });
@@ -462,6 +463,16 @@ fn walk_dir_parallel(
     let entries: Vec<BulkEntry> = match read_dir_bulk(dir) {
         Ok(e) => e,
         Err(e) => {
+            // EPERM (os error 1) on macOS = TCC denial — retrying is futile,
+            // the user must grant access in System Settings → Privacy & Security.
+            if e.raw_os_error() == Some(1) {
+                crate::write_app_log(format!(
+                    "SCAN TCC DENIED — unified | {} | {} \
+                     (grant Full Disk Access or Files and Folders permission)",
+                    dir.display(), e,
+                ));
+                return;
+            }
             if is_net {
                 crate::write_app_log(format!(
                     "SCAN NETWORK RETRY — unified | {} | first error: {} | retrying in 50ms",

@@ -431,6 +431,7 @@
     .settings-container {
       columns: 1;
       column-gap: 3px;
+      column-fill: balance;
       padding: 6px 6px 40px;
     }
 
@@ -5554,6 +5555,158 @@
           </div>
         </div>
 
+        <div class="settings-section" data-section="scan-behavior">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_scan_behavior">Scan Behavior</span></h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.default_plugin_type_filter">Default Plugin Type Filter</span>
+              <span class="settings-desc" data-i18n="ui.sd.plugin_type_to_show_by_default_after_scanning">Plugin type to show by default after scanning</span>
+            </div>
+            <div class="settings-control">
+              <select class="settings-select" id="settingDefaultTypeFilter" data-action="settingDefaultTypeFilter" title="Default plugin type filter on launch" data-i18n-title="ui.tt.default_plugin_type_filter_on_launch">
+                <option value="all" data-i18n="ui.opt.all_types">All Types</option>
+                <option value="VST2" data-i18n="ui.opt.vst2">VST2</option>
+                <option value="VST3" data-i18n="ui.opt.vst3">VST3</option>
+                <option value="AU" data-i18n="ui.opt.audio_units">Audio Units</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.auto_scan_on_launch">Auto-Scan on Launch</span>
+              <span class="settings-desc" data-i18n="ui.sd.automatically_scan_for_plugins_when_the_app_starts">Automatically scan for plugins when the app starts</span>
+            </div>
+            <div class="settings-control">
+              <button class="settings-toggle" id="settingAutoScan" data-action="settingToggleAutoScan" title="Automatically scan on app launch" data-i18n-title="ui.tt.automatically_scan_on_app_launch">
+                <span class="settings-toggle-label" id="settingAutoScanLabel">Off</span>
+                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.folder_watch_auto_scan">Folder Watch (Auto-Scan)</span>
+              <span class="settings-desc" data-i18n="ui.sd.watch_scan_directories_for_new_changed_files_and_a">Watch scan directories for new/changed files and auto-index them</span>
+            </div>
+            <div class="settings-control">
+              <button class="settings-toggle" id="settingFolderWatch" data-action="settingToggleFolderWatch" title="Watch directories for filesystem changes" data-i18n-title="ui.tt.watch_directories_for_filesystem_changes">
+                <span class="settings-toggle-label" id="settingFolderWatchLabel">Off</span>
+                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.auto_check_updates_on_launch">Auto-Check Updates on Launch</span>
+              <span class="settings-desc" data-i18n="ui.sd.automatically_check_for_plugin_updates_after_scann">Automatically check for plugin updates after scanning</span>
+            </div>
+            <div class="settings-control">
+              <button class="settings-toggle" id="settingAutoUpdate" data-action="settingToggleAutoUpdate" title="Automatically check KVR for updates after scanning" data-i18n-title="ui.tt.automatically_check_kvr_for_updates_after_scanning">
+                <span class="settings-toggle-label" id="settingAutoUpdateLabel">Off</span>
+                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section" data-section="exclusions">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_exclusions">Exclusions</span></h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.directory_blacklist">Directory Blacklist</span>
+              <span class="settings-desc" data-i18n="ui.sd.directory_names_to_skip_during_scans_one_per_line_">Directory names to skip during scans (one per line). Applies to all scanners.</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingBlacklist" rows="4" placeholder="#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;System Volume Information&#10;node_modules&#10;.git&#10;.Trash" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Directory names to exclude from scanning, one per line" data-i18n-placeholder="ui.ph.recycle_10_eadir_10_spotlight_v100_10_recycle_bin_" data-i18n-title="ui.tt.directory_names_to_exclude_from_scanning_one_per_l"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveBlacklist" style="margin-top: 6px;" title="Save directory blacklist" data-i18n-title="ui.tt.save_directory_blacklist" data-i18n="ui.btn.save">Save</button>
+              <span class="settings-saved-msg" id="savedMsgBlacklist"></span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.max_recently_played">Max Recently Played</span>
+              <span class="settings-desc" data-i18n="ui.sd.number_of_tracks_to_keep_in_the_play_history">Number of tracks to keep in the play history</span>
+            </div>
+            <div class="settings-control">
+              <div class="settings-range-wrap">
+                <input type="range" class="settings-range" id="settingMaxRecent" min="20" max="500" step="10" value="50" data-action="settingMaxRecent" title="Maximum number of recently played tracks to remember" data-i18n-title="ui.tt.maximum_number_of_recently_played_tracks_to_rememb">
+                <span class="settings-range-value" id="settingMaxRecentValue">50</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section" data-section="fuzzy-search">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_fuzzy_search">Fuzzy Search</span></h2>
+          <div style="margin-bottom:8px;">
+            <h3 style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;"><span data-i18n="ui.settings.fuzzy_search_weights_heading">Fuzzy search weights</span></h3>
+            <div id="fzfSettingsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;"></div>
+            <button class="btn btn-secondary btn-settings-action" data-action="resetFzfParams" title="Reset all fzf parameters to defaults" style="margin-top:4px;font-size:10px;" data-i18n-title="ui.tt.reset_all_fzf_parameters_to_defaults" data-i18n="ui.btn.reset_fzf">Reset fzf</button>
+          </div>
+        </div>
+
+        <div class="settings-section" data-section="sorting">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_sorting">Sorting</span></h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.default_plugin_sort">Default Plugin Sort</span>
+              <span class="settings-desc" data-i18n="ui.sd.how_plugins_are_ordered_after_scanning">How plugins are ordered after scanning</span>
+            </div>
+            <div class="settings-control">
+              <select class="settings-select" id="settingPluginSort" data-action="settingPluginSort" title="Default sort order for plugins" data-i18n-title="ui.tt.default_sort_order_for_plugins">
+                <option value="name-asc" data-i18n="ui.opt.name_a_z">Name A-Z</option>
+                <option value="name-desc" data-i18n="ui.opt.name_z_a">Name Z-A</option>
+                <option value="type" data-i18n="ui.opt.by_type">By Type</option>
+                <option value="manufacturer" data-i18n="ui.opt.by_manufacturer">By Manufacturer</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.default_audio_sort">Default Audio Sort</span>
+              <span class="settings-desc" data-i18n="ui.sd.how_audio_samples_are_ordered_after_scanning">How audio samples are ordered after scanning</span>
+            </div>
+            <div class="settings-control">
+              <select class="settings-select" id="settingAudioSort" data-action="settingAudioSort" title="Default sort order for audio samples" data-i18n-title="ui.tt.default_sort_order_for_audio_samples">
+                <option value="name" data-i18n="ui.opt.name">Name</option>
+                <option value="format" data-i18n="ui.opt.format">Format</option>
+                <option value="size" data-i18n="ui.opt.size">Size</option>
+                <option value="modified" data-i18n="ui.opt.modified_date">Modified Date</option>
+                <option value="directory" data-i18n="ui.opt.path">Path</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.default_daw_sort">Default DAW Sort</span>
+              <span class="settings-desc" data-i18n="ui.sd.how_daw_projects_are_ordered_after_scanning">How DAW projects are ordered after scanning</span>
+            </div>
+            <div class="settings-control">
+              <select class="settings-select" id="settingDawSort" data-action="settingDawSort" title="Default sort order for DAW projects" data-i18n-title="ui.tt.default_sort_order_for_daw_projects">
+                <option value="name" data-i18n="ui.opt.name">Name</option>
+                <option value="daw" data-i18n="ui.opt.daw">DAW</option>
+                <option value="format" data-i18n="ui.opt.format">Format</option>
+                <option value="size" data-i18n="ui.opt.size">Size</option>
+                <option value="modified" data-i18n="ui.opt.modified_date">Modified Date</option>
+                <option value="directory" data-i18n="ui.opt.path">Path</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section" data-section="about">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_about">About</span></h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.audio_haxor">AUDIO_HAXOR</span>
+              <span class="settings-desc">
+                <span id="settingsAboutVersionLine"></span>
+                <a href="#" data-action="openUpdate" data-url="https://github.com/MenkeTechnologies/Audio-Haxor" style="color: var(--cyan); text-decoration: none;" title="Open AUDIO_HAXOR GitHub repository in browser" data-i18n-title="ui.tt.open_audio_haxor_github_repository_in_browser">&#128279; GitHub</a>
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div class="settings-section" data-section="colorscheme">
           <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_color_scheme">Color Scheme</span></h2>
           <div class="scheme-grid" id="schemeGrid"></div>
@@ -5648,124 +5801,6 @@
           </div>
         </div>
 
-        <div class="settings-section" data-section="scanning">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_scan_directories">Scan Directories</span></h2>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.plugin_scan_directories">Plugin Scan Directories</span>
-              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_plugins_one_per">Additional directories to scan for plugins (one per line)</span>
-            </div>
-            <div class="settings-control">
-              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for VST/AU plugins, one path per line" data-i18n-placeholder="ui.ph.path_to_plugins_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_vst_au_plugins_"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingCustomDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="saveCustomDirs" style="margin-top: 6px;" title="Save custom plugin scan directories" data-i18n-title="ui.tt.save_custom_plugin_scan_directories" data-i18n="ui.btn.save">Save</button>
-              <span class="settings-saved-msg" id="savedMsgCustomDirs"></span>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.audio_scan_directories">Audio Scan Directories</span>
-              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_audio_samples_o">Additional directories to scan for audio samples (one per line)</span>
-            </div>
-            <div class="settings-control">
-              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for audio samples, one path per line" data-i18n-placeholder="ui.ph.path_to_samples_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_audio_samples_o"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingAudioScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="saveAudioScanDirs" style="margin-top: 6px;" title="Save custom audio sample scan directories" data-i18n-title="ui.tt.save_custom_audio_sample_scan_directories" data-i18n="ui.btn.save">Save</button>
-              <span class="settings-saved-msg" id="savedMsgAudioScanDirs"></span>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.daw_scan_directories">DAW Scan Directories</span>
-              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_daw_project_fil">Additional directories to scan for DAW project files (one per line)</span>
-            </div>
-            <div class="settings-control">
-              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for DAW project files, one path per line" data-i18n-placeholder="ui.ph.path_to_projects_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_daw_project_fil"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingDawScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="saveDawScanDirs" style="margin-top: 6px;" title="Save custom DAW project scan directories" data-i18n-title="ui.tt.save_custom_daw_project_scan_directories" data-i18n="ui.btn.save">Save</button>
-              <span class="settings-saved-msg" id="savedMsgDawScanDirs"></span>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.preset_scan_directories">Preset Scan Directories</span>
-              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_plugin_presets_">Additional directories to scan for plugin presets (one per line)</span>
-            </div>
-            <div class="settings-control">
-              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for plugin presets, one path per line" data-i18n-placeholder="ui.ph.path_to_presets_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_plugin_presets_"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPresetScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="savePresetScanDirs" style="margin-top: 6px;" title="Save custom preset scan directories" data-i18n-title="ui.tt.save_custom_preset_scan_directories" data-i18n="ui.btn.save">Save</button>
-              <span class="settings-saved-msg" id="savedMsgPresetScanDirs"></span>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.pdf_scan_directories">PDF Scan Directories</span>
-              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_pdf_documents">Additional directories to scan for PDF documents (one per line)</span>
-            </div>
-            <div class="settings-control">
-              <textarea class="settings-textarea" id="settingPdfScanDirs" rows="3" placeholder="/path/to/pdfs&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for PDF documents, one path per line" data-i18n-placeholder="ui.ph.path_to_pdfs_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_pdf_documents"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPdfScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
-              <button class="btn btn-secondary btn-settings-action" data-action="savePdfScanDirs" style="margin-top: 6px;" title="Save custom PDF scan directories" data-i18n-title="ui.tt.save_custom_pdf_scan_directories" data-i18n="ui.btn.save">Save</button>
-              <span class="settings-saved-msg" id="savedMsgPdfScanDirs"></span>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section" data-section="scan-behavior">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_scan_behavior">Scan Behavior</span></h2>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.default_plugin_type_filter">Default Plugin Type Filter</span>
-              <span class="settings-desc" data-i18n="ui.sd.plugin_type_to_show_by_default_after_scanning">Plugin type to show by default after scanning</span>
-            </div>
-            <div class="settings-control">
-              <select class="settings-select" id="settingDefaultTypeFilter" data-action="settingDefaultTypeFilter" title="Default plugin type filter on launch" data-i18n-title="ui.tt.default_plugin_type_filter_on_launch">
-                <option value="all" data-i18n="ui.opt.all_types">All Types</option>
-                <option value="VST2" data-i18n="ui.opt.vst2">VST2</option>
-                <option value="VST3" data-i18n="ui.opt.vst3">VST3</option>
-                <option value="AU" data-i18n="ui.opt.audio_units">Audio Units</option>
-              </select>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.auto_scan_on_launch">Auto-Scan on Launch</span>
-              <span class="settings-desc" data-i18n="ui.sd.automatically_scan_for_plugins_when_the_app_starts">Automatically scan for plugins when the app starts</span>
-            </div>
-            <div class="settings-control">
-              <button class="settings-toggle" id="settingAutoScan" data-action="settingToggleAutoScan" title="Automatically scan on app launch" data-i18n-title="ui.tt.automatically_scan_on_app_launch">
-                <span class="settings-toggle-label" id="settingAutoScanLabel">Off</span>
-                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-              </button>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.folder_watch_auto_scan">Folder Watch (Auto-Scan)</span>
-              <span class="settings-desc" data-i18n="ui.sd.watch_scan_directories_for_new_changed_files_and_a">Watch scan directories for new/changed files and auto-index them</span>
-            </div>
-            <div class="settings-control">
-              <button class="settings-toggle" id="settingFolderWatch" data-action="settingToggleFolderWatch" title="Watch directories for filesystem changes" data-i18n-title="ui.tt.watch_directories_for_filesystem_changes">
-                <span class="settings-toggle-label" id="settingFolderWatchLabel">Off</span>
-                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-              </button>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.auto_check_updates_on_launch">Auto-Check Updates on Launch</span>
-              <span class="settings-desc" data-i18n="ui.sd.automatically_check_for_plugin_updates_after_scann">Automatically check for plugin updates after scanning</span>
-            </div>
-            <div class="settings-control">
-              <button class="settings-toggle" id="settingAutoUpdate" data-action="settingToggleAutoUpdate" title="Automatically check KVR for updates after scanning" data-i18n-title="ui.tt.automatically_check_kvr_for_updates_after_scanning">
-                <span class="settings-toggle-label" id="settingAutoUpdateLabel">Off</span>
-                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-              </button>
-            </div>
-          </div>
-        </div>
-
         <div class="settings-section" data-section="playback">
           <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_playback">Playback</span></h2>
           <div class="settings-row">
@@ -5830,29 +5865,161 @@
           </div>
         </div>
 
-        <div class="settings-section" data-section="exclusions">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_exclusions">Exclusions</span></h2>
+        <div class="settings-section" data-section="visualizer-settings">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_visualizer">Visualizer</span></h2>
           <div class="settings-row">
             <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.directory_blacklist">Directory Blacklist</span>
-              <span class="settings-desc" data-i18n="ui.sd.directory_names_to_skip_during_scans_one_per_line_">Directory names to skip during scans (one per line). Applies to all scanners.</span>
+              <span class="settings-title" data-i18n="ui.st.visualizer_fps">Visualizer FPS</span>
+              <span class="settings-desc" data-i18n="ui.sd.frame_rate_cap_for_the_visualizer_tab_lower_less_c">Frame rate cap for the visualizer tab (lower = less CPU)</span>
             </div>
             <div class="settings-control">
-              <textarea class="settings-textarea" id="settingBlacklist" rows="4" placeholder="#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;System Volume Information&#10;node_modules&#10;.git&#10;.Trash" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Directory names to exclude from scanning, one per line" data-i18n-placeholder="ui.ph.recycle_10_eadir_10_spotlight_v100_10_recycle_bin_" data-i18n-title="ui.tt.directory_names_to_exclude_from_scanning_one_per_l"></textarea>
-              <button class="btn btn-secondary btn-settings-action" data-action="saveBlacklist" style="margin-top: 6px;" title="Save directory blacklist" data-i18n-title="ui.tt.save_directory_blacklist" data-i18n="ui.btn.save">Save</button>
-              <span class="settings-saved-msg" id="savedMsgBlacklist"></span>
+              <div class="settings-range-wrap">
+                <input type="range" class="settings-range" id="settingVizFps" min="10" max="60" step="5" value="30" data-action="settingVizFps" title="Visualizer frame rate cap" data-i18n-title="ui.tt.visualizer_frame_rate_cap">
+                <span class="settings-range-value" id="settingVizFpsValue">30</span>
+              </div>
             </div>
           </div>
           <div class="settings-row">
             <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.max_recently_played">Max Recently Played</span>
-              <span class="settings-desc" data-i18n="ui.sd.number_of_tracks_to_keep_in_the_play_history">Number of tracks to keep in the play history</span>
+              <span class="settings-title" data-i18n="ui.st.waveform_cache_size">Waveform Cache Size</span>
+              <span class="settings-desc" data-i18n="ui.sd.max_cached_waveforms_in_memory_higher_more_ram">Max cached waveforms in memory (higher = more RAM)</span>
             </div>
             <div class="settings-control">
               <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingMaxRecent" min="20" max="500" step="10" value="50" data-action="settingMaxRecent" title="Maximum number of recently played tracks to remember" data-i18n-title="ui.tt.maximum_number_of_recently_played_tracks_to_rememb">
-                <span class="settings-range-value" id="settingMaxRecentValue">50</span>
+                <input type="range" class="settings-range" id="settingWfCacheMax" min="100" max="2000" step="100" value="500" data-action="settingWfCacheMax" title="Maximum number of cached waveforms" data-i18n-title="ui.tt.maximum_number_of_cached_waveforms">
+                <span class="settings-range-value" id="settingWfCacheMaxValue">500</span>
               </div>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.analysis_pause_timeout">Analysis Pause Timeout</span>
+              <span class="settings-desc" data-i18n="ui.sd.seconds_of_idle_before_background_bpm_key_lufs_ana">Seconds of idle before background BPM/Key/LUFS analysis resumes</span>
+            </div>
+            <div class="settings-control">
+              <div class="settings-range-wrap">
+                <input type="range" class="settings-range" id="settingAnalysisPause" min="1" max="10" step="1" value="3" data-action="settingAnalysisPause" title="Seconds to wait before resuming background analysis" data-i18n-title="ui.tt.seconds_to_wait_before_resuming_background_analysi">
+                <span class="settings-range-value" id="settingAnalysisPauseValue">3</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section" data-section="storage">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_history">History</span></h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.clear_all_history">Clear All History</span>
+              <span class="settings-desc" data-i18n="ui.sd.remove_all_plugin_audio_and_daw_scan_history">Remove all plugin, audio, and DAW scan history</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-stop btn-settings-action" data-action="settingClearAllHistory" title="Delete all scan history data" data-i18n-title="ui.tt.delete_all_scan_history_data" data-i18n="ui.btn.clear">Clear</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.clear_kvr_cache">Clear KVR Cache</span>
+              <span class="settings-desc" data-i18n="ui.sd.remove_cached_version_lookups_next_check_will_re_f">Remove cached version lookups — next check will re-fetch all</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-stop btn-settings-action" data-action="settingClearKvrCache" title="Clear cached KVR plugin version data" data-i18n-title="ui.tt.clear_cached_kvr_plugin_version_data" data-i18n="ui.btn.clear">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section" data-section="caches">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_database_caches">Database Caches</span></h2>
+          <div id="cacheStatsGrid" style="font-size:11px;margin-bottom:8px;"></div>
+          <div class="settings-row settings-cache-bpm-wrap">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.bpm_key_lufs_analysis">BPM/Key/LUFS analysis</span>
+              <span class="settings-desc" data-i18n="ui.sd.bpm_key_lufs_analysis">Analyze files that do not have BPM, key, and loudness yet — same background job as idle analysis</span>
+            </div>
+            <div class="settings-cache-bpm-btns">
+              <button class="btn btn-secondary btn-settings-action" data-action="runBpmKeyLufsAnalysis" title="Start or resume background BPM/Key/LUFS analysis for unanalyzed files" style="font-size:10px;" data-i18n-title="ui.tt.run_bpm_key_lufs_analysis" data-i18n="ui.btn.run_bpm_key_lufs_analysis">Run analysis</button>
+              <button class="btn btn-stop btn-settings-action" data-action="stopBpmKeyLufsAnalysis" title="Stop background BPM/Key/LUFS analysis (after the current batch finishes)" style="font-size:10px;" data-i18n-title="ui.tt.stop_bpm_key_lufs_analysis" data-i18n="ui.btn.stop_bpm_key_lufs_analysis">Stop analysis</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-stop btn-settings-action" data-action="settingClearAnalysisCache" title="Clear all caches at once" style="font-size:10px;" data-i18n-title="ui.tt.clear_all_caches_at_once" data-i18n="ui.btn.clear_all_caches">Clear All Caches</button>
+            <button class="btn btn-stop btn-settings-action" data-action="settingClearAllDatabases" title="Clear all scan history tables (plugins, audio, DAW, presets, MIDI, PDF)" style="font-size:10px;" data-i18n-title="ui.tt.clear_all_databases" data-i18n="ui.btn.clear_all_databases">Clear All Databases</button>
+            <button class="btn btn-secondary btn-settings-action" data-action="refreshCacheStats" title="Refresh cache stats" style="font-size:10px;" data-i18n-title="ui.tt.refresh_cache_stats" data-i18n="ui.btn.refresh">Refresh</button>
+          </div>
+        </div>
+
+        <div class="settings-section" data-section="danger-zone">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_danger_zone">Danger Zone</span></h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.reset_all_scans">Reset All Scans</span>
+              <span class="settings-desc" data-i18n="ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_">Wipe all scan results, history, and KVR cache. Start completely fresh</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-stop btn-settings-action" data-action="resetAllScans" title="Clear all data and return to initial state" data-i18n-title="ui.tt.clear_all_data_and_return_to_initial_state" data-i18n="ui.btn.reset_all">Reset All</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section" data-section="scanning">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_scan_directories">Scan Directories</span></h2>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.plugin_scan_directories">Plugin Scan Directories</span>
+              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_plugins_one_per">Additional directories to scan for plugins (one per line)</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingCustomDirs" rows="3" placeholder="/path/to/plugins&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for VST/AU plugins, one path per line" data-i18n-placeholder="ui.ph.path_to_plugins_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_vst_au_plugins_"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingCustomDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveCustomDirs" style="margin-top: 6px;" title="Save custom plugin scan directories" data-i18n-title="ui.tt.save_custom_plugin_scan_directories" data-i18n="ui.btn.save">Save</button>
+              <span class="settings-saved-msg" id="savedMsgCustomDirs"></span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.audio_scan_directories">Audio Scan Directories</span>
+              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_audio_samples_o">Additional directories to scan for audio samples (one per line)</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingAudioScanDirs" rows="3" placeholder="/path/to/samples&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for audio samples, one path per line" data-i18n-placeholder="ui.ph.path_to_samples_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_audio_samples_o"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingAudioScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveAudioScanDirs" style="margin-top: 6px;" title="Save custom audio sample scan directories" data-i18n-title="ui.tt.save_custom_audio_sample_scan_directories" data-i18n="ui.btn.save">Save</button>
+              <span class="settings-saved-msg" id="savedMsgAudioScanDirs"></span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.daw_scan_directories">DAW Scan Directories</span>
+              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_daw_project_fil">Additional directories to scan for DAW project files (one per line)</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingDawScanDirs" rows="3" placeholder="/path/to/projects&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for DAW project files, one path per line" data-i18n-placeholder="ui.ph.path_to_projects_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_daw_project_fil"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingDawScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="saveDawScanDirs" style="margin-top: 6px;" title="Save custom DAW project scan directories" data-i18n-title="ui.tt.save_custom_daw_project_scan_directories" data-i18n="ui.btn.save">Save</button>
+              <span class="settings-saved-msg" id="savedMsgDawScanDirs"></span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.preset_scan_directories">Preset Scan Directories</span>
+              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_plugin_presets_">Additional directories to scan for plugin presets (one per line)</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingPresetScanDirs" rows="3" placeholder="/path/to/presets&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for plugin presets, one path per line" data-i18n-placeholder="ui.ph.path_to_presets_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_plugin_presets_"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPresetScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="savePresetScanDirs" style="margin-top: 6px;" title="Save custom preset scan directories" data-i18n-title="ui.tt.save_custom_preset_scan_directories" data-i18n="ui.btn.save">Save</button>
+              <span class="settings-saved-msg" id="savedMsgPresetScanDirs"></span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.pdf_scan_directories">PDF Scan Directories</span>
+              <span class="settings-desc" data-i18n="ui.sd.additional_directories_to_scan_for_pdf_documents">Additional directories to scan for PDF documents (one per line)</span>
+            </div>
+            <div class="settings-control">
+              <textarea class="settings-textarea" id="settingPdfScanDirs" rows="3" placeholder="/path/to/pdfs&#10;/another/path" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Additional directories to scan for PDF documents, one path per line" data-i18n-placeholder="ui.ph.path_to_pdfs_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_pdf_documents"></textarea>
+              <button class="btn btn-secondary btn-settings-action" data-action="browseDir" data-target="settingPdfScanDirs" style="margin-top: 6px;" title="Browse for folder (grants macOS access)" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access" data-i18n="ui.btn.browse">Browse</button>
+              <button class="btn btn-secondary btn-settings-action" data-action="savePdfScanDirs" style="margin-top: 6px;" title="Save custom PDF scan directories" data-i18n-title="ui.tt.save_custom_pdf_scan_directories" data-i18n="ui.btn.save">Save</button>
+              <span class="settings-saved-msg" id="savedMsgPdfScanDirs"></span>
             </div>
           </div>
         </div>
@@ -5933,128 +6100,6 @@
           </div>
         </div>
 
-        <div class="settings-section" data-section="visualizer-settings">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_visualizer">Visualizer</span></h2>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.visualizer_fps">Visualizer FPS</span>
-              <span class="settings-desc" data-i18n="ui.sd.frame_rate_cap_for_the_visualizer_tab_lower_less_c">Frame rate cap for the visualizer tab (lower = less CPU)</span>
-            </div>
-            <div class="settings-control">
-              <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingVizFps" min="10" max="60" step="5" value="30" data-action="settingVizFps" title="Visualizer frame rate cap" data-i18n-title="ui.tt.visualizer_frame_rate_cap">
-                <span class="settings-range-value" id="settingVizFpsValue">30</span>
-              </div>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.waveform_cache_size">Waveform Cache Size</span>
-              <span class="settings-desc" data-i18n="ui.sd.max_cached_waveforms_in_memory_higher_more_ram">Max cached waveforms in memory (higher = more RAM)</span>
-            </div>
-            <div class="settings-control">
-              <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingWfCacheMax" min="100" max="2000" step="100" value="500" data-action="settingWfCacheMax" title="Maximum number of cached waveforms" data-i18n-title="ui.tt.maximum_number_of_cached_waveforms">
-                <span class="settings-range-value" id="settingWfCacheMaxValue">500</span>
-              </div>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.analysis_pause_timeout">Analysis Pause Timeout</span>
-              <span class="settings-desc" data-i18n="ui.sd.seconds_of_idle_before_background_bpm_key_lufs_ana">Seconds of idle before background BPM/Key/LUFS analysis resumes</span>
-            </div>
-            <div class="settings-control">
-              <div class="settings-range-wrap">
-                <input type="range" class="settings-range" id="settingAnalysisPause" min="1" max="10" step="1" value="3" data-action="settingAnalysisPause" title="Seconds to wait before resuming background analysis" data-i18n-title="ui.tt.seconds_to_wait_before_resuming_background_analysi">
-                <span class="settings-range-value" id="settingAnalysisPauseValue">3</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section" data-section="system-info" style="display:none;">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_system_info">System Info</span></h2>
-          <div id="settingPerfInfo" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);line-height:1.7;"></div>
-        </div>
-
-        <div class="settings-section" data-section="app-info" style="display:none;">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_app_info">App Info</span></h2>
-          <div id="settingAppInfo" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);line-height:1.7;"></div>
-        </div>
-
-        <div class="settings-section" data-section="shortcuts">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_keybindings_amp_search">Keybindings &amp; Search</span></h2>
-          <div style="margin-bottom:8px;">
-            <h3 style="font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;"><span data-i18n="ui.settings.fuzzy_search_weights_heading">Fuzzy search weights</span></h3>
-            <div id="fzfSettingsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;"></div>
-            <button class="btn btn-secondary btn-settings-action" data-action="resetFzfParams" title="Reset all fzf parameters to defaults" style="margin-top:4px;font-size:10px;" data-i18n-title="ui.tt.reset_all_fzf_parameters_to_defaults" data-i18n="ui.btn.reset_fzf">Reset fzf</button>
-          </div>
-          <div class="search-box" style="max-width:400px;margin-bottom:8px;">
-            <span class="search-icon">&#128269;</span>
-            <input type="text" id="shortcutsFilter" placeholder="Fuzzy search shortcuts..." data-action="filterShortcuts" title="Fuzzy filter keyboard shortcuts by name or key" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.fuzzy_search_shortcuts" data-i18n-title="ui.tt.fuzzy_filter_keyboard_shortcuts_by_name_or_key">
-          </div>
-          <div id="shortcutsList"></div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.reset_all_shortcuts">Reset All Shortcuts</span>
-              <span class="settings-desc" data-i18n="ui.sd.restore_default_keyboard_shortcuts">Restore default keyboard shortcuts</span>
-            </div>
-            <div class="settings-control">
-              <button class="btn btn-secondary btn-settings-action" data-action="resetShortcuts" title="Reset all keyboard shortcuts to defaults" data-i18n-title="ui.tt.reset_all_keyboard_shortcuts_to_defaults" data-i18n="ui.btn.reset">Reset</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section" data-section="sorting">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_sorting">Sorting</span></h2>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.default_plugin_sort">Default Plugin Sort</span>
-              <span class="settings-desc" data-i18n="ui.sd.how_plugins_are_ordered_after_scanning">How plugins are ordered after scanning</span>
-            </div>
-            <div class="settings-control">
-              <select class="settings-select" id="settingPluginSort" data-action="settingPluginSort" title="Default sort order for plugins" data-i18n-title="ui.tt.default_sort_order_for_plugins">
-                <option value="name-asc" data-i18n="ui.opt.name_a_z">Name A-Z</option>
-                <option value="name-desc" data-i18n="ui.opt.name_z_a">Name Z-A</option>
-                <option value="type" data-i18n="ui.opt.by_type">By Type</option>
-                <option value="manufacturer" data-i18n="ui.opt.by_manufacturer">By Manufacturer</option>
-              </select>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.default_audio_sort">Default Audio Sort</span>
-              <span class="settings-desc" data-i18n="ui.sd.how_audio_samples_are_ordered_after_scanning">How audio samples are ordered after scanning</span>
-            </div>
-            <div class="settings-control">
-              <select class="settings-select" id="settingAudioSort" data-action="settingAudioSort" title="Default sort order for audio samples" data-i18n-title="ui.tt.default_sort_order_for_audio_samples">
-                <option value="name" data-i18n="ui.opt.name">Name</option>
-                <option value="format" data-i18n="ui.opt.format">Format</option>
-                <option value="size" data-i18n="ui.opt.size">Size</option>
-                <option value="modified" data-i18n="ui.opt.modified_date">Modified Date</option>
-                <option value="directory" data-i18n="ui.opt.path">Path</option>
-              </select>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.default_daw_sort">Default DAW Sort</span>
-              <span class="settings-desc" data-i18n="ui.sd.how_daw_projects_are_ordered_after_scanning">How DAW projects are ordered after scanning</span>
-            </div>
-            <div class="settings-control">
-              <select class="settings-select" id="settingDawSort" data-action="settingDawSort" title="Default sort order for DAW projects" data-i18n-title="ui.tt.default_sort_order_for_daw_projects">
-                <option value="name" data-i18n="ui.opt.name">Name</option>
-                <option value="daw" data-i18n="ui.opt.daw">DAW</option>
-                <option value="format" data-i18n="ui.opt.format">Format</option>
-                <option value="size" data-i18n="ui.opt.size">Size</option>
-                <option value="modified" data-i18n="ui.opt.modified_date">Modified Date</option>
-                <option value="directory" data-i18n="ui.opt.path">Path</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
         <div class="settings-section" data-section="data">
           <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_reset_layout">Reset Layout</span></h2>
           <div class="settings-row">
@@ -6091,61 +6136,6 @@
             </div>
             <div class="settings-control">
               <button class="btn btn-secondary btn-settings-action" data-action="settingResetColumns" title="Reset all column widths to default" data-i18n-title="ui.tt.reset_all_column_widths_to_default" data-i18n="ui.btn.reset">Reset</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section" data-section="storage">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_history">History</span></h2>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.clear_all_history">Clear All History</span>
-              <span class="settings-desc" data-i18n="ui.sd.remove_all_plugin_audio_and_daw_scan_history">Remove all plugin, audio, and DAW scan history</span>
-            </div>
-            <div class="settings-control">
-              <button class="btn btn-stop btn-settings-action" data-action="settingClearAllHistory" title="Delete all scan history data" data-i18n-title="ui.tt.delete_all_scan_history_data" data-i18n="ui.btn.clear">Clear</button>
-            </div>
-          </div>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.clear_kvr_cache">Clear KVR Cache</span>
-              <span class="settings-desc" data-i18n="ui.sd.remove_cached_version_lookups_next_check_will_re_f">Remove cached version lookups — next check will re-fetch all</span>
-            </div>
-            <div class="settings-control">
-              <button class="btn btn-stop btn-settings-action" data-action="settingClearKvrCache" title="Clear cached KVR plugin version data" data-i18n-title="ui.tt.clear_cached_kvr_plugin_version_data" data-i18n="ui.btn.clear">Clear</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section" data-section="caches">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_database_caches">Database Caches</span></h2>
-          <div id="cacheStatsGrid" style="font-size:11px;margin-bottom:8px;"></div>
-          <div class="settings-row settings-cache-bpm-wrap">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.bpm_key_lufs_analysis">BPM/Key/LUFS analysis</span>
-              <span class="settings-desc" data-i18n="ui.sd.bpm_key_lufs_analysis">Analyze files that do not have BPM, key, and loudness yet — same background job as idle analysis</span>
-            </div>
-            <div class="settings-cache-bpm-btns">
-              <button class="btn btn-secondary btn-settings-action" data-action="runBpmKeyLufsAnalysis" title="Start or resume background BPM/Key/LUFS analysis for unanalyzed files" style="font-size:10px;" data-i18n-title="ui.tt.run_bpm_key_lufs_analysis" data-i18n="ui.btn.run_bpm_key_lufs_analysis">Run analysis</button>
-              <button class="btn btn-stop btn-settings-action" data-action="stopBpmKeyLufsAnalysis" title="Stop background BPM/Key/LUFS analysis (after the current batch finishes)" style="font-size:10px;" data-i18n-title="ui.tt.stop_bpm_key_lufs_analysis" data-i18n="ui.btn.stop_bpm_key_lufs_analysis">Stop analysis</button>
-            </div>
-          </div>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-stop btn-settings-action" data-action="settingClearAnalysisCache" title="Clear all caches at once" style="font-size:10px;" data-i18n-title="ui.tt.clear_all_caches_at_once" data-i18n="ui.btn.clear_all_caches">Clear All Caches</button>
-            <button class="btn btn-stop btn-settings-action" data-action="settingClearAllDatabases" title="Clear all scan history tables (plugins, audio, DAW, presets, MIDI, PDF)" style="font-size:10px;" data-i18n-title="ui.tt.clear_all_databases" data-i18n="ui.btn.clear_all_databases">Clear All Databases</button>
-            <button class="btn btn-secondary btn-settings-action" data-action="refreshCacheStats" title="Refresh cache stats" style="font-size:10px;" data-i18n-title="ui.tt.refresh_cache_stats" data-i18n="ui.btn.refresh">Refresh</button>
-          </div>
-        </div>
-
-        <div class="settings-section" data-section="danger-zone">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_danger_zone">Danger Zone</span></h2>
-          <div class="settings-row">
-            <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.reset_all_scans">Reset All Scans</span>
-              <span class="settings-desc" data-i18n="ui.sd.wipe_all_scan_results_history_and_kvr_cache_start_">Wipe all scan results, history, and KVR cache. Start completely fresh</span>
-            </div>
-            <div class="settings-control">
-              <button class="btn btn-stop btn-settings-action" data-action="resetAllScans" title="Clear all data and return to initial state" data-i18n-title="ui.tt.clear_all_data_and_return_to_initial_state" data-i18n="ui.btn.reset_all">Reset All</button>
             </div>
           </div>
         </div>
@@ -6193,17 +6183,32 @@
           </div>
         </div>
 
-        <div class="settings-section" data-section="about">
-          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_about">About</span></h2>
+        <div class="settings-section" data-section="shortcuts">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_keyboard_shortcuts">Keyboard Shortcuts</span></h2>
+          <div class="search-box" style="max-width:400px;margin-bottom:8px;">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" id="shortcutsFilter" placeholder="Fuzzy search shortcuts..." data-action="filterShortcuts" title="Fuzzy filter keyboard shortcuts by name or key" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ui.ph.fuzzy_search_shortcuts" data-i18n-title="ui.tt.fuzzy_filter_keyboard_shortcuts_by_name_or_key">
+          </div>
+          <div id="shortcutsList"></div>
           <div class="settings-row">
             <div class="settings-label">
-              <span class="settings-title" data-i18n="ui.st.audio_haxor">AUDIO_HAXOR</span>
-              <span class="settings-desc">
-                <span id="settingsAboutVersionLine"></span>
-                <a href="#" data-action="openUpdate" data-url="https://github.com/MenkeTechnologies/Audio-Haxor" style="color: var(--cyan); text-decoration: none;" title="Open AUDIO_HAXOR GitHub repository in browser" data-i18n-title="ui.tt.open_audio_haxor_github_repository_in_browser">&#128279; GitHub</a>
-              </span>
+              <span class="settings-title" data-i18n="ui.st.reset_all_shortcuts">Reset All Shortcuts</span>
+              <span class="settings-desc" data-i18n="ui.sd.restore_default_keyboard_shortcuts">Restore default keyboard shortcuts</span>
+            </div>
+            <div class="settings-control">
+              <button class="btn btn-secondary btn-settings-action" data-action="resetShortcuts" title="Reset all keyboard shortcuts to defaults" data-i18n-title="ui.tt.reset_all_keyboard_shortcuts_to_defaults" data-i18n="ui.btn.reset">Reset</button>
             </div>
           </div>
+        </div>
+
+        <div class="settings-section" data-section="system-info" style="display:none;">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_system_info">System Info</span></h2>
+          <div id="settingPerfInfo" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);line-height:1.7;"></div>
+        </div>
+
+        <div class="settings-section" data-section="app-info" style="display:none;">
+          <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_app_info">App Info</span></h2>
+          <div id="settingAppInfo" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);line-height:1.7;"></div>
         </div>
       </div>
     </div>

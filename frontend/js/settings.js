@@ -1663,7 +1663,7 @@ function initSettingsSectionDrag() {
 
   // Individual rows within sections are still draggable
   // Skip sections with dynamic JS content that breaks on clone/reinsert
-  const noDragSections = new Set(['colorscheme', 'shortcuts', 'system-info', 'app-info', 'caches']);
+  const noDragSections = new Set(['colorscheme', 'shortcuts', 'fuzzy-search', 'system-info', 'app-info', 'caches']);
   if (typeof initDragReorder === 'function') {
     container.querySelectorAll('.settings-section[data-section]').forEach(section => {
       if (noDragSections.has(section.dataset.section)) return;
@@ -1705,7 +1705,7 @@ function restoreSettingsSectionOrder() {
 function resetSettingsSectionOrder() {
   prefs.removeItem('settingsSectionOrder');
   const container = document.querySelector('.settings-container');
-  const defaultOrder = ['appearance', 'colorscheme', 'playback', 'scanning', 'scan-behavior', 'exclusions', 'sorting', 'performance', 'visualizer-settings', 'shortcuts', 'system-info', 'app-info', 'data', 'caches', 'storage', 'files', 'danger-zone', 'about'];
+  const defaultOrder = ['appearance', 'scan-behavior', 'exclusions', 'fuzzy-search', 'sorting', 'about', 'colorscheme', 'playback', 'visualizer-settings', 'storage', 'caches', 'danger-zone', 'scanning', 'performance', 'data', 'files', 'shortcuts', 'system-info', 'app-info'];
   const sectionMap = {};
   container.querySelectorAll('.settings-section[data-section]').forEach(s => {
     sectionMap[s.dataset.section] = s;
