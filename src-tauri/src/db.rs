@@ -215,6 +215,13 @@ pub struct CacheStat {
 /// Prefer the latest finalized audio scan; if none (e.g. streaming scan before parent row updated), use latest by timestamp.
 const ACTIVE_AUDIO_SCAN_ID_SQL: &str = "(SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1)";
 
+/// Latest DAW scan that has at least one `daw_projects` row. Empty scans remain in history but must not shadow prior results.
+/// Uses child-row presence (not `project_count`) so streaming scans still resolve after finalize quirks.
+const LATEST_DAW_SCAN_ID_SQL: &str = "\
+    SELECT s.id FROM daw_scans s \
+    WHERE EXISTS (SELECT 1 FROM daw_projects p WHERE p.scan_id = s.id) \
+    ORDER BY s.timestamp DESC LIMIT 1";
+
 // ── Generic paginated query result for plugins/DAW/presets ──
 
 #[derive(Debug, Serialize)]
@@ -1297,11 +1304,7 @@ impl Database {
         let sid = match scan_id {
             Some(id) => id.to_string(),
             None => conn
-                .query_row(
-                    "SELECT id FROM daw_scans ORDER BY timestamp DESC LIMIT 1",
-                    [],
-                    |row| row.get::<_, String>(0),
-                )
+                .query_row(LATEST_DAW_SCAN_ID_SQL, [], |row| row.get::<_, String>(0))
                 .optional()
                 .map_err(|e| e.to_string())?
                 .unwrap_or_default(),
@@ -1684,11 +1687,7 @@ impl Database {
     ) -> Result<DawQueryResult, String> {
         let conn = self.conn.lock().unwrap();
         let scan_id: String = conn
-            .query_row(
-                "SELECT id FROM daw_scans ORDER BY timestamp DESC LIMIT 1",
-                [],
-                |r| r.get(0),
-            )
+            .query_row(LATEST_DAW_SCAN_ID_SQL, [], |r| r.get(0))
             .optional()
             .map_err(|e| e.to_string())?
             .unwrap_or_default();
@@ -2429,11 +2428,7 @@ impl Database {
     pub fn get_latest_daw_scan(&self) -> Result<Option<DawScanSnapshot>, String> {
         let conn = self.conn.lock().unwrap();
         let id: Option<String> = conn
-            .query_row(
-                "SELECT id FROM daw_scans ORDER BY timestamp DESC LIMIT 1",
-                [],
-                |r| r.get(0),
-            )
+            .query_row(LATEST_DAW_SCAN_ID_SQL, [], |r| r.get(0))
             .optional()
             .map_err(|e| e.to_string())?;
         drop(conn);
@@ -6939,7 +6934,7 @@ mod tests {
 
     #[test]
     fn test_query_daw_empty_latest_scan_ignored() {
-        // Selecting the "latest" scan uses `WHERE project_count > 0` — a zero-result
+        // Latest scan is the newest scan with ≥1 `daw_projects` row — a zero-result
         // scan saved after a successful one must NOT clobber the header count.
         let db = test_db();
         db.save_daw_scan(&daw_snap(
