@@ -39,6 +39,7 @@ function setNavIndex(idx) {
       clearTimeout(_sampleSelectPlayTimer);
       _sampleSelectPlayTimer = setTimeout(() => {
         if (typeof previewAudio === 'function') previewAudio(path);
+        if (typeof syncExpandedMetaWithKeyboardSelection === 'function') syncExpandedMetaWithKeyboardSelection(path);
       }, 140);
     }
   }

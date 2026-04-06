@@ -1555,6 +1555,13 @@ async function expandMetaForPath(filePath) {
   }
 }
 
+/** Called from keyboard-nav when Play on Keyboard Selection moves the highlight; keeps the metadata panel under the selected row. */
+function syncExpandedMetaWithKeyboardSelection(newPath) {
+  if (expandedMetaPath === null) return;
+  if (expandedMetaPath === newPath) return;
+  void expandMetaForPath(newPath);
+}
+
 async function toggleMetadata(filePath, event) {
   // Don't toggle if clicking buttons
   if (event.target.closest('.col-actions')) return;
