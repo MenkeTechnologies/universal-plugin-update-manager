@@ -1583,71 +1583,72 @@ async fn scan_unified(
 
         unified_walker::walk_unified(
             &spec,
-            &mut |batch, counts| {
+            &mut |batch, _counts| {
                 use unified_walker::ClassifiedBatch;
                 match batch {
                     ClassifiedBatch::Audio(b) => {
+                        for s in &b {
+                            audio_bytes += s.size;
+                            *audio_format_counts.entry(s.format.clone()).or_insert(0) += 1;
+                        }
+                        let inserted = db.insert_audio_batch(&audio_scan_id, &b).unwrap_or(0);
+                        audio_count += inserted;
                         let _ = app_handle.emit(
                             "audio-scan-progress",
                             serde_json::json!({
                                 "phase": "scanning",
                                 "samples": &b,
-                                "found": counts.audio,
+                                "found": audio_count,
                             }),
                         );
-                        for s in &b {
-                            audio_bytes += s.size;
-                            *audio_format_counts.entry(s.format.clone()).or_insert(0) += 1;
-                        }
-                        audio_count += b.len() as u64;
-                        let _ = db.insert_audio_batch(&audio_scan_id, &b);
                     }
                     ClassifiedBatch::Daw(b) => {
+                        let inserted_idx = db.insert_daw_batch(&daw_scan_id, &b).unwrap_or_default();
+                        let deduped: Vec<&DawProject> = inserted_idx.iter().map(|&i| &b[i]).collect();
+                        for p in &deduped {
+                            daw_bytes += p.size;
+                            *daw_daw_counts.entry(p.daw.clone()).or_insert(0) += 1;
+                        }
+                        daw_count += deduped.len() as u64;
                         let _ = app_handle.emit(
                             "daw-scan-progress",
                             serde_json::json!({
                                 "phase": "scanning",
-                                "projects": &b,
-                                "found": counts.daw,
+                                "projects": &deduped,
+                                "found": daw_count,
                             }),
                         );
-                        for p in &b {
-                            daw_bytes += p.size;
-                            *daw_daw_counts.entry(p.daw.clone()).or_insert(0) += 1;
-                        }
-                        daw_count += b.len() as u64;
-                        let _ = db.insert_daw_batch(&daw_scan_id, &b);
                     }
                     ClassifiedBatch::Preset(b) => {
+                        for p in &b {
+                            preset_bytes += p.size;
+                            *preset_format_counts.entry(p.format.clone()).or_insert(0) += 1;
+                        }
+                        let inserted = db.insert_preset_batch(&preset_scan_id, &b).unwrap_or(0);
+                        preset_count += inserted;
                         let _ = app_handle.emit(
                             "preset-scan-progress",
                             serde_json::json!({
                                 "phase": "scanning",
                                 "presets": &b,
-                                "found": counts.preset,
+                                "found": preset_count,
                             }),
                         );
-                        for p in &b {
-                            preset_bytes += p.size;
-                            *preset_format_counts.entry(p.format.clone()).or_insert(0) += 1;
-                        }
-                        preset_count += b.len() as u64;
-                        let _ = db.insert_preset_batch(&preset_scan_id, &b);
                     }
                     ClassifiedBatch::Pdf(b) => {
+                        for p in &b {
+                            pdf_bytes += p.size;
+                        }
+                        let inserted = db.insert_pdf_batch(&pdf_scan_id, &b).unwrap_or(0);
+                        pdf_count += inserted;
                         let _ = app_handle.emit(
                             "pdf-scan-progress",
                             serde_json::json!({
                                 "phase": "scanning",
                                 "pdfs": &b,
-                                "found": counts.pdf,
+                                "found": pdf_count,
                             }),
                         );
-                        for p in &b {
-                            pdf_bytes += p.size;
-                        }
-                        pdf_count += b.len() as u64;
-                        let _ = db.insert_pdf_batch(&pdf_scan_id, &b);
                     }
                 }
             },
@@ -5857,22 +5858,23 @@ pub fn run() {
         .build_global()
         .ok();
 
-    // Initialize global SQLite database
+    // Initialize global SQLite database (open + migrate only — fast)
     db::init_global().expect("Failed to initialize database");
 
-    // Warm page cache in background so first tab activation is instant
-    std::thread::spawn(|| { db::global().prewarm(); });
-
-    // Log DB stats at startup
-    if let Ok(counts) = db::global().table_counts() {
-        let m = counts.as_object().unwrap();
-        let get = |k: &str| m.get(k).and_then(|v| v.as_u64()).unwrap_or(0);
-        append_log(format!(
-            "DB STATS — {} plugins | {} samples | {} DAW projects | {} presets | {} KVR cache | {} waveforms | {} spectrograms | {} xref | {} fingerprints",
-            get("plugins"), get("audio_samples"), get("daw_projects"), get("presets"),
-            get("kvr_cache"), get("waveform_cache"), get("spectrogram_cache"), get("xref_cache"), get("fingerprint_cache"),
-        ));
-    }
+    // Heavy DB housekeeping (WAL checkpoint, optimize, prune, vacuum, prewarm)
+    // runs off the main thread so the window appears immediately.
+    std::thread::spawn(|| {
+        db::global().housekeep();
+        if let Ok(counts) = db::global().table_counts() {
+            let m = counts.as_object().unwrap();
+            let get = |k: &str| m.get(k).and_then(|v| v.as_u64()).unwrap_or(0);
+            append_log(format!(
+                "DB STATS — {} plugins | {} samples | {} DAW projects | {} presets | {} KVR cache | {} waveforms | {} spectrograms | {} xref | {} fingerprints",
+                get("plugins"), get("audio_samples"), get("daw_projects"), get("presets"),
+                get("kvr_cache"), get("waveform_cache"), get("spectrogram_cache"), get("xref_cache"), get("fingerprint_cache"),
+            ));
+        }
+    });
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

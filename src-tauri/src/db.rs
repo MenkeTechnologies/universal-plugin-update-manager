@@ -368,20 +368,24 @@ impl Database {
         )
         .map_err(|e| format!("Failed to set pragmas: {e}"))?;
 
-        // Checkpoint WAL to keep it small (prevents startup lag from huge WAL)
-        let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
-
-        // Refresh query-planner statistics so SQLite picks the right index
-        let _ = conn.execute_batch("PRAGMA optimize;");
-
         let db = Self {
             conn: Mutex::new(conn),
         };
         db.migrate()?;
-        // Auto-prune: keep only 3 most recent scans per type, then reclaim space
-        db.prune_old_scans(3);
-        db.vacuum_if_needed();
         Ok(db)
+    }
+
+    /// Background housekeeping — checkpoint WAL, refresh query planner stats,
+    /// prune old scans, and vacuum if needed. Safe to call from any thread;
+    /// must NOT run on the main thread (blocks for seconds on large DBs).
+    pub fn housekeep(&self) {
+        {
+            let conn = self.conn.lock().unwrap();
+            let _ = conn.execute_batch("PRAGMA optimize;");
+        }
+        self.prune_old_scans(3);
+        self.vacuum_if_needed();
+        self.prewarm();
     }
 
     /// Prune old scans — keep only the N most recent per type. Reduces DB bloat.
@@ -906,7 +910,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn insert_audio_batch(&self, scan_id: &str, samples: &[AudioSample]) -> Result<(), String> {
+    pub fn insert_audio_batch(&self, scan_id: &str, samples: &[AudioSample]) -> Result<u64, String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted: u64 = 0;
@@ -965,7 +969,7 @@ impl Database {
             ).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())?;
-        Ok(())
+        Ok(inserted)
     }
 
     /// Save scan metadata.
@@ -2278,15 +2282,15 @@ impl Database {
         &self,
         scan_id: &str,
         projects: &[DawProject],
-    ) -> Result<(), String> {
+    ) -> Result<Vec<usize>, String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-        let mut inserted: u64 = 0;
+        let mut inserted_idx: Vec<usize> = Vec::new();
         let mut batch_bytes: u64 = 0;
         {
             let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO daw_projects (name, path, directory, format, daw, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").map_err(|e| e.to_string())?;
             let mut fts_stmt = tx.prepare_cached("INSERT INTO daw_projects_fts(rowid, name, path, daw, scan_id) VALUES (?1,?2,?3,?4,?5)").map_err(|e| e.to_string())?;
-            for p in projects {
+            for (i, p) in projects.iter().enumerate() {
                 let changed = stmt.execute(params![
                     p.name,
                     p.path,
@@ -2302,18 +2306,20 @@ impl Database {
                 if changed > 0 {
                     let id = tx.last_insert_rowid();
                     fts_stmt.execute(params![id, p.name, p.path, p.daw, scan_id]).map_err(|e| e.to_string())?;
-                    inserted += 1;
+                    inserted_idx.push(i);
                     batch_bytes += p.size;
                 }
             }
         }
+        let inserted = inserted_idx.len() as u64;
         if inserted > 0 {
             tx.execute(
                 "UPDATE daw_scans SET project_count = project_count + ?2, total_bytes = total_bytes + ?3 WHERE id = ?1",
                 params![scan_id, inserted, batch_bytes],
             ).map_err(|e| e.to_string())?;
         }
-        tx.commit().map_err(|e| e.to_string())
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(inserted_idx)
     }
 
     pub fn save_daw_scan(&self, snap: &DawScanSnapshot) -> Result<(), String> {
@@ -2493,7 +2499,7 @@ impl Database {
         &self,
         scan_id: &str,
         presets: &[PresetFile],
-    ) -> Result<(), String> {
+    ) -> Result<u64, String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted: u64 = 0;
@@ -2527,7 +2533,8 @@ impl Database {
                 params![scan_id, inserted, batch_bytes],
             ).map_err(|e| e.to_string())?;
         }
-        tx.commit().map_err(|e| e.to_string())
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(inserted)
     }
 
     pub fn save_preset_scan(&self, snap: &PresetScanSnapshot) -> Result<(), String> {
@@ -3154,7 +3161,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn insert_pdf_batch(&self, scan_id: &str, pdfs: &[PdfFile]) -> Result<(), String> {
+    pub fn insert_pdf_batch(&self, scan_id: &str, pdfs: &[PdfFile]) -> Result<u64, String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted: u64 = 0;
@@ -3187,7 +3194,8 @@ impl Database {
                 params![scan_id, inserted, batch_bytes],
             ).map_err(|e| e.to_string())?;
         }
-        tx.commit().map_err(|e| e.to_string())
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(inserted)
     }
 
     pub fn save_pdf_scan(&self, snap: &PdfScanSnapshot) -> Result<(), String> {

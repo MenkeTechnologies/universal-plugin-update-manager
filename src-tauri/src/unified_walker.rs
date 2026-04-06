@@ -341,6 +341,7 @@ pub fn walk_unified(
         .unwrap();
 
     let tcc_denied: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
+    let tcc_summary = tcc_denied.clone();
     std::thread::spawn(move || {
         pool.install(|| {
             union.par_iter().for_each(|root| {
@@ -376,6 +377,17 @@ pub fn walk_unified(
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
         }
     }
+
+    let denied = tcc_summary.lock().unwrap();
+    if !denied.is_empty() {
+        let paths: Vec<_> = denied.iter().map(|p| p.display().to_string()).collect();
+        crate::write_app_log(format!(
+            "SCAN TCC SUMMARY — {} path(s) denied by macOS TCC: {} \
+             (grant access in System Settings → Privacy & Security → Files and Folders)",
+            paths.len(),
+            paths.join(", "),
+        ));
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -392,8 +404,14 @@ fn walk_dir_parallel(
     stop: &Arc<AtomicBool>,
     spec: &Arc<UnifiedSpec>,
     active_dirs: &[Arc<Mutex<Vec<String>>>],
+    tcc_denied: &Arc<Mutex<HashSet<PathBuf>>>,
 ) {
     if depth > 30 || stop.load(Ordering::Relaxed) {
+        return;
+    }
+
+    // Skip paths under a previously TCC-denied ancestor — no syscalls needed.
+    if tcc_denied.lock().unwrap().iter().any(|d| dir.starts_with(d)) {
         return;
     }
 
@@ -465,12 +483,18 @@ fn walk_dir_parallel(
         Err(e) => {
             // EPERM (os error 1) on macOS = TCC denial — retrying is futile,
             // the user must grant access in System Settings → Privacy & Security.
+            // Log once per denied root, silently skip descendants.
             if e.raw_os_error() == Some(1) {
-                crate::write_app_log(format!(
-                    "SCAN TCC DENIED — unified | {} | {} \
-                     (grant Full Disk Access or Files and Folders permission)",
-                    dir.display(), e,
-                ));
+                let mut denied = tcc_denied.lock().unwrap();
+                if !denied.iter().any(|d| dir.starts_with(d)) {
+                    denied.insert(dir.to_path_buf());
+                    drop(denied);
+                    crate::write_app_log(format!(
+                        "SCAN TCC DENIED — unified | {} | {} \
+                         (grant Full Disk Access or Files and Folders permission)",
+                        dir.display(), e,
+                    ));
+                }
                 return;
             }
             if is_net {
@@ -767,6 +791,7 @@ fn walk_dir_parallel(
             stop,
             spec,
             active_dirs,
+            tcc_denied,
         );
     });
 }
