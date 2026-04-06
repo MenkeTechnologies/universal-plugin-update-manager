@@ -62,9 +62,6 @@ async function fetchPresetPage() {
           if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, highlightMatch);
         }
       }
-      const hasFilter = !!(needle || fmtSet);
-      _presetTotalUnfiltered = allPresets.length;
-      _presetTotalCount = hasFilter ? visible : _presetTotalUnfiltered;
       rebuildPresetStats();
     }
     return;
@@ -149,18 +146,7 @@ async function rebuildPresetStats(force) {
   const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
   const key = search.trim() + '|' + (formatFilter || '');
   let count = 0, bytes = 0, unfiltered = 0, byType = {};
-  // During an active scan the DB hasn't been written yet (savePresetScan runs
-  // at scan completion), so dbPresetFilterStats returns stale/empty data and
-  // would flick the counter to 0. Use the incremental accumulator instead.
-  if (presetScanProgressCleanup) {
-    bytes = _presetStatsTotalBytes;
-    byType = _presetStatsFormatCounts;
-    const accTotal = Object.values(byType).reduce((a, b) => a + b, 0);
-    // Use authoritative counts set by the filter-during-scan path so
-    // "filtered / total" display works; fall back to accumulator total.
-    unfiltered = _presetTotalUnfiltered || accTotal;
-    count = _presetTotalCount != null ? _presetTotalCount : accTotal;
-  } else {
+  {
     const cacheHit = !force && key === _lastPresetAggKey && _presetAggCache;
     try {
       const agg = cacheHit ? _presetAggCache : await window.vstUpdater.dbPresetFilterStats(search.trim(), formatFilter);

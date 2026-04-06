@@ -49,13 +49,7 @@ async function fetchDawPage() {
           if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, (t, q, m) => highlightMatch(t, q, m));
         }
       }
-      // Use allDawProjects.length as the unfiltered total — DOM rows are
-      // capped at 2000 rendered so counting them would mismatch the scan
-      // button counter (pendingFound) when the filter box is empty.
-      const hasFilter = !!(needle || dawSet);
-      _dawTotalUnfiltered = allDawProjects.length;
-      _dawTotalCount = hasFilter ? visible : _dawTotalUnfiltered;
-      updateDawStats();
+      refreshDawStatsSnapshot();
     }
     return;
   }
@@ -142,10 +136,6 @@ function updateDawStats() {
 
 let _lastDawAggKey = null;
 async function refreshDawStatsSnapshot(force) {
-  // During an active scan, the DB hasn't been written yet — querying it would
-  // overwrite the incremental snapshot with stale/empty data and flick counters
-  // to 0. The scan flush keeps _dawStatsSnapshot current via accumulateDawStats.
-  if (dawScanProgressCleanup) { updateDawStats(); return; }
   try {
     const search = document.getElementById('dawSearchInput')?.value || '';
     const dawSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('dawDawFilter') : null;

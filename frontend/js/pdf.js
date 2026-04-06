@@ -51,8 +51,6 @@ async function fetchPdfPage() {
           if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, highlightMatch);
         }
       }
-      _pdfTotalUnfiltered = allPdfs.length;
-      _pdfTotalCount = needle ? visible : _pdfTotalUnfiltered;
       rebuildPdfStats();
     }
     if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
@@ -108,27 +106,7 @@ async function rebuildPdfStats(force) {
   const search = document.getElementById('pdfSearchInput')?.value || '';
   const key = search.trim();
   let displayCount = 0, displayBytes = 0, unfiltered = 0;
-  // During an active scan, the DB doesn't have the new data yet (save happens at
-  // scan-end). Use the in-memory accumulators so the counter reflects live progress.
-  if (pdfScanProgressCleanup) {
-    const needle = key.toLowerCase();
-    if (needle) {
-      let c = 0, b = 0;
-      for (const p of allPdfs) {
-        if ((p.name || '').toLowerCase().includes(needle) || (p.path || '').toLowerCase().includes(needle)) {
-          c++; b += (p.size || 0);
-        }
-      }
-      displayCount = c; displayBytes = b;
-    } else {
-      displayCount = allPdfs.length;
-      if (_pdfStatsTotalBytes === 0 && allPdfs.length > 0) accumulatePdfStats(allPdfs);
-      displayBytes = _pdfStatsTotalBytes;
-    }
-    unfiltered = allPdfs.length;
-    _pdfTotalCount = displayCount;
-    _pdfTotalUnfiltered = unfiltered;
-  } else {
+  {
     const cacheHit = !force && key === _lastPdfAggKey && _pdfAggCache;
     try {
       const agg = cacheHit ? _pdfAggCache : await window.vstUpdater.dbPdfFilterStats(search.trim());

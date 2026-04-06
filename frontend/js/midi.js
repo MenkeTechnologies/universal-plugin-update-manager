@@ -57,9 +57,7 @@ async function fetchMidiPage() {
           if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, 'fuzzy', highlightMatch);
         }
       }
-      _midiTotalUnfiltered = allMidiFiles.length;
-      _midiTotalCount = needle ? visible : _midiTotalUnfiltered;
-      updateMidiCount();
+      refreshMidiStatsSnapshot();
     }
     return;
   }
@@ -98,7 +96,6 @@ async function fetchMidiPage() {
 }
 
 async function refreshMidiStatsSnapshot(force) {
-  if (_midiScanProgressCleanup) { updateMidiCount(); return; }
   try {
     const search = _midiSearch || '';
     const agg = await window.vstUpdater.dbMidiFilterStats(search, null);
@@ -272,45 +269,31 @@ async function scanMidi(resume = false) {
 }
 
 function getMidiCount() {
-  return _midiScanProgressCleanup ? (allMidiFiles.length) : _midiTotalUnfiltered;
+  return _midiTotalUnfiltered;
 }
 
-/** Stats bar "MIDI Found" — must not rely on preset scan (MIDI has its own walker/DB). */
 function syncMidiStatsBarCount(total) {
   const el = document.getElementById('midiScanCount');
   if (!el) return;
-  const n = typeof total === 'number'
-    ? total
-    : (_midiScanProgressCleanup ? (allMidiFiles.length) : _midiTotalUnfiltered);
+  const n = typeof total === 'number' ? total : _midiTotalUnfiltered;
   el.textContent = n.toLocaleString();
 }
 
 function updateMidiCount() {
-  // Match audio/daw/preset/pdf convention: "Total:" shows "filtered / total"
-  // when a filter is active, and just the total when unfiltered. During a scan
-  // we fall back to allMidiFiles (streaming buffer); post-scan uses DB totals.
-  const scanning = !!_midiScanProgressCleanup;
-  const search = _midiSearch || '';
-  const hasFilter = scanning && !!search.trim();
-  const scanTotal = allMidiFiles.length;
-  const filtered = scanning
-    ? (hasFilter ? _midiTotalCount : scanTotal)
-    : _midiTotalCount;
-  const total = scanning ? scanTotal : _midiTotalUnfiltered;
+  const filtered = _midiTotalCount;
+  const total = _midiTotalUnfiltered;
   const isFiltered = total > 0 && filtered < total;
   const totalEl = document.getElementById('midiTotalCount');
   if (totalEl) {
     totalEl.textContent = isFiltered
       ? filtered.toLocaleString() + ' / ' + total.toLocaleString()
-      : total.toLocaleString();
+      : (total || filtered).toLocaleString();
   }
   const count = document.getElementById('midiCount');
-  if (count) count.textContent = filtered.toLocaleString();
+  if (count) count.textContent = (total || filtered).toLocaleString();
   const sizeEl = document.getElementById('midiTotalSize');
   if (sizeEl) {
-    const bytes = scanning
-      ? filteredMidi.reduce((s, f) => s + (f.size || 0), 0)
-      : (_midiStatsSnapshot ? _midiStatsSnapshot.totalBytes : 0);
+    const bytes = _midiStatsSnapshot ? _midiStatsSnapshot.totalBytes : 0;
     sizeEl.textContent = typeof formatAudioSize === 'function' ? formatAudioSize(bytes) : Math.round(bytes / 1024) + ' KB';
   }
   const statsBar = document.getElementById('midiStats');
@@ -320,7 +303,7 @@ function updateMidiCount() {
 function updateMidiHeaderCount() {
   const el = document.getElementById('headerMidi');
   if (el) {
-    const n = _midiScanProgressCleanup ? (allMidiFiles.length) : _midiTotalUnfiltered;
+    const n = _midiTotalUnfiltered;
     el.textContent = n.toLocaleString();
   }
 }

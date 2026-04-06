@@ -799,11 +799,7 @@ function updateAudioStats() {
   const mainFormats = wav + mp3 + aiff + flac;
   let accumulatedTotal = 0;
   for (const k in audioStatCounts) accumulatedTotal += audioStatCounts[k];
-  // When a filter is active during a scan, audioTotalCount holds the filtered
-  // count (smaller than accumulatedTotal). Use it directly instead of Math.max
-  // so that the "filtered / total" display works.
-  const isFilterActive = audioTotalUnfiltered > 0 && audioTotalCount < audioTotalUnfiltered;
-  const total = isFilterActive ? audioTotalCount : Math.max(audioTotalCount || 0, accumulatedTotal);
+  const total = Math.max(audioTotalCount || 0, accumulatedTotal);
   const unfiltered = audioTotalUnfiltered || 0;
   const isFiltered = unfiltered > 0 && total > 0 && total < unfiltered;
   const totalStr = isFiltered ? total.toLocaleString() + ' / ' + unfiltered.toLocaleString() : total.toLocaleString();
@@ -824,10 +820,6 @@ function updateAudioStats() {
 let _lastAudioAggKey = null;
 let _audioBytesByType = {};
 async function rebuildAudioStats(force) {
-  // During an active scan, the DB hasn't been written yet — querying it would
-  // overwrite the incremental accumulators with stale/empty data and flick the
-  // counters to 0. The scan flush already keeps audioStatCounts/Bytes current.
-  if (audioScanProgressCleanup) { updateAudioStats(); return; }
   try {
     const search = _lastAudioSearch || '';
     const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('audioFormatFilter') : null;
@@ -930,10 +922,8 @@ async function fetchAudioPage() {
           if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, (t, q, m) => highlightPathPrefixFromPath(pathCell.title, t, q, m));
         }
       }
-      const hasFilter = !!(needle || fmtSet);
-      audioTotalUnfiltered = allAudioSamples.length;
-      audioTotalCount = hasFilter ? visible : audioTotalUnfiltered;
-      updateAudioStats();
+      // DB has rows during scan — query it for accurate counts.
+      rebuildAudioStats();
     }
     return;
   }
