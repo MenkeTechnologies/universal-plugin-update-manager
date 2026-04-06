@@ -912,7 +912,8 @@ function settingToggleAutoUpdate() {
 }
 
 function settingToggleSingleClickPlay() {
-  const current = prefs.getItem('singleClickPlay') === 'on';
+  const sc = prefs.getItem('singleClickPlay');
+  const current = sc !== 'off' && sc !== 'false';
   const next = !current;
   prefs.setItem('singleClickPlay', next ? 'on' : 'off');
   showToast(toastFmt('toast.single_click_play', { state: next ? 'on' : 'off' }));
@@ -920,7 +921,8 @@ function settingToggleSingleClickPlay() {
 }
 
 function settingToggleAutoPlaySampleOnSelect() {
-  const current = prefs.getItem('autoPlaySampleOnSelect') === 'on';
+  const ap = prefs.getItem('autoPlaySampleOnSelect');
+  const current = ap !== 'off' && ap !== 'false';
   const next = !current;
   prefs.setItem('autoPlaySampleOnSelect', next ? 'on' : 'off');
   showToast(toastFmt('toast.auto_play_sample_on_select', { state: next ? 'on' : 'off' }));
@@ -1215,8 +1217,9 @@ function refreshSettingsUI() {
     autoUpdateLabel.textContent = _uiToggle(autoUpdate);
   }
 
-  // Single-click play
-  const singleClick = prefs.getItem('singleClickPlay') === 'on';
+  // Single-click play (treat null as on — matches merged defaults and pre-load race)
+  const scPref = prefs.getItem('singleClickPlay');
+  const singleClick = scPref !== 'off' && scPref !== 'false';
   const singleClickBtn = document.getElementById('settingSingleClickPlay');
   const singleClickLabel = document.getElementById('settingSingleClickPlayLabel');
   if (singleClickBtn) {
@@ -1224,7 +1227,8 @@ function refreshSettingsUI() {
     singleClickLabel.textContent = _uiToggle(singleClick);
   }
 
-  const autoPlayOnSelect = prefs.getItem('autoPlaySampleOnSelect') === 'on';
+  const apPref = prefs.getItem('autoPlaySampleOnSelect');
+  const autoPlayOnSelect = apPref !== 'off' && apPref !== 'false';
   const autoPlayOnSelectBtn = document.getElementById('settingAutoPlaySampleOnSelect');
   const autoPlayOnSelectLabel = document.getElementById('settingAutoPlaySampleOnSelectLabel');
   if (autoPlayOnSelectBtn) {

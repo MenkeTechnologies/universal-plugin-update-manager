@@ -32,15 +32,18 @@ function setNavIndex(idx) {
   item.classList.add('nav-selected');
   item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 
-  if (activeTab === 'tabSamples' && typeof prefs !== 'undefined' && prefs.getItem('autoPlaySampleOnSelect') === 'on') {
-    const path = item.getAttribute('data-audio-path');
-    if (path && path !== _lastAutoPlaySamplePath) {
-      _lastAutoPlaySamplePath = path;
-      clearTimeout(_sampleSelectPlayTimer);
-      _sampleSelectPlayTimer = setTimeout(() => {
-        if (typeof previewAudio === 'function') previewAudio(path);
-        if (typeof syncExpandedMetaWithKeyboardSelection === 'function') syncExpandedMetaWithKeyboardSelection(path);
-      }, 140);
+  if (activeTab === 'tabSamples' && typeof prefs !== 'undefined') {
+    const ap = prefs.getItem('autoPlaySampleOnSelect');
+    if (ap !== 'off' && ap !== 'false') {
+      const path = item.getAttribute('data-audio-path');
+      if (path && path !== _lastAutoPlaySamplePath) {
+        _lastAutoPlaySamplePath = path;
+        clearTimeout(_sampleSelectPlayTimer);
+        _sampleSelectPlayTimer = setTimeout(() => {
+          if (typeof previewAudio === 'function') previewAudio(path);
+          if (typeof syncExpandedMetaWithKeyboardSelection === 'function') syncExpandedMetaWithKeyboardSelection(path);
+        }, 140);
+      }
     }
   }
 }

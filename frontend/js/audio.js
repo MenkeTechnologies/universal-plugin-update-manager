@@ -1566,9 +1566,12 @@ async function toggleMetadata(filePath, event) {
   // Don't toggle if clicking buttons
   if (event.target.closest('.col-actions')) return;
 
-  // Single-click: play only when enabled; otherwise double-click (ipc dblclick) plays
-  if (prefs.getItem('singleClickPlay') === 'on') {
-    previewAudio(filePath);
+  // Single-click: play unless explicitly off (null/undefined before prefs.load() → play; matches default-on)
+  {
+    const sc = prefs.getItem('singleClickPlay');
+    if (sc !== 'off' && sc !== 'false') {
+      previewAudio(filePath);
+    }
   }
 
   if (prefs.getItem('expandOnClick') === 'off') return;
