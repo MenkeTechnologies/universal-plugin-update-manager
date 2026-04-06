@@ -53,6 +53,7 @@ async function fetchPluginPage() {
     const list = document.getElementById('pluginList');
     if (list) {
       const needle = search ? search.trim().toLowerCase() : '';
+      const mode = _lastPluginMode;
       const cards = list.querySelectorAll('.plugin-card[data-plugin-type]');
       let visible = 0;
       for (let i = 0; i < cards.length; i++) {
@@ -62,7 +63,14 @@ async function fetchPluginPage() {
         if (typeSet && !typeSet.has(t)) match = false;
         if (match && needle && !c.dataset.pluginName.includes(needle) && !c.dataset.pluginMfg.includes(needle)) match = false;
         c.style.display = match ? '' : 'none';
-        if (match) visible++;
+        if (match) {
+          visible++;
+          // Apply search text highlights to visible cards
+          const h3 = c.querySelector('h3');
+          if (h3) applyScanCellHighlight(h3, h3.title || h3.textContent, search, mode, highlightMatch);
+          const mfgSpan = c.querySelector('.plugin-meta > span:nth-child(2)');
+          if (mfgSpan) mfgSpan.innerHTML = search ? highlightMatch(mfgSpan.textContent, search, mode) : escapeHtml(mfgSpan.textContent);
+        }
       }
       _pluginTotalCount = visible;
       document.getElementById('totalCount').textContent = (_pluginTotalUnfiltered || allPlugins.length || 0).toLocaleString();
@@ -254,7 +262,7 @@ function buildPluginCardHtml(p) {
   return `
     <div class="plugin-card" data-path="${escapeHtml(p.path)}" data-plugin-type="${escapeHtml(p.type)}" data-plugin-name="${escapeHtml((p.name || '').toLowerCase())}" data-plugin-mfg="${escapeHtml((p.manufacturer || '').toLowerCase())}">
       <div class="plugin-info">
-        <h3>${_lastPluginSearch ? highlightMatch(p.name, _lastPluginSearch, _lastPluginMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? ' ' + rowBadges(p.path) : ''}</h3>
+        <h3 title="${escapeHtml(p.name)}">${_lastPluginSearch ? highlightMatch(p.name, _lastPluginSearch, _lastPluginMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? ' ' + rowBadges(p.path) : ''}</h3>
         <div class="plugin-meta">
           <span class="plugin-type ${typeClass}">${p.type}</span>
           <span>${_lastPluginSearch ? highlightMatch(p.manufacturer || '', _lastPluginSearch, _lastPluginMode) : escapeHtml(p.manufacturer || '')}</span>

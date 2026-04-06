@@ -43,6 +43,7 @@ async function fetchPresetPage() {
     const tbody = document.getElementById('presetTableBody');
     if (tbody) {
       const needle = search ? search.trim().toLowerCase() : '';
+      const mode = _lastPresetMode;
       const rows = tbody.rows;
       let visible = 0;
       for (let i = 0; i < rows.length; i++) {
@@ -53,7 +54,13 @@ async function fetchPresetPage() {
         if (fmtSet && !fmtSet.has(fmt)) match = false;
         if (match && needle && !r.dataset.presetName.includes(needle)) match = false;
         r.style.display = match ? '' : 'none';
-        if (match) visible++;
+        if (match) {
+          visible++;
+          const nameCell = r.querySelector('.col-name');
+          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, mode, highlightMatch);
+          const pathCell = r.querySelector('.col-path');
+          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, highlightMatch);
+        }
       }
       _presetTotalCount = visible;
     }
@@ -101,9 +108,9 @@ function buildPresetRow(p) {
     : _presetFmt('ui.tt.row_double_click_reveal_finder');
   return `<tr data-preset-path="${hp}" data-preset-format="${escapeHtml(p.format)}" data-preset-name="${escapeHtml((p.name || '').toLowerCase())}" style="cursor: pointer;" title="${rowTt}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
-    <td>${_lastPresetSearch ? highlightMatch(p.name, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
+    <td class="col-name" title="${escapeHtml(p.name)}">${_lastPresetSearch ? highlightMatch(p.name, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
     <td class="col-format"><span class="format-badge format-default">${p.format}</span></td>
-    <td title="${hp}">${_lastPresetSearch ? highlightMatch(p.directory, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.directory)}</td>
+    <td class="col-path" title="${hp}">${_lastPresetSearch ? highlightMatch(p.directory, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.directory)}</td>
     <td class="col-size">${p.sizeFormatted || formatPresetSize(p.size)}</td>
     <td class="col-date">${p.modified}</td>
     <td class="col-actions">

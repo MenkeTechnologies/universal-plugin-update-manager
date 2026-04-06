@@ -24,6 +24,7 @@ LANG_SELECTOR_NATIVE = {
     "ui.opt.lang_fi": "Suomi",
     "ui.opt.lang_fr": "Français",
     "ui.opt.lang_hu": "Magyar",
+    "ui.opt.lang_id": "Bahasa Indonesia",
     "ui.opt.lang_it": "Italiano",
     "ui.opt.lang_ja": "日本語",
     "ui.opt.lang_ko": "한국어",

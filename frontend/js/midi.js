@@ -49,7 +49,13 @@ async function fetchMidiPage() {
         const name = (r.querySelector('.col-name')?.textContent || '').toLowerCase();
         const match = !needle || name.includes(needle);
         r.style.display = match ? '' : 'none';
-        if (match) visible++;
+        if (match) {
+          visible++;
+          const nameCell = r.querySelector('.col-name');
+          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, 'fuzzy', highlightMatch);
+          const pathCell = r.querySelector('.col-path');
+          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, 'fuzzy', highlightMatch);
+        }
       }
       _midiTotalCount = visible;
     }

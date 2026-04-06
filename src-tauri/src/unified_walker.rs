@@ -53,6 +53,44 @@ fn normalize_macos_path(p: PathBuf) -> PathBuf {
     p
 }
 
+// ── Network filesystem detection ─────────────────────────────────────────
+// Returns the filesystem type name (e.g. "smbfs", "nfs", "afpfs") if `path`
+// lives on a network mount, or None for local filesystems.  Uses statfs(2)
+// on macOS; always returns None on other platforms.
+#[cfg(target_os = "macos")]
+fn network_fs_type(path: &Path) -> Option<String> {
+    use std::ffi::CString;
+    let c_path = CString::new(path.as_os_str().to_string_lossy().as_bytes()).ok()?;
+    let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
+    let rc = unsafe { libc::statfs(c_path.as_ptr(), &mut stat) };
+    if rc != 0 {
+        return None;
+    }
+    let fstype = unsafe {
+        std::ffi::CStr::from_ptr(stat.f_fstypename.as_ptr())
+            .to_string_lossy()
+            .to_string()
+    };
+    // MNT_LOCAL is clear on network mounts (smbfs, nfs, afpfs, webdav).
+    const MNT_LOCAL: u32 = 0x00001000;
+    if stat.f_flags & MNT_LOCAL == 0 {
+        Some(fstype)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn network_fs_type(_path: &Path) -> Option<String> {
+    None
+}
+
+/// Quick check: is this path likely on a network share?
+fn is_network_path(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+    s.contains("/mnt/") || s.ends_with("/mnt") || s.starts_with("/Volumes/")
+}
+
 // Re-exported from individual scanners to keep extension lists in sync. If
 // either scanner's list changes, update the constant there and this module
 // will see it via the `pub(crate)` re-exports at the bottom of each scanner.
@@ -274,6 +312,18 @@ pub fn walk_unified(
     union.dedup();
     let union: Vec<PathBuf> = union.into_iter().filter(|r| r.exists()).collect();
 
+    // Log root set with network mount annotations so the user can verify
+    // their SMB/NFS shares are included in the walk.
+    for r in &union {
+        let net_tag = network_fs_type(r)
+            .map(|fs| format!(" [NETWORK: {}]", fs))
+            .unwrap_or_default();
+        crate::write_app_log(format!(
+            "SCAN ROOT — unified | {}{}",
+            r.display(), net_tag,
+        ));
+    }
+
     let audio_found = Arc::new(AtomicUsize::new(0));
     let daw_found = Arc::new(AtomicUsize::new(0));
     let preset_found = Arc::new(AtomicUsize::new(0));
@@ -351,16 +401,45 @@ fn walk_dir_parallel(
         // Canonicalize OUTSIDE the mutex — it's a syscall (network roundtrip
         // on SMB) and must not block other workers while in flight.
         let orig = normalize_macos_path(dir.to_path_buf());
-        let canon = fs::canonicalize(dir).ok().map(normalize_macos_path);
-        let key = canon.unwrap_or_else(|| orig.clone());
+        let canon_result = fs::canonicalize(dir);
+        if is_network_path(dir) {
+            if let Err(ref e) = canon_result {
+                crate::write_app_log(format!(
+                    "SCAN NETWORK CANONICALIZE FAIL — unified | {} | {} (using original path as dedup key)",
+                    dir.display(), e,
+                ));
+            }
+        }
+        let canon = canon_result.ok().map(normalize_macos_path);
+        let key = canon.clone().unwrap_or_else(|| orig.clone());
         let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
-        if !vis.insert(key) {
+        if !vis.insert(key.clone()) {
+            if is_network_path(dir) {
+                crate::write_app_log(format!(
+                    "SCAN DEDUP SKIP — unified | orig={} | canon={} | key={}",
+                    orig.display(),
+                    canon.as_ref().map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "<canonicalize failed>".into()),
+                    key.display(),
+                ));
+            }
             return;
         }
         vis.insert(orig);
     }
 
     let dir_str = dir.to_string_lossy().to_string();
+
+    // Log when entering a network share root (depth 0-2) so the user can
+    // verify their mounts are actually being traversed.
+    if depth <= 2 {
+        if let Some(fstype) = network_fs_type(dir) {
+            crate::write_app_log(format!(
+                "SCAN NETWORK ENTER — unified | {} | fs={} | depth={}",
+                dir.display(), fstype, depth,
+            ));
+        }
+    }
     {
         // Fan out the dir-status push to every sink (walker-status tiles).
         for sink in active_dirs {
@@ -379,15 +458,41 @@ fn walk_dir_parallel(
     // One bulk syscall (getattrlistbulk on macOS) returns name+type+size+mtime
     // for every entry in the directory. Replaces readdir + file_type + stat
     // per entry — critical for SMB where each syscall is a network roundtrip.
+    // Retry once on transient errors (common on SMB/NFS mounts).
+    let is_net = is_network_path(dir);
     let entries: Vec<BulkEntry> = match read_dir_bulk(dir) {
         Ok(e) => e,
         Err(e) => {
-            crate::write_app_log(format!(
-                "SCAN READDIR ERROR — unified | {} | {}",
-                dir.display(),
-                e
-            ));
-            return;
+            if is_net {
+                crate::write_app_log(format!(
+                    "SCAN NETWORK RETRY — unified | {} | first error: {} | retrying in 50ms",
+                    dir.display(), e,
+                ));
+            }
+            // Retry once — SMB shares can return transient ETIMEDOUT / EIO on
+            // first access after idle, but succeed on the immediate retry.
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            match read_dir_bulk(dir) {
+                Ok(e) => {
+                    if is_net {
+                        crate::write_app_log(format!(
+                            "SCAN NETWORK RECOVERED — unified | {} | retry succeeded",
+                            dir.display(),
+                        ));
+                    }
+                    e
+                }
+                Err(e2) => {
+                    let fsinfo = network_fs_type(dir)
+                        .map(|fs| format!(" (fs={})", fs))
+                        .unwrap_or_default();
+                    crate::write_app_log(format!(
+                        "SCAN READDIR ERROR — unified | {}{} | {} (retry: {})",
+                        dir.display(), fsinfo, e, e2,
+                    ));
+                    return;
+                }
+            }
         }
     };
 

@@ -425,23 +425,24 @@
     }
     .btn-stop:active { transform: translateY(1px) scale(0.98); }
 
-    /* Settings page — CSS Grid (not multicol): WebKit release flickers/corrupts with
-       `columns:` + animated rows + dynamic perf panes. Grid row flow is stable. */
+    /* Settings page — flexbox wrap: sections pack tightly without the
+       equal-row-height dead space that CSS grid forces.  Avoids CSS columns
+       which caused WebKit release flicker with animated rows + perf panes. */
     .settings-container {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 5px;
-      padding: 10px 10px 80px;
-      align-items: start;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      padding: 6px 6px 40px;
+      align-items: flex-start;
     }
 
-    /* Search bar spans full width above the grid */
+    /* Search bar spans full width */
     .settings-search-bar {
-      grid-column: 1 / -1;
+      flex: 1 1 100%;
       margin-bottom: 0;
     }
     .settings-search-empty {
-      padding: 8px;
+      padding: 6px;
       text-align: center;
       color: var(--text-dim);
       font-size: 11px;
@@ -454,42 +455,46 @@
     /* Hit-highlight for matched text */
     .settings-search-hit { color: var(--accent); font-weight: 700; }
 
+    /* Sections fill columns — single column by default */
+    .settings-section {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+
     @media (min-width: 600px) {
-      .settings-container { padding: 10px 12px 80px; }
+      .settings-container { padding: 6px 8px 40px; }
     }
 
-    @media (min-width: 1100px) {
-      .settings-container {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+    @media (min-width: 900px) {
+      .settings-section { flex: 1 1 calc(50% - 2px); max-width: calc(50% - 2px); }
     }
 
-    @media (min-width: 1700px) {
-      .settings-container {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
+    @media (min-width: 1500px) {
+      .settings-section { flex: 1 1 calc(33.333% - 2px); max-width: calc(33.333% - 2px); }
+    }
+
+    @media (min-width: 2100px) {
+      .settings-section { flex: 1 1 calc(25% - 3px); max-width: calc(25% - 3px); }
     }
 
     .settings-section {
       overflow: visible;
-      min-width: 0;
       border: 1px solid var(--cyan);
       border-radius: 4px;
-      padding: 6px;
-      margin-bottom: 0;
+      padding: 4px;
       background: var(--bg-card);
     }
 
     .settings-heading {
       font-family: 'Orbitron', sans-serif;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
       color: var(--cyan);
       text-shadow: 0 0 8px var(--cyan-glow);
-      margin-bottom: 4px;
-      padding-bottom: 3px;
+      margin-bottom: 2px;
+      padding-bottom: 2px;
       border-bottom: 1px solid var(--border);
     }
     /* No heading glow inside settings grid — reduces WebKit compositor churn next to perf/app panes */
@@ -502,12 +507,12 @@
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 4px;
-      padding: 4px 6px;
+      gap: 3px;
+      padding: 3px 5px;
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-left: 3px solid var(--cyan);
-      margin-bottom: 1px;
+      margin-bottom: 0;
       cursor: grab;
       animation: settings-row-glow 3s ease-in-out infinite;
     }
@@ -540,30 +545,32 @@
     .settings-row-placeholder {
       border: 2px dashed var(--cyan);
       background: rgba(5,217,232,0.04);
-      margin-bottom: 2px;
-      min-height: 36px;
+      margin-bottom: 0;
+      min-height: 30px;
       border-radius: 2px;
     }
 
     .settings-label {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1px;
       min-width: 0;
-      flex: 1 1 200px;
+      flex: 1 1 180px;
     }
 
     .settings-title {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: var(--text);
       word-wrap: break-word;
+      line-height: 1.2;
     }
 
     .settings-desc {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-muted);
       word-wrap: break-word;
+      line-height: 1.2;
     }
 
     .settings-control {
@@ -574,9 +581,9 @@
     .settings-row.settings-cache-bpm-wrap {
       flex-direction: column;
       align-items: flex-start;
-      gap: 5px;
+      gap: 3px;
       width: 100%;
-      margin-bottom: 5px;
+      margin-bottom: 3px;
     }
     .settings-cache-bpm-wrap .settings-label {
       flex: 0 1 auto;
@@ -600,7 +607,7 @@
     .settings-toggle {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 6px;
       background: none;
       border: none;
       cursor: pointer;
@@ -654,13 +661,13 @@
 
     .scheme-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 5px;
-      margin-top: 4px;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 3px;
+      margin-top: 2px;
     }
 
     .scheme-btn {
-      padding: 8px 10px;
+      padding: 5px 8px;
       background: var(--bg-secondary);
       border: 1px solid var(--border);
       border-radius: 2px;
@@ -771,8 +778,8 @@
 
     .custom-color-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 4px;
     }
 
     .custom-color-item {
@@ -6204,42 +6211,42 @@
     </div>
   </div>
 
-  <script src="js/i18n-ui.js?v=89319"></script>
-  <script src="js/ipc.js?v=89319"></script>
-  <script src="js/utils.js?v=89319"></script>
-  <script src="js/drag-reorder.js?v=89319"></script>
-  <script src="js/modal-drag.js?v=89319"></script>
-  <script src="js/columns.js?v=89319"></script>
-  <script src="js/notes.js?v=89319"></script>
-  <script src="js/favorites.js?v=89319"></script>
-  <script src="js/export.js?v=89319"></script>
-  <script src="js/plugins.js?v=89319"></script>
-  <script src="js/settings.js?v=89319"></script>
-  <script src="js/history.js?v=89319"></script>
-  <script src="js/kvr.js?v=89319"></script>
-  <script src="js/audio.js?v=89319"></script>
-  <script src="js/daw.js?v=89319"></script>
-  <script src="js/presets.js?v=89319"></script>
-  <script src="js/disk-usage.js?v=89319"></script>
-  <script src="js/batch-select.js?v=89319"></script>
-  <script src="js/sort-persist.js?v=89319"></script>
-  <script src="js/multi-filter.js?v=89319"></script>
-  <script src="js/file-browser.js?v=89319"></script>
-  <script src="js/duplicates.js?v=89319"></script>
-  <script src="js/command-palette.js?v=89319"></script>
-  <script src="js/xref.js?v=89319"></script>
-  <script src="js/dep-graph.js?v=89319"></script>
-  <script src="js/smart-playlists.js?v=89319"></script>
-  <script src="js/heatmap-dashboard.js?v=89319"></script>
-  <script src="js/midi.js?v=89319"></script>
-  <script src="js/pdf.js?v=89319"></script>
-  <script src="js/settings-search.js?v=89319"></script>
-  <script src="js/visualizer.js?v=89319"></script>
-  <script src="js/walker-status.js?v=89319"></script>
-  <script src="js/context-menu.js?v=89319"></script>
-  <script src="js/help-overlay.js?v=89319"></script>
-  <script src="js/shortcuts.js?v=89319"></script>
-  <script src="js/keyboard-nav.js?v=89319"></script>
-  <script src="js/app.js?v=89319"></script>
+  <script src="js/i18n-ui.js?v=79913"></script>
+  <script src="js/ipc.js?v=79913"></script>
+  <script src="js/utils.js?v=79913"></script>
+  <script src="js/drag-reorder.js?v=79913"></script>
+  <script src="js/modal-drag.js?v=79913"></script>
+  <script src="js/columns.js?v=79913"></script>
+  <script src="js/notes.js?v=79913"></script>
+  <script src="js/favorites.js?v=79913"></script>
+  <script src="js/export.js?v=79913"></script>
+  <script src="js/plugins.js?v=79913"></script>
+  <script src="js/settings.js?v=79913"></script>
+  <script src="js/history.js?v=79913"></script>
+  <script src="js/kvr.js?v=79913"></script>
+  <script src="js/audio.js?v=79913"></script>
+  <script src="js/daw.js?v=79913"></script>
+  <script src="js/presets.js?v=79913"></script>
+  <script src="js/disk-usage.js?v=79913"></script>
+  <script src="js/batch-select.js?v=79913"></script>
+  <script src="js/sort-persist.js?v=79913"></script>
+  <script src="js/multi-filter.js?v=79913"></script>
+  <script src="js/file-browser.js?v=79913"></script>
+  <script src="js/duplicates.js?v=79913"></script>
+  <script src="js/command-palette.js?v=79913"></script>
+  <script src="js/xref.js?v=79913"></script>
+  <script src="js/dep-graph.js?v=79913"></script>
+  <script src="js/smart-playlists.js?v=79913"></script>
+  <script src="js/heatmap-dashboard.js?v=79913"></script>
+  <script src="js/midi.js?v=79913"></script>
+  <script src="js/pdf.js?v=79913"></script>
+  <script src="js/settings-search.js?v=79913"></script>
+  <script src="js/visualizer.js?v=79913"></script>
+  <script src="js/walker-status.js?v=79913"></script>
+  <script src="js/context-menu.js?v=79913"></script>
+  <script src="js/help-overlay.js?v=79913"></script>
+  <script src="js/shortcuts.js?v=79913"></script>
+  <script src="js/keyboard-nav.js?v=79913"></script>
+  <script src="js/app.js?v=79913"></script>
 </body>
 </html>

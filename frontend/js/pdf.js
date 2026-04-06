@@ -34,6 +34,7 @@ async function fetchPdfPage() {
     const tbody = document.getElementById('pdfTableBody');
     if (tbody) {
       const needle = search ? search.trim().toLowerCase() : '';
+      const mode = _lastPdfMode;
       const rows = tbody.rows;
       let visible = 0;
       for (let i = 0; i < rows.length; i++) {
@@ -42,7 +43,13 @@ async function fetchPdfPage() {
         if (name === undefined) continue;
         const match = !needle || name.includes(needle);
         r.style.display = match ? '' : 'none';
-        if (match) visible++;
+        if (match) {
+          visible++;
+          const nameCell = r.querySelector('.col-name');
+          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, mode, highlightMatch);
+          const pathCell = r.querySelector('.col-path');
+          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, highlightMatch);
+        }
       }
       _pdfTotalCount = visible;
     }
@@ -170,8 +177,8 @@ function buildPdfRow(p) {
     : cached.toLocaleString();
   return `<tr data-pdf-path="${hp}" data-pdf-name="${escapeHtml((p.name || '').toLowerCase())}" style="cursor: pointer;" title="${rowTt}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
-    <td>${_lastPdfSearch ? highlightMatch(p.name, _lastPdfSearch, _lastPdfMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
-    <td title="${hp}">${_lastPdfSearch ? highlightMatch(p.directory, _lastPdfSearch, _lastPdfMode) : escapeHtml(p.directory)}</td>
+    <td class="col-name" title="${escapeHtml(p.name)}">${_lastPdfSearch ? highlightMatch(p.name, _lastPdfSearch, _lastPdfMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
+    <td class="col-path" title="${hp}">${_lastPdfSearch ? highlightMatch(p.directory, _lastPdfSearch, _lastPdfMode) : escapeHtml(p.directory)}</td>
     <td class="col-size">${p.sizeFormatted}</td>
     <td class="col-pages" data-pdf-pages-cell="${hp}" style="text-align:right;">${pagesCell}</td>
     <td class="col-date">${p.modified}</td>

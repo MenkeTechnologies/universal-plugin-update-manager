@@ -903,6 +903,7 @@ async function fetchAudioPage() {
     const tbody = document.getElementById('audioTableBody');
     if (tbody) {
       const needle = search ? search.trim().toLowerCase() : '';
+      const mode = _lastAudioMode;
       const rows = tbody.rows;
       let visible = 0;
       for (let i = 0; i < rows.length; i++) {
@@ -913,7 +914,17 @@ async function fetchAudioPage() {
         if (fmtSet && !fmtSet.has(fmt)) match = false;
         if (match && needle && !r.dataset.audioName.includes(needle)) match = false;
         r.style.display = match ? '' : 'none';
-        if (match) visible++;
+        if (match) {
+          visible++;
+          // Apply search text highlights to visible rows
+          const nameCell = r.querySelector('.col-name');
+          const path = r.dataset.audioPath;
+          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, mode, (t, q, m) => highlightBasenameFromPath(path, t, q, m));
+          const fmtSpan = r.querySelector('.col-format .format-badge');
+          if (fmtSpan) fmtSpan.innerHTML = search ? highlightMatch(fmt, search, mode) : escapeHtml(fmt);
+          const pathCell = r.querySelector('.col-path');
+          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, (t, q, m) => highlightPathPrefixFromPath(pathCell.title, t, q, m));
+        }
       }
       audioTotalCount = visible;
     }

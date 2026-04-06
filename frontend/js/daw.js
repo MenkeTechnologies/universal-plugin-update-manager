@@ -30,6 +30,7 @@ async function fetchDawPage() {
     const tbody = document.getElementById('dawTableBody');
     if (tbody) {
       const needle = search ? search.trim().toLowerCase() : '';
+      const mode = _lastDawMode;
       const rows = tbody.rows;
       let visible = 0;
       for (let i = 0; i < rows.length; i++) {
@@ -40,7 +41,13 @@ async function fetchDawPage() {
         if (dawSet && !dawSet.has(daw)) match = false;
         if (match && needle && !r.dataset.dawSearch.includes(needle)) match = false;
         r.style.display = match ? '' : 'none';
-        if (match) visible++;
+        if (match) {
+          visible++;
+          const nameCell = r.querySelector('.col-name');
+          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, mode, highlightMatch);
+          const pathCell = r.querySelector('.col-path');
+          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, (t, q, m) => highlightMatch(t, q, m));
+        }
       }
       _dawTotalCount = visible;
     }

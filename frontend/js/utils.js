@@ -379,6 +379,18 @@ function highlightPathPrefixFromPath(path, dirField, query, mode) {
   return highlightWithIndices(dirField, mapped);
 }
 
+/**
+ * Apply search highlights to a name cell during scan DOM-toggle filtering.
+ * Preserves .row-badge spans while replacing the text portion with highlighted HTML.
+ */
+function applyScanCellHighlight(cell, originalText, search, mode, hlFn) {
+  if (!cell) return;
+  // Preserve badge spans
+  const badges = cell.querySelectorAll('.row-badge');
+  const badgeHtml = Array.from(badges).map(b => b.outerHTML).join('');
+  cell.innerHTML = (search ? hlFn(originalText, search, mode) : escapeHtml(originalText)) + badgeHtml;
+}
+
 // Extension-to-dropdown value mapping for auto-select
 const EXT_TO_FILTER = {
   // Audio formats
