@@ -470,10 +470,11 @@ function applyNeonGlowSetting(on) {
 }
 
 function formatCacheSize(bytes) {
-  if (bytes === 0) return '0 B';
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+  const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
+  return (n / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
 }
 
 /** Maps `db_cache_stats` row `key` → `appFmt` catalog key (Database Caches table). */
@@ -506,6 +507,7 @@ async function renderCacheStats() {
   if (!grid) return;
   try {
     const stats = await window.vstUpdater.dbCacheStats();
+    const rows = Array.isArray(stats) ? stats : [];
     const _cf = catalogFmt;
     grid.innerHTML = `<table style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;">
       <thead><tr style="color:var(--cyan);font-size:10px;text-transform:uppercase;letter-spacing:1px;">
@@ -514,7 +516,7 @@ async function renderCacheStats() {
         <th style="text-align:right;padding:4px 8px;">${_cf('ui.settings.cache_table_size')}</th>
         <th style="text-align:center;padding:4px 8px;width:60px;"></th>
       </tr></thead>
-      <tbody>${stats.map(s => {
+      <tbody>${rows.map(s => {
         let countStr = '';
         if (s.count > 0) {
           if (s.total > 0 && s.key !== 'database' && !s.key.includes('_scans')) {
@@ -527,7 +529,7 @@ async function renderCacheStats() {
         } else {
           countStr = s.key === 'database' ? '' : '0';
         }
-        const sizeStr = formatCacheSize(s.sizeBytes);
+        const sizeStr = formatCacheSize(s.sizeBytes ?? s.size_bytes);
         const canClear = s.key !== 'database' && !s.key.includes('_scans');
         // On-demand caches: expose a BUILD action when the cache is empty so users
         // don't have to hunt through the UI for the individual trigger.
@@ -543,11 +545,17 @@ async function renderCacheStats() {
         return `<tr style="border-bottom:1px solid rgba(26,26,62,0.2);">
           <td style="padding:4px 8px;color:var(--text);">${safeLabel}</td>
           <td style="padding:4px 8px;text-align:right;color:var(--text-muted);">${countStr}</td>
-          <td style="padding:4px 8px;text-align:right;color:${s.sizeBytes > 10*1024*1024 ? 'var(--yellow)' : 'var(--text-muted)'};">${sizeStr}</td>
+          <td style="padding:4px 8px;text-align:right;color:${(Number(s.sizeBytes ?? s.size_bytes) || 0) > 10*1024*1024 ? 'var(--yellow)' : 'var(--text-muted)'};">${sizeStr}</td>
           <td style="padding:4px 8px;text-align:center;">${action}</td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;
+    if (typeof window.balanceSettingsColumns === 'function') {
+      window._columnsBalanced = false;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => window.balanceSettingsColumns(true));
+      });
+    }
   } catch (e) {
     const msg = catalogFmt('ui.settings.cache_load_failed', { err: e.message || String(e) });
     grid.innerHTML = `<span style="color:var(--red);font-size:11px;">${typeof escapeHtml === 'function' ? escapeHtml(msg) : msg}</span>`;
@@ -1658,8 +1666,8 @@ function initSettingsSectionDrag() {
 
   // Balance CSS columns — deferred until settings tab is visible (offsetHeight=0 when hidden)
   window._columnsBalanced = false;
-  window.balanceSettingsColumns = function() {
-    if (window._columnsBalanced) return;
+  window.balanceSettingsColumns = function(force) {
+    if (window._columnsBalanced && !force) return;
     const sections = [...container.querySelectorAll('.settings-section[data-section]')];
     if (!sections.length || sections[0].offsetHeight === 0) return; // still hidden
     window._columnsBalanced = true;

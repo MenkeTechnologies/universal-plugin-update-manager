@@ -212,6 +212,9 @@ pub struct CacheStat {
     pub size_bytes: u64,
 }
 
+/// Prefer the latest finalized audio scan; if none (e.g. streaming scan before parent row updated), use latest by timestamp.
+const ACTIVE_AUDIO_SCAN_ID_SQL: &str = "COALESCE((SELECT id FROM audio_scans WHERE sample_count > 0 ORDER BY timestamp DESC LIMIT 1),(SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1))";
+
 // ── Generic paginated query result for plugins/DAW/presets ──
 
 #[derive(Debug, Serialize)]
@@ -906,6 +909,8 @@ impl Database {
     pub fn insert_audio_batch(&self, scan_id: &str, samples: &[AudioSample]) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut inserted: u64 = 0;
+        let mut batch_bytes: u64 = 0;
         {
             // INSERT OR IGNORE (not REPLACE) so auto-increment ids stay stable —
             // FTS5 rowid is linked to audio_samples.id and REPLACE would break that
@@ -947,8 +952,17 @@ impl Database {
                     fts_stmt
                         .execute(params![id, s.name, s.path, scan_id])
                         .map_err(|e| e.to_string())?;
+                    inserted += 1;
+                    batch_bytes += s.size;
                 }
             }
+        }
+        // Increment parent row counts so history is accurate mid-scan.
+        if inserted > 0 {
+            tx.execute(
+                "UPDATE audio_scans SET sample_count = sample_count + ?2, total_bytes = total_bytes + ?3 WHERE id = ?1",
+                params![scan_id, inserted, batch_bytes],
+            ).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(())
@@ -2097,21 +2111,29 @@ impl Database {
     // ── Audio scan full CRUD (using existing tables) ──
 
     pub fn save_audio_scan_full(&self, snap: &AudioScanSnapshot) -> Result<(), String> {
+        // Write parent with 0 counts — insert_audio_batch increments live.
+        // Finalize afterwards to set the authoritative totals (including format_counts).
         self.save_scan(
             &snap.id,
             &snap.timestamp,
-            snap.sample_count as u64,
-            snap.total_bytes,
+            0,
+            0,
             &snap.format_counts,
             &snap.roots,
         )?;
-        self.insert_audio_batch(&snap.id, &snap.samples)
+        self.insert_audio_batch(&snap.id, &snap.samples)?;
+        self.audio_scan_parent_finalize(
+            &snap.id,
+            snap.sample_count as u64,
+            snap.total_bytes,
+            &snap.format_counts,
+        )
     }
 
     pub fn get_audio_scans_list(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM audio_samples WHERE scan_id = s.id), s.total_bytes, s.format_counts, s.roots FROM audio_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM audio_samples WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM audio_samples WHERE scan_id = s.id)), s.format_counts, s.roots FROM audio_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2168,11 +2190,16 @@ impl Database {
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
+        // Derive count + total_bytes from child rows so the detail view is
+        // correct even when parent_finalize never ran (streaming scan stopped
+        // or finalize silently failed).
+        let live_count = samples.len();
+        let live_bytes: u64 = samples.iter().map(|s| s.size).sum();
         Ok(AudioScanSnapshot {
             id: id.to_string(),
             timestamp: ts,
-            sample_count: sc,
-            total_bytes: tb,
+            sample_count: if sc > 0 { sc } else { live_count },
+            total_bytes: if tb > 0 { tb } else { live_bytes },
             format_counts: serde_json::from_str(&fc_str).unwrap_or_default(),
             samples,
             roots: serde_json::from_str(&roots_str).unwrap_or_default(),
@@ -2254,6 +2281,8 @@ impl Database {
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut inserted: u64 = 0;
+        let mut batch_bytes: u64 = 0;
         {
             let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO daw_projects (name, path, directory, format, daw, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").map_err(|e| e.to_string())?;
             let mut fts_stmt = tx.prepare_cached("INSERT INTO daw_projects_fts(rowid, name, path, daw, scan_id) VALUES (?1,?2,?3,?4,?5)").map_err(|e| e.to_string())?;
@@ -2273,8 +2302,16 @@ impl Database {
                 if changed > 0 {
                     let id = tx.last_insert_rowid();
                     fts_stmt.execute(params![id, p.name, p.path, p.daw, scan_id]).map_err(|e| e.to_string())?;
+                    inserted += 1;
+                    batch_bytes += p.size;
                 }
             }
+        }
+        if inserted > 0 {
+            tx.execute(
+                "UPDATE daw_scans SET project_count = project_count + ?2, total_bytes = total_bytes + ?3 WHERE id = ?1",
+                params![scan_id, inserted, batch_bytes],
+            ).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())
     }
@@ -2328,7 +2365,7 @@ impl Database {
         // Count from child rows so the History tab stays correct even if parent totals
         // were never finalized (streaming scans) or finalize failed silently.
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM daw_projects WHERE scan_id = s.id), s.total_bytes, s.daw_counts, s.roots FROM daw_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM daw_projects WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM daw_projects WHERE scan_id = s.id)), s.daw_counts, s.roots FROM daw_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2370,11 +2407,13 @@ impl Database {
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
+        let live_count = projects.len();
+        let live_bytes: u64 = projects.iter().map(|p| p.size).sum();
         Ok(DawScanSnapshot {
             id: id.to_string(),
             timestamp: ts,
-            project_count: pc,
-            total_bytes: tb,
+            project_count: if pc > 0 { pc } else { live_count },
+            total_bytes: if tb > 0 { tb } else { live_bytes },
             daw_counts: serde_json::from_str(&dc_str).unwrap_or_default(),
             projects,
             roots: serde_json::from_str(&roots_str).unwrap_or_default(),
@@ -2457,6 +2496,8 @@ impl Database {
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut inserted: u64 = 0;
+        let mut batch_bytes: u64 = 0;
         {
             let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO presets (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
             let mut fts_stmt = tx.prepare_cached("INSERT INTO presets_fts(rowid, name, path, format, scan_id) VALUES (?1,?2,?3,?4,?5)").map_err(|e| e.to_string())?;
@@ -2475,8 +2516,16 @@ impl Database {
                 if changed > 0 {
                     let id = tx.last_insert_rowid();
                     fts_stmt.execute(params![id, p.name, p.path, p.format, scan_id]).map_err(|e| e.to_string())?;
+                    inserted += 1;
+                    batch_bytes += p.size;
                 }
             }
+        }
+        if inserted > 0 {
+            tx.execute(
+                "UPDATE preset_scans SET preset_count = preset_count + ?2, total_bytes = total_bytes + ?3 WHERE id = ?1",
+                params![scan_id, inserted, batch_bytes],
+            ).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())
     }
@@ -2521,7 +2570,7 @@ impl Database {
     pub fn get_preset_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM presets WHERE scan_id = s.id), s.total_bytes, s.format_counts, s.roots FROM preset_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM presets WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM presets WHERE scan_id = s.id)), s.format_counts, s.roots FROM preset_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2562,11 +2611,13 @@ impl Database {
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
+        let live_count = presets.len();
+        let live_bytes: u64 = presets.iter().map(|p| p.size).sum();
         Ok(PresetScanSnapshot {
             id: id.to_string(),
             timestamp: ts,
-            preset_count: pc,
-            total_bytes: tb,
+            preset_count: if pc > 0 { pc } else { live_count },
+            total_bytes: if tb > 0 { tb } else { live_bytes },
             format_counts: serde_json::from_str(&fc_str).unwrap_or_default(),
             presets,
             roots: serde_json::from_str(&roots_str).unwrap_or_default(),
@@ -2649,6 +2700,8 @@ impl Database {
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut inserted: u64 = 0;
+        let mut batch_bytes: u64 = 0;
         {
             let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO midi_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
             let mut fts_stmt = tx.prepare_cached("INSERT INTO midi_files_fts(rowid, name, path, scan_id) VALUES (?1,?2,?3,?4)").map_err(|e| e.to_string())?;
@@ -2667,8 +2720,16 @@ impl Database {
                 if changed > 0 {
                     let id = tx.last_insert_rowid();
                     fts_stmt.execute(params![id, m.name, m.path, scan_id]).map_err(|e| e.to_string())?;
+                    inserted += 1;
+                    batch_bytes += m.size;
                 }
             }
+        }
+        if inserted > 0 {
+            tx.execute(
+                "UPDATE midi_scans SET midi_count = midi_count + ?2, total_bytes = total_bytes + ?3 WHERE id = ?1",
+                params![scan_id, inserted, batch_bytes],
+            ).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())
     }
@@ -2719,7 +2780,7 @@ impl Database {
     pub fn get_midi_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM midi_files WHERE scan_id = s.id), s.total_bytes, s.format_counts, s.roots FROM midi_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM midi_files WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM midi_files WHERE scan_id = s.id)), s.format_counts, s.roots FROM midi_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2760,11 +2821,13 @@ impl Database {
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
+        let live_count = midi_files.len();
+        let live_bytes: u64 = midi_files.iter().map(|m| m.size).sum();
         Ok(MidiScanSnapshot {
             id: id.to_string(),
             timestamp: ts,
-            midi_count: mc,
-            total_bytes: tb,
+            midi_count: if mc > 0 { mc } else { live_count },
+            total_bytes: if tb > 0 { tb } else { live_bytes },
             format_counts: serde_json::from_str(&fc_str).unwrap_or_default(),
             midi_files,
             roots: serde_json::from_str(&roots_str).unwrap_or_default(),
@@ -3094,6 +3157,8 @@ impl Database {
     pub fn insert_pdf_batch(&self, scan_id: &str, pdfs: &[PdfFile]) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut inserted: u64 = 0;
+        let mut batch_bytes: u64 = 0;
         {
             let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO pdfs (name, path, directory, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7)").map_err(|e| e.to_string())?;
             let mut fts_stmt = tx.prepare_cached("INSERT INTO pdfs_fts(rowid, name, path, scan_id) VALUES (?1,?2,?3,?4)").map_err(|e| e.to_string())?;
@@ -3111,8 +3176,16 @@ impl Database {
                 if changed > 0 {
                     let id = tx.last_insert_rowid();
                     fts_stmt.execute(params![id, p.name, p.path, scan_id]).map_err(|e| e.to_string())?;
+                    inserted += 1;
+                    batch_bytes += p.size;
                 }
             }
+        }
+        if inserted > 0 {
+            tx.execute(
+                "UPDATE pdf_scans SET pdf_count = pdf_count + ?2, total_bytes = total_bytes + ?3 WHERE id = ?1",
+                params![scan_id, inserted, batch_bytes],
+            ).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())
     }
@@ -3155,7 +3228,7 @@ impl Database {
     pub fn get_pdf_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM pdfs WHERE scan_id = s.id), s.total_bytes, s.roots FROM pdf_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM pdfs WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = s.id)), s.roots FROM pdf_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -3200,11 +3273,13 @@ impl Database {
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
+        let live_count = pdfs.len();
+        let live_bytes: u64 = pdfs.iter().map(|p| p.size).sum();
         Ok(PdfScanSnapshot {
             id: id.to_string(),
             timestamp: ts,
-            pdf_count: pc,
-            total_bytes: tb,
+            pdf_count: if pc > 0 { pc } else { live_count },
+            total_bytes: if tb > 0 { tb } else { live_bytes },
             pdfs,
             roots: serde_json::from_str(&roots_str).unwrap_or_default(),
         })
@@ -4196,7 +4271,7 @@ impl Database {
 
         // Analysis caches (columns on audio_samples)
         let total_samples: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM audio_samples WHERE scan_id = (SELECT id FROM audio_scans WHERE sample_count > 0 ORDER BY timestamp DESC LIMIT 1)",
+            &format!("SELECT COUNT(*) FROM audio_samples WHERE scan_id = ({ACTIVE_AUDIO_SCAN_ID_SQL})"),
             [], |r| r.get(0),
         ).unwrap_or(0);
         for (label, col, key) in [
@@ -4205,7 +4280,7 @@ impl Database {
             ("LUFS", "lufs", "lufs"),
         ] {
             let count: u64 = conn.query_row(
-                &format!("SELECT COUNT(*) FROM audio_samples WHERE {col} IS NOT NULL AND scan_id = (SELECT id FROM audio_scans WHERE sample_count > 0 ORDER BY timestamp DESC LIMIT 1)"),
+                &format!("SELECT COUNT(*) FROM audio_samples WHERE {col} IS NOT NULL AND scan_id = ({ACTIVE_AUDIO_SCAN_ID_SQL})"),
                 [], |r| r.get(0),
             ).unwrap_or(0);
             stats.push(CacheStat {
