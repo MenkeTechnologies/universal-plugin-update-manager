@@ -1,8 +1,8 @@
 /**
  * Mirrors `src-tauri/src/app_i18n.rs` seed invariants that are not covered by
  * `i18n-locales-and-shape.test.js` / `i18n-placeholders.test.js`:
- * - `seed_json_appfmt_placeholders_preserved_…_uk_vi_id_hi` (Rust; here: strict token multiset parity for `de`/`el`/`es`/`fi`/`fr`/`it`/`nl`/`pl`/`pt`/`pt_br`/`ru`/`sv`/`zh`/`ja`/`ko`/`da`/`nb`/`tr`/`cs`/`hu`/`ro`/`uk`/`vi`/`id`/`hi`; JS multiset is stricter than Rust substring check)
- * - `seed_json_es_critical_prefixes_match_en_placeholders`
+ * - `seed_json_appfmt_placeholders_preserved_…_uk_vi_id_hi` (Rust; here: strict token multiset parity for `de`/`el`/`es`/`es_419`/`fi`/`fr`/`it`/`nl`/`pl`/`pt`/`pt_br`/`ru`/`sv`/`zh`/`ja`/`ko`/`da`/`nb`/`tr`/`cs`/`hu`/`ro`/`uk`/`vi`/`id`/`hi`; JS multiset is stricter than Rust substring check)
+ * - `seed_json_es_critical_prefixes_match_en_placeholders` + `seed_json_es_419_critical_prefixes_match_en_placeholders`
  * - `seed_json_en_defines_all_native_menu_bar_keys` + `seed_json_en_defines_all_tray_keys`
  *
  * Keep `NATIVE_MENU_BAR_KEYS` / `TRAY_KEYS` in sync with `app_i18n.rs` `#[cfg(test)]` consts.
@@ -114,12 +114,13 @@ function isEsCriticalPrefix(k) {
   );
 }
 
-test('de, el, es, fi, fr, it, nl, pl, pt, pt_br, ru, sv, zh, ja, ko, da, nb, tr, cs, hu, ro, uk, vi, id, hi: appFmt placeholder token multiset matches English for every key', () => {
+test('de, el, es, es_419, fi, fr, it, nl, pl, pt, pt_br, ru, sv, zh, ja, ko, da, nb, tr, cs, hu, ro, uk, vi, id, hi: appFmt placeholder token multiset matches English for every key', () => {
   const en = loadMap('app_i18n_en.json');
   for (const loc of [
     'de',
     'el',
     'es',
+    'es_419',
     'fi',
     'fr',
     'it',
@@ -178,6 +179,26 @@ test('es: critical prefixes preserve every English {token} substring (Rust seed_
   );
 });
 
+test('es_419: critical prefixes preserve every English {token} substring (Rust seed_json rule)', () => {
+  const en = loadMap('app_i18n_en.json');
+  const es419 = loadMap('app_i18n_es_419.json');
+  const bad = [];
+  for (const [k, enVal] of Object.entries(en)) {
+    if (!isEsCriticalPrefix(k)) continue;
+    const placeholders = enVal.match(RUST_PLACEHOLDER) ?? [];
+    if (placeholders.length === 0) continue;
+    const v = es419[k];
+    for (const p of placeholders) {
+      if (!v.includes(p)) bad.push({ k, missing: p, en: enVal, es_419: v });
+    }
+  }
+  assert.deepEqual(
+    bad,
+    [],
+    `es_419 critical: ${bad.length} missing placeholder(s) (first key ${bad[0]?.k ?? ''})`
+  );
+});
+
 test('es: menu.* and tray.* appFmt token multiset matches English (native menu + tray)', () => {
   const en = loadMap('app_i18n_en.json');
   const es = loadMap('app_i18n_es.json');
@@ -192,6 +213,23 @@ test('es: menu.* and tray.* appFmt token multiset matches English (native menu +
     bad,
     [],
     `es menu/tray: ${bad.length} key(s) differ in {token} multiset vs English (first: ${bad[0]?.k ?? ''})`
+  );
+});
+
+test('es_419: menu.* and tray.* appFmt token multiset matches English (native menu + tray)', () => {
+  const en = loadMap('app_i18n_en.json');
+  const es419 = loadMap('app_i18n_es_419.json');
+  const bad = [];
+  for (const k of Object.keys(en)) {
+    if (!k.startsWith('menu.') && !k.startsWith('tray.')) continue;
+    const a = JSON.stringify(ipcTokenMultiset(en[k]));
+    const b = JSON.stringify(ipcTokenMultiset(es419[k]));
+    if (a !== b) bad.push({ k, en: en[k], es_419: es419[k] });
+  }
+  assert.deepEqual(
+    bad,
+    [],
+    `es_419 menu/tray: ${bad.length} key(s) differ in {token} multiset vs English (first: ${bad[0]?.k ?? ''})`
   );
 });
 

@@ -17,7 +17,7 @@ The script fails if a key already exists (prevents accidental overwrites). Rebui
 
 **Settings → Interface language** only saves `uiLocale` to prefs. The **next app launch** runs `reloadAppStrings` (and `refresh_native_menu`) so the UI and native menu bar match the saved locale. Changing the dropdown does **not** reload strings in the current session. Editing `i18n/app_i18n_*.json` still requires a rebuild (and restart) for the bundled SQLite seed to change.
 
-## Other locales (`cs` — Czech, `da`, `de`, `es`, `sv`, `fr`, `nl`, `pt` — Portuguese, `pt-BR` — Brazilian Portuguese (`app_i18n_pt_br.json`), `it`, `el`, `pl`, `ru`, `zh` — Simplified Chinese, `ja` — Japanese, `ko` — Korean, `fi` — Finnish, `nb` — Norwegian Bokmål, `tr` — Turkish, `hu` — Hungarian, `id` — Indonesian, `hi` — Hindi, `ro` — Romanian, `uk` — Ukrainian, `vi` — Vietnamese)
+## Other locales (`cs` — Czech, `da`, `de`, `es`, `es-419` — Latin American Spanish (`app_i18n_es_419.json`), `sv`, `fr`, `nl`, `pt` — Portuguese, `pt-BR` — Brazilian Portuguese (`app_i18n_pt_br.json`), `it`, `el`, `pl`, `ru`, `zh` — Simplified Chinese, `ja` — Japanese, `ko` — Korean, `fi` — Finnish, `nb` — Norwegian Bokmål, `tr` — Turkish, `hu` — Hungarian, `id` — Indonesian, `hi` — Hindi, `ro` — Romanian, `uk` — Ukrainian, `vi` — Vietnamese)
 
 - **Full machine translation** (slow; needs network). Regenerate **all** shipped non-English catalogs from English in one go:
 
@@ -32,6 +32,7 @@ Or run per-locale generators individually:
 ```bash
 .venv-i18n/bin/python scripts/gen_app_i18n_de.py
 .venv-i18n/bin/python scripts/gen_app_i18n_es.py
+.venv-i18n/bin/python scripts/gen_app_i18n_es_419.py
 .venv-i18n/bin/python scripts/gen_app_i18n_sv.py
 .venv-i18n/bin/python scripts/gen_app_i18n_fr.py
 .venv-i18n/bin/python scripts/gen_app_i18n_nl.py
@@ -74,7 +75,7 @@ Run the stub sync after adding keys to `app_i18n_en.json` if you cannot run the 
 
 ### `appFmt` placeholders (`{token}`)
 
-Dynamic strings substitute **English token names** from `ipc.js` / Rust callers (e.g. `{name}`, `{err}`, `{n}`). Non-English catalogs must use the **same** `{token}` spellings as `app_i18n_en.json` for each key — translated prose around them is fine, but renaming a token to a localized word (e.g. `{nombre}` for `{name}`) breaks substitution. `node --test test/i18n-seed-parity.test.js` and `test/i18n-per-key-placeholder-parity.test.js` enforce multiset parity vs English for every shipped locale (including `es`).
+Dynamic strings substitute **English token names** from `ipc.js` / Rust callers (e.g. `{name}`, `{err}`, `{n}`). Non-English catalogs must use the **same** `{token}` spellings as `app_i18n_en.json` for each key — translated prose around them is fine, but renaming a token to a localized word (e.g. `{nombre}` for `{name}`) breaks substitution. `node --test test/i18n-seed-parity.test.js` and `test/i18n-per-key-placeholder-parity.test.js` enforce multiset parity vs English for every shipped locale (including `es` and `es_419`).
 
 ### Audit all locales (placeholder parity vs English)
 
@@ -88,7 +89,7 @@ Broader catalog checks (same key set in every JSON, HTML/JS key coverage, etc.):
 
 ## Batch merge into non-English locales only
 
-If English already contains new keys and you need the same keys in `de`/`es`/`sv`/`fr`/`nl`/`pt`/`it`/`el`/`pl`/`ru`/`zh`/`ja`/`ko`/`fi`/`da`/`nb`/`tr`/`cs`/`hu`/`id`/`ro`/`uk`/`vi` with English placeholder text until a full `gen_app_i18n_*` run:
+If English already contains new keys and you need the same keys in `de`/`es`/`es_419`/`sv`/`fr`/`nl`/`pt`/`it`/`el`/`pl`/`ru`/`zh`/`ja`/`ko`/`fi`/`da`/`nb`/`tr`/`cs`/`hu`/`id`/`ro`/`uk`/`vi` with English placeholder text until a full `gen_app_i18n_*` run:
 
 ```bash
 python3 scripts/merge_batch_into_locales.py scripts/i18n_batches/your_batch.json
@@ -100,7 +101,7 @@ python3 scripts/merge_batch_into_locales.py scripts/i18n_batches/your_batch.json
 - `test/i18n-js-keys.test.js` — string literals that look like catalog keys (`ui.*`, `menu.*`, `toast.*`, …) under `frontend/js` are defined in English.
 - `test/i18n-locales-and-shape.test.js` — every shipped locale JSON has the **same key set** as English and only non-empty string values.
 - `test/i18n-prove-all-locales-complete.test.js` — exhaustive proof: every English key exists in every locale with a non-empty value; every HTML- and JS-referenced catalog key exists in **every** locale (not only `en`).
-- `test/i18n-anchor-keys.test.js` — for keys where **cs/da/de/el/es/fi/fr/hu/id/it/ja/ko/nb/nl/pl/pt/ro/ru/sv/tr/uk/vi/zh** all differ from English, none of those locales may copy `en` verbatim.
+- `test/i18n-anchor-keys.test.js` — for keys where **cs/da/de/el/es/es_419/fi/fr/hu/id/it/ja/ko/nb/nl/pl/pt/ro/ru/sv/tr/uk/vi/zh** all differ from English, none of those locales may copy `en` verbatim.
 - `test/i18n-no-raw-showtoast.test.js` — `showToast` is not called with a raw `'…'` / `"…"` first argument (use `toastFmt('toast.*')` or `String(err)`).
 - `test/i18n-proof-contract.test.js` — no `? appFmt('…') : 'English'` / `toastFmt` patterns in `frontend/js`; use `catalogFmt` / `catalogFmtOrUnit` (`utils.js`) so strings resolve through the catalog (or the key when `appFmt` is missing in VM tests). Byte/time unit suffixes (`B`, `s`, …) use `catalogFmtOrUnit` only.
 - `test/i18n-catalog-files.test.js` — shipped locale JSON files match `app_i18n.rs` seeds, UTF-8, and **lexicographically sorted keys** (stable merges).

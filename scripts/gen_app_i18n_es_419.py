@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
-"""Build i18n/app_i18n_hi.json from app_i18n_en.json (Hindi UI).
+"""Build i18n/app_i18n_es_419.json from app_i18n_en.json (Latin American Spanish UI).
 
 Requires: pip install deep-translator (use a venv, e.g. .venv-i18n).
+
+Uses the same Google Translate target as `gen_app_i18n_es.py` (`es`); the shipped
+catalog is a distinct locale row (`es-419` in SQLite, BCP 47) so prefs can follow
+regional Spanish conventions. Re-run when `app_i18n_en.json` grows.
+
+Usage:
+  .venv-i18n/bin/python scripts/gen_app_i18n_es_419.py
 """
 from __future__ import annotations
 
 import json
 import pathlib
-import re
 import sys
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 I18N_DIR = ROOT / "i18n"
 
+# Native endonyms for the language selector (same set as `gen_app_i18n_hi.py` LANG_SELECTOR_NATIVE).
 LANG_SELECTOR_NATIVE = {
     "ui.opt.lang_cs": "Čeština",
     "ui.opt.lang_da": "Dansk",
@@ -45,31 +52,6 @@ LANG_SELECTOR_NATIVE = {
 }
 
 
-def align_placeholders(en_val: str, loc_val: str) -> str:
-    ph_en = re.findall(r"\{(\w+)\}", en_val)
-    ph_loc = re.findall(r"\{(\w+)\}", loc_val)
-    if len(ph_en) != len(ph_loc):
-        return loc_val
-    it = iter(ph_en)
-    return re.sub(r"\{[^}]+\}", lambda _: "{" + next(it) + "}", loc_val)
-
-
-def restore_ipc_placeholders(en_val: str, loc_val: str) -> str:
-    re_en = re.compile(r"\{[a-zA-Z_][a-zA-Z0-9_]*\}")
-    re_any = re.compile(r"\{[^}]+\}")
-    en_phs = re_en.findall(en_val)
-    if not en_phs:
-        return loc_val
-    loc_phs = re_any.findall(loc_val)
-    if len(loc_phs) != len(en_phs):
-        return loc_val
-    out = loc_val
-    for wrong, right in zip(loc_phs, en_phs):
-        if wrong != right:
-            out = out.replace(wrong, right, 1)
-    return out
-
-
 def main() -> None:
     try:
         from deep_translator import GoogleTranslator
@@ -77,44 +59,42 @@ def main() -> None:
         print(
             "Install deep-translator in a venv: python3 -m venv .venv-i18n && "
             ".venv-i18n/bin/pip install deep-translator && "
-            ".venv-i18n/bin/python scripts/gen_app_i18n_hi.py",
+            ".venv-i18n/bin/python scripts/gen_app_i18n_es_419.py",
             file=sys.stderr,
         )
         raise SystemExit(1) from None
 
     en_path = I18N_DIR / "app_i18n_en.json"
-    out_path = I18N_DIR / "app_i18n_hi.json"
+    out_path = I18N_DIR / "app_i18n_es_419.json"
     en: dict[str, str] = json.loads(en_path.read_text(encoding="utf-8"))
-    translator = GoogleTranslator(source="en", target="hi")
+    translator = GoogleTranslator(source="en", target="es")
 
     uniq_vals = list(dict.fromkeys(en.values()))
-    val_to: dict[str, str] = {}
+    val_to_es: dict[str, str] = {}
     for i, v in enumerate(uniq_vals):
         try:
-            val_to[v] = translator.translate(v)
+            val_to_es[v] = translator.translate(v)
         except Exception:
-            val_to[v] = v
+            val_to_es[v] = v
         if (i + 1) % 80 == 0:
             print(f"{i + 1}/{len(uniq_vals)}", flush=True)
         time.sleep(0.06)
 
-    out_map = {k: val_to[v] for k, v in en.items()}
-    for k in out_map:
-        out_map[k] = align_placeholders(en[k], out_map[k])
-        out_map[k] = restore_ipc_placeholders(en[k], out_map[k])
+    es_419 = {k: val_to_es[v] for k, v in en.items()}
+    if es_419.get("ui.opt.lang_en") in ("Inglés", "Ingles"):
+        es_419["ui.opt.lang_en"] = "English"
     for k, native in LANG_SELECTOR_NATIVE.items():
-        if k in out_map:
-            out_map[k] = native
-    for k in list(out_map.keys()):
-        if "{Name}" in out_map[k]:
-            out_map[k] = out_map[k].replace("{Name}", "{name}")
-    # MT often drops `{count}` for this string in Hindi; `appFmt` requires the English token name.
-    k_pdf = "ui.history.footer_pdfs_other"
-    if k_pdf in out_map and "{count}" not in out_map[k_pdf]:
-        out_map[k_pdf] = "{count} PDF इस स्कैन में"
+        if k in es_419:
+            es_419[k] = native
+    for k in list(es_419.keys()):
+        if "{Name}" in es_419[k]:
+            es_419[k] = es_419[k].replace("{Name}", "{name}")
 
-    out_path.write_text(json.dumps(out_map, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"Wrote {len(out_map)} keys to {out_path}", file=sys.stderr)
+    out_path.write_text(
+        json.dumps(es_419, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(f"Wrote {len(es_419)} keys to {out_path}", file=sys.stderr)
 
 
 if __name__ == "__main__":

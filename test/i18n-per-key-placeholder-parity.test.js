@@ -4,8 +4,8 @@
  * only report the first mismatch.
  *
  * Rules mirror `src-tauri/src/app_i18n.rs` + `i18n-seed-parity.test.js`:
- * - `cs` / `da` / `de` / `el` / `es` / `fi` / `fr` / `hi` / `hu` / `id` / `it` / `nb` / `nl` / `pl` / `pt` / `pt_br` / `ro` / `ru` / `sv` / `tr` / `uk` / `vi` / `zh` / `ja` / `ko`: IPC `{token}` multiset matches English for every key that uses placeholders
- * - `es`: every English `{token}` substring must appear in the translation for `menu.*`,
+ * - `cs` / `da` / `de` / `el` / `es` / `es_419` / `fi` / `fr` / `hi` / `hu` / `id` / `it` / `nb` / `nl` / `pl` / `pt` / `pt_br` / `ro` / `ru` / `sv` / `tr` / `uk` / `vi` / `zh` / `ja` / `ko`: IPC `{token}` multiset matches English for every key that uses placeholders
+ * - `es` / `es_419`: every English `{token}` substring must appear in the translation for `menu.*`,
  *   `ui.palette.*`, `ui.sp_*`, `confirm.*` when English has placeholders (`seed_json_es_critical_prefixes`)
  */
 import assert from 'node:assert/strict';
@@ -57,6 +57,7 @@ const ja = loadMap('app_i18n_ja.json');
 const ko = loadMap('app_i18n_ko.json');
 const fi = loadMap('app_i18n_fi.json');
 const es = loadMap('app_i18n_es.json');
+const es_419 = loadMap('app_i18n_es_419.json');
 const da = loadMap('app_i18n_da.json');
 const nb = loadMap('app_i18n_nb.json');
 const tr = loadMap('app_i18n_tr.json');
@@ -78,6 +79,7 @@ const localeMaps = {
   de,
   el,
   es,
+  es_419,
   fi,
   fr,
   hi,
@@ -106,6 +108,7 @@ for (const loc of /** @type {const} */ ([
   'de',
   'el',
   'es',
+  'es_419',
   'fi',
   'fr',
   'hi',
@@ -141,17 +144,22 @@ for (const loc of /** @type {const} */ ([
   }
 }
 
-for (const k of Object.keys(en)) {
-  if (!isEsCriticalPrefix(k)) continue;
-  const placeholders = en[k].match(RUST_PLACEHOLDER) ?? [];
-  if (placeholders.length === 0) continue;
-  test(`es critical English {token} substrings preserved ${k}`, () => {
-    const v = es[k];
-    for (const p of placeholders) {
-      assert.ok(
-        v.includes(p),
-        `es key ${k}: must contain ${p} (en=${JSON.stringify(en[k])} es=${JSON.stringify(v)})`
-      );
-    }
-  });
+for (const [loc, map] of /** @type {const} */ ([
+  ['es', es],
+  ['es_419', es_419],
+])) {
+  for (const k of Object.keys(en)) {
+    if (!isEsCriticalPrefix(k)) continue;
+    const placeholders = en[k].match(RUST_PLACEHOLDER) ?? [];
+    if (placeholders.length === 0) continue;
+    test(`${loc} critical English {token} substrings preserved ${k}`, () => {
+      const v = map[k];
+      for (const p of placeholders) {
+        assert.ok(
+          v.includes(p),
+          `${loc} key ${k}: must contain ${p} (en=${JSON.stringify(en[k])} ${loc}=${JSON.stringify(v)})`
+        );
+      }
+    });
+  }
 }

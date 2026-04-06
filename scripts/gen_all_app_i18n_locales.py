@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCALE_SCRIPTS: tuple[tuple[str, str], ...] = (
     ("de", "gen_app_i18n_de.py"),
     ("es", "gen_app_i18n_es.py"),
+    ("es_419", "gen_app_i18n_es_419.py"),
     ("sv", "gen_app_i18n_sv.py"),
     ("fr", "gen_app_i18n_fr.py"),
     ("nl", "gen_app_i18n_nl.py"),

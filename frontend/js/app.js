@@ -51,6 +51,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
       [
         'de',
         'es',
+        'es-419',
         'sv',
         'fr',
         'nl',

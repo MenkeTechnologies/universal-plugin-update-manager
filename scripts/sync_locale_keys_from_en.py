@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ensure i18n/app_i18n_{de,es,sv,fr,nl,pt,pt_br,it,el,pl,ru,zh,ja,ko,fi,da,nb,tr,cs,hu,ro,uk,vi,id,hi}.json contain every key from app_i18n_en.json.
+"""Ensure i18n/app_i18n_{de,es,es_419,sv,fr,nl,pt,pt_br,it,el,pl,ru,zh,ja,ko,fi,da,nb,tr,cs,hu,ro,uk,vi,id,hi}.json contain every key from app_i18n_en.json.
 
 Missing keys are filled with the English string (stub) so the app never shows raw
 keys. Re-run scripts/gen_app_i18n_*.py with a venv when you want full machine
@@ -23,6 +23,7 @@ def main() -> None:
     for loc in (
         "de",
         "es",
+        "es_419",
         "sv",
         "fr",
         "nl",

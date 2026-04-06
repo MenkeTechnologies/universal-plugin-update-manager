@@ -59,6 +59,7 @@ macro_rules! locale_map {
 locale_map!(CELL_EN, map_en, "app_i18n_en.json");
 locale_map!(CELL_DE, map_de, "app_i18n_de.json");
 locale_map!(CELL_ES, map_es, "app_i18n_es.json");
+locale_map!(CELL_ES_419, map_es_419, "app_i18n_es_419.json");
 locale_map!(CELL_SV, map_sv, "app_i18n_sv.json");
 locale_map!(CELL_FR, map_fr, "app_i18n_fr.json");
 locale_map!(CELL_NL, map_nl, "app_i18n_nl.json");
@@ -86,6 +87,10 @@ seq!(N in 0..1024 {
     #[test]
     fn es_bucket~N() {
         check_bucket(map_es(), "es", N);
+    }
+    #[test]
+    fn es_419_bucket~N() {
+        check_bucket(map_es_419(), "es-419", N);
     }
     #[test]
     fn sv_bucket~N() {

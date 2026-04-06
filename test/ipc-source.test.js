@@ -76,6 +76,7 @@ describe('frontend/js/ipc.js (vm-loaded)', () => {
 
   const supportedLocales = [
     'es',
+    'es-419',
     'sv',
     'pt',
     'pt-BR',

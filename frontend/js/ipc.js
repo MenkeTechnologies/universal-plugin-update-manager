@@ -30,6 +30,7 @@ async function reloadAppStrings(locale) {
     const loc =
         locale === 'de' ||
         locale === 'es' ||
+        locale === 'es-419' ||
         locale === 'sv' ||
         locale === 'fr' ||
         locale === 'pt' ||
