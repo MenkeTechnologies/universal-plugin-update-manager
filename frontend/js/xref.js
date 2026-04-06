@@ -428,7 +428,11 @@ async function showXmlProjectViewer(filePath, projectName) {
     document.getElementById('projExportBtn')?.addEventListener('click', async () => {
       const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
       if (!dialogApi) return;
-      const savePath = await dialogApi.save({ title: 'Export XML', defaultPath: projectName + '.xml', filters: [{ name: 'XML', extensions: ['xml'] }] });
+      const savePath = await dialogApi.save({
+        title: catalogFmt('ui.dialog.export_xml'),
+        defaultPath: projectName + '.xml',
+        filters: [{ name: catalogFmt('ui.file_filter.xml'), extensions: ['xml'] }],
+      });
       if (savePath) { await window.vstUpdater.writeTextFile(savePath, xml); showToast(toastFmt('toast.xml_exported')); }
     });
   } catch (e) {
@@ -589,9 +593,9 @@ async function showAlsViewer(filePath, projectName) {
       const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
       if (!dialogApi) return;
       const savePath = await dialogApi.save({
-        title: 'Save Decompressed XML',
+        title: catalogFmt('ui.dialog.save_decompressed_xml'),
         defaultPath: projectName.replace(/\\.als$/i, '') + '.xml',
-        filters: [{ name: 'XML', extensions: ['xml'] }],
+        filters: [{ name: catalogFmt('ui.file_filter.xml'), extensions: ['xml'] }],
       });
       if (savePath) {
         await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: xml });
@@ -789,9 +793,9 @@ async function showBwViewer(filePath, projectName) {
       const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
       if (!dialogApi) return;
       const savePath = await dialogApi.save({
-        title: 'Export Bitwig Project Data',
+        title: catalogFmt('ui.dialog.export_bitwig_project_data'),
         defaultPath: projectName.replace(/\.bwproject$/i, '') + '.json',
-        filters: [{ name: 'JSON', extensions: ['json'] }],
+        filters: [{ name: catalogFmt('ui.file_filter.json'), extensions: ['json'] }],
       });
       if (savePath) {
         await window.__TAURI__.core.invoke('write_text_file', { filePath: savePath, contents: jsonStr });

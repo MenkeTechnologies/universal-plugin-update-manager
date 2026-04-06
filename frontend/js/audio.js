@@ -368,8 +368,44 @@ audioPlayer.addEventListener('ended', () => {
 let _playbackRafId = null;
 function _playbackRafLoop() {
   updatePlaybackTime();
+  _renderNpFft();
   if (!audioPlayer.paused) {
     _playbackRafId = requestAnimationFrame(_playbackRafLoop);
+  }
+}
+
+// Mini FFT frequency bar visualization next to the waveform bar.
+// Uses the existing _analyser (fftSize=4096) — draws ~16 bars covering
+// low-to-high frequencies on a 64×24 canvas.
+let _npFftBuf = null;
+function _renderNpFft() {
+  if (!_analyser) return;
+  const canvas = document.getElementById('npFftCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  if (!_npFftBuf) _npFftBuf = new Uint8Array(_analyser.frequencyBinCount);
+  _analyser.getByteFrequencyData(_npFftBuf);
+  ctx.clearRect(0, 0, w, h);
+  // Draw 16 bars from logarithmically-spaced frequency bins
+  const bars = 16;
+  const barW = (w / bars) - 1;
+  const binCount = _npFftBuf.length;
+  for (let i = 0; i < bars; i++) {
+    // Log-scale: more bins for low frequencies, fewer for highs
+    const lo = Math.floor(Math.pow(i / bars, 2) * binCount);
+    const hi = Math.max(lo + 1, Math.floor(Math.pow((i + 1) / bars, 2) * binCount));
+    let sum = 0;
+    for (let b = lo; b < hi; b++) sum += _npFftBuf[b];
+    const avg = sum / (hi - lo);
+    const barH = (avg / 255) * h;
+    const t = i / bars;
+    const r = Math.round(5 + t * 250);
+    const g = Math.round(217 - t * 175);
+    const b2 = Math.round(232 - t * 123);
+    ctx.fillStyle = `rgb(${r},${g},${b2})`;
+    ctx.fillRect(i * (barW + 1), h - barH, barW, barH);
   }
 }
 audioPlayer.addEventListener('play', () => {

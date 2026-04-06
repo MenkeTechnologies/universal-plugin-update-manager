@@ -19,6 +19,8 @@ The script fails if a key already exists (prevents accidental overwrites). Rebui
 
 **`ui.ph.*` (HTML `data-i18n-placeholder`):** Multi-line placeholder text uses the literal characters `&#10;` in JSON (same convention as `placeholder="…&#10;…"` in static HTML). `frontend/js/i18n-ui.js` decodes `&#10;` and `&#13;` to real newline characters when assigning `element.placeholder`, because JavaScript does not apply HTML entity decoding to that property.
 
+**Tauri save/export dialogs:** Use `catalogFmt('menu.*')` or `catalogFmt('ui.dialog.*')` for `title`, and `catalogFmt('ui.file_filter.*')` for `filters[].name`, so OS file sheets follow the current UI locale.
+
 ## Other locales (`cs` — Czech, `da`, `de`, `es`, `es-419` — Latin American Spanish (`app_i18n_es_419.json`), `sv`, `fr`, `nl`, `pt` — Portuguese, `pt-BR` — Brazilian Portuguese (`app_i18n_pt_br.json`), `it`, `el`, `pl`, `ru`, `zh` — Simplified Chinese, `ja` — Japanese, `ko` — Korean, `fi` — Finnish, `nb` — Norwegian Bokmål, `tr` — Turkish, `hu` — Hungarian, `id` — Indonesian, `hi` — Hindi, `ro` — Romanian, `uk` — Ukrainian, `vi` — Vietnamese)
 
 - **Full machine translation** (slow; needs network). Regenerate **all** shipped non-English catalogs from English in one go:

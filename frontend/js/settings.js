@@ -563,9 +563,12 @@ async function exportSettingsPdf() {
   const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
   if (!dialogApi) return;
   const savePath = await dialogApi.save({
-    title: 'Export Settings & Keybindings',
+    title: catalogFmt('menu.export_settings_keybindings'),
     defaultPath: 'audio-haxor-settings.pdf',
-    filters: [{ name: 'PDF', extensions: ['pdf'] }, { name: 'Text', extensions: ['txt'] }],
+    filters: [
+      { name: catalogFmt('ui.file_filter.pdf'), extensions: ['pdf'] },
+      { name: catalogFmt('ui.file_filter.text'), extensions: ['txt'] },
+    ],
   });
   if (!savePath) return;
 
@@ -611,9 +614,12 @@ async function exportLogPdf() {
     const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
     if (!dialogApi) return;
     const savePath = await dialogApi.save({
-      title: 'Export App Log',
+      title: catalogFmt('menu.export_app_log'),
       defaultPath: 'audio-haxor-log.pdf',
-      filters: [{ name: 'PDF', extensions: ['pdf'] }, { name: 'Text', extensions: ['txt'] }],
+      filters: [
+        { name: catalogFmt('ui.file_filter.pdf'), extensions: ['pdf'] },
+        { name: catalogFmt('ui.file_filter.text'), extensions: ['txt'] },
+      ],
     });
     if (!savePath) return;
 
