@@ -178,7 +178,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
             updateAudioStats();
             audioCurrentOffset = 0;
             await fetchAudioPage();
-            if (typeof startBackgroundAnalysis === 'function') startBackgroundAnalysis();
+            if (typeof startBackgroundAnalysis === 'function' && prefs.getItem('autoAnalysis') !== 'off') startBackgroundAnalysis();
         }
     } catch (err) {
         showToast(toastFmt('toast.failed_load_audio_scan', {err: err.message || err}), 4000, 'error');

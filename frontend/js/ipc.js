@@ -753,6 +753,9 @@ document.addEventListener('click', (e) => {
             case 'settingColorScheme':
                 settingColorScheme(el.dataset.scheme);
                 break;
+            case 'settingToggleAutoAnalysis':
+                settingToggleAutoAnalysis();
+                break;
             case 'settingToggleAutoScan':
                 settingToggleAutoScan();
                 break;
@@ -1304,6 +1307,7 @@ window.vstUpdater = {
     dbUpdateKey: (path, key) => invoke('db_update_key', {path, key}),
     dbUpdateLufs: (path, lufs) => invoke('db_update_lufs', {path, lufs}),
     dbGetAnalysis: (path) => invoke('db_get_analysis', {path}),
+    dbBackfillAudioMeta: (paths) => invoke('db_backfill_audio_meta', {paths}),
     dbUnanalyzedPaths: (limit) => invoke('db_unanalyzed_paths', {limit: limit || 100}),
     dbMigrateJson: () => invoke('db_migrate_json'),
     dbCacheStats: () => invoke('db_cache_stats'),

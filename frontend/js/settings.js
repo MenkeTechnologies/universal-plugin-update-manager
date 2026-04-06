@@ -854,6 +854,14 @@ async function settingClearKvrCache() {
   } finally { hideGlobalProgress(); }
 }
 
+function settingToggleAutoAnalysis() {
+  const current = prefs.getItem('autoAnalysis') !== 'off';
+  const next = !current;
+  prefs.setItem('autoAnalysis', next ? 'on' : 'off');
+  showToast(toastFmt('toast.auto_analysis_launch', { state: next ? 'on' : 'off' }));
+  refreshSettingsUI();
+}
+
 function settingToggleAutoScan() {
   const current = prefs.getItem('autoScan') === 'on';
   const next = !current;
@@ -1166,6 +1174,15 @@ function refreshSettingsUI() {
   if (autoScanBtn) {
     autoScanBtn.classList.toggle('active', autoScan);
     autoScanLabel.textContent = _uiToggle(autoScan);
+  }
+
+  // Auto-analysis
+  const autoAnalysis = prefs.getItem('autoAnalysis') !== 'off';
+  const autoAnalysisBtn = document.getElementById('settingAutoAnalysis');
+  const autoAnalysisLabel = document.getElementById('settingAutoAnalysisLabel');
+  if (autoAnalysisBtn) {
+    autoAnalysisBtn.classList.toggle('active', autoAnalysis);
+    autoAnalysisLabel.textContent = _uiToggle(autoAnalysis);
   }
 
   // Folder watch

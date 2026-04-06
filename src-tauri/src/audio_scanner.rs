@@ -253,15 +253,11 @@ fn walk_dir_parallel(
                     })
                     .unwrap_or_default();
 
-                // Only read headers for formats with fast native parsers (WAV/AIFF/FLAC)
-                // Skip symphonia probe for MP3/OGG/etc during scan — too slow for bulk
-                let fast_fmt = matches!(ext.as_str(), ".wav" | ".aiff" | ".aif" | ".flac");
-                let (dur, ch, sr, bps) = if fast_fmt {
-                    let am = get_audio_metadata(path.to_str().unwrap_or(""));
-                    (am.duration, am.channels, am.sample_rate, am.bits_per_sample)
-                } else {
-                    (None, None, None, None)
-                };
+                // Read headers for all supported formats (symphonia probe reads
+                // codec params without decoding — fast enough for bulk scan)
+                let am = get_audio_metadata(path.to_str().unwrap_or(""));
+                let (dur, ch, sr, bps) =
+                    (am.duration, am.channels, am.sample_rate, am.bits_per_sample);
                 batch.push(AudioSample {
                     name: sample_name,
                     path: path.to_string_lossy().to_string(),

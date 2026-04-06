@@ -684,7 +684,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
     // Use length truncation instead of .slice() to avoid O(n) copy every flush.
     if (allAudioSamples.length > 100000) allAudioSamples.length = 100000;
     accumulateAudioStats(toAdd);
-    if (!_bgAnalysisRunning) startBackgroundAnalysis();
+    if (!_bgAnalysisRunning && prefs.getItem('autoAnalysis') !== 'off') startBackgroundAnalysis();
     const audioElapsed = audioEta.elapsed();
     btn.innerHTML = catalogFmt('ui.audio.scan_progress_line', { n: pendingFound.toLocaleString(), elapsed: audioElapsed ? ' — ' + audioElapsed : '' });
     progressFill.style.width = '';
@@ -745,7 +745,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
     audioCurrentOffset = 0;
     await rebuildAudioStats();
     await fetchAudioPage();
-    startBackgroundAnalysis();
+    if (prefs.getItem('autoAnalysis') !== 'off') startBackgroundAnalysis();
     if (result.stopped && audioTotalUnfiltered > 0) {
       resumeBtn.style.display = '';
     }
@@ -837,6 +837,27 @@ async function rebuildAudioStats(force) {
     resetAudioStats();
     updateAudioStats();
   }
+}
+
+async function backfillAudioMeta(samples) {
+  if (!samples || !samples.length) return;
+  const missing = samples.filter(s => s.duration == null && s.channels == null).map(s => s.path);
+  if (!missing.length) return;
+  try {
+    const updated = await window.vstUpdater.dbBackfillAudioMeta(missing);
+    if (!updated || !Object.keys(updated).length) return;
+    let changed = false;
+    for (const s of filteredAudioSamples) {
+      const u = updated[s.path];
+      if (!u) continue;
+      if (u.duration != null) s.duration = u.duration;
+      if (u.channels != null) s.channels = u.channels;
+      if (u.sampleRate != null) s.sampleRate = u.sampleRate;
+      if (u.bitsPerSample != null) s.bitsPerSample = u.bitsPerSample;
+      changed = true;
+    }
+    if (changed) renderAudioTable();
+  } catch { /* backfill is best-effort */ }
 }
 
 function initAudioTable() {
@@ -946,6 +967,8 @@ async function fetchAudioPage() {
     renderAudioTable();
     // Update stats from DB
     rebuildAudioStats();
+    // Backfill duration/channels for rows missing metadata (legacy scans)
+    backfillAudioMeta(filteredAudioSamples);
   } catch (e) {
     if (typeof showToast === 'function') showToast(toastFmt('toast.audio_query_failed', { err: e.message || e }), 4000, 'error');
   }
@@ -1321,36 +1344,21 @@ function setPlaybackSpeed(value) {
 }
 
 // ── Metadata Panel ──
-async function toggleMetadata(filePath, event) {
-  // Don't toggle if clicking buttons
-  if (event.target.closest('.col-actions')) return;
-
-  // Single-click: play audio, and expand/transfer panel if setting is on
-  previewAudio(filePath);
-
-  if (prefs.getItem('expandOnClick') === 'off') return;
-
+/** Expand the metadata panel for a given file path (no toggle, always opens). */
+async function expandMetaForPath(filePath) {
   const tbody = document.getElementById('audioTableBody');
   if (!tbody) return;
 
+  // Close any existing meta row
   const existingMeta = document.getElementById('audioMetaRow');
-
-  // Close existing
   if (existingMeta) {
-    const wasPath = existingMeta.getAttribute('data-meta-path');
     existingMeta.remove();
-    const prevRow = tbody.querySelector(`tr.row-expanded`);
+    const prevRow = tbody.querySelector('tr.row-expanded');
     if (prevRow) prevRow.classList.remove('row-expanded');
-
-    if (wasPath === filePath) {
-      expandedMetaPath = null;
-      return; // toggle off
-    }
   }
 
   expandedMetaPath = filePath;
 
-  // Find the clicked row
   const row = tbody.querySelector(`tr[data-audio-path="${CSS.escape(filePath)}"]`);
   if (!row) return;
   row.classList.add('row-expanded');
@@ -1362,6 +1370,9 @@ async function toggleMetadata(filePath, event) {
   metaRow.setAttribute('data-meta-path', filePath);
   metaRow.innerHTML = `<td colspan="12"><div class="audio-meta-panel" style="justify-items: center;"><div class="spinner" style="width: 18px; height: 18px;"></div></div></td>`;
   row.after(metaRow);
+
+  // Scroll the expanded row into view
+  row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   // Fetch metadata
   try {
@@ -1444,6 +1455,24 @@ async function toggleMetadata(filePath, event) {
       metaRow.innerHTML = `<td colspan="12"><div class="audio-meta-panel"><span style="color: var(--red);">${msg}</span></div></td>`;
     }
   }
+}
+
+async function toggleMetadata(filePath, event) {
+  // Don't toggle if clicking buttons
+  if (event.target.closest('.col-actions')) return;
+
+  // Single-click: play audio, and expand/transfer panel if setting is on
+  previewAudio(filePath);
+
+  if (prefs.getItem('expandOnClick') === 'off') return;
+
+  // If the same row is already expanded, toggle it off
+  if (expandedMetaPath === filePath) {
+    closeMetaRow();
+    return;
+  }
+
+  await expandMetaForPath(filePath);
 }
 
 // BPM cache — persisted to prefs
@@ -1910,24 +1939,32 @@ document.getElementById('npHistoryList')?.addEventListener('click', (e) => {
 // ── Previous / Next / Shuffle ──
 function prevTrack() {
   if (recentlyPlayed.length < 2) return;
+  const hadExpanded = expandedMetaPath !== null;
   // Find current in recently played, go to next older one
   const idx = recentlyPlayed.findIndex(r => r.path === audioPlayerPath);
   const nextIdx = idx >= 0 && idx < recentlyPlayed.length - 1 ? idx + 1 : 0;
-  previewAudio(recentlyPlayed[nextIdx].path);
+  const prevPath = recentlyPlayed[nextIdx].path;
+  previewAudio(prevPath);
+  if (hadExpanded) expandMetaForPath(prevPath);
 }
 
 function nextTrack() {
+  const hadExpanded = expandedMetaPath !== null;
+  let nextPath = null;
   if (audioShuffling) {
     // Random from filtered samples
     if (filteredAudioSamples.length === 0) return;
-    const rand = filteredAudioSamples[Math.floor(Math.random() * filteredAudioSamples.length)];
-    previewAudio(rand.path);
+    nextPath = filteredAudioSamples[Math.floor(Math.random() * filteredAudioSamples.length)].path;
   } else {
     // Next in filtered list after current
     const idx = filteredAudioSamples.findIndex(s => s.path === audioPlayerPath);
     const nextIdx = (idx + 1) % filteredAudioSamples.length;
-    if (filteredAudioSamples.length > 0) previewAudio(filteredAudioSamples[nextIdx].path);
+    if (filteredAudioSamples.length === 0) return;
+    nextPath = filteredAudioSamples[nextIdx].path;
   }
+  previewAudio(nextPath);
+  // Follow expanded row to the new track
+  if (hadExpanded) expandMetaForPath(nextPath);
 }
 
 function toggleShuffle() {

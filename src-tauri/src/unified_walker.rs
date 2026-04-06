@@ -670,13 +670,9 @@ fn walk_dir_parallel(
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
                     .unwrap_or_default();
-                let fast_fmt = matches!(ext_with_dot, ".wav" | ".aiff" | ".aif" | ".flac");
-                let (dur, ch, sr, bps) = if fast_fmt {
-                    let am = crate::audio_scanner::get_audio_metadata(&path_str);
-                    (am.duration, am.channels, am.sample_rate, am.bits_per_sample)
-                } else {
-                    (None, None, None, None)
-                };
+                let am = crate::audio_scanner::get_audio_metadata(&path_str);
+                let (dur, ch, sr, bps) =
+                    (am.duration, am.channels, am.sample_rate, am.bits_per_sample);
                 audio_batch.push(AudioSample {
                     name: sample_name,
                     path: path_str.clone(),

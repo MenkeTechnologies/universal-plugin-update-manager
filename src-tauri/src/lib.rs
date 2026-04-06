@@ -5605,6 +5605,42 @@ fn db_update_lufs(path: String, lufs: Option<f64>) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn db_backfill_audio_meta(paths: Vec<String>) -> Result<serde_json::Value, String> {
+    let missing = db::global().paths_missing_audio_meta(&paths)?;
+    if missing.is_empty() {
+        return Ok(serde_json::json!({}));
+    }
+    let mut updated = serde_json::Map::new();
+    for p in &missing {
+        let am = audio_scanner::get_audio_metadata(p);
+        if am.duration.is_some() || am.channels.is_some() {
+            db::global().update_audio_meta(
+                p,
+                am.duration,
+                am.channels,
+                am.sample_rate,
+                am.bits_per_sample,
+            )?;
+            let mut obj = serde_json::Map::new();
+            if let Some(d) = am.duration {
+                obj.insert("duration".into(), serde_json::json!(d));
+            }
+            if let Some(c) = am.channels {
+                obj.insert("channels".into(), serde_json::json!(c));
+            }
+            if let Some(sr) = am.sample_rate {
+                obj.insert("sampleRate".into(), serde_json::json!(sr));
+            }
+            if let Some(bps) = am.bits_per_sample {
+                obj.insert("bitsPerSample".into(), serde_json::json!(bps));
+            }
+            updated.insert(p.clone(), serde_json::Value::Object(obj));
+        }
+    }
+    Ok(serde_json::Value::Object(updated))
+}
+
+#[tauri::command]
 fn db_get_analysis(path: String) -> Result<serde_json::Value, String> {
     db::global().get_analysis(&path)
 }
@@ -6062,6 +6098,7 @@ pub fn run() {
             db_update_bpm,
             db_update_key,
             db_update_lufs,
+            db_backfill_audio_meta,
             db_get_analysis,
             db_unanalyzed_paths,
             db_migrate_json,

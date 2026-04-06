@@ -1433,6 +1433,61 @@ impl Database {
         Ok(())
     }
 
+    /// Update core audio metadata (duration, channels, sample_rate, bits_per_sample) for a sample.
+    pub fn update_audio_meta(
+        &self,
+        path: &str,
+        duration: Option<f64>,
+        channels: Option<u16>,
+        sample_rate: Option<u32>,
+        bits_per_sample: Option<u16>,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE audio_samples SET duration = ?1, channels = ?2, sample_rate = ?3, bits_per_sample = ?4
+             WHERE path = ?5 AND scan_id = (
+                SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
+             )",
+            params![
+                duration,
+                channels.map(|v| v as i32),
+                sample_rate.map(|v| v as i32),
+                bits_per_sample.map(|v| v as i32),
+                path
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Get paths from current scan that are missing duration metadata.
+    pub fn paths_missing_audio_meta(&self, paths: &[String]) -> Result<Vec<String>, String> {
+        let conn = self.conn.lock().unwrap();
+        if paths.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders: Vec<&str> = paths.iter().map(|_| "?").collect();
+        let sql = format!(
+            "SELECT path FROM audio_samples WHERE duration IS NULL AND scan_id = (
+                SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
+             ) AND path IN ({})",
+            placeholders.join(",")
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut idx = 1;
+        for p in paths {
+            stmt.raw_bind_parameter(idx, p)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
+        let mut result = Vec::new();
+        let mut rows = stmt.raw_query();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            result.push(row.get::<_, String>(0).unwrap_or_default());
+        }
+        Ok(result)
+    }
+
     /// Update LUFS for a sample.
     pub fn update_lufs(&self, path: &str, lufs: Option<f64>) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();

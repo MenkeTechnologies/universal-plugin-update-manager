@@ -106,6 +106,7 @@ function collectPaletteItems() {
   // Toggles
   if (typeof settingToggleCrt === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_crt'), icon: '&#128187;', action: () => settingToggleCrt() });
   if (typeof settingToggleNeonGlow === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_neon_glow'), icon: '&#10024;', action: () => settingToggleNeonGlow() });
+  if (typeof settingToggleAutoAnalysis === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_auto_analyze_startup'), icon: '&#127925;', action: () => settingToggleAutoAnalysis() });
   if (typeof settingToggleAutoScan === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_auto_scan_launch'), icon: '&#8635;', action: () => settingToggleAutoScan() });
   if (typeof settingToggleAutoUpdate === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_auto_check_updates'), icon: '&#9889;', action: () => settingToggleAutoUpdate() });
   if (typeof settingToggleFolderWatch === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_folder_watch'), icon: '&#128065;', action: () => settingToggleFolderWatch() });
