@@ -50,6 +50,7 @@ async function reloadAppStrings(locale) {
         locale === 'ro' ||
         locale === 'uk' ||
         locale === 'vi' ||
+        locale === 'id' ||
         locale === 'en'
             ? locale
             : null;
