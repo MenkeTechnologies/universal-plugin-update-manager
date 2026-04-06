@@ -473,6 +473,7 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
             ("autoScan", "autoScan"),
             ("autoUpdate", "autoUpdate"),
             ("singleClickPlay", "singleClickPlay"),
+            ("autoPlaySampleOnSelect", "autoPlaySampleOnSelect"),
             ("defaultTypeFilter", "defaultTypeFilter"),
             ("customDirs", "customDirs"),
             ("audioScanDirs", "audioScanDirs"),

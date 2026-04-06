@@ -768,6 +768,9 @@ document.addEventListener('click', (e) => {
             case 'settingToggleSingleClickPlay':
                 settingToggleSingleClickPlay();
                 break;
+            case 'settingToggleAutoPlaySampleOnSelect':
+                settingToggleAutoPlaySampleOnSelect();
+                break;
             case 'settingToggleExpandOnClick':
                 settingToggleExpandOnClick();
                 break;

@@ -919,6 +919,14 @@ function settingToggleSingleClickPlay() {
   refreshSettingsUI();
 }
 
+function settingToggleAutoPlaySampleOnSelect() {
+  const current = prefs.getItem('autoPlaySampleOnSelect') === 'on';
+  const next = !current;
+  prefs.setItem('autoPlaySampleOnSelect', next ? 'on' : 'off');
+  showToast(toastFmt('toast.auto_play_sample_on_select', { state: next ? 'on' : 'off' }));
+  refreshSettingsUI();
+}
+
 function settingToggleAutoplayNext() {
   const current = prefs.getItem('autoplayNext');
   const next = current === 'off' ? 'on' : 'off';
@@ -1214,6 +1222,14 @@ function refreshSettingsUI() {
   if (singleClickBtn) {
     singleClickBtn.classList.toggle('active', singleClick);
     singleClickLabel.textContent = _uiToggle(singleClick);
+  }
+
+  const autoPlayOnSelect = prefs.getItem('autoPlaySampleOnSelect') === 'on';
+  const autoPlayOnSelectBtn = document.getElementById('settingAutoPlaySampleOnSelect');
+  const autoPlayOnSelectLabel = document.getElementById('settingAutoPlaySampleOnSelectLabel');
+  if (autoPlayOnSelectBtn) {
+    autoPlayOnSelectBtn.classList.toggle('active', autoPlayOnSelect);
+    autoPlayOnSelectLabel.textContent = _uiToggle(autoPlayOnSelect);
   }
 
   // Expand on click

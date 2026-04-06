@@ -1559,8 +1559,10 @@ async function toggleMetadata(filePath, event) {
   // Don't toggle if clicking buttons
   if (event.target.closest('.col-actions')) return;
 
-  // Single-click: play audio, and expand/transfer panel if setting is on
-  previewAudio(filePath);
+  // Single-click: play only when enabled; otherwise double-click (ipc dblclick) plays
+  if (prefs.getItem('singleClickPlay') === 'on') {
+    previewAudio(filePath);
+  }
 
   if (prefs.getItem('expandOnClick') === 'off') return;
 

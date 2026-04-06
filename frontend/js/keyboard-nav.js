@@ -3,6 +3,8 @@
 
 let _navIndex = -1;
 let _navTab = null;
+let _sampleSelectPlayTimer = null;
+let _lastAutoPlaySamplePath = null;
 
 function getNavigableItems() {
   const activeTab = document.querySelector('.tab-content.active');
@@ -23,11 +25,23 @@ function clearNavSelection() {
 function setNavIndex(idx) {
   const items = getNavigableItems();
   if (items.length === 0) return;
+  const activeTab = document.querySelector('.tab-content.active')?.id;
   clearNavSelection();
   _navIndex = Math.max(0, Math.min(idx, items.length - 1));
   const item = items[_navIndex];
   item.classList.add('nav-selected');
   item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  if (activeTab === 'tabSamples' && typeof prefs !== 'undefined' && prefs.getItem('autoPlaySampleOnSelect') === 'on') {
+    const path = item.getAttribute('data-audio-path');
+    if (path && path !== _lastAutoPlaySamplePath) {
+      _lastAutoPlaySamplePath = path;
+      clearTimeout(_sampleSelectPlayTimer);
+      _sampleSelectPlayTimer = setTimeout(() => {
+        if (typeof previewAudio === 'function') previewAudio(path);
+      }, 140);
+    }
+  }
 }
 
 function activateNavItem() {
@@ -197,6 +211,9 @@ document.addEventListener('keydown', (e) => {
 const _origSwitchTab = switchTab;
 switchTab = function(tab) {
   _navIndex = -1;
+  clearTimeout(_sampleSelectPlayTimer);
+  _sampleSelectPlayTimer = null;
+  _lastAutoPlaySamplePath = null;
   clearNavSelection();
   _origSwitchTab(tab);
 };

@@ -111,6 +111,7 @@ function collectPaletteItems() {
   if (typeof settingToggleAutoUpdate === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_auto_check_updates'), icon: '&#9889;', action: () => settingToggleAutoUpdate() });
   if (typeof settingToggleFolderWatch === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_folder_watch'), icon: '&#128065;', action: () => settingToggleFolderWatch() });
   if (typeof settingToggleSingleClickPlay === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_single_click_play'), icon: '&#9654;', action: () => settingToggleSingleClickPlay() });
+  if (typeof settingToggleAutoPlaySampleOnSelect === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_play_sample_on_keyboard_select'), icon: '&#9835;', action: () => settingToggleAutoPlaySampleOnSelect() });
   if (typeof settingToggleAutoplayNext === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_autoplay_next'), icon: '&#9197;', action: () => settingToggleAutoplayNext() });
   if (typeof settingToggleShowPlayerOnStartup === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_show_player_startup'), icon: '&#9835;', action: () => settingToggleShowPlayerOnStartup() });
   if (typeof settingToggleExpandOnClick === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_expand_on_click'), icon: '&#8597;', action: () => settingToggleExpandOnClick() });

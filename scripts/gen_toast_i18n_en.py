@@ -167,6 +167,7 @@ TOAST_EN: dict[str, str] = {
     "toast.watch_failed": "Watch failed: {err}",
     "toast.auto_check_updates": "Auto-check updates: {state}",
     "toast.single_click_play": "Single-click play: {state}",
+    "toast.auto_play_sample_on_select": "Play on keyboard selection: {state}",
     "toast.autoplay_next_state": "Autoplay next: {next}",
     "toast.show_player_startup": "Show player on startup: {state}",
     "toast.expand_on_click": "Expand on click: {next}",

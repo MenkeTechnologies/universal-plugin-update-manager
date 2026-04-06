@@ -5903,6 +5903,18 @@
           </div>
           <div class="settings-row">
             <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.play_sample_on_keyboard_selection">Play on Keyboard Selection</span>
+              <span class="settings-desc" data-i18n="ui.sd.autoplay_the_selected_sample_when_you_move_the_sel">Autoplay the selected sample when you move the selection with arrow keys or j/k on the Samples tab</span>
+            </div>
+            <div class="settings-control">
+              <button class="settings-toggle" id="settingAutoPlaySampleOnSelect" data-action="settingToggleAutoPlaySampleOnSelect" title="Start playback when keyboard selection moves to a new sample row" data-i18n-title="ui.tt.start_playback_when_keyboard_selection_moves_to_a_n">
+                <span class="settings-toggle-label" id="settingAutoPlaySampleOnSelectLabel">Off</span>
+                <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
               <span class="settings-title" data-i18n="ui.st.expand_sample_row">Expand Sample Row</span>
               <span class="settings-desc" data-i18n="ui.sd.double_click_a_sample_row_to_expand_collapse_metad">Double-click a sample row to expand/collapse metadata. Setting is toggled automatically by double-click</span>
             </div>
@@ -6226,7 +6238,7 @@
   </div>
 
   <script src="js/i18n-ui.js?v=47950"></script>
-  <script src="js/ipc.js?v=47950"></script>
+  <script src="js/ipc.js?v=47953"></script>
   <script src="js/utils.js?v=47950"></script>
   <script src="js/drag-reorder.js?v=47950"></script>
   <script src="js/modal-drag.js?v=47950"></script>
@@ -6235,10 +6247,10 @@
   <script src="js/favorites.js?v=47950"></script>
   <script src="js/export.js?v=47950"></script>
   <script src="js/plugins.js?v=47950"></script>
-  <script src="js/settings.js?v=47950"></script>
+  <script src="js/settings.js?v=47953"></script>
   <script src="js/history.js?v=47950"></script>
   <script src="js/kvr.js?v=47950"></script>
-  <script src="js/audio.js?v=47950"></script>
+  <script src="js/audio.js?v=47953"></script>
   <script src="js/daw.js?v=47950"></script>
   <script src="js/presets.js?v=47950"></script>
   <script src="js/disk-usage.js?v=47950"></script>
@@ -6247,7 +6259,7 @@
   <script src="js/multi-filter.js?v=47950"></script>
   <script src="js/file-browser.js?v=47952"></script>
   <script src="js/duplicates.js?v=47950"></script>
-  <script src="js/command-palette.js?v=47951"></script>
+  <script src="js/command-palette.js?v=47953"></script>
   <script src="js/xref.js?v=47950"></script>
   <script src="js/dep-graph.js?v=47950"></script>
   <script src="js/smart-playlists.js?v=47950"></script>
@@ -6260,7 +6272,7 @@
   <script src="js/context-menu.js?v=47950"></script>
   <script src="js/help-overlay.js?v=47950"></script>
   <script src="js/shortcuts.js?v=47952"></script>
-  <script src="js/keyboard-nav.js?v=47952"></script>
+  <script src="js/keyboard-nav.js?v=47953"></script>
   <script src="js/app.js?v=47950"></script>
 </body>
 </html>
