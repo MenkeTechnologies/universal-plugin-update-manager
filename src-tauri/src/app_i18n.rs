@@ -1,5 +1,5 @@
 //! App UI strings for i18n: seeded into SQLite (`app_i18n` table) from `i18n/app_i18n_en.json`
-//! (toasts, menus, tray, HTML `data-i18n*`, dialogs). Locales `cs`, `da`, `de`, `es`, `sv`, `fr`, `nl`, `pt`, `pt-BR`, `it`, `el`, `pl`, `ru`, `zh`, `ja`, `ko`, `fi`, `nb`, `tr`, `hu`, `ro`, `uk`, `vi`, `id` add rows with the same keys.
+//! (toasts, menus, tray, HTML `data-i18n*`, dialogs). Locales `cs`, `da`, `de`, `es`, `sv`, `fr`, `nl`, `pt`, `pt-BR`, `it`, `el`, `pl`, `ru`, `zh`, `ja`, `ko`, `fi`, `nb`, `tr`, `hu`, `ro`, `uk`, `vi`, `id`, `hi` add rows with the same keys.
 
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
@@ -29,6 +29,7 @@ static SEED_JSON_RO: &str = include_str!("../../i18n/app_i18n_ro.json");
 static SEED_JSON_UK: &str = include_str!("../../i18n/app_i18n_uk.json");
 static SEED_JSON_VI: &str = include_str!("../../i18n/app_i18n_vi.json");
 static SEED_JSON_ID: &str = include_str!("../../i18n/app_i18n_id.json");
+static SEED_JSON_HI: &str = include_str!("../../i18n/app_i18n_hi.json");
 
 /// Insert default locale rows (`INSERT OR REPLACE` on `(key, locale)` primary key) on every
 /// migration so shipped `i18n/app_i18n_*.json` values stay current. There is no separate UI to
@@ -59,6 +60,7 @@ pub fn seed_defaults(conn: &Connection) -> Result<(), String> {
     seed_locale(conn, "uk", SEED_JSON_UK)?;
     seed_locale(conn, "vi", SEED_JSON_VI)?;
     seed_locale(conn, "id", SEED_JSON_ID)?;
+    seed_locale(conn, "hi", SEED_JSON_HI)?;
     Ok(())
 }
 
@@ -114,7 +116,7 @@ mod tests {
         SEED_JSON_ES, SEED_JSON_FI, SEED_JSON_FR, SEED_JSON_HU, SEED_JSON_IT, SEED_JSON_JA,
         SEED_JSON_KO, SEED_JSON_NB, SEED_JSON_NL, SEED_JSON_PL, SEED_JSON_PT, SEED_JSON_PT_BR,
         SEED_JSON_RO, SEED_JSON_RU, SEED_JSON_SV, SEED_JSON_TR, SEED_JSON_UK, SEED_JSON_VI,
-        SEED_JSON_ID, SEED_JSON_ZH,
+        SEED_JSON_ID, SEED_JSON_HI, SEED_JSON_ZH,
     };
     use regex::Regex;
     use rusqlite::Connection;
@@ -559,6 +561,17 @@ mod tests {
     }
 
     #[test]
+    fn seed_json_hi_menu_scan_all_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let hi: HashMap<String, String> = serde_json::from_str(SEED_JSON_HI).expect("hi json");
+        assert_ne!(
+            en.get("menu.scan_all"),
+            hi.get("menu.scan_all"),
+            "Hindi seed should translate menu.scan_all (same key, different value)"
+        );
+    }
+
+    #[test]
     fn seed_json_de_tray_play_pause_differs_from_en() {
         let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
         let de: HashMap<String, String> = serde_json::from_str(SEED_JSON_DE).expect("de json");
@@ -820,6 +833,17 @@ mod tests {
             en.get("tray.play_pause"),
             id.get("tray.play_pause"),
             "Indonesian seed should translate tray.play_pause (same key, different value)"
+        );
+    }
+
+    #[test]
+    fn seed_json_hi_tray_play_pause_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let hi: HashMap<String, String> = serde_json::from_str(SEED_JSON_HI).expect("hi json");
+        assert_ne!(
+            en.get("tray.play_pause"),
+            hi.get("tray.play_pause"),
+            "Hindi seed should translate tray.play_pause (same key, different value)"
         );
     }
 
@@ -1089,6 +1113,17 @@ mod tests {
     }
 
     #[test]
+    fn seed_json_hi_tray_stop_all_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let hi: HashMap<String, String> = serde_json::from_str(SEED_JSON_HI).expect("hi json");
+        assert_ne!(
+            en.get("tray.stop_all"),
+            hi.get("tray.stop_all"),
+            "Hindi seed should translate tray.stop_all (same key, different value)"
+        );
+    }
+
+    #[test]
     fn seed_json_de_tray_show_differs_from_en() {
         let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
         let de: HashMap<String, String> = serde_json::from_str(SEED_JSON_DE).expect("de json");
@@ -1350,6 +1385,17 @@ mod tests {
             en.get("tray.show"),
             id.get("tray.show"),
             "Indonesian seed should translate tray.show (same key, different value)"
+        );
+    }
+
+    #[test]
+    fn seed_json_hi_tray_show_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let hi: HashMap<String, String> = serde_json::from_str(SEED_JSON_HI).expect("hi json");
+        assert_ne!(
+            en.get("tray.show"),
+            hi.get("tray.show"),
+            "Hindi seed should translate tray.show (same key, different value)"
         );
     }
 
@@ -1618,13 +1664,24 @@ mod tests {
         );
     }
 
+    #[test]
+    fn seed_json_hi_menu_scan_daw_differs_from_en() {
+        let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
+        let hi: HashMap<String, String> = serde_json::from_str(SEED_JSON_HI).expect("hi json");
+        assert_ne!(
+            en.get("menu.scan_daw"),
+            hi.get("menu.scan_daw"),
+            "Hindi seed should translate menu.scan_daw (same key, different value)"
+        );
+    }
+
     /// Mirrors `test/i18n-anchor-keys.test.js`: for every `menu.` / `tray.` / `confirm.` /
     /// `toast.` / `help.` / `ui.` key where **all** non-English seeds differ from English, assert
     /// each locale row is not a verbatim copy of `en`.
     #[test]
     fn seed_json_safe_catalog_keys_all_locales_differ_from_en() {
         let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
-        let locales: [(&str, &str); 24] = [
+        let locales: [(&str, &str); 25] = [
             ("de", SEED_JSON_DE),
             ("es", SEED_JSON_ES),
             ("sv", SEED_JSON_SV),
@@ -1649,6 +1706,7 @@ mod tests {
             ("uk", SEED_JSON_UK),
             ("vi", SEED_JSON_VI),
             ("id", SEED_JSON_ID),
+            ("hi", SEED_JSON_HI),
         ];
         let maps: Vec<(&str, HashMap<String, String>)> = locales
             .iter()
@@ -1708,6 +1766,7 @@ mod tests {
             ("uk", SEED_JSON_UK),
             ("vi", SEED_JSON_VI),
             ("id", SEED_JSON_ID),
+            ("hi", SEED_JSON_HI),
         ] {
             let m: HashMap<String, String> = serde_json::from_str(json).expect(loc);
             let keys: HashSet<_> = m.keys().cloned().collect();
@@ -1746,6 +1805,7 @@ mod tests {
             ("uk", SEED_JSON_UK),
             ("vi", SEED_JSON_VI),
             ("id", SEED_JSON_ID),
+            ("hi", SEED_JSON_HI),
         ] {
             let m: HashMap<String, String> = serde_json::from_str(json).expect(loc);
             for (k, v) in &m {
@@ -1758,7 +1818,7 @@ mod tests {
     }
 
     /// `appFmt` / `toastFmt` replace `{token}` using the **English** token names passed from JS
-    /// (`ipc.js`). `de`, `el`, `fi`, `fr`, `it`, `nl`, `pl`, `pt`, `pt-BR`, `ru`, `sv`, `zh`, `ja`, and `ko` seeds keep the same `{name}`, `{n}`, … substrings as English.
+    /// (`ipc.js`). `de`, `el`, `fi`, `fr`, `it`, `nl`, `pl`, `pt`, `pt-BR`, `ru`, `sv`, `zh`, `ja`, `ko`, and `hi` seeds keep the same `{name}`, `{n}`, … substrings as English.
     /// Spanish (`es`) still has many legacy localized placeholder spellings in `toast.*` — covered
     /// separately via `seed_json_es_critical_prefixes_match_en_placeholders`.
     fn assert_seed_placeholders_match_en(en: &HashMap<String, String>, loc: &str, json: &str) {
@@ -1785,7 +1845,7 @@ mod tests {
     }
 
     #[test]
-    fn seed_json_appfmt_placeholders_preserved_de_el_es_fi_fr_it_nl_pl_pt_pt_br_ru_sv_zh_ja_ko_da_nb_tr_cs_hu_ro_uk_vi_id(
+    fn seed_json_appfmt_placeholders_preserved_de_el_es_fi_fr_it_nl_pl_pt_pt_br_ru_sv_zh_ja_ko_da_nb_tr_cs_hu_ro_uk_vi_id_hi(
     ) {
         let en: HashMap<String, String> = serde_json::from_str(SEED_JSON_EN).expect("en json");
         for (loc, json) in [
@@ -1813,6 +1873,7 @@ mod tests {
             ("uk", SEED_JSON_UK),
             ("vi", SEED_JSON_VI),
             ("id", SEED_JSON_ID),
+            ("hi", SEED_JSON_HI),
         ] {
             assert_seed_placeholders_match_en(&en, loc, json);
         }

@@ -33,6 +33,7 @@ const NON_EN = /** @type {const} */ ([
   'es',
   'fi',
   'fr',
+  'hi',
   'hu',
   'id',
   'it',

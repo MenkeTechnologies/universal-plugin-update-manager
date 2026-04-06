@@ -25,6 +25,7 @@ const LOCALE_FILES = [
   ['da', 'app_i18n_da.json'],
   ['nb', 'app_i18n_nb.json'],
   ['fr', 'app_i18n_fr.json'],
+  ['hi', 'app_i18n_hi.json'],
   ['nl', 'app_i18n_nl.json'],
   ['pl', 'app_i18n_pl.json'],
   ['pt', 'app_i18n_pt.json'],

@@ -93,6 +93,7 @@ describe('frontend/js/ipc.js (vm-loaded)', () => {
     'cs',
     'hu',
     'ro',
+    'hi',
   ];
 
   for (const loc of supportedLocales) {

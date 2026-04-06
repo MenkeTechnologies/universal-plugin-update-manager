@@ -1578,7 +1578,7 @@ function restoreSettings() {
   const localeSel = document.getElementById('settingUiLocale');
   if (
     localeSel &&
-    (uiLoc === 'de' || uiLoc === 'es' || uiLoc === 'sv' || uiLoc === 'fr' || uiLoc === 'nl' || uiLoc === 'pt' || uiLoc === 'pt-BR' || uiLoc === 'it' || uiLoc === 'el' || uiLoc === 'pl' || uiLoc === 'ru' || uiLoc === 'zh' || uiLoc === 'ja' || uiLoc === 'ko' || uiLoc === 'fi' || uiLoc === 'da' || uiLoc === 'nb' || uiLoc === 'tr' || uiLoc === 'cs' || uiLoc === 'hu' || uiLoc === 'ro' || uiLoc === 'en')
+    (uiLoc === 'de' || uiLoc === 'es' || uiLoc === 'sv' || uiLoc === 'fr' || uiLoc === 'nl' || uiLoc === 'pt' || uiLoc === 'pt-BR' || uiLoc === 'it' || uiLoc === 'el' || uiLoc === 'pl' || uiLoc === 'ru' || uiLoc === 'zh' || uiLoc === 'ja' || uiLoc === 'ko' || uiLoc === 'fi' || uiLoc === 'da' || uiLoc === 'nb' || uiLoc === 'tr' || uiLoc === 'cs' || uiLoc === 'hu' || uiLoc === 'ro' || uiLoc === 'uk' || uiLoc === 'vi' || uiLoc === 'id' || uiLoc === 'hi' || uiLoc === 'en')
   ) {
     localeSel.value = uiLoc;
   }

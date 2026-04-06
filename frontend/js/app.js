@@ -70,6 +70,10 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
         'cs',
         'hu',
         'ro',
+        'uk',
+        'vi',
+        'id',
+        'hi',
       ].includes(uiLoc)
         ? uiLoc
         : 'en'
