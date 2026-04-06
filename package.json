@@ -5,6 +5,7 @@
   "scripts": {
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
+    "dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:ci": "tauri build --ci --no-sign",
     "ship-check": "bash scripts/ship-check.sh",
