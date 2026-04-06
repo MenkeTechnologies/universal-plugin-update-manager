@@ -10,8 +10,7 @@ function prefsStore() {
     _cache: {},
     getObject(key, fallback) {
       const v = this._cache[key];
-      if (v === undefined || v === null) return fallback;
-      return v;
+      return v === undefined || v === null ? fallback : v;
     },
     setItem(key, value) {
       this._cache[key] = value;
@@ -111,5 +110,40 @@ describe('frontend/js/shortcuts.js (vm-loaded)', () => {
     const S = loadShortcutsSandbox('Win32');
     assert.strictEqual(S.formatKey({ key: 'F3', mod: false }), 'F3');
     assert.strictEqual(S.formatKey({ key: 'F4', mod: true }), 'Ctrl+F4');
+  });
+
+  it('capture keydown Space calls toggleAudioPlayback (e.key Space string)', () => {
+    let keydownCapture;
+    let playPauseCalls = 0;
+    loadFrontendScripts(['utils.js', 'shortcuts.js'], {
+      prefs: prefsStore(),
+      registerFilter: () => {},
+      showToast: () => {},
+      toastFmt: (k) => k,
+      appFmt: (k) => k,
+      navigator: { platform: 'MacIntel' },
+      toggleAudioPlayback: () => { playPauseCalls++; },
+      document: {
+        ...defaultDocument(),
+        getElementById: () => null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        addEventListener(type, fn, cap) {
+          if (type === 'keydown' && cap === true) keydownCapture = fn;
+        },
+        body: {},
+      },
+    });
+    assert.ok(typeof keydownCapture === 'function', 'keydown capture handler registered');
+    keydownCapture({
+      key: 'Space',
+      code: 'Space',
+      metaKey: false,
+      ctrlKey: false,
+      target: { tagName: 'BODY', isContentEditable: false, closest: () => null },
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    assert.strictEqual(playPauseCalls, 1);
   });
 });

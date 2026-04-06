@@ -147,6 +147,16 @@ function resetShortcuts() {
   showToast(toastFmt('toast.shortcuts_reset'));
 }
 
+/** Space bar: match on e.code (reliable) and normalize stored 'Space' vs ' '. */
+function normalizeStoredShortcutKey(k) {
+  if (k === 'Space' || k === ' ') return ' ';
+  return k;
+}
+function eventKeyForShortcutMatch(e) {
+  if (e.code === 'Space' || e.key === ' ' || e.key === 'Space') return ' ';
+  return e.key;
+}
+
 function formatKey(shortcut) {
   const isMac = navigator.platform.includes('Mac');
   let parts = [];
@@ -241,7 +251,7 @@ document.addEventListener('keydown', (e) => {
     if (['Meta', 'Control', 'Shift', 'Alt'].includes(e.key)) return;
 
     const shortcuts = getShortcuts();
-    shortcuts[_recordingId] = { ...shortcuts[_recordingId], key: e.key, mod };
+    shortcuts[_recordingId] = { ...shortcuts[_recordingId], key: eventKeyForShortcutMatch(e), mod };
     saveShortcuts(shortcuts);
     _recordingId = null;
     renderShortcutSettings();
@@ -257,9 +267,10 @@ document.addEventListener('keydown', (e) => {
   const isMac = navigator.platform.includes('Mac');
   const mod = isMac ? e.metaKey : e.ctrlKey;
   const shortcuts = getShortcuts();
+  const eventKey = eventKeyForShortcutMatch(e);
 
   for (const [id, sc] of Object.entries(shortcuts)) {
-    if (sc.key === e.key && sc.mod === mod) {
+    if (normalizeStoredShortcutKey(sc.key) === eventKey && sc.mod === mod) {
       e.preventDefault();
       executeShortcut(id);
       return;

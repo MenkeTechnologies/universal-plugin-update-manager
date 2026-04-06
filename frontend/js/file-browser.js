@@ -680,6 +680,8 @@ document.addEventListener('keydown', (e) => {
       });
     }
   } else if (e.key === ' ') {
+    // Global shortcut handles Space for play/pause; do not restart preview on top of it.
+    if (e.defaultPrevented) return;
     // Space: preview audio if selected
     e.preventDefault();
     if (_fileNavIdx < 0 || _fileNavIdx >= rows.length) return;

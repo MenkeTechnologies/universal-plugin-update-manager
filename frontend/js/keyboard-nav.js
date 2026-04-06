@@ -128,6 +128,8 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'Enter') {
     if (_navIndex >= 0) { e.preventDefault(); activateNavItem(); }
   } else if (e.key === ' ' && activeTab === 'tabSamples') {
+    // Global shortcut (shortcuts.js capture) handles Space for play/pause; skip row preview if so.
+    if (e.defaultPrevented) return;
     if (_navIndex >= 0) { e.preventDefault(); activateNavItem(); }
 
   } else if (e.key === 'o') {
