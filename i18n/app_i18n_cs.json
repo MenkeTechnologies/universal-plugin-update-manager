@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Předvolby",
   "ui.welcome.recently_played": "Nedávno hrané",
   "ui.welcome.samples": "Vzorky",
-  "ui.welcome.tags": "Tagy"
+  "ui.welcome.tags": "Tagy",
+  "ui.scan_status.midi": "MIDI"
 }

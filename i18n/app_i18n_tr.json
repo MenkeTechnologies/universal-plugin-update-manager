@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Ön ayarlar",
   "ui.welcome.recently_played": "Son Oynananlar",
   "ui.welcome.samples": "Örnekler",
-  "ui.welcome.tags": "Etiketler"
+  "ui.welcome.tags": "Etiketler",
+  "ui.scan_status.midi": "MIDI"
 }

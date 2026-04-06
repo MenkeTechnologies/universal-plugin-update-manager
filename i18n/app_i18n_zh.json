@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "预设",
   "ui.welcome.recently_played": "最近玩过",
   "ui.welcome.samples": "样品",
-  "ui.welcome.tags": "标签"
+  "ui.welcome.tags": "标签",
+  "ui.scan_status.midi": "MIDI"
 }

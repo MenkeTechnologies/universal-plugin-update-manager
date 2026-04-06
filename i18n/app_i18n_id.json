@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Preset",
   "ui.welcome.recently_played": "Baru-baru ini Dimainkan",
   "ui.welcome.samples": "Sampel",
-  "ui.welcome.tags": "Tag"
+  "ui.welcome.tags": "Tag",
+  "ui.scan_status.midi": "MIDI"
 }

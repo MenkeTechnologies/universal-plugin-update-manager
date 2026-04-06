@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Forudindstillinger",
   "ui.welcome.recently_played": "For nylig spillet",
   "ui.welcome.samples": "Prøver",
-  "ui.welcome.tags": "Tags"
+  "ui.welcome.tags": "Tags",
+  "ui.scan_status.midi": "MIDI"
 }

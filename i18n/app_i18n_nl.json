@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Voorinstellingen",
   "ui.welcome.recently_played": "Recent gespeeld",
   "ui.welcome.samples": "Monsters",
-  "ui.welcome.tags": "Labels"
+  "ui.welcome.tags": "Labels",
+  "ui.scan_status.midi": "MIDI"
 }

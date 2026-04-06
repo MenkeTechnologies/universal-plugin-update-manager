@@ -4382,6 +4382,99 @@ impl Database {
         Ok(serde_json::Value::Object(map))
     }
 
+    /// Row counts per inventory category for the **latest** scan in each domain (same `scan_id`
+    /// scope as paginated queries and `*_filter_stats`). Not raw `COUNT(*)` on whole tables.
+    pub fn active_scan_inventory_counts(&self) -> Result<serde_json::Value, String> {
+        let count_plugins = |sid: &str| -> Result<u64, String> {
+            if sid.is_empty() {
+                return Ok(0);
+            }
+            let conn = self.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT COUNT(*) FROM plugins WHERE scan_id = ?1",
+                params![sid],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .map_err(|e| e.to_string())
+        };
+        let count_audio = |sid: &str| -> Result<u64, String> {
+            if sid.is_empty() {
+                return Ok(0);
+            }
+            let conn = self.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT COUNT(*) FROM audio_samples WHERE scan_id = ?1",
+                params![sid],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .map_err(|e| e.to_string())
+        };
+        let count_daw = |sid: &str| -> Result<u64, String> {
+            if sid.is_empty() {
+                return Ok(0);
+            }
+            let conn = self.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT COUNT(*) FROM daw_projects WHERE scan_id = ?1",
+                params![sid],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .map_err(|e| e.to_string())
+        };
+        let count_presets = |sid: &str| -> Result<u64, String> {
+            if sid.is_empty() {
+                return Ok(0);
+            }
+            let conn = self.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT COUNT(*) FROM presets WHERE scan_id = ?1 AND format NOT IN ('MID','MIDI')",
+                params![sid],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .map_err(|e| e.to_string())
+        };
+        let count_pdfs = |sid: &str| -> Result<u64, String> {
+            if sid.is_empty() {
+                return Ok(0);
+            }
+            let conn = self.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT COUNT(*) FROM pdfs WHERE scan_id = ?1",
+                params![sid],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .map_err(|e| e.to_string())
+        };
+        let count_midi = |sid: &str| -> Result<u64, String> {
+            if sid.is_empty() {
+                return Ok(0);
+            }
+            let conn = self.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT COUNT(*) FROM midi_files WHERE scan_id = ?1",
+                params![sid],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .map_err(|e| e.to_string())
+        };
+
+        let plugins_sid = self.get_latest_scan_id("plugin_scans", "plugin_count")?;
+        let audio_sid = self.get_latest_scan_id("audio_scans", "sample_count")?;
+        let daw_sid = self.get_latest_scan_id("daw_scans", "project_count")?;
+        let preset_sid = self.get_latest_scan_id("preset_scans", "preset_count")?;
+        let pdf_sid = self.get_latest_scan_id("pdf_scans", "pdf_count")?;
+        let midi_sid = self.get_latest_scan_id("midi_scans", "midi_count")?;
+
+        Ok(serde_json::json!({
+            "plugins": count_plugins(&plugins_sid)?,
+            "audio_samples": count_audio(&audio_sid)?,
+            "daw_projects": count_daw(&daw_sid)?,
+            "presets": count_presets(&preset_sid)?,
+            "pdfs": count_pdfs(&pdf_sid)?,
+            "midi_files": count_midi(&midi_sid)?,
+        }))
+    }
+
     /// Get stats for all caches: item count and estimated size.
     pub fn cache_stats(&self) -> Result<Vec<CacheStat>, String> {
         let conn = self.conn.lock().unwrap();
@@ -7925,6 +8018,31 @@ mod tests {
         assert_eq!(obj["plugin_scans"], 1);
         assert_eq!(obj["daw_projects"], 1);
         assert_eq!(obj["daw_scans"], 1);
+    }
+
+    #[test]
+    fn test_active_scan_inventory_counts_empty() {
+        let db = test_db();
+        let v = db.active_scan_inventory_counts().unwrap();
+        assert_eq!(v["plugins"], 0);
+        assert_eq!(v["audio_samples"], 0);
+        assert_eq!(v["daw_projects"], 0);
+        assert_eq!(v["presets"], 0);
+        assert_eq!(v["pdfs"], 0);
+        assert_eq!(v["midi_files"], 0);
+    }
+
+    #[test]
+    fn test_active_scan_inventory_counts_presets_exclude_midi_formats() {
+        let db = test_db();
+        db.save_preset_scan(&preset_snap(
+            "pr-midi-only",
+            "2024-06-01T00:00:00",
+            vec![preset_file("a.mid", "MID"), preset_file("b.midi", "MIDI")],
+        ))
+        .unwrap();
+        let v = db.active_scan_inventory_counts().unwrap();
+        assert_eq!(v["presets"], 0);
     }
 
     /// Many lib tests call `init_global()` in parallel; migrations must not race on one file.

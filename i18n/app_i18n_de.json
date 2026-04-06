@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Voreinstellungen",
   "ui.welcome.recently_played": "Kürzlich gespielt",
   "ui.welcome.samples": "Proben",
-  "ui.welcome.tags": "Schlagworte"
+  "ui.welcome.tags": "Schlagworte",
+  "ui.scan_status.midi": "MIDI"
 }

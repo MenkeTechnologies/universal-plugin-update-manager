@@ -307,11 +307,24 @@ function _fmtInventoryCount(n) {
     return x.toLocaleString();
 }
 
+/** Map `get_active_scan_inventory_counts` payload to stats-bar keys. */
+function mapActiveScanInv(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    return {
+        plugins: Number(raw.plugins) || 0,
+        samples: Number(raw.audio_samples) || 0,
+        daw: Number(raw.daw_projects) || 0,
+        presets: Number(raw.presets) || 0,
+        pdf: Number(raw.pdfs) || 0,
+        midi: Number(raw.midi_files) || 0,
+    };
+}
+
 /**
- * Canonical per-category totals for header + stats bar (library-wide unfiltered,
- * or live scan progress when a scanner is active).
+ * Fallback when IPC is unavailable: table_counts-style totals + in-memory scan progress.
+ * Prefer `get_active_scan_inventory_counts` (latest scan_id per domain) for idle UI.
  */
-function computeInventoryCounts(tc) {
+function computeInventoryCountsLegacy(tc) {
     const tc0 = tc || {};
     let plugins = _pluginTotalUnfiltered || tc0.plugins || 0;
     if (typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup && typeof allPlugins !== 'undefined') {
@@ -345,6 +358,98 @@ function computeInventoryCounts(tc) {
     return { plugins, samples, daw, presets, pdf, midi };
 }
 
+/** Overlay live scan progress on DB-backed baseline (same rules as legacy, keyed off scanner flags + cleanup fns). */
+function mergeInventoryWithLiveScan(dbCounts, scanner) {
+    const sc = scanner || {};
+    let plugins = dbCounts.plugins;
+    if ((typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) || sc.pluginScanning) {
+        if (typeof allPlugins !== 'undefined') plugins = Math.max(plugins, allPlugins.length);
+    }
+    let samples = dbCounts.samples;
+    if ((typeof audioScanProgressCleanup !== 'undefined' && audioScanProgressCleanup) || sc.audioScanning) {
+        const p = typeof window.__audioScanPendingFound === 'number' ? window.__audioScanPendingFound : 0;
+        samples = Math.max(samples, p);
+    }
+    let daw = dbCounts.daw;
+    if ((typeof dawScanProgressCleanup !== 'undefined' && dawScanProgressCleanup) || sc.dawScanning) {
+        const p = typeof window.__dawScanPendingFound === 'number' ? window.__dawScanPendingFound : 0;
+        daw = Math.max(daw, p);
+    }
+    let presets = dbCounts.presets;
+    if ((typeof presetScanProgressCleanup !== 'undefined' && presetScanProgressCleanup) || sc.presetScanning) {
+        const p = typeof window.__presetScanPendingFound === 'number' ? window.__presetScanPendingFound : 0;
+        presets = Math.max(presets, p);
+    }
+    let pdf = dbCounts.pdf;
+    if ((typeof pdfScanProgressCleanup !== 'undefined' && pdfScanProgressCleanup) || sc.pdfScanning) {
+        const p = typeof window.__pdfScanPendingFound === 'number' ? window.__pdfScanPendingFound : 0;
+        pdf = Math.max(pdf, p);
+    }
+    let midi = dbCounts.midi;
+    if ((typeof _midiScanProgressCleanup !== 'undefined' && _midiScanProgressCleanup) || sc.midiScanning) {
+        const p = typeof window.__midiScanPendingFound === 'number' ? window.__midiScanPendingFound : 0;
+        midi = Math.max(midi, p);
+    }
+    return { plugins, samples, daw, presets, pdf, midi };
+}
+
+async function resolveInventoryCounts(tc, scanner) {
+    let dbCounts = null;
+    try {
+        if (typeof window.vstUpdater.getActiveScanInventoryCounts === 'function') {
+            const raw = await window.vstUpdater.getActiveScanInventoryCounts();
+            dbCounts = mapActiveScanInv(raw);
+        }
+    } catch (_) {
+        dbCounts = null;
+    }
+    if (!dbCounts) {
+        dbCounts = computeInventoryCountsLegacy(tc);
+    }
+    const merged = mergeInventoryWithLiveScan(dbCounts, scanner);
+    window.__inventoryCounts = merged;
+    applyInventoryCounts(merged);
+}
+
+let _refreshInvTimer = null;
+function scheduleRefreshInventoryFromDb() {
+    if (_refreshInvTimer) clearTimeout(_refreshInvTimer);
+    _refreshInvTimer = setTimeout(async () => {
+        _refreshInvTimer = null;
+        try {
+            if (typeof window.vstUpdater.getActiveScanInventoryCounts !== 'function') return;
+            const raw = await window.vstUpdater.getActiveScanInventoryCounts();
+            const dbCounts = mapActiveScanInv(raw);
+            if (!dbCounts) return;
+            const merged = mergeInventoryWithLiveScan(dbCounts, window.__scannerFlags || {});
+            window.__inventoryCounts = merged;
+            applyInventoryCounts(merged);
+        } catch (_) {
+            /* ignore */
+        }
+    }, 50);
+}
+
+function isInventoryCategoryScanning(k) {
+    const sc = window.__scannerFlags || {};
+    switch (k) {
+        case 'plugins':
+            return (typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) || !!sc.pluginScanning;
+        case 'samples':
+            return (typeof audioScanProgressCleanup !== 'undefined' && audioScanProgressCleanup) || !!sc.audioScanning;
+        case 'daw':
+            return (typeof dawScanProgressCleanup !== 'undefined' && dawScanProgressCleanup) || !!sc.dawScanning;
+        case 'presets':
+            return (typeof presetScanProgressCleanup !== 'undefined' && presetScanProgressCleanup) || !!sc.presetScanning;
+        case 'pdf':
+            return (typeof pdfScanProgressCleanup !== 'undefined' && pdfScanProgressCleanup) || !!sc.pdfScanning;
+        case 'midi':
+            return (typeof _midiScanProgressCleanup !== 'undefined' && _midiScanProgressCleanup) || !!sc.midiScanning;
+        default:
+            return false;
+    }
+}
+
 function applyInventoryCounts(counts) {
     if (!counts || typeof counts !== 'object') return;
     const set = (id, val) => {
@@ -359,10 +464,24 @@ function applyInventoryCounts(counts) {
     }
 }
 
-/** Update one or more categories — always writes both header + stats bar for each key. */
+/**
+ * Per-category updates during an active scan only; otherwise refreshes from
+ * `get_active_scan_inventory_counts` so idle counts never come from stale table totals.
+ */
 function applyInventoryCountsPartial(overrides) {
     if (!overrides || typeof overrides !== 'object') return;
-    applyInventoryCounts(overrides);
+    for (const k of Object.keys(overrides)) {
+        if (!isInventoryCategoryScanning(k)) {
+            scheduleRefreshInventoryFromDb();
+            return;
+        }
+    }
+    const base = { ...(window.__inventoryCounts || {}) };
+    for (const [k, v] of Object.entries(overrides)) {
+        base[k] = v;
+    }
+    window.__inventoryCounts = base;
+    applyInventoryCounts(base);
 }
 
 window.applyInventoryCounts = applyInventoryCounts;
@@ -372,6 +491,7 @@ async function updateHeaderInfo() {
     if (typeof document !== 'undefined' && document.hidden) return;
     try {
         const s = await window.vstUpdater.getProcessStats();
+        window.__scannerFlags = s.scanner || {};
         const set = (id, val) => {
             const el = document.getElementById(id);
             if (el) el.textContent = val;
@@ -386,7 +506,7 @@ async function updateHeaderInfo() {
         set('headerUptime', formatUptime(s.uptimeSecs));
         set('headerPid', s.pid);
         const tc = s.database?.tables || {};
-        applyInventoryCounts(computeInventoryCounts(tc));
+        await resolveInventoryCounts(tc, s.scanner);
 
         // Scan status badge
         const sc = s.scanner || {};
@@ -396,6 +516,7 @@ async function updateHeaderInfo() {
         if (sc.dawScanning) active.push(catalogFmt('ui.scan_status.daw'));
         if (sc.presetScanning) active.push(catalogFmt('ui.scan_status.presets'));
         if (sc.pdfScanning) active.push(catalogFmt('ui.scan_status.pdfs'));
+        if (sc.midiScanning) active.push(catalogFmt('ui.scan_status.midi'));
         if (sc.updateChecking) active.push(catalogFmt('ui.scan_status.updates'));
         const badge = document.getElementById('scanStatusBadge');
         if (badge) {

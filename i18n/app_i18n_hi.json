@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "प्रीसेट",
   "ui.welcome.recently_played": "हाल ही में खेला गया",
   "ui.welcome.samples": "नमूने",
-  "ui.welcome.tags": "टैग"
+  "ui.welcome.tags": "टैग",
+  "ui.scan_status.midi": "MIDI"
 }

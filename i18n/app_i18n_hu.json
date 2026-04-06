@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Előbeállítások",
   "ui.welcome.recently_played": "Nemrég játszott",
   "ui.welcome.samples": "Minták",
-  "ui.welcome.tags": "Címkék"
+  "ui.welcome.tags": "Címkék",
+  "ui.scan_status.midi": "MIDI"
 }

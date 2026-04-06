@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Predefinições",
   "ui.welcome.recently_played": "Jogado recentemente",
   "ui.welcome.samples": "Amostras",
-  "ui.welcome.tags": "Etiquetas"
+  "ui.welcome.tags": "Etiquetas",
+  "ui.scan_status.midi": "MIDI"
 }

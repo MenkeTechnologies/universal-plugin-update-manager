@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Preimpostazioni",
   "ui.welcome.recently_played": "Giocato di recente",
   "ui.welcome.samples": "Campioni",
-  "ui.welcome.tags": "Tag"
+  "ui.welcome.tags": "Tag",
+  "ui.scan_status.midi": "MIDI"
 }

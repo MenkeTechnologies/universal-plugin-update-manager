@@ -2957,6 +2957,7 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
     let daw_state = app.state::<DawScanState>();
     let preset_state = app.state::<PresetScanState>();
     let pdf_state = app.state::<PdfScanState>();
+    let midi_state = app.state::<MidiScanState>();
 
     // Preferences for scanner config
     let prefs = history::load_preferences();
@@ -3124,6 +3125,8 @@ fn get_process_stats(app: AppHandle) -> serde_json::Value {
             "presetStopped": preset_state.stop_scan.load(Ordering::Relaxed),
             "pdfScanning": pdf_state.scanning.load(Ordering::Relaxed),
             "pdfStopped": pdf_state.stop_scan.load(Ordering::Relaxed),
+            "midiScanning": midi_state.scanning.load(Ordering::Relaxed),
+            "midiStopped": midi_state.stop_scan.load(Ordering::Relaxed),
         },
         "config": {
             "threadMultiplier": thread_mult,
@@ -5579,6 +5582,11 @@ fn db_pdf_filter_stats(search: Option<String>) -> Result<db::FilterStatsResult, 
 }
 
 #[tauri::command]
+fn get_active_scan_inventory_counts() -> Result<serde_json::Value, String> {
+    db::global().active_scan_inventory_counts()
+}
+
+#[tauri::command]
 fn db_list_scans() -> Result<Vec<db::ScanInfo>, String> {
     db::global().list_scans()
 }
@@ -6088,6 +6096,7 @@ pub fn run() {
             db_preset_filter_stats,
             db_plugin_filter_stats,
             db_pdf_filter_stats,
+            get_active_scan_inventory_counts,
             db_list_scans,
             db_update_bpm,
             db_update_key,

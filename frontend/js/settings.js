@@ -824,7 +824,9 @@ async function resetAllScans() {
     // Reset plugin UI
     document.getElementById('pluginList').innerHTML = '<div class="state-message" id="emptyState"><div class="state-icon">&#128268;</div><h2>Audio Plugin Scanner</h2><p>Click <strong>"Scan Plugins"</strong> to discover all VST2, VST3, and Audio Unit plugins on your system.</p></div>';
     if (typeof applyInventoryCounts === 'function') {
-      applyInventoryCounts({ plugins: 0, samples: 0, daw: 0, presets: 0, pdf: 0, midi: 0 });
+      const z = { plugins: 0, samples: 0, daw: 0, presets: 0, pdf: 0, midi: 0 };
+      window.__inventoryCounts = z;
+      applyInventoryCounts(z);
     } else {
       document.getElementById('totalCount').textContent = '0';
     }

@@ -1768,5 +1768,6 @@
   "ui.welcome.presets": "Предустановки",
   "ui.welcome.recently_played": "Нещодавно зіграно",
   "ui.welcome.samples": "Зразки",
-  "ui.welcome.tags": "Теги"
+  "ui.welcome.tags": "Теги",
+  "ui.scan_status.midi": "MIDI"
 }

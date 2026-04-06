@@ -1307,6 +1307,7 @@ window.vstUpdater = {
     readProjectFile: (filePath) => invoke('read_project_file', {filePath}),
     // Preferences (file-backed)
     getProcessStats: () => invoke('get_process_stats'),
+    getActiveScanInventoryCounts: () => invoke('get_active_scan_inventory_counts'),
     openPrefsFile: () => invoke('open_prefs_file'),
     getPrefsPath: () => invoke('get_prefs_path'),
     prefsGetAll: () => invoke('prefs_get_all'),
