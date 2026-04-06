@@ -378,14 +378,31 @@ function _playbackRafLoop() {
 // Mirrors the parametric EQ's filled-curve style (magenta→cyan gradient).
 let _npFftBuf = null;
 let _npFftGrad = null;
+
+// ResizeObserver syncs canvas pixel buffer to container size on resize —
+// NOT in the render loop (which would reset the bitmap every frame).
+(function initFftCanvasResize() {
+  const canvas = document.getElementById('npFftCanvas');
+  if (!canvas) return;
+  const ro = new ResizeObserver((entries) => {
+    for (const e of entries) {
+      const cw = Math.round(e.contentRect.width) || 600;
+      const ch = Math.round(e.contentRect.height) || 48;
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw;
+        canvas.height = ch;
+        _npFftGrad = null; // rebuild gradient for new height
+      }
+    }
+  });
+  ro.observe(canvas.parentElement || canvas);
+})();
+
 function _renderNpFft() {
   if (!_analyser) return;
   const canvas = document.getElementById('npFftCanvas');
-  if (!canvas || canvas.offsetParent === null) return; // skip if hidden
+  if (!canvas || canvas.offsetParent === null) return;
   const ctx = canvas.getContext('2d');
-  // Fixed 600×48 buffer set in HTML attributes, CSS stretches to container.
-  // Never read clientWidth/clientHeight or set canvas.width/height in the
-  // render loop — release WebView returns wrong values and resets the bitmap.
   const w = canvas.width;
   const h = canvas.height;
   if (w === 0 || h === 0) return;
