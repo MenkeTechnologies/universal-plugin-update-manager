@@ -412,38 +412,51 @@ function _renderNpFft() {
   const logMin = Math.log10(fMin);
   const logMax = Math.log10(fMax);
 
-  // Draw filled spectrum curve on log frequency scale
+  // Draw filled spectrum curve on log frequency scale (leave 10px for labels)
+  const specH = h - 10;
   ctx.beginPath();
-  ctx.moveTo(0, h);
+  ctx.moveTo(0, specH);
   for (let i = 1; i < binCount; i++) {
     const freq = (i * sampleRate) / (_analyser.fftSize);
     if (freq < fMin) continue;
     if (freq > fMax) break;
     const x = ((Math.log10(freq) - logMin) / (logMax - logMin)) * w;
     const mag = _npFftBuf[i] / 255;
-    const y = h - mag * (h - 2);
+    const y = specH - mag * (specH - 2);
     ctx.lineTo(x, y);
   }
-  ctx.lineTo(w, h);
+  ctx.lineTo(w, specH);
   ctx.closePath();
   ctx.fillStyle = _npFftGrad;
   ctx.fill();
 
   // Bright top edge
   ctx.beginPath();
-  ctx.moveTo(0, h);
+  ctx.moveTo(0, specH);
   for (let i = 1; i < binCount; i++) {
     const freq = (i * sampleRate) / (_analyser.fftSize);
     if (freq < fMin) continue;
     if (freq > fMax) break;
     const x = ((Math.log10(freq) - logMin) / (logMax - logMin)) * w;
     const mag = _npFftBuf[i] / 255;
-    const y = h - mag * (h - 2);
+    const y = specH - mag * (specH - 2);
     ctx.lineTo(x, y);
   }
   ctx.strokeStyle = 'rgba(5,217,232,0.5)';
   ctx.lineWidth = 1;
   ctx.stroke();
+
+  // Frequency scale labels along the bottom
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = '8px sans-serif';
+  ctx.textAlign = 'center';
+  for (const f of [50, 100, 200, 500, '1k', '2k', '5k', '10k', '20k']) {
+    const hz = typeof f === 'string' ? parseFloat(f) * 1000 : f;
+    if (hz < fMin || hz > fMax) continue;
+    const x = ((Math.log10(hz) - logMin) / (logMax - logMin)) * w;
+    ctx.fillText(typeof f === 'string' ? f : f + '', x, h - 1);
+  }
+  ctx.textAlign = 'start';
 }
 audioPlayer.addEventListener('play', () => {
   if (!_playbackRafId) _playbackRafId = requestAnimationFrame(_playbackRafLoop);
