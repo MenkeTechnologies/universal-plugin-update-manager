@@ -1,7 +1,10 @@
 // ── Notes & Tags ──
 
+// Cache parsed notes object — avoids JSON.parse on every row render.
+let _notesCache = null;
 function getNotes() {
-  return prefs.getObject('itemNotes', {});
+  if (!_notesCache) _notesCache = prefs.getObject('itemNotes', {});
+  return _notesCache;
 }
 
 function getNote(path) {
@@ -9,6 +12,7 @@ function getNote(path) {
 }
 
 function setNote(path, note, tags) {
+  _notesCache = null; // invalidate cache before read
   const notes = getNotes();
   if ((!note || !note.trim()) && (!tags || tags.length === 0)) {
     delete notes[path];
@@ -16,6 +20,7 @@ function setNote(path, note, tags) {
     notes[path] = { note: note || '', tags: tags || [], updatedAt: new Date().toISOString() };
   }
   prefs.setItem('itemNotes', notes);
+  _notesCache = null;
 }
 
 function getStandaloneTags() {
@@ -87,6 +92,7 @@ function renameTag(oldTag, newTag) {
   }
   if (changed > 0) {
     prefs.setItem('itemNotes', notes);
+    _notesCache = null;
     showToast(toastFmt('toast.tag_renamed_items', { oldTag, newTag, changed }));
   }
 }
@@ -102,6 +108,7 @@ function deleteTag(tag) {
   }
   if (changed > 0) {
     prefs.setItem('itemNotes', notes);
+    _notesCache = null;
   }
   // Also remove from standalone tags
   const standalone = getStandaloneTags();
@@ -428,6 +435,7 @@ async function importNotes() {
         if (!existing[path]) { existing[path] = note; added++; }
       }
       prefs.setItem('itemNotes', existing);
+      _notesCache = null;
     }
     // Merge standalone tags
     if (Array.isArray(imported.standaloneTags)) {
@@ -450,6 +458,7 @@ async function importNotes() {
 function clearAllNotes() {
   if (!confirm(appFmt('confirm.delete_all_notes'))) return;
   prefs.setItem('itemNotes', {});
+  _notesCache = null;
   setStandaloneTags([]);
   renderNotesTab();
   renderGlobalTagBar();

@@ -1,16 +1,26 @@
 // ── Favorites ──
 // Stored in prefs as an array of { type, path, name, ... }
 
+// Cache favorites array + Set for O(1) isFavorite lookups.
+let _favsCache = null;
+let _favsPathSet = null;
 function getFavorites() {
-  return prefs.getObject('favorites', []);
+  if (!_favsCache) {
+    _favsCache = prefs.getObject('favorites', []);
+    _favsPathSet = new Set(_favsCache.map(f => f.path));
+  }
+  return _favsCache;
 }
 
 function saveFavorites(favs) {
+  _favsCache = null;
+  _favsPathSet = null;
   prefs.setItem('favorites', favs);
 }
 
 function isFavorite(path) {
-  return getFavorites().some(f => f.path === path);
+  if (!_favsPathSet) getFavorites();
+  return _favsPathSet.has(path);
 }
 
 function addFavorite(type, path, name, extra) {
