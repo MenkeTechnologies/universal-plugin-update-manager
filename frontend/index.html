@@ -4194,31 +4194,11 @@
       display: none;
     }
 
-    /* Cyberpunk visualizer animation */
+    /* FFT spectrum canvas */
     .np-visualizer {
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
+      display: block;
       height: 32px;
-      padding: 0 4px;
       overflow: hidden;
-    }
-    .np-viz-bar {
-      flex: 1;
-      min-width: 3px;
-      max-width: 6px;
-      background: linear-gradient(180deg, var(--cyan), var(--magenta));
-      border-radius: 1px 1px 0 0;
-      transform-origin: bottom;
-      height: 4px;
-      transition: height 0.15s ease;
-    }
-    .audio-now-playing.np-playing .np-viz-bar {
-      animation: viz-bounce var(--viz-dur, 0.6s) ease-in-out infinite alternate;
-    }
-    @keyframes viz-bounce {
-      0%   { height: var(--viz-min, 4px); opacity: 0.5; }
-      100% { height: var(--viz-max, 28px); opacity: 1; }
     }
 
     .audio-now-playing.np-playing {
@@ -4250,9 +4230,6 @@
 
     .audio-now-playing.expanded .np-visualizer {
       height: 48px;
-    }
-    .audio-now-playing.expanded.np-playing .np-viz-bar {
-      max-width: 8px;
     }
 
     /* Restore pill — shown when player is hidden but audio is playing */
@@ -6245,42 +6222,42 @@
     </div>
   </div>
 
-  <script src="js/i18n-ui.js?v=91733"></script>
-  <script src="js/ipc.js?v=91733"></script>
-  <script src="js/utils.js?v=91733"></script>
-  <script src="js/drag-reorder.js?v=91733"></script>
-  <script src="js/modal-drag.js?v=91733"></script>
-  <script src="js/columns.js?v=91733"></script>
-  <script src="js/notes.js?v=91733"></script>
-  <script src="js/favorites.js?v=91733"></script>
-  <script src="js/export.js?v=91733"></script>
-  <script src="js/plugins.js?v=91733"></script>
-  <script src="js/settings.js?v=91733"></script>
-  <script src="js/history.js?v=91733"></script>
-  <script src="js/kvr.js?v=91733"></script>
-  <script src="js/audio.js?v=91733"></script>
-  <script src="js/daw.js?v=91733"></script>
-  <script src="js/presets.js?v=91733"></script>
-  <script src="js/disk-usage.js?v=91733"></script>
-  <script src="js/batch-select.js?v=91733"></script>
-  <script src="js/sort-persist.js?v=91733"></script>
-  <script src="js/multi-filter.js?v=91733"></script>
-  <script src="js/file-browser.js?v=91733"></script>
-  <script src="js/duplicates.js?v=91733"></script>
-  <script src="js/command-palette.js?v=91733"></script>
-  <script src="js/xref.js?v=91733"></script>
-  <script src="js/dep-graph.js?v=91733"></script>
-  <script src="js/smart-playlists.js?v=91733"></script>
-  <script src="js/heatmap-dashboard.js?v=91733"></script>
-  <script src="js/midi.js?v=91733"></script>
-  <script src="js/pdf.js?v=91733"></script>
-  <script src="js/settings-search.js?v=91733"></script>
-  <script src="js/visualizer.js?v=91733"></script>
-  <script src="js/walker-status.js?v=91733"></script>
-  <script src="js/context-menu.js?v=91733"></script>
-  <script src="js/help-overlay.js?v=91733"></script>
-  <script src="js/shortcuts.js?v=91733"></script>
-  <script src="js/keyboard-nav.js?v=91733"></script>
-  <script src="js/app.js?v=91733"></script>
+  <script src="js/i18n-ui.js?v=11566"></script>
+  <script src="js/ipc.js?v=11566"></script>
+  <script src="js/utils.js?v=11566"></script>
+  <script src="js/drag-reorder.js?v=11566"></script>
+  <script src="js/modal-drag.js?v=11566"></script>
+  <script src="js/columns.js?v=11566"></script>
+  <script src="js/notes.js?v=11566"></script>
+  <script src="js/favorites.js?v=11566"></script>
+  <script src="js/export.js?v=11566"></script>
+  <script src="js/plugins.js?v=11566"></script>
+  <script src="js/settings.js?v=11566"></script>
+  <script src="js/history.js?v=11566"></script>
+  <script src="js/kvr.js?v=11566"></script>
+  <script src="js/audio.js?v=11566"></script>
+  <script src="js/daw.js?v=11566"></script>
+  <script src="js/presets.js?v=11566"></script>
+  <script src="js/disk-usage.js?v=11566"></script>
+  <script src="js/batch-select.js?v=11566"></script>
+  <script src="js/sort-persist.js?v=11566"></script>
+  <script src="js/multi-filter.js?v=11566"></script>
+  <script src="js/file-browser.js?v=11566"></script>
+  <script src="js/duplicates.js?v=11566"></script>
+  <script src="js/command-palette.js?v=11566"></script>
+  <script src="js/xref.js?v=11566"></script>
+  <script src="js/dep-graph.js?v=11566"></script>
+  <script src="js/smart-playlists.js?v=11566"></script>
+  <script src="js/heatmap-dashboard.js?v=11566"></script>
+  <script src="js/midi.js?v=11566"></script>
+  <script src="js/pdf.js?v=11566"></script>
+  <script src="js/settings-search.js?v=11566"></script>
+  <script src="js/visualizer.js?v=11566"></script>
+  <script src="js/walker-status.js?v=11566"></script>
+  <script src="js/context-menu.js?v=11566"></script>
+  <script src="js/help-overlay.js?v=11566"></script>
+  <script src="js/shortcuts.js?v=11566"></script>
+  <script src="js/keyboard-nav.js?v=11566"></script>
+  <script src="js/app.js?v=11566"></script>
 </body>
 </html>
