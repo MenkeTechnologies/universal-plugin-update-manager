@@ -23,6 +23,15 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// Pause walker polling when browser tab is hidden
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { stopWalkerPolling(); }
+  else {
+    const tab = document.getElementById('tabWalkers');
+    if (tab && tab.classList.contains('active')) startWalkerPolling();
+  }
+});
+
 let _walkerIdleCount = 0;
 
 async function _updateWalkerTiles() {

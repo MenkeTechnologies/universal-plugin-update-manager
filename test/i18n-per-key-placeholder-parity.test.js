@@ -4,7 +4,7 @@
  * only report the first mismatch.
  *
  * Rules mirror `src-tauri/src/app_i18n.rs` + `i18n-seed-parity.test.js`:
- * - `cs` / `da` / `de` / `el` / `es` / `fi` / `fr` / `hu` / `id` / `it` / `nb` / `nl` / `pl` / `pt` / `ro` / `ru` / `sv` / `tr` / `uk` / `vi` / `zh` / `ja` / `ko`: IPC `{token}` multiset matches English for every key that uses placeholders
+ * - `cs` / `da` / `de` / `el` / `es` / `fi` / `fr` / `hu` / `id` / `it` / `nb` / `nl` / `pl` / `pt` / `pt_br` / `ro` / `ru` / `sv` / `tr` / `uk` / `vi` / `zh` / `ja` / `ko`: IPC `{token}` multiset matches English for every key that uses placeholders
  * - `es`: every English `{token}` substring must appear in the translation for `menu.*`,
  *   `ui.palette.*`, `ui.sp_*`, `confirm.*` when English has placeholders (`seed_json_es_critical_prefixes`)
  */
@@ -46,6 +46,7 @@ const de = loadMap('app_i18n_de.json');
 const fr = loadMap('app_i18n_fr.json');
 const nl = loadMap('app_i18n_nl.json');
 const pt = loadMap('app_i18n_pt.json');
+const pt_br = loadMap('app_i18n_pt_br.json');
 const sv = loadMap('app_i18n_sv.json');
 const it = loadMap('app_i18n_it.json');
 const el = loadMap('app_i18n_el.json');
@@ -85,6 +86,7 @@ const localeMaps = {
   nl,
   pl,
   pt,
+  pt_br,
   ro,
   ru,
   sv,
@@ -111,6 +113,7 @@ for (const loc of /** @type {const} */ ([
   'nl',
   'pl',
   'pt',
+  'pt_br',
   'ro',
   'ru',
   'sv',

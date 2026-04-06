@@ -125,6 +125,7 @@ async function scanPlugins(resume = false) {
   const stopBtn = document.getElementById('btnStopPlugins');
   const excludePaths = resume ? allPlugins.map(p => p.path) : null;
 
+  if (typeof btnLoading === 'function') btnLoading(btn, true);
   btn.disabled = true;
   resumeBtn.style.display = 'none';
   stopBtn.style.display = '';
@@ -220,6 +221,7 @@ async function scanPlugins(resume = false) {
   hideGlobalProgress();
   stopBtn.style.display = 'none';
   btn.disabled = false;
+  if (typeof btnLoading === 'function') btnLoading(btn, false);
   btn.innerHTML = `&#8635; ${_ui('ui.js.scan_plugins_btn')}`;
   progressFill.style.width = '100%';
   setTimeout(() => {

@@ -42,6 +42,7 @@ const NON_EN = /** @type {const} */ ([
   'nl',
   'pl',
   'pt',
+  'pt_br',
   'ro',
   'ru',
   'sv',

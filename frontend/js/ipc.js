@@ -33,6 +33,7 @@ async function reloadAppStrings(locale) {
         locale === 'sv' ||
         locale === 'fr' ||
         locale === 'pt' ||
+        locale === 'pt-BR' ||
         locale === 'nl' ||
         locale === 'it' ||
         locale === 'el' ||

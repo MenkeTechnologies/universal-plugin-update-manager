@@ -392,17 +392,17 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Hover to highlight
+// Hover to highlight — swap class on old/new row only (no querySelectorAll)
 document.addEventListener('mousemove', (e) => {
   if (!_paletteOpen) return;
   const row = e.target.closest('[data-palette-idx]');
   if (row) {
     const idx = parseInt(row.dataset.paletteIdx, 10);
     if (idx !== _paletteSelected) {
+      const prev = document.querySelector('.palette-row.palette-selected');
+      if (prev) prev.classList.remove('palette-selected');
+      row.classList.add('palette-selected');
       _paletteSelected = idx;
-      document.querySelectorAll('.palette-row').forEach((r, i) => {
-        r.classList.toggle('palette-selected', i === idx);
-      });
     }
   }
 });

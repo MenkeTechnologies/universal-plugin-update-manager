@@ -4,6 +4,31 @@ function escapeHtml(str) {
   return _escDiv.innerHTML;
 }
 
+/** Throttle: invoke at most once per `ms` milliseconds (trailing call guaranteed). */
+function throttle(fn, ms) {
+  let last = 0, timer = null;
+  return function (...args) {
+    const now = performance.now();
+    const remaining = ms - (now - last);
+    if (remaining <= 0) {
+      if (timer) { clearTimeout(timer); timer = null; }
+      last = now;
+      fn.apply(this, args);
+    } else if (!timer) {
+      timer = setTimeout(() => { last = performance.now(); timer = null; fn.apply(this, args); }, remaining);
+    }
+  };
+}
+
+/** Debounce: invoke after `ms` milliseconds of inactivity. */
+function debounce(fn, ms) {
+  let timer = null;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
 /**
  * Resolve a catalog key to the current locale string. No English fallbacks — if `appFmt`
  * is unavailable (e.g. VM tests), returns the key string. See `test/i18n-proof-contract.test.js`.

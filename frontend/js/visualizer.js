@@ -71,13 +71,17 @@ document.addEventListener('keydown', (e) => {
 
 function _resizeCanvases() {
   requestAnimationFrame(() => {
-    document.querySelectorAll('.viz-tile-canvas').forEach(canvas => {
+    const canvases = document.querySelectorAll('.viz-tile-canvas');
+    const dpr = window.devicePixelRatio || 1;
+    // Batch all reads first, then all writes (avoid layout thrashing)
+    const sizes = [];
+    for (const canvas of canvases) {
       const rect = canvas.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        canvas.width = Math.floor(rect.width * (window.devicePixelRatio || 1));
-        canvas.height = Math.floor(rect.height * (window.devicePixelRatio || 1));
-      }
-    });
+      sizes.push({ canvas, w: Math.floor(rect.width * dpr), h: Math.floor(rect.height * dpr), ok: rect.width > 0 && rect.height > 0 });
+    }
+    for (const { canvas, w, h, ok } of sizes) {
+      if (ok) { canvas.width = w; canvas.height = h; }
+    }
   });
 }
 
@@ -489,5 +493,5 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Resize canvases when window resizes
-window.addEventListener('resize', _resizeCanvases);
+// Resize canvases when window resizes (debounced — canvas reset is expensive)
+window.addEventListener('resize', typeof debounce === 'function' ? debounce(_resizeCanvases, 150) : _resizeCanvases);

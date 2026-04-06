@@ -239,7 +239,7 @@ async function selectScan(id, type) {
       _r += batch.length;
     }
     _renderPlugBatch();
-    plugListEl.addEventListener('scroll', () => { if (plugListEl.scrollTop + plugListEl.clientHeight >= plugListEl.scrollHeight - 50) _renderPlugBatch(); });
+    plugListEl.addEventListener('scroll', throttle(() => { if (plugListEl.scrollTop + plugListEl.clientHeight >= plugListEl.scrollHeight - 50) _renderPlugBatch(); }, 100));
   }
 }
 
@@ -315,11 +315,11 @@ async function selectAudioScan(id) {
     }
     _renderAudioBatch();
     // Load more on scroll to bottom
-    listEl.addEventListener('scroll', () => {
+    listEl.addEventListener('scroll', throttle(() => {
       if (listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 50) {
         _renderAudioBatch();
       }
-    });
+    }, 100));
   }
 }
 
@@ -423,7 +423,7 @@ async function selectDawScan(id) {
       _r += batch.length;
     }
     _renderDawBatch();
-    dawListEl.addEventListener('scroll', () => { if (dawListEl.scrollTop + dawListEl.clientHeight >= dawListEl.scrollHeight - 50) _renderDawBatch(); });
+    dawListEl.addEventListener('scroll', throttle(() => { if (dawListEl.scrollTop + dawListEl.clientHeight >= dawListEl.scrollHeight - 50) _renderDawBatch(); }, 100));
   }
 }
 
@@ -536,7 +536,7 @@ async function selectPresetScan(id) {
       _r += batch.length;
     }
     _renderPresetBatch();
-    presetListEl.addEventListener('scroll', () => { if (presetListEl.scrollTop + presetListEl.clientHeight >= presetListEl.scrollHeight - 50) _renderPresetBatch(); });
+    presetListEl.addEventListener('scroll', throttle(() => { if (presetListEl.scrollTop + presetListEl.clientHeight >= presetListEl.scrollHeight - 50) _renderPresetBatch(); }, 100));
   }
 }
 
@@ -635,7 +635,7 @@ async function selectPdfScan(id) {
       _r += batch.length;
     }
     _renderPdfBatch();
-    pdfListEl.addEventListener('scroll', () => { if (pdfListEl.scrollTop + pdfListEl.clientHeight >= pdfListEl.scrollHeight - 50) _renderPdfBatch(); });
+    pdfListEl.addEventListener('scroll', throttle(() => { if (pdfListEl.scrollTop + pdfListEl.clientHeight >= pdfListEl.scrollHeight - 50) _renderPdfBatch(); }, 100));
   }
 }
 
@@ -748,7 +748,7 @@ async function selectMidiScan(id) {
       _r += batch.length;
     }
     _renderMidiBatch();
-    midiListEl.addEventListener('scroll', () => { if (midiListEl.scrollTop + midiListEl.clientHeight >= midiListEl.scrollHeight - 50) _renderMidiBatch(); });
+    midiListEl.addEventListener('scroll', throttle(() => { if (midiListEl.scrollTop + midiListEl.clientHeight >= midiListEl.scrollHeight - 50) _renderMidiBatch(); }, 100));
   }
 }
 

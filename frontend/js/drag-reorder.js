@@ -36,7 +36,7 @@
 
       d.ghost = d.dragged.cloneNode(true);
       d.ghost.classList.add('trello-ghost');
-      d.ghost.style.cssText = `position:fixed;z-index:20000;width:${rect.width}px;height:${rect.height}px;left:${rect.left}px;top:${rect.top}px;pointer-events:none;opacity:0.9;transform:rotate(2deg) scale(1.05);box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 20px rgba(5,217,232,0.3);border:2px solid var(--cyan);border-radius:4px;background:var(--bg-primary);transition:none;`;
+      d.ghost.style.cssText = `position:fixed;z-index:20000;width:${rect.width}px;height:${rect.height}px;left:${rect.left}px;top:${rect.top}px;pointer-events:none;opacity:0.9;transform:rotate(2deg) scale(1.05);will-change:transform,left,top;box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 20px rgba(5,217,232,0.3);border:2px solid var(--cyan);border-radius:4px;background:var(--bg-primary);transition:none;`;
       document.body.appendChild(d.ghost);
       d.dragged.style.display = 'none';
     }

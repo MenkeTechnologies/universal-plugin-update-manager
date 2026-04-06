@@ -54,6 +54,7 @@ locale_map!(CELL_SV, map_sv, "app_i18n_sv.json");
 locale_map!(CELL_FR, map_fr, "app_i18n_fr.json");
 locale_map!(CELL_NL, map_nl, "app_i18n_nl.json");
 locale_map!(CELL_PT, map_pt, "app_i18n_pt.json");
+locale_map!(CELL_PT_BR, map_pt_br, "app_i18n_pt_br.json");
 locale_map!(CELL_IT, map_it, "app_i18n_it.json");
 locale_map!(CELL_EL, map_el, "app_i18n_el.json");
 locale_map!(CELL_PL, map_pl, "app_i18n_pl.json");
@@ -91,6 +92,10 @@ seq!(N in 0..1024 {
     #[test]
     fn pt_bucket~N() {
         check_bucket(map_pt(), "pt", N);
+    }
+    #[test]
+    fn pt_br_bucket~N() {
+        check_bucket(map_pt_br(), "pt-BR", N);
     }
     #[test]
     fn it_bucket~N() {

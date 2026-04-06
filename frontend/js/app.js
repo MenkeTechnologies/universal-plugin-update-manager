@@ -55,6 +55,7 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
         'fr',
         'nl',
         'pt',
+        'pt-BR',
         'it',
         'el',
         'pl',
@@ -204,7 +205,12 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
   renderWelcomeDashboard();
   renderShortcutSettings();
   updateHeaderInfo();
-  setInterval(updateHeaderInfo, 3000); // refresh process stats every 3s
+  // Refresh process stats every 3s, but pause when tab is hidden
+  let _headerInterval = setInterval(updateHeaderInfo, 3000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { clearInterval(_headerInterval); _headerInterval = null; }
+    else if (!_headerInterval) { updateHeaderInfo(); _headerInterval = setInterval(updateHeaderInfo, 3000); }
+  });
 
   // Auto-scan on launch
   if (prefs.getItem('autoScan') === 'on' && allPlugins.length === 0) {
@@ -317,6 +323,7 @@ async function scanAll(resume = false) {
   const btn = document.getElementById('btnScanAll');
   const stopBtn = document.getElementById('btnStopAll');
   const resumeBtn = document.getElementById('btnResumeAll');
+  if (typeof btnLoading === 'function') btnLoading(btn, true);
   btn.disabled = true;
   {
     btn.textContent = resume ? catalogFmt('ui.js.resuming_btn') : catalogFmt('ui.js.scanning_btn');
@@ -398,6 +405,7 @@ async function scanAll(resume = false) {
 
   scanAllRunning = false;
   btn.disabled = false;
+  if (typeof btnLoading === 'function') btnLoading(btn, false);
   btn.innerHTML = catalogFmt('ui.btn.9889_scan_all');
   stopBtn.style.display = 'none';
 

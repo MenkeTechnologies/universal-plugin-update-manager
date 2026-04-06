@@ -78,6 +78,7 @@ describe('frontend/js/ipc.js (vm-loaded)', () => {
     'es',
     'sv',
     'pt',
+    'pt-BR',
     'nl',
     'pl',
     'ru',
