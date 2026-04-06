@@ -797,9 +797,7 @@ function updateAudioStats() {
   const aiff = (audioStatCounts['AIFF'] || 0) + (audioStatCounts['AIF'] || 0);
   const flac = audioStatCounts['FLAC'] || 0;
   const mainFormats = wav + mp3 + aiff + flac;
-  let accumulatedTotal = 0;
-  for (const k in audioStatCounts) accumulatedTotal += audioStatCounts[k];
-  const total = Math.max(audioTotalCount || 0, accumulatedTotal);
+  const total = audioTotalCount || audioTotalUnfiltered || 0;
   const unfiltered = audioTotalUnfiltered || 0;
   const isFiltered = unfiltered > 0 && total > 0 && total < unfiltered;
   const totalStr = isFiltered ? total.toLocaleString() + ' / ' + unfiltered.toLocaleString() : total.toLocaleString();
