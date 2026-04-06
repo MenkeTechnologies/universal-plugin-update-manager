@@ -358,42 +358,7 @@ function computeInventoryCountsLegacy(tc) {
     return { plugins, samples, daw, presets, pdf, midi };
 }
 
-/** Overlay live scan progress on DB-backed baseline (same rules as legacy, keyed off scanner flags + cleanup fns). */
-function mergeInventoryWithLiveScan(dbCounts, scanner) {
-    const sc = scanner || {};
-    let plugins = dbCounts.plugins;
-    if ((typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) || sc.pluginScanning) {
-        if (typeof allPlugins !== 'undefined') plugins = Math.max(plugins, allPlugins.length);
-    }
-    let samples = dbCounts.samples;
-    if ((typeof audioScanProgressCleanup !== 'undefined' && audioScanProgressCleanup) || sc.audioScanning) {
-        const p = typeof window.__audioScanPendingFound === 'number' ? window.__audioScanPendingFound : 0;
-        samples = Math.max(samples, p);
-    }
-    let daw = dbCounts.daw;
-    if ((typeof dawScanProgressCleanup !== 'undefined' && dawScanProgressCleanup) || sc.dawScanning) {
-        const p = typeof window.__dawScanPendingFound === 'number' ? window.__dawScanPendingFound : 0;
-        daw = Math.max(daw, p);
-    }
-    let presets = dbCounts.presets;
-    if ((typeof presetScanProgressCleanup !== 'undefined' && presetScanProgressCleanup) || sc.presetScanning) {
-        const p = typeof window.__presetScanPendingFound === 'number' ? window.__presetScanPendingFound : 0;
-        presets = Math.max(presets, p);
-    }
-    let pdf = dbCounts.pdf;
-    if ((typeof pdfScanProgressCleanup !== 'undefined' && pdfScanProgressCleanup) || sc.pdfScanning) {
-        const p = typeof window.__pdfScanPendingFound === 'number' ? window.__pdfScanPendingFound : 0;
-        pdf = Math.max(pdf, p);
-    }
-    let midi = dbCounts.midi;
-    if ((typeof _midiScanProgressCleanup !== 'undefined' && _midiScanProgressCleanup) || sc.midiScanning) {
-        const p = typeof window.__midiScanPendingFound === 'number' ? window.__midiScanPendingFound : 0;
-        midi = Math.max(midi, p);
-    }
-    return { plugins, samples, daw, presets, pdf, midi };
-}
-
-async function resolveInventoryCounts(tc, scanner) {
+async function resolveInventoryCounts(tc, _scanner) {
     let dbCounts = null;
     try {
         if (typeof window.vstUpdater.getActiveScanInventoryCounts === 'function') {
@@ -406,9 +371,8 @@ async function resolveInventoryCounts(tc, scanner) {
     if (!dbCounts) {
         dbCounts = computeInventoryCountsLegacy(tc);
     }
-    const merged = mergeInventoryWithLiveScan(dbCounts, scanner);
-    window.__inventoryCounts = merged;
-    applyInventoryCounts(merged);
+    window.__inventoryCounts = dbCounts;
+    applyInventoryCounts(dbCounts);
 }
 
 let _refreshInvTimer = null;
@@ -421,33 +385,12 @@ function scheduleRefreshInventoryFromDb() {
             const raw = await window.vstUpdater.getActiveScanInventoryCounts();
             const dbCounts = mapActiveScanInv(raw);
             if (!dbCounts) return;
-            const merged = mergeInventoryWithLiveScan(dbCounts, window.__scannerFlags || {});
-            window.__inventoryCounts = merged;
-            applyInventoryCounts(merged);
+            window.__inventoryCounts = dbCounts;
+            applyInventoryCounts(dbCounts);
         } catch (_) {
             /* ignore */
         }
-    }, 50);
-}
-
-function isInventoryCategoryScanning(k) {
-    const sc = window.__scannerFlags || {};
-    switch (k) {
-        case 'plugins':
-            return (typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) || !!sc.pluginScanning;
-        case 'samples':
-            return (typeof audioScanProgressCleanup !== 'undefined' && audioScanProgressCleanup) || !!sc.audioScanning;
-        case 'daw':
-            return (typeof dawScanProgressCleanup !== 'undefined' && dawScanProgressCleanup) || !!sc.dawScanning;
-        case 'presets':
-            return (typeof presetScanProgressCleanup !== 'undefined' && presetScanProgressCleanup) || !!sc.presetScanning;
-        case 'pdf':
-            return (typeof pdfScanProgressCleanup !== 'undefined' && pdfScanProgressCleanup) || !!sc.pdfScanning;
-        case 'midi':
-            return (typeof _midiScanProgressCleanup !== 'undefined' && _midiScanProgressCleanup) || !!sc.midiScanning;
-        default:
-            return false;
-    }
+    }, 100);
 }
 
 function applyInventoryCounts(counts) {
@@ -464,28 +407,14 @@ function applyInventoryCounts(counts) {
     }
 }
 
-/**
- * Per-category updates during an active scan only; otherwise refreshes from
- * `get_active_scan_inventory_counts` so idle counts never come from stale table totals.
- */
-function applyInventoryCountsPartial(overrides) {
-    if (!overrides || typeof overrides !== 'object') return;
-    for (const k of Object.keys(overrides)) {
-        if (!isInventoryCategoryScanning(k)) {
-            scheduleRefreshInventoryFromDb();
-            return;
-        }
-    }
-    const base = { ...(window.__inventoryCounts || {}) };
-    for (const [k, v] of Object.entries(overrides)) {
-        base[k] = v;
-    }
-    window.__inventoryCounts = base;
-    applyInventoryCounts(base);
+/** All inventory totals come from SQLite (`get_active_scan_inventory_counts`); scan progress triggers throttled refresh. */
+function applyInventoryCountsPartial(_overrides) {
+    scheduleRefreshInventoryFromDb();
 }
 
 window.applyInventoryCounts = applyInventoryCounts;
 window.applyInventoryCountsPartial = applyInventoryCountsPartial;
+window.scheduleRefreshInventoryFromDb = scheduleRefreshInventoryFromDb;
 
 async function updateHeaderInfo() {
     if (typeof document !== 'undefined' && document.hidden) return;

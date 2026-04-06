@@ -267,6 +267,11 @@ async fn scan_plugins(
         let plugin_paths = scanner::discover_plugins(&directories);
         let total = plugin_paths.len();
 
+        let plugin_scan_id = history::gen_id();
+        let now_iso = history::now_iso();
+        let db = db::global();
+        let _ = db.plugin_scan_parent_create(&plugin_scan_id, &now_iso, &directories);
+
         let _ = app_handle.emit(
             "scan-progress",
             serde_json::json!({
@@ -372,6 +377,7 @@ async fn scan_plugins(
             batch.push(info);
             processed += 1;
             if batch.len() >= batch_size || processed == total {
+                let _ = db.insert_plugin_batch(&plugin_scan_id, &batch);
                 all_plugins.extend(batch.clone());
                 let _ = app_handle.emit(
                     "scan-progress",
@@ -386,6 +392,7 @@ async fn scan_plugins(
             }
         }
         if !batch.is_empty() {
+            let _ = db.insert_plugin_batch(&plugin_scan_id, &batch);
             all_plugins.extend(batch.clone());
             let _ = app_handle.emit(
                 "scan-progress",
@@ -401,14 +408,18 @@ async fn scan_plugins(
         let was_stopped = scan_state.stop_scan.load(Ordering::Relaxed);
         all_plugins.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         let roots: Vec<String> = directories.clone();
-        let snapshot = history::build_plugin_snapshot(&all_plugins, &directories, &roots);
-        let _ = db::global().save_plugin_scan(&snapshot);
-        db::global().checkpoint();
+        let _ = db.plugin_scan_parent_finalize(
+            &plugin_scan_id,
+            all_plugins.len(),
+            &directories,
+            &roots,
+        );
+        db.checkpoint();
 
         serde_json::json!({
             "plugins": all_plugins,
             "directories": directories,
-            "snapshotId": snapshot.id,
+            "snapshotId": plugin_scan_id,
             "stopped": was_stopped
         })
     })
@@ -694,19 +705,35 @@ async fn scan_audio_samples(
         } else {
             audio_scanner::get_audio_roots()
         };
-        let mut all_samples: Vec<AudioSample> = Vec::new();
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
+        let now_iso = history::now_iso();
+        let audio_scan_id = history::gen_id();
+        let db = db::global();
+        let _ = db.audio_scan_parent_create(&audio_scan_id, &now_iso, &root_strs);
+
+        let mut audio_count: u64 = 0;
+        let mut audio_bytes: u64 = 0;
+        let mut audio_format_counts: HashMap<String, usize> = HashMap::new();
         let exclude_set = exclude_paths.map(|v| v.into_iter().collect::<HashSet<String>>());
 
         audio_scanner::walk_for_audio(
             &roots,
-            &mut |batch, found| {
-                all_samples.extend_from_slice(batch);
+            &mut |batch, _found| {
+                for s in batch.iter() {
+                    audio_bytes += s.size;
+                    *audio_format_counts.entry(s.format.clone()).or_insert(0) += 1;
+                }
+                let inserted = db.insert_audio_batch(&audio_scan_id, batch).unwrap_or(0);
+                audio_count += inserted;
                 let _ = app_handle.emit(
                     "audio-scan-progress",
                     serde_json::json!({
                         "phase": "scanning",
                         "samples": batch,
-                        "found": found
+                        "found": audio_count,
                     }),
                 );
             },
@@ -722,13 +749,22 @@ async fn scan_audio_samples(
             ad.clear();
         }
 
-        let root_strs: Vec<String> = roots
-            .iter()
-            .map(|r| r.to_string_lossy().to_string())
-            .collect();
         let was_stopped = audio_state.stop_scan.load(Ordering::Relaxed);
-        all_samples.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        serde_json::json!({ "samples": all_samples, "roots": root_strs, "stopped": was_stopped })
+        let _ = db.audio_scan_parent_finalize(
+            &audio_scan_id,
+            audio_count,
+            audio_bytes,
+            &audio_format_counts,
+        );
+        db.checkpoint();
+        serde_json::json!({
+            "samples": [],
+            "roots": root_strs,
+            "stopped": was_stopped,
+            "streamed": true,
+            "audioScanId": audio_scan_id,
+            "audioCount": audio_count,
+        })
     })
     .await;
 
@@ -738,9 +774,13 @@ async fn scan_audio_samples(
         Ok(v) => append_log(format!(
             "SCAN END — audio | {}s | {} found",
             elapsed.as_secs(),
-            v.get("samples")
-                .and_then(|p| p.as_array())
-                .map(|a| a.len())
+            v.get("audioCount")
+                .and_then(|n| n.as_u64())
+                .or_else(|| {
+                    v.get("samples")
+                        .and_then(|p| p.as_array())
+                        .map(|a| a.len() as u64)
+                })
                 .unwrap_or(0)
         )),
         Err(e) => append_log(format!(
@@ -854,19 +894,36 @@ async fn scan_daw_projects(
         } else {
             daw_scanner::get_daw_roots()
         };
-        let mut all_projects: Vec<DawProject> = Vec::new();
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
+        let now_iso = history::now_iso();
+        let daw_scan_id = history::gen_id();
+        let db = db::global();
+        let _ = db.daw_scan_parent_create(&daw_scan_id, &now_iso, &root_strs);
+
+        let mut daw_count: u64 = 0;
+        let mut daw_bytes: u64 = 0;
+        let mut daw_daw_counts: HashMap<String, usize> = HashMap::new();
         let exclude_set = exclude_paths.map(|v| v.into_iter().collect::<HashSet<String>>());
 
         daw_scanner::walk_for_daw(
             &roots,
-            &mut |batch, found| {
-                all_projects.extend_from_slice(batch);
+            &mut |batch, _found| {
+                let inserted_idx = db.insert_daw_batch(&daw_scan_id, batch).unwrap_or_default();
+                let deduped: Vec<&DawProject> = inserted_idx.iter().map(|&i| &batch[i]).collect();
+                for p in &deduped {
+                    daw_bytes += p.size;
+                    *daw_daw_counts.entry(p.daw.clone()).or_insert(0) += 1;
+                }
+                daw_count += deduped.len() as u64;
                 let _ = app_handle.emit(
                     "daw-scan-progress",
                     serde_json::json!({
                         "phase": "scanning",
-                        "projects": batch,
-                        "found": found
+                        "projects": deduped,
+                        "found": daw_count,
                     }),
                 );
             },
@@ -888,13 +945,22 @@ async fn scan_daw_projects(
             let mut ad = ws.daw_dirs.lock().unwrap_or_else(|e| e.into_inner());
             ad.clear();
         }
-        let root_strs: Vec<String> = roots
-            .iter()
-            .map(|r| r.to_string_lossy().to_string())
-            .collect();
         let was_stopped = daw_state.stop_scan.load(Ordering::Relaxed);
-        all_projects.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        serde_json::json!({ "projects": all_projects, "roots": root_strs, "stopped": was_stopped })
+        let _ = db.daw_scan_parent_finalize(
+            &daw_scan_id,
+            daw_count as usize,
+            daw_bytes,
+            &daw_daw_counts,
+        );
+        db.checkpoint();
+        serde_json::json!({
+            "projects": [],
+            "roots": root_strs,
+            "stopped": was_stopped,
+            "streamed": true,
+            "dawScanId": daw_scan_id,
+            "dawCount": daw_count,
+        })
     })
     .await;
 
@@ -904,9 +970,13 @@ async fn scan_daw_projects(
         Ok(v) => append_log(format!(
             "SCAN END — daw | {}s | {} found",
             elapsed.as_secs(),
-            v.get("projects")
-                .and_then(|p| p.as_array())
-                .map(|a| a.len())
+            v.get("dawCount")
+                .and_then(|n| n.as_u64())
+                .or_else(|| {
+                    v.get("projects")
+                        .and_then(|p| p.as_array())
+                        .map(|a| a.len() as u64)
+                })
                 .unwrap_or(0)
         )),
         Err(e) => append_log(format!("SCAN ERROR — daw | {}s | {}", elapsed.as_secs(), e)),
@@ -1011,19 +1081,35 @@ async fn scan_presets(
         } else {
             preset_scanner::get_preset_roots()
         };
-        let mut all_presets: Vec<PresetFile> = Vec::new();
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
+        let now_iso = history::now_iso();
+        let preset_scan_id = history::gen_id();
+        let db = db::global();
+        let _ = db.preset_scan_parent_create(&preset_scan_id, &now_iso, &root_strs);
+
+        let mut preset_count: u64 = 0;
+        let mut preset_bytes: u64 = 0;
+        let mut preset_format_counts: HashMap<String, usize> = HashMap::new();
         let exclude_set = exclude_paths.map(|v| v.into_iter().collect::<HashSet<String>>());
 
         preset_scanner::walk_for_presets(
             &roots,
-            &mut |batch, found| {
-                all_presets.extend_from_slice(batch);
+            &mut |batch, _found| {
+                for p in batch.iter() {
+                    preset_bytes += p.size;
+                    *preset_format_counts.entry(p.format.clone()).or_insert(0) += 1;
+                }
+                let inserted = db.insert_preset_batch(&preset_scan_id, batch).unwrap_or(0);
+                preset_count += inserted;
                 let _ = app_handle.emit(
                     "preset-scan-progress",
                     serde_json::json!({
                         "phase": "scanning",
                         "presets": batch,
-                        "found": found
+                        "found": preset_count,
                     }),
                 );
             },
@@ -1038,12 +1124,21 @@ async fn scan_presets(
             ad.clear();
         }
         let was_stopped = preset_state.stop_scan.load(Ordering::Relaxed);
-        let root_strs: Vec<String> = roots
-            .iter()
-            .map(|r| r.to_string_lossy().to_string())
-            .collect();
-        all_presets.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        serde_json::json!({ "presets": all_presets, "roots": root_strs, "stopped": was_stopped })
+        let _ = db.preset_scan_parent_finalize(
+            &preset_scan_id,
+            preset_count as usize,
+            preset_bytes,
+            &preset_format_counts,
+        );
+        db.checkpoint();
+        serde_json::json!({
+            "presets": [],
+            "roots": root_strs,
+            "stopped": was_stopped,
+            "streamed": true,
+            "presetScanId": preset_scan_id,
+            "presetCount": preset_count,
+        })
     })
     .await;
 
@@ -1053,9 +1148,13 @@ async fn scan_presets(
         Ok(v) => append_log(format!(
             "SCAN END — presets | {}s | {} found",
             elapsed.as_secs(),
-            v.get("presets")
-                .and_then(|p| p.as_array())
-                .map(|a| a.len())
+            v.get("presetCount")
+                .and_then(|n| n.as_u64())
+                .or_else(|| {
+                    v.get("presets")
+                        .and_then(|p| p.as_array())
+                        .map(|a| a.len() as u64)
+                })
                 .unwrap_or(0)
         )),
         Err(e) => append_log(format!(
@@ -1367,19 +1466,33 @@ async fn scan_pdfs(
         } else {
             pdf_scanner::get_pdf_roots()
         };
-        let mut all_pdfs: Vec<PdfFile> = Vec::new();
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
+        let now_iso = history::now_iso();
+        let pdf_scan_id = history::gen_id();
+        let db = db::global();
+        let _ = db.pdf_scan_parent_create(&pdf_scan_id, &now_iso, &root_strs);
+
+        let mut pdf_count: u64 = 0;
+        let mut pdf_bytes: u64 = 0;
         let exclude_set = exclude_paths.map(|v| v.into_iter().collect::<HashSet<String>>());
 
         pdf_scanner::walk_for_pdfs(
             &roots,
-            &mut |batch, found| {
-                all_pdfs.extend_from_slice(batch);
+            &mut |batch, _found| {
+                for p in batch.iter() {
+                    pdf_bytes += p.size;
+                }
+                let inserted = db.insert_pdf_batch(&pdf_scan_id, batch).unwrap_or(0);
+                pdf_count += inserted;
                 let _ = app_handle.emit(
                     "pdf-scan-progress",
                     serde_json::json!({
                         "phase": "scanning",
                         "pdfs": batch,
-                        "found": found
+                        "found": pdf_count,
                     }),
                 );
             },
@@ -1394,12 +1507,16 @@ async fn scan_pdfs(
             ad.clear();
         }
         let was_stopped = pdf_state.stop_scan.load(Ordering::Relaxed);
-        let root_strs: Vec<String> = roots
-            .iter()
-            .map(|r| r.to_string_lossy().to_string())
-            .collect();
-        all_pdfs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        serde_json::json!({ "pdfs": all_pdfs, "roots": root_strs, "stopped": was_stopped })
+        let _ = db.pdf_scan_parent_finalize(&pdf_scan_id, pdf_count as usize, pdf_bytes);
+        db.checkpoint();
+        serde_json::json!({
+            "pdfs": [],
+            "roots": root_strs,
+            "stopped": was_stopped,
+            "streamed": true,
+            "pdfScanId": pdf_scan_id,
+            "pdfCount": pdf_count,
+        })
     })
     .await;
 
@@ -1409,9 +1526,13 @@ async fn scan_pdfs(
         Ok(v) => append_log(format!(
             "SCAN END — pdfs | {}s | {} found",
             elapsed.as_secs(),
-            v.get("pdfs")
-                .and_then(|p| p.as_array())
-                .map(|a| a.len())
+            v.get("pdfCount")
+                .and_then(|n| n.as_u64())
+                .or_else(|| {
+                    v.get("pdfs")
+                        .and_then(|p| p.as_array())
+                        .map(|a| a.len() as u64)
+                })
                 .unwrap_or(0)
         )),
         Err(e) => append_log(format!(

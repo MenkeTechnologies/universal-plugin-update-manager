@@ -2077,6 +2077,89 @@ impl Database {
         tx.commit().map_err(|e| e.to_string())
     }
 
+    /// Begin a streaming plugin scan: parent row + clear prior rows for this id.
+    pub fn plugin_scan_parent_create(
+        &self,
+        id: &str,
+        timestamp: &str,
+        roots: &[String],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let dirs_json = "[]".to_string();
+        let roots_json = serde_json::to_string(roots).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO plugin_scans (id, timestamp, plugin_count, directories, roots) VALUES (?1,?2,0,?3,?4)",
+            params![id, timestamp, dirs_json, roots_json],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM plugins WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Append plugins for a streaming scan; updates `plugin_scans.plugin_count` incrementally.
+    pub fn insert_plugin_batch(&self, scan_id: &str, batch: &[PluginInfo]) -> Result<u64, String> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut inserted: u64 = 0;
+        {
+            let mut stmt = tx
+                .prepare_cached(
+                    "INSERT OR IGNORE INTO plugins (name, path, plugin_type, version, manufacturer, manufacturer_url, size, size_bytes, modified, architectures, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+                )
+                .map_err(|e| e.to_string())?;
+            for p in batch {
+                let arch_json = serde_json::to_string(&p.architectures).unwrap_or_default();
+                let changed = stmt
+                    .execute(params![
+                        p.name,
+                        p.path,
+                        p.plugin_type,
+                        p.version,
+                        p.manufacturer,
+                        p.manufacturer_url,
+                        p.size,
+                        p.size_bytes as i64,
+                        p.modified,
+                        arch_json,
+                        scan_id
+                    ])
+                    .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    inserted += 1;
+                }
+            }
+        }
+        if inserted > 0 {
+            tx.execute(
+                "UPDATE plugin_scans SET plugin_count = plugin_count + ?2 WHERE id = ?1",
+                params![scan_id, inserted as i64],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(inserted)
+    }
+
+    /// Finalize directory list and counts after streaming inserts (matches non-streaming snapshot shape).
+    pub fn plugin_scan_parent_finalize(
+        &self,
+        id: &str,
+        plugin_count: usize,
+        directories: &[String],
+        roots: &[String],
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        let dirs_json = serde_json::to_string(directories).unwrap_or_default();
+        let roots_json = serde_json::to_string(roots).unwrap_or_default();
+        conn.execute(
+            "UPDATE plugin_scans SET plugin_count = ?2, directories = ?3, roots = ?4 WHERE id = ?1",
+            params![id, plugin_count as i64, dirs_json, roots_json],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn get_plugin_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
@@ -8043,6 +8126,30 @@ mod tests {
         .unwrap();
         let v = db.active_scan_inventory_counts().unwrap();
         assert_eq!(v["presets"], 0);
+    }
+
+    #[test]
+    fn test_plugin_streaming_insert_seen_in_active_scan_counts() {
+        let db = test_db();
+        db.plugin_scan_parent_create("ps-stream", "2024-01-01T00:00:00", &["/Applications".into()])
+            .unwrap();
+        let p = PluginInfo {
+            name: "Test".into(),
+            path: "/test.vst3".into(),
+            plugin_type: "VST3".into(),
+            version: "1.0".into(),
+            manufacturer: "Test Co".into(),
+            manufacturer_url: None,
+            size: "1 MB".into(),
+            size_bytes: 1_000_000,
+            modified: "2024-01-01".into(),
+            architectures: vec![],
+        };
+        assert_eq!(db.insert_plugin_batch("ps-stream", &[p]).unwrap(), 1);
+        db.plugin_scan_parent_finalize("ps-stream", 1, &[], &["/Applications".into()])
+            .unwrap();
+        let v = db.active_scan_inventory_counts().unwrap();
+        assert_eq!(v["plugins"], 1);
     }
 
     /// Many lib tests call `init_global()` in parallel; migrations must not race on one file.

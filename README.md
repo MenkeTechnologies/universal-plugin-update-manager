@@ -409,7 +409,7 @@ src-tauri/
 frontend/
   index.html           -- Cyberpunk CRT UI (HTML/CSS)
   js/
-    app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals identical per category (`get_active_scan_inventory_counts` = latest `scan_id` per domain when idle; live scan progress while a scanner runs)
+    app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals identical per category (always `get_active_scan_inventory_counts`; standalone scans stream-insert into SQLite per batch so counts track committed rows; `applyInventoryCountsPartial` throttles DB refresh on progress)
     audio.js           -- Audio sample scanning + inline playback + floating player
     batch-select.js    -- Checkbox selection + batch operations
     command-palette.js -- Cmd+K universal fuzzy search across all items
