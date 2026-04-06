@@ -156,7 +156,7 @@ mod macos {
     // Timespec (2 x i64, 16 bytes) are parsed manually via byte slicing — no
     // Rust structs needed for them.
 
-    extern "C" {
+    unsafe extern "C" {
         fn getattrlistbulk(
             dirfd: c_int,
             alist: *mut c_void,

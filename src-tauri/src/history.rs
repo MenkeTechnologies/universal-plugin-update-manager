@@ -758,13 +758,11 @@ pub fn remove_preference(key: &str) {
 }
 
 pub fn gen_id() -> String {
-    use rand::Rng;
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    let mut rng = rand::thread_rng();
-    let rand_part: u32 = rng.gen();
+    let rand_part: u32 = rand::random();
     format!(
         "{}{}",
         radix_string(ts as u64, 36),
