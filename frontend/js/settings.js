@@ -550,12 +550,6 @@ async function renderCacheStats() {
         </tr>`;
       }).join('')}</tbody>
     </table>`;
-    if (typeof window.balanceSettingsColumns === 'function') {
-      window._columnsBalanced = false;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => window.balanceSettingsColumns(true));
-      });
-    }
   } catch (e) {
     const msg = catalogFmt('ui.settings.cache_load_failed', { err: e.message || String(e) });
     grid.innerHTML = `<span style="color:var(--red);font-size:11px;">${typeof escapeHtml === 'function' ? escapeHtml(msg) : msg}</span>`;
@@ -1664,32 +1658,8 @@ function initSettingsSectionDrag() {
   const container = document.querySelector('.settings-container');
   if (!container) return;
 
-  // Balance CSS columns — deferred until settings tab is visible (offsetHeight=0 when hidden)
-  window._columnsBalanced = false;
-  window.balanceSettingsColumns = function(force) {
-    if (window._columnsBalanced && !force) return;
-    const sections = [...container.querySelectorAll('.settings-section[data-section]')];
-    if (!sections.length || sections[0].offsetHeight === 0) return; // still hidden
-    window._columnsBalanced = true;
-    const numCols = window.innerWidth >= 1700 ? 3 : window.innerWidth >= 1100 ? 2 : 1;
-    if (numCols < 2) return;
-    sections.sort((a, b) => b.offsetHeight - a.offsetHeight);
-    const cols = Array.from({ length: numCols }, () => ({ items: [], height: 0 }));
-    for (const s of sections) {
-      const shortest = cols.reduce((a, b) => a.height <= b.height ? a : b);
-      shortest.items.push(s);
-      shortest.height += s.offsetHeight;
-    }
-    for (const col of cols) for (const s of col.items) container.appendChild(s);
-  }
-  // Hook into switchTab — balance when settings becomes visible
-  const _origSwitchTabBalance = window.switchTab;
-  if (_origSwitchTabBalance) {
-    window.switchTab = function(tab) {
-      _origSwitchTabBalance(tab);
-      if (tab === 'settings') setTimeout(window.balanceSettingsColumns, 500);
-    };
-  }
+  // Settings uses CSS Grid (see index.html); legacy hook kept for callers that still invoke it.
+  window.balanceSettingsColumns = function() {};
 
   // Individual rows within sections are still draggable
   // Skip sections with dynamic JS content that breaks on clone/reinsert
