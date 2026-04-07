@@ -66,35 +66,63 @@ function historyScanTypeLabel(scanType) {
   return catalogFmt(key);
 }
 
-async function loadHistory() {
+/** Monotonic id so a stale in-flight History refresh does not toast after a newer load. */
+let _historyFetchSeq = 0;
+
+async function fetchHistoryListsAndRender() {
+  const [pluginScans, audioScans, dawScans, presetScans, pdfScans, midiScans] = await Promise.all([
+    window.vstUpdater.getScans(),
+    window.vstUpdater.getAudioScans(),
+    window.vstUpdater.getDawScans(),
+    window.vstUpdater.getPresetScans(),
+    window.vstUpdater.getPdfScans(),
+    window.vstUpdater.getMidiScans(),
+  ]);
+  historyScanList = pluginScans;
+  historyAudioScanList = audioScans;
+  historyDawScanList = dawScans;
+  historyPresetScanList = presetScans;
+  historyPdfScanList = pdfScans;
+  historyMidiScanList = midiScans;
+  historyMergedList = [
+    ...pluginScans.map(s => ({ ...s, _type: 'plugin' })),
+    ...audioScans.map(s => ({ ...s, _type: 'audio' })),
+    ...dawScans.map(s => ({ ...s, _type: 'daw' })),
+    ...presetScans.map(s => ({ ...s, _type: 'preset' })),
+    ...pdfScans.map(s => ({ ...s, _type: 'pdf' })),
+    ...midiScans.map(s => ({ ...s, _type: 'midi' })),
+  ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  renderHistoryList();
+}
+
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.preferCache] — from tab switch: repaint last list immediately, refresh in background (no global progress).
+ */
+async function loadHistory(opts) {
+  const preferCache = opts && opts.preferCache === true;
+  if (preferCache && historyMergedList.length > 0) {
+    renderHistoryList();
+    const seq = ++_historyFetchSeq;
+    try {
+      await fetchHistoryListsAndRender();
+    } catch (e) {
+      if (seq === _historyFetchSeq) {
+        showToast(toastFmt('toast.failed_load_history', { err: e.message || e }), 4000, 'error');
+      }
+    }
+    return;
+  }
+
   showGlobalProgress();
   try {
-    const [pluginScans, audioScans, dawScans, presetScans, pdfScans, midiScans] = await Promise.all([
-      window.vstUpdater.getScans(),
-      window.vstUpdater.getAudioScans(),
-      window.vstUpdater.getDawScans(),
-      window.vstUpdater.getPresetScans(),
-      window.vstUpdater.getPdfScans(),
-      window.vstUpdater.getMidiScans(),
-    ]);
-    historyScanList = pluginScans;
-    historyAudioScanList = audioScans;
-    historyDawScanList = dawScans;
-    historyPresetScanList = presetScans;
-    historyPdfScanList = pdfScans;
-    historyMidiScanList = midiScans;
-    historyMergedList = [
-      ...pluginScans.map(s => ({ ...s, _type: 'plugin' })),
-      ...audioScans.map(s => ({ ...s, _type: 'audio' })),
-      ...dawScans.map(s => ({ ...s, _type: 'daw' })),
-      ...presetScans.map(s => ({ ...s, _type: 'preset' })),
-      ...pdfScans.map(s => ({ ...s, _type: 'pdf' })),
-      ...midiScans.map(s => ({ ...s, _type: 'midi' })),
-    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    renderHistoryList();
+    _historyFetchSeq += 1;
+    await fetchHistoryListsAndRender();
   } catch (e) {
     showToast(toastFmt('toast.failed_load_history', { err: e.message || e }), 4000, 'error');
-  } finally { hideGlobalProgress(); }
+  } finally {
+    hideGlobalProgress();
+  }
 }
 
 function renderHistoryList() {
