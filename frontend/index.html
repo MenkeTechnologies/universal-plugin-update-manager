@@ -6462,17 +6462,30 @@
             }
         }
 
-        /* ── Audio Engine tab — Settings-style layout (`settings-container` / `settings-section` / `settings-row`) ── */
+        /* ── Audio Engine tab — full-width masonry like Settings: `.settings-section` + `break-inside: avoid`,
+           `column-fill: balance` to balance column heights; cap at 3 columns (Settings uses 4 on ultra-wide). ── */
         #tabAudioEngine .settings-container.audio-engine-tab {
-            columns: 1 !important;
-            max-width: 960px;
-            margin: 0 auto;
-            padding: 16px 12px 40px;
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            box-sizing: border-box;
+            flex: 1 1 auto;
+            min-width: 0;
+            columns: 1;
+            column-gap: 3px;
+            column-fill: balance;
+            padding: 6px 8px 40px;
         }
 
         @media (min-width: 900px) {
             #tabAudioEngine .settings-container.audio-engine-tab {
-                columns: 1 !important;
+                columns: 2;
+            }
+        }
+
+        @media (min-width: 1500px) {
+            #tabAudioEngine .settings-container.audio-engine-tab {
+                columns: 3;
             }
         }
 
