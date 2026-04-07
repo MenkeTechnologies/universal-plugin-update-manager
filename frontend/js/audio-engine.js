@@ -727,12 +727,27 @@ async function applyAudioEngineDevice() {
     try {
         const r = await inv({cmd: 'set_output_device', device_id: id});
         throwIfAeNotOk(r, 'set_output_device failed');
+        /* If a library track is loaded (`playback_load`), reconnect file PCM to the new stream.
+         * Omitting `start_playback` leaves silence/tone-only output while the session still exists — breaks preview. */
+        let playbackLoaded = false;
+        try {
+            const st = await inv({cmd: 'playback_status'});
+            playbackLoaded = Boolean(st && st.ok && st.loaded === true);
+        } catch {
+            /* ignore */
+        }
         const startPayload = {cmd: 'start_output_stream', device_id: id, tone: toneOn};
         if (bufferFrames !== undefined) {
             startPayload.buffer_frames = bufferFrames;
         }
+        if (playbackLoaded) {
+            startPayload.start_playback = true;
+        }
         const start = await inv(startPayload);
         throwIfAeNotOk(start, 'start_output_stream failed');
+        if (playbackLoaded && typeof window !== 'undefined' && typeof window.syncEnginePlaybackDspFromPrefs === 'function') {
+            window.syncEnginePlaybackDspFromPrefs();
+        }
         if (statusEl && typeof catalogFmt === 'function') {
             statusEl.textContent = catalogFmt('ui.ae.status_applied_stream', {id});
         }
