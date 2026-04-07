@@ -934,8 +934,19 @@ function setPan(value) {
 function toggleEqSection() {
     const section = document.getElementById('npEqSection');
     const btn = document.getElementById('npEqToggle');
+    if (!section || !btn) return;
     section.classList.toggle('visible');
-    btn.classList.toggle('active', section.classList.contains('visible'));
+    const vis = section.classList.contains('visible');
+    btn.classList.toggle('active', vis);
+    /* MutationObserver + ResizeObserver alone can miss in release WebView; kick after layout settles. */
+    if (vis) {
+        if (typeof window.applyNpEqCanvasHeightFromPrefs === 'function') window.applyNpEqCanvasHeightFromPrefs();
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (typeof window.scheduleParametricEqFrame === 'function') window.scheduleParametricEqFrame();
+            });
+        });
+    }
 }
 
 function toggleMono() {
@@ -3559,9 +3570,18 @@ function renderMiniSearchResults() {
 function togglePlayerExpanded() {
     const np = document.getElementById('audioNowPlaying');
     np.classList.toggle('expanded');
-    prefs.setItem('playerExpanded', np.classList.contains('expanded') ? 'on' : 'off');
-    if (np.classList.contains('expanded')) {
+    const ex = np.classList.contains('expanded');
+    prefs.setItem('playerExpanded', ex ? 'on' : 'off');
+    if (ex) {
         renderRecentlyPlayed();
+        /* Expanded layout changes canvas wrap size; re-sync EQ + mini FFT after paint (tauri:// vs dev). */
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (typeof window.applyNpEqCanvasHeightFromPrefs === 'function') window.applyNpEqCanvasHeightFromPrefs();
+                if (typeof window.scheduleParametricEqFrame === 'function') window.scheduleParametricEqFrame();
+                if (typeof window.ensureEnginePlaybackFftRaf === 'function') window.ensureEnginePlaybackFftRaf();
+            });
+        });
     }
 }
 
@@ -4870,9 +4890,15 @@ function updateMetaLine() {
 
         if (canvases.length === 0) return;
 
-        ensureAudioGraph();
-        for (const c of canvases) {
-            drawParametricEqOnCanvas(c);
+        try {
+            ensureAudioGraph();
+            for (const c of canvases) {
+                drawParametricEqOnCanvas(c);
+            }
+        } catch (err) {
+            if (typeof console !== 'undefined' && typeof console.error === 'function') {
+                console.error('parametricEqTick', err);
+            }
         }
         _paramEqRafId = requestAnimationFrame(parametricEqTick);
     }
