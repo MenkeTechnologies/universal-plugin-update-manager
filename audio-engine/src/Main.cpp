@@ -24,6 +24,14 @@ static juce::var errObjSimple(const juce::String& msg)
     return o;
 }
 
+/** Match `Engine` cmd key — used to route `ping` without `callAsync` (macOS pipe smoke tests). */
+static juce::String cmdKeyMain(const juce::var& req)
+{
+    if (req.isObject())
+        return req["cmd"].toString().toLowerCase();
+    return {};
+}
+
 int main()
 {
     audio_haxor::initAppLogFromEnv();
@@ -51,9 +59,31 @@ int main()
                 continue;
             }
 
+            // `ping` is handled on this thread so shell pipes work before / without relying on
+            // `[NSApp run]` having processed a queued `callAsync` (see audio-engine README).
+            if (cmdKeyMain(parsed) == "ping")
+            {
+                try
+                {
+                    std::cout << juce::JSON::toString(engine.dispatch(parsed), true) << '\n' << std::flush;
+                }
+                catch (const std::exception& e)
+                {
+                    audio_haxor::appLogLine(juce::String("dispatch exception: ") + e.what());
+                    std::cout << juce::JSON::toString(errObjSimple(juce::String("exception: ") + e.what()), true)
+                              << '\n' << std::flush;
+                }
+                catch (...)
+                {
+                    audio_haxor::appLogLine("dispatch exception: ...");
+                    std::cout << juce::JSON::toString(errObjSimple("internal error"), true) << '\n' << std::flush;
+                }
+                continue;
+            }
+
             auto prom = std::make_shared<std::promise<juce::var>>();
             std::future<juce::var> fut = prom->get_future();
-            juce::MessageManager::callAsync([&engine, parsed, prom]() {
+            const bool posted = juce::MessageManager::callAsync([&engine, parsed, prom]() {
                 try
                 {
                     prom->set_value(engine.dispatch(parsed));
@@ -69,6 +99,13 @@ int main()
                     prom->set_value(errObjSimple("internal error"));
                 }
             });
+            if (!posted)
+            {
+                audio_haxor::appLogLine("MessageManager::callAsync failed to queue (post returned false)");
+                std::cout << juce::JSON::toString(errObjSimple("IPC queue failed (callAsync)"), true) << '\n'
+                          << std::flush;
+                continue;
+            }
             std::cout << juce::JSON::toString(fut.get(), true) << '\n' << std::flush;
         }
         audio_haxor::appLogLine("stdin closed, exiting");
