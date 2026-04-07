@@ -439,7 +439,7 @@
         }
 
         /* Wet glass highlight + frosted glass on all interactive panels */
-        .modal-content, .hm-card, .walker-tile, .viz-tile,
+        .modal-content, .hm-card, .walker-tile,
         .plugin-card, .fav-item, .note-card, .tag-manager-card, .sp-item,
         .shortcut-row, .ctx-menu, .palette-box, .audio-now-playing {
             background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 30%, transparent 50%);
@@ -452,7 +452,7 @@
         }
 
         /* Specular highlight — bright edge on top of cards */
-        .plugin-card::before, .hm-card::before, .walker-tile::before, .viz-tile::before {
+        .plugin-card::before, .hm-card::before, .walker-tile::before {
             content: '';
             position: absolute;
             top: 0;
@@ -6039,13 +6039,17 @@
             margin-bottom: 6px;
         }
 
-        /* Visualizer tab */
+        /* Visualizer tab — HUD / cyberdeck panels (chamfered, glow, not flat blocks) */
         .viz-container {
             position: relative;
             height: 100%;
             display: flex;
             flex-direction: column;
-            padding: 8px;
+            padding: 10px;
+            background:
+                radial-gradient(ellipse 120% 80% at 50% -20%, rgba(5, 80, 96, 0.22) 0%, transparent 55%),
+                radial-gradient(ellipse 80% 50% at 100% 100%, rgba(90, 0, 80, 0.08) 0%, transparent 45%),
+                linear-gradient(180deg, #030308 0%, #06060f 40%, #020205 100%);
         }
 
         .viz-container.viz-fullscreen {
@@ -6055,56 +6059,66 @@
             right: 0;
             bottom: 0;
             z-index: 30000;
-            background: #05050a;
-            padding: 8px;
+            padding: 12px;
         }
 
         .viz-toolbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             flex-shrink: 0;
             flex-wrap: wrap;
-            gap: 4px;
+            gap: 8px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid transparent;
+            border-image: linear-gradient(90deg, rgba(5, 217, 232, 0.35), rgba(211, 0, 197, 0.2), transparent 70%) 1;
         }
 
         .viz-mode-btns {
             display: flex;
-            gap: 4px;
+            gap: 6px;
             flex-wrap: wrap;
         }
 
         .viz-mode-btn {
-            padding: 5px 12px;
+            padding: 6px 14px;
+            font-family: 'Share Tech Mono', ui-monospace, monospace;
             font-size: 10px;
             font-weight: 600;
-            letter-spacing: 1px;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
             color: var(--text-muted);
             cursor: pointer;
-            border-radius: 2px;
-            transition: all 0.15s;
+            border: 1px solid rgba(5, 217, 232, 0.22);
+            background: linear-gradient(165deg, rgba(5, 217, 232, 0.09) 0%, rgba(0, 0, 0, 0.45) 55%, rgba(8, 4, 20, 0.6) 100%);
+            clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+            box-shadow:
+                inset 0 1px 0 rgba(5, 217, 232, 0.12),
+                0 2px 12px rgba(0, 0, 0, 0.45);
+            transition: color 0.15s, border-color 0.15s, box-shadow 0.2s, filter 0.15s;
         }
 
         .viz-mode-btn:hover {
             color: var(--text);
-            border-color: var(--text-muted);
+            border-color: rgba(5, 217, 232, 0.45);
+            filter: brightness(1.08);
         }
 
         .viz-mode-btn.active {
             color: var(--cyan);
-            border-color: var(--cyan);
-            background: rgba(5, 217, 232, 0.08);
-            box-shadow: 0 0 8px rgba(5, 217, 232, 0.15);
+            border-color: rgba(5, 217, 232, 0.65);
+            background: linear-gradient(165deg, rgba(5, 217, 232, 0.18) 0%, rgba(0, 0, 0, 0.35) 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(5, 217, 232, 0.25),
+                0 0 16px rgba(5, 217, 232, 0.2),
+                0 0 28px rgba(211, 0, 197, 0.08);
         }
 
         .viz-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 8px;
+            gap: 10px;
             flex: 1;
             min-height: 0;
         }
@@ -6124,29 +6138,70 @@
         .viz-tile {
             display: flex;
             flex-direction: column;
-            background: #05050a;
-            border: 1px solid var(--border);
-            border-radius: 4px;
             overflow: hidden;
             position: relative;
             min-height: 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: none;
+            background: linear-gradient(155deg, rgba(6, 14, 32, 0.95) 0%, rgba(2, 4, 12, 0.98) 55%, rgba(0, 0, 0, 0.92) 100%);
+            clip-path: polygon(
+                0 12px, 12px 0,
+                calc(100% - 12px) 0, 100% 12px,
+                100% calc(100% - 12px), calc(100% - 12px) 100%,
+                12px 100%, 0 calc(100% - 12px)
+            );
+            box-shadow:
+                inset 0 1px 0 rgba(5, 217, 232, 0.14),
+                inset 0 -1px 0 rgba(211, 0, 197, 0.08),
+                0 4px 24px rgba(0, 0, 0, 0.55),
+                0 0 0 1px rgba(5, 217, 232, 0.12);
+        }
+
+        .viz-tile::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 12px;
+            right: 12px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), rgba(211, 0, 197, 0.6), transparent);
+            opacity: 0.55;
+            pointer-events: none;
+            z-index: 1;
         }
 
         .viz-tile:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 10px var(--cyan-glow);
+            box-shadow:
+                inset 0 1px 0 rgba(5, 217, 232, 0.2),
+                inset 0 -1px 0 rgba(211, 0, 197, 0.12),
+                0 6px 28px rgba(0, 0, 0, 0.5),
+                0 0 22px rgba(5, 217, 232, 0.12);
         }
 
         .viz-tile-label {
             font-family: 'Orbitron', sans-serif;
             font-size: 8px;
-            letter-spacing: 2px;
+            font-weight: 600;
+            letter-spacing: 0.22em;
             color: var(--cyan);
-            padding: 4px 8px;
+            padding: 7px 12px 6px 14px;
             flex-shrink: 0;
-            opacity: 0.6;
             cursor: grab;
+            position: relative;
+            z-index: 2;
+            text-shadow: 0 0 14px rgba(5, 217, 232, 0.35);
+            border-bottom: 1px solid transparent;
+            border-image: linear-gradient(90deg, rgba(5, 217, 232, 0.45), rgba(211, 0, 197, 0.15), transparent 88%) 1;
+            opacity: 0.92;
+        }
+
+        .viz-tile-label::before {
+            content: '//';
+            margin-right: 6px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0;
+            color: var(--magenta);
+            opacity: 0.75;
         }
 
         .viz-tile-canvas {
@@ -9559,7 +9614,7 @@
 <script src="js/midi.js?v=67431"></script>
 <script src="js/pdf.js?v=67431"></script>
 <script src="js/settings-search.js?v=67429"></script>
-<script src="js/visualizer.js?v=67429"></script>
+<script src="js/visualizer.js?v=67434"></script>
 <script src="js/walker-status.js?v=67429"></script>
 <script src="js/context-menu.js?v=67433"></script>
 <script src="js/shortcuts.js?v=67433"></script>

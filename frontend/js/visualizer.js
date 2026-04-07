@@ -23,6 +23,64 @@ let _vizParams = {
 let _vizPeakHold = -96;
 let _vizPeakTimer = null;
 
+/** Dark HUD backdrop + faint tech grid (replaces flat clear). */
+function _vizHudBackdrop(ctx, w, h) {
+    const bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, 'rgba(2,10,26,0.98)');
+    bg.addColorStop(0.45, 'rgba(6,4,18,0.96)');
+    bg.addColorStop(1, 'rgba(0,0,0,0.94)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+    const step = Math.max(40, Math.floor(Math.min(w, h) / 10));
+    ctx.strokeStyle = 'rgba(5,217,232,0.055)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= w; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, h);
+        ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(w, y + 0.5);
+        ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(211,0,197,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.5 + 0.5);
+    ctx.lineTo(w, h * 0.5 + 0.5);
+    ctx.stroke();
+}
+
+/** Vertical neon gradient for spectrum-style bars (cyan → magenta by t∈[0,1]). */
+function _vizNeonBarGradient(ctx, x, y0, y1, t) {
+    const g = ctx.createLinearGradient(x, y0, x, y1);
+    const r = Math.floor(5 + t * 206);
+    const gg = Math.floor(217 - t * 167);
+    const b = Math.floor(232 - t * 35);
+    g.addColorStop(0, `rgba(${r},${gg},${b},1)`);
+    g.addColorStop(0.55, `rgba(${r},${gg},${b},0.88)`);
+    g.addColorStop(1, `rgba(${Math.min(255, r + 30)},${gg},${b},0.45)`);
+    return g;
+}
+
+/** Rounded top-only bar (less blocky than fillRect). */
+function _vizFillRoundTopBar(ctx, x, yTop, bw, bh, fillStyle) {
+    if (bh <= 0.5 || bw <= 0) return;
+    const r = Math.min(bh * 0.12, bw * 0.35, 6);
+    ctx.fillStyle = fillStyle;
+    ctx.beginPath();
+    ctx.moveTo(x, yTop + bh);
+    ctx.lineTo(x, yTop + r);
+    ctx.quadraticCurveTo(x, yTop, x + r, yTop);
+    ctx.lineTo(x + bw - r, yTop);
+    ctx.quadraticCurveTo(x + bw, yTop, x + bw, yTop + r);
+    ctx.lineTo(x + bw, yTop + bh);
+    ctx.closePath();
+    ctx.fill();
+}
+
 /** Cached canvas + 2D context per tile mode — avoids `querySelector` every frame. */
 const _VIZ_TILE_MODES = ['fft', 'waveform', 'spectrogram', 'stereo', 'levels', 'bands'];
 const _vizTileCache = new Map();
@@ -209,7 +267,7 @@ function _drawFFT(ctx, w, h, analyser) {
         analyser.getByteFrequencyData(_vizFreqData);
     }
     const data = _vizFreqData;
-    ctx.clearRect(0, 0, w, h);
+    _vizHudBackdrop(ctx, w, h);
 
     if (_vizParams.fftLogScale) {
         // Log-frequency display — cap columns so retina-wide canvases do not do O(width) pow/log per frame
@@ -226,12 +284,13 @@ function _drawFFT(ctx, w, h, analyser) {
             if (bin >= bufLen) continue;
             const barH = (data[bin] / 255) * h;
             const x = c * colW;
-            ctx.fillStyle = `rgb(${Math.floor(5 + t * 206)},${Math.floor(217 - t * 167)},${Math.floor(232 - t * 35)})`;
-            ctx.fillRect(x, h - barH, Math.max(1, colW), barH);
+            const bw = Math.max(1, colW - 0.25);
+            const grad = _vizNeonBarGradient(ctx, x, h - barH, h, t);
+            _vizFillRoundTopBar(ctx, x, h - barH, bw, barH, grad);
         }
         // Frequency grid
-        ctx.fillStyle = 'rgba(122,139,168,0.4)';
-        ctx.font = `${Math.max(8, h / 40)}px sans-serif`;
+        ctx.fillStyle = 'rgba(122,139,168,0.42)';
+        ctx.font = `${Math.max(8, h / 40)}px "Share Tech Mono", ui-monospace, monospace`;
         ctx.textAlign = 'center';
         [50, 100, 200, 500, 1000, 2000, 5000, 10000].forEach(f => {
             const x = ((Math.log10(f) - logMin) / (logMax - logMin)) * w;
@@ -242,8 +301,9 @@ function _drawFFT(ctx, w, h, analyser) {
         for (let i = 0; i < bufLen; i++) {
             const barH = (data[i] / 255) * h;
             const t = i / bufLen;
-            ctx.fillStyle = `rgb(${Math.floor(5 + t * 206)},${Math.floor(217 - t * 167)},${Math.floor(232 - t * 35)})`;
-            ctx.fillRect(i * barW, h - barH, barW - 0.5, barH);
+            const x = i * barW;
+            const grad = _vizNeonBarGradient(ctx, x, h - barH, h, t);
+            _vizFillRoundTopBar(ctx, x, h - barH, barW - 0.5, barH, grad);
         }
     }
 }
@@ -256,12 +316,14 @@ function _drawWaveform(ctx, w, h, analyser) {
         analyser.getFloatTimeDomainData(_vizTimeData);
     }
     const data = _vizTimeData;
-    ctx.clearRect(0, 0, w, h);
+    _vizHudBackdrop(ctx, w, h);
 
-    const color = _vizParams.waveformColor === 'magenta' ? 'rgba(211,0,197,0.8)' :
-        _vizParams.waveformColor === 'green' ? 'rgba(57,255,20,0.8)' : 'rgba(5,217,232,0.8)';
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    const color = _vizParams.waveformColor === 'magenta' ? 'rgba(211,0,197,0.92)' :
+        _vizParams.waveformColor === 'green' ? 'rgba(57,255,20,0.9)' : 'rgba(5,217,232,0.92)';
+    const glow = _vizParams.waveformColor === 'magenta' ? 'rgba(211,0,197,0.35)' :
+        _vizParams.waveformColor === 'green' ? 'rgba(57,255,20,0.35)' : 'rgba(5,217,232,0.4)';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.beginPath();
     const sliceW = w / bufLen;
     for (let i = 0; i < bufLen; i++) {
@@ -269,15 +331,23 @@ function _drawWaveform(ctx, w, h, analyser) {
         const y = (0.5 - data[i] * 0.5) * h;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // Center line + grid
-    ctx.strokeStyle = 'rgba(122,139,168,0.12)';
+    ctx.strokeStyle = 'rgba(122,139,168,0.14)';
     ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
     ctx.beginPath();
     ctx.moveTo(0, h / 2);
     ctx.lineTo(w, h / 2);
     ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(122,139,168,0.08)';
     ctx.beginPath();
     ctx.moveTo(0, h / 4);
     ctx.lineTo(w, h / 4);
@@ -308,24 +378,30 @@ function _drawSpectrogram(ctx, w, h, analyser) {
     _vizSpectrogramData[_vizSpectrogramIdx].set(data);
     _vizSpectrogramIdx = (_vizSpectrogramIdx + 1) % maxCols;
 
-    ctx.clearRect(0, 0, w, h);
+    _vizHudBackdrop(ctx, w, h);
     const colW = w / maxCols;
     const binStep = Math.max(1, Math.floor(bufLen / 256));
+    const cw = Math.max(0.85, colW * 0.92);
     for (let col = 0; col < maxCols; col++) {
         const ringIdx = (_vizSpectrogramIdx + col) % maxCols;
         const cd = _vizSpectrogramData[ringIdx];
         if (!cd) continue;
-        const x = col * colW;
+        const x = col * colW + (colW - cw) * 0.5;
         for (let bin = 0; bin < bufLen; bin += binStep) {
             const mag = cd[bin] / 255;
-            if (mag < 0.015) continue;
+            if (mag < 0.012) continue;
             const y = h - (bin / bufLen) * h;
-            const binH = Math.max(1, Math.ceil((h / bufLen) * binStep));
+            const binH = Math.max(0.85, Math.ceil((h / bufLen) * binStep));
             const r = Math.floor(mag * 211 + (1 - mag) * 5);
-            const g = Math.floor(mag * mag * 50);
-            const b = Math.floor(mag * 197 + (1 - mag) * 20);
-            ctx.fillStyle = `rgba(${r},${g},${b},${mag * 0.9 + 0.1})`;
-            ctx.fillRect(x, y - binH, Math.max(1, colW), binH);
+            const g = Math.floor(mag * mag * 55);
+            const b = Math.floor(mag * 197 + (1 - mag) * 24);
+            const t = bin / bufLen;
+            const gcol = ctx.createLinearGradient(x, y - binH, x + cw, y);
+            gcol.addColorStop(0, `rgba(${r},${g},${b},${mag * 0.55 + 0.08})`);
+            gcol.addColorStop(0.5, `rgba(${Math.min(255, r + 40)},${g},${b},${mag * 0.75 + 0.1})`);
+            gcol.addColorStop(1, `rgba(${r},${g},${b},${mag * 0.35})`);
+            ctx.fillStyle = gcol;
+            ctx.fillRect(x, y - binH, cw, binH);
         }
     }
 }
@@ -348,13 +424,14 @@ function _drawStereo(ctx, w, h, analyser) {
     aL.getFloatTimeDomainData(_vizLeftData);
     aR.getFloatTimeDomainData(_vizRightData);
 
-    ctx.clearRect(0, 0, w, h);
+    _vizHudBackdrop(ctx, w, h);
     const cx = w / 2, cy = h / 2;
     const scale = Math.min(cx, cy) * 0.8;
 
     // Grid
-    ctx.strokeStyle = 'rgba(122,139,168,0.12)';
+    ctx.strokeStyle = 'rgba(122,139,168,0.1)';
     ctx.lineWidth = 1;
+    ctx.setLineDash([3, 5]);
     ctx.beginPath();
     ctx.moveTo(cx, 0);
     ctx.lineTo(cx, h);
@@ -363,6 +440,8 @@ function _drawStereo(ctx, w, h, analyser) {
     ctx.moveTo(0, cy);
     ctx.lineTo(w, cy);
     ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(5,217,232,0.08)';
     ctx.beginPath();
     ctx.moveTo(cx - scale, cy - scale);
     ctx.lineTo(cx + scale, cy + scale);
@@ -372,18 +451,31 @@ function _drawStereo(ctx, w, h, analyser) {
     ctx.lineTo(cx - scale, cy + scale);
     ctx.stroke();
 
-    // Plot true L vs R
-    ctx.fillStyle = 'rgba(5,217,232,0.35)';
-    for (let i = 0; i < bufLen; i++) {
+    // Plot true L vs R — soft phosphor dots (lighter composite)
+    const prev = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < bufLen; i += 2) {
         const l = _vizLeftData[i];
         const r = _vizRightData[i];
         const mid = (l + r) * 0.5;
         const side = (l - r) * 0.5;
-        ctx.fillRect(cx + side * scale - 0.5, cy - mid * scale - 0.5, 1.5, 1.5);
+        const px = cx + side * scale;
+        const py = cy - mid * scale;
+        const a = 0.12 + Math.min(0.55, (Math.abs(l) + Math.abs(r)) * 0.35);
+        const rad = 0.9 + Math.min(2.2, (Math.abs(mid) + Math.abs(side)) * 1.8);
+        const grd = ctx.createRadialGradient(px, py, 0, px, py, rad);
+        grd.addColorStop(0, `rgba(5,217,232,${a})`);
+        grd.addColorStop(0.55, `rgba(211,0,197,${a * 0.45})`);
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(px, py, rad, 0, Math.PI * 2);
+        ctx.fill();
     }
+    ctx.globalCompositeOperation = prev;
 
-    ctx.fillStyle = 'rgba(122,139,168,0.4)';
-    ctx.font = `${Math.max(9, h / 30)}px sans-serif`;
+    ctx.fillStyle = 'rgba(122,139,168,0.5)';
+    ctx.font = `${Math.max(9, h / 30)}px "Share Tech Mono", ui-monospace, monospace`;
     ctx.textAlign = 'center';
     ctx.fillText('L', 12, cy + 4);
     ctx.fillText('R', w - 12, cy + 4);
@@ -420,29 +512,45 @@ function _drawLevels(ctx, w, h, analyser) {
         }
     }
 
-    ctx.clearRect(0, 0, w, h);
+    _vizHudBackdrop(ctx, w, h);
     const meterW = Math.min(80, w / 4);
     const meterH = h - 50;
     const startY = 25;
-
-    const grad = ctx.createLinearGradient(0, startY + meterH, 0, startY);
-    grad.addColorStop(0, 'rgba(57,255,20,0.8)');
-    grad.addColorStop(0.6, 'rgba(249,240,2,0.8)');
-    grad.addColorStop(0.85, 'rgba(255,107,53,0.8)');
-    grad.addColorStop(1, 'rgba(255,7,58,0.9)');
+    const rr = 5;
 
     const drawMeter = (x, db, label) => {
         const pct = Math.max(0, Math.min(1, (db + 60) / 60));
         const barH = pct * meterH;
-        ctx.fillStyle = 'rgba(10,10,20,0.5)';
-        ctx.fillRect(x, startY, meterW, meterH);
-        ctx.fillStyle = grad;
-        ctx.fillRect(x, startY + meterH - barH, meterW, barH);
-        ctx.fillStyle = 'rgba(224,240,255,0.8)';
+        ctx.fillStyle = 'rgba(6,8,22,0.75)';
+        ctx.beginPath();
+        ctx.moveTo(x + rr, startY);
+        ctx.lineTo(x + meterW - rr, startY);
+        ctx.quadraticCurveTo(x + meterW, startY, x + meterW, startY + rr);
+        ctx.lineTo(x + meterW, startY + meterH - rr);
+        ctx.quadraticCurveTo(x + meterW, startY + meterH, x + meterW - rr, startY + meterH);
+        ctx.lineTo(x + rr, startY + meterH);
+        ctx.quadraticCurveTo(x, startY + meterH, x, startY + meterH - rr);
+        ctx.lineTo(x, startY + rr);
+        ctx.quadraticCurveTo(x, startY, x + rr, startY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(5,217,232,0.22)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        if (barH > 1) {
+            const y1 = startY + meterH - barH;
+            const gbar = ctx.createLinearGradient(0, y1, 0, startY + meterH);
+            gbar.addColorStop(0, 'rgba(57,255,20,0.92)');
+            gbar.addColorStop(0.55, 'rgba(249,240,2,0.88)');
+            gbar.addColorStop(0.82, 'rgba(255,107,53,0.88)');
+            gbar.addColorStop(1, 'rgba(255,7,58,0.95)');
+            _vizFillRoundTopBar(ctx, x + 2, y1, meterW - 4, barH, gbar);
+        }
+        ctx.fillStyle = 'rgba(224,240,255,0.88)';
         ctx.font = `${Math.max(10, h / 30)}px Orbitron, sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText(label, x + meterW / 2, startY - 6);
-        ctx.font = `${Math.max(9, h / 35)}px Share Tech Mono, monospace`;
+        ctx.font = `${Math.max(9, h / 35)}px "Share Tech Mono", ui-monospace, monospace`;
         ctx.fillText(db.toFixed(1) + ' dB', x + meterW / 2, startY + meterH + 16);
     };
 
@@ -462,8 +570,8 @@ function _drawLevels(ctx, w, h, analyser) {
     }
 
     // dB scale
-    ctx.fillStyle = 'rgba(122,139,168,0.3)';
-    ctx.font = '8px sans-serif';
+    ctx.fillStyle = 'rgba(122,139,168,0.38)';
+    ctx.font = '8px "Share Tech Mono", ui-monospace, monospace';
     ctx.textAlign = 'right';
     for (let db = 0; db >= -60; db -= 6) {
         const y = startY + meterH * (1 - (db + 60) / 60);
@@ -485,7 +593,7 @@ function _drawBands(ctx, w, h, analyser) {
     const bands = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
     const labels = ['31', '63', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
 
-    ctx.clearRect(0, 0, w, h);
+    _vizHudBackdrop(ctx, w, h);
     const bandW = (w - 30) / bands.length;
     const maxH = h - 35;
 
@@ -502,11 +610,14 @@ function _drawBands(ctx, w, h, analyser) {
         const barH = (avg / 255) * maxH;
         const x = 15 + i * bandW;
         const t = i / bands.length;
-        ctx.fillStyle = `rgba(${Math.floor(5 + t * 206)},${Math.floor(217 - t * 167)},${Math.floor(232 - t * 35)},0.8)`;
-        ctx.fillRect(x + 2, h - 20 - barH, bandW - 4, barH);
+        const bw = bandW - 6;
+        const bx = x + 3;
+        const by = h - 20 - barH;
+        const grad = _vizNeonBarGradient(ctx, bx, by, h - 20, t);
+        _vizFillRoundTopBar(ctx, bx, by, bw, barH, grad);
 
-        ctx.fillStyle = 'rgba(224,240,255,0.6)';
-        ctx.font = `${Math.max(8, h / 35)}px sans-serif`;
+        ctx.fillStyle = 'rgba(224,240,255,0.65)';
+        ctx.font = `${Math.max(8, h / 35)}px "Share Tech Mono", ui-monospace, monospace`;
         ctx.textAlign = 'center';
         ctx.fillText(labels[i], x + bandW / 2, h - 5);
     }
