@@ -9,8 +9,11 @@ use crate::history::{
 };
 use crate::path_norm::{normalize_path_for_db, path_strings_json_normalized};
 use crate::scanner::PluginInfo;
+use regex::{Regex, RegexBuilder};
+use rusqlite::functions::{Context, FunctionFlags};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -72,6 +75,10 @@ pub struct AudioQueryParams {
     pub scan_id: Option<String>,
     #[serde(default)]
     pub search: Option<String>,
+    /// When true, `search` is a Rust regex (case-insensitive, matches JS `RegExp` `i` flag).
+    /// Uses SQLite `REGEXP` with a user-defined function — not FTS5 phrase search.
+    #[serde(default)]
+    pub search_regex: bool,
     #[serde(default)]
     pub format_filter: Option<String>,
     #[serde(default = "default_sort_key")]
@@ -119,6 +126,53 @@ fn short_like(search: &str) -> Option<String> {
     }
     let escaped = trimmed.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
     Some(format!("%{escaped}%"))
+}
+
+static REGEXP_FUNC_CACHE: OnceLock<Mutex<HashMap<String, Regex>>> = OnceLock::new();
+
+fn regexp_pattern_cache() -> &'static Mutex<HashMap<String, Regex>> {
+    REGEXP_FUNC_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// SQLite `regexp(pattern, haystack)` — matches JS `new RegExp(pattern, 'i')` (case-insensitive).
+fn regexp_user_matches(pattern: &str, haystack: &str) -> bool {
+    let mut map = match regexp_pattern_cache().lock() {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    if map.len() > 256 {
+        map.clear();
+    }
+    let re = match map.entry(pattern.to_string()) {
+        Entry::Occupied(e) => e.get().clone(),
+        Entry::Vacant(v) => {
+            let r = match RegexBuilder::new(pattern).case_insensitive(true).build() {
+                Ok(r) => r,
+                Err(_) => return false,
+            };
+            v.insert(r.clone());
+            r
+        }
+    };
+    re.is_match(haystack)
+}
+
+fn install_regexp_function(conn: &Connection) -> Result<(), String> {
+    conn.create_scalar_function(
+        "regexp",
+        2,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        |ctx: &Context<'_>| -> std::result::Result<i64, rusqlite::Error> {
+            let pattern: String = ctx.get(0)?;
+            let haystack: String = ctx.get(1)?;
+            Ok(if regexp_user_matches(&pattern, &haystack) {
+                1
+            } else {
+                0
+            })
+        },
+    )
+    .map_err(|e| e.to_string())
 }
 
 /// Backfill FTS5 contentless shadow tables from primary tables for rows missing from FTS.
@@ -584,6 +638,7 @@ impl Database {
              PRAGMA wal_autocheckpoint=1000;",
         )
         .map_err(|e| format!("Failed to set pragmas: {e}"))?;
+        install_regexp_function(&conn)?;
         Ok(conn)
     }
 
@@ -1542,8 +1597,34 @@ impl Database {
         let mut bind_idx = if single_scan { 2 } else { 1 };
 
         // FTS5 trigram for ≥3 char searches; LIKE fallback for 1–2 chars.
-        let fts_match = params.search.as_deref().and_then(fts_phrase);
-        let like_pat = params.search.as_deref().and_then(short_like);
+        // Regex mode (UI `.*` toggle): real ECMA-style regex via SQLite `REGEXP`, not FTS phrase.
+        let fts_match: Option<String>;
+        let like_pat: Option<String>;
+        let regex_pat: Option<String>;
+        if params.search_regex {
+            fts_match = None;
+            if let Some(ref s) = params.search {
+                let t = s.trim();
+                if t.is_empty() {
+                    like_pat = None;
+                    regex_pat = None;
+                } else if RegexBuilder::new(t).case_insensitive(true).build().is_ok() {
+                    like_pat = None;
+                    regex_pat = Some(t.to_string());
+                } else {
+                    let escaped = t.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+                    like_pat = Some(format!("%{escaped}%"));
+                    regex_pat = None;
+                }
+            } else {
+                like_pat = None;
+                regex_pat = None;
+            }
+        } else {
+            fts_match = params.search.as_deref().and_then(fts_phrase);
+            like_pat = params.search.as_deref().and_then(short_like);
+            regex_pat = None;
+        }
         if fts_match.is_some() {
             if single_scan {
                 conditions.push(format!(
@@ -1560,6 +1641,11 @@ impl Database {
                 ));
                 bind_idx += 1;
             }
+        } else if regex_pat.is_some() {
+            conditions.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
+            ));
+            bind_idx += 1;
         } else if like_pat.is_some() {
             conditions.push(format!(
                 "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
@@ -1641,6 +1727,11 @@ impl Database {
                         .map_err(|e| e.to_string())?;
                     idx += 1;
                 }
+            } else if let Some(ref r) = regex_pat {
+                count_stmt
+                    .raw_bind_parameter(idx, r)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
             } else if let Some(ref pat) = like_pat {
                 count_stmt
                     .raw_bind_parameter(idx, pat)
@@ -1689,6 +1780,10 @@ impl Database {
                     .map_err(|e| e.to_string())?;
                 idx += 1;
             }
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(idx, r)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(idx, pat)
                 .map_err(|e| e.to_string())?;
@@ -4670,6 +4765,7 @@ impl Database {
         &self,
         search: Option<&str>,
         format_filter: Option<&str>,
+        search_regex: bool,
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = conn
@@ -4679,13 +4775,43 @@ impl Database {
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let fts_match: Option<String>;
+        let like_pat: Option<String>;
+        let regex_pat: Option<String>;
+        if search_regex {
+            fts_match = None;
+            if let Some(s) = search {
+                let t = s.trim();
+                if t.is_empty() {
+                    like_pat = None;
+                    regex_pat = None;
+                } else if RegexBuilder::new(t).case_insensitive(true).build().is_ok() {
+                    like_pat = None;
+                    regex_pat = Some(t.to_string());
+                } else {
+                    let escaped = t.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+                    like_pat = Some(format!("%{escaped}%"));
+                    regex_pat = None;
+                }
+            } else {
+                like_pat = None;
+                regex_pat = None;
+            }
+        } else {
+            fts_match = search.and_then(fts_phrase);
+            like_pat = search.and_then(short_like);
+            regex_pat = None;
+        }
         let mut where_parts = vec![AUDIO_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx})",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -4707,6 +4833,9 @@ impl Database {
         let mut bi = 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -6006,6 +6135,7 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
             .unwrap();
+        install_regexp_function(&conn).unwrap();
         let db = Database {
             write: Mutex::new(conn),
             read: Vec::new(),
@@ -6054,6 +6184,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("scan1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6084,6 +6215,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: Some("kick".into()),
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6093,6 +6225,36 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.total_count, 2);
+    }
+
+    /// Regex mode (`search_regex`) uses SQLite `REGEXP` + Rust `regex` (case-insensitive), not FTS5
+    /// phrase search — so `F[a][n]` matches `Fan` (JS `RegExp` semantics), not a literal `[` substring.
+    #[test]
+    fn test_query_audio_regex_mode_bracket_class_matches_name() {
+        let db = test_db();
+        let samples = vec![
+            sample("Fan.wav", "/test/Fan.wav", "WAV", 1000),
+            sample("Fox.wav", "/test/Fox.wav", "WAV", 2000),
+        ];
+        db.save_scan("s1", "2024-01-01T00:00:00", 2, 3000, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &samples).unwrap();
+
+        let result = db
+            .query_audio(&AudioQueryParams {
+                scan_id: Some("s1".into()),
+                search: Some("F[a][n]".into()),
+                search_regex: true,
+                format_filter: None,
+                sort_key: "name".into(),
+                sort_asc: true,
+                offset: 0,
+                limit: 100,
+            })
+            .unwrap();
+
+        assert_eq!(result.total_count, 1);
+        assert_eq!(result.samples[0].name, "Fan.wav");
     }
 
     /// v13 backfill: rows in `audio_samples` without FTS shadow rows produced zero `MATCH` hits.
@@ -6114,6 +6276,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: Some("kick".into()),
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6132,6 +6295,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: Some("kick".into()),
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6159,6 +6323,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: Some("kick".into()),
+                search_regex: false,
                 format_filter: None,
                 sort_key: "size".into(),
                 sort_asc: false,
@@ -6189,6 +6354,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: Some("WAV".into()),
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6217,6 +6383,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: Some("100%".into()),
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6244,6 +6411,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: Some("a_b".into()),
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6272,6 +6440,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: None,
                 sort_key: "not_a_supported_column".into(),
                 sort_asc: true,
@@ -6299,6 +6468,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: Some("all".into()),
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6316,7 +6486,7 @@ mod tests {
     #[test]
     fn test_audio_filter_stats_empty_db() {
         let db = test_db();
-        let st = db.audio_filter_stats(None, None).unwrap();
+        let st = db.audio_filter_stats(None, None, false).unwrap();
         assert_eq!(st.count, 0);
         assert_eq!(st.total_bytes, 0);
         assert_eq!(st.total_unfiltered, 0);
@@ -6335,7 +6505,7 @@ mod tests {
             .unwrap();
         db.insert_audio_batch("s1", &samples).unwrap();
 
-        let st = db.audio_filter_stats(None, None).unwrap();
+        let st = db.audio_filter_stats(None, None, false).unwrap();
         assert_eq!(st.total_unfiltered, 3);
         assert_eq!(st.count, 3);
         assert_eq!(st.total_bytes, 700);
@@ -6357,7 +6527,7 @@ mod tests {
             .unwrap();
         db.insert_audio_batch("s1", &samples).unwrap();
 
-        let st = db.audio_filter_stats(Some("kick"), None).unwrap();
+        let st = db.audio_filter_stats(Some("kick"), None, false).unwrap();
         assert_eq!(st.total_unfiltered, 3);
         assert_eq!(st.count, 2);
         assert_eq!(st.total_bytes, 400);
@@ -6375,12 +6545,12 @@ mod tests {
             .unwrap();
         db.insert_audio_batch("s1", &samples).unwrap();
 
-        let w = db.audio_filter_stats(None, Some("WAV")).unwrap();
+        let w = db.audio_filter_stats(None, Some("WAV"), false).unwrap();
         assert_eq!(w.count, 1);
         assert_eq!(w.total_unfiltered, 3);
         assert_eq!(w.by_type.len(), 1);
 
-        let wm = db.audio_filter_stats(None, Some("WAV,AIFF")).unwrap();
+        let wm = db.audio_filter_stats(None, Some("WAV,AIFF"), false).unwrap();
         assert_eq!(wm.count, 2);
         assert_eq!(wm.total_bytes, 300);
     }
@@ -6393,7 +6563,7 @@ mod tests {
             .unwrap();
         db.insert_audio_batch("s1", &samples).unwrap();
 
-        let st = db.audio_filter_stats(None, Some("all")).unwrap();
+        let st = db.audio_filter_stats(None, Some("all"), false).unwrap();
         assert_eq!(st.count, 1);
         assert_eq!(st.total_unfiltered, 1);
     }
@@ -6598,6 +6768,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: Some("   \t  ".into()),
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6609,6 +6780,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6660,6 +6832,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6676,6 +6849,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: None,
                 sort_key: "name".into(),
                 sort_asc: true,
@@ -6814,6 +6988,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: None,
                 sort_key: "size".into(),
                 sort_asc: true,
@@ -6828,6 +7003,7 @@ mod tests {
             .query_audio(&AudioQueryParams {
                 scan_id: Some("s1".into()),
                 search: None,
+                search_regex: false,
                 format_filter: None,
                 sort_key: "size".into(),
                 sort_asc: false,

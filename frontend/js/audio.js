@@ -1472,7 +1472,11 @@ async function _runAudioFilterStatsAgg() {
         if (key !== _pendingAudioAggKey) {
             return;
         }
-        const agg = await window.vstUpdater.dbAudioFilterStats(search, formatFilter);
+        const agg = await window.vstUpdater.dbAudioFilterStats(
+            search,
+            formatFilter,
+            _lastAudioMode === 'regex',
+        );
         if (key !== _pendingAudioAggKey) {
             return;
         }
@@ -1597,6 +1601,7 @@ async function fetchAudioSamplesForExport() {
         try {
             const probe = await window.vstUpdater.dbQueryAudio({
                 search: search || null,
+                search_regex: _lastAudioMode === 'regex',
                 format_filter: formatFilter,
                 sort_key: audioSortKey,
                 sort_asc: audioSortAsc,
@@ -1612,6 +1617,7 @@ async function fetchAudioSamplesForExport() {
     if (n <= 0) return [];
     const result = await window.vstUpdater.dbQueryAudio({
         search: search || null,
+        search_regex: _lastAudioMode === 'regex',
         format_filter: formatFilter,
         sort_key: audioSortKey,
         sort_asc: audioSortAsc,
@@ -1640,6 +1646,7 @@ async function fetchAudioPage() {
     try {
         const result = await window.vstUpdater.dbQueryAudio({
             search: search || null,
+            search_regex: _lastAudioMode === 'regex',
             format_filter: formatFilter,
             sort_key: audioSortKey,
             sort_asc: audioSortAsc,

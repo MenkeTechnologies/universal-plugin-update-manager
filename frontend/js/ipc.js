@@ -1348,9 +1348,10 @@ window.vstUpdater = {
     /** Full audio library paths (SQLite `audio_library`) — not the in-memory paginated slice. */
     dbAudioLibraryPaths: () => invoke('db_audio_library_paths', {}),
     dbPdfStats: (scanId) => invoke('db_pdf_stats', {scanId: scanId || null}),
-    dbAudioFilterStats: (search, formatFilter) => invoke('db_audio_filter_stats', {
+    dbAudioFilterStats: (search, formatFilter, searchRegex) => invoke('db_audio_filter_stats', {
         search: search || null,
-        format_filter: formatFilter || null
+        format_filter: formatFilter || null,
+        search_regex: !!searchRegex,
     }),
     dbDawFilterStats: (search, dawFilter) => invoke('db_daw_filter_stats', {
         search: search || null,

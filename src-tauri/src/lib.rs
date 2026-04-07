@@ -6286,6 +6286,7 @@ async fn db_query_palette_preview(search: String) -> Result<PalettePreviewResult
         let audio = db.query_audio(&db::AudioQueryParams {
             scan_id: None,
             search: Some(search.clone()),
+            search_regex: false,
             format_filter: None,
             sort_key: "name".into(),
             sort_asc: true,
@@ -6318,9 +6319,15 @@ async fn db_pdf_stats(scan_id: Option<String>) -> Result<db::PdfStatsResult, Str
 async fn db_audio_filter_stats(
     search: Option<String>,
     format_filter: Option<String>,
+    search_regex: Option<bool>,
 ) -> Result<db::FilterStatsResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
-        db::global().audio_filter_stats(search.as_deref(), format_filter.as_deref())
+        db::global().audio_filter_stats(
+            search.as_deref(),
+            format_filter.as_deref(),
+            search_regex,
+        )
     })
     .await
     .map_err(|e| format!("db_audio_filter_stats task: {e}"))?
