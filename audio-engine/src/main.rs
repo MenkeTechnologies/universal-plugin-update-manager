@@ -14,9 +14,10 @@ use std::thread;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{
-    BufferSize, Device, SampleFormat, SampleRate, Stream, StreamConfig, SupportedBufferSize,
+    BufferSize, Device, SampleFormat, Stream, StreamConfig, SupportedBufferSize,
     SupportedStreamConfig,
 };
+use rodio::Player;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -67,9 +68,12 @@ struct OutputDeviceInfo {
 }
 
 struct ActiveStream {
-    /// Held so [`Stream`] stays open; drop stops playback.
+    /// F32 tone/silence path: cpal output stream. None when library playback uses **rodio** only.
     #[allow(dead_code)]
-    stream: Stream,
+    stream: Option<Stream>,
+    /// Keeps rodio’s OS sink alive when [`Self::stream`] is None (file playback).
+    #[allow(dead_code)]
+    rodio_sink: Option<rodio::stream::MixerDeviceSink>,
     device_id: String,
     device_name: String,
     sample_rate_hz: u32,
@@ -152,7 +156,7 @@ fn pick_output_config_for_playback(device: &Device, prefer_hz: u32) -> Result<Su
         if r.sample_format() != SampleFormat::F32 {
             continue;
         }
-        if let Some(cfg) = r.try_with_sample_rate(SampleRate(prefer_hz)) {
+        if let Some(cfg) = r.try_with_sample_rate(prefer_hz) {
             let replace = match &best_exact {
                 None => true,
                 Some(b) => output_config_preference_key(&cfg) < output_config_preference_key(b),
@@ -170,10 +174,10 @@ fn pick_output_config_for_playback(device: &Device, prefer_hz: u32) -> Result<Su
         if r.sample_format() != SampleFormat::F32 {
             continue;
         }
-        let mn = r.min_sample_rate().0;
-        let mx = r.max_sample_rate().0;
+        let mn = r.min_sample_rate();
+        let mx = r.max_sample_rate();
         let target = prefer_hz.clamp(mn, mx);
-        let cfg = r.with_sample_rate(SampleRate(target));
+        let cfg = r.with_sample_rate(target);
         let diff = target.abs_diff(prefer_hz);
         let replace = match &best {
             None => true,
@@ -220,10 +224,9 @@ fn audio_thread_main(rx: mpsc::Receiver<AudioCmd>) {
             } => {
                 let res = (|| {
                     current.take();
-                    /* Dropping the stream does not stop the decoder thread (`PlaybackSession::join`).
-                     * `enginePlaybackStart` always calls `stop_output_stream` first; Apply only calls
-                     * `start_output_stream`. Without stopping here, `begin_playback` hits "playback already
-                     * running" or leaves multiple decoders / wrong rate vs the new device callback. */
+                    /* `enginePlaybackStart` always calls `stop_output_stream` first; Apply only calls
+                     * `start_output_stream`. Without stopping here, rodio/cpal output replacement can
+                     * leave multiple players or the wrong device rate vs the new stream. */
                     if start_playback {
                         playback::stop_playback_thread();
                     }
@@ -265,35 +268,61 @@ fn audio_thread_main(rx: mpsc::Receiver<AudioCmd>) {
                     let channels = supported.channels();
                     let sample_format = format!("{:?}", supported.sample_format());
                     let buffer_size = buffer_size_json(supported.buffer_size());
-                    let defer_play = start_playback && file_pb.is_some();
-                    let (stream, tone_flag, stream_buffer_frames, stream_sr, stream_started) =
-                        build_playback_stream(
-                            &device,
-                            supported,
-                            tone,
-                            buffer_frames,
-                            file_pb.clone(),
-                            defer_play,
-                        )?;
+                    let stream_sr = supported.sample_rate();
+
                     if start_playback {
                         if file_pb.is_none() {
                             return Err("playback_load required before start_playback".to_string());
                         }
-                        playback::begin_playback(stream_sr)
+                        let path = playback::playback_session_path()?;
+                        let shared = file_pb
+                            .as_ref()
+                            .ok_or_else(|| "playback shared missing".to_string())?
+                            .clone();
+                        shared.device_rate.store(stream_sr, Ordering::Relaxed);
+                        let sink = playback::open_rodio_output(device, supported, buffer_frames)?;
+                        let player = Player::connect_new(&sink.mixer());
+                        playback::start_rodio_playback(&path, player, shared)
                             .map_err(|e| format!("playback: {e}"))?;
+                        let tone_supported = false;
+                        let tone_on = false;
+                        current = Some(ActiveStream {
+                            stream: None,
+                            rodio_sink: Some(sink),
+                            device_id: resolved_id.clone(),
+                            device_name: device_name.clone(),
+                            sample_rate_hz: stream_sr,
+                            channels,
+                            sample_format: sample_format.clone(),
+                            buffer_size: buffer_size.clone(),
+                            stream_buffer_frames: buffer_frames,
+                            tone_flag: None,
+                        });
+                        return Ok(json!({
+                            "ok": true,
+                            "device_id": resolved_id,
+                            "device_name": device_name,
+                            "sample_rate_hz": stream_sr,
+                            "channels": channels,
+                            "sample_format": sample_format,
+                            "buffer_size": buffer_size,
+                            "stream_buffer_frames": buffer_frames,
+                            "tone_supported": tone_supported,
+                            "tone_on": tone_on,
+                            "note": "file playback via rodio",
+                        }));
                     }
-                    if !stream_started {
-                        stream
-                            .play()
-                            .map_err(|e| format!("stream.play: {e}"))?;
-                    }
+
+                    let (stream, tone_flag, stream_buffer_frames, stream_sr, _started) =
+                        build_playback_stream(&device, supported, tone, buffer_frames)?;
                     let tone_supported = tone_flag.is_some();
                     let tone_on = tone_flag
                         .as_ref()
                         .map(|f| f.load(Ordering::Relaxed))
                         .unwrap_or(false);
                     current = Some(ActiveStream {
-                        stream,
+                        stream: Some(stream),
+                        rodio_sink: None,
                         device_id: resolved_id.clone(),
                         device_name: device_name.clone(),
                         sample_rate_hz: stream_sr,
@@ -314,7 +343,7 @@ fn audio_thread_main(rx: mpsc::Receiver<AudioCmd>) {
                         "stream_buffer_frames": stream_buffer_frames,
                         "tone_supported": tone_supported,
                         "tone_on": tone_on,
-                        "note": if start_playback { "file playback PCM" } else { "silence or test tone" },
+                        "note": "silence or test tone",
                     }))
                 })();
                 let _ = reply.send(res);
@@ -341,7 +370,7 @@ fn audio_thread_main(rx: mpsc::Receiver<AudioCmd>) {
                     let supported = device
                         .default_input_config()
                         .map_err(|e| format!("default_input_config: {e}"))?;
-                    let sample_rate_hz = supported.sample_rate().0;
+                    let sample_rate_hz = supported.sample_rate();
                     let channels = supported.channels();
                     let sample_format = format!("{:?}", supported.sample_format());
                     let buffer_size = buffer_size_json(supported.buffer_size());
@@ -784,8 +813,8 @@ fn get_output_device_info(device_id: Option<&str>) -> Result<serde_json::Value, 
     let mut rate_max = None::<u32>;
     if let Ok(configs) = device.supported_output_configs() {
         for range in configs {
-            let mn = range.min_sample_rate().0;
-            let mx = range.max_sample_rate().0;
+            let mn = range.min_sample_rate();
+            let mx = range.max_sample_rate();
             rate_min = Some(rate_min.map_or(mn, |a: u32| a.min(mn)));
             rate_max = Some(rate_max.map_or(mx, |a: u32| a.max(mx)));
         }
@@ -794,7 +823,7 @@ fn get_output_device_info(device_id: Option<&str>) -> Result<serde_json::Value, 
     let mut j = json!({
         "ok": true,
         "device_name": name,
-        "sample_rate_hz": cfg.sample_rate().0,
+        "sample_rate_hz": cfg.sample_rate(),
         "channels": cfg.channels(),
         "sample_format": format!("{:?}", cfg.sample_format()),
         "buffer_size": buffer_size_json(cfg.buffer_size()),
@@ -820,8 +849,8 @@ fn get_input_device_info(device_id: Option<&str>) -> Result<serde_json::Value, S
     let mut rate_max = None::<u32>;
     if let Ok(configs) = device.supported_input_configs() {
         for range in configs {
-            let mn = range.min_sample_rate().0;
-            let mx = range.max_sample_rate().0;
+            let mn = range.min_sample_rate();
+            let mx = range.max_sample_rate();
             rate_min = Some(rate_min.map_or(mn, |a: u32| a.min(mn)));
             rate_max = Some(rate_max.map_or(mx, |a: u32| a.max(mx)));
         }
@@ -830,7 +859,7 @@ fn get_input_device_info(device_id: Option<&str>) -> Result<serde_json::Value, S
     let mut j = json!({
         "ok": true,
         "device_name": name,
-        "sample_rate_hz": cfg.sample_rate().0,
+        "sample_rate_hz": cfg.sample_rate(),
         "channels": cfg.channels(),
         "sample_format": format!("{:?}", cfg.sample_format()),
         "buffer_size": buffer_size_json(cfg.buffer_size()),
@@ -1075,24 +1104,19 @@ fn build_capture_stream(
     }
 }
 
-/// F32: file playback ring, optional test tone, or silence. Other formats: silence only, `tone_flag` = None.
-///
-/// When `defer_play` is true and `file_playback` is some, the stream is built but **`play()` is not
-/// called** — the caller must run [`playback::begin_playback`] (prefill) then [`Stream::play`].
-/// This avoids draining an empty ring before the decoder thread exists.
+/// F32: test tone or silence. Other formats: silence only, `tone_flag` = None.
+/// Library file playback uses **rodio** ([`playback::open_rodio_output`]) instead of this path.
 fn build_playback_stream(
     device: &Device,
     supported: SupportedStreamConfig,
     tone_initial: bool,
     buffer_frames: Option<u32>,
-    file_playback: Option<Arc<playback::PlaybackShared>>,
-    defer_play: bool,
 ) -> Result<(Stream, Option<Arc<AtomicBool>>, Option<u32>, u32, bool), String> {
     let sf = supported.sample_format();
     let bs = supported.buffer_size();
     let mut stream_config = supported.config();
     let stream_buffer_frames = apply_buffer_frames_request(&mut stream_config, bs, buffer_frames);
-    let stream_sr = stream_config.sample_rate.0;
+    let stream_sr = stream_config.sample_rate;
     let err = |e| eprintln!("audio-engine stream error: {e}");
     match sf {
         SampleFormat::F32 => {
@@ -1102,15 +1126,10 @@ fn build_playback_stream(
             let phase = Arc::new(AtomicU64::new(0));
             let t = tone_flag.clone();
             let p = phase.clone();
-            let pb = file_playback.clone();
             let stream = device.build_output_stream(
                 &stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     let ch = ch.max(1);
-                    if let Some(ref shared) = pb {
-                        shared.fill_interleaved_f32(data, ch);
-                        return;
-                    }
                     let frames = data.len() / ch;
                     if t.load(Ordering::Relaxed) {
                         let mut i = p.load(Ordering::Relaxed);
@@ -1134,13 +1153,8 @@ fn build_playback_stream(
                 None,
             )
             .map_err(|e| e.to_string())?;
-            let started = if defer_play && file_playback.is_some() {
-                false
-            } else {
-                stream.play().map_err(|e| e.to_string())?;
-                true
-            };
-            Ok((stream, Some(tone_flag), stream_buffer_frames, stream_sr, started))
+            stream.play().map_err(|e| e.to_string())?;
+            Ok((stream, Some(tone_flag), stream_buffer_frames, stream_sr, true))
         }
         SampleFormat::I16 => {
             let stream = device.build_output_stream(
@@ -1353,8 +1367,6 @@ fn set_output_tone(enabled: bool) -> Result<serde_json::Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cpal::SampleRate;
-
     #[test]
     fn unique_device_id_counts_duplicates() {
         let mut seen = HashMap::new();
@@ -1378,7 +1390,7 @@ mod tests {
     fn apply_buffer_frames_clamps_to_range() {
         let mut cfg = StreamConfig {
             channels: 2,
-            sample_rate: SampleRate(48_000),
+            sample_rate: 48_000,
             buffer_size: BufferSize::Default,
         };
         let r = apply_buffer_frames_request(
@@ -1394,7 +1406,7 @@ mod tests {
     fn apply_buffer_frames_none_leaves_default() {
         let mut cfg = StreamConfig {
             channels: 2,
-            sample_rate: SampleRate(48_000),
+            sample_rate: 48_000,
             buffer_size: BufferSize::Default,
         };
         let r = apply_buffer_frames_request(
@@ -1410,7 +1422,7 @@ mod tests {
     fn apply_buffer_frames_caps_absurd_request_before_unknown() {
         let mut cfg = StreamConfig {
             channels: 2,
-            sample_rate: SampleRate(48_000),
+            sample_rate: 48_000,
             buffer_size: BufferSize::Default,
         };
         let r = apply_buffer_frames_request(
