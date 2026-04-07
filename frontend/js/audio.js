@@ -1266,6 +1266,28 @@ let _npFftCtx = null;
 /** Reused point list for spectrum outline (one Web Audio bin pass, then fill + stroke). */
 let _npFftPts = null;
 
+/**
+ * IPC `playback_status` updates `spectrum_sr_hz` / `spectrum_fft_size` frequently; using those
+ * values directly would shift the log-frequency x-axis every poll (visible "scaling"). Pin once
+ * per engine-playback session for stable bin→pixel mapping (mini FFT + parametric EQ fill).
+ */
+let _npFftEngineAxisSrHz = null;
+let _npFftEngineAxisFftSize = null;
+
+function getPinnedEngineSpectrumAxis() {
+    if (typeof window === 'undefined' || window._enginePlaybackActive !== true) {
+        _npFftEngineAxisSrHz = null;
+        _npFftEngineAxisFftSize = null;
+        return null;
+    }
+    if (!window._engineSpectrumU8 || window._engineSpectrumU8.length < 1024) return null;
+    if (_npFftEngineAxisSrHz == null) {
+        _npFftEngineAxisSrHz = typeof window._engineSpectrumSrHz === 'number' ? window._engineSpectrumSrHz : 44100;
+        _npFftEngineAxisFftSize = typeof window._engineSpectrumFftSize === 'number' ? window._engineSpectrumFftSize : 2048;
+    }
+    return {sr: _npFftEngineAxisSrHz, fft: _npFftEngineAxisFftSize};
+}
+
 // ResizeObserver syncs canvas pixel buffer to container size on resize —
 // NOT in the render loop (which would reset the bitmap every frame).
 (function initFftCanvasResize() {
@@ -1273,18 +1295,25 @@ let _npFftPts = null;
     if (!canvas) return;
     _npFftCanvas = canvas;
     _npFftCtx = canvas.getContext('2d');
-    const ro = new ResizeObserver((entries) => {
-        for (const e of entries) {
-            const cw = Math.round(e.contentRect.width) || 600;
-            const ch = Math.round(e.contentRect.height) || 48;
-            if (canvas.width !== cw || canvas.height !== ch) {
-                canvas.width = cw;
-                canvas.height = ch;
-                _npFftGrad = null; // rebuild gradient for new height
-            }
-        }
-    });
-    ro.observe(canvas.parentElement || canvas);
+    const parent = canvas.parentElement || canvas;
+    let resizeRaf = null;
+    function applyFftCanvasSize() {
+        resizeRaf = null;
+        const br = parent.getBoundingClientRect();
+        const cw = Math.max(1, Math.round(br.width));
+        const ch = Math.max(1, Math.round(br.height));
+        if (canvas.width === cw && canvas.height === ch) return;
+        canvas.width = cw;
+        canvas.height = ch;
+        _npFftGrad = null; // rebuild gradient for new height
+    }
+    function scheduleFftCanvasSize() {
+        if (resizeRaf != null) return;
+        resizeRaf = requestAnimationFrame(applyFftCanvasSize);
+    }
+    const ro = new ResizeObserver(() => scheduleFftCanvasSize());
+    ro.observe(parent);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyFftCanvasSize);
 })();
 
 function _renderNpFft() {
@@ -1318,10 +1347,12 @@ function _renderNpFft() {
     let fftSize = 2048;
     let binCount = 1024;
     if (useEngineSpectrum) {
+        const axis = getPinnedEngineSpectrumAxis();
+        if (!axis) return;
         if (!_npFftBuf || _npFftBuf.length < 1024) _npFftBuf = new Uint8Array(1024);
         _npFftBuf.set(window._engineSpectrumU8.subarray(0, 1024));
-        sampleRate = typeof window._engineSpectrumSrHz === 'number' ? window._engineSpectrumSrHz : 44100;
-        fftSize = typeof window._engineSpectrumFftSize === 'number' ? window._engineSpectrumFftSize : 2048;
+        sampleRate = axis.sr;
+        fftSize = axis.fft;
         binCount = Math.min(1024, window._engineSpectrumU8.length);
     } else {
         if (!_npFftBuf) _npFftBuf = new Uint8Array(_analyser.frequencyBinCount);
@@ -4710,29 +4741,32 @@ function updateMetaLine() {
                 : window._enginePlaybackActive === true && typeof isAudioPlaying === 'function' && isAudioPlaying());
 
         if (useEngineEqSpectrum) {
-            const dataArr = window._engineSpectrumU8;
-            const bufLen = Math.min(1024, dataArr.length);
-            const sampleRate = typeof window._engineSpectrumSrHz === 'number' ? window._engineSpectrumSrHz : 44100;
-            const fftSize = typeof window._engineSpectrumFftSize === 'number' ? window._engineSpectrumFftSize : 2048;
+            const axis = getPinnedEngineSpectrumAxis();
+            if (axis) {
+                const dataArr = window._engineSpectrumU8;
+                const bufLen = Math.min(1024, dataArr.length);
+                const sampleRate = axis.sr;
+                const fftSize = axis.fft;
 
-            ctx.beginPath();
-            ctx.moveTo(0, h);
-            for (let k = 0; k < bufLen; k++) {
-                const freq = ((k + 1) * sampleRate) / fftSize;
-                if (freq < FREQ_MIN || freq > FREQ_MAX) continue;
-                const x = freqToX(freq, w);
-                const magnitude = dataArr[k] / 255;
-                const y = h - magnitude * (h - 20);
-                ctx.lineTo(x, y);
+                ctx.beginPath();
+                ctx.moveTo(0, h);
+                for (let k = 0; k < bufLen; k++) {
+                    const freq = ((k + 1) * sampleRate) / fftSize;
+                    if (freq < FREQ_MIN || freq > FREQ_MAX) continue;
+                    const x = freqToX(freq, w);
+                    const magnitude = dataArr[k] / 255;
+                    const y = h - magnitude * (h - 20);
+                    ctx.lineTo(x, y);
+                }
+                ctx.lineTo(w, h);
+                ctx.closePath();
+                const grad = ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, 'rgba(211,0,197,0.25)');
+                grad.addColorStop(0.5, 'rgba(5,217,232,0.12)');
+                grad.addColorStop(1, 'rgba(5,217,232,0.02)');
+                ctx.fillStyle = grad;
+                ctx.fill();
             }
-            ctx.lineTo(w, h);
-            ctx.closePath();
-            const grad = ctx.createLinearGradient(0, 0, 0, h);
-            grad.addColorStop(0, 'rgba(211,0,197,0.25)');
-            grad.addColorStop(0.5, 'rgba(5,217,232,0.12)');
-            grad.addColorStop(1, 'rgba(5,217,232,0.02)');
-            ctx.fillStyle = grad;
-            ctx.fill();
         } else if (_analyser && _playbackCtx && typeof isAudioPlaying === 'function' && isAudioPlaying()) {
             const bufLen = _analyser.frequencyBinCount;
             const dataArr = new Uint8Array(bufLen);
