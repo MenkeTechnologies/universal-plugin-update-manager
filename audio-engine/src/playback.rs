@@ -275,22 +275,20 @@ struct PlaybackSession {
 /// Wraps a [`Source`] and applies EQ / gain / pan for each stereo frame (interleaved samples).
 struct DspStereoSource<S: Source<Item = f32>> {
     inner: S,
-    dsp: Arc<DspAtomic>,
+    shared: Arc<PlaybackShared>,
     chain: DspChain,
-    peak: Arc<AtomicU32>,
     out: [f32; 2],
     out_i: u8,
     ch: ChannelCount,
 }
 
 impl<S: Source<Item = f32>> DspStereoSource<S> {
-    fn new(inner: S, dsp: Arc<DspAtomic>, peak: Arc<AtomicU32>) -> Self {
+    fn new(inner: S, shared: Arc<PlaybackShared>) -> Self {
         let ch = inner.channels();
         Self {
             inner,
-            dsp,
+            shared,
             chain: DspChain::new(),
-            peak,
             out: [0.0, 0.0],
             out_i: 2,
             ch,
@@ -309,7 +307,7 @@ impl<S: Source<Item = f32>> DspStereoSource<S> {
             l
         };
         let sr = f64::from(self.inner.sample_rate().get());
-        let (g, pan, low, mid, high) = self.dsp.snapshot(sr);
+        let (g, pan, low, mid, high) = self.shared.dsp.snapshot(sr);
         let cl = coeffs_lowshelf(200.0, low, sr);
         let cm = coeffs_peaking(1000.0, 1.0, mid, sr);
         let c_hi = coeffs_highshelf(8000.0, high, sr);
@@ -318,10 +316,10 @@ impl<S: Source<Item = f32>> DspStereoSource<S> {
             .process_stereo_with_coeffs(f64::from(l), f64::from(r), &cl, &cm, &c_hi, g, pan);
         let lo = lo as f32;
         let ro = ro as f32;
-        let pk = f32::from_bits(self.peak.load(Ordering::Relaxed))
+        let pk = f32::from_bits(self.shared.peak.load(Ordering::Relaxed))
             .max(lo.abs())
             .max(ro.abs());
-        self.peak.store(pk.to_bits(), Ordering::Relaxed);
+        self.shared.peak.store(pk.to_bits(), Ordering::Relaxed);
         self.out = [lo, ro];
         self.out_i = 0;
         true
@@ -428,8 +426,7 @@ pub fn start_rodio_playback(path: &str, player: Player, shared: Arc<PlaybackShar
     stop_rodio_player();
     let file = File::open(path).map_err(|e| e.to_string())?;
     let decoder = Decoder::try_from(BufReader::new(file)).map_err(|e| format!("rodio decode open: {e}"))?;
-    let peak = Arc::new(AtomicU32::new(0.0f32.to_bits()));
-    let src = DspStereoSource::new(decoder, shared.dsp.clone(), peak.clone());
+    let src = DspStereoSource::new(decoder, shared.clone());
     player.append(src);
     *RODIO_PLAYER.lock().map_err(|_| "rodio player mutex poisoned")? = Some(player);
     Ok(())
