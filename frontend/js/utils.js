@@ -21,6 +21,13 @@ function throttle(fn, ms) {
 }
 
 /** Debounce: invoke after `ms` milliseconds of inactivity. */
+/** Yield to the event loop so pending input/paint runs before a heavy synchronous chunk (e.g. table `innerHTML`). */
+function yieldToBrowser() {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 function debounce(fn, ms) {
   let timer = null;
   return function (...args) {

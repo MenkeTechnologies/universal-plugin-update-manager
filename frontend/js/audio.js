@@ -970,8 +970,15 @@ async function _runAudioFilterStatsAgg() {
     if (key !== _pendingAudioAggKey) {
       return;
     }
-    _lastAudioAggKey = key;
     const agg = await window.vstUpdater.dbAudioFilterStats(search, formatFilter);
+    if (key !== _pendingAudioAggKey) {
+      return;
+    }
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    if (key !== _pendingAudioAggKey) {
+      return;
+    }
+    _lastAudioAggKey = key;
     audioStatCounts = agg.byType || {};
     audioStatBytes = agg.totalBytes || 0;
     audioTotalCount = agg.count || 0;
@@ -1160,6 +1167,9 @@ async function fetchAudioPage() {
       scored.sort((a, b) => b.score - a.score);
       filteredAudioSamples = scored.map(x => x.s);
     }
+    // Let the browser process pending input/paint before `innerHTML` + row work (can take tens of ms).
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    if (seq !== _audioQuerySeq) return;
     renderAudioTable();
     // Header totals from paginated query (fast); per-format breakdown debounced.
     updateAudioStats();

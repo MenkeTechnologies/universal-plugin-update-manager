@@ -5738,8 +5738,10 @@ mod tests {
 // ── Database IPC commands ──
 
 #[tauri::command]
-fn db_query_audio(params: db::AudioQueryParams) -> Result<db::AudioQueryResult, String> {
-    db::global().query_audio(&params)
+async fn db_query_audio(params: db::AudioQueryParams) -> Result<db::AudioQueryResult, String> {
+    tokio::task::spawn_blocking(move || db::global().query_audio(&params))
+        .await
+        .map_err(|e| format!("db_query_audio task: {e}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -5837,11 +5839,15 @@ fn db_pdf_stats(scan_id: Option<String>) -> Result<db::PdfStatsResult, String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_audio_filter_stats(
+async fn db_audio_filter_stats(
     search: Option<String>,
     format_filter: Option<String>,
 ) -> Result<db::FilterStatsResult, String> {
-    db::global().audio_filter_stats(search.as_deref(), format_filter.as_deref())
+    tokio::task::spawn_blocking(move || {
+        db::global().audio_filter_stats(search.as_deref(), format_filter.as_deref())
+    })
+    .await
+    .map_err(|e| format!("db_audio_filter_stats task: {e}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
