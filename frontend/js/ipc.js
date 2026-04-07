@@ -401,7 +401,7 @@ document.addEventListener('click', (e) => {
                 showDepGraph();
                 break;
             case 'showHeatmapDash':
-                if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard();
+                if (typeof showHeatmapDashboard === 'function') void showHeatmapDashboard();
                 break;
             case 'scanPresets':
                 scanPresets();

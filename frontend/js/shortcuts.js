@@ -372,7 +372,7 @@ function executeShortcut(id) {
             if (typeof setAbLoopStart === 'function') setAbLoopStart();
         }
     } else if (id === 'heatmapDash') {
-        if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard();
+        if (typeof showHeatmapDashboard === 'function') void showHeatmapDashboard();
     } else if (id === 'togglePlayer') {
         const np = document.getElementById('audioNowPlaying');
         if (np && np.classList.contains('active')) {

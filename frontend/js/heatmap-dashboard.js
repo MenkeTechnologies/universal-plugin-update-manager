@@ -6,7 +6,65 @@ function _hmFmt(key, vars) {
     return catalogFmt(key, vars);
 }
 
-function showHeatmapDashboard() {
+/** Parallel DB aggregates (whole library, no search/filter) for correct counts when tabs are paginated. */
+async function fetchHeatmapDbAggregates() {
+    const vu = typeof window !== 'undefined' ? window.vstUpdater : null;
+    if (!vu || typeof vu.dbAudioFilterStats !== 'function') return null;
+    try {
+        const [audio, plugins, daw, presets] = await Promise.all([
+            vu.dbAudioFilterStats(null, null),
+            vu.dbPluginFilterStats(null, null),
+            vu.dbDawFilterStats(null, null),
+            vu.dbPresetFilterStats(null, null),
+        ]);
+        return {audio, plugins, daw, presets};
+    } catch (e) {
+        if (typeof console !== 'undefined' && console.warn) console.warn('heatmap DB aggregates', e);
+        return null;
+    }
+}
+
+function _hmOverviewTotals(agg, samples, plugins, projects, presets) {
+    if (agg) {
+        const sz = agg.audio?.totalBytes ?? 0;
+        return {
+            nSamples: Number(agg.audio?.count) || 0,
+            nPlugins: Number(agg.plugins?.count) || 0,
+            nDaw: Number(agg.daw?.count) || 0,
+            nPresets: Number(agg.presets?.count) || 0,
+            totalBytes: typeof sz === 'bigint' ? Number(sz) : sz,
+        };
+    }
+    const ns = Number(typeof audioTotalCount !== 'undefined' ? audioTotalCount : 0)
+        || Number(typeof audioTotalUnfiltered !== 'undefined' ? audioTotalUnfiltered : 0)
+        || samples.length;
+    const np = Number(typeof _pluginTotalCount !== 'undefined' ? _pluginTotalCount : 0)
+        || Number(typeof _pluginTotalUnfiltered !== 'undefined' ? _pluginTotalUnfiltered : 0)
+        || plugins.length;
+    const nd = Number(typeof _dawTotalCount !== 'undefined' ? _dawTotalCount : 0)
+        || Number(typeof _dawTotalUnfiltered !== 'undefined' ? _dawTotalUnfiltered : 0)
+        || projects.length;
+    const npr = Number(typeof _presetTotalCount !== 'undefined' ? _presetTotalCount : 0)
+        || Number(typeof _presetTotalUnfiltered !== 'undefined' ? _presetTotalUnfiltered : 0)
+        || presets.length;
+    let totalBytes = 0;
+    if (typeof audioStatBytes !== 'undefined' && audioStatBytes > 0) {
+        totalBytes = audioStatBytes;
+    } else {
+        totalBytes = samples.reduce((s, a) => s + (a.size || a.sizeBytes || 0), 0);
+    }
+    return {nSamples: ns, nPlugins: np, nDaw: nd, nPresets: npr, totalBytes};
+}
+
+function _hmPartialSampleHintCard(agg, samples) {
+    const lib = agg?.audio?.count ?? (Number(typeof audioTotalCount !== 'undefined' ? audioTotalCount : 0) || 0);
+    if (!lib || samples.length >= lib) return '';
+    return `<div class="hm-card hm-card-wide" data-hm-card="partialHint" style="padding:8px 12px;margin-bottom:8px;border:1px dashed var(--text-dim);">
+  <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(_hmFmt('ui.hm.partial_sample_rows', {shown: samples.length.toLocaleString(), total: lib.toLocaleString()}))}</span>
+</div>`;
+}
+
+async function showHeatmapDashboard() {
     let existing = document.getElementById('heatmapDashModal');
     if (existing) existing.remove();
 
@@ -14,6 +72,14 @@ function showHeatmapDashboard() {
     const plugins = typeof allPlugins !== 'undefined' ? allPlugins : [];
     const projects = typeof allDawProjects !== 'undefined' ? allDawProjects : [];
     const presets = typeof allPresets !== 'undefined' ? allPresets : [];
+
+    if (typeof showGlobalProgress === 'function') showGlobalProgress();
+    let agg = null;
+    try {
+        agg = await fetchHeatmapDbAggregates();
+    } finally {
+        if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
+    }
 
     const html = `<div class="modal-overlay" id="heatmapDashModal" data-action-modal="closeHeatmapDash">
     <div class="modal-content modal-wide" style="max-width:95vw;width:95vw;max-height:95vh;height:95vh;">
@@ -32,7 +98,7 @@ function showHeatmapDashboard() {
     // Double-rAF: first frame makes modal visible, second frame renders with correct widths
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-            renderDashboard(samples, plugins, projects, presets);
+            renderDashboard(samples, plugins, projects, presets, agg);
         });
     });
 }
@@ -42,32 +108,33 @@ function closeHeatmapDash() {
     if (el) el.remove();
 }
 
-function renderDashboard(samples, plugins, projects, presets) {
+function renderDashboard(samples, plugins, projects, presets, agg) {
     const overview = document.getElementById('hmOverview');
     const grid = document.getElementById('hmGrid');
     if (!overview || !grid) return;
 
-    const totalSize = samples.reduce((s, a) => s + (a.size || a.sizeBytes || 0), 0);
+    const t = _hmOverviewTotals(agg, samples, plugins, projects, presets);
+    const totalSize = Number(t.totalBytes) || 0;
 
     // Overview stats
     overview.innerHTML = `
-    <div class="hm-stat"><span class="hm-stat-val">${samples.length.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_samples'))}</span></div>
-    <div class="hm-stat"><span class="hm-stat-val">${plugins.length.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_plugins'))}</span></div>
-    <div class="hm-stat"><span class="hm-stat-val">${projects.length.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_daw'))}</span></div>
-    <div class="hm-stat"><span class="hm-stat-val">${presets.length.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_presets'))}</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${t.nSamples.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_samples'))}</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${t.nPlugins.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_plugins'))}</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${t.nDaw.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_daw'))}</span></div>
+    <div class="hm-stat"><span class="hm-stat-val">${t.nPresets.toLocaleString()}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_presets'))}</span></div>
     <div class="hm-stat"><span class="hm-stat-val">${typeof formatAudioSize === 'function' ? formatAudioSize(totalSize) : (totalSize / (1024 * 1024 * 1024)).toFixed(1) + ' GB'}</span><span class="hm-stat-label">${escapeHtml(_hmFmt('ui.hm.overview_total_size'))}</span></div>
   `;
 
-    let cards = '';
+    let cards = _hmPartialSampleHintCard(agg, samples);
 
     // 1. Format distribution (pie-like horizontal bars)
-    cards += buildFormatCard(samples);
+    cards += buildFormatCard(samples, agg);
 
     // 2. Size distribution histogram
-    cards += buildSizeCard(samples);
+    cards += buildSizeCard(samples, agg);
 
     // 3. Folder heatmap (top directories by file count)
-    cards += buildFolderCard(samples);
+    cards += buildFolderCard(samples, agg);
 
     // 4. BPM distribution (if any cached)
     cards += buildBpmCard();
@@ -79,10 +146,10 @@ function renderDashboard(samples, plugins, projects, presets) {
     cards += buildTimelineCard(samples);
 
     // 7. Plugin type breakdown
-    cards += buildPluginTypeCard(plugins);
+    cards += buildPluginTypeCard(plugins, agg);
 
     // 8. DAW format breakdown
-    cards += buildDawFormatCard(projects);
+    cards += buildDawFormatCard(projects, agg);
 
     grid.innerHTML = cards;
 
@@ -109,15 +176,15 @@ function renderDashboard(samples, plugins, projects, presets) {
 
 // ── Card Builders ──
 
-function buildFormatCard(samples) {
-    // Use full DB stats if available (samples is only the current page)
-    const counts = (typeof audioStatCounts !== 'undefined' && Object.keys(audioStatCounts).length > 0)
-        ? {...audioStatCounts}
-        : (() => {
-            const c = {};
-            for (const s of samples) c[s.format] = (c[s.format] || 0) + 1;
-            return c;
-        })();
+function buildFormatCard(samples, agg) {
+    let counts = {};
+    if (agg?.audio?.byType && Object.keys(agg.audio.byType).length > 0) {
+        counts = {...agg.audio.byType};
+    } else if (typeof audioStatCounts !== 'undefined' && Object.keys(audioStatCounts).length > 0) {
+        counts = {...audioStatCounts};
+    } else {
+        for (const s of samples) counts[s.format] = (counts[s.format] || 0) + 1;
+    }
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     const max = sorted.length > 0 ? sorted[0][1] : 1;
     const total = sorted.reduce((sum, [, c]) => sum + c, 0) || 1;
@@ -135,7 +202,7 @@ function buildFormatCard(samples) {
     return `<div class="hm-card" data-hm-card="format"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_format_dist'))}</h3>${bars || `<span class="hm-empty">${escapeHtml(_hmFmt('ui.hm.empty_no_samples'))}</span>`}</div>`;
 }
 
-function buildSizeCard(samples) {
+function buildSizeCard(samples, agg) {
     const buckets = [
         {labelKey: 'ui.hm.bucket_lt_100kb', max: 100 * 1024},
         {labelKey: 'ui.hm.bucket_100kb_1mb', max: 1024 * 1024},
@@ -154,11 +221,11 @@ function buildSizeCard(samples) {
             }
         }
     }
-    const total = samples.length || 1;
+    const pageTotal = samples.length || 1;
     const maxBucket = Math.max(...counts, 1);
     const bars = buckets.map((b, i) => {
         const barPct = (counts[i] / maxBucket) * 100;
-        const share = ((counts[i] / total) * 100).toFixed(1);
+        const share = ((counts[i] / pageTotal) * 100).toFixed(1);
         const bl = _hmFmt(b.labelKey);
         return `<div class="hm-bar-row">
       <span class="hm-bar-label">${escapeHtml(bl)}</span>
@@ -170,7 +237,7 @@ function buildSizeCard(samples) {
     return `<div class="hm-card" data-hm-card="size"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_size_dist'))}</h3>${bars}</div>`;
 }
 
-function buildFolderCard(samples) {
+function buildFolderCard(samples, agg) {
     const dirs = {};
     for (const s of samples) {
         const dir = s.directory || s.path?.replace(/\/[^/]+$/, '') || _hmFmt('ui.hm.unknown');
@@ -180,12 +247,12 @@ function buildFolderCard(samples) {
         dirs[key] = (dirs[key] || 0) + 1;
     }
     const sorted = Object.entries(dirs).sort((a, b) => b[1] - a[1]).slice(0, 12);
-    const total = samples.length || 1;
+    const pageTotal = samples.length || 1;
     const maxFolder = sorted.length > 0 ? sorted[0][1] : 1;
 
     const bars = sorted.map(([dir, count]) => {
         const barPct = (count / maxFolder) * 100;
-        const share = ((count / total) * 100).toFixed(1);
+        const share = ((count / pageTotal) * 100).toFixed(1);
         const name = dir.split('/').pop() || dir;
         return `<div class="hm-bar-row" title="${escapeHtml(dir)}">
       <span class="hm-bar-label" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</span>
@@ -218,12 +285,16 @@ function buildTimelineCard(samples) {
     return `<div class="hm-card hm-card-wide" data-hm-card="timeline"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_timeline'))}</h3><canvas id="hmTimelineCanvas" width="800" height="100" style="width:100%;height:100px;" title="${escapeHtml(_hmFmt('ui.hm.card_timeline_canvas_title'))}"></canvas></div>`;
 }
 
-function buildPluginTypeCard(plugins) {
-    if (plugins.length === 0) return '';
+function buildPluginTypeCard(plugins, agg) {
     const types = {};
-    for (const p of plugins) types[p.type || _hmFmt('ui.hm.unknown')] = (types[p.type || _hmFmt('ui.hm.unknown')] || 0) + 1;
+    if (agg?.plugins?.byType && Object.keys(agg.plugins.byType).length > 0) {
+        Object.assign(types, agg.plugins.byType);
+    } else if (plugins.length > 0) {
+        for (const p of plugins) types[p.type || _hmFmt('ui.hm.unknown')] = (types[p.type || _hmFmt('ui.hm.unknown')] || 0) + 1;
+    }
+    if (Object.keys(types).length === 0) return '';
     const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]);
-    const total = plugins.length || 1;
+    const total = Object.values(types).reduce((a, b) => a + b, 0) || 1;
     const maxType = sorted[0]?.[1] || 1;
     const bars = sorted.map(([type, count]) => {
         const barPct = (count / maxType) * 100;
@@ -237,15 +308,23 @@ function buildPluginTypeCard(plugins) {
     return `<div class="hm-card" data-hm-card="pluginTypes"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_plugin_types'))}</h3>${bars}</div>`;
 }
 
-function buildDawFormatCard(projects) {
-    if (projects.length === 0) return '';
+function buildDawFormatCard(projects, agg) {
     const fmts = {};
-    for (const p of projects) {
-        const fmt = p.daw || p.format || _hmFmt('ui.hm.unknown');
-        fmts[fmt] = (fmts[fmt] || 0) + 1;
+    if (agg?.daw?.byType && Object.keys(agg.daw.byType).length > 0) {
+        Object.assign(fmts, agg.daw.byType);
+    } else if (typeof _dawStatsSnapshot !== 'undefined' && _dawStatsSnapshot && _dawStatsSnapshot.counts && Object.keys(_dawStatsSnapshot.counts).length > 0) {
+        Object.assign(fmts, _dawStatsSnapshot.counts);
+    } else if (typeof dawStatCounts !== 'undefined' && dawStatCounts && Object.keys(dawStatCounts).length > 0) {
+        Object.assign(fmts, dawStatCounts);
+    } else if (projects.length > 0) {
+        for (const p of projects) {
+            const fmt = p.daw || p.format || _hmFmt('ui.hm.unknown');
+            fmts[fmt] = (fmts[fmt] || 0) + 1;
+        }
     }
+    if (Object.keys(fmts).length === 0) return '';
     const sorted = Object.entries(fmts).sort((a, b) => b[1] - a[1]);
-    const total = projects.length || 1;
+    const total = sorted.reduce((sum, [, c]) => sum + c, 0) || 1;
     const maxFmt = sorted[0]?.[1] || 1;
     const bars = sorted.map(([fmt, count]) => {
         const barPct = (count / maxFmt) * 100;
@@ -405,7 +484,7 @@ document.addEventListener('click', (e) => {
         }
     }
     if (e.target.closest('[data-action="showHeatmapDash"]')) {
-        showHeatmapDashboard();
+        void showHeatmapDashboard();
     }
 });
 

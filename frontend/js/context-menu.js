@@ -1057,7 +1057,7 @@ document.addEventListener('contextmenu', (e) => {
             const items = [
                 {
                     icon: '&#128202;', label: appFmt('menu.heatmap_dashboard'), action: () => {
-                        if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard();
+                        if (typeof showHeatmapDashboard === 'function') void showHeatmapDashboard();
                     }
                 },
                 {
@@ -2116,7 +2116,7 @@ document.addEventListener('contextmenu', (e) => {
             items.push('---');
             items.push({
                 icon: '&#8634;', label: appFmt('menu.refresh_dashboard'), action: () => {
-                    if (typeof showHeatmapDashboard === 'function') showHeatmapDashboard();
+                    if (typeof showHeatmapDashboard === 'function') void showHeatmapDashboard();
                 }
             });
             items.push({

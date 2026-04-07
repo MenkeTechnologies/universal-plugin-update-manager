@@ -332,7 +332,7 @@ function buildPaletteStaticItems() {
         items.push({
             type: 'action', name: appFmt('menu.heatmap_dashboard'), icon: '&#128202;', action: () => {
                 showToast(toastFmt('toast.opening_dashboard'));
-                showHeatmapDashboard();
+                void showHeatmapDashboard();
             }
         });
     }

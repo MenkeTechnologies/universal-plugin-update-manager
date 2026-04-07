@@ -110,8 +110,24 @@ describe('frontend/js/heatmap-dashboard.js card builders (vm-loaded)', () => {
     assert.ok(html.includes('data-hm-card="timeline"'));
   });
 
-  it('buildPluginTypeCard returns empty string for no plugins', () => {
+  it('buildPluginTypeCard returns empty string for no plugins and no DB aggregate', () => {
     assert.strictEqual(H.buildPluginTypeCard([]), '');
+  });
+
+  it('buildPluginTypeCard uses agg.plugins.byType when in-memory list is empty', () => {
+    const html = H.buildPluginTypeCard([], {
+      plugins: {count: 10, byType: {VST3: 7, AU: 3}},
+    });
+    assert.ok(html.includes('VST3'));
+    assert.ok(html.includes('AU'));
+  });
+
+  it('buildDawFormatCard uses agg.daw.byType when project list is empty', () => {
+    const html = H.buildDawFormatCard([], {
+      daw: {count: 5, byType: {'Ableton Live': 3, 'Logic Pro': 2}},
+    });
+    assert.ok(html.includes('Ableton Live'));
+    assert.ok(html.includes('Logic Pro'));
   });
 
   it('buildFolderCard shows hm-empty when samples array is empty', () => {

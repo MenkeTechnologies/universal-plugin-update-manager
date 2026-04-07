@@ -981,6 +981,7 @@
   "ui.hm.overview_presets": "Presets",
   "ui.hm.overview_samples": "Samples",
   "ui.hm.overview_total_size": "Total Size",
+  "ui.hm.partial_sample_rows": "Size / folder / timeline charts use the loaded sample page ({shown} of {total} in the library).",
   "ui.hm.title": "Audio Heatmap Dashboard",
   "ui.hm.unknown": "Unknown",
   "ui.js.badge_unknown_latest": "Unknown Latest",
