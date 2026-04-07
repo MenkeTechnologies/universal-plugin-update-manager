@@ -2,14 +2,27 @@
 // Visual map of plugin usage across DAW projects.
 // Shows most-used plugins, orphaned plugins, and per-project breakdowns.
 
+/** When the DAW tab is SQLite-paginated, `allDawProjects` only has the current page — xref paths still need graph rows. */
+function _depProjectMetaForPath(path) {
+    const fromList = typeof findByPath === 'function' && typeof allDawProjects !== 'undefined'
+        ? findByPath(allDawProjects, path)
+        : undefined;
+    if (fromList) return fromList;
+    const name = path.split('/').pop() || path;
+    return {name, daw: '—', format: '', path};
+}
+
+function _depTypeSlug(t) {
+    return String(t || 'unknown').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'unknown';
+}
+
 function buildDepGraphData() {
     const pluginProjects = {};  // normalizedName → { name, type, manufacturer, projects: Set<path> }
     const projectPlugins = {};  // path → { name, daw, plugins: PluginRef[] }
 
     // Build from xref cache
     for (const [path, plugins] of Object.entries(_xrefCache)) {
-        const project = findByPath(allDawProjects, path);
-        if (!project) continue;
+        const project = _depProjectMetaForPath(path);
         projectPlugins[path] = {name: project.name, daw: project.daw || project.format, plugins};
         for (const p of plugins) {
             const key = p.normalizedName || p.name.toLowerCase();
@@ -71,7 +84,7 @@ function buildAnalyticsHtml(data) {
         .sort((a, b) => b[1] - a[1])
         .map(([type, count]) => {
             const pct = Math.round((count / typeTotal) * 100);
-            const typeCls = 'xref-type-' + type.toLowerCase();
+            const typeCls = 'xref-type-' + _depTypeSlug(type);
             return `<div class="dep-plugin-row">
         <div class="dep-plugin-info">
           <span class="xref-item-type ${typeCls}">${escapeHtml(type)}</span>
@@ -156,7 +169,7 @@ function buildAnalyticsHtml(data) {
         <h3 class="dep-analytics-title">Your Go-To Plugins (>50% of projects)</h3>
         ${widelyUsed.map(p => `<div class="dep-plugin-row">
           <div class="dep-plugin-info">
-            <span class="xref-item-type xref-type-${p.type.toLowerCase()}">${escapeHtml(p.type)}</span>
+            <span class="xref-item-type xref-type-${_depTypeSlug(p.type)}">${escapeHtml(p.type || 'Unknown')}</span>
             <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
             <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer)}</span>
           </div>
@@ -171,7 +184,7 @@ function buildAnalyticsHtml(data) {
         <div style="max-height:200px;overflow-y:auto;">
         ${singleUse.slice(0, 30).map(p => `<div class="dep-plugin-row" style="opacity:0.7;">
           <div class="dep-plugin-info">
-            <span class="xref-item-type xref-type-${p.type.toLowerCase()}">${escapeHtml(p.type)}</span>
+            <span class="xref-item-type xref-type-${_depTypeSlug(p.type)}">${escapeHtml(p.type || 'Unknown')}</span>
             <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
             <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer)}</span>
           </div>
@@ -208,14 +221,14 @@ function showDepGraph() {
     // Most-used plugins section
     const topPlugins = data.pluginsByUsage.slice(0, 50).map(p => {
         const pct = Math.round((p.count / maxCount) * 100);
-        const typeCls = 'xref-type-' + p.type.toLowerCase();
+        const typeCls = 'xref-type-' + _depTypeSlug(p.type);
         const projectList = [...p.projects].map(path => {
             const proj = data.projectsByCount.find(pr => pr.path === path);
             return proj ? escapeHtml(proj.name) : escapeHtml(path.split('/').pop());
         }).join(', ');
         return `<div class="dep-plugin-row" title="Used in: ${escapeHtml(projectList)}">
       <div class="dep-plugin-info">
-        <span class="xref-item-type ${typeCls}">${escapeHtml(p.type)}</span>
+        <span class="xref-item-type ${typeCls}">${escapeHtml(p.type || 'Unknown')}</span>
         <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
         <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer)}</span>
       </div>
@@ -230,7 +243,7 @@ function showDepGraph() {
     const maxPlugins = data.projectsByCount.length > 0 ? data.projectsByCount[0].count : 1;
     const topProjects = data.projectsByCount.slice(0, 30).map(p => {
         const pct = Math.round((p.count / maxPlugins) * 100);
-        const dawCls = typeof getDawBadgeClass === 'function' ? getDawBadgeClass(p.daw) : 'format-default';
+        const dawCls = typeof getDawBadgeClass === 'function' ? getDawBadgeClass(p.daw || 'unknown') : 'format-default';
         return `<div class="dep-project-row" data-dep-project="${escapeHtml(p.path)}" title="${escapeHtml(p.path)}">
       <div class="dep-project-info">
         <span class="format-badge ${dawCls}" style="font-size:9px;">${escapeHtml(p.daw)}</span>
@@ -389,9 +402,9 @@ document.addEventListener('click', (e) => {
                 body = '<div class="state-message"><div class="state-icon">&#9889;</div><h2>No plugins found in this project</h2></div>';
             } else {
                 body = plugins.map(p => {
-                    const typeCls = 'xref-type-' + p.pluginType.toLowerCase();
+                    const typeCls = 'xref-type-' + _depTypeSlug(p.pluginType);
                     return `<div class="dep-plugin-row">
-            <span class="xref-item-type ${typeCls}">${escapeHtml(p.pluginType)}</span>
+            <span class="xref-item-type ${typeCls}">${escapeHtml(p.pluginType || 'Unknown')}</span>
             <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
             <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer)}</span>
           </div>`;
