@@ -150,6 +150,50 @@ function resetPresetStatsAccumulators() {
     _presetStatsFormatCounts = {};
 }
 
+/** Dynamic format rows are direct children of `#presetStats` (draggable with count/size). */
+function clearPresetFormatBreakdownPairs() {
+    const ps = document.getElementById('presetStats');
+    if (!ps) return;
+    ps.querySelectorAll('.audio-stats-pair[data-stat-key^="fmt-"]').forEach((el) => el.remove());
+}
+
+function renderPresetFormatBreakdown(entries) {
+    clearPresetFormatBreakdownPairs();
+    const ps = document.getElementById('presetStats');
+    if (!ps) return;
+    for (const [fmt, c] of entries) {
+        const span = document.createElement('span');
+        span.className = 'audio-stats-pair format-badge format-default';
+        span.dataset.statKey = 'fmt-' + fmt;
+        span.textContent = fmt + ': ' + c.toLocaleString();
+        ps.appendChild(span);
+    }
+    applyPresetStatsOrderFromPrefs();
+}
+
+/** Re-apply prefs after format rows are recreated (DOMContentLoaded restore runs before breakdown exists). */
+function applyPresetStatsOrderFromPrefs() {
+    if (typeof prefs === 'undefined') return;
+    const saved = prefs.getObject('presetStatsOrder', null);
+    if (!saved || !Array.isArray(saved)) return;
+    const ps = document.getElementById('presetStats');
+    if (!ps) return;
+    const getKey = (el) => el.dataset.statKey || '';
+    const children = [...ps.children].filter((c) => c.classList.contains('audio-stats-pair'));
+    const map = {};
+    children.forEach((c) => {
+        const k = getKey(c);
+        if (k) map[k] = c;
+    });
+    for (const key of saved) {
+        if (map[key]) ps.appendChild(map[key]);
+    }
+    children.forEach((c) => {
+        const k = getKey(c);
+        if (k && !saved.includes(k)) ps.appendChild(c);
+    });
+}
+
 let _lastPresetAggKey = null;
 let _presetAggCache = null;
 
@@ -208,17 +252,14 @@ async function rebuildPresetStats(force) {
     }
     document.getElementById('presetTotalSize').textContent = formatPresetSize(bytes);
     const entries = Object.entries(byType).sort((a, b) => b[1] - a[1]);
-    const fmtHtml = entries
-        .map(([fmt, c]) => `<span class="format-badge format-default">${fmt}: ${c}</span>`)
-        .join(' ');
-    document.getElementById('presetFormatBreakdown').innerHTML = fmtHtml;
+    renderPresetFormatBreakdown(entries);
     updatePresetExportButton();
 }
 
 function resetPresetStats() {
     document.getElementById('presetCount').textContent = '0';
     document.getElementById('presetTotalSize').textContent = '0 B';
-    document.getElementById('presetFormatBreakdown').innerHTML = '';
+    clearPresetFormatBreakdownPairs();
     resetPresetStatsAccumulators();
 }
 

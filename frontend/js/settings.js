@@ -759,7 +759,8 @@ function settingResetAllUI() {
     const uiKeys = [
         'tabOrder', 'settingsSectionOrder', 'columnWidths',
         'playerSectionOrder', 'playerDock', 'playerWidth', 'playerHeight', 'playerExpanded',
-        'headerStatsOrder', 'statsBarOrder', 'audioStatsOrder', 'dawStatsOrder', 'presetStatsOrder',
+        'headerStatsOrder', 'statsBarOrder',
+        'pluginStatsOrder', 'audioStatsOrder', 'dawStatsOrder', 'presetStatsOrder', 'midiStatsOrder', 'pdfStatsOrder',
         'audioColumnOrder', 'dawColumnOrder', 'presetColumnOrder',
         'favItemOrder', 'fileFavOrder', 'noteCardOrder', 'tagCardOrder', 'presetChipOrder',
         'hmCardOrder', 'fzfParamOrder', 'shortcutOrder', 'vizTileOrder',

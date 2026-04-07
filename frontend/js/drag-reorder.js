@@ -6,6 +6,22 @@
     // Global drag state — only one drag at a time
     let _drag = null; // { container, childSelector, direction, dragged, ghost, placeholder, startX, startY, offsetX, offsetY, isDragging, saveOrder, onReorder }
 
+    /** Draggable unit must be a **direct child** of `container` (avoids nested spans inside a key:value pair). */
+    function resolveDragChild(container, childSelector, target) {
+        if (!target || !container.contains(target)) return null;
+        const hit = target.closest(childSelector);
+        if (!hit || !container.contains(hit)) return null;
+        let cur = hit;
+        while (cur && cur.parentElement !== container) {
+            cur = cur.parentElement;
+        }
+        return cur && cur.parentElement === container && cur.matches(childSelector) ? cur : null;
+    }
+
+    function listDragChildren(container, childSelector) {
+        return [...container.children].filter((c) => c.matches(childSelector));
+    }
+
     document.addEventListener('mousemove', (e) => {
         if (!_drag) return;
         const d = _drag;
@@ -49,7 +65,7 @@
         d.ghost.style.display = 'none';
         const el = document.elementFromPoint(e.clientX, e.clientY);
         d.ghost.style.display = '';
-        const target = el?.closest(d.childSelector);
+        const target = d.resolveDragChild ? d.resolveDragChild(el) : el?.closest(d.childSelector);
 
         if (target && target !== d.dragged && target !== d.placeholder && d.container.contains(target)) {
             try {
@@ -94,10 +110,12 @@
         const getKey = opts?.getKey || ((el, i) => el.dataset.dragKey || el.dataset.npSection || el.textContent.trim().slice(0, 30) || String(i));
 
         // Restore saved order
+        const resolveChild = (node) => resolveDragChild(container, childSelector, node);
+
         if (prefsKey && typeof prefs !== 'undefined') {
             const saved = prefs.getObject(prefsKey, null);
             if (saved && Array.isArray(saved)) {
-                const children = [...container.querySelectorAll(childSelector)];
+                const children = listDragChildren(container, childSelector);
                 const map = {};
                 children.forEach((c, i) => {
                     map[getKey(c, i)] = c;
@@ -113,13 +131,13 @@
 
         function saveOrder() {
             if (!prefsKey || typeof prefs === 'undefined') return;
-            const children = [...container.querySelectorAll(childSelector)];
+            const children = listDragChildren(container, childSelector);
             prefs.setItem(prefsKey, children.map((c, i) => getKey(c, i)));
         }
 
         container.addEventListener('mousedown', (e) => {
             if (e.button !== 0 || _drag) return;
-            const child = e.target.closest(childSelector);
+            const child = resolveChild(e.target);
             if (!child || !container.contains(child)) return;
             if (handleSelector && !e.target.closest(handleSelector)) return;
             const skipSelector = direction === 'horizontal' ? 'input, select, textarea, .col-resize' : 'input, button, select, textarea, a, .btn-small, .col-resize';
@@ -127,7 +145,7 @@
             e.preventDefault();
             const rect = child.getBoundingClientRect();
             _drag = {
-                container, childSelector, direction, onReorder, saveOrder,
+                container, childSelector, direction, onReorder, saveOrder, resolveDragChild: resolveChild,
                 dragged: child, ghost: null, placeholder: null, isDragging: false,
                 startX: e.clientX, startY: e.clientY,
                 offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
@@ -182,15 +200,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const statsBar = document.getElementById('statsBar');
     if (statsBar) initDragReorder(statsBar, '.stat', 'statsBarOrder', {
         direction: 'horizontal',
-        getKey: (el) => el.textContent.trim().replace(/\d+/g, '').trim()
+        getKey: (el) => el.dataset.statKey || el.textContent.trim().replace(/\d+/g, '').trim()
     });
 
-    ['audioStats', 'dawStats', 'presetStats'].forEach(id => {
+    [
+        ['pluginStats', 'pluginStatsOrder'],
+        ['audioStats', 'audioStatsOrder'],
+        ['dawStats', 'dawStatsOrder'],
+        ['presetStats', 'presetStatsOrder'],
+        ['midiStats', 'midiStatsOrder'],
+        ['pdfStats', 'pdfStatsOrder'],
+    ].forEach(([id, prefsKey]) => {
         const bar = document.getElementById(id);
-        if (bar) initDragReorder(bar, 'span', id + 'Order', {
-            direction: 'horizontal',
-            getKey: (el) => el.textContent.trim().replace(/[\d,.]+/g, '').replace(/\s+/g, ' ').trim()
-        });
+        if (bar) {
+            initDragReorder(bar, '.audio-stats-pair', prefsKey, {
+                direction: 'horizontal',
+                getKey: (el) =>
+                    el.dataset.statKey ||
+                    el.textContent.trim().replace(/[\d,.]+/g, '').replace(/\s+/g, ' ').trim(),
+            });
+        }
     });
 
     setTimeout(() => {

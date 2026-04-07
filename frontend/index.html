@@ -1160,6 +1160,11 @@
             color: var(--text-dim);
             text-transform: uppercase;
             letter-spacing: 1px;
+            cursor: grab;
+        }
+
+        .stat:active {
+            cursor: grabbing;
         }
 
         .stat-value {
@@ -2955,6 +2960,19 @@
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+
+        /* One draggable unit per inventory stat (key + value); see drag-reorder.js */
+        .audio-stats-pair {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            cursor: grab;
+        }
+
+        .audio-stats-pair:active {
+            cursor: grabbing;
         }
 
         .audio-stat-value {
@@ -8031,54 +8049,54 @@
             </div>
         </div>
         <div class="stats-bar" id="statsBar">
-            <div class="stat">
+            <div class="stat" data-stat-key="plugins">
                 <span class="stat-dot purple"></span>
                 <span class="stat-value" id="totalCount">0</span>
                 <span data-i18n="ui.stats.bar_plugins_found">Plugins Found</span>
             </div>
-            <div class="stat">
+            <div class="stat" data-stat-key="up_to_date">
                 <span class="stat-dot green"></span>
                 <span class="stat-value" id="upToDateCount">0</span>
                 <span data-i18n="ui.stats.bar_up_to_date">Up to Date</span>
             </div>
-            <div class="stat">
+            <div class="stat" data-stat-key="updates">
                 <span class="stat-dot orange"></span>
                 <span class="stat-value" id="updateCount">0</span>
                 <span data-i18n="ui.stats.bar_updates_available">Updates Available</span>
             </div>
-            <div class="stat">
+            <div class="stat" data-stat-key="samples">
                 <span class="stat-dot"
                       style="background: var(--yellow); box-shadow: 0 0 6px var(--yellow-glow);"></span>
                 <span class="stat-value" id="sampleCount">0</span>
                 <span data-i18n="ui.stats.bar_samples_found">Samples Found</span>
             </div>
-            <div class="stat">
+            <div class="stat" data-stat-key="midi">
                 <span class="stat-dot" style="background: var(--cyan); box-shadow: 0 0 6px var(--cyan-glow);"></span>
                 <span class="stat-value" id="midiScanCount">0</span>
                 <span data-i18n="ui.stats.bar_midi_found">MIDI Found</span>
             </div>
-            <div class="stat">
+            <div class="stat" data-stat-key="daw">
                 <span class="stat-dot"
                       style="background: var(--magenta); box-shadow: 0 0 6px var(--magenta-glow);"></span>
                 <span class="stat-value" id="dawProjectCount">0</span>
                 <span data-i18n="ui.stats.bar_daw_projects">DAW Projects</span>
             </div>
-            <div class="stat">
+            <div class="stat" data-stat-key="presets">
                 <span class="stat-dot" style="background: var(--orange); box-shadow: 0 0 6px var(--orange-bg);"></span>
                 <span class="stat-value" id="presetCountHeader">0</span>
                 <span data-i18n="ui.stats.bar_presets">Presets</span>
             </div>
-            <div class="stat">
+            <div class="stat" data-stat-key="pdfs">
                 <span class="stat-dot" style="background: var(--green); box-shadow: 0 0 6px var(--green-glow);"></span>
                 <span class="stat-value" id="pdfCountHeader">0</span>
                 <span data-i18n="ui.stats.bar_pdfs">PDFs</span>
             </div>
-            <div class="stat" id="dashBtnGroup">
+            <div class="stat" id="dashBtnGroup" data-stat-key="dashboard">
                 <button class="btn btn-secondary" data-action="showHeatmapDash" data-i18n-title="ui.tt.audio_heatmap_dashboard_d"
                         style="padding:4px 10px;font-size:10px;" title="Audio heatmap dashboard (D)">
                     &#128202; <span data-i18n="ui.btn.128202_dashboard">Dashboard</span></button>
             </div>
-            <div class="stat" data-i18n-title="ui.tt.background_bpm_key_analysis_progress" id="bgAnalysisBadge"
+            <div class="stat" data-i18n-title="ui.tt.background_bpm_key_analysis_progress" data-stat-key="bg_analysis" id="bgAnalysisBadge"
                  style="font-size:10px;color:var(--cyan);"
                  title="Background BPM/Key analysis progress"></div>
         </div>
@@ -8226,13 +8244,13 @@
             </div>
 
             <div class="audio-stats" id="pluginStats" style="display:none;">
-                <span>Total: <span class="audio-stat-value" id="pluginStatsTotal">0</span></span>
-                <span>VST3: <span class="audio-stat-value" id="pluginStatsVst3">0</span></span>
-                <span>VST2: <span class="audio-stat-value" id="pluginStatsVst2">0</span></span>
-                <span>AU: <span class="audio-stat-value" id="pluginStatsAu">0</span></span>
-                <span>CLAP: <span class="audio-stat-value" id="pluginStatsClap">0</span></span>
-                <span>Other: <span class="audio-stat-value" id="pluginStatsOther">0</span></span>
-                <span>Size: <span class="audio-stat-value" id="pluginStatsSize">0 B</span></span>
+                <span class="audio-stats-pair" data-stat-key="total"><span data-i18n="ui.audio.stat_total">Total:</span> <span class="audio-stat-value" id="pluginStatsTotal">0</span></span>
+                <span class="audio-stats-pair" data-stat-key="vst3">VST3: <span class="audio-stat-value" id="pluginStatsVst3">0</span></span>
+                <span class="audio-stats-pair" data-stat-key="vst2">VST2: <span class="audio-stat-value" id="pluginStatsVst2">0</span></span>
+                <span class="audio-stats-pair" data-stat-key="au">AU: <span class="audio-stat-value" id="pluginStatsAu">0</span></span>
+                <span class="audio-stats-pair" data-stat-key="clap">CLAP: <span class="audio-stat-value" id="pluginStatsClap">0</span></span>
+                <span class="audio-stats-pair" data-stat-key="other">Other: <span class="audio-stat-value" id="pluginStatsOther">0</span></span>
+                <span class="audio-stats-pair" data-stat-key="size"><span data-i18n="ui.audio.stat_size">Size:</span> <span class="audio-stat-value" id="pluginStatsSize">0 B</span></span>
             </div>
             <div class="disk-usage" id="pluginDiskUsage" style="display:none;"></div>
             <div class="plugin-list" id="pluginList">
@@ -8491,17 +8509,17 @@
                 <div class="audio-progress-fill" id="audioProgressFill"></div>
             </div>
             <div class="audio-stats" id="audioStats" style="display: none;">
-                <span><span data-i18n="ui.audio.stat_total">Total:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="total"><span data-i18n="ui.audio.stat_total">Total:</span> <span class="audio-stat-value"
                                                                                 id="audioTotalCount">0</span></span>
-                <span><span data-i18n="ui.audio.stat_wav">WAV:</span> <span class="audio-stat-value" id="audioWavCount">0</span></span>
-                <span><span data-i18n="ui.audio.stat_mp3">MP3:</span> <span class="audio-stat-value" id="audioMp3Count">0</span></span>
-                <span><span data-i18n="ui.audio.stat_aiff">AIFF:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="wav"><span data-i18n="ui.audio.stat_wav">WAV:</span> <span class="audio-stat-value" id="audioWavCount">0</span></span>
+                <span class="audio-stats-pair" data-stat-key="mp3"><span data-i18n="ui.audio.stat_mp3">MP3:</span> <span class="audio-stat-value" id="audioMp3Count">0</span></span>
+                <span class="audio-stats-pair" data-stat-key="aiff"><span data-i18n="ui.audio.stat_aiff">AIFF:</span> <span class="audio-stat-value"
                                                                               id="audioAiffCount">0</span></span>
-                <span><span data-i18n="ui.audio.stat_flac">FLAC:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="flac"><span data-i18n="ui.audio.stat_flac">FLAC:</span> <span class="audio-stat-value"
                                                                               id="audioFlacCount">0</span></span>
-                <span><span data-i18n="ui.audio.stat_other">Other:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="other"><span data-i18n="ui.audio.stat_other">Other:</span> <span class="audio-stat-value"
                                                                                 id="audioOtherCount">0</span></span>
-                <span><span data-i18n="ui.audio.stat_size">Size:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="size"><span data-i18n="ui.audio.stat_size">Size:</span> <span class="audio-stat-value"
                                                                               id="audioTotalSize">0 B</span></span>
             </div>
             <div class="disk-usage" id="audioDiskUsage" style="display:none;"></div>
@@ -8573,19 +8591,19 @@
                 <div class="audio-progress-fill" id="dawProgressFill"></div>
             </div>
             <div class="audio-stats" id="dawStats" style="display: none;">
-                <span><span data-i18n="ui.audio.daw_stat_total">Total:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="total"><span data-i18n="ui.audio.daw_stat_total">Total:</span> <span class="audio-stat-value"
                                                                                     id="dawTotalCount">0</span></span>
-                <span><span data-i18n="ui.audio.daw_stat_ableton">Ableton:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="ableton"><span data-i18n="ui.audio.daw_stat_ableton">Ableton:</span> <span class="audio-stat-value"
                                                                                         id="dawAbletonCount">0</span></span>
-                <span><span data-i18n="ui.audio.daw_stat_logic">Logic:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="logic"><span data-i18n="ui.audio.daw_stat_logic">Logic:</span> <span class="audio-stat-value"
                                                                                     id="dawLogicCount">0</span></span>
-                <span><span data-i18n="ui.audio.daw_stat_fl">FL Studio:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="fl"><span data-i18n="ui.audio.daw_stat_fl">FL Studio:</span> <span class="audio-stat-value"
                                                                                      id="dawFlCount">0</span></span>
-                <span><span data-i18n="ui.audio.daw_stat_reaper">REAPER:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="reaper"><span data-i18n="ui.audio.daw_stat_reaper">REAPER:</span> <span class="audio-stat-value"
                                                                                       id="dawReaperCount">0</span></span>
-                <span><span data-i18n="ui.audio.daw_stat_other">Other:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="other"><span data-i18n="ui.audio.daw_stat_other">Other:</span> <span class="audio-stat-value"
                                                                                     id="dawOtherCount">0</span></span>
-                <span><span data-i18n="ui.audio.daw_stat_size">Size:</span> <span class="audio-stat-value"
+                <span class="audio-stats-pair" data-stat-key="size"><span data-i18n="ui.audio.daw_stat_size">Size:</span> <span class="audio-stat-value"
                                                                                   id="dawTotalSize">0 B</span></span>
             </div>
             <div class="disk-usage" id="dawDiskUsage" style="display:none;"></div>
@@ -8648,11 +8666,10 @@
                 <div class="progress-fill" id="presetProgressFill"></div>
             </div>
             <div class="audio-stats" id="presetStats" style="display: none;">
-                <div class="audio-stat"><span class="audio-stat-value" id="presetFilteredCount"></span><span
+                <div class="audio-stat audio-stats-pair" data-stat-key="count"><span class="audio-stat-value" id="presetFilteredCount"></span><span
                         class="audio-stat-value" id="presetCount">0</span> <span data-i18n="ui.preset.stats_word">presets</span>
                 </div>
-                <div class="audio-stat"><span class="audio-stat-value" id="presetTotalSize">0 B</span></div>
-                <div class="audio-stat" id="presetFormatBreakdown"></div>
+                <div class="audio-stat audio-stats-pair" data-stat-key="size"><span class="audio-stat-value" id="presetTotalSize">0 B</span></div>
             </div>
             <div class="audio-table-wrap" id="presetTableWrap">
                 <div class="state-message">
@@ -8698,11 +8715,11 @@
             <div class="progress-fill" id="midiProgressFill"></div>
         </div>
         <div class="audio-stats" id="midiStats" style="display:none;">
-            <span><span data-i18n="ui.audio.midi_stat_total">Total:</span> <span class="audio-stat-value"
+            <span class="audio-stats-pair" data-stat-key="total"><span data-i18n="ui.audio.midi_stat_total">Total:</span> <span class="audio-stat-value"
                                                                                  id="midiTotalCount">0</span></span>
-            <span><span data-i18n="ui.audio.midi_stat_files">Files:</span> <span class="audio-stat-value"
+            <span class="audio-stats-pair" data-stat-key="files"><span data-i18n="ui.audio.midi_stat_files">Files:</span> <span class="audio-stat-value"
                                                                                  id="midiCount">0</span></span>
-            <span><span data-i18n="ui.audio.midi_stat_size">Size:</span> <span class="audio-stat-value"
+            <span class="audio-stats-pair" data-stat-key="size"><span data-i18n="ui.audio.midi_stat_size">Size:</span> <span class="audio-stat-value"
                                                                                id="midiTotalSize">0 B</span></span>
         </div>
         <div class="table-wrap" id="midiTableWrap"></div>
@@ -8740,9 +8757,9 @@
             <div class="progress-fill" id="pdfProgressFill"></div>
         </div>
         <div class="audio-stats" id="pdfStats" style="display:none;">
-            <span><span data-i18n="ui.pdf.stat_total">Total:</span> <span class="audio-stat-value"
+            <span class="audio-stats-pair" data-stat-key="total"><span data-i18n="ui.pdf.stat_total">Total:</span> <span class="audio-stat-value"
                                                                           id="pdfCount">0</span></span>
-            <span><span data-i18n="ui.pdf.stat_size">Size:</span> <span class="audio-stat-value"
+            <span class="audio-stats-pair" data-stat-key="size"><span data-i18n="ui.pdf.stat_size">Size:</span> <span class="audio-stat-value"
                                                                         id="pdfTotalSize">0 B</span></span>
         </div>
         <div class="disk-usage" id="pdfDiskUsage" style="display:none;"></div>
