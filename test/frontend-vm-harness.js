@@ -41,6 +41,11 @@ function defaultDocument() {
  * @param {Record<string, unknown>} [overrides] - merged into sandbox before run
  */
 function loadFrontendScripts(relativePaths, overrides = {}) {
+  const batchByTab = new Map();
+  function batchSetForTabId(tabId) {
+    if (!batchByTab.has(tabId)) batchByTab.set(tabId, new Set());
+    return batchByTab.get(tabId);
+  }
   const sandbox = {
     console,
     performance: { now: () => 0 },
@@ -58,6 +63,7 @@ function loadFrontendScripts(relativePaths, overrides = {}) {
       if (typeof cb === 'function') cb();
       return 0;
     },
+    batchSetForTabId,
     ...overrides,
   };
   sandbox.window = sandbox;

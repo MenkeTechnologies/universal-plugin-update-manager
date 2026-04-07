@@ -256,7 +256,8 @@ function getDawBadgeClass(daw) {
 function buildDawRow(p) {
     const hp = escapeHtml(p.path);
     const dawClass = getDawBadgeClass(p.daw);
-    const checked = batchSelected.has(p.path) ? ' checked' : '';
+    const checked =
+        typeof batchSetForTabId === 'function' && batchSetForTabId('tabDaw').has(p.path) ? ' checked' : '';
     const xrefSupported = typeof isXrefSupported === 'function' && isXrefSupported(p.format);
     const cached = typeof _xrefCache !== 'undefined' && _xrefCache[p.path];
     const xrefTitle = typeof escapeHtml === 'function'

@@ -227,7 +227,7 @@ document.addEventListener('keydown', (e) => {
     } else if (e.key === 'V') {
         // V = select all visible (visual line mode)
         e.preventDefault();
-        if (batchSelected.size > 0) deselectAll();
+        if (typeof activeBatchCount === 'function' && activeBatchCount() > 0) deselectAll();
         else selectAllVisible();
 
     } else if (e.key === 'd' && !e.ctrlKey) {

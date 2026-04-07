@@ -11,7 +11,6 @@ describe('frontend/js/presets.js (vm-loaded)', () => {
 
   beforeEach(() => {
     P = loadFrontendScripts(['utils.js', 'batch-select.js', 'presets.js'], {
-      batchSelected: new Set(),
       _lastPresetSearch: '',
       _lastPresetMode: 'fuzzy',
       rowBadges: () => '',

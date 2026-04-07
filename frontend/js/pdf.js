@@ -164,7 +164,8 @@ function pdfPagesUnknownHtml() {
 
 function buildPdfRow(p) {
     const hp = escapeHtml(p.path);
-    const checked = batchSelected.has(p.path) ? ' checked' : '';
+    const checked =
+        typeof batchSetForTabId === 'function' && batchSetForTabId('tabPdf').has(p.path) ? ' checked' : '';
     const rowTt = typeof escapeHtml === 'function'
         ? escapeHtml(_pdfFmt('ui.tt.pdf_row_double_click_open_default'))
         : _pdfFmt('ui.tt.pdf_row_double_click_open_default');

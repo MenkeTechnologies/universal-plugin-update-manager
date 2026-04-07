@@ -48,7 +48,7 @@ function loadKeyboardNavSandbox(activeTab, navSelectedEls = []) {
     toggleHelpOverlay: () => {},
     showToast: () => {},
     toastFmt: (k) => k,
-    batchSelected: { size: 0 },
+    activeBatchCount: () => 0,
     deselectAll: () => {},
     selectAllVisible: () => {},
     window: { vstUpdater: { openDawProject: () => Promise.resolve() } },

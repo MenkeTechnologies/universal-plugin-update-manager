@@ -11,7 +11,6 @@ describe('frontend/js/daw.js (vm-loaded)', () => {
 
   before(() => {
     D = loadFrontendScripts(['utils.js', 'xref.js', 'daw.js'], {
-      batchSelected: new Set(),
       _lastDawSearch: '',
       _lastDawMode: 'fuzzy',
       rowBadges: () => '',
@@ -49,7 +48,7 @@ describe('frontend/js/daw.js (vm-loaded)', () => {
       '_xrefCache["/proj/session.rpp"] = [{ name: "ReaComp", pluginType: "VST3", manufacturer: "Cockos" }]',
       D
     );
-    D.batchSelected.add('/proj/session.rpp');
+    D.batchSetForTabId('tabDaw').add('/proj/session.rpp');
     const html = D.buildDawRow({
       path: '/proj/session.rpp',
       name: 'Mix',
@@ -59,7 +58,7 @@ describe('frontend/js/daw.js (vm-loaded)', () => {
       modified: 't',
       directory: '/proj',
     });
-    assert.ok(html.includes('checked'), 'checkbox checked when path in batchSelected');
+    assert.ok(html.includes('checked'), 'checkbox checked when path in tabDaw batch set');
     assert.ok(html.includes('has-plugins'), 'cached xref adds has-plugins class');
     assert.ok(html.includes('&#9889; 1'), 'button shows plugin count');
   });

@@ -1,7 +1,39 @@
 // ── Batch Selection ──
-// Checkboxes in table rows for multi-item operations
+// Checkboxes in table rows for multi-item operations.
+// Selections are scoped per inventory tab (tabSamples, tabDaw, …) — not one global Set.
 
-const batchSelected = new Set();
+/** Tab panel ids that use `.batch-cb` in a table body. */
+const TABS_WITH_BATCH = new Set(['tabSamples', 'tabDaw', 'tabPresets', 'tabMidi', 'tabPdf']);
+
+/** @type {Map<string, Set<string>>} */
+const batchByTab = new Map();
+
+function tabIdForBatchContext() {
+    const tab = document.querySelector('.tab-content.active');
+    return tab && TABS_WITH_BATCH.has(tab.id) ? tab.id : null;
+}
+
+/**
+ * Paths selected on the given inventory tab (for row HTML `checked` state).
+ * @param {string} tabId — e.g. `tabSamples`
+ */
+function batchSetForTabId(tabId) {
+    if (!TABS_WITH_BATCH.has(tabId)) return new Set();
+    if (!batchByTab.has(tabId)) batchByTab.set(tabId, new Set());
+    return batchByTab.get(tabId);
+}
+
+/** Mutable Set for the active inventory tab, or null if the active tab has no batch UI. */
+function getActiveBatchSet() {
+    const id = tabIdForBatchContext();
+    if (!id) return null;
+    return batchSetForTabId(id);
+}
+
+function activeBatchCount() {
+    const s = getActiveBatchSet();
+    return s ? s.size : 0;
+}
 
 function getPathFromBatchRow(el) {
     if (!el) return null;
@@ -21,28 +53,36 @@ function rowElementFromBatchCheckbox(cb) {
 }
 
 function toggleBatchSelect(path, checked) {
+    const set = getActiveBatchSet();
+    if (!set) return;
     if (checked) {
-        batchSelected.add(path);
+        set.add(path);
     } else {
-        batchSelected.delete(path);
+        set.delete(path);
     }
     updateBatchBar();
 }
 
 function selectAllVisible() {
+    const id = tabIdForBatchContext();
+    if (!id) return;
     const tbody = document.querySelector('.tab-content.active tbody');
     if (!tbody) return;
+    const set = batchSetForTabId(id);
     tbody.querySelectorAll('.batch-cb').forEach(cb => {
         cb.checked = true;
         const path = getPathFromBatchRow(rowElementFromBatchCheckbox(cb));
-        if (path) batchSelected.add(path);
+        if (path) set.add(path);
     });
     updateBatchBar();
 }
 
 function deselectAll() {
-    batchSelected.clear();
+    batchByTab.clear();
     document.querySelectorAll('.batch-cb').forEach(cb => {
+        cb.checked = false;
+    });
+    document.querySelectorAll('.batch-cb-all').forEach(cb => {
         cb.checked = false;
     });
     updateBatchBar();
@@ -51,9 +91,9 @@ function deselectAll() {
 function updateBatchBar() {
     const bar = document.getElementById('batchActionBar');
     if (!bar) return;
-    if (batchSelected.size === 0) {
+    const n = activeBatchCount();
+    if (n === 0) {
         bar.style.display = 'none';
-        // Uncheck header "select all" checkboxes
         document.querySelectorAll('.batch-cb-all').forEach(cb => {
             cb.checked = false;
         });
@@ -62,10 +102,9 @@ function updateBatchBar() {
     bar.style.display = 'flex';
     const bc = document.getElementById('batchSelectionCount');
     if (bc) {
-        bc.textContent = catalogFmt('menu.batch_selected', {n: batchSelected.size});
+        bc.textContent = catalogFmt('menu.batch_selected', {n});
     }
 
-    // Update header checkbox state (checked if all visible are selected)
     const tbody = document.querySelector('.tab-content.active tbody');
     if (tbody) {
         const allCbs = tbody.querySelectorAll('.batch-cb');
@@ -78,6 +117,9 @@ function updateBatchBar() {
 function batchFavoriteAll() {
     const activeTab = document.querySelector('.tab-content.active');
     if (!activeTab) return;
+    const set = getActiveBatchSet();
+    if (!set || set.size === 0) return;
+
     let type = 'sample',
         items = typeof allAudioSamples !== 'undefined' ? allAudioSamples : [];
     if (activeTab.id === 'tabPlugins') {
@@ -98,7 +140,7 @@ function batchFavoriteAll() {
     }
 
     let added = 0;
-    for (const path of batchSelected) {
+    for (const path of set) {
         if (isFavorite(path)) continue;
         const item = typeof findByPath === 'function' ? findByPath(items, path) : items.find(i => i.path === path);
         if (item) {
@@ -115,21 +157,23 @@ function batchFavoriteAll() {
 }
 
 function batchCopyPaths() {
-    const paths = [...batchSelected].join('\n');
+    const set = getActiveBatchSet();
+    if (!set || set.size === 0) return;
+    const paths = [...set].join('\n');
     if (typeof copyToClipboard !== 'function') return;
     copyToClipboard(paths);
-    showToast(toastFmt('toast.copied_n_paths', {n: batchSelected.size}));
+    showToast(toastFmt('toast.copied_n_paths', {n: set.size}));
 }
 
 function batchExportSelected() {
     const activeTab = document.querySelector('.tab-content.active');
     if (!activeTab) return;
+    const set = getActiveBatchSet();
+    if (!set || set.size === 0) return;
 
-    // O(selected) via path index instead of O(total) linear filter — matters when
-    // total is millions and selection is small.
     const pickByPaths = (arr) => {
         const out = [];
-        for (const path of batchSelected) {
+        for (const path of set) {
             const item = findByPath(arr, path);
             if (item) out.push(item);
         }
@@ -158,9 +202,9 @@ function batchExportSelected() {
 
 function batchRevealAll() {
     const activeTab = document.querySelector('.tab-content.active');
-    if (!activeTab || batchSelected.size === 0) return;
-    // Reveal first selected item
-    const path = [...batchSelected][0];
+    const set = getActiveBatchSet();
+    if (!activeTab || !set || set.size === 0) return;
+    const path = [...set][0];
     if (activeTab.id === 'tabSamples') {
         if (typeof openAudioFolder === 'function') openAudioFolder(path);
     } else if (activeTab.id === 'tabDaw') {
@@ -174,7 +218,7 @@ function batchRevealAll() {
     } else if (activeTab.id === 'tabMidi' || activeTab.id === 'tabPdf') {
         if (typeof openAudioFolder === 'function') openAudioFolder(path);
     }
-    showToast(toastFmt('toast.revealing_first_batch', {n: batchSelected.size}));
+    showToast(toastFmt('toast.revealing_first_batch', {n: set.size}));
 }
 
 // Wire up checkbox changes and batch action buttons
@@ -211,3 +255,9 @@ document.addEventListener('click', (e) => {
         else if (act === 'reveal') batchRevealAll();
     }
 });
+
+if (typeof window !== 'undefined') {
+    window.batchSetForTabId = batchSetForTabId;
+    window.getActiveBatchSet = getActiveBatchSet;
+    window.activeBatchCount = activeBatchCount;
+}

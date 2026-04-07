@@ -114,7 +114,8 @@ function formatPresetSize(bytes) {
 
 function buildPresetRow(p) {
     const hp = escapeHtml(p.path);
-    const checked = batchSelected.has(p.path) ? ' checked' : '';
+    const checked =
+        typeof batchSetForTabId === 'function' && batchSetForTabId('tabPresets').has(p.path) ? ' checked' : '';
     const rowTt = typeof escapeHtml === 'function'
         ? escapeHtml(_presetFmt('ui.tt.row_double_click_reveal_finder'))
         : _presetFmt('ui.tt.row_double_click_reveal_finder');

@@ -10,7 +10,6 @@ describe('frontend/js/pdf.js (vm-loaded)', () => {
 
   before(() => {
     P = loadFrontendScripts(['utils.js', 'pdf.js'], {
-      batchSelected: new Set(),
       showToast: () => {},
       toastFmt: (key) => key,
       rowBadges: () => '',
@@ -34,7 +33,7 @@ describe('frontend/js/pdf.js (vm-loaded)', () => {
   });
 
   it('buildPdfRow reflects batch selection', () => {
-    P.batchSelected.add('/x/a.pdf');
+    P.batchSetForTabId('tabPdf').add('/x/a.pdf');
     const html = P.buildPdfRow({
       path: '/x/a.pdf',
       name: 'A',
@@ -44,7 +43,7 @@ describe('frontend/js/pdf.js (vm-loaded)', () => {
       size: 1,
     });
     assert.ok(html.includes('checked'));
-    P.batchSelected.delete('/x/a.pdf');
+    P.batchSetForTabId('tabPdf').delete('/x/a.pdf');
   });
 
   it('buildPdfTableHtml defines pdfTable, sort headers, and load-more tbody', () => {

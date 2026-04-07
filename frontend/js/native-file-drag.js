@@ -200,10 +200,10 @@ function drawCornerTicks(ctx, x, y, w, h, c1, c2) {
 }
 
 function pathsWithBatch(primaryPath) {
-    if (typeof batchSelected !== 'undefined' && batchSelected.size > 0 && batchSelected.has(primaryPath)) {
-        return [...batchSelected];
-    }
-    return [primaryPath];
+    if (typeof getActiveBatchSet !== 'function') return [primaryPath];
+    const set = getActiveBatchSet();
+    if (!set || set.size === 0 || !set.has(primaryPath)) return [primaryPath];
+    return [...set];
 }
 
 /**

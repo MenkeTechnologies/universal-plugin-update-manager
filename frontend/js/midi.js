@@ -641,7 +641,8 @@ function buildMidiRow(s) {
     const info = _midiInfoCache[s.path];
     const dur = info && info.duration ? (typeof formatTime === 'function' ? formatTime(info.duration) : info.duration.toFixed(1) + 's') : '';
     const trackNames = info && info.trackNames && info.trackNames.length > 0 ? info.trackNames.join(', ') : '';
-    const checked = typeof batchSelected !== 'undefined' && batchSelected.has(s.path) ? ' checked' : '';
+    const checked =
+        typeof batchSetForTabId === 'function' && batchSetForTabId('tabMidi').has(s.path) ? ' checked' : '';
     const rowTitle = trackNames
         ? (typeof escapeHtml === 'function'
             ? escapeHtml(_midiFmt('ui.midi.tracks_tooltip', {names: trackNames}))

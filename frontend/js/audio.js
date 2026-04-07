@@ -2331,7 +2331,8 @@ function buildAudioRow(s) {
     const hp = escapeHtml(s.path);
     const isPlaying = audioPlayerPath === s.path;
     const rowClass = isPlaying ? ' class="row-playing"' : '';
-    const checked = batchSelected.has(s.path) ? ' checked' : '';
+    const checked =
+        typeof batchSetForTabId === 'function' && batchSetForTabId('tabSamples').has(s.path) ? ' checked' : '';
     // BPM/key/LUFS come inline from SQLite query result
     const bpm = s.bpm || (typeof _bpmCache !== 'undefined' && _bpmCache[s.path]) || '';
     const key = s.key || (typeof _keyCache !== 'undefined' && _keyCache[s.path]) || '';

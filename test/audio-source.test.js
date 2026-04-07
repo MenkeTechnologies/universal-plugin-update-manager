@@ -10,6 +10,11 @@ const vm = require('vm');
 const { createTextDiv } = require('./frontend-vm-harness.js');
 
 function loadAudioSandbox() {
+  const batchByTab = new Map();
+  function batchSetForTabId(tabId) {
+    if (!batchByTab.has(tabId)) batchByTab.set(tabId, new Set());
+    return batchByTab.get(tabId);
+  }
   const sandbox = {
     console,
     performance: { now: () => 0 },
@@ -20,7 +25,7 @@ function loadAudioSandbox() {
       setItem: () => {},
       removeItem: () => {},
     },
-    batchSelected: new Set(),
+    batchSetForTabId,
     showToast: () => {},
     toastFmt: (k) => k,
     appFmt: (k) => k,
