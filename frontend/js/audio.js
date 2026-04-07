@@ -950,17 +950,9 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
 
   if (!resume) {
     _audioScanDbView = false;
-    allAudioSamples = [];
-    filteredAudioSamples = [];
-    expandedMetaPath = null;
-    resetAudioStats();
-    document.getElementById('audioStats').style.display = 'none';
-    {
-      const h2 = typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.scanning_title')) : _audioFmt('ui.audio.scanning_title');
-      const sub = typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.scanning_sub')) : _audioFmt('ui.audio.scanning_sub');
-      tableWrap.innerHTML = `<div class="state-message"><div class="spinner"></div><h2>${h2}</h2><p>${sub}</p></div>`;
-    }
   }
+  /** Until the first streamed batch, keep the previous table and buffers so starting a scan does not blank the UI. */
+  let pendingScanClear = !resume;
 
   let firstAudioBatch = true;
   let pendingSamples = [];
@@ -971,6 +963,15 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
 
   function flushPendingSamples() {
+    if (pendingScanClear && pendingSamples.length > 0) {
+      pendingScanClear = false;
+      allAudioSamples = [];
+      filteredAudioSamples = [];
+      expandedMetaPath = null;
+      resetAudioStats();
+      const statsEl = document.getElementById('audioStats');
+      if (statsEl) statsEl.style.display = 'none';
+    }
     if (pendingSamples.length === 0) return;
 
     if (firstAudioBatch) {
@@ -1047,6 +1048,13 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
       : await window.vstUpdater.scanAudioSamples(audioRoots.length ? audioRoots : undefined, excludePaths);
     if (audioScanProgressCleanup) { audioScanProgressCleanup(); audioScanProgressCleanup = null; }
     flushPendingSamples();
+    if (pendingScanClear) {
+      pendingScanClear = false;
+      allAudioSamples = [];
+      filteredAudioSamples = [];
+      expandedMetaPath = null;
+      resetAudioStats();
+    }
     // Save scan results to SQLite (backend already streamed-saved when result.streamed)
     if (!result.streamed) {
       try { await window.vstUpdater.saveAudioScan(result.samples || [], result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_audio_history', { err: e.message || e }), 4000, 'error'); }
@@ -1072,6 +1080,13 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
     if (audioScanProgressCleanup) { audioScanProgressCleanup(); audioScanProgressCleanup = null; }
     _audioScanDbView = false;
     flushPendingSamples();
+    if (pendingScanClear) {
+      pendingScanClear = false;
+      allAudioSamples = [];
+      filteredAudioSamples = [];
+      expandedMetaPath = null;
+      resetAudioStats();
+    }
     const errMsg = err.message || err || catalogFmt('toast.unknown_error');
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>${typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.scan_error_title')) : _audioFmt('ui.audio.scan_error_title')}</h2><p>${typeof escapeHtml === 'function' ? escapeHtml(errMsg) : errMsg}</p></div>`;
     showToast(toastFmt('toast.audio_scan_failed', { errMsg }), 4000, 'error');
@@ -1268,6 +1283,8 @@ registerFilter('filterAudioSamples', {
   inputId: 'audioSearchInput',
   regexToggleId: 'regexAudio',
   formatDropdownId: 'audioFormatFilter',
+  // Slightly longer than default 250ms: at 3+ chars the backend uses FTS5 MATCH (heavier than LIKE).
+  debounceMs: 400,
   resetOffset() { audioCurrentOffset = 0; },
   fetchFn() {
     _lastAudioSearch = this.lastSearch || '';

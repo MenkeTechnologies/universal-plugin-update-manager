@@ -381,14 +381,8 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
 
   if (!resume) {
     _dawScanDbView = false;
-    allDawProjects = [];
-    filteredDawProjects = [];
-    resetDawStats();
   }
-  if (!resume) {
-    document.getElementById('dawStats').style.display = 'none';
-    tableWrap.innerHTML = '<div class="state-message"><div class="spinner"></div><h2>Scanning for DAW projects...</h2><p>Walking filesystem directories parallelized...</p></div>';
-  }
+  let pendingDawClear = !resume;
 
   let firstDawBatch = true;
   let pendingProjects = [];
@@ -398,6 +392,14 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
 
   function flushPendingProjects() {
+    if (pendingDawClear && pendingProjects.length > 0) {
+      pendingDawClear = false;
+      allDawProjects = [];
+      filteredDawProjects = [];
+      resetDawStats();
+      const dawStatsEl = document.getElementById('dawStats');
+      if (dawStatsEl) dawStatsEl.style.display = 'none';
+    }
     if (pendingProjects.length === 0) return;
 
     if (firstDawBatch) {
@@ -470,6 +472,12 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     if (dawScanProgressCleanup) { dawScanProgressCleanup(); dawScanProgressCleanup = null; }
     _dawScanDbView = false;
     flushPendingProjects();
+    if (pendingDawClear) {
+      pendingDawClear = false;
+      allDawProjects = [];
+      filteredDawProjects = [];
+      resetDawStats();
+    }
     if (result.streamed) {
       // Backend streamed results live — allDawProjects was built from progress events.
     } else if (resume) {
@@ -502,6 +510,12 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     if (dawScanProgressCleanup) { dawScanProgressCleanup(); dawScanProgressCleanup = null; }
     _dawScanDbView = false;
     flushPendingProjects();
+    if (pendingDawClear) {
+      pendingDawClear = false;
+      allDawProjects = [];
+      filteredDawProjects = [];
+      resetDawStats();
+    }
     const errMsg = err.message || err || 'Unknown error';
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;
     showToast(toastFmt('toast.daw_scan_failed', { errMsg }), 4000, 'error');

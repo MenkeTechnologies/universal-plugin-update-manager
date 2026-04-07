@@ -195,9 +195,9 @@ async function scanPlugins(resume = false, overrideRoots = null) {
 
   if (!resume) {
     _pluginScanDbView = false;
-    list.innerHTML = `<div class="state-message"><div class="spinner"></div><h2>${_ui('ui.js.scanning_for_plugins')}</h2><p>${_ui('ui.js.discovering_plugin_files')}</p></div>`;
-    allPlugins = [];
   }
+  /** First `scanning` chunk clears the list — keep previous plugins visible until data streams. */
+  let firstScanningChunk = true;
 
   const eta = createETA();
   try {
@@ -206,10 +206,16 @@ async function scanPlugins(resume = false, overrideRoots = null) {
     scanProgressCleanup = await window.vstUpdater.onScanProgress((data) => {
       if (data.phase === 'start') {
         _pluginScanDbView = false;
-        list.innerHTML = '';
         btn.innerHTML = `&#8635; 0 / ${data.total}`;
         eta.start();
       } else if (data.phase === 'scanning') {
+        if (firstScanningChunk) {
+          firstScanningChunk = false;
+          if (!resume) {
+            allPlugins = [];
+            list.innerHTML = '';
+          }
+        }
         // Append new plugins to the list incrementally
         allPlugins.push(...data.plugins);
         const total = data.total || 0;

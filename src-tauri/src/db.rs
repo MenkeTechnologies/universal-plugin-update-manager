@@ -12,6 +12,7 @@ use crate::scanner::PluginInfo;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 static GLOBAL_DB: OnceLock<Database> = OnceLock::new();
@@ -55,9 +56,13 @@ pub fn global() -> &'static Database {
 /// One row for [`Database::batch_update_analysis`]: path, BPM, musical key, LUFS.
 pub type AnalysisBatchRow = (String, Option<f64>, Option<String>, Option<f64>);
 
-/// Wraps a SQLite connection with WAL mode for concurrent reads.
+/// SQLite with WAL: multiple connections can serve read-heavy queries concurrently.
+/// `write` holds the primary handle (migrations run here when the read pool is still empty).
+/// `read` adds extra file handles; [`Database::read_conn`] round-robins across `write` + `read`.
 pub struct Database {
-    conn: Mutex<Connection>,
+    write: Mutex<Connection>,
+    read: Vec<Mutex<Connection>>,
+    read_idx: AtomicUsize,
 }
 
 /// Parameters for paginated audio sample queries.
@@ -511,6 +516,42 @@ pub struct UnifiedScanRunRow {
 const SCHEMA_VERSION: i64 = 4;
 
 impl Database {
+    /// Extra SQLite file handles beyond the primary (total = 1 + this) for parallel read load.
+    fn read_pool_extra() -> usize {
+        num_cpus::get().min(8).max(2)
+    }
+
+    fn open_file_connection(db_path: &std::path::Path) -> Result<Connection, String> {
+        let conn =
+            Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
+        conn.busy_timeout(std::time::Duration::from_secs(30))
+            .map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             PRAGMA cache_size=-262144;
+             PRAGMA mmap_size=536870912;
+             PRAGMA foreign_keys=ON;
+             PRAGMA temp_store=MEMORY;
+             PRAGMA wal_autocheckpoint=1000;",
+        )
+        .map_err(|e| format!("Failed to set pragmas: {e}"))?;
+        Ok(conn)
+    }
+
+    /// Round-robin across primary + pool so concurrent IPC (startup tab queries, stats) parallelizes.
+    #[inline]
+    fn read_conn(&self) -> std::sync::MutexGuard<'_, Connection> {
+        let total = 1 + self.read.len();
+        let i = self.read_idx.fetch_add(1, Ordering::Relaxed) % total;
+        if i == 0 {
+            return self.write.lock().unwrap_or_else(|e| e.into_inner());
+        }
+        self.read[i - 1]
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
     /// `_al_refresh_paths` lists paths touched by removing `audio_samples` for a scan; those rows
     /// must already be deleted. Reconciles `audio_library` with remaining `audio_samples` rows.
     fn sync_audio_library_after_paths_refresh(conn: &Connection) -> Result<(), String> {
@@ -534,34 +575,19 @@ impl Database {
     pub fn open() -> Result<Self, String> {
         let db_path = history::get_data_dir().join("audio_haxor.db");
         let _ = std::fs::create_dir_all(db_path.parent().unwrap());
-        let conn =
-            Connection::open(&db_path).map_err(|e| format!("Failed to open database: {e}"))?;
-        // Parallel `cargo test` processes can open the same path; without a busy timeout,
-        // migrations hit `database is locked` immediately.
-        conn.busy_timeout(std::time::Duration::from_secs(30))
-            .map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
-
-        // Performance pragmas
-        //   cache_size=-262144  — 256 MB page cache (negative = KB). Keeps hot
-        //                         indexes resident at millions-of-rows scale.
-        //   mmap_size=536870912 — 512 MB memory-mapped reads. SQLite reads pages
-        //                         directly from the OS page cache without a read()
-        //                         syscall — big win for browse-heavy workloads.
-        conn.execute_batch(
-            "PRAGMA journal_mode=WAL;
-             PRAGMA synchronous=NORMAL;
-             PRAGMA cache_size=-262144;
-             PRAGMA mmap_size=536870912;
-             PRAGMA foreign_keys=ON;
-             PRAGMA temp_store=MEMORY;
-             PRAGMA wal_autocheckpoint=1000;",
-        )
-        .map_err(|e| format!("Failed to set pragmas: {e}"))?;
-
-        let db = Self {
-            conn: Mutex::new(conn),
+        // Parallel `cargo test` processes can open the same path; busy_timeout avoids
+        // immediate `database is locked` during migrations.
+        let write = Self::open_file_connection(&db_path)?;
+        let mut db = Self {
+            write: Mutex::new(write),
+            read: Vec::new(),
+            read_idx: AtomicUsize::new(0),
         };
         db.migrate()?;
+        for _ in 0..Self::read_pool_extra() {
+            db.read
+                .push(Mutex::new(Self::open_file_connection(&db_path)?));
+        }
         Ok(db)
     }
 
@@ -570,7 +596,7 @@ impl Database {
     /// must NOT run on the main thread (blocks for seconds on large DBs).
     pub fn housekeep(&self) {
         {
-            let conn = self.conn.lock().unwrap();
+            let conn = self.read_conn();
             let _ = conn.execute_batch("PRAGMA optimize;");
         }
         self.prune_old_scans(3);
@@ -581,7 +607,7 @@ impl Database {
     /// Prune old scans — keep only the N most recent **complete** scans per type. Incomplete
     /// (user-stopped) runs are retained until superseded or cleared so library rows stay addressable.
     pub fn prune_old_scans(&self, keep: usize) {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let keep_i = keep as i64;
         for (scan_tbl, data_tbl, id_col) in [
             ("audio_scans", "audio_samples", "scan_id"),
@@ -606,7 +632,7 @@ impl Database {
 
     /// Mark whether a streaming scan finished normally (`complete`) or was user-stopped (partial).
     pub fn set_audio_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE audio_scans SET scan_complete = ?2 WHERE id = ?1",
             params![id, if complete { 1 } else { 0 }],
@@ -616,7 +642,7 @@ impl Database {
     }
 
     pub fn set_plugin_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE plugin_scans SET scan_complete = ?2 WHERE id = ?1",
             params![id, if complete { 1 } else { 0 }],
@@ -626,7 +652,7 @@ impl Database {
     }
 
     pub fn set_daw_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE daw_scans SET scan_complete = ?2 WHERE id = ?1",
             params![id, if complete { 1 } else { 0 }],
@@ -636,7 +662,7 @@ impl Database {
     }
 
     pub fn set_preset_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE preset_scans SET scan_complete = ?2 WHERE id = ?1",
             params![id, if complete { 1 } else { 0 }],
@@ -646,7 +672,7 @@ impl Database {
     }
 
     pub fn set_midi_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE midi_scans SET scan_complete = ?2 WHERE id = ?1",
             params![id, if complete { 1 } else { 0 }],
@@ -656,7 +682,7 @@ impl Database {
     }
 
     pub fn set_pdf_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE pdf_scans SET scan_complete = ?2 WHERE id = ?1",
             params![id, if complete { 1 } else { 0 }],
@@ -669,7 +695,7 @@ impl Database {
     /// Warm the page cache by touching each table + FTS index root. First real
     /// query returns ~1 ms instead of the 50-200 ms cold-cache penalty.
     pub fn prewarm(&self) {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let _ = conn.execute_batch(
             "SELECT COUNT(*) FROM audio_samples WHERE id=1;
              SELECT COUNT(*) FROM daw_projects WHERE id=1;
@@ -686,13 +712,13 @@ impl Database {
     }
 
     pub fn checkpoint(&self) {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
     }
 
     /// Resolved app UI strings for the given locale (merged with English fallback).
     pub fn get_app_strings(&self, locale: &str) -> Result<HashMap<String, String>, String> {
-        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let conn = self.read_conn();
         crate::app_i18n::load_merged(&conn, locale)
     }
 
@@ -703,7 +729,7 @@ impl Database {
 
     /// VACUUM if >20% of pages are free (dead space from deleted rows).
     pub fn vacuum_if_needed(&self) {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let page_size: u64 = conn
             .query_row("PRAGMA page_size", [], |r| r.get::<_, i64>(0))
             .unwrap_or(4096) as u64;
@@ -728,7 +754,7 @@ impl Database {
                 crate::format_size(before),
             ));
             drop(conn);
-            let conn = self.conn.lock().unwrap();
+            let conn = self.read_conn();
             let _ = conn.execute_batch("VACUUM;");
             let after: u64 = conn
                 .query_row("PRAGMA page_count", [], |r| r.get::<_, i64>(0))
@@ -743,7 +769,7 @@ impl Database {
 
     /// Run schema migrations.
     fn migrate(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
 
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS schema_version (
@@ -1216,7 +1242,7 @@ impl Database {
         timestamp: &str,
         roots: &[String],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
             "INSERT OR REPLACE INTO audio_scans (id, timestamp, sample_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
@@ -1250,7 +1276,7 @@ impl Database {
         _total_bytes: u64,
         _format_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let sample_count: i64 = conn
             .query_row(
                 "SELECT COUNT(DISTINCT path) FROM audio_samples",
@@ -1289,7 +1315,7 @@ impl Database {
     }
 
     pub fn insert_audio_batch(&self, scan_id: &str, samples: &[AudioSample]) -> Result<u64, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted: u64 = 0;
         let mut batch_bytes: u64 = 0;
@@ -1373,7 +1399,7 @@ impl Database {
         format_counts: &HashMap<String, usize>,
         roots: &[String],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let fc_json = serde_json::to_string(format_counts).unwrap_or_default();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
@@ -1395,7 +1421,7 @@ impl Database {
 
     /// Get the most recent scan ID.
     pub fn latest_scan_id(&self) -> Result<Option<String>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.query_row(
             "SELECT id FROM audio_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
             [],
@@ -1407,7 +1433,7 @@ impl Database {
 
     /// List all scans (metadata only).
     pub fn list_scans(&self) -> Result<Vec<ScanInfo>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn
             .prepare(
                 "SELECT id, timestamp, sample_count, total_bytes, format_counts, roots
@@ -1438,7 +1464,7 @@ impl Database {
     /// `scan_id` **None** or empty → **library** mode: all rows across scans, deduped by `path`
     /// (`MAX(id)` per path).
     pub fn query_audio(&self, params: &AudioQueryParams) -> Result<AudioQueryResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
 
         let single_scan = params
             .scan_id
@@ -1478,8 +1504,10 @@ impl Database {
                 ));
                 bind_idx += 2;
             } else {
+                // Library scope is already `AUDIO_LIBRARY_IDS` above; do not nest a second
+                // `sample_id IN audio_library` inside the FTS subquery (same semantics, worse plan).
                 conditions.push(format!(
-                    "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND rowid IN (SELECT sample_id FROM audio_library))",
+                    "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx})",
                     bind_idx = bind_idx,
                 ));
                 bind_idx += 1;
@@ -1672,7 +1700,7 @@ impl Database {
 
     /// Get aggregate stats. `scan_id` None or empty → full library (deduped by path). Otherwise that scan only.
     pub fn audio_stats(&self, scan_id: Option<&str>) -> Result<AudioStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
 
         let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
         if library {
@@ -1778,7 +1806,7 @@ impl Database {
 
     /// DAW aggregate stats. `scan_id` None or empty → full library (deduped by path).
     pub fn daw_stats(&self, scan_id: Option<&str>) -> Result<DawStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
         if library {
             let project_count: u64 = conn
@@ -1859,7 +1887,7 @@ impl Database {
 
     /// Preset aggregate stats. `scan_id` None or empty → full library (deduped by path). MIDI excluded.
     pub fn preset_stats(&self, scan_id: Option<&str>) -> Result<PresetStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
         if library {
             let preset_count: u64 = conn
@@ -1943,7 +1971,7 @@ impl Database {
     /// Update BPM for a sample (all rows for that path).
     pub fn update_bpm(&self, path: &str, bpm: Option<f64>) -> Result<(), String> {
         let path = normalize_path_for_db(path);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE audio_samples SET bpm = ?1 WHERE path = ?2",
             params![bpm, path],
@@ -1955,7 +1983,7 @@ impl Database {
     /// Update musical key for a sample.
     pub fn update_key(&self, path: &str, key: Option<&str>) -> Result<(), String> {
         let path = normalize_path_for_db(path);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE audio_samples SET key_name = ?1 WHERE path = ?2",
             params![key, path],
@@ -1974,7 +2002,7 @@ impl Database {
         bits_per_sample: Option<u16>,
     ) -> Result<(), String> {
         let path = normalize_path_for_db(path);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE audio_samples SET duration = ?1, channels = ?2, sample_rate = ?3, bits_per_sample = ?4
              WHERE path = ?5",
@@ -1992,7 +2020,7 @@ impl Database {
 
     /// Get paths that are missing duration metadata (among the given paths).
     pub fn paths_missing_audio_meta(&self, paths: &[String]) -> Result<Vec<String>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         if paths.is_empty() {
             return Ok(Vec::new());
         }
@@ -2020,7 +2048,7 @@ impl Database {
     /// Update LUFS for a sample (all rows for that path).
     pub fn update_lufs(&self, path: &str, lufs: Option<f64>) -> Result<(), String> {
         let path = normalize_path_for_db(path);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE audio_samples SET lufs = ?1 WHERE path = ?2",
             params![lufs, path],
@@ -2032,7 +2060,7 @@ impl Database {
     /// Get analysis data for a single sample.
     pub fn get_analysis(&self, path: &str) -> Result<serde_json::Value, String> {
         let path = normalize_path_for_db(path);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let result = conn
             .query_row(
                 &format!(
@@ -2059,7 +2087,7 @@ impl Database {
 
     /// Get paths of samples that haven't been analyzed yet (bpm IS NULL on library row).
     pub fn unanalyzed_paths(&self, limit: u64) -> Result<Vec<String>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn
             .prepare(&format!(
                 "SELECT path FROM audio_samples
@@ -2076,7 +2104,7 @@ impl Database {
 
     /// All canonical `path` values in the audio library (one row per path via `audio_library`).
     pub fn audio_library_paths(&self) -> Result<Vec<String>, String> {
-        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let conn = self.read_conn();
         let mut stmt = conn
             .prepare("SELECT path FROM audio_library ORDER BY path")
             .map_err(|e| e.to_string())?;
@@ -2089,7 +2117,7 @@ impl Database {
 
     /// Delete a scan and its samples.
     pub fn delete_scan(&self, scan_id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute("CREATE TEMP TABLE _al_refresh_paths (path TEXT PRIMARY KEY)", [])
             .map_err(|e| e.to_string())?;
         conn.execute(
@@ -2126,7 +2154,7 @@ impl Database {
         offset: u64,
         limit: u64,
     ) -> Result<PluginQueryResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM plugins WHERE id IN (SELECT MAX(id) FROM plugins GROUP BY path)",
@@ -2314,7 +2342,7 @@ impl Database {
         offset: u64,
         limit: u64,
     ) -> Result<DawQueryResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
@@ -2447,7 +2475,7 @@ impl Database {
         offset: u64,
         limit: u64,
     ) -> Result<PresetQueryResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI')",
@@ -2572,7 +2600,7 @@ impl Database {
     }
 
     pub fn save_plugin_scan(&self, snap: &ScanSnapshot) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let dirs_json = path_strings_json_normalized(&snap.directories);
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
@@ -2616,7 +2644,7 @@ impl Database {
         timestamp: &str,
         roots: &[String],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let dirs_json = "[]".to_string();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
@@ -2631,7 +2659,7 @@ impl Database {
 
     /// Append plugins for a streaming scan; updates `plugin_scans.plugin_count` incrementally.
     pub fn insert_plugin_batch(&self, scan_id: &str, batch: &[PluginInfo]) -> Result<u64, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted: u64 = 0;
         {
@@ -2682,7 +2710,7 @@ impl Database {
         directories: &[String],
         roots: &[String],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let plugin_count: i64 = conn
             .query_row(
                 "SELECT COUNT(DISTINCT path) FROM plugins",
@@ -2701,7 +2729,7 @@ impl Database {
     }
 
     pub fn get_plugin_scans(&self) -> Result<Vec<serde_json::Value>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn.prepare(
             "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.plugin_count,0),(SELECT COUNT(*) FROM plugins WHERE scan_id = s.id)), s.roots FROM plugin_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
@@ -2722,7 +2750,7 @@ impl Database {
     }
 
     pub fn get_plugin_scan_detail(&self, id: &str) -> Result<ScanSnapshot, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let (ts, pc, dirs_json, roots_json): (String, usize, String, String) = conn.query_row(
             "SELECT timestamp, plugin_count, directories, roots FROM plugin_scans WHERE id = ?1",
             params![id],
@@ -2767,7 +2795,7 @@ impl Database {
     }
 
     pub fn get_latest_plugin_scan(&self) -> Result<Option<ScanSnapshot>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let id: Option<String> = conn
             .query_row(
                 "SELECT id FROM plugin_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
@@ -2784,7 +2812,7 @@ impl Database {
     }
 
     pub fn delete_plugin_scan(&self, id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute("DELETE FROM plugins WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM plugin_scans WHERE id = ?1", params![id])
@@ -2793,7 +2821,7 @@ impl Database {
     }
 
     pub fn clear_plugin_history(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute_batch("DELETE FROM plugins; DELETE FROM plugin_scans;")
             .map_err(|e| e.to_string())
     }
@@ -2821,7 +2849,7 @@ impl Database {
     }
 
     pub fn get_audio_scans_list(&self) -> Result<Vec<serde_json::Value>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn.prepare(
             "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.sample_count,0),(SELECT COUNT(*) FROM audio_samples WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM audio_samples WHERE scan_id = s.id)), s.format_counts, s.roots FROM audio_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
@@ -2843,7 +2871,7 @@ impl Database {
     }
 
     pub fn get_audio_scan_detail(&self, id: &str) -> Result<AudioScanSnapshot, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let (ts, sc, tb, fc_str, roots_str): (String, usize, u64, String, String) = conn.query_row(
             "SELECT timestamp, sample_count, total_bytes, format_counts, roots FROM audio_scans WHERE id = ?1",
             params![id],
@@ -2907,7 +2935,7 @@ impl Database {
     }
 
     pub fn get_latest_audio_scan(&self) -> Result<Option<AudioScanSnapshot>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let id: Option<String> = conn
             .query_row(
                 "SELECT id FROM audio_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
@@ -2928,7 +2956,7 @@ impl Database {
     }
 
     pub fn clear_audio_history(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute_batch(
             "DELETE FROM audio_library;
              DELETE FROM audio_samples_fts;
@@ -2948,7 +2976,7 @@ impl Database {
         timestamp: &str,
         roots: &[String],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
             "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
@@ -2969,7 +2997,7 @@ impl Database {
         _total_bytes: u64,
         _daw_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let project_count: i64 = conn
             .query_row(
                 "SELECT COUNT(DISTINCT path) FROM daw_projects",
@@ -3013,7 +3041,7 @@ impl Database {
         scan_id: &str,
         projects: &[DawProject],
     ) -> Result<Vec<usize>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted_idx: Vec<usize> = Vec::new();
         let mut batch_bytes: u64 = 0;
@@ -3055,7 +3083,7 @@ impl Database {
     }
 
     pub fn save_daw_scan(&self, snap: &DawScanSnapshot) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let daw_json = serde_json::to_string(&snap.daw_counts).unwrap_or_default();
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
@@ -3101,7 +3129,7 @@ impl Database {
     }
 
     pub fn get_daw_scans(&self) -> Result<Vec<serde_json::Value>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         // Count from child rows so the History tab stays correct even if parent totals
         // were never finalized (streaming scans) or finalize failed silently.
         let mut stmt = conn.prepare(
@@ -3125,7 +3153,7 @@ impl Database {
     }
 
     pub fn get_daw_scan_detail(&self, id: &str) -> Result<DawScanSnapshot, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let (ts, pc, tb, dc_str, roots_str): (String, usize, u64, String, String) = conn.query_row(
             "SELECT timestamp, project_count, total_bytes, daw_counts, roots FROM daw_scans WHERE id = ?1",
             params![id],
@@ -3171,7 +3199,7 @@ impl Database {
     }
 
     pub fn get_latest_daw_scan(&self) -> Result<Option<DawScanSnapshot>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let id: Option<String> = conn
             .query_row(LATEST_DAW_SCAN_ID_SQL, [], |r| r.get::<_, String>(0))
             .optional()
@@ -3184,7 +3212,7 @@ impl Database {
     }
 
     pub fn delete_daw_scan(&self, id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute("DELETE FROM daw_projects WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM daw_scans WHERE id = ?1", params![id])
@@ -3193,7 +3221,7 @@ impl Database {
     }
 
     pub fn clear_daw_history(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute_batch("DELETE FROM daw_projects; DELETE FROM daw_scans;")
             .map_err(|e| e.to_string())
     }
@@ -3206,7 +3234,7 @@ impl Database {
         timestamp: &str,
         roots: &[String],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
             "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
@@ -3226,7 +3254,7 @@ impl Database {
         _total_bytes: u64,
         _format_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let preset_count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI')",
@@ -3269,7 +3297,7 @@ impl Database {
         scan_id: &str,
         presets: &[PresetFile],
     ) -> Result<u64, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted: u64 = 0;
         let mut batch_bytes: u64 = 0;
@@ -3309,7 +3337,7 @@ impl Database {
     }
 
     pub fn save_preset_scan(&self, snap: &PresetScanSnapshot) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
@@ -3348,7 +3376,7 @@ impl Database {
     }
 
     pub fn get_preset_scans(&self) -> Result<Vec<serde_json::Value>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn.prepare(
             "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.preset_count,0),(SELECT COUNT(*) FROM presets WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM presets WHERE scan_id = s.id)), s.format_counts, s.roots FROM preset_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
@@ -3370,7 +3398,7 @@ impl Database {
     }
 
     pub fn get_preset_scan_detail(&self, id: &str) -> Result<PresetScanSnapshot, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let (ts, pc, tb, fc_str, roots_str): (String, usize, u64, String, String) = conn.query_row(
             "SELECT timestamp, preset_count, total_bytes, format_counts, roots FROM preset_scans WHERE id = ?1",
             params![id],
@@ -3415,7 +3443,7 @@ impl Database {
     }
 
     pub fn get_latest_preset_scan(&self) -> Result<Option<PresetScanSnapshot>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let id: Option<String> = conn
             .query_row(
                 "SELECT id FROM preset_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
@@ -3432,7 +3460,7 @@ impl Database {
     }
 
     pub fn delete_preset_scan(&self, id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute("DELETE FROM presets WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM preset_scans WHERE id = ?1", params![id])
@@ -3441,7 +3469,7 @@ impl Database {
     }
 
     pub fn clear_preset_history(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute_batch("DELETE FROM presets; DELETE FROM preset_scans;")
             .map_err(|e| e.to_string())
     }
@@ -3454,7 +3482,7 @@ impl Database {
         timestamp: &str,
         roots: &[String],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
             "INSERT OR REPLACE INTO midi_scans (id, timestamp, midi_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
@@ -3474,7 +3502,7 @@ impl Database {
         _total_bytes: u64,
         _format_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let midi_count: i64 = conn
             .query_row(
                 "SELECT COUNT(DISTINCT path) FROM midi_files",
@@ -3517,7 +3545,7 @@ impl Database {
         scan_id: &str,
         midi_files: &[MidiFile],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted: u64 = 0;
         let mut batch_bytes: u64 = 0;
@@ -3556,7 +3584,7 @@ impl Database {
     }
 
     pub fn save_midi_scan(&self, snap: &MidiScanSnapshot) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
@@ -3601,7 +3629,7 @@ impl Database {
     }
 
     pub fn get_midi_scans(&self) -> Result<Vec<serde_json::Value>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn.prepare(
             "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.midi_count,0),(SELECT COUNT(*) FROM midi_files WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM midi_files WHERE scan_id = s.id)), s.format_counts, s.roots FROM midi_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
@@ -3623,7 +3651,7 @@ impl Database {
     }
 
     pub fn get_midi_scan_detail(&self, id: &str) -> Result<MidiScanSnapshot, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let (ts, mc, tb, fc_str, roots_str): (String, usize, u64, String, String) = conn.query_row(
             "SELECT timestamp, midi_count, total_bytes, format_counts, roots FROM midi_scans WHERE id = ?1",
             params![id],
@@ -3668,7 +3696,7 @@ impl Database {
     }
 
     pub fn get_latest_midi_scan(&self) -> Result<Option<MidiScanSnapshot>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let id: Option<String> = conn
             .query_row(
                 "SELECT id FROM midi_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
@@ -3685,7 +3713,7 @@ impl Database {
     }
 
     pub fn delete_midi_scan(&self, id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute("DELETE FROM midi_files WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM midi_scans WHERE id = ?1", params![id])
@@ -3694,7 +3722,7 @@ impl Database {
     }
 
     pub fn clear_midi_history(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute_batch("DELETE FROM midi_files; DELETE FROM midi_scans;")
             .map_err(|e| e.to_string())
     }
@@ -3708,7 +3736,7 @@ impl Database {
         offset: u64,
         limit: u64,
     ) -> Result<MidiQueryResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path)",
@@ -3839,7 +3867,7 @@ impl Database {
         search: Option<&str>,
         format_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path)",
@@ -3919,7 +3947,7 @@ impl Database {
         timestamp: &str,
         roots: &[String],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
             "INSERT OR REPLACE INTO pdf_scans (id, timestamp, pdf_count, total_bytes, roots, scan_complete) VALUES (?1,?2,0,0,?3,0)",
@@ -3938,7 +3966,7 @@ impl Database {
         _pdf_count: usize,
         _total_bytes: u64,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let pdf_count: i64 = conn
             .query_row(
                 "SELECT COUNT(DISTINCT path) FROM pdfs",
@@ -3962,7 +3990,7 @@ impl Database {
     }
 
     pub fn insert_pdf_batch(&self, scan_id: &str, pdfs: &[PdfFile]) -> Result<u64, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut inserted: u64 = 0;
         let mut batch_bytes: u64 = 0;
@@ -4007,7 +4035,7 @@ impl Database {
         &self,
         domain: &str,
     ) -> Result<HashMap<String, i64>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn
             .prepare("SELECT path, mtime_secs FROM directory_scan_state WHERE domain = ?1")
             .map_err(|e| e.to_string())?;
@@ -4033,7 +4061,7 @@ impl Database {
         if rows.is_empty() {
             return Ok(());
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
             let mut stmt = tx
@@ -4053,7 +4081,7 @@ impl Database {
 
     /// Remove all incremental directory rows for a domain (e.g. `"unified"`).
     pub fn delete_directory_scan_state_domain(&self, domain: &str) -> Result<u64, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let n = conn
             .execute(
                 "DELETE FROM directory_scan_state WHERE domain = ?1",
@@ -4066,7 +4094,7 @@ impl Database {
     /// True when the last persisted unified scan finished successfully; incremental mtime
     /// snapshots are only trusted in that case.
     pub fn unified_scan_incremental_snapshot_is_trusted(&self) -> Result<bool, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let outcome: String = conn
             .query_row(
                 "SELECT outcome FROM unified_scan_run WHERE id = 1",
@@ -4087,7 +4115,7 @@ impl Database {
         pdf_scan_id: &str,
         roots_json: &str,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "INSERT INTO unified_scan_run (id, run_id, started_at, finished_at, outcome, audio_scan_id, daw_scan_id, preset_scan_id, pdf_scan_id, roots_json, last_directory_path, error_message)
              VALUES (1, ?1, ?2, NULL, 'in_progress', ?3, ?4, ?5, ?6, ?7, NULL, NULL)
@@ -4126,7 +4154,7 @@ impl Database {
         error_message: Option<&str>,
         last_directory_path: Option<&str>,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute(
             "UPDATE unified_scan_run SET finished_at = ?1, outcome = ?2, error_message = ?3, last_directory_path = ?4 WHERE id = 1",
             params![
@@ -4147,7 +4175,7 @@ impl Database {
     }
 
     pub fn get_unified_scan_run(&self) -> Result<UnifiedScanRunRow, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.query_row(
             "SELECT run_id, started_at, finished_at, outcome, audio_scan_id, daw_scan_id, preset_scan_id, pdf_scan_id, roots_json, last_directory_path, error_message FROM unified_scan_run WHERE id = 1",
             [],
@@ -4171,7 +4199,7 @@ impl Database {
     }
 
     pub fn save_pdf_scan(&self, snap: &PdfScanSnapshot) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
             "INSERT OR REPLACE INTO pdf_scans (id, timestamp, pdf_count, total_bytes, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,1)",
@@ -4208,7 +4236,7 @@ impl Database {
     }
 
     pub fn get_pdf_scans(&self) -> Result<Vec<serde_json::Value>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn.prepare(
             "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.pdf_count,0),(SELECT COUNT(*) FROM pdfs WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = s.id)), s.roots FROM pdf_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
@@ -4230,7 +4258,7 @@ impl Database {
     }
 
     pub fn get_pdf_scan_detail(&self, id: &str) -> Result<PdfScanSnapshot, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let (ts, pc, tb, roots_str): (String, usize, u64, String) = conn
             .query_row(
                 "SELECT timestamp, pdf_count, total_bytes, roots FROM pdf_scans WHERE id = ?1",
@@ -4275,7 +4303,7 @@ impl Database {
     }
 
     pub fn get_latest_pdf_scan(&self) -> Result<Option<PdfScanSnapshot>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let id: Option<String> = conn
             .query_row(
                 "SELECT id FROM pdf_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
@@ -4292,7 +4320,7 @@ impl Database {
     }
 
     pub fn delete_pdf_scan(&self, id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute("DELETE FROM pdfs WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM pdf_scans WHERE id = ?1", params![id])
@@ -4301,7 +4329,7 @@ impl Database {
     }
 
     pub fn clear_pdf_history(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute_batch("DELETE FROM pdfs; DELETE FROM pdf_scans;")
             .map_err(|e| e.to_string())
     }
@@ -4310,7 +4338,7 @@ impl Database {
 
     /// Return paths from the latest PDF scan that don't yet have metadata cached.
     pub fn unindexed_pdf_paths(&self, limit: u64) -> Result<Vec<String>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let scan_id: String = conn
             .query_row(
                 "SELECT id FROM pdf_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
@@ -4346,7 +4374,7 @@ impl Database {
         if batch.is_empty() {
             return Ok(());
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let now = chrono::Utc::now()
             .format("%Y-%m-%dT%H:%M:%S%.3fZ")
             .to_string();
@@ -4373,7 +4401,7 @@ impl Database {
         if paths.is_empty() {
             return Ok(std::collections::HashMap::new());
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut out = std::collections::HashMap::new();
         // SQLite IN clause with ~999 param limit — chunk to be safe.
         for chunk in paths.chunks(500) {
@@ -4402,7 +4430,7 @@ impl Database {
     }
 
     pub fn clear_pdf_metadata(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute_batch("DELETE FROM pdf_metadata;")
             .map_err(|e| e.to_string())
     }
@@ -4416,7 +4444,7 @@ impl Database {
         offset: u64,
         limit: u64,
     ) -> Result<PdfQueryResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
@@ -4509,7 +4537,7 @@ impl Database {
 
     /// PDF aggregate stats. `scan_id` None or empty → full library (deduped by path).
     pub fn pdf_stats(&self, scan_id: Option<&str>) -> Result<PdfStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
         if library {
             let pdf_count: u64 = conn
@@ -4595,7 +4623,7 @@ impl Database {
         search: Option<&str>,
         format_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM audio_library",
@@ -4609,7 +4637,7 @@ impl Database {
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND rowid IN (SELECT sample_id FROM audio_library))",
+                "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx})",
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -4670,7 +4698,7 @@ impl Database {
         search: Option<&str>,
         daw_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
@@ -4745,7 +4773,7 @@ impl Database {
         search: Option<&str>,
         format_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID','MIDI')",
@@ -4823,7 +4851,7 @@ impl Database {
         search: Option<&str>,
         type_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM plugins WHERE id IN (SELECT MAX(id) FROM plugins GROUP BY path)",
@@ -4885,7 +4913,7 @@ impl Database {
     }
 
     pub fn pdf_filter_stats(&self, search: Option<&str>) -> Result<FilterStatsResult, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
@@ -4929,7 +4957,7 @@ impl Database {
     // ── KVR cache ──
 
     pub fn load_kvr_cache(&self) -> Result<HashMap<String, KvrCacheEntry>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut stmt = conn.prepare("SELECT plugin_key, kvr_url, update_url, latest_version, has_update, source, timestamp FROM kvr_cache").map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map([], |row| {
@@ -4957,7 +4985,7 @@ impl Database {
         &self,
         entries: &[crate::history::KvrCacheUpdateEntry],
     ) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
             let mut stmt = tx.prepare_cached(
@@ -4999,7 +5027,7 @@ impl Database {
     }
 
     fn read_analysis_as_cache(&self, field: &str) -> Result<serde_json::Value, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let col = match field {
             "bpm" => "bpm",
             "key" => "key_name",
@@ -5033,7 +5061,7 @@ impl Database {
         if obj.is_empty() {
             return Ok(());
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let col = match field {
             "bpm" => "bpm",
             "key" => "key_name",
@@ -5062,7 +5090,7 @@ impl Database {
 
     fn read_kv_cache(&self, name: &str) -> Result<serde_json::Value, String> {
         let (table, key_col, val_col) = self.cache_table_for(name);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let sql = format!("SELECT {key_col}, {val_col} FROM {table}");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut map = serde_json::Map::new();
@@ -5080,7 +5108,7 @@ impl Database {
     fn write_kv_cache(&self, name: &str, data: &serde_json::Value) -> Result<(), String> {
         let obj = data.as_object().ok_or("expected object")?;
         let (table, key_col, val_col) = self.cache_table_for(name);
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let sql = format!("INSERT OR REPLACE INTO {table} ({key_col}, {val_col}) VALUES (?1, ?2)");
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
@@ -5100,7 +5128,7 @@ impl Database {
 
     /// Get row counts for all tables.
     pub fn table_counts(&self) -> Result<serde_json::Value, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tables = [
             "audio_samples",
             "audio_scans",
@@ -5191,7 +5219,7 @@ impl Database {
     /// (same tab rules as elsewhere). Matches default `scan_id` handling on paginated queries and
     /// `*_filter_stats`, not raw `COUNT(*)` on whole tables.
     pub fn active_scan_inventory_counts(&self) -> Result<serde_json::Value, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let count_plugins: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM plugins WHERE id IN (SELECT MAX(id) FROM plugins GROUP BY path)",
@@ -5248,7 +5276,7 @@ impl Database {
     /// All library paths with byte sizes for content-hash duplicate detection.
     /// Uses the same per-domain library rules as [`Database::active_scan_inventory_counts`].
     pub fn library_paths_for_content_hash(&self) -> Result<Vec<(String, u64, String)>, String> {
-        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let conn = self.read_conn();
         let mut out: Vec<(String, u64, String)> = Vec::new();
 
         let mut push_sql = |sql: &str, kind: &str| -> Result<(), String> {
@@ -5296,7 +5324,7 @@ impl Database {
 
     /// Get stats for all caches: item count and estimated size.
     pub fn cache_stats(&self) -> Result<Vec<CacheStat>, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let page_size: u64 = conn
             .query_row("PRAGMA page_size", [], |r| r.get::<_, i64>(0))
             .unwrap_or(4096) as u64;
@@ -5425,7 +5453,7 @@ impl Database {
 
     /// Batch update BPM/Key/LUFS for multiple files in a single transaction.
     pub fn batch_update_analysis(&self, results: &[AnalysisBatchRow]) -> Result<u32, String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut count = 0u32;
         {
@@ -5444,7 +5472,7 @@ impl Database {
 
     /// Clear a specific cache table.
     pub fn clear_cache_table(&self, table: &str) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let sql = match table {
             "bpm" => "UPDATE audio_samples SET bpm = NULL",
             "key" => "UPDATE audio_samples SET key_name = NULL",
@@ -5461,7 +5489,7 @@ impl Database {
 
     /// Clear all analysis and cache data from SQLite.
     pub fn clear_all_caches(&self) -> Result<(), String> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         conn.execute_batch(
             "UPDATE audio_samples SET bpm = NULL, key_name = NULL, lufs = NULL;
              DELETE FROM waveform_cache;
@@ -5490,7 +5518,7 @@ impl Database {
 
         // Check if already migrated (any scan table has data)
         {
-            let conn = self.conn.lock().unwrap();
+            let conn = self.read_conn();
             let count: u64 = conn
                 .query_row(
                     "SELECT (SELECT COUNT(*) FROM audio_scans) +
@@ -5610,7 +5638,7 @@ impl Database {
         let data = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let history: ScanHistory =
             serde_json::from_str(&data).map_err(|e| format!("plugin JSON: {e}"))?;
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut count = 0;
         for snap in &history.scans {
             let dirs_json = path_strings_json_normalized(&snap.directories);
@@ -5658,7 +5686,7 @@ impl Database {
         let data = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let history: DawHistory =
             serde_json::from_str(&data).map_err(|e| format!("daw JSON: {e}"))?;
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut count = 0;
         for snap in &history.scans {
             let daw_json = serde_json::to_string(&snap.daw_counts).unwrap_or_default();
@@ -5704,7 +5732,7 @@ impl Database {
         let data = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let history: PresetHistory =
             serde_json::from_str(&data).map_err(|e| format!("preset JSON: {e}"))?;
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let mut count = 0;
         for snap in &history.scans {
             let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
@@ -5751,7 +5779,7 @@ impl Database {
         if cache.is_empty() {
             return Ok(0);
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let count = cache.len();
         {
@@ -5794,7 +5822,7 @@ impl Database {
         if cache.is_empty() {
             return Ok(0);
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let sql = format!("INSERT OR REPLACE INTO {table} ({key_col}, {val_col}) VALUES (?1, ?2)");
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let count = cache.len();
@@ -5832,7 +5860,7 @@ impl Database {
             return Ok(());
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn();
         let sql = match field {
             "bpm" => "UPDATE audio_samples SET bpm = ?1 WHERE path = ?2",
             "key" => "UPDATE audio_samples SET key_name = ?1 WHERE path = ?2",
@@ -5931,7 +5959,9 @@ mod tests {
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
             .unwrap();
         let db = Database {
-            conn: Mutex::new(conn),
+            write: Mutex::new(conn),
+            read: Vec::new(),
+            read_idx: AtomicUsize::new(0),
         };
         db.migrate().unwrap();
         db
@@ -6027,7 +6057,7 @@ mod tests {
         db.insert_audio_batch("s1", &samples).unwrap();
 
         {
-            let conn = db.conn.lock().unwrap();
+            let conn = db.read_conn();
             conn.execute("DELETE FROM audio_samples_fts", [])
                 .expect("clear FTS");
         }
@@ -6046,7 +6076,7 @@ mod tests {
         assert_eq!(empty.total_count, 0);
 
         {
-            let conn = db.conn.lock().unwrap();
+            let conn = db.read_conn();
             backfill_contentless_fts(&conn).expect("backfill");
         }
 
@@ -8973,13 +9003,13 @@ mod tests {
         db.save_scan("s2", "2024-01-02T00:00:00", 1, 100, &HashMap::new(), &[])
             .unwrap();
         db.insert_audio_batch("s2", &[s]).unwrap();
-        let conn = db.conn.lock().unwrap();
+        let conn = db.read_conn();
         let n: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM audio_library lib
                  WHERE lib.sample_id = (SELECT MAX(id) FROM audio_samples a WHERE a.path = lib.path)",
                 [],
-                |r| r.get(0),
+                |r| r.get::<_, i64>(0),
             )
             .unwrap();
         assert_eq!(n, 1);

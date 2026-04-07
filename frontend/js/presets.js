@@ -403,13 +403,8 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
 
   if (!resume) {
     _presetScanDbView = false;
-    allPresets = [];
-    filteredPresets = [];
-    resetPresetStats();
-    resetPresetStatsAccumulators();
-    document.getElementById('presetStats').style.display = 'none';
-    tableWrap.innerHTML = '<div class="state-message"><div class="spinner"></div><h2>Scanning for presets...</h2><p>Walking filesystem directories parallelized...</p></div>';
   }
+  let pendingPresetClear = !resume;
 
   let firstBatch = true;
   let pendingPresets = [];
@@ -419,6 +414,14 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
   const FLUSH_INTERVAL = parseInt(prefs.getItem('flushInterval') || '100', 10);
 
   function flushPending() {
+    if (pendingPresetClear && pendingPresets.length > 0) {
+      pendingPresetClear = false;
+      allPresets = [];
+      filteredPresets = [];
+      resetPresetStats();
+      resetPresetStatsAccumulators();
+      document.getElementById('presetStats').style.display = 'none';
+    }
     if (pendingPresets.length === 0) return;
     const batch = pendingPresets.splice(0);
 
@@ -514,6 +517,13 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
     // Drain final streamed batch with the scan-active guard still set so the
     // rebuild inside flushPending uses incremental accumulators.
     flushPending();
+    if (pendingPresetClear) {
+      pendingPresetClear = false;
+      allPresets = [];
+      filteredPresets = [];
+      resetPresetStats();
+      resetPresetStatsAccumulators();
+    }
     if (result.streamed) {
       // Backend streamed results live — allPresets was built from progress events.
     } else if (resume) {
@@ -552,6 +562,13 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
     if (presetScanProgressCleanup) { presetScanProgressCleanup(); presetScanProgressCleanup = null; }
     _presetScanDbView = false;
     flushPending();
+    if (pendingPresetClear) {
+      pendingPresetClear = false;
+      allPresets = [];
+      filteredPresets = [];
+      resetPresetStats();
+      resetPresetStatsAccumulators();
+    }
     const errMsg = err.message || err || 'Unknown error';
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;
     showToast(toastFmt('toast.preset_scan_failed', { errMsg }), 4000, 'error');
