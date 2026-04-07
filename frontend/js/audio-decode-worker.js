@@ -5,10 +5,9 @@
 /* global self, OfflineAudioContext, fetch */
 
 function computePeaksFromChannel(raw, bars) {
-    const nBars = Math.max(1, Math.floor(Number(bars)) || 1);
-    const step = Math.max(1, Math.floor(raw.length / nBars));
+    const step = Math.max(1, Math.floor(raw.length / bars));
     const peaks = [];
-    for (let i = 0; i < nBars; i++) {
+    for (let i = 0; i < bars; i++) {
         let max = 0;
         let min = 0;
         const start = i * step;
@@ -29,14 +28,7 @@ function computeSpectrogramData(raw) {
     const fftSize = 1024;
     const hop = fftSize / 2;
     const numBins = fftSize / 2;
-    const minLen = fftSize + hop;
-    let pcm = raw;
-    if (raw.length < minLen) {
-        const p = new Float32Array(minLen);
-        p.set(raw);
-        pcm = p;
-    }
-    const numFrames = Math.floor((pcm.length - fftSize) / hop);
+    const numFrames = Math.floor((raw.length - fftSize) / hop);
     if (numFrames <= 0) return [];
 
     const cols = Math.min(w, numFrames);
@@ -73,10 +65,10 @@ function computeSpectrogramData(raw) {
     for (let col = 0; col < cols; col++) {
         const frameIdx = col * frameStep;
         const offset = frameIdx * hop;
-        if (offset + fftSize > pcm.length) break;
+        if (offset + fftSize > raw.length) break;
 
         for (let i = 0; i < fftSize; i++) {
-            re[bitRev[i]] = pcm[offset + i] * hannWindow[i];
+            re[bitRev[i]] = raw[offset + i] * hannWindow[i];
             im[bitRev[i]] = 0;
         }
 
