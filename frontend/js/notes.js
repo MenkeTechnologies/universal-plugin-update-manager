@@ -726,21 +726,34 @@ document.addEventListener('keydown', (e) => {
 
 // ── Global Tag Filter ──
 let _globalActiveTag = null;
+/** Last rendered tag-bar state — skip DOM work when unchanged (tab switches, idle replays). */
+let _tagBarRenderSig = null;
 
 function getGlobalActiveTag() { return _globalActiveTag; }
 
-function renderGlobalTagBar() {
+/**
+ * @param {boolean} [force] — bypass signature check (prefs/tag mutations that must repaint)
+ */
+function renderGlobalTagBar(force) {
+  if (force === true) _tagBarRenderSig = null;
   const bar = document.getElementById('globalTagBar');
   const list = document.getElementById('globalTagList');
   if (!bar || !list) return;
 
-  // Respect tag bar visibility setting
-  if (typeof prefs !== 'undefined' && prefs.getItem('tagBarVisible') === 'off') {
+  const tagBarPref = typeof prefs !== 'undefined' ? (prefs.getItem('tagBarVisible') || 'on') : 'on';
+  const tagBarOff = tagBarPref === 'off';
+  const allTags = tagBarOff ? [] : getAllTags();
+  const sig = tagBarOff
+    ? tagBarPref + '|hidden'
+    : tagBarPref + '|' + [...allTags].sort().join('\0') + '\x1e' + (_globalActiveTag || '') + '\x1e' + allTags.length;
+
+  if (!force && sig === _tagBarRenderSig) return;
+  _tagBarRenderSig = sig;
+
+  if (tagBarOff) {
     bar.style.display = 'none';
     return;
   }
-
-  const allTags = getAllTags();
   if (allTags.length === 0) {
     bar.style.display = 'none';
     return;
@@ -749,6 +762,20 @@ function renderGlobalTagBar() {
   list.innerHTML = allTags.map(t =>
     `<span class="global-tag-item${_globalActiveTag === t ? ' active' : ''}" data-action-global-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`
   ).join('');
+}
+
+let _tagBarSwitchRaf = null;
+function scheduleGlobalTagBarRefresh() {
+  if (_tagBarSwitchRaf !== null) return;
+  _tagBarSwitchRaf = requestAnimationFrame(() => {
+    _tagBarSwitchRaf = null;
+    const run = () => renderGlobalTagBar();
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(run, { timeout: 250 });
+    } else {
+      setTimeout(run, 0);
+    }
+  });
 }
 
 function setGlobalTag(tag) {
@@ -783,7 +810,7 @@ function passesGlobalTagFilter(path) {
 const _origSwitchTabForTags = switchTab;
 switchTab = function(tab) {
   _origSwitchTabForTags(tab);
-  renderGlobalTagBar();
+  scheduleGlobalTagBarRefresh();
 };
 
 // Tag click filtering + note card actions + tag management + global tag

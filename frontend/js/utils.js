@@ -967,6 +967,7 @@ function initTabDragReorder() {
 function saveTabOrder() {
   const tabs = [...document.querySelectorAll('.tab-nav .tab-btn')].map(b => b.dataset.tab);
   prefs.setItem('tabOrder', JSON.stringify(tabs));
+  invalidateTabButtonCache();
 }
 
 function restoreTabOrder() {
@@ -988,6 +989,7 @@ function restoreTabOrder() {
       if (!order.includes(btn.dataset.tab)) nav.appendChild(btn);
     });
   } catch(e) { if(typeof showToast==='function'&&e) showToast(String(e),4000,'error'); }
+  invalidateTabButtonCache();
 }
 
 function settingResetTabOrder() {
@@ -1000,9 +1002,21 @@ function settingResetTabOrder() {
     if (tabMap[key]) nav.appendChild(tabMap[key]);
   }
   showToast(toastFmt('toast.tab_order_reset'));
+  invalidateTabButtonCache();
 }
 
 // ── Tab switching ──
+// Cache tab strip buttons once — same idea as _tabPanels; invalidate when order changes.
+let _tabButtonsCache = null;
+function invalidateTabButtonCache() {
+  _tabButtonsCache = null;
+}
+function _ensureTabButtonCache() {
+  if (_tabButtonsCache != null) return;
+  const nav = document.querySelector('.tab-nav');
+  _tabButtonsCache = nav ? [...nav.querySelectorAll('.tab-btn')] : [];
+}
+
 // Cache tab panel elements once — avoids 14 getElementById calls per switch.
 const _tabPanels = {};
 const _tabPanelIds = [
@@ -1020,10 +1034,11 @@ function _ensureTabCache() {
 
 function switchTab(tab) {
   _ensureTabCache();
+  _ensureTabButtonCache();
   // Toggle tab buttons + panels in one pass — pure class mutations, no layout reads.
-  document.querySelectorAll('.tab-btn').forEach(b => {
+  for (const b of _tabButtonsCache) {
     b.classList.toggle('active', b.dataset.tab === tab);
-  });
+  }
   for (const t of _tabPanelIds) {
     _tabPanels[t]?.classList.toggle('active', t === tab);
   }
