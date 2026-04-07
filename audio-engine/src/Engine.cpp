@@ -38,6 +38,7 @@ static constexpr uint32_t kMaxBufferFrames = 8192;
 
 static juce::var errObj(const juce::String& msg)
 {
+    appLogLine("error: " + msg);
     auto* o = new juce::DynamicObject();
     o->setProperty("ok", false);
     o->setProperty("error", msg);
@@ -1078,6 +1079,7 @@ struct Engine::Impl
             }
             else
             {
+                appLogLine("plugin scan: cache file present but XML parse failed; ignoring " + cacheFile.getFullPathName());
                 pluginScanProgress.cacheLoaded.store(false, std::memory_order_relaxed);
             }
         }
@@ -1129,6 +1131,7 @@ struct Engine::Impl
             std::lock_guard<std::mutex> lock(pluginScanMutex);
             pluginScanPhase = PluginScanPhase::Failed;
             pluginScanLastError = "scan failed: " + juce::String(e.what());
+            appLogLine("error: " + pluginScanLastError);
             return;
         }
         catch (...)
@@ -1137,6 +1140,7 @@ struct Engine::Impl
             std::lock_guard<std::mutex> lock(pluginScanMutex);
             pluginScanPhase = PluginScanPhase::Failed;
             pluginScanLastError = "scan failed: unknown exception";
+            appLogLine("error: " + pluginScanLastError);
             return;
         }
 

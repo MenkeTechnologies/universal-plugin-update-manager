@@ -1,4 +1,5 @@
 #include "VisualPreview.hpp"
+#include "AppLog.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,6 +13,7 @@ namespace {
 
 static juce::var errPrev(const juce::String& msg)
 {
+    appLogLine("error: " + msg);
     auto* o = new juce::DynamicObject();
     o->setProperty("ok", false);
     o->setProperty("error", msg);
