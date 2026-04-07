@@ -213,6 +213,11 @@ function showReverseXrefModal(pluginName, projects) {
 
 // Scan all supported DAW projects in background for xref index
 async function buildXrefIndex() {
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.building_plugin_index'), 5000);
+    }
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+
     let supported = [];
     if (typeof fetchAllDawProjectsForXref === 'function') {
         try {
@@ -230,24 +235,36 @@ async function buildXrefIndex() {
         }
         return;
     }
-    let scanned = 0;
-    for (const p of supported) {
-        if (_xrefCache[p.path]) {
+
+    if (typeof showGlobalProgress === 'function') showGlobalProgress();
+    try {
+        const total = supported.length;
+        let scanned = 0;
+        let lastBand = -1;
+        for (const p of supported) {
+            if (_xrefCache[p.path]) {
+                scanned++;
+                continue;
+            }
+            try {
+                await getProjectPlugins(p.path);
+            } catch { /* skip errors */
+            }
             scanned++;
-            continue;
+            const pct = total ? (100 * scanned) / total : 100;
+            const band = Math.min(4, Math.floor(pct / 25));
+            if (band > lastBand && band < 4) {
+                lastBand = band;
+                showToast(toastFmt('toast.indexing_plugins', {scanned, total}), 2500);
+            } else if (band > lastBand) {
+                lastBand = band;
+            }
         }
-        try {
-            await getProjectPlugins(p.path);
-        } catch { /* skip errors */
-        }
-        scanned++;
-        // Update progress every 10 projects
-        if (scanned % 10 === 0) {
-            showToast(toastFmt('toast.indexing_plugins', {scanned, total: supported.length}), 1500);
-        }
+        saveXrefCache();
+        showToast(toastFmt('toast.plugin_index_built', {n: supported.length}));
+    } finally {
+        if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
     }
-    saveXrefCache();
-    showToast(toastFmt('toast.plugin_index_built', {n: supported.length}));
 }
 
 // Event delegation

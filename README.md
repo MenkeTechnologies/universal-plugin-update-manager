@@ -440,7 +440,7 @@ frontend/
     shortcuts.js       -- Customizable keyboard shortcuts
     sort-persist.js    -- Sort column/direction persistence per tab
     utils.js           -- fzf search, escaping, slugs, formatting, `postScanCompleteToast` (scan-finished slide-ins; suppressed during Scan All), `fetchAudioLibraryPathsForFingerprint` (SQLite `audio_library` paths for fingerprint cache builds; falls back to in-memory list)
-    xref.js            -- Plugin ↔ DAW cross-reference UI + project viewer (11 formats)
+    xref.js            -- Plugin ↔ DAW cross-reference UI + project viewer (11 formats); **Plugin Index** shows an immediate toast + global progress while projects load and parse
     dep-graph.js       -- Plugin dependency graph visualization
     visualizer.js      -- 6 real-time audio displays (FFT, waveform, spectrogram, Lissajous, levels, bands)
     walker-status.js   -- 4-tile live scanner thread status view

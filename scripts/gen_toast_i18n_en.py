@@ -81,7 +81,7 @@ TOAST_EN: dict[str, str] = {
     "toast.checking_updates": "Checking for updates...",
     "toast.scanning_duplicates": "Scanning for duplicates...",
     "toast.resetting_scans": "Resetting all scans...",
-    "toast.building_plugin_index": "Building plugin index...",
+    "toast.building_plugin_index": "Starting plugin index in the background…",
     "toast.opening_dep_graph": "Opening dependency graph...",
     "toast.finding_similar": "Finding similar samples...",
     "toast.player_hidden": "Player hidden",

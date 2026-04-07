@@ -376,7 +376,7 @@
   "toast.bpm_key_lufs_analysis_not_running": "BPM/Key/LUFS analysis is not running",
   "toast.bpm_key_lufs_analysis_started": "BPM/Key/LUFS: background analysis started",
   "toast.bpm_key_lufs_analysis_stopped": "BPM/Key/LUFS: stop requested — finishing current batch",
-  "toast.building_plugin_index": "Building plugin index...",
+  "toast.building_plugin_index": "Starting plugin index in the background…",
   "toast.building_xref_index_all_daw": "Building xref index for all DAW projects...",
   "toast.cache_list_refreshed": "Cache list refreshed",
   "toast.cache_stats_refreshed": "Cache stats refreshed",
