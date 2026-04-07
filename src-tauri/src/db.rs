@@ -128,6 +128,66 @@ fn short_like(search: &str) -> Option<String> {
     Some(format!("%{escaped}%"))
 }
 
+/// FTS-backed tabs (name + path): returns `(fts_match, like_pat, regex_pat)` — at most one of the
+/// three is `Some`. Mirrors [`AudioQueryParams::search_regex`] semantics.
+fn classify_fts_name_path_search(
+    search: Option<&str>,
+    search_regex: bool,
+) -> (Option<String>, Option<String>, Option<String>) {
+    if search_regex {
+        let mut like_pat = None;
+        let mut regex_pat = None;
+        if let Some(s) = search {
+            let t = s.trim();
+            if !t.is_empty() {
+                if RegexBuilder::new(t).case_insensitive(true).build().is_ok() {
+                    regex_pat = Some(t.to_string());
+                } else {
+                    let escaped = t.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+                    like_pat = Some(format!("%{escaped}%"));
+                }
+            }
+        }
+        (None, like_pat, regex_pat)
+    } else {
+        (
+            search.and_then(fts_phrase),
+            search.and_then(short_like),
+            None,
+        )
+    }
+}
+
+/// Plugins tab (name, manufacturer, path): `(regex_pat, like_pat)` — when `regex_pat` is `Some`,
+/// use `REGEXP` on all three columns; otherwise `like_pat` is fuzzy interleaved or invalid-regex
+/// fallback (same binding shape).
+fn classify_plugins_search(search: Option<&str>, search_regex: bool) -> (Option<String>, Option<String>) {
+    let Some(s) = search else {
+        return (None, None);
+    };
+    let t = s.trim();
+    if t.is_empty() {
+        return (None, None);
+    }
+    if search_regex {
+        if RegexBuilder::new(t).case_insensitive(true).build().is_ok() {
+            (Some(t.to_string()), None)
+        } else {
+            let escaped = t.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+            (None, Some(format!("%{escaped}%")))
+        }
+    } else {
+        let interleaved = format!(
+            "%{}%",
+            t.chars()
+                .map(|c| c.to_string())
+                .collect::<Vec<_>>()
+                .join("%")
+        );
+        (None, Some(interleaved))
+    }
+}
+
 static REGEXP_FUNC_CACHE: OnceLock<Mutex<HashMap<String, Regex>>> = OnceLock::new();
 
 fn regexp_pattern_cache() -> &'static Mutex<HashMap<String, Regex>> {
@@ -1598,33 +1658,10 @@ impl Database {
 
         // FTS5 trigram for ≥3 char searches; LIKE fallback for 1–2 chars.
         // Regex mode (UI `.*` toggle): real ECMA-style regex via SQLite `REGEXP`, not FTS phrase.
-        let fts_match: Option<String>;
-        let like_pat: Option<String>;
-        let regex_pat: Option<String>;
-        if params.search_regex {
-            fts_match = None;
-            if let Some(ref s) = params.search {
-                let t = s.trim();
-                if t.is_empty() {
-                    like_pat = None;
-                    regex_pat = None;
-                } else if RegexBuilder::new(t).case_insensitive(true).build().is_ok() {
-                    like_pat = None;
-                    regex_pat = Some(t.to_string());
-                } else {
-                    let escaped = t.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
-                    like_pat = Some(format!("%{escaped}%"));
-                    regex_pat = None;
-                }
-            } else {
-                like_pat = None;
-                regex_pat = None;
-            }
-        } else {
-            fts_match = params.search.as_deref().and_then(fts_phrase);
-            like_pat = params.search.as_deref().and_then(short_like);
-            regex_pat = None;
-        }
+        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(
+            params.search.as_deref(),
+            params.search_regex,
+        );
         if fts_match.is_some() {
             if single_scan {
                 conditions.push(format!(
@@ -2294,6 +2331,7 @@ impl Database {
         status_filter: Option<&str>,
         sort_key: &str,
         sort_asc: bool,
+        search_regex: bool,
         offset: u64,
         limit: u64,
     ) -> Result<PluginQueryResult, String> {
@@ -2334,21 +2372,13 @@ impl Database {
 
         let mut where_parts = vec![id_clause.to_string()];
         let mut bind_idx = 1usize;
-        let search_pat = search.and_then(|s| {
-            let t = s.trim();
-            if t.is_empty() {
-                None
-            } else {
-                Some(format!(
-                    "%{}%",
-                    t.chars()
-                        .map(|c| c.to_string())
-                        .collect::<Vec<_>>()
-                        .join("%")
-                ))
-            }
-        });
-        if search_pat.is_some() {
+        let (regex_pat, like_pat) = classify_plugins_search(search, search_regex);
+        if regex_pat.is_some() {
+            where_parts.push(format!(
+                "({q}name REGEXP ?{bind_idx} OR {q}manufacturer REGEXP ?{bind_idx} OR {q}path REGEXP ?{bind_idx})"
+            ));
+            bind_idx += 1;
+        } else if like_pat.is_some() {
             where_parts.push(format!(
                 "({q}name LIKE ?{bind_idx} ESCAPE '\\' OR {q}manufacturer LIKE ?{bind_idx} ESCAPE '\\' OR {q}path LIKE ?{bind_idx} ESCAPE '\\')"
             ));
@@ -2401,7 +2431,7 @@ impl Database {
             let sql = format!("SELECT COUNT(*) {from_sql} WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            if let Some(ref p) = search_pat {
+            if let Some(ref p) = regex_pat.as_ref().or(like_pat.as_ref()) {
                 stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
                 bi += 1;
             }
@@ -2419,7 +2449,7 @@ impl Database {
         };
 
         let mut bind_offset = 1usize;
-        if search_pat.is_some() {
+        if regex_pat.is_some() || like_pat.is_some() {
             bind_offset += 1;
         }
         if type_filter
@@ -2434,7 +2464,7 @@ impl Database {
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        if let Some(ref p) = search_pat {
+        if let Some(ref p) = regex_pat.as_ref().or(like_pat.as_ref()) {
             stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
             bi += 1;
         }
@@ -2482,6 +2512,7 @@ impl Database {
         daw_filter: Option<&str>,
         sort_key: &str,
         sort_asc: bool,
+        search_regex: bool,
         offset: u64,
         limit: u64,
     ) -> Result<DawQueryResult, String> {
@@ -2503,11 +2534,16 @@ impl Database {
 
         let mut where_parts = vec![DAW_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM daw_projects GROUP BY path))",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -2548,6 +2584,9 @@ impl Database {
             if let Some(ref m) = fts_match {
                 stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
                 bi += 1;
+            } else if let Some(ref r) = regex_pat {
+                stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
+                bi += 1;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
                 bi += 1;
@@ -2569,6 +2608,9 @@ impl Database {
         let mut bi = 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -2615,6 +2657,7 @@ impl Database {
         format_filter: Option<&str>,
         sort_key: &str,
         sort_asc: bool,
+        search_regex: bool,
         offset: u64,
         limit: u64,
     ) -> Result<PresetQueryResult, String> {
@@ -2639,11 +2682,16 @@ impl Database {
             "format NOT IN ('MID', 'MIDI')".to_string(),
         ];
         let mut bind_idx = 1usize;
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM presets GROUP BY path))",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -2683,6 +2731,9 @@ impl Database {
             if let Some(ref m) = fts_match {
                 stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
                 bi += 1;
+            } else if let Some(ref r) = regex_pat {
+                stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
+                bi += 1;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
                 bi += 1;
@@ -2704,6 +2755,9 @@ impl Database {
         let mut bi = 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -3876,6 +3930,7 @@ impl Database {
         format_filter: Option<&str>,
         sort_key: &str,
         sort_asc: bool,
+        search_regex: bool,
         offset: u64,
         limit: u64,
     ) -> Result<MidiQueryResult, String> {
@@ -3897,11 +3952,16 @@ impl Database {
 
         let mut where_parts = vec![MIDI_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM midi_files GROUP BY path))",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -3943,6 +4003,9 @@ impl Database {
             if let Some(ref m) = fts_match {
                 stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
                 bi += 1;
+            } else if let Some(ref r) = regex_pat {
+                stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
+                bi += 1;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
                 bi += 1;
@@ -3970,6 +4033,9 @@ impl Database {
         let mut bi = 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -4009,6 +4075,7 @@ impl Database {
         &self,
         search: Option<&str>,
         format_filter: Option<&str>,
+        search_regex: bool,
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = conn
@@ -4018,13 +4085,18 @@ impl Database {
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         let mut where_parts = vec![MIDI_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM midi_files GROUP BY path))",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -4048,6 +4120,9 @@ impl Database {
         let mut bi = 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -4584,6 +4659,7 @@ impl Database {
         search: Option<&str>,
         sort_key: &str,
         sort_asc: bool,
+        search_regex: bool,
         offset: u64,
         limit: u64,
     ) -> Result<PdfQueryResult, String> {
@@ -4605,11 +4681,16 @@ impl Database {
 
         let mut where_parts = vec![PDF_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM pdfs GROUP BY path))",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -4633,6 +4714,8 @@ impl Database {
             let bi = 1;
             if let Some(ref m) = fts_match {
                 stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            } else if let Some(ref r) = regex_pat {
+                stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
             }
@@ -4649,6 +4732,9 @@ impl Database {
         let mut bi = 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -4734,25 +4820,6 @@ impl Database {
     // Each returns count + total_bytes + per-type breakdown reflecting the active
     // search/filter over library rows (deduped by path). Uses GROUP BY for the breakdown.
 
-    fn fzf_like(s: Option<&str>) -> Option<String> {
-        s.and_then(|t| {
-            let t = t.trim();
-            if t.is_empty() {
-                return None;
-            }
-            let esc: String = t
-                .chars()
-                .map(|c| match c {
-                    '%' => "\\%".to_string(),
-                    '_' => "\\_".to_string(),
-                    _ => c.to_string(),
-                })
-                .collect::<Vec<_>>()
-                .join("%");
-            Some(format!("%{esc}%"))
-        })
-    }
-
     fn in_list_sql(values: &str) -> String {
         values
             .split(',')
@@ -4775,33 +4842,8 @@ impl Database {
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
-        let fts_match: Option<String>;
-        let like_pat: Option<String>;
-        let regex_pat: Option<String>;
-        if search_regex {
-            fts_match = None;
-            if let Some(s) = search {
-                let t = s.trim();
-                if t.is_empty() {
-                    like_pat = None;
-                    regex_pat = None;
-                } else if RegexBuilder::new(t).case_insensitive(true).build().is_ok() {
-                    like_pat = None;
-                    regex_pat = Some(t.to_string());
-                } else {
-                    let escaped = t.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
-                    like_pat = Some(format!("%{escaped}%"));
-                    regex_pat = None;
-                }
-            } else {
-                like_pat = None;
-                regex_pat = None;
-            }
-        } else {
-            fts_match = search.and_then(fts_phrase);
-            like_pat = search.and_then(short_like);
-            regex_pat = None;
-        }
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         let mut where_parts = vec![AUDIO_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
@@ -4874,6 +4916,7 @@ impl Database {
         &self,
         search: Option<&str>,
         daw_filter: Option<&str>,
+        search_regex: bool,
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = conn
@@ -4883,13 +4926,18 @@ impl Database {
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         let mut where_parts = vec![DAW_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM daw_projects GROUP BY path))",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -4911,6 +4959,9 @@ impl Database {
         let mut bi = 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -4949,6 +5000,7 @@ impl Database {
         &self,
         search: Option<&str>,
         format_filter: Option<&str>,
+        search_regex: bool,
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = conn
@@ -4958,8 +5010,8 @@ impl Database {
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         let mut where_parts = vec![
             PRESET_LIBRARY_IDS.to_string(),
             "format NOT IN ('MID','MIDI')".to_string(),
@@ -4968,6 +5020,11 @@ impl Database {
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM presets GROUP BY path))",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
             ));
             bind_idx += 1;
         } else if like_pat.is_some() {
@@ -4989,6 +5046,9 @@ impl Database {
         let mut bi = 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -5027,6 +5087,7 @@ impl Database {
         &self,
         search: Option<&str>,
         type_filter: Option<&str>,
+        search_regex: bool,
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = conn
@@ -5036,10 +5097,13 @@ impl Database {
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
-        let search_pat = Self::fzf_like(search);
+        let (regex_pat, like_pat) = classify_plugins_search(search, search_regex);
         let mut where_parts = vec![PLUGIN_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
-        if search_pat.is_some() {
+        if regex_pat.is_some() {
+            where_parts.push(format!("(name REGEXP ?{bind_idx} OR manufacturer REGEXP ?{bind_idx} OR path REGEXP ?{bind_idx})"));
+            bind_idx += 1;
+        } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR manufacturer LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
         }
@@ -5056,7 +5120,7 @@ impl Database {
         let sql = format!("SELECT plugin_type, COUNT(*), COALESCE(SUM(size_bytes),0) FROM plugins WHERE {where_cl} GROUP BY plugin_type");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        if let Some(ref p) = search_pat {
+        if let Some(ref p) = regex_pat.as_ref().or(like_pat.as_ref()) {
             stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
             bi += 1;
         }
@@ -5089,7 +5153,11 @@ impl Database {
         })
     }
 
-    pub fn pdf_filter_stats(&self, search: Option<&str>) -> Result<FilterStatsResult, String> {
+    pub fn pdf_filter_stats(
+        &self,
+        search: Option<&str>,
+        search_regex: bool,
+    ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = conn
             .query_row(
@@ -5098,10 +5166,12 @@ impl Database {
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
-        let fts_match = search.and_then(fts_phrase);
-        let like_pat = search.and_then(short_like);
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(search, search_regex);
         let sql = if fts_match.is_some() {
             "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path) AND id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?1 AND rowid IN (SELECT MAX(id) FROM pdfs GROUP BY path))"
+        } else if regex_pat.is_some() {
+            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path) AND ((name REGEXP ?1) OR (path REGEXP ?1))"
         } else if like_pat.is_some() {
             "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path) AND (name LIKE ?1 ESCAPE '\\' OR path LIKE ?1 ESCAPE '\\')"
         } else {
@@ -5110,6 +5180,8 @@ impl Database {
         let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(1, m).map_err(|e| e.to_string())?;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(1, r).map_err(|e| e.to_string())?;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(1, pat).map_err(|e| e.to_string())?;
         }
@@ -6582,7 +6654,7 @@ mod tests {
         ))
         .unwrap();
 
-        let unfiltered = db.daw_filter_stats(None, None).unwrap();
+        let unfiltered = db.daw_filter_stats(None, None, false).unwrap();
         assert_eq!(unfiltered.total_unfiltered, 3);
         assert_eq!(unfiltered.count, 3);
         assert_eq!(
@@ -6591,12 +6663,12 @@ mod tests {
         );
         assert_eq!(unfiltered.by_type.get("Logic Pro").copied().unwrap_or(0), 1);
 
-        let abl = db.daw_filter_stats(None, Some("Ableton Live")).unwrap();
+        let abl = db.daw_filter_stats(None, Some("Ableton Live"), false).unwrap();
         assert_eq!(abl.count, 2);
         assert_eq!(abl.total_unfiltered, 3);
         assert_eq!(abl.total_bytes, 2000);
 
-        let search = db.daw_filter_stats(Some("a.als"), None).unwrap();
+        let search = db.daw_filter_stats(Some("a.als"), None, false).unwrap();
         assert_eq!(search.count, 1);
         assert_eq!(search.total_unfiltered, 3);
     }
@@ -6604,7 +6676,7 @@ mod tests {
     #[test]
     fn test_daw_filter_stats_empty_db() {
         let db = test_db();
-        let st = db.daw_filter_stats(None, None).unwrap();
+        let st = db.daw_filter_stats(None, None, false).unwrap();
         assert_eq!(st.count, 0);
         assert_eq!(st.total_unfiltered, 0);
     }
@@ -6623,12 +6695,12 @@ mod tests {
         ))
         .unwrap();
 
-        let st = db.preset_filter_stats(None, None).unwrap();
+        let st = db.preset_filter_stats(None, None, false).unwrap();
         assert_eq!(st.total_unfiltered, 2);
         assert_eq!(st.count, 2);
         assert_eq!(st.by_type.get("FXP").copied().unwrap_or(0), 2);
 
-        let fx = db.preset_filter_stats(None, Some("FXP")).unwrap();
+        let fx = db.preset_filter_stats(None, Some("FXP"), false).unwrap();
         assert_eq!(fx.count, 2);
         assert_eq!(fx.total_unfiltered, 2);
     }
@@ -6646,7 +6718,7 @@ mod tests {
         ))
         .unwrap();
 
-        let st = db.preset_filter_stats(Some("brass"), None).unwrap();
+        let st = db.preset_filter_stats(Some("brass"), None, false).unwrap();
         assert_eq!(st.count, 1);
         assert_eq!(st.total_unfiltered, 2);
     }
@@ -6665,16 +6737,16 @@ mod tests {
         ))
         .unwrap();
 
-        let st = db.plugin_filter_stats(None, None).unwrap();
+        let st = db.plugin_filter_stats(None, None, false).unwrap();
         assert_eq!(st.total_unfiltered, 3);
         assert_eq!(st.count, 3);
         assert_eq!(st.by_type.get("VST3").copied().unwrap_or(0), 2);
 
-        let vst = db.plugin_filter_stats(None, Some("VST3")).unwrap();
+        let vst = db.plugin_filter_stats(None, Some("VST3"), false).unwrap();
         assert_eq!(vst.count, 2);
         assert_eq!(vst.total_bytes, 2_000_000);
 
-        let xfer = db.plugin_filter_stats(Some("Xfer"), None).unwrap();
+        let xfer = db.plugin_filter_stats(Some("Xfer"), None, false).unwrap();
         assert_eq!(xfer.count, 1);
         assert_eq!(xfer.total_unfiltered, 3);
     }
@@ -6689,7 +6761,7 @@ mod tests {
         ))
         .unwrap();
 
-        let st = db.plugin_filter_stats(None, Some("VST3,AU")).unwrap();
+        let st = db.plugin_filter_stats(None, Some("VST3,AU"), false).unwrap();
         assert_eq!(st.count, 2);
         assert_eq!(st.total_unfiltered, 2);
     }
@@ -6697,7 +6769,7 @@ mod tests {
     #[test]
     fn test_plugin_filter_stats_empty_db() {
         let db = test_db();
-        let st = db.plugin_filter_stats(None, None).unwrap();
+        let st = db.plugin_filter_stats(None, None, false).unwrap();
         assert_eq!(st.count, 0);
         assert_eq!(st.total_unfiltered, 0);
     }
@@ -6732,13 +6804,13 @@ mod tests {
         };
         db.save_pdf_scan(&snap).unwrap();
 
-        let all = db.pdf_filter_stats(None).unwrap();
+        let all = db.pdf_filter_stats(None, false).unwrap();
         assert_eq!(all.total_unfiltered, 2);
         assert_eq!(all.count, 2);
         assert_eq!(all.total_bytes, 300);
         assert!(all.by_type.is_empty());
 
-        let sub = db.pdf_filter_stats(Some("readme")).unwrap();
+        let sub = db.pdf_filter_stats(Some("readme"), false).unwrap();
         assert_eq!(sub.count, 1);
         assert_eq!(sub.total_bytes, 200);
         assert_eq!(sub.total_unfiltered, 2);
@@ -6747,7 +6819,7 @@ mod tests {
     #[test]
     fn test_pdf_filter_stats_empty_db() {
         let db = test_db();
-        let st = db.pdf_filter_stats(None).unwrap();
+        let st = db.pdf_filter_stats(None, false).unwrap();
         assert_eq!(st.count, 0);
         assert_eq!(st.total_unfiltered, 0);
     }
@@ -7117,7 +7189,7 @@ mod tests {
         db.save_plugin_scan(&snap).unwrap();
 
         let res = db
-            .query_plugins(Some("ser"), None, None, "size", false, 0, 100)
+            .query_plugins(Some("ser"), None, None, "size", false, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.plugins[0].name, "big_serum_bank");
@@ -7274,7 +7346,7 @@ mod tests {
         db.save_daw_scan(&snap).unwrap();
 
         let res = db
-            .query_daw(Some("mix"), None, "size", false, 0, 100)
+            .query_daw(Some("mix"), None, "size", false, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.projects[0].name, "big_mix_master.als");
@@ -7345,7 +7417,7 @@ mod tests {
     #[test]
     fn test_query_pdfs_empty_without_scan() {
         let db = test_db();
-        let res = db.query_pdfs(None, "name", true, 0, 100).unwrap();
+        let res = db.query_pdfs(None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_count, 0);
         assert_eq!(res.total_unfiltered, 0);
         assert!(res.pdfs.is_empty());
@@ -7391,17 +7463,17 @@ mod tests {
         };
         db.save_pdf_scan(&snap).unwrap();
 
-        let filtered = db.query_pdfs(Some("alp"), "name", true, 0, 100).unwrap();
+        let filtered = db.query_pdfs(Some("alp"), "name", true, false, 0, 100).unwrap();
         assert_eq!(filtered.total_unfiltered, 3);
         assert_eq!(filtered.total_count, 2);
         assert_eq!(filtered.pdfs.len(), 2);
         assert_eq!(filtered.pdfs[0].name, "alpha");
         assert_eq!(filtered.pdfs[1].name, "alpha_notes");
 
-        let by_size = db.query_pdfs(None, "size", false, 0, 10).unwrap();
+        let by_size = db.query_pdfs(None, "size", false, false, 0, 10).unwrap();
         assert_eq!(by_size.pdfs[0].name, "zebra");
 
-        let page = db.query_pdfs(None, "name", true, 1, 1).unwrap();
+        let page = db.query_pdfs(None, "name", true, false, 1, 1).unwrap();
         assert_eq!(page.pdfs.len(), 1);
         assert_eq!(page.total_count, 3);
         assert_eq!(page.pdfs[0].name, "alpha_notes");
@@ -7442,7 +7514,7 @@ mod tests {
             roots: vec![],
         })
         .unwrap();
-        let res = db.query_pdfs(None, "name", true, 0, 100).unwrap();
+        let res = db.query_pdfs(None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_unfiltered, 2);
         assert_eq!(res.pdfs.len(), 2);
         assert_eq!(res.pdfs[0].name, "new");
@@ -7575,7 +7647,7 @@ mod tests {
 
         // Filter that matches nothing → filtered count 0, unfiltered stays 3
         let res = db
-            .query_plugins(Some("nonexistent_xyz"), None, None, "name", true, 0, 100)
+            .query_plugins(Some("nonexistent_xyz"), None, None, "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 0, "filtered count should be 0");
         assert_eq!(
@@ -7601,7 +7673,7 @@ mod tests {
         };
         db.save_plugin_scan(&snap).unwrap();
 
-        let res = db.query_plugins(None, None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_plugins(None, None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.total_unfiltered, 2);
     }
@@ -7609,7 +7681,7 @@ mod tests {
     #[test]
     fn test_query_plugins_total_unfiltered_empty_db() {
         let db = test_db();
-        let res = db.query_plugins(None, None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_plugins(None, None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_count, 0);
         assert_eq!(res.total_unfiltered, 0);
         assert!(res.plugins.is_empty());
@@ -7651,7 +7723,7 @@ mod tests {
 
         // daw_filter that doesn't match any existing daw — filtered=0, unfiltered=3
         let res = db
-            .query_daw(None, Some("FL Studio"), "name", true, 0, 100)
+            .query_daw(None, Some("FL Studio"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 0);
         assert_eq!(
@@ -7681,7 +7753,7 @@ mod tests {
 
         // Search that only matches 1 — filtered=1, unfiltered=2
         let res = db
-            .query_daw(Some("bass"), None, "name", true, 0, 100)
+            .query_daw(Some("bass"), None, "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 1);
         assert_eq!(res.total_unfiltered, 2);
@@ -7690,7 +7762,7 @@ mod tests {
     #[test]
     fn test_query_daw_total_unfiltered_empty_db() {
         let db = test_db();
-        let res = db.query_daw(None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_daw(None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_count, 0);
         assert_eq!(res.total_unfiltered, 0);
     }
@@ -7762,7 +7834,7 @@ mod tests {
         db.save_preset_scan(&snap).unwrap();
 
         let res = db
-            .query_presets(None, Some("H2P"), "name", true, 0, 100)
+            .query_presets(None, Some("H2P"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 0);
         assert_eq!(res.total_unfiltered, 2);
@@ -7792,7 +7864,7 @@ mod tests {
         };
         db.save_preset_scan(&snap).unwrap();
 
-        let res = db.query_presets(None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_presets(None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(
             res.total_unfiltered, 1,
             "MIDI files must be excluded from preset header count"
@@ -7825,7 +7897,7 @@ mod tests {
         db.save_preset_scan(&snap).unwrap();
 
         let res = db
-            .query_presets(Some("bass"), None, "name", true, 0, 100)
+            .query_presets(Some("bass"), None, "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.total_unfiltered, 3);
@@ -7877,7 +7949,7 @@ mod tests {
         db.save_preset_scan(&snap).unwrap();
 
         let res = db
-            .query_presets(Some("lead"), None, "size", false, 0, 100)
+            .query_presets(Some("lead"), None, "size", false, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.presets[0].name, "big_lead.fxp");
@@ -7888,7 +7960,7 @@ mod tests {
     #[test]
     fn test_query_presets_total_unfiltered_empty_db() {
         let db = test_db();
-        let res = db.query_presets(None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_presets(None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_count, 0);
         assert_eq!(res.total_unfiltered, 0);
     }
@@ -8299,7 +8371,7 @@ mod tests {
         ))
         .unwrap();
 
-        let res = db.query_daw(None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_daw(None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_unfiltered, 5, "library = union of distinct paths");
         assert_eq!(res.total_count, 5);
         assert_eq!(res.projects.len(), 5);
@@ -8323,7 +8395,7 @@ mod tests {
         db.save_daw_scan(&daw_snap("ds-empty", "2024-12-01T00:00:00", vec![]))
             .unwrap();
 
-        let res = db.query_daw(None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_daw(None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(
             res.total_unfiltered, 1,
             "empty scans with project_count=0 must not hide existing library projects"
@@ -8341,9 +8413,9 @@ mod tests {
         db.save_daw_scan(&daw_snap("ds-page", "2024-06-01T00:00:00", projects))
             .unwrap();
 
-        let p1 = db.query_daw(None, None, "name", true, 0, 10).unwrap();
-        let p2 = db.query_daw(None, None, "name", true, 10, 10).unwrap();
-        let p3 = db.query_daw(None, None, "name", true, 20, 10).unwrap();
+        let p1 = db.query_daw(None, None, "name", true, false, 0, 10).unwrap();
+        let p2 = db.query_daw(None, None, "name", true, false, 10, 10).unwrap();
+        let p3 = db.query_daw(None, None, "name", true, false, 20, 10).unwrap();
 
         assert_eq!(p1.total_unfiltered, 25);
         assert_eq!(p2.total_unfiltered, 25);
@@ -8371,7 +8443,7 @@ mod tests {
 
         // search="bass" + daw_filter="Ableton" → 1 match, unfiltered stays 4
         let res = db
-            .query_daw(Some("bass"), Some("Ableton"), "name", true, 0, 100)
+            .query_daw(Some("bass"), Some("Ableton"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 1);
         assert_eq!(res.total_unfiltered, 4);
@@ -8395,7 +8467,7 @@ mod tests {
         .unwrap();
 
         let res = db
-            .query_daw(None, Some("Ableton,Logic"), "name", true, 0, 100)
+            .query_daw(None, Some("Ableton,Logic"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.total_unfiltered, 4);
@@ -8427,7 +8499,7 @@ mod tests {
         .unwrap();
 
         let res = db
-            .query_daw(None, Some("Ableton,Logic"), "name", true, 0, 5)
+            .query_daw(None, Some("Ableton,Logic"), "name", true, false, 0, 5)
             .unwrap();
         assert_eq!(res.total_count, 12);
         assert_eq!(res.projects.len(), 5, "LIMIT=5 must be respected");
@@ -8470,7 +8542,7 @@ mod tests {
         ))
         .unwrap();
 
-        let res = db.query_presets(None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_presets(None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_unfiltered, 4);
         assert_eq!(res.presets.len(), 4);
         assert_eq!(res.presets[0].name, "a.fxp");
@@ -8496,7 +8568,7 @@ mod tests {
 
         // Explicit MID filter still returns 0 filtered results
         let res = db
-            .query_presets(None, Some("MID"), "name", true, 0, 100)
+            .query_presets(None, Some("MID"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 0);
         // Unfiltered excludes MIDI regardless of format_filter
@@ -8521,7 +8593,7 @@ mod tests {
         .unwrap();
 
         let res = db
-            .query_presets(None, Some("FXP,H2P"), "name", true, 0, 100)
+            .query_presets(None, Some("FXP,H2P"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 3);
         assert_eq!(res.total_unfiltered, 4);
@@ -8541,9 +8613,9 @@ mod tests {
         db.save_preset_scan(&preset_snap("pr-page", "2024-06-01T00:00:00", presets))
             .unwrap();
 
-        let p1 = db.query_presets(None, None, "name", true, 0, 10).unwrap();
-        let p2 = db.query_presets(None, None, "name", true, 10, 10).unwrap();
-        let p3 = db.query_presets(None, None, "name", true, 25, 10).unwrap();
+        let p1 = db.query_presets(None, None, "name", true, false, 0, 10).unwrap();
+        let p2 = db.query_presets(None, None, "name", true, false, 10, 10).unwrap();
+        let p3 = db.query_presets(None, None, "name", true, false, 25, 10).unwrap();
 
         assert_eq!(p1.total_unfiltered, 30);
         assert_eq!(p2.total_unfiltered, 30);
@@ -8584,7 +8656,7 @@ mod tests {
         ))
         .unwrap();
 
-        let res = db.query_plugins(None, None, None, "name", true, 0, 100).unwrap();
+        let res = db.query_plugins(None, None, None, "name", true, false, 0, 100).unwrap();
         assert_eq!(res.total_unfiltered, 4);
         assert_eq!(res.plugins.len(), 4);
         assert_eq!(res.plugins[0].name, "New1");
@@ -8611,7 +8683,7 @@ mod tests {
         .unwrap();
 
         let res = db
-            .query_plugins(None, Some("VST3,AU"), None, "name", true, 0, 100)
+            .query_plugins(None, Some("VST3,AU"), None, "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 4);
         assert_eq!(
@@ -8644,7 +8716,7 @@ mod tests {
         .unwrap();
 
         let res = db
-            .query_plugins(Some("al"), Some("VST3,AU"), None, "name", true, 0, 2)
+            .query_plugins(Some("al"), Some("VST3,AU"), None, "name", true, false, 0, 2)
             .unwrap();
         assert_eq!(res.total_count, 4); // alpha, alpen, alto, alps
         assert_eq!(res.plugins.len(), 2, "LIMIT must be respected");
@@ -8666,13 +8738,13 @@ mod tests {
         .unwrap();
 
         let res = db
-            .query_plugins(None, Some("VST3"), None, "name", true, 0, 100)
+            .query_plugins(None, Some("VST3"), None, "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.total_unfiltered, 4);
 
         let res = db
-            .query_plugins(None, Some("VST3,AU"), None, "name", true, 0, 100)
+            .query_plugins(None, Some("VST3,AU"), None, "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 3);
         assert_eq!(res.total_unfiltered, 4);
@@ -8722,19 +8794,19 @@ mod tests {
         .unwrap();
 
         let r_up = db
-            .query_plugins(None, None, Some("update"), "name", true, 0, 100)
+            .query_plugins(None, None, Some("update"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(r_up.total_count, 1);
         assert_eq!(r_up.plugins[0].name, "HasUpdate");
 
         let r_cur = db
-            .query_plugins(None, None, Some("current"), "name", true, 0, 100)
+            .query_plugins(None, None, Some("current"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(r_cur.total_count, 1);
         assert_eq!(r_cur.plugins[0].name, "Current");
 
         let r_unk = db
-            .query_plugins(None, None, Some("unknown"), "name", true, 0, 100)
+            .query_plugins(None, None, Some("unknown"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(r_unk.total_count, 2);
         let names: Vec<_> = r_unk.plugins.iter().map(|p| p.name.as_str()).collect();
@@ -8742,7 +8814,7 @@ mod tests {
         assert!(names.contains(&"NoCache"));
 
         let r_all = db
-            .query_plugins(None, None, Some("update,current,unknown"), "name", true, 0, 100)
+            .query_plugins(None, None, Some("update,current,unknown"), "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(r_all.total_count, 4);
     }
@@ -8756,8 +8828,8 @@ mod tests {
         db.save_plugin_scan(&plugin_snap("ps-page", "2024-06-01T00:00:00", plugins))
             .unwrap();
 
-        let p1 = db.query_plugins(None, None, None, "name", true, 0, 15).unwrap();
-        let p2 = db.query_plugins(None, None, None, "name", true, 15, 15).unwrap();
+        let p1 = db.query_plugins(None, None, None, "name", true, false, 0, 15).unwrap();
+        let p2 = db.query_plugins(None, None, None, "name", true, false, 15, 15).unwrap();
 
         assert_eq!(p1.total_unfiltered, 40);
         assert_eq!(p2.total_unfiltered, 40);
@@ -8780,7 +8852,7 @@ mod tests {
         .unwrap();
 
         let res = db
-            .query_plugins(Some("Xfer"), None, None, "name", true, 0, 100)
+            .query_plugins(Some("Xfer"), None, None, "name", true, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 2);
         assert_eq!(res.total_unfiltered, 3);

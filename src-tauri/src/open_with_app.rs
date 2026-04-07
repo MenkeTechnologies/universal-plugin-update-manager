@@ -3,7 +3,10 @@
 //! macOS uses `open -a`. Windows and Linux resolve the same human-readable labels the UI uses
 //! (often macOS-oriented) to real executables, then spawn `program path/to/file`.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use std::path::PathBuf;
 
 /// Opens an existing file with a named application.
 pub fn open_with_application(file_path: &Path, app_name: &str) -> Result<(), String> {

@@ -111,14 +111,57 @@ function computeSpectrogramData(raw) {
 async function decodeToBuffer(url) {
     const resp = await fetch(url);
     const ab = await resp.arrayBuffer();
+    return decodeToBufferFromAb(ab);
+}
+
+function decodeToBufferFromAb(ab) {
     const ctx = new OfflineAudioContext(1, 1, 48000);
     return ctx.decodeAudioData(ab.slice(0));
 }
 
 self.onmessage = async (e) => {
     const msg = e.data;
-    const { id, type, url, bars } = msg;
+    const { id, type, url, bars, ab } = msg;
     try {
+        if (type === 'peaksFromBuffer') {
+            const audioBuf = await decodeToBufferFromAb(ab);
+            const raw = audioBuf.getChannelData(0);
+            const peaks = computePeaksFromChannel(raw, bars);
+            self.postMessage({ id, ok: true, peaks });
+            return;
+        }
+        if (type === 'metaFromBuffer') {
+            const audioBuf = await decodeToBufferFromAb(ab);
+            const raw = audioBuf.getChannelData(0);
+            const peaks = computePeaksFromChannel(raw, bars);
+            const sgData = computeSpectrogramData(raw);
+            self.postMessage({ id, ok: true, peaks, sgData });
+            return;
+        }
+        if (type === 'spectrogramFromBuffer') {
+            const audioBuf = await decodeToBufferFromAb(ab);
+            const raw = audioBuf.getChannelData(0);
+            const sgData = computeSpectrogramData(raw);
+            self.postMessage({ id, ok: true, sgData });
+            return;
+        }
+        if (type === 'channelsFromBuffer') {
+            const audioBuf = await decodeToBufferFromAb(ab);
+            const nCh = audioBuf.numberOfChannels;
+            const len = audioBuf.length;
+            const sampleRate = audioBuf.sampleRate;
+            const channels = [];
+            const transfer = [];
+            for (let c = 0; c < nCh; c++) {
+                const src = audioBuf.getChannelData(c);
+                const copy = new Float32Array(len);
+                copy.set(src);
+                channels.push(copy);
+                transfer.push(copy.buffer);
+            }
+            self.postMessage({ id, ok: true, sampleRate, length: len, channels }, transfer);
+            return;
+        }
         if (type === 'peaks') {
             const audioBuf = await decodeToBuffer(url);
             const raw = audioBuf.getChannelData(0);

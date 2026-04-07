@@ -1604,15 +1604,18 @@ async fn db_query_midi(
     format_filter: Option<String>,
     sort_key: Option<String>,
     sort_asc: Option<bool>,
+    search_regex: Option<bool>,
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::MidiQueryResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
         db::global().query_midi(
             search.as_deref(),
             format_filter.as_deref(),
             sort_key.as_deref().unwrap_or("name"),
             sort_asc.unwrap_or(true),
+            search_regex,
             offset.unwrap_or(0),
             limit.unwrap_or(500),
         )
@@ -1625,9 +1628,15 @@ async fn db_query_midi(
 async fn db_midi_filter_stats(
     search: Option<String>,
     format_filter: Option<String>,
+    search_regex: Option<bool>,
 ) -> Result<db::FilterStatsResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
-        db::global().midi_filter_stats(search.as_deref(), format_filter.as_deref())
+        db::global().midi_filter_stats(
+            search.as_deref(),
+            format_filter.as_deref(),
+            search_regex,
+        )
     })
     .await
     .map_err(|e| format!("db_midi_filter_stats task: {e}"))?
@@ -2429,7 +2438,7 @@ async fn extract_project_plugins(file_path: String) -> Result<Vec<xref::PluginRe
     let mut result = xref::extract_plugins(&file_path);
     // Enrich empty manufacturers from scanned plugin database
     if result.iter().any(|p| p.manufacturer.is_empty()) {
-        if let Ok(all) = db::global().query_plugins(None, None, None, "name", true, 0, 100000) {
+        if let Ok(all) = db::global().query_plugins(None, None, None, "name", true, false, 0, 100000) {
             let mfg_map: std::collections::HashMap<String, String> = all
                 .plugins
                 .iter()
@@ -6128,9 +6137,11 @@ async fn db_query_plugins(
     status_filter: Option<String>,
     sort_key: Option<String>,
     sort_asc: Option<bool>,
+    search_regex: Option<bool>,
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::PluginQueryResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
         db::global().query_plugins(
             search.as_deref(),
@@ -6138,6 +6149,7 @@ async fn db_query_plugins(
             status_filter.as_deref(),
             &sort_key.unwrap_or("name".into()),
             sort_asc.unwrap_or(true),
+            search_regex,
             offset.unwrap_or(0),
             limit.unwrap_or(200),
         )
@@ -6152,15 +6164,18 @@ async fn db_query_daw(
     daw_filter: Option<String>,
     sort_key: Option<String>,
     sort_asc: Option<bool>,
+    search_regex: Option<bool>,
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::DawQueryResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
         db::global().query_daw(
             search.as_deref(),
             daw_filter.as_deref(),
             &sort_key.unwrap_or("name".into()),
             sort_asc.unwrap_or(true),
+            search_regex,
             offset.unwrap_or(0),
             limit.unwrap_or(200),
         )
@@ -6175,15 +6190,18 @@ async fn db_query_presets(
     format_filter: Option<String>,
     sort_key: Option<String>,
     sort_asc: Option<bool>,
+    search_regex: Option<bool>,
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::PresetQueryResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
         db::global().query_presets(
             search.as_deref(),
             format_filter.as_deref(),
             &sort_key.unwrap_or("name".into()),
             sort_asc.unwrap_or(true),
+            search_regex,
             offset.unwrap_or(0),
             limit.unwrap_or(200),
         )
@@ -6212,14 +6230,17 @@ async fn db_query_pdfs(
     search: Option<String>,
     sort_key: Option<String>,
     sort_asc: Option<bool>,
+    search_regex: Option<bool>,
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::PdfQueryResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
         db::global().query_pdfs(
             search.as_deref(),
             &sort_key.unwrap_or("name".into()),
             sort_asc.unwrap_or(true),
+            search_regex,
             offset.unwrap_or(0),
             limit.unwrap_or(200),
         )
@@ -6282,7 +6303,7 @@ async fn db_query_palette_preview(search: String) -> Result<PalettePreviewResult
     }
     tokio::task::spawn_blocking(move || {
         let db = db::global();
-        let plugins = db.query_plugins(Some(&search), None, None, "name", true, 0, 6)?;
+        let plugins = db.query_plugins(Some(&search), None, None, "name", true, false, 0, 6)?;
         let audio = db.query_audio(&db::AudioQueryParams {
             scan_id: None,
             search: Some(search.clone()),
@@ -6293,10 +6314,10 @@ async fn db_query_palette_preview(search: String) -> Result<PalettePreviewResult
             offset: 0,
             limit: 6,
         })?;
-        let daw = db.query_daw(Some(&search), None, "name", true, 0, 6)?;
-        let presets = db.query_presets(Some(&search), None, "name", true, 0, 6)?;
-        let pdfs = db.query_pdfs(Some(&search), "name", true, 0, 6)?;
-        let midi = db.query_midi(Some(&search), None, "name", true, 0, 6)?;
+        let daw = db.query_daw(Some(&search), None, "name", true, false, 0, 6)?;
+        let presets = db.query_presets(Some(&search), None, "name", true, false, 0, 6)?;
+        let pdfs = db.query_pdfs(Some(&search), "name", true, false, 0, 6)?;
+        let midi = db.query_midi(Some(&search), None, "name", true, false, 0, 6)?;
         Ok(PalettePreviewResult {
             plugins,
             audio,
@@ -6337,9 +6358,15 @@ async fn db_audio_filter_stats(
 async fn db_daw_filter_stats(
     search: Option<String>,
     daw_filter: Option<String>,
+    search_regex: Option<bool>,
 ) -> Result<db::FilterStatsResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
-        db::global().daw_filter_stats(search.as_deref(), daw_filter.as_deref())
+        db::global().daw_filter_stats(
+            search.as_deref(),
+            daw_filter.as_deref(),
+            search_regex,
+        )
     })
     .await
     .map_err(|e| format!("db_daw_filter_stats task: {e}"))?
@@ -6349,9 +6376,15 @@ async fn db_daw_filter_stats(
 async fn db_preset_filter_stats(
     search: Option<String>,
     format_filter: Option<String>,
+    search_regex: Option<bool>,
 ) -> Result<db::FilterStatsResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
-        db::global().preset_filter_stats(search.as_deref(), format_filter.as_deref())
+        db::global().preset_filter_stats(
+            search.as_deref(),
+            format_filter.as_deref(),
+            search_regex,
+        )
     })
     .await
     .map_err(|e| format!("db_preset_filter_stats task: {e}"))?
@@ -6361,19 +6394,31 @@ async fn db_preset_filter_stats(
 async fn db_plugin_filter_stats(
     search: Option<String>,
     type_filter: Option<String>,
+    search_regex: Option<bool>,
 ) -> Result<db::FilterStatsResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
-        db::global().plugin_filter_stats(search.as_deref(), type_filter.as_deref())
+        db::global().plugin_filter_stats(
+            search.as_deref(),
+            type_filter.as_deref(),
+            search_regex,
+        )
     })
     .await
     .map_err(|e| format!("db_plugin_filter_stats task: {e}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
-async fn db_pdf_filter_stats(search: Option<String>) -> Result<db::FilterStatsResult, String> {
-    tokio::task::spawn_blocking(move || db::global().pdf_filter_stats(search.as_deref()))
-        .await
-        .map_err(|e| format!("db_pdf_filter_stats task: {e}"))?
+async fn db_pdf_filter_stats(
+    search: Option<String>,
+    search_regex: Option<bool>,
+) -> Result<db::FilterStatsResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
+    tokio::task::spawn_blocking(move || {
+        db::global().pdf_filter_stats(search.as_deref(), search_regex)
+    })
+    .await
+    .map_err(|e| format!("db_pdf_filter_stats task: {e}"))?
 }
 
 /// Per-category row counts for the header strip — **library** scope (one row per `path`), not the
