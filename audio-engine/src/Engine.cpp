@@ -921,24 +921,37 @@ struct Engine::Impl
         while (processed < n)
         {
             const juce::String fileId = files[static_cast<size_t>(n - 1 - processed)];
-            if (list.isListingUpToDate(fileId, format))
+            const juce::String displayName = format.getNameOfPluginFromIdentifier(fileId);
+            const bool cacheListingUpToDate = list.isListingUpToDate(fileId, format);
+            if (cacheListingUpToDate)
                 pluginScanProgress.skipped.fetch_add(1, std::memory_order_relaxed);
             {
                 std::lock_guard<std::mutex> lk(pluginScanProgress.mutex);
                 pluginScanProgress.currentFormat = formatLabel;
-                pluginScanProgress.currentName = format.getNameOfPluginFromIdentifier(fileId);
+                pluginScanProgress.currentName = displayName;
             }
+            const int doneBefore = pluginScanProgress.done.load(std::memory_order_relaxed);
+            const int scanSeq = doneBefore + 1;
+            const int totalCandidates = pluginScanProgress.total.load(std::memory_order_relaxed);
+            appLogLine("plugin scan: START " + formatLabel + " scan_seq=" + juce::String(scanSeq)
+                       + " total_candidates=" + juce::String(totalCandidates) + " format_pos=" + juce::String(processed + 1)
+                       + "/" + juce::String(n) + " cache_listing_up_to_date=" + juce::String(cacheListingUpToDate ? "yes" : "no")
+                       + " name=\"" + displayName + "\" file=\"" + fileId + "\"");
             bool more = false;
             try
             {
                 more = scanner.scanNextFile(true, name);
             }
-            catch (const std::exception&)
+            catch (const std::exception& e)
             {
+                appLogLine("plugin scan: EXCEPTION " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
+                           + "\" what=\"" + juce::String(e.what()) + "\"");
                 continue;
             }
             catch (...)
             {
+                appLogLine("plugin scan: EXCEPTION " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
+                           + "\" (non-std)");
                 continue;
             }
             processed++;
@@ -991,6 +1004,11 @@ struct Engine::Impl
         }
 #endif
         pluginScanProgress.total.store(vst3Total + auTotal, std::memory_order_relaxed);
+        appLogLine("plugin scan: worker starting total_candidates=" + juce::String(vst3Total + auTotal) + " vst3=" + juce::String(vst3Total)
+#if JUCE_MAC
+                   + " au=" + juce::String(auTotal)
+#endif
+        );
 
         try
         {
@@ -999,6 +1017,7 @@ struct Engine::Impl
                 scanPluginFormatWithProgress(list, vst3, dirs, deadMans, "VST3");
             }
 #if JUCE_MAC
+            appLogLine("plugin scan: VST3 phase complete; starting AU");
             {
                 const juce::FileSearchPath auDirs = auFormat.getDefaultLocationsToSearch();
                 scanPluginFormatWithProgress(list, auFormat, auDirs, deadMans, "AU");
