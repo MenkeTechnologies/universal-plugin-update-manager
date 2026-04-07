@@ -96,163 +96,163 @@ listen('menu-action', (event) => {
     switch (id) {
         // File
         case 'scan_all':
-            scanAll();
+            if (typeof scanAll === 'function') scanAll();
             break;
         case 'stop_all':
-            stopAll();
+            if (typeof stopAll === 'function') stopAll();
             break;
         case 'export_plugins':
             runExport(exportPlugins);
             break;
         case 'import_plugins':
-            importPlugins();
+            if (typeof importPlugins === 'function') importPlugins();
             break;
         case 'export_audio':
             runExport(exportAudio);
             break;
         case 'import_audio':
-            importAudio();
+            if (typeof importAudio === 'function') importAudio();
             break;
         case 'export_daw':
             runExport(exportDaw);
             break;
         case 'import_daw':
-            importDaw();
+            if (typeof importDaw === 'function') importDaw();
             break;
         case 'export_presets':
             runExport(exportPresets);
             break;
         case 'import_presets':
-            importPresets();
+            if (typeof importPresets === 'function') importPresets();
             break;
         case 'open_prefs':
-            openPrefsFile();
+            if (typeof openPrefsFile === 'function') openPrefsFile();
             break;
         case 'open_prefs_app':
-            switchTab('settings');
+            if (typeof switchTab === 'function') switchTab('settings');
             break;
         // Scan
         case 'scan_plugins':
-            scanPlugins();
+            if (typeof scanPlugins === 'function') scanPlugins();
             break;
         case 'scan_audio':
-            scanAudioSamples();
+            if (typeof scanAudioSamples === 'function') scanAudioSamples();
             break;
         case 'scan_daw':
-            scanDawProjects();
+            if (typeof scanDawProjects === 'function') scanDawProjects();
             break;
         case 'scan_presets':
-            scanPresets();
+            if (typeof scanPresets === 'function') scanPresets();
             break;
         case 'scan_pdfs':
-            scanPdfs();
+            if (typeof scanPdfs === 'function') scanPdfs();
             break;
         case 'check_updates':
-            checkUpdates();
+            if (typeof checkUpdates === 'function') checkUpdates();
             break;
         // View — tabs
         case 'tab_plugins':
-            switchTab('plugins');
+            if (typeof switchTab === 'function') switchTab('plugins');
             break;
         case 'tab_samples':
-            switchTab('samples');
+            if (typeof switchTab === 'function') switchTab('samples');
             break;
         case 'tab_daw':
-            switchTab('daw');
+            if (typeof switchTab === 'function') switchTab('daw');
             break;
         case 'tab_presets':
-            switchTab('presets');
+            if (typeof switchTab === 'function') switchTab('presets');
             break;
         case 'tab_favorites':
-            switchTab('favorites');
+            if (typeof switchTab === 'function') switchTab('favorites');
             break;
         case 'tab_notes':
-            switchTab('notes');
+            if (typeof switchTab === 'function') switchTab('notes');
             break;
         case 'tab_history':
-            switchTab('history');
+            if (typeof switchTab === 'function') switchTab('history');
             break;
         case 'tab_settings':
-            switchTab('settings');
+            if (typeof switchTab === 'function') switchTab('settings');
             break;
         case 'tab_files':
-            switchTab('files');
+            if (typeof switchTab === 'function') switchTab('files');
             break;
         // View — appearance
         case 'toggle_theme':
-            settingToggleTheme();
+            if (typeof settingToggleTheme === 'function') settingToggleTheme();
             break;
         case 'toggle_crt':
-            settingToggleCrt();
+            if (typeof settingToggleCrt === 'function') settingToggleCrt();
             break;
         case 'reset_columns':
-            settingResetColumns();
+            if (typeof settingResetColumns === 'function') settingResetColumns();
             break;
         case 'reset_tabs':
-            settingResetTabOrder();
+            if (typeof settingResetTabOrder === 'function') settingResetTabOrder();
             break;
         // Data
         case 'clear_history':
-            settingClearAllHistory();
+            if (typeof settingClearAllHistory === 'function') settingClearAllHistory();
             break;
         case 'clear_all_databases':
             if (typeof settingClearAllDatabases === 'function') settingClearAllDatabases();
             break;
         case 'clear_kvr':
-            settingClearKvrCache();
+            if (typeof settingClearKvrCache === 'function') settingClearKvrCache();
             break;
         case 'clear_favorites':
-            clearFavorites();
+            if (typeof clearFavorites === 'function') clearFavorites();
             break;
         case 'reset_all':
-            resetAllScans();
+            if (typeof resetAllScans === 'function') resetAllScans();
             break;
         // Playback
         case 'play_pause':
-            toggleAudioPlayback();
+            if (typeof toggleAudioPlayback === 'function') toggleAudioPlayback();
             break;
         case 'toggle_loop':
-            toggleAudioLoop();
+            if (typeof toggleAudioLoop === 'function') toggleAudioLoop();
             break;
         case 'stop_playback':
-            stopAudioPlayback();
+            if (typeof stopAudioPlayback === 'function') stopAudioPlayback();
             break;
         case 'expand_player':
-            togglePlayerExpanded();
+            if (typeof togglePlayerExpanded === 'function') togglePlayerExpanded();
             break;
         case 'next_track':
-            nextTrack();
+            if (typeof nextTrack === 'function') nextTrack();
             break;
         case 'prev_track':
-            prevTrack();
+            if (typeof prevTrack === 'function') prevTrack();
             break;
         case 'toggle_shuffle':
-            toggleShuffle();
+            if (typeof toggleShuffle === 'function') toggleShuffle();
             break;
         case 'toggle_mute':
-            toggleMute();
+            if (typeof toggleMute === 'function') toggleMute();
             break;
         // Tools
         case 'find_duplicates':
-            showDuplicateReport();
+            if (typeof showDuplicateReport === 'function') showDuplicateReport();
             break;
         case 'dep_graph':
-            showDepGraph();
+            if (typeof showDepGraph === 'function') showDepGraph();
             break;
         case 'cmd_palette':
-            openPalette();
+            if (typeof openPalette === 'function') openPalette();
             break;
         case 'help_overlay':
-            toggleHelpOverlay();
+            if (typeof toggleHelpOverlay === 'function') toggleHelpOverlay();
             break;
         // Help
         case 'github':
-            showToast(toastFmt('toast.opening_github'));
-            openUpdate('https://github.com/MenkeTechnologies/Audio-Haxor');
+            if (typeof showToast === 'function') showToast(toastFmt('toast.opening_github'));
+            if (typeof openUpdate === 'function') openUpdate('https://github.com/MenkeTechnologies/Audio-Haxor');
             break;
         case 'docs':
-            showToast(toastFmt('toast.opening_docs'));
-            openUpdate('https://github.com/MenkeTechnologies/Audio-Haxor');
+            if (typeof showToast === 'function') showToast(toastFmt('toast.opening_docs'));
+            if (typeof openUpdate === 'function') openUpdate('https://github.com/MenkeTechnologies/Audio-Haxor');
             break;
         // Find (handled by existing Cmd+F)
         case 'find': {
@@ -1045,8 +1045,6 @@ document.addEventListener('change', (e) => {
         if (typeof showToast === 'function') showToast(toastFmt('toast.locale_changed'), 4000, '');
     }
 });
-document.addEventListener('blur', (e) => {
-}, true);
 
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
@@ -1070,6 +1068,7 @@ document.addEventListener('keydown', (e) => {
 
 function showToast(message, duration = 2500, type = '') {
     const container = document.getElementById('toastContainer');
+    if (!container) return;
     const el = document.createElement('div');
     el.className = 'toast' + (type ? ` toast-${type}` : '');
     el.textContent = message;
@@ -1096,7 +1095,7 @@ window.vstUpdater = {
     onScanProgress: (callback) => {
         const p = listen('scan-progress', (event) => callback(event.payload));
         return () => {
-            p.then(fn => fn());
+            p.then((fn) => fn()).catch(() => {});
         };
     },
     checkUpdates: (plugins) => invoke('check_updates', {plugins}),
@@ -1104,7 +1103,7 @@ window.vstUpdater = {
     onUpdateProgress: (callback) => {
         const p = listen('update-progress', (event) => callback(event.payload));
         return () => {
-            p.then(fn => fn());
+            p.then((fn) => fn()).catch(() => {});
         };
     },
     resolveKvr: (directUrl, pluginName) => invoke('resolve_kvr', {directUrl, pluginName}),
@@ -1126,7 +1125,7 @@ window.vstUpdater = {
     onAudioScanProgress: (callback) => {
         const p = listen('audio-scan-progress', (event) => callback(event.payload));
         return () => {
-            p.then(fn => fn());
+            p.then((fn) => fn()).catch(() => {});
         };
     },
     openAudioFolder: (path) => invoke('open_audio_folder', {filePath: path}),
@@ -1153,7 +1152,7 @@ window.vstUpdater = {
     onPresetScanProgress: (callback) => {
         const p = listen('preset-scan-progress', (event) => callback(event.payload));
         return () => {
-            p.then(fn => fn());
+            p.then((fn) => fn()).catch(() => {});
         };
     },
     openPresetFolder: (path) => invoke('open_preset_folder', {filePath: path}),
@@ -1173,7 +1172,7 @@ window.vstUpdater = {
     onMidiScanProgress: (callback) => {
         const p = listen('midi-scan-progress', (event) => callback(event.payload));
         return () => {
-            p.then(fn => fn());
+            p.then((fn) => fn()).catch(() => {});
         };
     },
     saveMidiScan: (midiFiles, roots) => invoke('midi_history_save', {midiFiles, roots: roots || null}),
@@ -1215,7 +1214,7 @@ window.vstUpdater = {
     onPdfScanProgress: (callback) => {
         const p = listen('pdf-scan-progress', (event) => callback(event.payload));
         return () => {
-            p.then(fn => fn());
+            p.then((fn) => fn()).catch(() => {});
         };
     },
     openPdfFile: (path) => invoke('open_pdf_file', {filePath: path}),
@@ -1238,7 +1237,7 @@ window.vstUpdater = {
     onDawScanProgress: (callback) => {
         const p = listen('daw-scan-progress', (event) => callback(event.payload));
         return () => {
-            p.then(fn => fn());
+            p.then((fn) => fn()).catch(() => {});
         };
     },
     openDawFolder: (path) => invoke('open_daw_folder', {filePath: path}),
@@ -1301,7 +1300,7 @@ window.vstUpdater = {
     onPdfMetadataProgress: (callback) => {
         const p = listen('pdf-metadata-progress', (event) => callback(event.payload));
         return () => {
-            p.then(fn => fn());
+            p.then((fn) => fn()).catch(() => {});
         };
     },
     readAlsXml: (filePath) => invoke('read_als_xml', {filePath}),

@@ -425,7 +425,7 @@ frontend/
     file-browser.js    -- Filesystem navigation with tags + notes
     help-overlay.js    -- Keyboard shortcuts reference overlay
     history.js         -- Scan history management + merged timeline
-    ipc.js             -- Tauri v2 IPC bridge + event delegation
+    ipc.js             -- Tauri v2 IPC bridge + event delegation; `stopAll` stops every scanner plus KVR update check (`stop_updates`); native menu actions use `typeof` guards; Tauri `listen` unlisteners use `.catch` so teardown never rejects
     keyboard-nav.js    -- Arrow key / j/k table row navigation
     kvr.js             -- KVR Audio resolver + cache management
     multi-filter.js    -- Multi-select checkbox dropdowns

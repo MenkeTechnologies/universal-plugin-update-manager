@@ -195,6 +195,8 @@ function getPluginExportableCount() {
 
 async function scanPlugins(resume = false) {
   showGlobalProgress();
+  try {
+  currentOperation = 'scan';
   const btn = document.getElementById('btnScan');
   const resumeBtn = document.getElementById('btnResumeScan');
   const progress = document.getElementById('progressBar');
@@ -230,7 +232,8 @@ async function scanPlugins(resume = false) {
     } else if (data.phase === 'scanning') {
       // Append new plugins to the list incrementally
       allPlugins.push(...data.plugins);
-      const pct = Math.round((data.processed / data.total) * 100);
+      const total = data.total || 0;
+      const pct = total ? Math.round((data.processed / total) * 100) : 0;
       progressFill.style.width = pct + '%';
       const etaStr = eta.estimate(data.processed, data.total);
       btn.innerHTML = `&#8635; ${data.processed} / ${data.total}${etaStr ? ' — ' + etaStr : ''}`;
@@ -310,6 +313,9 @@ async function scanPlugins(resume = false) {
     progressFill.style.animation = '';
     progressFill.style.width = '0%';
   }, 400);
+  } finally {
+    if (currentOperation === 'scan') currentOperation = null;
+  }
 }
 
 function buildPluginCardHtml(p) {
@@ -394,7 +400,8 @@ async function checkUpdates() {
       statusText.textContent = _ui('ui.js.searching_updates', { n: data.total });
       updateEta.start();
     } else if (data.phase === 'checking') {
-      const pct = Math.round((data.processed / data.total) * 100);
+      const total = data.total || 0;
+      const pct = total ? Math.round((data.processed / total) * 100) : 0;
       progressFill.style.width = pct + '%';
       const updateEtaStr = updateEta.estimate(data.processed, data.total);
       btn.innerHTML = `&#9889; ${data.processed} / ${data.total}${updateEtaStr ? ' — ' + updateEtaStr : ''}`;

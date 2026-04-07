@@ -616,6 +616,9 @@ async function stopAll() {
         window.vstUpdater.stopPdfScan().catch(e => {
             if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
         }),
+        window.vstUpdater.stopUpdates().catch(e => {
+            if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+        }),
     ]);
 }
 
