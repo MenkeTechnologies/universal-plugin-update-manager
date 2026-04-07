@@ -503,6 +503,16 @@ function fillAeEngineStatusFromError(statusEl, err) {
 }
 
 /**
+ * @param {object|null|undefined} r — IPC JSON response with optional `error`
+ * @param {string} fallback — when `r` missing or `r.error` absent
+ */
+function throwIfAeNotOk(r, fallback) {
+    if (r && r.ok === true) return;
+    const err = (r && r.error) ? String(r.error) : fallback;
+    throw new Error(err);
+}
+
+/**
  * @param {HTMLInputElement|null|undefined} toneCb
  * @param {object|null|undefined} stream — `engine_state.stream`
  */
@@ -533,19 +543,13 @@ async function refreshAudioEnginePanel() {
 
     try {
         const es = await inv({cmd: 'engine_state'});
-        if (!es || es.ok !== true) {
-            const err = (es && es.error) ? String(es.error) : 'engine_state failed';
-            throw new Error(err);
-        }
+        throwIfAeNotOk(es, 'engine_state failed');
         fillAeEngineStatusOkFromState(statusEl, es);
         fillAeStreamsFromEngineState(es);
         syncAeToneCheckboxFromStream(toneCb, es.stream);
 
         const list = await inv({cmd: 'list_output_devices'});
-        if (!list || list.ok !== true) {
-            const err = (list && list.error) ? String(list.error) : 'list_output_devices failed';
-            throw new Error(err);
-        }
+        throwIfAeNotOk(list, 'list_output_devices failed');
         const devices = Array.isArray(list.devices) ? list.devices : [];
         const saved = typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
             ? prefs.getItem(AE_PREFS_DEVICE)
@@ -672,10 +676,7 @@ async function toggleAeTestTone(enabled) {
     }
     try {
         const r = await inv({cmd: 'set_output_tone', tone: enabled});
-        if (!r || r.ok !== true) {
-            const err = (r && r.error) ? String(r.error) : 'set_output_tone failed';
-            throw new Error(err);
-        }
+        throwIfAeNotOk(r, 'set_output_tone failed');
         const es = await inv({cmd: 'engine_state'});
         fillAeStreamsFromEngineState(es);
         const toneCb = document.getElementById('aeTestTone');
@@ -715,19 +716,13 @@ async function applyAudioEngineDevice() {
 
     try {
         const r = await inv({cmd: 'set_output_device', device_id: id});
-        if (!r || r.ok !== true) {
-            const err = (r && r.error) ? String(r.error) : 'set_output_device failed';
-            throw new Error(err);
-        }
+        throwIfAeNotOk(r, 'set_output_device failed');
         const startPayload = {cmd: 'start_output_stream', device_id: id, tone: toneOn};
         if (bufferFrames !== undefined) {
             startPayload.buffer_frames = bufferFrames;
         }
         const start = await inv(startPayload);
-        if (!start || start.ok !== true) {
-            const err = (start && start.error) ? String(start.error) : 'start_output_stream failed';
-            throw new Error(err);
-        }
+        throwIfAeNotOk(start, 'start_output_stream failed');
         if (statusEl && typeof catalogFmt === 'function') {
             statusEl.textContent = catalogFmt('ui.ae.status_applied_stream', {id});
         }
@@ -768,10 +763,7 @@ async function startAeInputCapture() {
             payload.buffer_frames = bufferFrames;
         }
         const r = await inv(payload);
-        if (!r || r.ok !== true) {
-            const err = (r && r.error) ? String(r.error) : 'start_input_stream failed';
-            throw new Error(err);
-        }
+        throwIfAeNotOk(r, 'start_input_stream failed');
         const es = await inv({cmd: 'engine_state'});
         fillAeStreamsFromEngineState(es);
         fillAeEngineStatusOkFromState(statusEl, es);
@@ -791,10 +783,7 @@ async function stopAeInputCapture() {
 
     try {
         const r = await inv({cmd: 'stop_input_stream'});
-        if (!r || r.ok !== true) {
-            const err = (r && r.error) ? String(r.error) : 'stop_input_stream failed';
-            throw new Error(err);
-        }
+        throwIfAeNotOk(r, 'stop_input_stream failed');
         const es = await inv({cmd: 'engine_state'});
         fillAeStreamsFromEngineState(es);
         fillAeEngineStatusOkFromState(statusEl, es);
@@ -815,10 +804,7 @@ async function stopAeOutputStream() {
 
     try {
         const r = await inv({cmd: 'stop_output_stream'});
-        if (!r || r.ok !== true) {
-            const err = (r && r.error) ? String(r.error) : 'stop_output_stream failed';
-            throw new Error(err);
-        }
+        throwIfAeNotOk(r, 'stop_output_stream failed');
         const es = await inv({cmd: 'engine_state'});
         fillAeEngineStatusOkFromState(statusEl, es);
         fillAeStreamsFromEngineState(es);
