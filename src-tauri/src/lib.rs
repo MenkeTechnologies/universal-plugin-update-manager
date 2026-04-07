@@ -3960,7 +3960,7 @@ fn get_cpu_percent() -> f64 {
     {
         use std::mem::MaybeUninit;
         #[link(name = "kernel32")]
-        extern "system" {
+        unsafe extern "system" {
             fn GetCurrentProcess() -> isize;
             fn GetProcessTimes(
                 h: isize,
@@ -4032,7 +4032,7 @@ fn get_open_fd_count() -> u32 {
     #[cfg(target_os = "windows")]
     {
         #[link(name = "kernel32")]
-        extern "system" {
+        unsafe extern "system" {
             fn GetCurrentProcess() -> isize;
             fn GetProcessHandleCount(h_process: isize, p_count: *mut u32) -> i32;
         }

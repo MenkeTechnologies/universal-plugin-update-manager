@@ -99,7 +99,7 @@ fn resolve_windows_executable(app_name: &str) -> Result<PathBuf, String> {
             ])
             .or_else(|_| vlc_windows());
         }
-        "QuickTime Player" => vlc_windows(),
+        "QuickTime Player" => return vlc_windows(),
         "Audacity" => {
             return where_win("audacity.exe").ok_or_else(|| {
                 "Audacity not found in PATH (install Audacity or pass the full path to Audacity.exe)"
@@ -114,7 +114,7 @@ fn resolve_windows_executable(app_name: &str) -> Result<PathBuf, String> {
                 "Ableton Live executable not found under Program Files or ProgramData".into(),
             );
         }
-        "Adobe Acrobat" => find_adobe_acrobat_windows(),
+        "Adobe Acrobat" => return find_adobe_acrobat_windows(),
         _ => {}
     }
 
@@ -136,10 +136,8 @@ fn where_win(name: &str) -> Option<PathBuf> {
     if !output.status.success() {
         return None;
     }
-    let line = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .next()?
-        .trim();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let line = stdout.lines().next()?.trim();
     if line.is_empty() {
         return None;
     }
@@ -262,10 +260,8 @@ fn which_linux(candidates: &[&str]) -> Option<PathBuf> {
         if !output.status.success() {
             continue;
         }
-        let line = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .next()?
-            .trim();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let line = stdout.lines().next()?.trim();
         if line.is_empty() {
             continue;
         }

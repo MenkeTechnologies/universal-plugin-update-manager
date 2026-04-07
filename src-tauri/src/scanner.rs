@@ -30,11 +30,11 @@ pub struct PluginInfo {
 }
 
 pub fn get_vst_directories() -> Vec<String> {
-    let home = dirs::home_dir().unwrap_or_default();
     let mut dirs_list: Vec<PathBuf> = Vec::new();
 
     #[cfg(target_os = "macos")]
     {
+        let home = dirs::home_dir().unwrap_or_default();
         dirs_list.extend([
             PathBuf::from("/Library/Audio/Plug-Ins/VST"),
             PathBuf::from("/Library/Audio/Plug-Ins/VST3"),
@@ -66,6 +66,7 @@ pub fn get_vst_directories() -> Vec<String> {
 
     #[cfg(target_os = "linux")]
     {
+        let home = dirs::home_dir().unwrap_or_default();
         dirs_list.extend([
             PathBuf::from("/usr/lib/vst"),
             PathBuf::from("/usr/lib/vst3"),
@@ -85,6 +86,7 @@ pub fn get_vst_directories() -> Vec<String> {
         target_os = "windows"
     )))]
     {
+        let home = dirs::home_dir().unwrap_or_default();
         dirs_list.extend([
             PathBuf::from("/usr/lib/vst"),
             PathBuf::from("/usr/lib/vst3"),
