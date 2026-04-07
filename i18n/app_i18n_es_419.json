@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "Preajustes",
   "ui.welcome.recently_played": "Jugado recientemente",
   "ui.welcome.samples": "Muestras",
-  "ui.welcome.tags": "Etiquetas"
+  "ui.welcome.tags": "Etiquetas",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

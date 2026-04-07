@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "Esiasetukset",
   "ui.welcome.recently_played": "Äskettäin pelattu",
   "ui.welcome.samples": "Näytteet",
-  "ui.welcome.tags": "Tunnisteet"
+  "ui.welcome.tags": "Tunnisteet",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

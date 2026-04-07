@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "预设",
   "ui.welcome.recently_played": "最近玩过",
   "ui.welcome.samples": "样品",
-  "ui.welcome.tags": "标签"
+  "ui.welcome.tags": "标签",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

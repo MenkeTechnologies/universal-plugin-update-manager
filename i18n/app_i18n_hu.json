@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "Előbeállítások",
   "ui.welcome.recently_played": "Nemrég játszott",
   "ui.welcome.samples": "Minták",
-  "ui.welcome.tags": "Címkék"
+  "ui.welcome.tags": "Címkék",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

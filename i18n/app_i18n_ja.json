@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "プリセット",
   "ui.welcome.recently_played": "最近プレイした曲",
   "ui.welcome.samples": "サンプル",
-  "ui.welcome.tags": "タグ"
+  "ui.welcome.tags": "タグ",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

@@ -562,6 +562,7 @@
   "toast.revealing_file": "Revealing file...",
   "toast.revealing_first_batch": "Revealing first of {n} items",
   "toast.revealing_preset_finder": "Revealing \"{presetName}\" in Finder...",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path.",
   "toast.reverse_no_track": "Load a track to use reverse playback",
   "toast.reverse_playback_failed": "Reverse playback failed: {err}",
   "toast.row_expand_disabled": "Row expand disabled",

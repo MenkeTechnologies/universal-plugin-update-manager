@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "cài đặt trước",
   "ui.welcome.recently_played": "Đã chơi gần đây",
   "ui.welcome.samples": "Mẫu",
-  "ui.welcome.tags": "Thẻ"
+  "ui.welcome.tags": "Thẻ",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

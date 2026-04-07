@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "Προεπιλογές",
   "ui.welcome.recently_played": "Παίχτηκε πρόσφατα",
   "ui.welcome.samples": "Δείγματα",
-  "ui.welcome.tags": "Ετικέτες"
+  "ui.welcome.tags": "Ετικέτες",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

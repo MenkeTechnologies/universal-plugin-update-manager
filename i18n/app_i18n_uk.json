@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "Предустановки",
   "ui.welcome.recently_played": "Нещодавно зіграно",
   "ui.welcome.samples": "Зразки",
-  "ui.welcome.tags": "Теги"
+  "ui.welcome.tags": "Теги",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

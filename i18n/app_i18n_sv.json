@@ -1883,5 +1883,6 @@
   "ui.welcome.presets": "Förinställningar",
   "ui.welcome.recently_played": "Nyligen spelad",
   "ui.welcome.samples": "Prover",
-  "ui.welcome.tags": "Taggar"
+  "ui.welcome.tags": "Taggar",
+  "toast.reverse_engine_unsupported": "Reverse playback is not available when using the audio engine output path."
 }

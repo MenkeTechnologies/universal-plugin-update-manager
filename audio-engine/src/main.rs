@@ -3,6 +3,8 @@
 //! host keeps one child process and reuses stdin/stdout. **`cpal::Stream` is not `Send` on macOS**,
 //! so output and input streams live on the same audio thread.
 
+mod playback;
+
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -34,6 +36,26 @@ struct Request {
     /// Optional hardware buffer size in frames (clamped to device `buffer_size` range).
     #[serde(default)]
     buffer_frames: Option<u32>,
+    /// After `playback_load`, start decoder + pull PCM from ring (requires F32 output path).
+    #[serde(default)]
+    start_playback: bool,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    position_sec: Option<f64>,
+    #[serde(default)]
+    gain: Option<f32>,
+    #[serde(default)]
+    pan: Option<f32>,
+    #[serde(default)]
+    eq_low_db: Option<f32>,
+    #[serde(default)]
+    eq_mid_db: Option<f32>,
+    #[serde(default)]
+    eq_high_db: Option<f32>,
+    /// `playback_pause` { "paused": true|false }
+    #[serde(default)]
+    paused: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -78,6 +100,7 @@ enum AudioCmd {
         device_id: Option<String>,
         tone: bool,
         buffer_frames: Option<u32>,
+        start_playback: bool,
         reply: mpsc::Sender<Result<serde_json::Value, String>>,
     },
     StartInput {
@@ -121,6 +144,7 @@ fn audio_thread_main(rx: mpsc::Receiver<AudioCmd>) {
                 device_id,
                 tone,
                 buffer_frames,
+                start_playback,
                 reply,
             } => {
                 let res = (|| {
@@ -144,8 +168,25 @@ fn audio_thread_main(rx: mpsc::Receiver<AudioCmd>) {
                     let channels = supported.channels();
                     let sample_format = format!("{:?}", supported.sample_format());
                     let buffer_size = buffer_size_json(supported.buffer_size());
-                    let (stream, tone_flag, stream_buffer_frames) =
-                        build_playback_stream(&device, supported, tone, buffer_frames)?;
+                    let file_pb = if start_playback {
+                        playback::current_playback_shared()
+                    } else {
+                        None
+                    };
+                    let (stream, tone_flag, stream_buffer_frames) = build_playback_stream(
+                        &device,
+                        supported,
+                        tone,
+                        buffer_frames,
+                        file_pb.clone(),
+                    )?;
+                    if start_playback {
+                        if file_pb.is_none() {
+                            return Err("playback_load required before start_playback".to_string());
+                        }
+                        playback::begin_playback(sample_rate_hz)
+                            .map_err(|e| format!("playback: {e}"))?;
+                    }
                     let tone_supported = tone_flag.is_some();
                     let tone_on = tone_flag
                         .as_ref()
@@ -173,7 +214,7 @@ fn audio_thread_main(rx: mpsc::Receiver<AudioCmd>) {
                         "stream_buffer_frames": stream_buffer_frames,
                         "tone_supported": tone_supported,
                         "tone_on": tone_on,
-                        "note": "output stream running (silence or test tone); mixer/plugin graph TBD",
+                        "note": if start_playback { "file playback PCM" } else { "silence or test tone" },
                     }))
                 })();
                 let _ = reply.send(res);
@@ -238,6 +279,7 @@ fn audio_thread_main(rx: mpsc::Receiver<AudioCmd>) {
                 let _ = reply.send(res);
             }
             AudioCmd::Stop { reply } => {
+                playback::stop_playback_thread();
                 let had = current.take().is_some();
                 let _ = reply.send(Ok(had));
             }
@@ -416,9 +458,24 @@ fn dispatch(req: &Request) -> Result<serde_json::Value, String> {
         "set_output_device" => set_output_device(req.device_id.as_deref()),
         "set_input_device" => set_input_device(req.device_id.as_deref()),
         "start_input_stream" => start_input_stream(req.device_id.as_deref(), req.buffer_frames),
-        "start_output_stream" => {
-            start_output_stream(req.device_id.as_deref(), req.tone, req.buffer_frames)
-        }
+        "start_output_stream" => start_output_stream(
+            req.device_id.as_deref(),
+            req.tone,
+            req.buffer_frames,
+            req.start_playback,
+        ),
+        "playback_load" => playback::playback_load(req.path.clone().ok_or_else(|| "path required".to_string())?),
+        "playback_stop" => playback::playback_stop(),
+        "playback_pause" => playback::playback_pause(req.paused.unwrap_or(true)),
+        "playback_seek" => playback::playback_seek(req.position_sec.unwrap_or(0.0)),
+        "playback_set_dsp" => playback::playback_set_dsp(
+            req.gain.unwrap_or(1.0),
+            req.pan.unwrap_or(0.0),
+            req.eq_low_db.unwrap_or(0.0),
+            req.eq_mid_db.unwrap_or(0.0),
+            req.eq_high_db.unwrap_or(0.0),
+        ),
+        "playback_status" => playback::playback_status(),
         "stop_input_stream" => stop_input_stream(),
         "stop_output_stream" => stop_output_stream(),
         "input_stream_status" => input_stream_status(),
@@ -912,12 +969,13 @@ fn build_capture_stream(
     }
 }
 
-/// F32: optional test tone via `tone_flag`. Other formats: silence only, `tone_flag` = None.
+/// F32: file playback ring, optional test tone, or silence. Other formats: silence only, `tone_flag` = None.
 fn build_playback_stream(
     device: &Device,
     supported: SupportedStreamConfig,
     tone_initial: bool,
     buffer_frames: Option<u32>,
+    file_playback: Option<Arc<playback::PlaybackShared>>,
 ) -> Result<(Stream, Option<Arc<AtomicBool>>, Option<u32>), String> {
     let sf = supported.sample_format();
     let bs = supported.buffer_size();
@@ -932,10 +990,15 @@ fn build_playback_stream(
             let phase = Arc::new(AtomicU64::new(0));
             let t = tone_flag.clone();
             let p = phase.clone();
+            let pb = file_playback.clone();
             let stream = device.build_output_stream(
                 &stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     let ch = ch.max(1);
+                    if let Some(ref shared) = pb {
+                        shared.fill_interleaved_f32(data, ch);
+                        return;
+                    }
                     let frames = data.len() / ch;
                     if t.load(Ordering::Relaxed) {
                         let mut i = p.load(Ordering::Relaxed);
@@ -1069,6 +1132,7 @@ fn start_output_stream(
     device_id: Option<&str>,
     tone: bool,
     buffer_frames: Option<u32>,
+    start_playback: bool,
 ) -> Result<serde_json::Value, String> {
     let (reply_tx, reply_rx) = mpsc::channel();
     audio_thread_tx()
@@ -1076,6 +1140,7 @@ fn start_output_stream(
             device_id: device_id.map(|s| s.to_string()),
             tone,
             buffer_frames,
+            start_playback,
             reply: reply_tx,
         })
         .map_err(|_| "audio engine thread unavailable".to_string())?;

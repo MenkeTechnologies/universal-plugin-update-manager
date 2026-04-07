@@ -825,3 +825,117 @@ async function stopAeOutputStream() {
         if (es && es.stream) syncAeToneCheckboxFromStream(toneCb, es.stream);
     }
 }
+
+// ── Library playback via sidecar (PCM + EQ in engine; WebView stays silent) ──
+
+/** @type {ReturnType<typeof setInterval> | null} */
+let _enginePlaybackPollTimer = null;
+
+function stopEnginePlaybackPoll() {
+    if (_enginePlaybackPollTimer != null) {
+        clearInterval(_enginePlaybackPollTimer);
+        _enginePlaybackPollTimer = null;
+    }
+}
+
+function startEnginePlaybackPoll() {
+    stopEnginePlaybackPoll();
+    const tick = async () => {
+        const inv = getAeAudioEngineInvoke();
+        if (!inv) return;
+        try {
+            const st = await inv({cmd: 'playback_status'});
+            if (st && st.ok === true && st.loaded === true) {
+                window._enginePlaybackPosSec = typeof st.position_sec === 'number' ? st.position_sec : 0;
+                window._enginePlaybackDurSec = typeof st.duration_sec === 'number' ? st.duration_sec : 0;
+                window._enginePlaybackPaused = st.paused === true;
+                window._enginePlaybackPeak = typeof st.peak === 'number' ? st.peak : 0;
+                if (typeof updatePlaybackTime === 'function') updatePlaybackTime();
+            }
+        } catch {
+            /* ignore */
+        }
+    };
+    void tick();
+    _enginePlaybackPollTimer = setInterval(() => void tick(), 100);
+}
+
+/**
+ * Push now-playing EQ / gain / pan prefs to the engine DSP path.
+ */
+function syncEnginePlaybackDspFromPrefs() {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv || typeof prefs === 'undefined' || typeof prefs.getItem !== 'function') return;
+    const g = parseFloat(prefs.getItem('preampGain') || '1') || 1;
+    const pan = parseFloat(prefs.getItem('audioPan') || '0') || 0;
+    const low = parseFloat(prefs.getItem('eqLow') || '0') || 0;
+    const mid = parseFloat(prefs.getItem('eqMid') || '0') || 0;
+    const high = parseFloat(prefs.getItem('eqHigh') || '0') || 0;
+    void inv({
+        cmd: 'playback_set_dsp',
+        gain: g,
+        pan,
+        eq_low_db: low,
+        eq_mid_db: mid,
+        eq_high_db: high,
+    });
+}
+
+/**
+ * Load file + start cpal output with `start_playback` (see audio-engine README).
+ * @param {string} filePath — absolute host path
+ */
+async function enginePlaybackStart(filePath) {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) throw new Error('audio engine IPC unavailable');
+    let r = await inv({cmd: 'playback_load', path: filePath});
+    throwIfAeNotOk(r, 'playback_load failed');
+    const deviceId =
+        typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+            ? prefs.getItem(AE_PREFS_DEVICE) || ''
+            : '';
+    const bufOut = document.getElementById('aeBufferFramesOutput');
+    const bfRaw = bufOut && typeof bufOut.value === 'string' ? bufOut.value : '';
+    const bufferFrames = parseAeBufferFramesPref(bfRaw);
+    await inv({cmd: 'stop_output_stream'});
+    await inv({cmd: 'set_output_device', device_id: deviceId});
+    const payload = {
+        cmd: 'start_output_stream',
+        device_id: deviceId,
+        tone: false,
+        start_playback: true,
+    };
+    if (bufferFrames !== undefined) {
+        payload.buffer_frames = bufferFrames;
+    }
+    r = await inv(payload);
+    throwIfAeNotOk(r, 'start_output_stream failed');
+    syncEnginePlaybackDspFromPrefs();
+    startEnginePlaybackPoll();
+}
+
+async function enginePlaybackStop() {
+    stopEnginePlaybackPoll();
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) return;
+    try {
+        await inv({cmd: 'stop_output_stream'});
+    } catch {
+        /* ignore */
+    }
+    try {
+        await inv({cmd: 'playback_stop'});
+    } catch {
+        /* ignore */
+    }
+    window._enginePlaybackPosSec = 0;
+    window._enginePlaybackDurSec = 0;
+    window._enginePlaybackPaused = false;
+}
+
+if (typeof window !== 'undefined') {
+    window.enginePlaybackStart = enginePlaybackStart;
+    window.enginePlaybackStop = enginePlaybackStop;
+    window.syncEnginePlaybackDspFromPrefs = syncEnginePlaybackDspFromPrefs;
+    window.stopEnginePlaybackPoll = stopEnginePlaybackPoll;
+}
