@@ -65,8 +65,8 @@ function _hmPartialSampleHintCard(agg, samples) {
 }
 
 function showHeatmapDashboard() {
-    let existing = document.getElementById('heatmapDashModal');
-    if (existing) existing.remove();
+    // Remove every overlay (invalid duplicate ids can leave multiple nodes; getElementById only removes one).
+    document.querySelectorAll('#heatmapDashModal').forEach((el) => el.remove());
 
     const samples = typeof allAudioSamples !== 'undefined' ? allAudioSamples : [];
     const plugins = typeof allPlugins !== 'undefined' ? allPlugins : [];
@@ -87,6 +87,8 @@ function showHeatmapDashboard() {
     </div>
   </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
+    const root = document.getElementById('heatmapDashModal');
+    if (!root) return;
 
     // DB aggregates were blocking modal insert; fetch after paint so the shell appears immediately.
     requestAnimationFrame(() => {
@@ -98,20 +100,20 @@ function showHeatmapDashboard() {
                 } catch (e) {
                     if (typeof console !== 'undefined' && console.warn) console.warn('heatmap DB aggregates', e);
                 }
-                renderDashboard(samples, plugins, projects, presets, agg);
+                if (!document.body.contains(root)) return;
+                renderDashboard(root, samples, plugins, projects, presets, agg);
             })();
         });
     });
 }
 
 function closeHeatmapDash() {
-    const el = document.getElementById('heatmapDashModal');
-    if (el) el.remove();
+    document.querySelectorAll('#heatmapDashModal').forEach((el) => el.remove());
 }
 
-function renderDashboard(samples, plugins, projects, presets, agg) {
-    const overview = document.getElementById('hmOverview');
-    const grid = document.getElementById('hmGrid');
+function renderDashboard(root, samples, plugins, projects, presets, agg) {
+    const overview = root.querySelector('.hm-overview');
+    const grid = root.querySelector('.hm-grid');
     if (!overview || !grid) return;
 
     const t = _hmOverviewTotals(agg, samples, plugins, projects, presets);
@@ -161,10 +163,10 @@ function renderDashboard(samples, plugins, projects, presets, agg) {
         });
     }
 
-    // Render canvases after DOM insertion
-    renderBpmHistogram();
-    renderKeyWheel();
-    renderTimelineChart(samples);
+    // Render canvases after DOM insertion (scoped to this modal — getElementById would hit the wrong overlay if ids ever duplicated)
+    renderBpmHistogram(root);
+    renderKeyWheel(root);
+    renderTimelineChart(root, samples);
 
     // Apply bar widths after layout resolves (flex containers need a frame to get correct widths)
     requestAnimationFrame(() => {
@@ -341,8 +343,8 @@ function buildDawFormatCard(projects, agg) {
 
 // ── Canvas Renderers ──
 
-function renderBpmHistogram() {
-    const canvas = document.getElementById('hmBpmCanvas');
+function renderBpmHistogram(root) {
+    const canvas = root.querySelector('#hmBpmCanvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
@@ -384,8 +386,8 @@ function renderBpmHistogram() {
     }
 }
 
-function renderKeyWheel() {
-    const canvas = document.getElementById('hmKeyCanvas');
+function renderKeyWheel(root) {
+    const canvas = root.querySelector('#hmKeyCanvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
@@ -432,8 +434,8 @@ function renderKeyWheel() {
     }
 }
 
-function renderTimelineChart(samples) {
-    const canvas = document.getElementById('hmTimelineCanvas');
+function renderTimelineChart(root, samples) {
+    const canvas = root.querySelector('#hmTimelineCanvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
@@ -484,9 +486,7 @@ document.addEventListener('click', (e) => {
             closeHeatmapDash();
         }
     }
-    if (e.target.closest('[data-action="showHeatmapDash"]')) {
-        void showHeatmapDashboard();
-    }
+    // showHeatmapDash is handled by ipc.js delegated click — do not duplicate here or two opens can stack overlays.
 });
 
 document.addEventListener('keydown', (e) => {
