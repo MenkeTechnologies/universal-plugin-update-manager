@@ -1182,9 +1182,10 @@ window.vstUpdater = {
     getLatestMidiScan: () => invoke('midi_history_latest'),
     diffMidiScans: (oldId, newId) => invoke('midi_history_diff', {oldId, newId}),
     dbQueryMidi: (params) => invoke('db_query_midi', params || {}),
-    dbMidiFilterStats: (search, formatFilter) => invoke('db_midi_filter_stats', {
+    dbMidiFilterStats: (search, formatFilter, searchRegex) => invoke('db_midi_filter_stats', {
         search: search || null,
-        format_filter: formatFilter || null
+        format_filter: formatFilter || null,
+        search_regex: !!searchRegex,
     }),
     // PDFs
     scanPdfs: (customRoots, excludePaths) => invoke('scan_pdfs', {
@@ -1361,15 +1362,20 @@ window.vstUpdater = {
         daw_filter: dawFilter || null,
         search_regex: !!searchRegex,
     }),
-    dbPresetFilterStats: (search, formatFilter) => invoke('db_preset_filter_stats', {
+    dbPresetFilterStats: (search, formatFilter, searchRegex) => invoke('db_preset_filter_stats', {
         search: search || null,
-        format_filter: formatFilter || null
+        format_filter: formatFilter || null,
+        search_regex: !!searchRegex,
     }),
-    dbPluginFilterStats: (search, typeFilter) => invoke('db_plugin_filter_stats', {
+    dbPluginFilterStats: (search, typeFilter, searchRegex) => invoke('db_plugin_filter_stats', {
         search: search || null,
-        type_filter: typeFilter || null
+        type_filter: typeFilter || null,
+        search_regex: !!searchRegex,
     }),
-    dbPdfFilterStats: (search) => invoke('db_pdf_filter_stats', {search: search || null}),
+    dbPdfFilterStats: (search, searchRegex) => invoke('db_pdf_filter_stats', {
+        search: search || null,
+        search_regex: !!searchRegex,
+    }),
 };
 
 // ── Preferences layer (file-backed, survives reboots) ──

@@ -12,10 +12,10 @@ async function fetchHeatmapDbAggregates() {
     if (!vu || typeof vu.dbAudioFilterStats !== 'function') return null;
     try {
         const [audio, plugins, daw, presets] = await Promise.all([
-            vu.dbAudioFilterStats(null, null),
-            vu.dbPluginFilterStats(null, null),
-            vu.dbDawFilterStats(null, null),
-            vu.dbPresetFilterStats(null, null),
+            vu.dbAudioFilterStats(null, null, false),
+            vu.dbPluginFilterStats(null, null, false),
+            vu.dbDawFilterStats(null, null, false),
+            vu.dbPresetFilterStats(null, null, false),
         ]);
         return {audio, plugins, daw, presets};
     } catch (e) {

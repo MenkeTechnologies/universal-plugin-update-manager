@@ -94,6 +94,7 @@ async function fetchPluginPage() {
             status_filter: statusFilter,
             sort_key: _pluginSortKey,
             sort_asc: _pluginSortAsc,
+            search_regex: _lastPluginMode === 'regex',
             offset: _pluginOffset,
             limit: AUDIO_PAGE_SIZE,
         });
@@ -156,6 +157,7 @@ async function fetchPluginsForExport() {
                 status_filter: statusFilter,
                 sort_key: _pluginSortKey,
                 sort_asc: _pluginSortAsc,
+                search_regex: _lastPluginMode === 'regex',
                 offset: 0,
                 limit: 1,
             });
@@ -172,6 +174,7 @@ async function fetchPluginsForExport() {
         status_filter: statusFilter,
         sort_key: _pluginSortKey,
         sort_asc: _pluginSortAsc,
+        search_regex: _lastPluginMode === 'regex',
         offset: 0,
         limit: n,
     });

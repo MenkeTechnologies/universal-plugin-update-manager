@@ -65,6 +65,7 @@ async function fetchPdfPage() {
             search: search || null,
             sort_key: backendSortKey,
             sort_asc: pdfSortAsc,
+            search_regex: _lastPdfMode === 'regex',
             offset: _pdfOffset,
             limit: PDF_PAGE_SIZE,
         });
@@ -112,7 +113,8 @@ async function rebuildPdfStats(force) {
     const statsEl = document.getElementById('pdfStats');
     if (!statsEl) return;
     const search = document.getElementById('pdfSearchInput')?.value || '';
-    const key = search.trim();
+    const regexOn = typeof getSearchMode === 'function' && getSearchMode('regexPdf') === 'regex';
+    const key = search.trim() + '|' + (regexOn ? 'r' : 'f');
     let displayCount = 0, displayBytes = 0, unfiltered = 0;
     {
         const cacheHit = !force && key === _lastPdfAggKey && _pdfAggCache;
@@ -121,7 +123,7 @@ async function rebuildPdfStats(force) {
             if (cacheHit) {
                 agg = _pdfAggCache;
             } else {
-                agg = await window.vstUpdater.dbPdfFilterStats(search.trim());
+                agg = await window.vstUpdater.dbPdfFilterStats(search.trim(), regexOn);
                 if (typeof yieldToBrowser === 'function') await yieldToBrowser();
                 _lastPdfAggKey = key;
                 _pdfAggCache = agg;
@@ -300,6 +302,7 @@ async function fetchPdfsForExport() {
                 search: search || null,
                 sort_key: backendSortKey,
                 sort_asc: pdfSortAsc,
+                search_regex: _lastPdfMode === 'regex',
                 offset: 0,
                 limit: 1,
             });
@@ -315,6 +318,7 @@ async function fetchPdfsForExport() {
         search: search || null,
         sort_key: backendSortKey,
         sort_asc: pdfSortAsc,
+        search_regex: _lastPdfMode === 'regex',
         offset: 0,
         limit: n,
     });

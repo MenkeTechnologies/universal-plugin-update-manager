@@ -76,6 +76,7 @@ async function fetchPresetPage() {
             format_filter: formatFilter,
             sort_key: presetSortKey,
             sort_asc: presetSortAsc,
+            search_regex: _lastPresetMode === 'regex',
             offset: _presetOffset,
             limit: PRESET_PAGE_SIZE,
         });
@@ -161,7 +162,8 @@ async function rebuildPresetStats(force) {
     const search = document.getElementById('presetSearchInput')?.value || '';
     const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('presetFormatFilter') : null;
     const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
-    const key = search.trim() + '|' + (formatFilter || '');
+    const regexOn = typeof getSearchMode === 'function' && getSearchMode('regexPresets') === 'regex';
+    const key = search.trim() + '|' + (formatFilter || '') + '|' + (regexOn ? 'r' : 'f');
     let count = 0, bytes = 0, unfiltered = 0, byType = {};
     {
         const cacheHit = !force && key === _lastPresetAggKey && _presetAggCache;
@@ -170,7 +172,7 @@ async function rebuildPresetStats(force) {
             if (cacheHit) {
                 agg = _presetAggCache;
             } else {
-                agg = await window.vstUpdater.dbPresetFilterStats(search.trim(), formatFilter);
+                agg = await window.vstUpdater.dbPresetFilterStats(search.trim(), formatFilter, regexOn);
                 if (typeof yieldToBrowser === 'function') await yieldToBrowser();
                 _lastPresetAggKey = key;
                 _presetAggCache = agg;
@@ -273,6 +275,7 @@ async function fetchPresetsForExport() {
                 format_filter: formatFilter,
                 sort_key: presetSortKey,
                 sort_asc: presetSortAsc,
+                search_regex: _lastPresetMode === 'regex',
                 offset: 0,
                 limit: 1,
             });
@@ -288,6 +291,7 @@ async function fetchPresetsForExport() {
         format_filter: formatFilter,
         sort_key: presetSortKey,
         sort_asc: presetSortAsc,
+        search_regex: _lastPresetMode === 'regex',
         offset: 0,
         limit: n,
     });

@@ -97,6 +97,7 @@ async function fetchMidiPage() {
             format_filter: null,
             sort_key: midiSortKey,
             sort_asc: midiSortAsc,
+            search_regex: _lastMidiMode === 'regex',
             offset: _midiOffset,
             limit: MIDI_PAGE_SIZE,
         });
@@ -104,8 +105,7 @@ async function fetchMidiPage() {
         let files = result.midiFiles || [];
         // Re-sort by fzf relevance when searching
         if (search && files.length > 1 && typeof searchScore === 'function') {
-            const mode = typeof getSearchMode === 'function' ? getSearchMode('regexMidi') : 'fuzzy';
-            const scored = files.map(s => ({s, score: searchScore(search, [s.name, s.directory || ''], mode)}));
+            const scored = files.map(s => ({s, score: searchScore(search, [s.name, s.directory || ''], _lastMidiMode)}));
             scored.sort((a, b) => b.score - a.score);
             files = scored.map(x => x.s);
         }
@@ -136,7 +136,7 @@ async function fetchMidiPage() {
 async function refreshMidiStatsSnapshot(force) {
     try {
         const search = _midiSearch || '';
-        const agg = await window.vstUpdater.dbMidiFilterStats(search, null);
+        const agg = await window.vstUpdater.dbMidiFilterStats(search, null, _lastMidiMode === 'regex');
         if (typeof yieldToBrowser === 'function') await yieldToBrowser();
         _midiStatsSnapshot = {
             count: agg.count || 0,
@@ -223,10 +223,9 @@ async function scanMidi(resume = false, overrideRoots = null) {
             if (allMidiFiles.length > 100000) allMidiFiles.length = 100000;
             if (filteredMidi.length > 100000) filteredMidi.length = 100000;
             const q = (typeof _midiSearch === 'string' && _midiSearch) ? _midiSearch : '';
-            const mode = typeof getSearchMode === 'function' ? getSearchMode('regexMidi') : 'fuzzy';
             const matching = q
                 ? toAdd.filter(s => typeof searchMatch === 'function'
-                    ? searchMatch(q, [s.name, s.directory || ''], mode)
+                    ? searchMatch(q, [s.name, s.directory || ''], _lastMidiMode)
                     : s.name.toLowerCase().includes(q.toLowerCase()))
                 : toAdd;
             filteredMidi.push(...matching);
@@ -249,10 +248,9 @@ async function scanMidi(resume = false, overrideRoots = null) {
         if (allMidiFiles.length > 100000) allMidiFiles.length = 100000;
         if (filteredMidi.length > 100000) filteredMidi.length = 100000;
         const q = (typeof _midiSearch === 'string' && _midiSearch) ? _midiSearch : '';
-        const mode = typeof getSearchMode === 'function' ? getSearchMode('regexMidi') : 'fuzzy';
         const matching = q
             ? toAdd.filter(s => typeof searchMatch === 'function'
-                ? searchMatch(q, [s.name, s.directory || ''], mode)
+                ? searchMatch(q, [s.name, s.directory || ''], _lastMidiMode)
                 : s.name.toLowerCase().includes(q.toLowerCase()))
             : toAdd;
         filteredMidi.push(...matching);
@@ -416,6 +414,7 @@ function updateMidiHeaderCount() {
 }
 
 let _midiSearch = '';
+let _lastMidiMode = 'fuzzy';
 
 registerFilter('filterMidi', {
     inputId: 'midiSearchInput',
@@ -426,6 +425,7 @@ registerFilter('filterMidi', {
     },
     fetchFn() {
         _midiSearch = this.lastSearch || '';
+        _lastMidiMode = this.lastMode || 'fuzzy';
         fetchMidiPage();
         refreshMidiStatsSnapshot();
     },
@@ -448,6 +448,7 @@ async function fetchMidiFilesForExport() {
                 format_filter: null,
                 sort_key: midiSortKey,
                 sort_asc: midiSortAsc,
+                search_regex: _lastMidiMode === 'regex',
                 offset: 0,
                 limit: 1,
             });
@@ -463,13 +464,13 @@ async function fetchMidiFilesForExport() {
         format_filter: null,
         sort_key: midiSortKey,
         sort_asc: midiSortAsc,
+        search_regex: _lastMidiMode === 'regex',
         offset: 0,
         limit: n,
     });
     let files = result.midiFiles || [];
     if (search && files.length > 1 && typeof searchScore === 'function') {
-        const mode = typeof getSearchMode === 'function' ? getSearchMode('regexMidi') : 'fuzzy';
-        const scored = files.map((s) => ({s, score: searchScore(search, [s.name, s.directory || ''], mode)}));
+        const scored = files.map((s) => ({s, score: searchScore(search, [s.name, s.directory || ''], _lastMidiMode)}));
         scored.sort((a, b) => b.score - a.score);
         files = scored.map((x) => x.s);
     }
@@ -653,7 +654,7 @@ function buildMidiRow(s) {
         : _midiFmt('menu.reveal_in_finder');
     return `<tr data-midi-path="${hp}" title="${rowTitle}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
-    <td class="col-name" title="${hn}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.name, _midiSearch, 'fuzzy') : hn}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
+    <td class="col-name" title="${hn}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.name, _midiSearch, _lastMidiMode) : hn}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
     <td style="text-align:center;">${info ? info.trackCount : ''}</td>
     <td style="text-align:center;color:var(--cyan);">${info ? info.tempo : ''}</td>
     <td style="text-align:center;">${info ? info.timeSignature : ''}</td>
@@ -662,7 +663,7 @@ function buildMidiRow(s) {
     <td style="text-align:center;">${info ? info.channelsUsed : ''}</td>
     <td style="text-align:center;">${dur}</td>
     <td class="col-size">${s.sizeFormatted}</td>
-    <td class="col-path" title="${hp}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.directory, _midiSearch, 'fuzzy') : (typeof escapeHtml === 'function' ? escapeHtml(s.directory) : s.directory)}</td>
+    <td class="col-path" title="${hp}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.directory, _midiSearch, _lastMidiMode) : (typeof escapeHtml === 'function' ? escapeHtml(s.directory) : s.directory)}</td>
     <td class="col-actions" data-action-stop>
       <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${hp}" title="${revealT}">&#128193;</button>
     </td>

@@ -81,11 +81,12 @@ async function updatePluginDiskUsage(force) {
     const search = document.getElementById('searchInput')?.value || '';
     const typeSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('typeFilter') : null;
     const typeFilter = typeSet ? [...typeSet].join(',') : null;
-    const key = search.trim() + '|' + (typeFilter || '');
+    const regexOn = typeof getSearchMode === 'function' && getSearchMode('regexPlugins') === 'regex';
+    const key = search.trim() + '|' + (typeFilter || '') + '|' + (regexOn ? 'r' : 'f');
     let counts = {}, bytes = {}, total = 0, unfiltered = 0, totalBytes = 0;
     const cacheHit = !force && key === _lastPluginAggKey && _pluginAggCache;
     try {
-        const agg = cacheHit ? _pluginAggCache : await window.vstUpdater.dbPluginFilterStats(search.trim(), typeFilter);
+        const agg = cacheHit ? _pluginAggCache : await window.vstUpdater.dbPluginFilterStats(search.trim(), typeFilter, regexOn);
         if (!cacheHit) {
             _lastPluginAggKey = key;
             _pluginAggCache = agg;
