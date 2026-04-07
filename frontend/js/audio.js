@@ -515,6 +515,17 @@ function isAudioPlaying() {
 }
 
 /**
+ * `playback_status` poll (~100ms) sets `_enginePlaybackPaused`. After `playback_pause` IPC, apply the
+ * same value immediately so `isAudioPlaying()` matches buttons (context menu → `previewAudio`, main bar,
+ * sample rows) before the next poll.
+ */
+function applyEnginePlaybackPausedFromTransport(paused) {
+    if (typeof window !== 'undefined') {
+        window._enginePlaybackPaused = paused === true;
+    }
+}
+
+/**
  * True when `window._engineSpectrumU8` should drive the floating mini FFT, parametric EQ fill, etc.
  * Matches `visualizer.js` `_vizEngineSpectrumOk`: library playback through the AudioEngine, or any
  * Audio Engine output with an FFT tap (`_aeOutputStreamRunning`).
@@ -2460,17 +2471,20 @@ function buildAudioRow(s) {
 async function previewAudio(filePath) {
     if (audioPlayerPath === filePath && isAudioPlaying()) {
         if (_enginePlaybackActive && typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
+            applyEnginePlaybackPausedFromTransport(true);
             void window.vstUpdater.audioEngineInvoke({cmd: 'playback_pause', paused: true});
         } else if (audioReverseMode) pauseReverseBufferPlayback();
         else audioPlayer.pause();
         updatePlayBtnStates();
         updateNowPlayingBtn();
+        if (typeof window.syncAeTransportFromPlayback === 'function') window.syncAeTransportFromPlayback();
         return;
     }
 
     if (audioPlayerPath === filePath && !isAudioPlaying()) {
         if (_enginePlaybackActive && typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
             await window.vstUpdater.audioEngineInvoke({cmd: 'playback_pause', paused: false});
+            applyEnginePlaybackPausedFromTransport(false);
         } else if (audioReverseMode) {
             startReverseBufferFromOffset(_pausedOffsetInRev);
         } else {
@@ -2485,6 +2499,7 @@ async function previewAudio(filePath) {
         }
         updatePlayBtnStates();
         updateNowPlayingBtn();
+        if (typeof window.syncAeTransportFromPlayback === 'function') window.syncAeTransportFromPlayback();
         scheduleNowPlayingWaveform(filePath);
         return;
     }
@@ -2607,9 +2622,11 @@ function toggleAudioPlayback() {
     }
     if (_enginePlaybackActive && typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
         const playing = isAudioPlaying();
+        applyEnginePlaybackPausedFromTransport(playing);
         void window.vstUpdater.audioEngineInvoke({cmd: 'playback_pause', paused: playing});
         updatePlayBtnStates();
         updateNowPlayingBtn();
+        if (typeof window.syncAeTransportFromPlayback === 'function') window.syncAeTransportFromPlayback();
         return;
     }
     if (audioReverseMode) {
