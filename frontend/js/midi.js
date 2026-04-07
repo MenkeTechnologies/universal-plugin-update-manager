@@ -19,8 +19,7 @@ let _midiOffset = 0;
 let _midiTotalCount = 0;      // filtered count from DB
 let _midiTotalUnfiltered = 0; // unfiltered count from DB
 let _midiStatsSnapshot = null;
-const MIDI_PAGE_SIZE = 200;
-/** Monotonic id so stale `dbQueryMidi` results never overwrite a newer filter. */
+/** Monotonic id so stale `dbQueryMidi` results never overwrite a newer filter. (`MIDI_PAGE_SIZE` lives in ipc.js.) */
 let _midiQuerySeq = 0;
 
 function mountMidiTableShell() {

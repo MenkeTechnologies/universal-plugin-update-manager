@@ -1391,6 +1391,9 @@ let pluginsWithUpdates = [];
 let currentOperation = null; // 'scan' or 'updates'
 let AUDIO_PAGE_SIZE = 200;
 let DAW_PAGE_SIZE = 200;
+/** Paginated MIDI / PDF tabs — kept in sync with Settings → Performance → Table Page Size. */
+let MIDI_PAGE_SIZE = 200;
+let PDF_PAGE_SIZE = 200;
 
 // Common audio plugin manufacturers where bundle ID doesn't match KVR slug
 const KVR_MANUFACTURER_MAP = {

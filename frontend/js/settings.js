@@ -975,9 +975,12 @@ function settingToggleIncludeBackups() {
 function settingUpdatePageSize(val) {
   document.getElementById('settingPageSizeValue').textContent = val;
   prefs.setItem('pageSize', val);
-  AUDIO_PAGE_SIZE = parseInt(val, 10);
-  DAW_PAGE_SIZE = parseInt(val, 10);
-  PRESET_PAGE_SIZE = parseInt(val, 10);
+  const n = parseInt(val, 10);
+  AUDIO_PAGE_SIZE = n;
+  DAW_PAGE_SIZE = n;
+  PRESET_PAGE_SIZE = n;
+  MIDI_PAGE_SIZE = n;
+  PDF_PAGE_SIZE = n;
 }
 
 function settingUpdateFlushInterval(val) {
@@ -1639,6 +1642,8 @@ function restoreSettings() {
   AUDIO_PAGE_SIZE = pageSize;
   DAW_PAGE_SIZE = pageSize;
   PRESET_PAGE_SIZE = pageSize;
+  MIDI_PAGE_SIZE = pageSize;
+  PDF_PAGE_SIZE = pageSize;
 
   const uiLoc = prefs.getItem('uiLocale');
   const localeSel = document.getElementById('settingUiLocale');

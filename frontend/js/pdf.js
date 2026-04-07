@@ -9,7 +9,6 @@ let filteredPdfs = [];
 let pdfSortKey = 'name';
 let pdfSortAsc = true;
 let pdfScanProgressCleanup = null;
-let PDF_PAGE_SIZE = 200;
 let pdfRenderCount = 0;
 let _pdfOffset = 0;
 let _pdfTotalCount = 0;
