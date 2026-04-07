@@ -19,7 +19,16 @@
     }
 
     function listDragChildren(container, childSelector) {
-        return [...container.children].filter((c) => c.matches(childSelector));
+        const ch = container.children;
+        if (ch == null) {
+            if (typeof container.querySelectorAll === 'function') {
+                return [...container.querySelectorAll(childSelector)].filter(
+                    (c) => (c.parentElement || c.parentNode) === container
+                );
+            }
+            return [];
+        }
+        return Array.from(ch).filter((c) => c.matches(childSelector));
     }
 
     document.addEventListener('mousemove', (e) => {

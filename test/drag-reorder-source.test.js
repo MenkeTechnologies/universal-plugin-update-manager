@@ -36,13 +36,11 @@ describe('frontend/js/drag-reorder.js initDragReorder (vm-loaded)', () => {
   });
 
   it('reorders children to match saved key list', () => {
-    const items = [
-      { dataset: { dragKey: 'alpha' } },
-      { dataset: { dragKey: 'beta' } },
-      { dataset: { dragKey: 'gamma' } },
-    ];
     const container = {
       _children: [],
+      get children() {
+        return this._children;
+      },
       querySelectorAll(sel) {
         if (sel === '[data-drag-key]') return [...this._children];
         return [];
@@ -50,11 +48,17 @@ describe('frontend/js/drag-reorder.js initDragReorder (vm-loaded)', () => {
       appendChild(node) {
         const i = this._children.indexOf(node);
         if (i >= 0) this._children.splice(i, 1);
+        node.parentElement = this;
         this._children.push(node);
       },
       addEventListener: () => {},
       contains: () => true,
     };
+    const items = [
+      { dataset: { dragKey: 'alpha' }, matches: (s) => s === '[data-drag-key]' },
+      { dataset: { dragKey: 'beta' }, matches: (s) => s === '[data-drag-key]' },
+      { dataset: { dragKey: 'gamma' }, matches: (s) => s === '[data-drag-key]' },
+    ];
     items.forEach((n) => container.appendChild(n));
 
     assert.strictEqual(typeof D.initDragReorder, 'function');
@@ -69,12 +73,11 @@ describe('frontend/js/drag-reorder.js initDragReorder (vm-loaded)', () => {
   });
 
   it('does not reorder when prefsKey is null (no saved order lookup)', () => {
-    const items = [
-      { dataset: { dragKey: 'a' } },
-      { dataset: { dragKey: 'b' } },
-    ];
     const container = {
       _children: [],
+      get children() {
+        return this._children;
+      },
       querySelectorAll(sel) {
         if (sel === '[data-drag-key]') return [...this._children];
         return [];
@@ -82,11 +85,16 @@ describe('frontend/js/drag-reorder.js initDragReorder (vm-loaded)', () => {
       appendChild(node) {
         const i = this._children.indexOf(node);
         if (i >= 0) this._children.splice(i, 1);
+        node.parentElement = this;
         this._children.push(node);
       },
       addEventListener: () => {},
       contains: () => true,
     };
+    const items = [
+      { dataset: { dragKey: 'a' }, matches: (s) => s === '[data-drag-key]' },
+      { dataset: { dragKey: 'b' }, matches: (s) => s === '[data-drag-key]' },
+    ];
     items.forEach((n) => container.appendChild(n));
     const D = loadFrontendScripts(['utils.js', 'drag-reorder.js'], {
       prefs: { getObject: () => ['b', 'a'], setItem: () => {} },
@@ -106,12 +114,11 @@ describe('frontend/js/drag-reorder.js initDragReorder (vm-loaded)', () => {
   });
 
   it('does not reorder when saved prefs value is not an array', () => {
-    const items = [
-      { dataset: { dragKey: 'x' } },
-      { dataset: { dragKey: 'y' } },
-    ];
     const container = {
       _children: [],
+      get children() {
+        return this._children;
+      },
       querySelectorAll(sel) {
         if (sel === '[data-drag-key]') return [...this._children];
         return [];
@@ -119,11 +126,16 @@ describe('frontend/js/drag-reorder.js initDragReorder (vm-loaded)', () => {
       appendChild(node) {
         const i = this._children.indexOf(node);
         if (i >= 0) this._children.splice(i, 1);
+        node.parentElement = this;
         this._children.push(node);
       },
       addEventListener: () => {},
       contains: () => true,
     };
+    const items = [
+      { dataset: { dragKey: 'x' }, matches: (s) => s === '[data-drag-key]' },
+      { dataset: { dragKey: 'y' }, matches: (s) => s === '[data-drag-key]' },
+    ];
     items.forEach((n) => container.appendChild(n));
     const D = loadFrontendScripts(['utils.js', 'drag-reorder.js'], {
       prefs: {
