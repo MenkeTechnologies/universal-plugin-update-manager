@@ -878,7 +878,7 @@ function ensureAudioGraph() {
 
     // FFT analyser for parametric EQ visualization
     _analyser = _playbackCtx.createAnalyser();
-    _analyser.fftSize = 4096;
+    _analyser.fftSize = 8192;
     _analyser.smoothingTimeConstant = 0.8;
 
     // Stereo split analysers for Lissajous/stereo field
@@ -1289,6 +1289,32 @@ if (typeof window !== 'undefined') {
     window.stopEnginePlaybackFftRaf = stopEnginePlaybackFftRaf;
 }
 
+/** Prefs: `fftAnimationPaused` — `1` freezes spectrum curves (mini FFT, visualizer FFT tile, EQ fill). */
+const FFT_ANIM_PREF_KEY = 'fftAnimationPaused';
+
+function isFftAnimationPaused() {
+    try {
+        return typeof prefs !== 'undefined' && prefs.getItem && prefs.getItem(FFT_ANIM_PREF_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function setFftAnimationPaused(on) {
+    if (typeof prefs === 'undefined' || !prefs.setItem) return;
+    prefs.setItem(FFT_ANIM_PREF_KEY, on ? '1' : '0');
+}
+
+function toggleFftAnimationPaused() {
+    setFftAnimationPaused(!isFftAnimationPaused());
+}
+
+if (typeof window !== 'undefined') {
+    window.isFftAnimationPaused = isFftAnimationPaused;
+    window.setFftAnimationPaused = setFftAnimationPaused;
+    window.toggleFftAnimationPaused = toggleFftAnimationPaused;
+}
+
 function _playbackRafLoop() {
     updatePlaybackTime();
     _renderNpFft();
@@ -1356,6 +1382,23 @@ function getPinnedEngineSpectrumAxis() {
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyFftCanvasSize);
 })();
 
+(function initNpFftCanvasContextMenu() {
+    const canvas = document.getElementById('npFftCanvas');
+    if (!canvas) return;
+    canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (typeof toggleFftAnimationPaused !== 'function') return;
+        toggleFftAnimationPaused();
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(
+                toastFmt(isFftAnimationPaused() ? 'toast.fft_animation_paused' : 'toast.fft_animation_resumed'),
+                2200,
+                'info'
+            );
+        }
+    });
+})();
+
 function _renderNpFft() {
     const useEngineSpectrum = engineSpectrumLive();
     if (!useEngineSpectrum) {
@@ -1379,6 +1422,7 @@ function _renderNpFft() {
     const w = canvas.width;
     const h = canvas.height;
     if (w === 0 || h === 0) return;
+    if (isFftAnimationPaused()) return;
     let sampleRate = 44100;
     let fftSize = 2048;
     let binCount = 1024;
@@ -1412,32 +1456,33 @@ function _renderNpFft() {
     const logMax = Math.log10(fMax);
     const specH = h - 10;
 
+    function magAtFreq(freqHz) {
+        const binF = (freqHz * fftSize) / sampleRate;
+        const i0 = Math.floor(binF);
+        if (i0 < 0) return 0;
+        if (i0 >= binCount) return _npFftBuf[binCount - 1] / 255;
+        const frac = binF - i0;
+        const i1 = Math.min(binCount - 1, i0 + 1);
+        const v0 = _npFftBuf[i0];
+        const v1 = _npFftBuf[i1];
+        return (v0 + (v1 - v0) * frac) / 255;
+    }
+
+    const maxCols = Math.min(Math.max(w, 1), 2048);
     let nPts = 0;
-    const maxPts = binCount * 2 + 4;
+    const maxPts = maxCols * 2 + 8;
     if (!_npFftPts || _npFftPts.length < maxPts) _npFftPts = new Float32Array(maxPts);
     const pts = _npFftPts;
-    if (useEngineSpectrum) {
-        for (let k = 0; k < binCount; k++) {
-            const freq = ((k + 1) * sampleRate) / fftSize;
-            if (freq < fMin) continue;
-            if (freq > fMax) break;
-            const x = ((Math.log10(freq) - logMin) / (logMax - logMin)) * w;
-            const mag = _npFftBuf[k] / 255;
-            const y = specH - mag * (specH - 2);
-            pts[nPts++] = x;
-            pts[nPts++] = y;
-        }
-    } else {
-        for (let i = 1; i < binCount; i++) {
-            const freq = (i * sampleRate) / fftSize;
-            if (freq < fMin) continue;
-            if (freq > fMax) break;
-            const x = ((Math.log10(freq) - logMin) / (logMax - logMin)) * w;
-            const mag = _npFftBuf[i] / 255;
-            const y = specH - mag * (specH - 2);
-            pts[nPts++] = x;
-            pts[nPts++] = y;
-        }
+    for (let c = 0; c < maxCols; c++) {
+        const t = (c + 0.5) / maxCols;
+        const logF = logMin + t * (logMax - logMin);
+        const freq = Math.pow(10, logF);
+        if (freq < fMin || freq > fMax) continue;
+        const x = ((Math.log10(freq) - logMin) / (logMax - logMin)) * w;
+        const mag = magAtFreq(freq);
+        const y = specH - mag * (specH - 2);
+        pts[nPts++] = x;
+        pts[nPts++] = y;
     }
 
     if (nPts >= 2) {
@@ -4696,6 +4741,8 @@ function updateMetaLine() {
     const aeCanvas = document.getElementById('aeEqCanvas');
     if (!npCanvas && !aeCanvas) return;
 
+    let _eqSpectrumBuf = null;
+
     function eqBandLabel(id) {
         const k = id === 'low' ? 'ui.eq.band_low' : id === 'mid' ? 'ui.eq.band_mid' : 'ui.eq.band_high';
         return typeof appFmt === 'function' ? appFmt(k) : id.toUpperCase();
@@ -4784,17 +4831,57 @@ function updateMetaLine() {
             const axis = getPinnedEngineSpectrumAxis();
             if (axis) {
                 const dataArr = window._engineSpectrumU8;
+                if (!dataArr) {
+                    /* skip spectrum fill */
+                } else {
                 const bufLen = Math.min(1024, dataArr.length);
-                const sampleRate = axis.sr;
-                const fftSize = axis.fft;
+                const paused = typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused();
+                if (!paused) {
+                    if (!_eqSpectrumBuf || _eqSpectrumBuf.length !== bufLen) _eqSpectrumBuf = new Uint8Array(bufLen);
+                    _eqSpectrumBuf.set(dataArr.subarray(0, bufLen));
+                }
+                if (_eqSpectrumBuf && _eqSpectrumBuf.length === bufLen) {
+                    const sampleRate = axis.sr;
+                    const fftSize = axis.fft;
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, h);
+                    for (let k = 0; k < bufLen; k++) {
+                        const freq = ((k + 1) * sampleRate) / fftSize;
+                        if (freq < FREQ_MIN || freq > FREQ_MAX) continue;
+                        const x = freqToX(freq, w);
+                        const magnitude = _eqSpectrumBuf[k] / 255;
+                        const y = h - magnitude * (h - 20);
+                        ctx.lineTo(x, y);
+                    }
+                    ctx.lineTo(w, h);
+                    ctx.closePath();
+                    const grad = ctx.createLinearGradient(0, 0, 0, h);
+                    grad.addColorStop(0, 'rgba(211,0,197,0.25)');
+                    grad.addColorStop(0.5, 'rgba(5,217,232,0.12)');
+                    grad.addColorStop(1, 'rgba(5,217,232,0.02)');
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+                }
+                }
+            }
+        } else if (_analyser && _playbackCtx && typeof isAudioPlaying === 'function' && isAudioPlaying()) {
+            const bufLen = _analyser.frequencyBinCount;
+            const paused = typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused();
+            if (!paused) {
+                if (!_eqSpectrumBuf || _eqSpectrumBuf.length !== bufLen) _eqSpectrumBuf = new Uint8Array(bufLen);
+                _analyser.getByteFrequencyData(_eqSpectrumBuf);
+            }
+            if (_eqSpectrumBuf && _eqSpectrumBuf.length === bufLen) {
+                const sampleRate = _playbackCtx.sampleRate;
 
                 ctx.beginPath();
                 ctx.moveTo(0, h);
-                for (let k = 0; k < bufLen; k++) {
-                    const freq = ((k + 1) * sampleRate) / fftSize;
+                for (let i = 1; i < bufLen; i++) {
+                    const freq = (i * sampleRate) / (_analyser.fftSize);
                     if (freq < FREQ_MIN || freq > FREQ_MAX) continue;
                     const x = freqToX(freq, w);
-                    const magnitude = dataArr[k] / 255;
+                    const magnitude = _eqSpectrumBuf[i] / 255;
                     const y = h - magnitude * (h - 20);
                     ctx.lineTo(x, y);
                 }
@@ -4807,30 +4894,6 @@ function updateMetaLine() {
                 ctx.fillStyle = grad;
                 ctx.fill();
             }
-        } else if (_analyser && _playbackCtx && typeof isAudioPlaying === 'function' && isAudioPlaying()) {
-            const bufLen = _analyser.frequencyBinCount;
-            const dataArr = new Uint8Array(bufLen);
-            _analyser.getByteFrequencyData(dataArr);
-            const sampleRate = _playbackCtx.sampleRate;
-
-            ctx.beginPath();
-            ctx.moveTo(0, h);
-            for (let i = 1; i < bufLen; i++) {
-                const freq = (i * sampleRate) / (_analyser.fftSize);
-                if (freq < FREQ_MIN || freq > FREQ_MAX) continue;
-                const x = freqToX(freq, w);
-                const magnitude = dataArr[i] / 255;
-                const y = h - magnitude * (h - 20);
-                ctx.lineTo(x, y);
-            }
-            ctx.lineTo(w, h);
-            ctx.closePath();
-            const grad = ctx.createLinearGradient(0, 0, 0, h);
-            grad.addColorStop(0, 'rgba(211,0,197,0.25)');
-            grad.addColorStop(0.5, 'rgba(5,217,232,0.12)');
-            grad.addColorStop(1, 'rgba(5,217,232,0.02)');
-            ctx.fillStyle = grad;
-            ctx.fill();
         }
 
         if (_eqLow && _eqMid && _eqHigh) {

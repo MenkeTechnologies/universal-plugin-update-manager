@@ -24,6 +24,8 @@ let _vizParams = {
 };
 let _vizPeakHold = -96;
 let _vizPeakTimer = null;
+/** Last spectrum snapshot for FFT tile when `prefs.fftAnimationPaused` freezes animation. */
+let _vizFftFrozenCopy = null;
 
 /** AudioEngine is sending usable spectrum bins (`playback_status.spectrum`). */
 function _vizEngineSpectrumOk() {
@@ -350,11 +352,18 @@ function _drawTile(mode, analyser) {
 // ── FFT Spectrum ──
 function _drawFFT(ctx, w, h, analyser) {
     const bufLen = analyser.frequencyBinCount;
-    if (_vizMode !== 'all') {
-        if (!_vizFreqData || _vizFreqData.length !== bufLen) _vizFreqData = new Uint8Array(bufLen);
-        analyser.getByteFrequencyData(_vizFreqData);
+    if (!_vizFftFrozenCopy || _vizFftFrozenCopy.length !== bufLen) {
+        _vizFftFrozenCopy = new Uint8Array(bufLen);
     }
-    const data = _vizFreqData;
+    const paused = typeof window !== 'undefined' && typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused();
+    if (!paused) {
+        if (_vizMode !== 'all') {
+            if (!_vizFreqData || _vizFreqData.length !== bufLen) _vizFreqData = new Uint8Array(bufLen);
+            analyser.getByteFrequencyData(_vizFreqData);
+        }
+        _vizFftFrozenCopy.set(_vizFreqData);
+    }
+    const data = _vizFftFrozenCopy;
     _vizHudBackdrop(ctx, w, h);
 
     if (_vizParams.fftLogScale) {
@@ -362,7 +371,7 @@ function _drawFFT(ctx, w, h, analyser) {
         const minF = 20, maxF = 20000;
         const logMin = Math.log10(minF), logMax = Math.log10(maxF);
         const sr = _vizOutputSampleRateHz();
-        const maxCols = Math.min(w, 1024);
+        const maxCols = Math.min(w, 4096);
         const colW = w / maxCols;
         for (let c = 0; c < maxCols; c++) {
             const t = (c + 0.5) / maxCols;
@@ -947,6 +956,15 @@ document.addEventListener('contextmenu', (e) => {
     ];
 
     if (mode === 'fft') {
+        const animOn = !(typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused());
+        items.push({
+            icon: animOn ? '&#10003;' : '&#9634;',
+            label: appFmt('menu.viz_fft_animate'),
+            action: () => {
+                if (typeof window.toggleFftAnimationPaused === 'function') window.toggleFftAnimationPaused();
+            },
+            ..._vizMenuNoEcho,
+        });
         items.push({
             icon: _vizParams.fftLogScale ? '&#10003;' : '&#9634;',
             label: appFmt('menu.viz_log_frequency_scale'),
