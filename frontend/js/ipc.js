@@ -1,6 +1,8 @@
 // Tauri IPC bridge — replaces Electron's preload.js window.vstUpdater API
 const {invoke, convertFileSrc} = window.__TAURI__.core;
 const {listen} = window.__TAURI__.event;
+/** Used by `audio.js` and other scripts — not every build exposes `convertFileSrc` as a global binding. */
+window.convertFileSrc = convertFileSrc;
 
 // App i18n — strings loaded from SQLite via get_app_strings (seeded from i18n/app_i18n_en.json at build).
 window.__appStr = {};

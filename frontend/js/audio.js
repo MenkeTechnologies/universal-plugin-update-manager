@@ -230,6 +230,55 @@ function cancelIdleSchedule(id) {
     clearTimeout(id);
 }
 
+/** Asset URL for fetch/decode — prefers global Tauri helper, then `window.convertFileSrc` from `ipc.js`. */
+function fileSrcForDecode(path) {
+    if (typeof convertFileSrc === 'function') return convertFileSrc(path);
+    if (typeof window !== 'undefined' && typeof window.convertFileSrc === 'function') {
+        return window.convertFileSrc(path);
+    }
+    const c = typeof window !== 'undefined' ? window.__TAURI__?.core?.convertFileSrc : null;
+    if (typeof c === 'function') return c(path);
+    return path;
+}
+
+/**
+ * WKWebView often reports 0×0 for the waveform flex child until reflow; `bars === 0` yields empty peaks and a blank canvas.
+ */
+async function resolveWaveformBoxSize(container, fallbackW, fallbackH) {
+    const np = document.getElementById('audioNowPlaying');
+    const fw = fallbackW != null ? fallbackW : 400;
+    const fh = fallbackH != null ? fallbackH : 24;
+    for (let i = 0; i < 8; i++) {
+        if (np) void np.offsetWidth;
+        if (container) void container.offsetWidth;
+        let w = container ? container.offsetWidth : 0;
+        let h = container ? container.offsetHeight : 0;
+        if (w < 2 && container) {
+            const br = container.getBoundingClientRect();
+            w = br.width;
+            h = br.height;
+        }
+        if (w >= 2 && h >= 2) return { w, h };
+        await new Promise((r) => requestAnimationFrame(r));
+    }
+    const br = container ? container.getBoundingClientRect() : null;
+    return {
+        w: br && br.width >= 2 ? br.width : fw,
+        h: br && br.height >= 2 ? br.height : fh,
+    };
+}
+
+function scheduleNowPlayingWaveform(filePath) {
+    cancelIdleSchedule(_npWaveformIdleId);
+    _npWaveformIdleId = null;
+    _npWaveformDrawSeq++;
+    const wfSeq = _npWaveformDrawSeq;
+    _npWaveformIdleId = scheduleIdleVisualWork(() => {
+        _npWaveformIdleId = null;
+        void drawWaveform(filePath, wfSeq);
+    }, { delayMs: 0 });
+}
+
 /** `appFmt` wrapper — same pattern as `plugins.js` `_ui`. */
 function _audioFmt(key, vars) {
     if (typeof appFmt !== 'function') return key;
@@ -316,7 +365,7 @@ async function copyFloat32ToBufferChannelAsync(buf, channelIndex, src) {
 async function ensureReversedBufferForPath(path) {
     if (_reversedBuf && _decodedBufPath === path) return _reversedBuf;
     ensureAudioGraph();
-    const url = convertFileSrc(path);
+    const url = fileSrcForDecode(path);
     let buf = null;
     try {
         const dec = await decodeChannelsViaWorker(url);
@@ -1934,6 +1983,7 @@ async function previewAudio(filePath) {
         }
         updatePlayBtnStates();
         updateNowPlayingBtn();
+        scheduleNowPlayingWaveform(filePath);
         return;
     }
 
@@ -1957,7 +2007,7 @@ async function previewAudio(filePath) {
         _decodedBufPath = null;
         _pausedOffsetInRev = 0;
         connectMediaToEq();
-        audioPlayer.src = convertFileSrc(filePath);
+        audioPlayer.src = fileSrcForDecode(filePath);
         audioPlayer.loop = audioLooping;
         audioPlayerPath = filePath;
         if (audioReverseMode) {
@@ -1993,15 +2043,8 @@ async function previewAudio(filePath) {
         updateNowPlayingBtn();
         updateFavBtn();
         updateMetaLine();
-        // Waveform is lowest priority: only run when idle (never compete with decode/play on the next macrotask).
-        cancelIdleSchedule(_npWaveformIdleId);
-        _npWaveformIdleId = null;
-        _npWaveformDrawSeq++;
-        const wfSeq = _npWaveformDrawSeq;
-        _npWaveformIdleId = scheduleIdleVisualWork(() => {
-            _npWaveformIdleId = null;
-            void drawWaveform(filePath, wfSeq);
-        }, { delayMs: 0 });
+        // Deferred one task — layout for the waveform flex child is often 0×0 until after paint (WKWebView).
+        scheduleNowPlayingWaveform(filePath);
     } catch (err) {
         showToast(toastFmt('toast.playback_failed', {
             ext: ext.toUpperCase(),
@@ -3069,8 +3112,11 @@ async function drawWaveform(filePath, wfSeq) {
     if (!canvas) return;
     if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
     const container = canvas.parentElement;
-    canvas.width = container.offsetWidth * (window.devicePixelRatio || 1);
-    canvas.height = container.offsetHeight * (window.devicePixelRatio || 1);
+    const { w: cw, h: ch } = await resolveWaveformBoxSize(container, 280, 24);
+    if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(cw * dpr));
+    canvas.height = Math.max(1, Math.round(ch * dpr));
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -3081,8 +3127,8 @@ async function drawWaveform(filePath, wfSeq) {
         return;
     }
 
-    const bars = Math.min(Math.floor(canvas.width), 800);
-    const src = convertFileSrc(filePath);
+    const bars = Math.max(1, Math.min(Math.max(1, Math.floor(cw)), 800));
+    const src = fileSrcForDecode(filePath);
     try {
         if (typeof yieldToBrowser === 'function') await yieldToBrowser();
         if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
@@ -3127,6 +3173,16 @@ function renderWaveformData(ctx, canvas, peaks) {
     const mid = h / 2;
 
     ctx.clearRect(0, 0, w, h);
+
+    if (!peaks || peaks.length === 0) {
+        ctx.strokeStyle = 'rgba(5,217,232,0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, mid);
+        ctx.lineTo(w, mid);
+        ctx.stroke();
+        return;
+    }
 
     // Support both old format (number[]) and new format ({max,min}[])
     const isNewFormat = peaks.length > 0 && typeof peaks[0] === 'object';
@@ -3209,8 +3265,11 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
     const sgCached = _spectrogramCache[filePath];
 
     const container = wfCanvas.parentElement;
-    wfCanvas.width = container.offsetWidth * (window.devicePixelRatio || 1);
-    wfCanvas.height = container.offsetHeight * (window.devicePixelRatio || 1);
+    const { w: cw, h: ch } = await resolveWaveformBoxSize(container, 560, 56);
+    if (_metaPanelStale(metaSeq, filePath)) return;
+    const dpr = window.devicePixelRatio || 1;
+    wfCanvas.width = Math.max(1, Math.round(cw * dpr));
+    wfCanvas.height = Math.max(1, Math.round(ch * dpr));
     const wfCtx = wfCanvas.getContext('2d');
     wfCtx.clearRect(0, 0, wfCanvas.width, wfCanvas.height);
     const sgCtx = sgCanvas.getContext('2d');
@@ -3229,8 +3288,8 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
         return;
     }
 
-    const url = convertFileSrc(filePath);
-    const bars = Math.min(Math.floor(wfCanvas.width), 800);
+    const url = fileSrcForDecode(filePath);
+    const bars = Math.max(1, Math.min(Math.max(1, Math.floor(cw)), 800));
 
     try {
         if (typeof yieldToBrowser === 'function') await yieldToBrowser();
