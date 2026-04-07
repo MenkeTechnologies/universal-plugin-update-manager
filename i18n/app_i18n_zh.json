@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "展示台",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} 带有插件交叉引用的 DAW 格式",
-  "ui.ph.filter_files": "过滤文件...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "模糊搜索 MIDI 文件...",
   "ui.ph.fuzzy_search_pdfs": "模糊搜索 PDF...",
   "ui.ph.fuzzy_search_plugins": "模糊搜索插件...",

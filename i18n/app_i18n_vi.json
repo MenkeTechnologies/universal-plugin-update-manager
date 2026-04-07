@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Trình hiển thị",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} Định dạng DAW có tham chiếu chéo plugin",
-  "ui.ph.filter_files": "Lọc tập tin...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Tìm kiếm tệp MIDI mờ...",
   "ui.ph.fuzzy_search_pdfs": "Các tệp PDF tìm kiếm mờ...",
   "ui.ph.fuzzy_search_plugins": "Các plugin tìm kiếm mờ...",

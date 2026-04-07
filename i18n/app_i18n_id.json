@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Visualisator",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} Format DAW dengan referensi silang plugin",
-  "ui.ph.filter_files": "Saring file...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Pencarian kabur file MIDI...",
   "ui.ph.fuzzy_search_pdfs": "PDF pencarian kabur...",
   "ui.ph.fuzzy_search_plugins": "Plugin pencarian kabur...",

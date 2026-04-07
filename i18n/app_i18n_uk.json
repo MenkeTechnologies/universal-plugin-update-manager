@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Візуалізатори",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} Формати DAW із перехресним посиланням плагіна",
-  "ui.ph.filter_files": "Фільтр файлів...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Нечіткий пошук файлів MIDI...",
   "ui.ph.fuzzy_search_pdfs": "Нечіткий пошук PDF-файлів...",
   "ui.ph.fuzzy_search_plugins": "Плагіни нечіткого пошуку...",

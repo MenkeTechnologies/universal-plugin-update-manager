@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Görselleştiriciler",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} Eklenti çapraz referanslı DAW formatları",
-  "ui.ph.filter_files": "Dosyaları filtrele...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Bulanık arama MIDI dosyaları...",
   "ui.ph.fuzzy_search_pdfs": "Bulanık arama PDF'leri...",
   "ui.ph.fuzzy_search_plugins": "Bulanık arama eklentileri...",

@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "시각화 장치",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} 플러그인 상호 참조가 있는 DAW 형식",
-  "ui.ph.filter_files": "파일 필터링...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "퍼지 검색 MIDI 파일...",
   "ui.ph.fuzzy_search_pdfs": "퍼지 검색 PDF...",
   "ui.ph.fuzzy_search_plugins": "퍼지 검색 플러그인...",

@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "ビジュアライザー",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} 個の DAW フォーマットとプラグインの相互参照",
-  "ui.ph.filter_files": "ファイルをフィルタリング...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "MIDI ファイルのあいまい検索...",
   "ui.ph.fuzzy_search_pdfs": "PDF のあいまい検索...",
   "ui.ph.fuzzy_search_plugins": "あいまい検索プラグイン...",

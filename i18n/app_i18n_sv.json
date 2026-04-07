@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Visualiserare",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} DAW-format med plugin-korsreferens",
-  "ui.ph.filter_files": "Filtrera filer...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Luddrig sökning i MIDI-filer...",
   "ui.ph.fuzzy_search_pdfs": "Luddiga sökningar i PDF-filer...",
   "ui.ph.fuzzy_search_plugins": "Luddiga sökplugins...",

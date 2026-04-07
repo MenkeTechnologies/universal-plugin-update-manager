@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "विज़ुअलाइज़र",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} प्लगइन क्रॉस-रेफरेंस के साथ DAW प्रारूप",
-  "ui.ph.filter_files": "फ़ाइलें फ़िल्टर करें...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "अस्पष्ट खोज MIDI फ़ाइलें...",
   "ui.ph.fuzzy_search_pdfs": "अस्पष्ट खोज पीडीएफ़...",
   "ui.ph.fuzzy_search_plugins": "फ़ज़ी खोज प्लगइन्स...",

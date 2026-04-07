@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Οπτικοποιητές",
   "ui.perf.sqlite_read_pool_auto_label": "Αυτο",
   "ui.perf.xref_format_count": "{n} Μορφές DAW με παραπομπή προσθηκών",
-  "ui.ph.filter_files": "Φιλτράρισμα αρχείων...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Ασαφής αναζήτηση αρχείων MIDI...",
   "ui.ph.fuzzy_search_pdfs": "Ασαφής αναζήτηση PDF...",
   "ui.ph.fuzzy_search_plugins": "Ασαφείς προσθήκες αναζήτησης...",

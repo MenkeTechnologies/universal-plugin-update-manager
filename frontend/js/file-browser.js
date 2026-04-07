@@ -32,6 +32,8 @@ let _fileBrowserEntries = [];
 let _fileBrowserInited = false;
 /** Invalidate in-flight chunked file list renders when directory or filter changes. */
 let _fileListRenderSeq = 0;
+/** Search mode for `filterFiles` (`registerFilter`); used by `renderFileList`. */
+let _lastFilesMode = 'fuzzy';
 const FILE_LIST_CHUNK = 80;
 
 // ── Favorite Directories ──
@@ -185,7 +187,7 @@ function renderBreadcrumb(dirPath) {
     el.innerHTML = html;
 }
 
-function buildFileListRowHtml(e, search, sampleByPath) {
+function buildFileListRowHtml(e, search, sampleByPath, mode) {
     const note = typeof noteIndicator === 'function' ? noteIndicator(e.path) : '';
     const cls = e.isDir ? ' file-dir' : '';
     const isAudio = !e.isDir && AUDIO_EXTS.includes(e.ext);
@@ -220,7 +222,7 @@ function buildFileListRowHtml(e, search, sampleByPath) {
     return `<div class="file-row${cls}${isAudio ? ' file-audio' : ''}" data-file-path="${escapeHtml(e.path)}" data-file-dir="${e.isDir}" ${isAudio ? `data-wf-file="${escapeHtml(e.path)}"` : ''}>
       ${wfBg}
       <span class="file-icon">${fileIcon(e)}</span>
-      <span class="file-name">${search && typeof highlightMatch === 'function' ? highlightMatch(e.name, search, 'fuzzy') : escapeHtml(e.name)}${extras}${note}</span>
+      <span class="file-name">${search && typeof highlightMatch === 'function' ? highlightMatch(e.name, search, mode || 'fuzzy') : escapeHtml(e.name)}${extras}${note}</span>
       <span class="file-ext">${e.isDir ? 'DIR' : e.ext}</span>
       <span class="file-size">${e.isDir ? '' : e.sizeFormatted}</span>
       <span class="file-date">${e.modified}</span>
@@ -231,10 +233,11 @@ function renderFileList() {
     const list = document.getElementById('fileList');
     if (!list) return;
     const search = (document.getElementById('fileSearchInput')?.value || '').trim();
+    const mode = _lastFilesMode;
     let filtered;
     if (search) {
         const scored = _fileBrowserEntries.map(e => {
-            const score = typeof searchScore === 'function' ? searchScore(search, [e.name, e.ext], 'fuzzy') : (e.name.toLowerCase().includes(search.toLowerCase()) ? 1 : 0);
+            const score = typeof searchScore === 'function' ? searchScore(search, [e.name, e.ext], mode) : (e.name.toLowerCase().includes(search.toLowerCase()) ? 1 : 0);
             return {entry: e, score};
         }).filter(s => s.score > 0);
         scored.sort((a, b) => b.score - a.score);
@@ -266,7 +269,7 @@ function renderFileList() {
         if (seq !== _fileListRenderSeq) return;
         const end = Math.min(idx + FILE_LIST_CHUNK, filtered.length);
         const slice = filtered.slice(idx, end);
-        const html = slice.map((e) => buildFileListRowHtml(e, search, sampleByPath)).join('');
+        const html = slice.map((e) => buildFileListRowHtml(e, search, sampleByPath, mode)).join('');
         list.insertAdjacentHTML('beforeend', html);
         idx = end;
         if (idx < filtered.length) {
@@ -630,7 +633,9 @@ document.addEventListener('click', (e) => {
 // Filter — uses unified filter system
 registerFilter('filterFiles', {
     inputId: 'fileSearchInput',
+    regexToggleId: 'regexFiles',
     fetchFn() {
+        _lastFilesMode = this.lastMode || 'fuzzy';
         renderFileList();
     },
     debounceMs: 150,

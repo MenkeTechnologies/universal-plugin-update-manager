@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Visualisoijat",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} DAW-muotoa liitännäisviittauksella",
-  "ui.ph.filter_files": "Suodata tiedostoja...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Sumea haku MIDI-tiedostoista...",
   "ui.ph.fuzzy_search_pdfs": "Sumea haku PDF...",
   "ui.ph.fuzzy_search_plugins": "Sumeat hakulaajennukset...",

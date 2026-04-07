@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Vizualizálók",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} DAW formátumok plugin kereszthivatkozással",
-  "ui.ph.filter_files": "Fájlok szűrése...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Fuzzy keresés MIDI fájlokban...",
   "ui.ph.fuzzy_search_pdfs": "Fuzzy keresés PDF-ekben...",
   "ui.ph.fuzzy_search_plugins": "Fuzzy keresési bővítmények...",

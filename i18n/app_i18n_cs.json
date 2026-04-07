@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Vizualizéry",
   "ui.perf.sqlite_read_pool_auto_label": "Auto",
   "ui.perf.xref_format_count": "{n} Formáty DAW s křížovým odkazem na plugin",
-  "ui.ph.filter_files": "Filtrovat soubory...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Fuzzy hledání MIDI souborů...",
   "ui.ph.fuzzy_search_pdfs": "Fuzzy hledání PDF...",
   "ui.ph.fuzzy_search_plugins": "Fuzzy vyhledávací pluginy...",

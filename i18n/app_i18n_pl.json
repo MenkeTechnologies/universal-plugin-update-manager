@@ -1366,7 +1366,7 @@
   "ui.perf.section_visualizers": "Wizualizatory",
   "ui.perf.sqlite_read_pool_auto_label": "Automatyczny",
   "ui.perf.xref_format_count": "{n} Formaty DAW z odniesieniami do wtyczek",
-  "ui.ph.filter_files": "Filtruj pliki...",
+  "ui.ph.filter_files": "Fuzzy filter files...",
   "ui.ph.fuzzy_search_midi_files": "Wyszukiwanie rozmyte plików MIDI...",
   "ui.ph.fuzzy_search_pdfs": "Rozmyte wyszukiwanie plików PDF...",
   "ui.ph.fuzzy_search_plugins": "Rozmyte wtyczki wyszukiwania...",
