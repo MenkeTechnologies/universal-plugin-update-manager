@@ -224,11 +224,12 @@ const PDF_LIBRARY_IDS: &str = "id IN (SELECT MAX(id) FROM pdfs GROUP BY path)";
 const MIDI_LIBRARY_IDS: &str = "id IN (SELECT MAX(id) FROM midi_files GROUP BY path)";
 const PLUGIN_LIBRARY_IDS: &str = "id IN (SELECT MAX(id) FROM plugins GROUP BY path)";
 
-/// Latest DAW scan that has at least one `daw_projects` row. Empty scans remain in history but must not shadow prior results.
+/// Latest **complete** DAW scan that has at least one `daw_projects` row. Empty scans remain in history but must not shadow prior results.
 /// Uses child-row presence (not `project_count`) so streaming scans still resolve after finalize quirks.
 const LATEST_DAW_SCAN_ID_SQL: &str = "\
     SELECT s.id FROM daw_scans s \
-    WHERE EXISTS (SELECT 1 FROM daw_projects p WHERE p.scan_id = s.id) \
+    WHERE s.scan_complete = 1 \
+    AND EXISTS (SELECT 1 FROM daw_projects p WHERE p.scan_id = s.id) \
     ORDER BY s.timestamp DESC LIMIT 1";
 
 // ── Generic paginated query result for plugins/DAW/presets ──
@@ -425,7 +426,8 @@ impl Database {
         self.prewarm();
     }
 
-    /// Prune old scans — keep only the N most recent per type. Reduces DB bloat.
+    /// Prune old scans — keep only the N most recent **complete** scans per type. Incomplete
+    /// (user-stopped) runs are retained until superseded or cleared so library rows stay addressable.
     pub fn prune_old_scans(&self, keep: usize) {
         let conn = self.conn.lock().unwrap();
         let keep_i = keep as i64;
@@ -438,10 +440,77 @@ impl Database {
             ("pdf_scans", "pdfs", "scan_id"),
         ] {
             let _ = conn.execute_batch(&format!(
-                "DELETE FROM {data_tbl} WHERE {id_col} NOT IN (SELECT id FROM {scan_tbl} ORDER BY timestamp DESC LIMIT {keep_i});
-                 DELETE FROM {scan_tbl} WHERE id NOT IN (SELECT id FROM {scan_tbl} ORDER BY timestamp DESC LIMIT {keep_i});"
+                "DELETE FROM {data_tbl} WHERE {id_col} IN (\
+                    SELECT id FROM {scan_tbl} WHERE scan_complete = 1 AND id NOT IN (\
+                        SELECT id FROM {scan_tbl} WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT {keep_i}\
+                    )\
+                );\
+                DELETE FROM {scan_tbl} WHERE scan_complete = 1 AND id NOT IN (\
+                    SELECT id FROM {scan_tbl} WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT {keep_i}\
+                );"
             ));
         }
+    }
+
+    /// Mark whether a streaming scan finished normally (`complete`) or was user-stopped (partial).
+    pub fn set_audio_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE audio_scans SET scan_complete = ?2 WHERE id = ?1",
+            params![id, if complete { 1 } else { 0 }],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn set_plugin_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE plugin_scans SET scan_complete = ?2 WHERE id = ?1",
+            params![id, if complete { 1 } else { 0 }],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn set_daw_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE daw_scans SET scan_complete = ?2 WHERE id = ?1",
+            params![id, if complete { 1 } else { 0 }],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn set_preset_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE preset_scans SET scan_complete = ?2 WHERE id = ?1",
+            params![id, if complete { 1 } else { 0 }],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn set_midi_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE midi_scans SET scan_complete = ?2 WHERE id = ?1",
+            params![id, if complete { 1 } else { 0 }],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn set_pdf_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE pdf_scans SET scan_complete = ?2 WHERE id = ?1",
+            params![id, if complete { 1 } else { 0 }],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     /// Checkpoint WAL to merge it into the main DB file. Keeps WAL small.
@@ -932,6 +1001,23 @@ impl Database {
                 .map_err(|e| format!("Migration v11 schema_version failed: {e}"))?;
         }
 
+        if current < 12 {
+            // `scan_complete`: streaming scans start at 0; lib sets 1 when the run finishes without stop.
+            // History / latest queries filter to complete rows so partial runs are not deletable "junk"
+            // that still backs library aggregates.
+            conn.execute_batch(
+                "ALTER TABLE audio_scans ADD COLUMN scan_complete INTEGER NOT NULL DEFAULT 1;
+                 ALTER TABLE plugin_scans ADD COLUMN scan_complete INTEGER NOT NULL DEFAULT 1;
+                 ALTER TABLE daw_scans ADD COLUMN scan_complete INTEGER NOT NULL DEFAULT 1;
+                 ALTER TABLE preset_scans ADD COLUMN scan_complete INTEGER NOT NULL DEFAULT 1;
+                 ALTER TABLE midi_scans ADD COLUMN scan_complete INTEGER NOT NULL DEFAULT 1;
+                 ALTER TABLE pdf_scans ADD COLUMN scan_complete INTEGER NOT NULL DEFAULT 1;",
+            )
+            .map_err(|e| format!("Migration v12 (scan_complete) failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (12)", [])
+                .map_err(|e| format!("Migration v12 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
@@ -956,7 +1042,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
-            "INSERT OR REPLACE INTO audio_scans (id, timestamp, sample_count, total_bytes, format_counts, roots) VALUES (?1,?2,0,0,'{}',?3)",
+            "INSERT OR REPLACE INTO audio_scans (id, timestamp, sample_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
             params![id, timestamp, roots_json],
         ).map_err(|e| e.to_string())?;
         conn.execute(
@@ -1096,8 +1182,8 @@ impl Database {
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
             "INSERT OR REPLACE INTO audio_scans
-             (id, timestamp, sample_count, total_bytes, format_counts, roots)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+             (id, timestamp, sample_count, total_bytes, format_counts, roots, scan_complete)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1)",
             params![
                 id,
                 timestamp,
@@ -1115,7 +1201,7 @@ impl Database {
     pub fn latest_scan_id(&self) -> Result<Option<String>, String> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            "SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1",
+            "SELECT id FROM audio_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
             [],
             |row| row.get::<_, String>(0),
         )
@@ -1129,7 +1215,7 @@ impl Database {
         let mut stmt = conn
             .prepare(
                 "SELECT id, timestamp, sample_count, total_bytes, format_counts, roots
-                 FROM audio_scans ORDER BY timestamp DESC",
+                 FROM audio_scans WHERE scan_complete = 1 ORDER BY timestamp DESC",
             )
             .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -2227,7 +2313,7 @@ impl Database {
         let dirs_json = path_strings_json_normalized(&snap.directories);
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
-            "INSERT OR REPLACE INTO plugin_scans (id, timestamp, plugin_count, directories, roots) VALUES (?1,?2,?3,?4,?5)",
+            "INSERT OR REPLACE INTO plugin_scans (id, timestamp, plugin_count, directories, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,1)",
             params![snap.id, snap.timestamp, snap.plugin_count as i64, dirs_json, roots_json],
         ).map_err(|e| e.to_string())?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
@@ -2271,7 +2357,7 @@ impl Database {
         let dirs_json = "[]".to_string();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
-            "INSERT OR REPLACE INTO plugin_scans (id, timestamp, plugin_count, directories, roots) VALUES (?1,?2,0,?3,?4)",
+            "INSERT OR REPLACE INTO plugin_scans (id, timestamp, plugin_count, directories, roots, scan_complete) VALUES (?1,?2,0,?3,?4,0)",
             params![id, timestamp, dirs_json, roots_json],
         )
         .map_err(|e| e.to_string())?;
@@ -2354,7 +2440,7 @@ impl Database {
     pub fn get_plugin_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.plugin_count,0),(SELECT COUNT(*) FROM plugins WHERE scan_id = s.id)), s.roots FROM plugin_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.plugin_count,0),(SELECT COUNT(*) FROM plugins WHERE scan_id = s.id)), s.roots FROM plugin_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -2421,7 +2507,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let id: Option<String> = conn
             .query_row(
-                "SELECT id FROM plugin_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT id FROM plugin_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
                 [],
                 |r| r.get(0),
             )
@@ -2474,7 +2560,7 @@ impl Database {
     pub fn get_audio_scans_list(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.sample_count,0),(SELECT COUNT(*) FROM audio_samples WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM audio_samples WHERE scan_id = s.id)), s.format_counts, s.roots FROM audio_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.sample_count,0),(SELECT COUNT(*) FROM audio_samples WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM audio_samples WHERE scan_id = s.id)), s.format_counts, s.roots FROM audio_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2561,7 +2647,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let id: Option<String> = conn
             .query_row(
-                "SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT id FROM audio_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
                 [],
                 |r| r.get::<_, String>(0),
             )
@@ -2597,7 +2683,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
-            "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots) VALUES (?1,?2,0,0,'{}',?3)",
+            "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
             params![id, timestamp, roots_json],
         ).map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM daw_projects WHERE scan_id = ?1", params![id])
@@ -2705,7 +2791,7 @@ impl Database {
         let daw_json = serde_json::to_string(&snap.daw_counts).unwrap_or_default();
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
-            "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots) VALUES (?1,?2,?3,?4,?5,?6)",
+            "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,?6,1)",
             params![snap.id, snap.timestamp, snap.project_count as i64, snap.total_bytes as i64, daw_json, roots_json],
         ).map_err(|e| e.to_string())?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
@@ -2751,7 +2837,7 @@ impl Database {
         // Count from child rows so the History tab stays correct even if parent totals
         // were never finalized (streaming scans) or finalize failed silently.
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.project_count,0),(SELECT COUNT(*) FROM daw_projects WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM daw_projects WHERE scan_id = s.id)), s.daw_counts, s.roots FROM daw_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.project_count,0),(SELECT COUNT(*) FROM daw_projects WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM daw_projects WHERE scan_id = s.id)), s.daw_counts, s.roots FROM daw_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2855,7 +2941,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
-            "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots) VALUES (?1,?2,0,0,'{}',?3)",
+            "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
             params![id, timestamp, roots_json],
         ).map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM presets WHERE scan_id = ?1", params![id])
@@ -2959,7 +3045,7 @@ impl Database {
         let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
-            "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots) VALUES (?1,?2,?3,?4,?5,?6)",
+            "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,?6,1)",
             params![snap.id, snap.timestamp, snap.preset_count as i64, snap.total_bytes as i64, fc_json, roots_json],
         ).map_err(|e| e.to_string())?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
@@ -2996,7 +3082,7 @@ impl Database {
     pub fn get_preset_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.preset_count,0),(SELECT COUNT(*) FROM presets WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM presets WHERE scan_id = s.id)), s.format_counts, s.roots FROM preset_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.preset_count,0),(SELECT COUNT(*) FROM presets WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM presets WHERE scan_id = s.id)), s.format_counts, s.roots FROM preset_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -3064,7 +3150,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let id: Option<String> = conn
             .query_row(
-                "SELECT id FROM preset_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT id FROM preset_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
                 [],
                 |r| r.get(0),
             )
@@ -3103,7 +3189,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
-            "INSERT OR REPLACE INTO midi_scans (id, timestamp, midi_count, total_bytes, format_counts, roots) VALUES (?1,?2,0,0,'{}',?3)",
+            "INSERT OR REPLACE INTO midi_scans (id, timestamp, midi_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
             params![id, timestamp, roots_json],
         ).map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM midi_files WHERE scan_id = ?1", params![id])
@@ -3206,7 +3292,7 @@ impl Database {
         let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
-            "INSERT OR REPLACE INTO midi_scans (id, timestamp, midi_count, total_bytes, format_counts, roots) VALUES (?1,?2,?3,?4,?5,?6)",
+            "INSERT OR REPLACE INTO midi_scans (id, timestamp, midi_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,?6,1)",
             params![snap.id, snap.timestamp, snap.midi_count as i64, snap.total_bytes as i64, fc_json, roots_json],
         ).map_err(|e| e.to_string())?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
@@ -3249,7 +3335,7 @@ impl Database {
     pub fn get_midi_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.midi_count,0),(SELECT COUNT(*) FROM midi_files WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM midi_files WHERE scan_id = s.id)), s.format_counts, s.roots FROM midi_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.midi_count,0),(SELECT COUNT(*) FROM midi_files WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM midi_files WHERE scan_id = s.id)), s.format_counts, s.roots FROM midi_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -3317,7 +3403,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let id: Option<String> = conn
             .query_row(
-                "SELECT id FROM midi_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT id FROM midi_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
                 [],
                 |r| r.get(0),
             )
@@ -3568,7 +3654,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
-            "INSERT OR REPLACE INTO pdf_scans (id, timestamp, pdf_count, total_bytes, roots) VALUES (?1,?2,0,0,?3)",
+            "INSERT OR REPLACE INTO pdf_scans (id, timestamp, pdf_count, total_bytes, roots, scan_complete) VALUES (?1,?2,0,0,?3,0)",
             params![id, timestamp, roots_json],
         ).map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM pdfs WHERE scan_id = ?1", params![id])
@@ -3820,7 +3906,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let roots_json = path_strings_json_normalized(&snap.roots);
         conn.execute(
-            "INSERT OR REPLACE INTO pdf_scans (id, timestamp, pdf_count, total_bytes, roots) VALUES (?1,?2,?3,?4,?5)",
+            "INSERT OR REPLACE INTO pdf_scans (id, timestamp, pdf_count, total_bytes, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,1)",
             params![snap.id, snap.timestamp, snap.pdf_count as i64, snap.total_bytes as i64, roots_json],
         ).map_err(|e| e.to_string())?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
@@ -3856,7 +3942,7 @@ impl Database {
     pub fn get_pdf_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.pdf_count,0),(SELECT COUNT(*) FROM pdfs WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = s.id)), s.roots FROM pdf_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.pdf_count,0),(SELECT COUNT(*) FROM pdfs WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = s.id)), s.roots FROM pdf_scans s WHERE s.scan_complete = 1 ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -3924,7 +4010,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let id: Option<String> = conn
             .query_row(
-                "SELECT id FROM pdf_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT id FROM pdf_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
                 [],
                 |r| r.get(0),
             )
@@ -3959,7 +4045,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let scan_id: String = conn
             .query_row(
-                "SELECT id FROM pdf_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT id FROM pdf_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
                 [],
                 |r| r.get(0),
             )
@@ -4241,7 +4327,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         Ok(conn
             .query_row(
-                &format!("SELECT id FROM {scan_table} ORDER BY timestamp DESC LIMIT 1"),
+                &format!("SELECT id FROM {scan_table} WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1"),
                 [],
                 |r| r.get::<_, String>(0),
             )
@@ -5172,7 +5258,7 @@ impl Database {
             let dirs_json = path_strings_json_normalized(&snap.directories);
             let roots_json = path_strings_json_normalized(&snap.roots);
             conn.execute(
-                "INSERT OR REPLACE INTO plugin_scans (id, timestamp, plugin_count, directories, roots) VALUES (?1,?2,?3,?4,?5)",
+                "INSERT OR REPLACE INTO plugin_scans (id, timestamp, plugin_count, directories, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,1)",
                 params![snap.id, snap.timestamp, snap.plugin_count as i64, dirs_json, roots_json],
             ).map_err(|e| e.to_string())?;
 
@@ -5220,7 +5306,7 @@ impl Database {
             let daw_json = serde_json::to_string(&snap.daw_counts).unwrap_or_default();
             let roots_json = path_strings_json_normalized(&snap.roots);
             conn.execute(
-                "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots) VALUES (?1,?2,?3,?4,?5,?6)",
+                "INSERT OR REPLACE INTO daw_scans (id, timestamp, project_count, total_bytes, daw_counts, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,?6,1)",
                 params![snap.id, snap.timestamp, snap.project_count as i64, snap.total_bytes as i64, daw_json, roots_json],
             ).map_err(|e| e.to_string())?;
 
@@ -5266,7 +5352,7 @@ impl Database {
             let fc_json = serde_json::to_string(&snap.format_counts).unwrap_or_default();
             let roots_json = path_strings_json_normalized(&snap.roots);
             conn.execute(
-                "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots) VALUES (?1,?2,?3,?4,?5,?6)",
+                "INSERT OR REPLACE INTO preset_scans (id, timestamp, preset_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,?3,?4,?5,?6,1)",
                 params![snap.id, snap.timestamp, snap.preset_count as i64, snap.total_bytes as i64, fc_json, roots_json],
             ).map_err(|e| e.to_string())?;
 
@@ -6446,9 +6532,38 @@ mod tests {
             modified: "2024-01-01".into(),
         };
         db.insert_daw_batch(id, &[p]).unwrap();
+        db.set_daw_scan_complete(id, true)
+            .expect("mark scan complete so history lists it");
         let scans = db.get_daw_scans().unwrap();
         assert_eq!(scans.len(), 1);
         assert_eq!(scans[0]["projectCount"], 1);
+    }
+
+    /// User-stopped (or unfinalized-incomplete) scans stay in the DB for library aggregation but
+    /// must not appear in deletable history lists.
+    #[test]
+    fn test_incomplete_scan_hidden_from_plugin_history() {
+        let db = test_db();
+        db.plugin_scan_parent_create("ps-partial", "2024-01-01T00:00:00", &["/vst".into()])
+            .unwrap();
+        let p = PluginInfo {
+            name: "X".into(),
+            path: "/x.vst3".into(),
+            plugin_type: "VST3".into(),
+            version: "1".into(),
+            manufacturer: "M".into(),
+            manufacturer_url: None,
+            size: "1 B".into(),
+            size_bytes: 1,
+            modified: "2024-01-01".into(),
+            architectures: vec![],
+        };
+        db.insert_plugin_batch("ps-partial", &[p]).unwrap();
+        db.plugin_scan_parent_finalize("ps-partial", 1, &["/vst".into()], &["/vst".into()])
+            .unwrap();
+        assert!(db.get_plugin_scans().unwrap().is_empty());
+        db.set_plugin_scan_complete("ps-partial", true).unwrap();
+        assert_eq!(db.get_plugin_scans().unwrap().len(), 1);
     }
 
     /// Subsequence search on name/path + sort by file size DESC.
@@ -8454,6 +8569,7 @@ mod tests {
         assert_eq!(db.insert_plugin_batch("ps-stream", &[p]).unwrap(), 1);
         db.plugin_scan_parent_finalize("ps-stream", 1, &[], &["/Applications".into()])
             .unwrap();
+        db.set_plugin_scan_complete("ps-stream", true).unwrap();
         let v = db.active_scan_inventory_counts().unwrap();
         assert_eq!(v["plugins"], 1);
     }

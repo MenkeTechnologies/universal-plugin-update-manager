@@ -478,6 +478,7 @@ async fn scan_plugins(
             &directories,
             &roots,
         );
+        let _ = db.set_plugin_scan_complete(&plugin_scan_id, !was_stopped);
         persist_incremental_dir_state_after_walk(incremental_state.as_ref(), &plugin_scan_id);
         db.checkpoint();
 
@@ -825,6 +826,7 @@ async fn scan_audio_samples(
             audio_bytes,
             &audio_format_counts,
         );
+        let _ = db.set_audio_scan_complete(&audio_scan_id, !was_stopped);
         db.checkpoint();
         serde_json::json!({
             "samples": [],
@@ -1025,6 +1027,7 @@ async fn scan_daw_projects(
             daw_bytes,
             &daw_daw_counts,
         );
+        let _ = db.set_daw_scan_complete(&daw_scan_id, !was_stopped);
         db.checkpoint();
         serde_json::json!({
             "projects": [],
@@ -1207,6 +1210,7 @@ async fn scan_presets(
             preset_bytes,
             &preset_format_counts,
         );
+        let _ = db.set_preset_scan_complete(&preset_scan_id, !was_stopped);
         db.checkpoint();
         serde_json::json!({
             "presets": [],
@@ -1396,6 +1400,7 @@ async fn scan_midi_files(
             midi_bytes,
             &midi_format_counts,
         );
+        let _ = db.set_midi_scan_complete(&midi_scan_id, !was_stopped);
         db.checkpoint();
         serde_json::json!({
             "midiCount": midi_count,
@@ -1601,6 +1606,7 @@ async fn scan_pdfs(
         }
         let was_stopped = pdf_state.stop_scan.load(Ordering::Relaxed);
         let _ = db.pdf_scan_parent_finalize(&pdf_scan_id, pdf_count as usize, pdf_bytes);
+        let _ = db.set_pdf_scan_complete(&pdf_scan_id, !was_stopped);
         db.checkpoint();
         serde_json::json!({
             "pdfs": [],
@@ -1947,6 +1953,11 @@ async fn scan_unified(
                 &preset_format_counts,
             );
             let _ = db.pdf_scan_parent_finalize(&pdf_scan_id, pdf_count as usize, pdf_bytes);
+            let complete = !stopped;
+            let _ = db.set_audio_scan_complete(&audio_scan_id, complete);
+            let _ = db.set_daw_scan_complete(&daw_scan_id, complete);
+            let _ = db.set_preset_scan_complete(&preset_scan_id, complete);
+            let _ = db.set_pdf_scan_complete(&pdf_scan_id, complete);
             db.checkpoint();
 
             let finished_at = history::now_iso();
