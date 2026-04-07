@@ -59,6 +59,9 @@ function _hmOverviewTotals(agg, samples, plugins, projects, presets) {
 function _hmPartialSampleHintCard(agg, samples) {
     const lib = agg?.audio?.count ?? (Number(typeof audioTotalCount !== 'undefined' ? audioTotalCount : 0) || 0);
     if (!lib || samples.length >= lib) return '';
+    // `allAudioSamples` is often still empty on first open (Samples tab not hydrated yet). DB-backed
+    // cards can still show full-library stats — avoid a bogus "0 of N" that clears on second open.
+    if (samples.length === 0) return '';
     return `<div class="hm-card hm-card-wide" data-hm-card="partialHint" style="padding:8px 12px;margin-bottom:8px;border:1px dashed var(--text-dim);">
   <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(_hmFmt('ui.hm.partial_sample_rows', {shown: samples.length.toLocaleString(), total: lib.toLocaleString()}))}</span>
 </div>`;
