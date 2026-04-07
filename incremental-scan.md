@@ -17,6 +17,10 @@
 - **Symlinks / canonical paths**: Keys use the same normalization as the walker’s visit deduplication (`canonicalize` when possible).
 - **Per-scan “new files” in History**: Listing only the files first seen in a given `scan_id` requires append-only inserts (no wholesale replace per scan) and optional columns such as `discovered_in_scan_id`. The directory layer is the prerequisite; file-level history UI is a separate follow-up.
 
+## Plugin-only scan
+
+- **VST/AU root enumeration** (`discover_plugins` / plugin tab scan) does **not** use the shared `directory_scan_state` incremental skip. Those roots are cheap to list (one `read_dir` per platform directory), but reusing the same mtime map as unified scans would incorrectly skip them: a prior unified walk already records each directory’s mtime, and after any plugin scan that used incremental, the next run would skip every root and find zero plugins.
+
 ## Preference
 
 - `incrementalDirectoryScan` — when `off`, directory snapshots are ignored and every scan is a full tree walk. Default in `config.default.toml`: `on` (`[scanning]`).

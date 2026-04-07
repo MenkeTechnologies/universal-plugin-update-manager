@@ -395,6 +395,28 @@ mod tests {
     }
 
     #[test]
+    fn test_discover_plugins_incremental_second_pass_skips_roots() {
+        use crate::unified_walker::IncrementalDirState;
+        use std::collections::HashMap;
+
+        let tmp = std::env::temp_dir().join("upum_test_discover_inc_second");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let vst = tmp.join("A.vst");
+        fs::create_dir_all(&vst).unwrap();
+        let dirs = vec![tmp.to_string_lossy().to_string()];
+        let inc = IncrementalDirState::new(HashMap::new());
+        let first = discover_plugins(&dirs, Some(&inc));
+        assert_eq!(first.len(), 1);
+        let second = discover_plugins(&dirs, Some(&inc));
+        assert!(
+            second.is_empty(),
+            "shared incremental state would skip plugin roots after the first enumeration"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn test_discover_plugins_finds_vst() {
         let tmp = std::env::temp_dir().join("upum_test_discover_vst");
         let _ = fs::remove_dir_all(&tmp);

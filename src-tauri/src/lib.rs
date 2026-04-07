@@ -353,9 +353,10 @@ async fn scan_plugins(
         let plugin_scan_id = history::gen_id();
         let now_iso = history::now_iso();
         let db = db::global();
-        let incremental_state = load_incremental_dir_state_for_walk();
-        let plugin_paths =
-            scanner::discover_plugins(&directories, incremental_state.as_deref());
+        // Plugin discovery must not use the shared unified incremental map: `record_scanned_dir`
+        // would mark each VST root as "already scanned", and `should_skip` would skip the entire
+        // root on the next plugin run (or skip immediately if a unified walk already recorded it).
+        let plugin_paths = scanner::discover_plugins(&directories, None);
         let total = plugin_paths.len();
 
         let _ = db.plugin_scan_parent_create(&plugin_scan_id, &now_iso, &directories);
@@ -503,7 +504,6 @@ async fn scan_plugins(
             &roots,
         );
         let _ = db.set_plugin_scan_complete(&plugin_scan_id, !was_stopped);
-        persist_incremental_dir_state_after_walk(incremental_state.as_ref(), &plugin_scan_id);
         db.checkpoint();
 
         serde_json::json!({
