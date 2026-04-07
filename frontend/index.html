@@ -6120,7 +6120,10 @@
         /* Visualizer tab — HUD / cyberdeck panels (chamfered, glow, not flat blocks) */
         .viz-container {
             position: relative;
-            height: 100%;
+            /* flex growth, not height:100% — release WKWebView often fails to resolve % height
+               inside overflow-y tab panels; flex fills #tabVisualizer reliably */
+            flex: 1 1 0;
+            min-height: 0;
             display: flex;
             flex-direction: column;
             padding: 10px;
@@ -6286,6 +6289,7 @@
             flex: 1;
             width: 100%;
             min-height: 0;
+            display: block;
         }
 
         /* Walker status tab */
@@ -6507,8 +6511,7 @@
 
         #tabAudioEngine .ae-eq-param-wrap {
             position: relative;
-            flex: 1 1 auto;
-            width: 100%;
+            flex: 1 1 280px;
             min-width: 0;
             max-width: 100%;
             min-height: 120px;
@@ -6522,9 +6525,8 @@
         #tabAudioEngine .ae-eq-canvas-col {
             display: flex;
             flex-direction: column;
-            flex: 1 1 0;
+            flex: 1 1 280px;
             min-width: 0;
-            width: 100%;
             max-width: 100%;
         }
 
@@ -6587,7 +6589,6 @@
             border: 1px solid transparent;
             border-radius: 2px;
             transition: border-color 0.15s;
-            width: 100%;
             min-width: 0;
             box-sizing: border-box;
         }
@@ -8890,8 +8891,8 @@
                 <h2 class="settings-heading">&#9776; <span data-i18n="ui.ae.plugins_heading">Insert plugins</span></h2>
                 <div class="settings-row ae-settings-row-full">
                     <div class="settings-label">
-                        <p id="aePluginStub" style="margin:0 0 6px 0;font-size:13px;color:var(--text-muted);line-height:1.5;">—</p>
-                        <p id="aePluginScanProgress" class="ae-mono" style="display:none;margin:0 0 8px 0;font-size:12px;line-height:1.45;color:var(--cyan);white-space:pre-wrap;word-break:break-word;">—</p>
+                        <p id="aePluginStub" style="margin:0 0 6px 0;font-size:13px;color:var(--text-muted);line-height:1.5;" data-i18n="ui.p.empty">—</p>
+                        <p id="aePluginScanProgress" class="ae-mono" style="display:none;margin:0 0 8px 0;font-size:12px;line-height:1.45;color:var(--cyan);white-space:pre-wrap;word-break:break-word;" data-i18n="ui.p.empty">—</p>
                         <p id="aePluginInsertIntro" style="margin:0;font-size:12px;color:var(--text-dim);line-height:1.45;" data-i18n="ui.ae.plugins_insert_intro">—</p>
                     </div>
                 </div>
@@ -10144,44 +10145,44 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=97977"></script>
-<script src="js/utils.js?v=97977"></script>
-<script src="js/ipc.js?v=97977"></script>
-<script src="js/drag-reorder.js?v=97977"></script>
-<script src="js/modal-drag.js?v=97977"></script>
-<script src="js/columns.js?v=97977"></script>
-<script src="js/notes.js?v=97977"></script>
-<script src="js/favorites.js?v=97977"></script>
-<script src="js/export.js?v=97977"></script>
-<script src="js/plugins.js?v=97977"></script>
-<script src="js/settings.js?v=97977"></script>
-<script src="js/history.js?v=97977"></script>
-<script src="js/kvr.js?v=97977"></script>
-<script src="js/audio.js?v=97977"></script>
-<script src="js/daw.js?v=97977"></script>
-<script src="js/presets.js?v=97977"></script>
-<script src="js/disk-usage.js?v=97977"></script>
-<script src="js/batch-select.js?v=97977"></script>
-<script src="js/native-file-drag.js?v=97977"></script>
-<script src="js/sort-persist.js?v=97977"></script>
-<script src="js/multi-filter.js?v=97977"></script>
-<script src="js/file-browser.js?v=97977"></script>
-<script src="js/duplicates.js?v=97977"></script>
-<script src="js/command-palette.js?v=97977"></script>
-<script src="js/xref.js?v=97977"></script>
-<script src="js/dep-graph.js?v=97977"></script>
-<script src="js/smart-playlists.js?v=97977"></script>
-<script src="js/heatmap-dashboard.js?v=97977"></script>
-<script src="js/midi.js?v=97977"></script>
-<script src="js/pdf.js?v=97977"></script>
-<script src="js/settings-search.js?v=97977"></script>
-<script src="js/visualizer.js?v=97977"></script>
-<script src="js/walker-status.js?v=97977"></script>
-<script src="js/audio-engine.js?v=97977"></script>
-<script src="js/context-menu.js?v=97977"></script>
-<script src="js/shortcuts.js?v=97977"></script>
-<script src="js/help-overlay.js?v=97977"></script>
-<script src="js/keyboard-nav.js?v=97977"></script>
-<script src="js/app.js?v=97977"></script>
+<script src="js/i18n-ui.js?v=97978"></script>
+<script src="js/utils.js?v=97978"></script>
+<script src="js/ipc.js?v=97978"></script>
+<script src="js/drag-reorder.js?v=97978"></script>
+<script src="js/modal-drag.js?v=97978"></script>
+<script src="js/columns.js?v=97978"></script>
+<script src="js/notes.js?v=97978"></script>
+<script src="js/favorites.js?v=97978"></script>
+<script src="js/export.js?v=97978"></script>
+<script src="js/plugins.js?v=97978"></script>
+<script src="js/settings.js?v=97978"></script>
+<script src="js/history.js?v=97978"></script>
+<script src="js/kvr.js?v=97978"></script>
+<script src="js/audio.js?v=97978"></script>
+<script src="js/daw.js?v=97978"></script>
+<script src="js/presets.js?v=97978"></script>
+<script src="js/disk-usage.js?v=97978"></script>
+<script src="js/batch-select.js?v=97978"></script>
+<script src="js/native-file-drag.js?v=97978"></script>
+<script src="js/sort-persist.js?v=97978"></script>
+<script src="js/multi-filter.js?v=97978"></script>
+<script src="js/file-browser.js?v=97978"></script>
+<script src="js/duplicates.js?v=97978"></script>
+<script src="js/command-palette.js?v=97978"></script>
+<script src="js/xref.js?v=97978"></script>
+<script src="js/dep-graph.js?v=97978"></script>
+<script src="js/smart-playlists.js?v=97978"></script>
+<script src="js/heatmap-dashboard.js?v=97978"></script>
+<script src="js/midi.js?v=97978"></script>
+<script src="js/pdf.js?v=97978"></script>
+<script src="js/settings-search.js?v=97978"></script>
+<script src="js/visualizer.js?v=97978"></script>
+<script src="js/walker-status.js?v=97978"></script>
+<script src="js/audio-engine.js?v=97978"></script>
+<script src="js/context-menu.js?v=97978"></script>
+<script src="js/shortcuts.js?v=97978"></script>
+<script src="js/help-overlay.js?v=97978"></script>
+<script src="js/keyboard-nav.js?v=97978"></script>
+<script src="js/app.js?v=97978"></script>
 </body>
 </html>
