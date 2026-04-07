@@ -312,6 +312,20 @@ async function reverseAudioBufferAsync(ctx, buf) {
     return out;
 }
 
+/** Copy decoded PCM into an AudioBuffer without one huge `copyToChannel` (can freeze the WebView on multi‑GB WAVs). */
+async function copyFloat32ToBufferChannelAsync(buf, channelIndex, src) {
+    const dst = buf.getChannelData(channelIndex);
+    const len = Math.min(src.length, dst.length);
+    const chunk = 524288; // floats per slice; yield between slices so the UI can paint
+    for (let i = 0; i < len; i += chunk) {
+        const n = Math.min(chunk, len - i);
+        dst.set(src.subarray(i, i + n), i);
+        if (i + n < len && typeof yieldToBrowser === 'function') {
+            await yieldToBrowser();
+        }
+    }
+}
+
 async function ensureReversedBufferForPath(path) {
     if (_reversedBuf && _decodedBufPath === path) return _reversedBuf;
     ensureAudioGraph();
@@ -321,8 +335,7 @@ async function ensureReversedBufferForPath(path) {
         const dec = await decodeChannelsViaWorker(url);
         buf = _playbackCtx.createBuffer(dec.channels.length, dec.length, dec.sampleRate);
         for (let c = 0; c < dec.channels.length; c++) {
-            buf.copyToChannel(dec.channels[c], c);
-            if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+            await copyFloat32ToBufferChannelAsync(buf, c, dec.channels[c]);
         }
     } catch (e) {
         if (!getAudioDecodeWorker()) {
