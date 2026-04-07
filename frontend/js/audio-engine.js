@@ -21,8 +21,34 @@ let aeInitialDeviceTypeRestored = false;
 /** Incremented at the start of each `refreshAudioEnginePanel` so in-flight plugin-scan polls do not apply stale results. */
 let aePluginChainPollGeneration = 0;
 
-/** Throttle `toast.ae_plugin_scan_progress` during long scans (`fetchPluginChainUntilSettled`). */
-let aePluginScanProgressToastAt = 0;
+/** One live toast for plugin scan (`#aePluginScanProgressToast`); updated each poll, not stacked. */
+const AE_PLUGIN_SCAN_PROGRESS_TOAST_ID = 'aePluginScanProgressToast';
+/** When `scan_done` / current plug-in / skipped unchanged, we still show elapsed seconds on the toast. */
+let aeScanProgressToastKey = '';
+let aeScanProgressToastKeyAt = 0;
+
+function dismissAePluginScanProgressToast() {
+    const el = document.getElementById(AE_PLUGIN_SCAN_PROGRESS_TOAST_ID);
+    if (el) el.remove();
+}
+
+/**
+ * Single non-expiring info toast for scan progress; text updated in place (avoids duplicate identical toasts).
+ * @param {string} message — already localized (e.g. `toastFmt('toast.ae_plugin_scan_progress', { line })`)
+ */
+function ensureAePluginScanProgressToast(message) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    let el = document.getElementById(AE_PLUGIN_SCAN_PROGRESS_TOAST_ID);
+    if (!el) {
+        el = document.createElement('div');
+        el.id = AE_PLUGIN_SCAN_PROGRESS_TOAST_ID;
+        el.className = 'toast toast-info';
+        el.style.animation = 'toast-in 0.3s ease-out forwards';
+        container.appendChild(el);
+    }
+    el.textContent = message;
+}
 
 function migrateAeBufferPrefs() {
     if (typeof prefs === 'undefined' || typeof prefs.getItem !== 'function' || typeof prefs.setItem !== 'function') {
@@ -499,14 +525,19 @@ function aePopulateInsertSlotSelects(chain) {
  * Poll `plugin_chain` until the sidecar finishes scanning (`phase` !== `scanning`) or attempts exhausted.
  * @param {function} inv — `audioEngineInvoke`
  * @param {object} [initialChain] — if set, skip the first `plugin_chain` IPC (caller already fetched it).
+ * @param {number} [expectedGen] — if set, stop when `aePluginChainPollGeneration` changes (stale panel refresh).
  * @returns {Promise<object>}
  */
-async function fetchPluginChainUntilSettled(inv, initialChain) {
+async function fetchPluginChainUntilSettled(inv, initialChain, expectedGen) {
     const delay = (ms) => new Promise((r) => setTimeout(r, ms));
     const toast = (key, params, ms, kind) => {
         if (typeof showToast !== 'function' || typeof toastFmt !== 'function') return;
         showToast(toastFmt(key, params || {}), ms, kind);
     };
+
+    dismissAePluginScanProgressToast();
+    aeScanProgressToastKey = '';
+    aeScanProgressToastKeyAt = 0;
 
     let chain =
         initialChain !== undefined && initialChain !== null
@@ -519,20 +550,36 @@ async function fetchPluginChainUntilSettled(inv, initialChain) {
 
     let attempts = 0;
     const maxAttempts = 600;
-    aePluginScanProgressToastAt = typeof Date.now === 'function' ? Date.now() - 2600 : 0;
     while (chain && chain.phase === 'scanning' && attempts < maxAttempts) {
+        if (expectedGen != null && aePluginChainPollGeneration !== expectedGen) {
+            dismissAePluginScanProgressToast();
+            return chain;
+        }
         await delay(250);
         chain = await inv({cmd: 'plugin_chain'});
         attempts++;
-        const now = typeof Date.now === 'function' ? Date.now() : 0;
-        if (chain && chain.phase === 'scanning' && now - aePluginScanProgressToastAt >= 2500) {
-            aePluginScanProgressToastAt = now;
+        if (expectedGen != null && aePluginChainPollGeneration !== expectedGen) {
+            dismissAePluginScanProgressToast();
+            return chain;
+        }
+        if (chain && chain.phase === 'scanning') {
+            const now = typeof Date.now === 'function' ? Date.now() : 0;
+            const key = `${chain.scan_done}|${chain.scan_current_format}|${chain.scan_current_name}|${chain.scan_skipped}`;
+            if (key !== aeScanProgressToastKey) {
+                aeScanProgressToastKey = key;
+                aeScanProgressToastKeyAt = now;
+            }
+            const sec = Math.floor((now - aeScanProgressToastKeyAt) / 1000);
+            const suffix = sec >= 1 ? ` · ${sec}s` : '';
+            fillAePluginSection(chain, sec >= 1 ? {elapsedSec: sec} : undefined);
             const line = formatAePluginScanProgressLine(chain);
-            if (line && typeof showToast === 'function' && typeof toastFmt === 'function') {
-                showToast(toastFmt('toast.ae_plugin_scan_progress', {line}), 2200, 'info');
+            if (line && typeof toastFmt === 'function') {
+                ensureAePluginScanProgressToast(toastFmt('toast.ae_plugin_scan_progress', {line: line + suffix}));
             }
         }
     }
+
+    dismissAePluginScanProgressToast();
 
     if (chain && chain.phase === 'scanning' && attempts >= maxAttempts) {
         toast('toast.ae_plugin_scan_timeout', {}, 6500, 'warning');
@@ -582,8 +629,9 @@ function formatAePluginScanProgressLine(chain) {
 
 /**
  * @param {object|null} chain — `plugin_chain` payload
+ * @param {{elapsedSec?: number}|undefined} [scanUiExtra] — wall-clock seconds on the current plug-in step (from poll loop)
  */
-function fillAePluginSection(chain) {
+function fillAePluginSection(chain, scanUiExtra) {
     const stub = document.getElementById('aePluginStub');
     const prog = document.getElementById('aePluginScanProgress');
     const ul = document.getElementById('aePluginSlotList');
@@ -608,7 +656,12 @@ function fillAePluginSection(chain) {
         stub.textContent = catalogFmt('ui.ae.plugins_scanning_note');
         if (prog) {
             prog.style.display = '';
-            prog.textContent = formatAePluginScanProgressLine(chain);
+            let line = formatAePluginScanProgressLine(chain);
+            const es = scanUiExtra && scanUiExtra.elapsedSec != null ? Number(scanUiExtra.elapsedSec) : 0;
+            if (Number.isFinite(es) && es >= 1) {
+                line += ` · ${es}s`;
+            }
+            prog.textContent = line;
         }
     } else {
         stub.textContent = catalogFmt('ui.ae.plugins_stub', {
@@ -718,7 +771,7 @@ async function applyAePlaybackInserts() {
         if (typeof showToast === 'function' && typeof toastFmt === 'function') {
             showToast(toastFmt('toast.ae_inserts_applied'), 3000, 'success');
         }
-        const chain = await fetchPluginChainUntilSettled(inv);
+        const chain = await fetchPluginChainUntilSettled(inv, undefined, aePluginChainPollGeneration);
         fillAePluginSection(chain);
     } catch (e) {
         const err = e && e.message ? String(e.message) : String(e);
@@ -1273,7 +1326,7 @@ async function refreshAudioEnginePanel() {
         const chain = await inv({cmd: 'plugin_chain'});
         fillAePluginSection(chain);
         if (chain && chain.phase === 'scanning') {
-            void fetchPluginChainUntilSettled(inv, chain).then((finalChain) => {
+            void fetchPluginChainUntilSettled(inv, chain, pollGen).then((finalChain) => {
                 if (pollGen !== aePluginChainPollGeneration) return;
                 fillAePluginSection(finalChain);
             });
