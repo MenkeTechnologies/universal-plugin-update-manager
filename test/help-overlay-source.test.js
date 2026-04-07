@@ -31,6 +31,7 @@ function loadHelpSandbox() {
   const H = loadFrontendScripts(['utils.js', 'help-overlay.js'], {
     document,
     appFmt: (k) => k,
+    navigator: { platform: 'Linux' },
   });
   return { H, metrics };
 }

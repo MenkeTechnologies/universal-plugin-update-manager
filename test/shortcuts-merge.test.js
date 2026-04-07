@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 // ── Default shortcuts subset + merge (frontend/js/shortcuts.js) ──
 const DEFAULT_SHORTCUTS = {
   tab1: { key: '1', mod: true, label: 'Plugins tab' },
-  tab2: { key: '2', mod: true, label: 'Samples tab' },
-  tab12: { key: 'F4', mod: false, label: 'Settings tab' },
+  tab12: { key: 'F4', mod: false, label: 'Visualizer tab' },
+  tab13: { key: 'F5', mod: false, label: 'Walkers tab' },
   search: { key: 'f', mod: true, label: 'Focus search' },
   newKey: { key: 'x', mod: false, label: 'Future shortcut' },
 };
@@ -20,7 +20,11 @@ function mergeShortcuts(saved, defaults) {
   return merged;
 }
 
-const TAB_MAP = ['plugins', 'samples', 'daw', 'presets', 'favorites', 'notes', 'tags', 'files', 'history', 'midi', 'visualizer', 'walkers', 'settings'];
+// Mirrors frontend/js/shortcuts.js TAB_MAP (plugins … settings)
+const TAB_MAP = [
+  'plugins', 'samples', 'daw', 'presets', 'midi', 'pdf', 'favorites', 'notes', 'tags', 'files',
+  'history', 'visualizer', 'walkers', 'settings',
+];
 
 function tabSlugFromShortcutId(id) {
   if (!id.startsWith('tab') || id.length < 4 || id.length > 5) return null;
@@ -57,11 +61,12 @@ describe('mergeShortcuts', () => {
 
   it('merges multiple ids', () => {
     const m = mergeShortcuts(
-      { tab1: { key: 'q', mod: false }, tab2: { key: 'w', mod: true } },
+      { tab1: { key: 'q', mod: false }, tab12: { key: 'w', mod: true } },
       DEFAULT_SHORTCUTS
     );
     assert.strictEqual(m.tab1.key, 'q');
-    assert.strictEqual(m.tab2.mod, true);
+    assert.strictEqual(m.tab12.key, 'w');
+    assert.strictEqual(m.tab12.mod, true);
   });
 });
 
@@ -70,16 +75,20 @@ describe('tabSlugFromShortcutId', () => {
     assert.strictEqual(tabSlugFromShortcutId('tab1'), 'plugins');
   });
 
-  it('maps tab12 to walkers (TAB_MAP index 11)', () => {
-    assert.strictEqual(tabSlugFromShortcutId('tab12'), 'walkers');
+  it('maps tab12 to visualizer', () => {
+    assert.strictEqual(tabSlugFromShortcutId('tab12'), 'visualizer');
   });
 
-  it('settings is last slug; reachable only at index 12 (no tab13 shortcut)', () => {
-    assert.strictEqual(TAB_MAP[12], 'settings');
+  it('maps tab13 to walkers', () => {
+    assert.strictEqual(tabSlugFromShortcutId('tab13'), 'walkers');
   });
 
-  it('maps tab6 to notes', () => {
-    assert.strictEqual(tabSlugFromShortcutId('tab6'), 'notes');
+  it('settings is last slug at index 13 (tab14 not defined in defaults)', () => {
+    assert.strictEqual(TAB_MAP[13], 'settings');
+  });
+
+  it('maps tab6 to pdf', () => {
+    assert.strictEqual(tabSlugFromShortcutId('tab6'), 'pdf');
   });
 
   it('returns null for tab0', () => {
@@ -101,8 +110,8 @@ describe('tabSlugFromShortcutId', () => {
 });
 
 describe('TAB_MAP', () => {
-  it('has 13 entries matching tab1..tab12 + implicit range', () => {
-    assert.strictEqual(TAB_MAP.length, 13);
+  it('has 14 entries matching tab1..tab14 range', () => {
+    assert.strictEqual(TAB_MAP.length, 14);
   });
 
   it('settings is last', () => {
