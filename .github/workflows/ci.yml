@@ -33,13 +33,6 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ninja --yes
 
-      # CMake otherwise picks MinGW GCC; JUCE 8 no longer supports MinGW (see juce_TargetPlatform.h).
-      - name: MSVC dev environment (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -96,12 +89,6 @@ jobs:
       - name: Install Ninja (Windows)
         if: matrix.os == 'windows-latest'
         run: choco install ninja --yes
-
-      - name: MSVC dev environment (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
