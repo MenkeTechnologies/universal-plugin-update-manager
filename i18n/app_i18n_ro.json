@@ -1389,7 +1389,7 @@
   "ui.ph.preset_name": "Preset name‌",
   "ui.ph.recycle_10_eadir_10_spotlight_v100_10_recycle_bin_": "#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;System Volume Information&#10;node_modules&#10;.git&#10;.Trash‌",
   "ui.ph.recycle_eadir_spotlight_v100_recycle_bin_system_vo": "#recycle @eaDir .Spotlight-V100 $RECYCLE.BIN System Volume Information node_modules .git .Trash",
-  "ui.ph.search_favorites": "Search favorites...‌",
+  "ui.ph.search_favorites": "Fuzzy search favorites...",
   "ui.ph.search_notes_and_tags": "Search notes and tags...‌",
   "ui.ph.search_settings": "Search settings...‌",
   "ui.ph.search_songs": "Search songs...‌",

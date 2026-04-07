@@ -134,14 +134,17 @@ function clearFavorites() {
 }
 
 let _favSearch = '';
+let _lastFavMode = 'fuzzy';
 
 registerFilter('filterFavorites', {
     inputId: 'favSearchInput',
+    regexToggleId: 'regexFavorites',
     resetOffset() {
         _favRenderCount = 0;
     },
     fetchFn() {
         _favSearch = this.lastSearch || '';
+        _lastFavMode = this.lastMode || 'fuzzy';
         renderFavorites();
     },
 });
@@ -163,7 +166,7 @@ function renderFavorites() {
     if (search) {
         const scored = filtered.map(f => ({
             f,
-            score: searchScore(search, [f.name, f.path], 'fuzzy')
+            score: searchScore(search, [f.name, f.path], _lastFavMode)
         })).filter(s => s.score > 0);
         scored.sort((a, b) => b.score - a.score);
         filtered = scored.map(s => s.f);
@@ -219,7 +222,7 @@ function renderFavorites() {
         return `<div class="fav-item" data-path="${hp}" data-type="${f.type}" data-name="${escapeHtml(f.name)}"${cursor}>
       <span class="fav-star">&#9733;</span>
       <span class="fav-type"><span class="format-badge ${typeClass}">${typeLabel}</span></span>
-      <span class="fav-name" title="${hp}">${_favSearch && typeof highlightMatch === 'function' ? highlightMatch(f.name, _favSearch, 'fuzzy') : escapeHtml(f.name)}</span>
+      <span class="fav-name" title="${hp}">${_favSearch && typeof highlightMatch === 'function' ? highlightMatch(f.name, _favSearch, _lastFavMode) : escapeHtml(f.name)}</span>
       ${extra}${daw}
       <span class="fav-actions">
         ${playBtn}${loopBtn}
@@ -270,7 +273,7 @@ function loadMoreFavs() {
         return `<div class="fav-item" data-path="${hp}" data-type="${f.type}" data-name="${escapeHtml(f.name)}">
       <span class="fav-star">&#9733;</span>
       <span class="fav-type"><span class="format-badge ${typeClass}">${typeLabel}</span></span>
-      <span class="fav-name" title="${hp}">${_favSearch && typeof highlightMatch === 'function' ? highlightMatch(f.name, _favSearch, 'fuzzy') : escapeHtml(f.name)}</span>${extra}
+      <span class="fav-name" title="${hp}">${_favSearch && typeof highlightMatch === 'function' ? highlightMatch(f.name, _favSearch, _lastFavMode) : escapeHtml(f.name)}</span>${extra}
       <span class="fav-actions">
         <button class="btn-small btn-folder" data-action="openFavFolder" data-path="${hp}" data-type="${f.type}" title="Reveal in Finder">&#128193;</button>
         <button class="btn-small btn-stop" data-action="removeFav" data-path="${hp}" title="Remove">&#10005;</button>

@@ -1389,7 +1389,7 @@
   "ui.ph.preset_name": "프리셋 이름",
   "ui.ph.recycle_10_eadir_10_spotlight_v100_10_recycle_bin_": "#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;시스템 볼륨 정보&#10;node_modules&#10;git&#10;.Trash",
   "ui.ph.recycle_eadir_spotlight_v100_recycle_bin_system_vo": "#recycle @eaDir .Spotlight-V100 $RECYCLE.BIN System Volume Information node_modules .git .Trash",
-  "ui.ph.search_favorites": "즐겨찾기 검색...",
+  "ui.ph.search_favorites": "Fuzzy search favorites...",
   "ui.ph.search_notes_and_tags": "메모 및 태그 검색...",
   "ui.ph.search_settings": "검색 설정...",
   "ui.ph.search_songs": "노래 검색...",
