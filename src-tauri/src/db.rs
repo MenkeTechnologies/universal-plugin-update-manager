@@ -212,8 +212,14 @@ pub struct CacheStat {
     pub size_bytes: u64,
 }
 
-/// Prefer the latest finalized audio scan; if none (e.g. streaming scan before parent row updated), use latest by timestamp.
-const ACTIVE_AUDIO_SCAN_ID_SQL: &str = "(SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1)";
+/// Canonical inventory: one row per `path` (highest `id` wins — newest insert for that path).
+const AUDIO_LIBRARY_IDS: &str = "id IN (SELECT MAX(id) FROM audio_samples GROUP BY path)";
+const DAW_LIBRARY_IDS: &str = "id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)";
+const PRESET_LIBRARY_IDS: &str =
+    "id IN (SELECT MAX(id) FROM presets GROUP BY path)";
+const PDF_LIBRARY_IDS: &str = "id IN (SELECT MAX(id) FROM pdfs GROUP BY path)";
+const MIDI_LIBRARY_IDS: &str = "id IN (SELECT MAX(id) FROM midi_files GROUP BY path)";
+const PLUGIN_LIBRARY_IDS: &str = "id IN (SELECT MAX(id) FROM plugins GROUP BY path)";
 
 /// Latest DAW scan that has at least one `daw_projects` row. Empty scans remain in history but must not shadow prior results.
 /// Uses child-row presence (not `project_count`) so streaming scans still resolve after finalize quirks.
@@ -357,6 +363,10 @@ impl Database {
         let _ = std::fs::create_dir_all(db_path.parent().unwrap());
         let conn =
             Connection::open(&db_path).map_err(|e| format!("Failed to open database: {e}"))?;
+        // Parallel `cargo test` processes can open the same path; without a busy timeout,
+        // migrations hit `database is locked` immediately.
+        conn.busy_timeout(std::time::Duration::from_secs(30))
+            .map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
 
         // Performance pragmas
         //   cache_size=-262144  — 256 MB page cache (negative = KB). Keeps hot
@@ -921,16 +931,45 @@ impl Database {
     pub fn audio_scan_parent_finalize(
         &self,
         id: &str,
-        sample_count: u64,
-        total_bytes: u64,
-        format_counts: &HashMap<String, usize>,
+        _sample_count: u64,
+        _total_bytes: u64,
+        _format_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
-        let fc_json = serde_json::to_string(format_counts).unwrap_or_default();
+        let sample_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT path) FROM audio_samples",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let total_bytes: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(size), 0) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let mut format_map: HashMap<String, usize> = HashMap::new();
+        let mut stmt = conn
+            .prepare(
+                "SELECT format, COUNT(*) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path) GROUP BY format",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
+            })
+            .map_err(|e| e.to_string())?;
+        for (fmt, n) in rows.flatten() {
+            format_map.insert(fmt, n);
+        }
+        let fc_json = serde_json::to_string(&format_map).unwrap_or_default();
         conn.execute(
             "UPDATE audio_scans SET sample_count = ?2, total_bytes = ?3, format_counts = ?4 WHERE id = ?1",
-            params![id, sample_count as i64, total_bytes as i64, fc_json],
-        ).map_err(|e| e.to_string())?;
+            params![id, sample_count, total_bytes, fc_json],
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -1066,24 +1105,25 @@ impl Database {
     }
 
     /// Paginated, sortable, filterable query for audio samples.
+    ///
+    /// `scan_id` **Some(non-empty)** → rows for that scan only (history detail).
+    /// `scan_id` **None** or empty → **library** mode: all rows across scans, deduped by `path`
+    /// (`MAX(id)` per path).
     pub fn query_audio(&self, params: &AudioQueryParams) -> Result<AudioQueryResult, String> {
         let conn = self.conn.lock().unwrap();
 
-        // Resolve scan_id
-        let scan_id = match &params.scan_id {
-            Some(id) => id.clone(),
-            None => conn
-                .query_row(
-                    "SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1",
-                    [],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()
-                .map_err(|e| e.to_string())?
-                .unwrap_or_default(),
+        let single_scan = params
+            .scan_id
+            .as_ref()
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+        let scan_id = if single_scan {
+            params.scan_id.as_ref().unwrap().clone()
+        } else {
+            String::new()
         };
 
-        if scan_id.is_empty() {
+        if single_scan && scan_id.is_empty() {
             return Ok(AudioQueryResult {
                 samples: vec![],
                 total_count: 0,
@@ -1092,18 +1132,30 @@ impl Database {
         }
 
         // Build WHERE clause
-        let mut conditions = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2;
+        let mut conditions = if single_scan {
+            vec!["scan_id = ?1".to_string()]
+        } else {
+            vec![AUDIO_LIBRARY_IDS.to_string()]
+        };
+        let mut bind_idx = if single_scan { 2 } else { 1 };
 
         // FTS5 trigram for ≥3 char searches; LIKE fallback for 1–2 chars.
         let fts_match = params.search.as_deref().and_then(fts_phrase);
         let like_pat = params.search.as_deref().and_then(short_like);
         if fts_match.is_some() {
-            conditions.push(format!(
-                "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
-            ));
-            bind_idx += 2;
+            if single_scan {
+                conditions.push(format!(
+                    "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
+                    scan_idx = bind_idx + 1,
+                ));
+                bind_idx += 2;
+            } else {
+                conditions.push(format!(
+                    "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM audio_samples GROUP BY path))",
+                    bind_idx = bind_idx,
+                ));
+                bind_idx += 1;
+            }
         } else if like_pat.is_some() {
             conditions.push(format!(
                 "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
@@ -1125,7 +1177,6 @@ impl Database {
                 }
             }
         }
-        let _ = bind_idx; // suppress unused warning
 
         let where_clause = conditions.join(" AND ");
 
@@ -1146,16 +1197,23 @@ impl Database {
         let sort_dir = if params.sort_asc { "ASC" } else { "DESC" };
         let nulls = "NULLS LAST";
 
-        // Total unfiltered count (cached per scan_id — cheap indexed lookup)
-        let total_unfiltered: u64 = conn
-            .query_row(
+        // Total unfiltered count
+        let total_unfiltered: u64 = if single_scan {
+            conn.query_row(
                 "SELECT COUNT(*) FROM audio_samples WHERE scan_id = ?1",
                 params![scan_id],
                 |row| row.get::<_, i64>(0).map(|v| v as u64),
             )
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?
+        } else {
+            conn.query_row(
+                "SELECT COUNT(*) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path)",
+                [],
+                |row| row.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0)
+        };
 
-        // Single query: fetch page + filtered count via COUNT(*) OVER()
         let query_sql = format!(
             "SELECT name, path, directory, format, size, size_formatted, modified,
                     duration, channels, sample_rate, bits_per_sample, bpm, key_name, lufs,
@@ -1170,16 +1228,20 @@ impl Database {
 
         let mut stmt = conn.prepare(&query_sql).map_err(|e| e.to_string())?;
         let mut idx = 1;
-        stmt.raw_bind_parameter(idx, &scan_id)
-            .map_err(|e| e.to_string())?;
-        idx += 1;
+        if single_scan {
+            stmt.raw_bind_parameter(idx, &scan_id)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(idx, m)
                 .map_err(|e| e.to_string())?;
             idx += 1;
-            stmt.raw_bind_parameter(idx, &scan_id)
-                .map_err(|e| e.to_string())?;
-            idx += 1;
+            if single_scan {
+                stmt.raw_bind_parameter(idx, &scan_id)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(idx, pat)
                 .map_err(|e| e.to_string())?;
@@ -1241,23 +1303,56 @@ impl Database {
         })
     }
 
-    /// Get aggregate stats for a scan.
+    /// Get aggregate stats. `scan_id` None or empty → full library (deduped by path). Otherwise that scan only.
     pub fn audio_stats(&self, scan_id: Option<&str>) -> Result<AudioStatsResult, String> {
         let conn = self.conn.lock().unwrap();
 
-        let sid = match scan_id {
-            Some(id) => id.to_string(),
-            None => conn
+        let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
+        if library {
+            let sample_count: u64 = conn
                 .query_row(
-                    "SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1",
+                    "SELECT COUNT(*) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path)",
                     [],
-                    |row| row.get::<_, String>(0),
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
                 )
-                .optional()
-                .map_err(|e| e.to_string())?
-                .unwrap_or_default(),
-        };
+                .unwrap_or(0);
+            let total_bytes: u64 = conn
+                .query_row(
+                    "SELECT COALESCE(SUM(size), 0) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path)",
+                    [],
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
+                )
+                .unwrap_or(0);
+            let mut format_counts = HashMap::new();
+            let mut stmt = conn
+                .prepare(
+                    "SELECT format, COUNT(*) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path) GROUP BY format",
+                )
+                .map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as u64))
+                })
+                .map_err(|e| e.to_string())?;
+            for (fmt, count) in rows.flatten() {
+                format_counts.insert(fmt, count);
+            }
+            let analyzed_count: u64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path) AND bpm IS NOT NULL",
+                    [],
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
+                )
+                .unwrap_or(0);
+            return Ok(AudioStatsResult {
+                sample_count,
+                total_bytes,
+                format_counts,
+                analyzed_count,
+            });
+        }
 
+        let sid = scan_id.expect("scan_id").to_string();
         if sid.is_empty() {
             return Ok(AudioStatsResult {
                 sample_count: 0,
@@ -1314,18 +1409,47 @@ impl Database {
         })
     }
 
-    /// Unfiltered aggregate stats for the latest DAW scan (or a specific one).
-    /// Header/stats-section counts come from here so they don't shift with table filters.
+    /// DAW aggregate stats. `scan_id` None or empty → full library (deduped by path).
     pub fn daw_stats(&self, scan_id: Option<&str>) -> Result<DawStatsResult, String> {
         let conn = self.conn.lock().unwrap();
-        let sid = match scan_id {
-            Some(id) => id.to_string(),
-            None => conn
-                .query_row(LATEST_DAW_SCAN_ID_SQL, [], |row| row.get::<_, String>(0))
-                .optional()
-                .map_err(|e| e.to_string())?
-                .unwrap_or_default(),
-        };
+        let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
+        if library {
+            let project_count: u64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
+                    [],
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
+                )
+                .unwrap_or(0);
+            let total_bytes: u64 = conn
+                .query_row(
+                    "SELECT COALESCE(SUM(size), 0) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
+                    [],
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
+                )
+                .unwrap_or(0);
+            let mut daw_counts = HashMap::new();
+            let mut stmt = conn
+                .prepare(
+                    "SELECT daw, COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path) GROUP BY daw",
+                )
+                .map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as u64))
+                })
+                .map_err(|e| e.to_string())?;
+            for (daw, count) in rows.flatten() {
+                daw_counts.insert(daw, count);
+            }
+            return Ok(DawStatsResult {
+                project_count,
+                total_bytes,
+                daw_counts,
+            });
+        }
+
+        let sid = scan_id.expect("scan_id").to_string();
         if sid.is_empty() {
             return Ok(DawStatsResult {
                 project_count: 0,
@@ -1366,22 +1490,47 @@ impl Database {
         })
     }
 
-    /// Unfiltered aggregate stats for the latest preset scan (or a specific one).
-    /// MIDI files (MID/MIDI) are excluded — they live in their own tab.
+    /// Preset aggregate stats. `scan_id` None or empty → full library (deduped by path). MIDI excluded.
     pub fn preset_stats(&self, scan_id: Option<&str>) -> Result<PresetStatsResult, String> {
         let conn = self.conn.lock().unwrap();
-        let sid = match scan_id {
-            Some(id) => id.to_string(),
-            None => conn
+        let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
+        if library {
+            let preset_count: u64 = conn
                 .query_row(
-                    "SELECT id FROM preset_scans ORDER BY timestamp DESC LIMIT 1",
+                    "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI')",
                     [],
-                    |row| row.get::<_, String>(0),
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
                 )
-                .optional()
-                .map_err(|e| e.to_string())?
-                .unwrap_or_default(),
-        };
+                .unwrap_or(0);
+            let total_bytes: u64 = conn
+                .query_row(
+                    "SELECT COALESCE(SUM(size), 0) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI')",
+                    [],
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
+                )
+                .unwrap_or(0);
+            let mut format_counts = HashMap::new();
+            let mut stmt = conn
+                .prepare(
+                    "SELECT format, COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI') GROUP BY format",
+                )
+                .map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as u64))
+                })
+                .map_err(|e| e.to_string())?;
+            for (fmt, count) in rows.flatten() {
+                format_counts.insert(fmt, count);
+            }
+            return Ok(PresetStatsResult {
+                preset_count,
+                total_bytes,
+                format_counts,
+            });
+        }
+
+        let sid = scan_id.expect("scan_id").to_string();
         if sid.is_empty() {
             return Ok(PresetStatsResult {
                 preset_count: 0,
@@ -1424,13 +1573,11 @@ impl Database {
         })
     }
 
-    /// Update BPM for a sample (by path, latest scan).
+    /// Update BPM for a sample (all rows for that path).
     pub fn update_bpm(&self, path: &str, bpm: Option<f64>) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "UPDATE audio_samples SET bpm = ?1 WHERE path = ?2 AND scan_id = (
-                SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
-            )",
+            "UPDATE audio_samples SET bpm = ?1 WHERE path = ?2",
             params![bpm, path],
         )
         .map_err(|e| e.to_string())?;
@@ -1441,9 +1588,7 @@ impl Database {
     pub fn update_key(&self, path: &str, key: Option<&str>) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "UPDATE audio_samples SET key_name = ?1 WHERE path = ?2 AND scan_id = (
-                SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
-            )",
+            "UPDATE audio_samples SET key_name = ?1 WHERE path = ?2",
             params![key, path],
         )
         .map_err(|e| e.to_string())?;
@@ -1462,9 +1607,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "UPDATE audio_samples SET duration = ?1, channels = ?2, sample_rate = ?3, bits_per_sample = ?4
-             WHERE path = ?5 AND scan_id = (
-                SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
-             )",
+             WHERE path = ?5",
             params![
                 duration,
                 channels.map(|v| v as i32),
@@ -1477,7 +1620,7 @@ impl Database {
         Ok(())
     }
 
-    /// Get paths from current scan that are missing duration metadata.
+    /// Get paths that are missing duration metadata (among the given paths).
     pub fn paths_missing_audio_meta(&self, paths: &[String]) -> Result<Vec<String>, String> {
         let conn = self.conn.lock().unwrap();
         if paths.is_empty() {
@@ -1485,9 +1628,7 @@ impl Database {
         }
         let placeholders: Vec<&str> = paths.iter().map(|_| "?").collect();
         let sql = format!(
-            "SELECT path FROM audio_samples WHERE duration IS NULL AND scan_id = (
-                SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
-             ) AND path IN ({})",
+            "SELECT path FROM audio_samples WHERE duration IS NULL AND path IN ({})",
             placeholders.join(",")
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -1505,13 +1646,11 @@ impl Database {
         Ok(result)
     }
 
-    /// Update LUFS for a sample.
+    /// Update LUFS for a sample (all rows for that path).
     pub fn update_lufs(&self, path: &str, lufs: Option<f64>) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "UPDATE audio_samples SET lufs = ?1 WHERE path = ?2 AND scan_id = (
-                SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
-            )",
+            "UPDATE audio_samples SET lufs = ?1 WHERE path = ?2",
             params![lufs, path],
         )
         .map_err(|e| e.to_string())?;
@@ -1523,10 +1662,10 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         let result = conn
             .query_row(
-                "SELECT bpm, key_name, lufs, duration, channels, sample_rate, bits_per_sample
-                 FROM audio_samples WHERE path = ?1 AND scan_id = (
-                    SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
-                 )",
+                &format!(
+                    "SELECT bpm, key_name, lufs, duration, channels, sample_rate, bits_per_sample
+                 FROM audio_samples WHERE path = ?1 AND ({AUDIO_LIBRARY_IDS})"
+                ),
                 params![path],
                 |row| {
                     Ok(serde_json::json!({
@@ -1545,17 +1684,15 @@ impl Database {
         Ok(result.unwrap_or(serde_json::json!({})))
     }
 
-    /// Get paths of samples that haven't been analyzed yet (bpm IS NULL).
+    /// Get paths of samples that haven't been analyzed yet (bpm IS NULL on library row).
     pub fn unanalyzed_paths(&self, limit: u64) -> Result<Vec<String>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn
-            .prepare(
+            .prepare(&format!(
                 "SELECT path FROM audio_samples
-                 WHERE bpm IS NULL AND scan_id = (
-                    SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1
-                 )
-                 LIMIT ?1",
-            )
+                 WHERE bpm IS NULL AND ({AUDIO_LIBRARY_IDS})
+                 LIMIT ?1"
+            ))
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map(params![limit as i64], |row| row.get(0))
@@ -1590,16 +1727,14 @@ impl Database {
         limit: u64,
     ) -> Result<PluginQueryResult, String> {
         let conn = self.conn.lock().unwrap();
-        let scan_id: String = conn
+        let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT id FROM plugin_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT COUNT(*) FROM plugins WHERE id IN (SELECT MAX(id) FROM plugins GROUP BY path)",
                 [],
-                |r| r.get(0),
+                |row| row.get::<_, i64>(0).map(|v| v as u64),
             )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .unwrap_or_default();
-        if scan_id.is_empty() {
+            .unwrap_or(0);
+        if total_unfiltered == 0 {
             return Ok(PluginQueryResult {
                 plugins: vec![],
                 total_count: 0,
@@ -1607,17 +1742,8 @@ impl Database {
             });
         }
 
-        // Unfiltered count for the latest scan (header total — independent of search/filter)
-        let total_unfiltered: u64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM plugins WHERE scan_id = ?1",
-                params![scan_id],
-                |row| row.get::<_, i64>(0).map(|v| v as u64),
-            )
-            .map_err(|e| e.to_string())?;
-
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![PLUGIN_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
         let search_pat = search.and_then(|s| {
             let t = s.trim();
             if t.is_empty() {
@@ -1650,7 +1776,6 @@ impl Database {
                 }
             }
         }
-        let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
 
         let sort_col = match sort_key {
@@ -1668,9 +1793,6 @@ impl Database {
             let sql = format!("SELECT COUNT(*) FROM plugins WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
-            bi += 1;
             if let Some(ref p) = search_pat {
                 stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
                 bi += 1;
@@ -1681,7 +1803,6 @@ impl Database {
                     bi += 1;
                 }
             }
-            let _ = bi;
             let mut rows = stmt.raw_query();
             rows.next()
                 .map_err(|e| e.to_string())?
@@ -1689,12 +1810,10 @@ impl Database {
                 .unwrap_or(0)
         };
 
-        let mut bi;
-        let mut bind_offset = 2usize;
+        let mut bind_offset = 1usize;
         if search_pat.is_some() {
             bind_offset += 1;
         }
-        // Comma-separated filters are inlined into `IN (...)` — no placeholder, so no offset shift.
         if type_filter
             .map(|t| !t.is_empty() && t != "all" && !t.contains(','))
             .unwrap_or(false)
@@ -1703,10 +1822,7 @@ impl Database {
         }
         let sql = format!("SELECT name, path, plugin_type, version, manufacturer, manufacturer_url, size, size_bytes, modified, architectures FROM plugins WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_offset} OFFSET ?{}", bind_offset + 1);
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-        bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
+        let mut bi = 1;
         if let Some(ref p) = search_pat {
             stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
             bi += 1;
@@ -1748,6 +1864,7 @@ impl Database {
     }
 
     // ── Paginated DAW query ──
+    /// Full library (deduped by path). Same pattern as `query_audio` without `scan_id`.
     pub fn query_daw(
         &self,
         search: Option<&str>,
@@ -1758,12 +1875,14 @@ impl Database {
         limit: u64,
     ) -> Result<DawQueryResult, String> {
         let conn = self.conn.lock().unwrap();
-        let scan_id: String = conn
-            .query_row(LATEST_DAW_SCAN_ID_SQL, [], |r| r.get::<_, String>(0))
-            .optional()
-            .map_err(|e| e.to_string())?
-            .unwrap_or_default();
-        if scan_id.is_empty() {
+        let total_unfiltered: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
+                [],
+                |row| row.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        if total_unfiltered == 0 {
             return Ok(DawQueryResult {
                 projects: vec![],
                 total_count: 0,
@@ -1771,25 +1890,15 @@ impl Database {
             });
         }
 
-        // Unfiltered count for the latest scan (header total — independent of search/filter)
-        let total_unfiltered: u64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM daw_projects WHERE scan_id = ?1",
-                params![scan_id],
-                |row| row.get::<_, i64>(0).map(|v| v as u64),
-            )
-            .map_err(|e| e.to_string())?;
-
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![DAW_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
+                "id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM daw_projects GROUP BY path))",
             ));
-            bind_idx += 2;
+            bind_idx += 1;
         } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
@@ -1825,14 +1934,8 @@ impl Database {
             let sql = format!("SELECT COUNT(*) FROM daw_projects WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
-            bi += 1;
             if let Some(ref m) = fts_match {
                 stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-                bi += 1;
-                stmt.raw_bind_parameter(bi, &scan_id)
-                    .map_err(|e| e.to_string())?;
                 bi += 1;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -1853,14 +1956,8 @@ impl Database {
         let sql = format!("SELECT name, path, directory, format, daw, size, size_formatted, modified FROM daw_projects WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}", bind_idx + 1);
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -1911,16 +2008,14 @@ impl Database {
         limit: u64,
     ) -> Result<PresetQueryResult, String> {
         let conn = self.conn.lock().unwrap();
-        let scan_id: String = conn
+        let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT id FROM preset_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI')",
                 [],
-                |r| r.get(0),
+                |row| row.get::<_, i64>(0).map(|v| v as u64),
             )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .unwrap_or_default();
-        if scan_id.is_empty() {
+            .unwrap_or(0);
+        if total_unfiltered == 0 {
             return Ok(PresetQueryResult {
                 presets: vec![],
                 total_count: 0,
@@ -1928,31 +2023,22 @@ impl Database {
             });
         }
 
-        // Unfiltered preset count for latest scan (excludes MIDI, which is shown in its own tab)
-        let total_unfiltered: u64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM presets WHERE scan_id = ?1 AND format NOT IN ('MID', 'MIDI')",
-                params![scan_id],
-                |row| row.get::<_, i64>(0).map(|v| v as u64),
-            )
-            .map_err(|e| e.to_string())?;
-
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![
+            PRESET_LIBRARY_IDS.to_string(),
+            "format NOT IN ('MID', 'MIDI')".to_string(),
+        ];
+        let mut bind_idx = 1usize;
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
+                "id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM presets GROUP BY path))",
             ));
-            bind_idx += 2;
+            bind_idx += 1;
         } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
         }
-        // Exclude MIDI files from presets
-        where_parts.push("format NOT IN ('MID', 'MIDI')".into());
         if let Some(f) = format_filter {
             if !f.is_empty() && f != "all" {
                 if f.contains(',') {
@@ -1983,14 +2069,8 @@ impl Database {
             let sql = format!("SELECT COUNT(*) FROM presets WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
-            bi += 1;
             if let Some(ref m) = fts_match {
                 stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-                bi += 1;
-                stmt.raw_bind_parameter(bi, &scan_id)
-                    .map_err(|e| e.to_string())?;
                 bi += 1;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -2011,14 +2091,8 @@ impl Database {
         let sql = format!("SELECT name, path, directory, format, size, size_formatted, modified FROM presets WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}", bind_idx + 1);
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -2162,16 +2236,23 @@ impl Database {
     pub fn plugin_scan_parent_finalize(
         &self,
         id: &str,
-        plugin_count: usize,
+        _plugin_count: usize,
         directories: &[String],
         roots: &[String],
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
+        let plugin_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT path) FROM plugins",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
         let dirs_json = serde_json::to_string(directories).unwrap_or_default();
         let roots_json = serde_json::to_string(roots).unwrap_or_default();
         conn.execute(
             "UPDATE plugin_scans SET plugin_count = ?2, directories = ?3, roots = ?4 WHERE id = ?1",
-            params![id, plugin_count as i64, dirs_json, roots_json],
+            params![id, plugin_count, dirs_json, roots_json],
         )
         .map_err(|e| e.to_string())?;
         Ok(())
@@ -2180,7 +2261,7 @@ impl Database {
     pub fn get_plugin_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM plugins WHERE scan_id = s.id), s.roots FROM plugin_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.plugin_count,0),(SELECT COUNT(*) FROM plugins WHERE scan_id = s.id)), s.roots FROM plugin_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -2300,7 +2381,7 @@ impl Database {
     pub fn get_audio_scans_list(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM audio_samples WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM audio_samples WHERE scan_id = s.id)), s.format_counts, s.roots FROM audio_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.sample_count,0),(SELECT COUNT(*) FROM audio_samples WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM audio_samples WHERE scan_id = s.id)), s.format_counts, s.roots FROM audio_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2437,16 +2518,45 @@ impl Database {
     pub fn daw_scan_parent_finalize(
         &self,
         id: &str,
-        project_count: usize,
-        total_bytes: u64,
-        daw_counts: &HashMap<String, usize>,
+        _project_count: usize,
+        _total_bytes: u64,
+        _daw_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
-        let dc_json = serde_json::to_string(daw_counts).unwrap_or_default();
+        let project_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT path) FROM daw_projects",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let total_bytes: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(size), 0) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let mut daw_map: HashMap<String, usize> = HashMap::new();
+        let mut stmt = conn
+            .prepare(
+                "SELECT daw, COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path) GROUP BY daw",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
+            })
+            .map_err(|e| e.to_string())?;
+        for (d, n) in rows.flatten() {
+            daw_map.insert(d, n);
+        }
+        let dc_json = serde_json::to_string(&daw_map).unwrap_or_default();
         conn.execute(
             "UPDATE daw_scans SET project_count = ?2, total_bytes = ?3, daw_counts = ?4 WHERE id = ?1",
-            params![id, project_count as i64, total_bytes as i64, dc_json],
-        ).map_err(|e| e.to_string())?;
+            params![id, project_count, total_bytes, dc_json],
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -2544,7 +2654,7 @@ impl Database {
         // Count from child rows so the History tab stays correct even if parent totals
         // were never finalized (streaming scans) or finalize failed silently.
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM daw_projects WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM daw_projects WHERE scan_id = s.id)), s.daw_counts, s.roots FROM daw_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.project_count,0),(SELECT COUNT(*) FROM daw_projects WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM daw_projects WHERE scan_id = s.id)), s.daw_counts, s.roots FROM daw_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2661,16 +2771,45 @@ impl Database {
     pub fn preset_scan_parent_finalize(
         &self,
         id: &str,
-        preset_count: usize,
-        total_bytes: u64,
-        format_counts: &HashMap<String, usize>,
+        _preset_count: usize,
+        _total_bytes: u64,
+        _format_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
-        let fc_json = serde_json::to_string(format_counts).unwrap_or_default();
+        let preset_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let total_bytes: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(size), 0) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let mut format_map: HashMap<String, usize> = HashMap::new();
+        let mut stmt = conn
+            .prepare(
+                "SELECT format, COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID', 'MIDI') GROUP BY format",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
+            })
+            .map_err(|e| e.to_string())?;
+        for (fmt, n) in rows.flatten() {
+            format_map.insert(fmt, n);
+        }
+        let fc_json = serde_json::to_string(&format_map).unwrap_or_default();
         conn.execute(
             "UPDATE preset_scans SET preset_count = ?2, total_bytes = ?3, format_counts = ?4 WHERE id = ?1",
-            params![id, preset_count as i64, total_bytes as i64, fc_json],
-        ).map_err(|e| e.to_string())?;
+            params![id, preset_count, total_bytes, fc_json],
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -2756,7 +2895,7 @@ impl Database {
     pub fn get_preset_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM presets WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM presets WHERE scan_id = s.id)), s.format_counts, s.roots FROM preset_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.preset_count,0),(SELECT COUNT(*) FROM presets WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM presets WHERE scan_id = s.id)), s.format_counts, s.roots FROM preset_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -2876,16 +3015,45 @@ impl Database {
     pub fn midi_scan_parent_finalize(
         &self,
         id: &str,
-        midi_count: usize,
-        total_bytes: u64,
-        format_counts: &HashMap<String, usize>,
+        _midi_count: usize,
+        _total_bytes: u64,
+        _format_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
-        let fc_json = serde_json::to_string(format_counts).unwrap_or_default();
+        let midi_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT path) FROM midi_files",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let total_bytes: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(size), 0) FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let mut format_map: HashMap<String, usize> = HashMap::new();
+        let mut stmt = conn
+            .prepare(
+                "SELECT format, COUNT(*) FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path) GROUP BY format",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
+            })
+            .map_err(|e| e.to_string())?;
+        for (fmt, n) in rows.flatten() {
+            format_map.insert(fmt, n);
+        }
+        let fc_json = serde_json::to_string(&format_map).unwrap_or_default();
         conn.execute(
             "UPDATE midi_scans SET midi_count = ?2, total_bytes = ?3, format_counts = ?4 WHERE id = ?1",
-            params![id, midi_count as i64, total_bytes as i64, fc_json],
-        ).map_err(|e| e.to_string())?;
+            params![id, midi_count, total_bytes, fc_json],
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -2976,7 +3144,7 @@ impl Database {
     pub fn get_midi_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM midi_files WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM midi_files WHERE scan_id = s.id)), s.format_counts, s.roots FROM midi_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.midi_count,0),(SELECT COUNT(*) FROM midi_files WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM midi_files WHERE scan_id = s.id)), s.format_counts, s.roots FROM midi_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
@@ -3082,40 +3250,30 @@ impl Database {
         limit: u64,
     ) -> Result<MidiQueryResult, String> {
         let conn = self.conn.lock().unwrap();
-        let scan_id: String = conn
+        let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT id FROM midi_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT COUNT(*) FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path)",
                 [],
-                |r| r.get(0),
+                |row| row.get::<_, i64>(0).map(|v| v as u64),
             )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .unwrap_or_default();
-        if scan_id.is_empty() {
+            .unwrap_or(0);
+        if total_unfiltered == 0 {
             return Ok(MidiQueryResult {
                 midi_files: vec![],
                 total_count: 0,
                 total_unfiltered: 0,
             });
         }
-        let total_unfiltered: u64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM midi_files WHERE scan_id = ?1",
-                params![scan_id],
-                |row| row.get::<_, i64>(0).map(|v| v as u64),
-            )
-            .map_err(|e| e.to_string())?;
 
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![MIDI_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
+                "id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM midi_files GROUP BY path))",
             ));
-            bind_idx += 2;
+            bind_idx += 1;
         } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
@@ -3152,14 +3310,8 @@ impl Database {
             let sql = format!("SELECT COUNT(*) FROM midi_files WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
-            bi += 1;
             if let Some(ref m) = fts_match {
                 stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-                bi += 1;
-                stmt.raw_bind_parameter(bi, &scan_id)
-                    .map_err(|e| e.to_string())?;
                 bi += 1;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -3186,14 +3338,8 @@ impl Database {
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -3234,34 +3380,23 @@ impl Database {
         search: Option<&str>,
         format_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let scan_id = self.get_latest_scan_id("midi_scans", "midi_count")?;
-        if scan_id.is_empty() {
-            return Ok(FilterStatsResult {
-                count: 0,
-                total_bytes: 0,
-                by_type: HashMap::new(),
-                bytes_by_type: HashMap::new(),
-                total_unfiltered: 0,
-            });
-        }
         let conn = self.conn.lock().unwrap();
         let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM midi_files WHERE scan_id = ?1",
-                params![scan_id],
+                "SELECT COUNT(*) FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![MIDI_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
+                "id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM midi_files GROUP BY path))",
             ));
-            bind_idx += 2;
+            bind_idx += 1;
         } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
@@ -3276,21 +3411,14 @@ impl Database {
                 }
             }
         }
-        let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!(
             "SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM midi_files WHERE {where_cl} GROUP BY format"
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -3348,13 +3476,27 @@ impl Database {
     pub fn pdf_scan_parent_finalize(
         &self,
         id: &str,
-        pdf_count: usize,
-        total_bytes: u64,
+        _pdf_count: usize,
+        _total_bytes: u64,
     ) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();
+        let pdf_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(DISTINCT path) FROM pdfs",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let total_bytes: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(size), 0) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
         conn.execute(
             "UPDATE pdf_scans SET pdf_count = ?2, total_bytes = ?3 WHERE id = ?1",
-            params![id, pdf_count as i64, total_bytes as i64],
+            params![id, pdf_count, total_bytes],
         )
         .map_err(|e| e.to_string())?;
         Ok(())
@@ -3485,7 +3627,7 @@ impl Database {
     pub fn get_pdf_scans(&self) -> Result<Vec<serde_json::Value>, String> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT s.id, s.timestamp, (SELECT COUNT(*) FROM pdfs WHERE scan_id = s.id), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = s.id)), s.roots FROM pdf_scans s ORDER BY s.timestamp DESC",
+            "SELECT s.id, s.timestamp, COALESCE(NULLIF(s.pdf_count,0),(SELECT COUNT(*) FROM pdfs WHERE scan_id = s.id)), COALESCE(NULLIF(s.total_bytes,0),(SELECT COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = s.id)), s.roots FROM pdf_scans s ORDER BY s.timestamp DESC",
         )
         .map_err(|e| e.to_string())?;
         let rows = stmt
@@ -3690,16 +3832,14 @@ impl Database {
         limit: u64,
     ) -> Result<PdfQueryResult, String> {
         let conn = self.conn.lock().unwrap();
-        let scan_id: String = conn
+        let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT id FROM pdf_scans ORDER BY timestamp DESC LIMIT 1",
+                "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
                 [],
-                |r| r.get(0),
+                |row| row.get::<_, i64>(0).map(|v| v as u64),
             )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .unwrap_or_default();
-        if scan_id.is_empty() {
+            .unwrap_or(0);
+        if total_unfiltered == 0 {
             return Ok(PdfQueryResult {
                 pdfs: vec![],
                 total_count: 0,
@@ -3707,24 +3847,15 @@ impl Database {
             });
         }
 
-        let total_unfiltered: u64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM pdfs WHERE scan_id = ?1",
-                params![scan_id],
-                |row| row.get::<_, i64>(0).map(|v| v as u64),
-            )
-            .map_err(|e| e.to_string())?;
-
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![PDF_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
+                "id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM pdfs GROUP BY path))",
             ));
-            bind_idx += 2;
+            bind_idx += 1;
         } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
@@ -3744,16 +3875,12 @@ impl Database {
             let sql = format!("SELECT COUNT(*) FROM pdfs WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
-            bi += 1;
             if let Some(ref m) = fts_match {
                 stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
                 bi += 1;
-                stmt.raw_bind_parameter(bi, &scan_id)
-                    .map_err(|e| e.to_string())?;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
+                bi += 1;
             }
             let mut rows = stmt.raw_query();
             rows.next()
@@ -3765,14 +3892,8 @@ impl Database {
         let sql = format!("SELECT name, path, directory, size, size_formatted, modified FROM pdfs WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}", bind_idx + 1);
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -3802,21 +3923,32 @@ impl Database {
         })
     }
 
-    /// Unfiltered aggregate stats for the latest PDF scan.
+    /// PDF aggregate stats. `scan_id` None or empty → full library (deduped by path).
     pub fn pdf_stats(&self, scan_id: Option<&str>) -> Result<PdfStatsResult, String> {
         let conn = self.conn.lock().unwrap();
-        let sid = match scan_id {
-            Some(id) => id.to_string(),
-            None => conn
+        let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
+        if library {
+            let pdf_count: u64 = conn
                 .query_row(
-                    "SELECT id FROM pdf_scans ORDER BY timestamp DESC LIMIT 1",
+                    "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
                     [],
-                    |row| row.get::<_, String>(0),
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
                 )
-                .optional()
-                .map_err(|e| e.to_string())?
-                .unwrap_or_default(),
-        };
+                .unwrap_or(0);
+            let total_bytes: u64 = conn
+                .query_row(
+                    "SELECT COALESCE(SUM(size), 0) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
+                    [],
+                    |row| row.get::<_, i64>(0).map(|v| v as u64),
+                )
+                .unwrap_or(0);
+            return Ok(PdfStatsResult {
+                pdf_count,
+                total_bytes,
+            });
+        }
+
+        let sid = scan_id.expect("scan_id").to_string();
         if sid.is_empty() {
             return Ok(PdfStatsResult {
                 pdf_count: 0,
@@ -3892,34 +4024,23 @@ impl Database {
         search: Option<&str>,
         format_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let scan_id = self.get_latest_scan_id("audio_scans", "sample_count")?;
-        if scan_id.is_empty() {
-            return Ok(FilterStatsResult {
-                count: 0,
-                total_bytes: 0,
-                by_type: HashMap::new(),
-                bytes_by_type: HashMap::new(),
-                total_unfiltered: 0,
-            });
-        }
         let conn = self.conn.lock().unwrap();
         let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM audio_samples WHERE scan_id = ?1",
-                params![scan_id],
+                "SELECT COUNT(*) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![AUDIO_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
+                "id IN (SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM audio_samples GROUP BY path))",
             ));
-            bind_idx += 2;
+            bind_idx += 1;
         } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
@@ -3934,19 +4055,12 @@ impl Database {
                 }
             }
         }
-        let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!("SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM audio_samples WHERE {where_cl} GROUP BY format");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -3985,34 +4099,23 @@ impl Database {
         search: Option<&str>,
         daw_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let scan_id = self.get_latest_scan_id("daw_scans", "project_count")?;
-        if scan_id.is_empty() {
-            return Ok(FilterStatsResult {
-                count: 0,
-                total_bytes: 0,
-                by_type: HashMap::new(),
-                bytes_by_type: HashMap::new(),
-                total_unfiltered: 0,
-            });
-        }
         let conn = self.conn.lock().unwrap();
         let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM daw_projects WHERE scan_id = ?1",
-                params![scan_id],
+                "SELECT COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![DAW_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
+                "id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM daw_projects GROUP BY path))",
             ));
-            bind_idx += 2;
+            bind_idx += 1;
         } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
@@ -4027,19 +4130,12 @@ impl Database {
                 }
             }
         }
-        let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!("SELECT daw, COUNT(*), COALESCE(SUM(size),0) FROM daw_projects WHERE {where_cl} GROUP BY daw");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -4078,38 +4174,26 @@ impl Database {
         search: Option<&str>,
         format_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let scan_id = self.get_latest_scan_id("preset_scans", "preset_count")?;
-        if scan_id.is_empty() {
-            return Ok(FilterStatsResult {
-                count: 0,
-                total_bytes: 0,
-                by_type: HashMap::new(),
-                bytes_by_type: HashMap::new(),
-                total_unfiltered: 0,
-            });
-        }
         let conn = self.conn.lock().unwrap();
         let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM presets WHERE scan_id = ?1 AND format NOT IN ('MID','MIDI')",
-                params![scan_id],
+                "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID','MIDI')",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
-        // Presets always exclude MIDI (lives in its own tab)
         let mut where_parts = vec![
-            "scan_id = ?1".to_string(),
+            PRESET_LIBRARY_IDS.to_string(),
             "format NOT IN ('MID','MIDI')".to_string(),
         ];
-        let mut bind_idx = 2usize;
+        let mut bind_idx = 1usize;
         if fts_match.is_some() {
             where_parts.push(format!(
-                "id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?{bind_idx} AND scan_id = ?{scan_idx})",
-                scan_idx = bind_idx + 1,
+                "id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?{bind_idx} AND rowid IN (SELECT MAX(id) FROM presets GROUP BY path))",
             ));
-            bind_idx += 2;
+            bind_idx += 1;
         } else if like_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
@@ -4124,19 +4208,12 @@ impl Database {
                 }
             }
         }
-        let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!("SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM presets WHERE {where_cl} GROUP BY format");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref m) = fts_match {
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
-            stmt.raw_bind_parameter(bi, &scan_id)
-                .map_err(|e| e.to_string())?;
             bi += 1;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
@@ -4175,27 +4252,17 @@ impl Database {
         search: Option<&str>,
         type_filter: Option<&str>,
     ) -> Result<FilterStatsResult, String> {
-        let scan_id = self.get_latest_scan_id("plugin_scans", "plugin_count")?;
-        if scan_id.is_empty() {
-            return Ok(FilterStatsResult {
-                count: 0,
-                total_bytes: 0,
-                by_type: HashMap::new(),
-                bytes_by_type: HashMap::new(),
-                total_unfiltered: 0,
-            });
-        }
         let conn = self.conn.lock().unwrap();
         let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM plugins WHERE scan_id = ?1",
-                params![scan_id],
+                "SELECT COUNT(*) FROM plugins WHERE id IN (SELECT MAX(id) FROM plugins GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
         let search_pat = Self::fzf_like(search);
-        let mut where_parts = vec!["scan_id = ?1".to_string()];
-        let mut bind_idx = 2usize;
+        let mut where_parts = vec![PLUGIN_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
         if search_pat.is_some() {
             where_parts.push(format!("(name LIKE ?{bind_idx} ESCAPE '\\' OR manufacturer LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"));
             bind_idx += 1;
@@ -4210,14 +4277,10 @@ impl Database {
                 }
             }
         }
-        let _ = bind_idx;
         let where_cl = where_parts.join(" AND ");
         let sql = format!("SELECT plugin_type, COUNT(*), COALESCE(SUM(size_bytes),0) FROM plugins WHERE {where_cl} GROUP BY plugin_type");
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        stmt.raw_bind_parameter(bi, &scan_id)
-            .map_err(|e| e.to_string())?;
-        bi += 1;
         if let Some(ref p) = search_pat {
             stmt.raw_bind_parameter(bi, p).map_err(|e| e.to_string())?;
             bi += 1;
@@ -4251,42 +4314,28 @@ impl Database {
     }
 
     pub fn pdf_filter_stats(&self, search: Option<&str>) -> Result<FilterStatsResult, String> {
-        let scan_id = self.get_latest_scan_id("pdf_scans", "pdf_count")?;
-        if scan_id.is_empty() {
-            return Ok(FilterStatsResult {
-                count: 0,
-                total_bytes: 0,
-                by_type: HashMap::new(),
-                bytes_by_type: HashMap::new(),
-                total_unfiltered: 0,
-            });
-        }
         let conn = self.conn.lock().unwrap();
         let total_unfiltered: u64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM pdfs WHERE scan_id = ?1",
-                params![scan_id],
+                "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
         let fts_match = search.and_then(fts_phrase);
         let like_pat = search.and_then(short_like);
         let sql = if fts_match.is_some() {
-            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1 AND id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?2 AND scan_id = ?3)"
+            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path) AND id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?1 AND rowid IN (SELECT MAX(id) FROM pdfs GROUP BY path))"
         } else if like_pat.is_some() {
-            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1 AND (name LIKE ?2 ESCAPE '\\' OR path LIKE ?2 ESCAPE '\\')"
+            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path) AND (name LIKE ?1 ESCAPE '\\' OR path LIKE ?1 ESCAPE '\\')"
         } else {
-            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE scan_id = ?1"
+            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)"
         };
         let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
-        stmt.raw_bind_parameter(1, &scan_id)
-            .map_err(|e| e.to_string())?;
         if let Some(ref m) = fts_match {
-            stmt.raw_bind_parameter(2, m).map_err(|e| e.to_string())?;
-            stmt.raw_bind_parameter(3, &scan_id)
-                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(1, m).map_err(|e| e.to_string())?;
         } else if let Some(ref pat) = like_pat {
-            stmt.raw_bind_parameter(2, pat).map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(1, pat).map_err(|e| e.to_string())?;
         }
         let mut rows = stmt.raw_query();
         let (count, total_bytes) = if let Some(row) = rows.next().map_err(|e| e.to_string())? {
@@ -4386,23 +4435,10 @@ impl Database {
             "lufs" => "lufs",
             _ => return Ok(serde_json::json!({})),
         };
-        // Pre-resolve scan_id to avoid subquery on every row
-        let sid: String = conn
-            .query_row(
-                "SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or_default();
-        if sid.is_empty() {
-            return Ok(serde_json::json!({}));
-        }
         let sql = format!(
-            "SELECT path, {col} FROM audio_samples WHERE {col} IS NOT NULL AND scan_id = ?1"
+            "SELECT path, {col} FROM audio_samples WHERE {col} IS NOT NULL AND ({AUDIO_LIBRARY_IDS})"
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-        stmt.raw_bind_parameter(1, &sid)
-            .map_err(|e| e.to_string())?;
         let mut map = serde_json::Map::new();
         let mut rows = stmt.raw_query();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
@@ -4433,28 +4469,18 @@ impl Database {
             "lufs" => "lufs",
             _ => return Ok(()),
         };
-        let sid: String = conn
-            .query_row(
-                "SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or_default();
-        if sid.is_empty() {
-            return Ok(());
-        }
-        let sql = format!("UPDATE audio_samples SET {col} = ?1 WHERE path = ?2 AND scan_id = ?3");
+        let sql = format!("UPDATE audio_samples SET {col} = ?1 WHERE path = ?2");
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
             let mut stmt = tx.prepare_cached(&sql).map_err(|e| e.to_string())?;
             for (path, val) in obj {
                 if field == "key" {
                     if let Some(s) = val.as_str() {
-                        let _ = stmt.execute(params![s, path, sid]);
+                        let _ = stmt.execute(params![s, path]);
                     }
                 } else {
                     if let Some(v) = val.as_f64() {
-                        let _ = stmt.execute(params![v, path, sid]);
+                        let _ = stmt.execute(params![v, path]);
                     }
                 }
             }
@@ -4535,93 +4561,57 @@ impl Database {
     /// Row counts per inventory category for the **latest** scan in each domain (same `scan_id`
     /// scope as paginated queries and `*_filter_stats`). Not raw `COUNT(*)` on whole tables.
     pub fn active_scan_inventory_counts(&self) -> Result<serde_json::Value, String> {
-        let count_plugins = |sid: &str| -> Result<u64, String> {
-            if sid.is_empty() {
-                return Ok(0);
-            }
-            let conn = self.conn.lock().unwrap();
-            conn.query_row(
-                "SELECT COUNT(*) FROM plugins WHERE scan_id = ?1",
-                params![sid],
+        let conn = self.conn.lock().unwrap();
+        let count_plugins: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM plugins WHERE id IN (SELECT MAX(id) FROM plugins GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
-            .map_err(|e| e.to_string())
-        };
-        let count_audio = |sid: &str| -> Result<u64, String> {
-            if sid.is_empty() {
-                return Ok(0);
-            }
-            let conn = self.conn.lock().unwrap();
-            conn.query_row(
-                "SELECT COUNT(*) FROM audio_samples WHERE scan_id = ?1",
-                params![sid],
+            .unwrap_or(0);
+        let count_audio: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
-            .map_err(|e| e.to_string())
-        };
-        let count_daw = |sid: &str| -> Result<u64, String> {
-            if sid.is_empty() {
-                return Ok(0);
-            }
-            let conn = self.conn.lock().unwrap();
-            conn.query_row(
-                "SELECT COUNT(*) FROM daw_projects WHERE scan_id = ?1",
-                params![sid],
+            .unwrap_or(0);
+        let count_daw: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
-            .map_err(|e| e.to_string())
-        };
-        let count_presets = |sid: &str| -> Result<u64, String> {
-            if sid.is_empty() {
-                return Ok(0);
-            }
-            let conn = self.conn.lock().unwrap();
-            conn.query_row(
-                "SELECT COUNT(*) FROM presets WHERE scan_id = ?1 AND format NOT IN ('MID','MIDI')",
-                params![sid],
+            .unwrap_or(0);
+        let count_presets: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID','MIDI')",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
-            .map_err(|e| e.to_string())
-        };
-        let count_pdfs = |sid: &str| -> Result<u64, String> {
-            if sid.is_empty() {
-                return Ok(0);
-            }
-            let conn = self.conn.lock().unwrap();
-            conn.query_row(
-                "SELECT COUNT(*) FROM pdfs WHERE scan_id = ?1",
-                params![sid],
+            .unwrap_or(0);
+        let count_pdfs: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
-            .map_err(|e| e.to_string())
-        };
-        let count_midi = |sid: &str| -> Result<u64, String> {
-            if sid.is_empty() {
-                return Ok(0);
-            }
-            let conn = self.conn.lock().unwrap();
-            conn.query_row(
-                "SELECT COUNT(*) FROM midi_files WHERE scan_id = ?1",
-                params![sid],
+            .unwrap_or(0);
+        let count_midi: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path)",
+                [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
-            .map_err(|e| e.to_string())
-        };
-
-        let plugins_sid = self.get_latest_scan_id("plugin_scans", "plugin_count")?;
-        let audio_sid = self.get_latest_scan_id("audio_scans", "sample_count")?;
-        let daw_sid = self.get_latest_scan_id("daw_scans", "project_count")?;
-        let preset_sid = self.get_latest_scan_id("preset_scans", "preset_count")?;
-        let pdf_sid = self.get_latest_scan_id("pdf_scans", "pdf_count")?;
-        let midi_sid = self.get_latest_scan_id("midi_scans", "midi_count")?;
+            .unwrap_or(0);
 
         Ok(serde_json::json!({
-            "plugins": count_plugins(&plugins_sid)?,
-            "audio_samples": count_audio(&audio_sid)?,
-            "daw_projects": count_daw(&daw_sid)?,
-            "presets": count_presets(&preset_sid)?,
-            "pdfs": count_pdfs(&pdf_sid)?,
-            "midi_files": count_midi(&midi_sid)?,
+            "plugins": count_plugins,
+            "audio_samples": count_audio,
+            "daw_projects": count_daw,
+            "presets": count_presets,
+            "pdfs": count_pdfs,
+            "midi_files": count_midi,
         }))
     }
 
@@ -4633,20 +4623,21 @@ impl Database {
             .unwrap_or(4096) as u64;
         let mut stats = Vec::new();
 
-        // Analysis caches (columns on audio_samples)
-        let total_samples: u64 = conn.query_row(
-            &format!("SELECT COUNT(*) FROM audio_samples WHERE scan_id = ({ACTIVE_AUDIO_SCAN_ID_SQL})"),
-            [],
-            |r| r.get::<_, i64>(0).map(|v| v as u64),
-        )
-        .unwrap_or(0);
+        // Analysis caches (columns on audio_samples — library rows only)
+        let total_samples: u64 = conn
+            .query_row(
+                &format!("SELECT COUNT(*) FROM audio_samples WHERE {AUDIO_LIBRARY_IDS}"),
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
         for (label, col, key) in [
             ("BPM", "bpm", "bpm"),
             ("Key", "key_name", "key"),
             ("LUFS", "lufs", "lufs"),
         ] {
             let count: u64 = conn.query_row(
-                &format!("SELECT COUNT(*) FROM audio_samples WHERE {col} IS NOT NULL AND scan_id = ({ACTIVE_AUDIO_SCAN_ID_SQL})"),
+                &format!("SELECT COUNT(*) FROM audio_samples WHERE {col} IS NOT NULL AND ({AUDIO_LIBRARY_IDS})"),
                 [],
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
@@ -4760,7 +4751,7 @@ impl Database {
         let mut count = 0u32;
         {
             let mut stmt = tx.prepare_cached(
-                "UPDATE audio_samples SET bpm = ?1, key_name = ?2, lufs = ?3 WHERE path = ?4 AND scan_id = (SELECT id FROM audio_scans ORDER BY timestamp DESC LIMIT 1)"
+                "UPDATE audio_samples SET bpm = ?1, key_name = ?2, lufs = ?3 WHERE path = ?4"
             ).map_err(|e| e.to_string())?;
             for (path, bpm, key, lufs) in results {
                 let _ = stmt.execute(params![bpm, key, lufs, path]);
@@ -6400,7 +6391,7 @@ mod tests {
     }
 
     #[test]
-    fn test_query_pdfs_uses_latest_non_empty_scan() {
+    fn test_query_pdfs_library_unions_distinct_paths_across_scans() {
         let db = test_db();
         db.save_pdf_scan(&PdfScanSnapshot {
             id: "old-pdf".into(),
@@ -6435,9 +6426,10 @@ mod tests {
         })
         .unwrap();
         let res = db.query_pdfs(None, "name", true, 0, 100).unwrap();
-        assert_eq!(res.total_unfiltered, 1);
-        assert_eq!(res.pdfs.len(), 1);
+        assert_eq!(res.total_unfiltered, 2);
+        assert_eq!(res.pdfs.len(), 2);
         assert_eq!(res.pdfs[0].name, "new");
+        assert_eq!(res.pdfs[1].name, "old");
     }
 
     #[test]
@@ -6480,7 +6472,7 @@ mod tests {
     // ── Header-count regression tests ──
     //
     // These verify that query_plugins/query_daw/query_presets return a
-    // `total_unfiltered` that reflects the *latest scan's row count* and is
+    // `total_unfiltered` that reflects the *library* (one row per path) and is
     // independent of any search/filter arguments. This is what drives the
     // header counters and must NOT drop to 0 when a filter excludes all rows.
 
@@ -7266,7 +7258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_query_daw_multi_scan_returns_latest_only() {
+    fn test_query_daw_multi_scan_library_unions_distinct_paths() {
         let db = test_db();
         // First (older) scan with 3 projects
         db.save_daw_scan(&daw_snap(
@@ -7291,10 +7283,12 @@ mod tests {
         .unwrap();
 
         let res = db.query_daw(None, None, "name", true, 0, 100).unwrap();
-        assert_eq!(res.total_unfiltered, 2, "should reflect latest scan only");
-        assert_eq!(res.total_count, 2);
-        assert_eq!(res.projects.len(), 2);
-        assert!(res.projects.iter().all(|p| p.name.starts_with("new")));
+        assert_eq!(res.total_unfiltered, 5, "library = union of distinct paths");
+        assert_eq!(res.total_count, 5);
+        assert_eq!(res.projects.len(), 5);
+        let names: Vec<_> = res.projects.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"old1.als"));
+        assert!(names.contains(&"new2.als"));
     }
 
     #[test]
@@ -7440,7 +7434,7 @@ mod tests {
     }
 
     #[test]
-    fn test_query_presets_multi_scan_returns_latest_only() {
+    fn test_query_presets_multi_scan_library_unions_distinct_paths() {
         let db = test_db();
         db.save_preset_scan(&preset_snap(
             "pr-old",
@@ -7460,9 +7454,10 @@ mod tests {
         .unwrap();
 
         let res = db.query_presets(None, None, "name", true, 0, 100).unwrap();
-        assert_eq!(res.total_unfiltered, 1);
-        assert_eq!(res.presets.len(), 1);
-        assert_eq!(res.presets[0].name, "x.fxp");
+        assert_eq!(res.total_unfiltered, 4);
+        assert_eq!(res.presets.len(), 4);
+        assert_eq!(res.presets[0].name, "a.fxp");
+        assert_eq!(res.presets[3].name, "x.fxp");
     }
 
     #[test]
@@ -7553,7 +7548,7 @@ mod tests {
     }
 
     #[test]
-    fn test_query_plugins_multi_scan_returns_latest_only() {
+    fn test_query_plugins_multi_scan_library_unions_distinct_paths() {
         let db = test_db();
         db.save_plugin_scan(&plugin_snap(
             "ps-old",
@@ -7573,9 +7568,10 @@ mod tests {
         .unwrap();
 
         let res = db.query_plugins(None, None, "name", true, 0, 100).unwrap();
-        assert_eq!(res.total_unfiltered, 1);
-        assert_eq!(res.plugins.len(), 1);
+        assert_eq!(res.total_unfiltered, 4);
+        assert_eq!(res.plugins.len(), 4);
         assert_eq!(res.plugins[0].name, "New1");
+        assert_eq!(res.plugins[3].name, "Old3");
     }
 
     #[test]
@@ -7741,7 +7737,7 @@ mod tests {
     }
 
     #[test]
-    fn test_daw_stats_multi_scan_latest_only() {
+    fn test_daw_stats_multi_scan_library_unions_distinct_paths() {
         let db = test_db();
         db.save_daw_scan(&daw_snap(
             "ds-old",
@@ -7761,9 +7757,9 @@ mod tests {
         .unwrap();
 
         let stats = db.daw_stats(None).unwrap();
-        assert_eq!(stats.project_count, 1);
+        assert_eq!(stats.project_count, 4);
+        assert_eq!(stats.daw_counts["Ableton"], 3);
         assert_eq!(stats.daw_counts["Logic"], 1);
-        assert!(stats.daw_counts.get("Ableton").is_none());
     }
 
     #[test]
@@ -7863,7 +7859,7 @@ mod tests {
     }
 
     #[test]
-    fn test_preset_stats_multi_scan_latest_only() {
+    fn test_preset_stats_multi_scan_library_unions_distinct_paths() {
         let db = test_db();
         db.save_preset_scan(&preset_snap(
             "pr-old",
@@ -7883,9 +7879,9 @@ mod tests {
         .unwrap();
 
         let stats = db.preset_stats(None).unwrap();
-        assert_eq!(stats.preset_count, 1);
+        assert_eq!(stats.preset_count, 4);
+        assert_eq!(stats.format_counts["FXP"], 3);
         assert_eq!(stats.format_counts["H2P"], 1);
-        assert!(stats.format_counts.get("FXP").is_none());
     }
 
     #[test]
@@ -8220,8 +8216,22 @@ mod tests {
     }
 
     /// Many lib tests call `init_global()` in parallel; migrations must not race on one file.
+    /// Uses a temp [`history::get_data_dir`] so workers do not touch the real DB; the global
+    /// test override is visible on all threads (see `TEST_DATA_DIR_GLOBAL` in `history.rs`).
     #[test]
     fn init_global_concurrent_ok() {
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_init_global_conc_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        crate::history::set_test_data_dir_path(tmp.clone());
+
         let threads: Vec<_> = (0..32)
             .map(|_| {
                 std::thread::spawn(|| {
@@ -8234,14 +8244,32 @@ mod tests {
         for t in threads {
             t.join().expect("thread join");
         }
+
+        crate::history::clear_test_data_dir_path();
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
     fn init_global_idempotent_same_thread() {
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_init_global_idem_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        crate::history::set_test_data_dir_path(tmp.clone());
+
         for _ in 0..64 {
             init_global().expect("init_global");
         }
         assert!(global_initialized());
+
+        crate::history::clear_test_data_dir_path();
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     /// Run this to migrate real JSON caches to SQLite.

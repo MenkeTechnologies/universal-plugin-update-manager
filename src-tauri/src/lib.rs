@@ -5282,20 +5282,46 @@ mod tests {
 
     #[test]
     fn test_cache_file_roundtrip() {
-        db::init_global().expect("init_global for cache roundtrip");
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_cache_rt_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        history::set_test_data_dir_path(tmp.clone());
+        let db = db::Database::open().expect("open db for cache roundtrip");
         let data = serde_json::json!({"hello": "world", "count": 42});
-        write_cache_file("test-cache-roundtrip.json".into(), data.clone()).unwrap();
-        let result = read_cache_file("test-cache-roundtrip.json".into()).unwrap();
+        db.write_cache("test-cache-roundtrip.json", &data).unwrap();
+        let result = db.read_cache("test-cache-roundtrip.json").unwrap();
         assert_eq!(result["hello"], "world");
         assert_eq!(result["count"], 42);
+        history::clear_test_data_dir_path();
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
     fn test_cache_file_nonexistent() {
-        db::init_global().expect("init_global for cache read");
-        let result = read_cache_file("nonexistent-cache-xyz.json".into()).unwrap();
+        let tmp = std::env::temp_dir().join(format!(
+            "ah_cache_ne_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        history::set_test_data_dir_path(tmp.clone());
+        let db = db::Database::open().expect("open db for cache read");
+        let result = db.read_cache("nonexistent-cache-xyz.json").unwrap();
         // Falls back to waveform_cache table — result is valid JSON (may be empty or populated)
         assert!(result.is_object());
+        history::clear_test_data_dir_path();
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]

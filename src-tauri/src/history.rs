@@ -375,9 +375,20 @@ thread_local! {
     static TEST_DATA_DIR: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
 }
 
+/// Process-wide test override so [`get_data_dir`] matches on **all** threads (spawned threads
+/// do not inherit `thread_local` storage — required for `init_global` stress tests and parallel
+/// `cargo test` workers that share one temp directory).
+#[cfg(test)]
+static TEST_DATA_DIR_GLOBAL: Mutex<Option<PathBuf>> = Mutex::new(None);
+
 pub fn get_data_dir() -> PathBuf {
     #[cfg(test)]
     {
+        if let Ok(g) = TEST_DATA_DIR_GLOBAL.lock() {
+            if let Some(ref dir) = *g {
+                return dir.clone();
+            }
+        }
         if let Some(dir) = TEST_DATA_DIR.with(|d| d.borrow().clone()) {
             return dir;
         }
@@ -390,11 +401,17 @@ pub fn get_data_dir() -> PathBuf {
 /// Redirect [`get_data_dir`] for unit tests (e.g. `lib.rs` log tests). Clear when done.
 #[cfg(test)]
 pub fn set_test_data_dir_path(path: PathBuf) {
+    if let Ok(mut g) = TEST_DATA_DIR_GLOBAL.lock() {
+        *g = Some(path.clone());
+    }
     TEST_DATA_DIR.with(|d| *d.borrow_mut() = Some(path));
 }
 
 #[cfg(test)]
 pub fn clear_test_data_dir_path() {
+    if let Ok(mut g) = TEST_DATA_DIR_GLOBAL.lock() {
+        *g = None;
+    }
     TEST_DATA_DIR.with(|d| *d.borrow_mut() = None);
 }
 

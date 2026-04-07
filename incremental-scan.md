@@ -15,3 +15,7 @@
 ## Preference
 
 - `incrementalDirectoryScan` — when `off`, directory snapshots are ignored and every scan is a full tree walk. Default in `config.default.toml`: `on` (`[scanning]`).
+
+## SQLite inventory (main UI)
+
+When queries do not pass a specific `scan_id`, the app treats the database as a **library**: one canonical row per filesystem `path` (the row with the largest `id` for that path). New scans append rows; the UI aggregates across all scans without dropping prior paths. Analysis fields (BPM, key, LUFS) and cache stats for those columns use the same library scope; updates apply by `path` so duplicate rows from different scans stay consistent. History or drill-down APIs that pass an explicit `scan_id` still restrict to that scan only.
