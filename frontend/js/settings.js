@@ -1527,13 +1527,18 @@ function refreshSettingsUI() {
             const sc = stats.scanner || {};
             const cfg = stats.config || {};
             const df = stats.dataFiles || {};
-            const pluginCount = typeof allPlugins !== 'undefined' ? allPlugins.length : 0;
-            const sampleCount = typeof allAudioSamples !== 'undefined' ? allAudioSamples.length : 0;
-            const dawCount = typeof allDawProjects !== 'undefined' ? allDawProjects.length : 0;
-            const presetCount = typeof allPresets !== 'undefined' ? allPresets.length : 0;
-            const dot = (on) => on ? '<span style="color:var(--green);">&#9679;</span>' : '<span style="color:var(--text-dim);">&#9675;</span>';
             const db = stats.database || {};
             const tc = db.tables || {};
+            // Library-first counts from SQLite (same as Database → library row). In-memory tab arrays
+            // are capped (~100k) for UI performance and may be empty before a tab is opened — do not use
+            // their .length here.
+            const pluginCount = Number(tc.plugins_library ?? tc.plugins ?? (typeof allPlugins !== 'undefined' ? allPlugins.length : 0));
+            const sampleCount = Number(tc.audio_samples_library ?? tc.audio_samples ?? (typeof allAudioSamples !== 'undefined' ? allAudioSamples.length : 0));
+            const dawCount = Number(tc.daw_projects_library ?? tc.daw_projects ?? (typeof allDawProjects !== 'undefined' ? allDawProjects.length : 0));
+            const presetCount = Number(tc.presets_library ?? tc.presets ?? (typeof allPresets !== 'undefined' ? allPresets.length : 0));
+            const midiCount = Number(tc.midi_files_library ?? tc.midi_files ?? (typeof allMidiFiles !== 'undefined' ? allMidiFiles.length : 0));
+            const pdfCount = Number(tc.pdfs_library ?? tc.pdfs ?? (typeof allPdfs !== 'undefined' ? allPdfs.length : 0));
+            const dot = (on) => on ? '<span style="color:var(--green);">&#9679;</span>' : '<span style="color:var(--text-dim);">&#9675;</span>';
             const section = (titleKey, lines) => {
                 const title = f(titleKey);
                 return `<div style="margin-bottom:6px;"><span style="color:var(--cyan);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1px;">${escapeHtml(title)}</span><br>${lines.join('<br>')}</div>`;
@@ -1590,8 +1595,8 @@ function refreshSettingsUI() {
                         sample_count: sampleCount.toLocaleString(),
                         daw_count: dawCount.toLocaleString(),
                         preset_count: presetCount.toLocaleString(),
-                        midi_count: (typeof allMidiFiles !== 'undefined' ? allMidiFiles.length : 0).toLocaleString(),
-                        pdf_count: (typeof allPdfs !== 'undefined' ? allPdfs.length : 0).toLocaleString(),
+                        midi_count: midiCount.toLocaleString(),
+                        pdf_count: pdfCount.toLocaleString(),
                     }),
                 ]),
                 section('ui.perf.section_database', [
