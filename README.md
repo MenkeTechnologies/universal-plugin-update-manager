@@ -144,7 +144,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Background Analysis** | Sequential BPM/Key/LUFS/metadata analysis starts as samples arrive during scan. Auto-pauses on user interaction, 50ms yield, saves every 50 samples. Cached to SQLite across reboots. Progress badge in header |
 | **Neon Glow Animations** | Animated pulsing neon borders on all modals, panels, walker tiles, visualizer tiles, heatmap cards, context menus, and command palette. Staggered delays create wave effects. Toggle on/off in Settings → Appearance |
 | **Resizable Recent List** | Audio player recently played list is vertically resizable via CSS resize handle (min 80px) |
-| **Folder Watch / Auto-Scan** | Watch configured scan directories for new/changed files using native filesystem events (FSEvents on macOS, inotify on Linux, ReadDirectoryChangesW on Windows). 2-second debounce batches rapid changes. Classifies files by type (audio/daw/preset/plugin) and triggers targeted re-scan. Toggle in Settings → Scanning. Auto-starts on launch if enabled |
+| **Folder Watch / Auto-Scan** | Watch configured scan directories for new/changed files using native filesystem events (FSEvents on macOS, inotify on Linux, ReadDirectoryChangesW on Windows). 2-second debounce batches rapid changes. Classifies paths by extension (audio, DAW project, preset, plugin, PDF, MIDI). Emits **per-category scan roots** (parent folder of each changed file, or the bundle dir for `.vst3`/`.logicx`/etc.); redundant nested roots are collapsed. Each affected scanner runs **only those subtrees** — not a full library scan. Toggle in Settings → Scanning. Auto-starts on launch if enabled |
 | **Cross-Platform** | Fully portable across macOS, Linux, and Windows. Process stats (RSS, CPU, threads, disk) via sysinfo crate on all platforms. File watcher uses native OS events. Scanner directories auto-detected per OS. All SQLite, audio analysis, and UI code is platform-agnostic |
 
 ---
@@ -401,7 +401,7 @@ src-tauri/
     similarity.rs      -- Audio similarity search via spectral fingerprinting
     xref.rs            -- Plugin ↔ DAW cross-reference engine (11 DAW formats)
     db.rs              -- SQLite database layer (paginated queries, 6M+ sample scale)
-    file_watcher.rs    -- Filesystem watcher for auto-scan (FSEvents/inotify/ReadDirectoryChangesW)
+    file_watcher.rs    -- Filesystem watcher for auto-scan; debounced `file-watcher-change` with per-category subtree roots
     history.rs         -- Scan history persistence + diff engine
     key_detect.rs      -- Musical key detection via Goertzel chromagram
     lufs.rs            -- LUFS loudness measurement
@@ -413,7 +413,7 @@ src-tauri/
 frontend/
   index.html           -- Cyberpunk CRT UI (HTML/CSS)
   js/
-    app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals from SQLite (`get_active_scan_inventory_counts`: one row per path, library scope — not tied to a single `scan_id`); scans stream-insert per batch; `applyInventoryCountsPartial` throttles DB refresh on progress
+    app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals from SQLite (`get_active_scan_inventory_counts`: one row per path, library scope — not tied to a single `scan_id`); scans stream-insert per batch; `applyInventoryCountsPartial` throttles DB refresh on progress; `handleFileWatcherChange` runs targeted per-root rescans from `roots_by_category` (sequential `await` per category)
     audio.js           -- Audio sample scanning + inline playback + floating player
     batch-select.js    -- Checkbox selection + batch operations
     command-palette.js -- Cmd+K fuzzy search; 2+ char inventory hits use `db_query_palette_preview` (SQLite), not in-memory paginated arrays; **Build fingerprint cache** loads paths from `db_audio_library_paths` (SQLite `audio_library`), same as Settings → cache fingerprint build

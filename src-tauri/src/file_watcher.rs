@@ -1,13 +1,13 @@
-//! Filesystem watcher for auto-scanning new/changed audio files, DAW projects, and presets.
+//! Filesystem watcher for auto-scanning new/changed audio files, DAW projects, presets, plugins, PDFs, and MIDI.
 //!
-//! Uses the `notify` crate (FSEvents on macOS, inotify on Linux) to watch
-//! configured scan directories. When files matching known extensions are
-//! created or modified, emits Tauri events so the frontend can trigger
-//! incremental re-indexing.
+//! Uses the `notify` crate (FSEvents on macOS, inotify on Linux, ReadDirectoryChangesW on Windows) to watch
+//! configured scan directories. On create/modify, classifies paths by extension, maps each path to a **scan root**
+//! (parent dir for files; bundle dirs as-is), debounces 2s, collapses nested roots, then emits `file-watcher-change`
+//! with `roots_by_category` so the UI runs each scanner **only on those subtrees**.
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::collections::HashSet;
-use std::path::Path;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -62,6 +62,32 @@ const PRESET_EXTS: &[&str] = &[
 /// Plugin extensions.
 const PLUGIN_EXTS: &[&str] = &["dll", "vst3", "component", "clap", "aaxplugin"];
 
+/// Directory to pass to scanners: bundle dirs (`.vst3`, `.logicx`, …) as-is; files use their parent folder.
+fn scan_root_for_changed_path(path: &Path) -> Option<PathBuf> {
+    if path.is_dir() {
+        Some(path.to_path_buf())
+    } else {
+        path.parent().map(Path::to_path_buf)
+    }
+}
+
+/// Drop redundant roots: if `/a` and `/a/b` both changed, keep only `/a`.
+fn minimize_scan_roots(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    if paths.is_empty() {
+        return Vec::new();
+    }
+    let mut paths: Vec<PathBuf> = paths.into_iter().collect();
+    paths.sort_by_key(|p| p.components().count());
+    let mut out: Vec<PathBuf> = Vec::new();
+    for p in paths {
+        if out.iter().any(|r| p.starts_with(r)) {
+            continue;
+        }
+        out.push(p);
+    }
+    out
+}
+
 /// Classify a file path into a change category.
 fn classify(path: &Path) -> Option<&'static str> {
     let ext = path.extension()?.to_str()?.to_lowercase();
@@ -73,6 +99,10 @@ fn classify(path: &Path) -> Option<&'static str> {
         Some("preset")
     } else if PLUGIN_EXTS.contains(&ext.as_str()) {
         Some("plugin")
+    } else if ext == "pdf" {
+        Some("pdf")
+    } else if ext == "mid" || ext == "midi" {
+        Some("midi")
     } else {
         None
     }
@@ -113,8 +143,9 @@ pub fn start_watching(
 
     let app_handle = app.clone();
 
-    // Debounce: collect changes for 2 seconds before emitting
-    let pending: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+    // Debounce: collect per-category scan roots for 2 seconds before emitting
+    let pending: Arc<Mutex<HashMap<String, HashSet<String>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
     let pending_clone = pending.clone();
     let last_emit = Arc::new(Mutex::new(Instant::now()));
     let last_emit_clone = last_emit.clone();
@@ -133,10 +164,19 @@ pub fn start_watching(
             }
 
             for path in &event.paths {
-                if let Some(category) = classify(path) {
-                    let mut p = pending_clone.lock().unwrap();
-                    p.insert(category.to_string());
+                let Some(category) = classify(path) else {
+                    continue;
+                };
+                let Some(mut root) = scan_root_for_changed_path(path) else {
+                    continue;
+                };
+                if let Ok(canonical) = root.canonicalize() {
+                    root = canonical;
                 }
+                let mut p = pending_clone.lock().unwrap();
+                p.entry(category.to_string())
+                    .or_insert_with(HashSet::new)
+                    .insert(root.to_string_lossy().to_string());
             }
 
             // Debounce: emit after 2 seconds of quiet
@@ -154,15 +194,26 @@ pub fn start_watching(
                 }
                 drop(last);
 
-                let mut p = pending_ref.lock().unwrap();
-                if p.is_empty() {
+                let mut map = pending_ref.lock().unwrap();
+                if map.is_empty() {
                     return;
                 }
-                let categories: Vec<String> = p.drain().collect();
+                let categories: Vec<String> = map.keys().cloned().collect();
+                let mut roots_by_category = serde_json::Map::new();
+                for (cat, path_strs) in map.drain() {
+                    let paths: Vec<PathBuf> = path_strs.into_iter().map(PathBuf::from).collect();
+                    let minimized = minimize_scan_roots(paths);
+                    let arr: Vec<String> = minimized
+                        .into_iter()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .collect();
+                    roots_by_category.insert(cat, serde_json::json!(arr));
+                }
                 let _ = app_ref.emit(
                     "file-watcher-change",
                     serde_json::json!({
                         "categories": categories,
+                        "roots_by_category": roots_by_category,
                         "timestamp": chrono::Utc::now().to_rfc3339(),
                     }),
                 );
@@ -296,6 +347,53 @@ mod tests {
         assert_eq!(classify(Path::new("photo.png")), None);
         assert_eq!(classify(Path::new("data.json")), None);
         assert_eq!(classify(Path::new("noext")), None);
+    }
+
+    #[test]
+    fn test_classify_pdf_and_midi() {
+        assert_eq!(classify(Path::new("manual.pdf")), Some("pdf"));
+        assert_eq!(classify(Path::new("x.PDF")), Some("pdf"));
+        assert_eq!(classify(Path::new("song.mid")), Some("midi"));
+        assert_eq!(classify(Path::new("track.midi")), Some("midi"));
+    }
+
+    #[test]
+    fn test_minimize_scan_roots_drops_nested() {
+        let a = PathBuf::from("music");
+        let b = PathBuf::from("music/sub");
+        let out = minimize_scan_roots(vec![b, a.clone()]);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0], a);
+    }
+
+    #[test]
+    fn test_minimize_scan_roots_keeps_siblings() {
+        let a = PathBuf::from("a/x");
+        let b = PathBuf::from("a/y");
+        let out = minimize_scan_roots(vec![a.clone(), b.clone()]);
+        assert_eq!(out.len(), 2);
+        assert!(out.contains(&a));
+        assert!(out.contains(&b));
+    }
+
+    #[test]
+    fn test_scan_root_file_is_parent() {
+        let p = Path::new("folder/track.wav");
+        assert_eq!(
+            scan_root_for_changed_path(p),
+            Some(PathBuf::from("folder"))
+        );
+    }
+
+    #[test]
+    fn test_scan_root_dir_is_self() {
+        let tmp = std::env::temp_dir().join("audio_haxor_fw_test_logicx");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let bundle = tmp.join("Proj.logicx");
+        std::fs::create_dir_all(&bundle).unwrap();
+        assert!(bundle.is_dir());
+        assert_eq!(scan_root_for_changed_path(&bundle), Some(bundle.clone()));
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]

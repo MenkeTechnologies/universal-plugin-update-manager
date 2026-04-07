@@ -200,7 +200,7 @@ function getPluginExportableCount() {
   return Math.max(_pluginTotalCount || 0, _pluginTotalUnfiltered || 0, typeof allPlugins !== 'undefined' ? allPlugins.length : 0);
 }
 
-async function scanPlugins(resume = false) {
+async function scanPlugins(resume = false, overrideRoots = null) {
   showGlobalProgress();
   try {
   currentOperation = 'scan';
@@ -274,7 +274,9 @@ async function scanPlugins(resume = false) {
       }
     });
 
-    const customDirs = (prefs.getItem('customDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const customDirs = (overrideRoots && overrideRoots.length > 0)
+      ? overrideRoots
+      : (prefs.getItem('customDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
     const result = await window.vstUpdater.scanPlugins(customDirs.length ? customDirs : undefined, excludePaths);
     // Final state -- merge with existing on resume
     if (resume) {

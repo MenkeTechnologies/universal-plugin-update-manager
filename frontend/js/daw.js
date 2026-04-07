@@ -391,7 +391,7 @@ function loadMoreDaw() {
 
 // When `unifiedResult` is passed (by scanAll), skip this function's Tauri
 // invoke and consume the shared result from a single scan_unified call.
-async function scanDawProjects(resume = false, unifiedResult = null) {
+async function scanDawProjects(resume = false, unifiedResult = null, overrideRoots = null) {
   showGlobalProgress();
   const btn = document.getElementById('btnScanDaw');
   const resumeBtn = document.getElementById('btnResumeDaw');
@@ -489,7 +489,9 @@ async function scanDawProjects(resume = false, unifiedResult = null) {
   });
 
   try {
-    const dawRoots = (prefs.getItem('dawScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const dawRoots = (overrideRoots && overrideRoots.length > 0)
+      ? overrideRoots
+      : (prefs.getItem('dawScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
     const result = unifiedResult
       ? await unifiedResult
       : await window.vstUpdater.scanDawProjects(dawRoots.length ? dawRoots : undefined, excludePaths);

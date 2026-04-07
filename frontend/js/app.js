@@ -42,6 +42,48 @@ document.getElementById('appLogo')?.addEventListener('click', () => {
 // Prevent header stats clicks from bubbling
 document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopPropagation());
 
+/** Debounced file-watcher event: scan only subtree roots from `roots_by_category`. */
+async function handleFileWatcherChange(event) {
+    const payload = event && event.payload ? event.payload : {};
+    const rootsByCat = payload.roots_by_category || {};
+    const cats = Object.keys(rootsByCat).length > 0
+        ? Object.keys(rootsByCat).sort()
+        : (payload.categories || []);
+    if (!cats.length) return;
+    const parts = cats.map((cat) => {
+        const r = rootsByCat[cat];
+        if (Array.isArray(r) && r.length > 0) {
+            return `${cat} (${r.join(', ')})`;
+        }
+        return cat;
+    });
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.files_changed_rescan', {cats: parts.join(', ')}));
+    }
+    for (const cat of cats) {
+        const roots = rootsByCat[cat];
+        const targeted = Array.isArray(roots) && roots.length > 0;
+        const rootsArg = targeted ? roots : null;
+        try {
+            if (cat === 'audio' && typeof scanAudioSamples === 'function') {
+                await scanAudioSamples(false, null, rootsArg);
+            } else if (cat === 'daw' && typeof scanDawProjects === 'function') {
+                await scanDawProjects(false, null, rootsArg);
+            } else if (cat === 'preset' && typeof scanPresets === 'function') {
+                await scanPresets(false, null, rootsArg);
+            } else if (cat === 'plugin' && typeof scanPlugins === 'function') {
+                await scanPlugins(false, rootsArg);
+            } else if (cat === 'pdf' && typeof scanPdfs === 'function') {
+                await scanPdfs(false, null, rootsArg);
+            } else if (cat === 'midi' && typeof scanMidi === 'function') {
+                await scanMidi(false, rootsArg);
+            }
+        } catch (err) {
+            if (typeof showToast === 'function' && err) showToast(String(err), 4000, 'error');
+        }
+    }
+}
+
 (async function loadLastScan() {
     showGlobalProgress();
     await (window.__toastReady || Promise.resolve());
@@ -98,20 +140,13 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
         startFolderWatch();
     }
 
-    // Listen for file watcher change events
+    // Listen for file watcher change events — backend sends `roots_by_category`
+    // so each scan walks only the directories that contained changes (debounced).
     try {
         const {listen} = window.__TAURI__.event || {};
         if (listen) {
             listen('file-watcher-change', (event) => {
-                const cats = event.payload?.categories || [];
-                showToast(toastFmt('toast.files_changed_rescan', {cats: cats.join(', ')}));
-                for (const cat of cats) {
-                    if (cat === 'audio' && typeof scanAudioSamples === 'function') scanAudioSamples();
-                    else if (cat === 'daw' && typeof scanDawProjects === 'function') scanDawProjects();
-                    else if (cat === 'preset' && typeof scanPresets === 'function') scanPresets();
-                    else if (cat === 'plugin' && typeof scanPlugins === 'function') scanPlugins();
-                    else if (cat === 'pdf' && typeof scanPdfs === 'function') scanPdfs();
-                }
+                void handleFileWatcherChange(event);
             });
         }
     } catch (e) {

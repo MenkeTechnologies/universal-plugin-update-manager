@@ -348,7 +348,7 @@ function openPdfFile(path) {
 
 // When `unifiedResult` is passed (by scanAll), skip this function's Tauri
 // invoke and consume the shared result from a single scan_unified call.
-async function scanPdfs(resume = false, unifiedResult = null) {
+async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = null) {
   showGlobalProgress();
   const scanBtn = document.querySelector('[data-action="scanPdfs"]');
   const resumeBtn = document.getElementById('btnResumePdf');
@@ -450,7 +450,9 @@ async function scanPdfs(resume = false, unifiedResult = null) {
   });
 
   try {
-    const pdfRoots = (prefs.getItem('pdfScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const pdfRoots = (overrideRoots && overrideRoots.length > 0)
+      ? overrideRoots
+      : (prefs.getItem('pdfScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
     const result = unifiedResult
       ? await unifiedResult
       : await window.vstUpdater.scanPdfs(pdfRoots.length ? pdfRoots : undefined, excludePaths);

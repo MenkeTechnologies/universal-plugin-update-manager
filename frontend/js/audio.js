@@ -926,7 +926,7 @@ function getFormatClass(format) {
 // to `{ samples, roots, stopped }` from a shared scan_unified backend call.
 // When provided, this function skips its own Tauri invoke and reuses the
 // shared result — so the filesystem is walked once instead of 4 times.
-async function scanAudioSamples(resume = false, unifiedResult = null) {
+async function scanAudioSamples(resume = false, unifiedResult = null, overrideRoots = null) {
   stopBackgroundAnalysis();
   showGlobalProgress();
   const btn = document.getElementById('btnScanAudio');
@@ -1034,7 +1034,9 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
   });
 
   try {
-    const audioRoots = (prefs.getItem('audioScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const audioRoots = (overrideRoots && overrideRoots.length > 0)
+      ? overrideRoots
+      : (prefs.getItem('audioScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
     const result = unifiedResult
       ? await unifiedResult
       : await window.vstUpdater.scanAudioSamples(audioRoots.length ? audioRoots : undefined, excludePaths);

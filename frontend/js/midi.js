@@ -184,7 +184,7 @@ async function stopMidiScan() {
   try { await window.vstUpdater.stopMidiScan(); } catch (e) { /* ignore */ }
 }
 
-async function scanMidi(resume = false) {
+async function scanMidi(resume = false, overrideRoots = null) {
   if (typeof showGlobalProgress === 'function') showGlobalProgress();
   const btn = document.getElementById('btnScanMidi');
   const resumeBtn = document.getElementById('btnResumeMidi');
@@ -277,7 +277,9 @@ async function scanMidi(resume = false) {
   });
 
   try {
-    const midiRoots = (typeof prefs !== 'undefined' ? (prefs.getItem('midiScanDirs') || '') : '').split('\n').map(s => s.trim()).filter(Boolean);
+    const midiRoots = (overrideRoots && overrideRoots.length > 0)
+      ? overrideRoots
+      : (typeof prefs !== 'undefined' ? (prefs.getItem('midiScanDirs') || '') : '').split('\n').map(s => s.trim()).filter(Boolean);
     const result = await window.vstUpdater.scanMidiFiles(midiRoots.length ? midiRoots : undefined, excludePaths);
     // Drain any remaining buffered batch that didn't hit the flush timer.
     flushPendingMidi();

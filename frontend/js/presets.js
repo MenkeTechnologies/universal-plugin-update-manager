@@ -412,7 +412,7 @@ function openPresetFolder(path) {
 
 // When `unifiedResult` is passed (by scanAll), skip this function's Tauri
 // invoke and consume the shared result from a single scan_unified call.
-async function scanPresets(resume = false, unifiedResult = null) {
+async function scanPresets(resume = false, unifiedResult = null, overrideRoots = null) {
   showGlobalProgress();
   const btn = document.getElementById('btnScanPresets');
   const setBtn = (html, disabled) => {
@@ -539,7 +539,9 @@ async function scanPresets(resume = false, unifiedResult = null) {
   });
 
   try {
-    const presetRoots = (prefs.getItem('presetScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const presetRoots = (overrideRoots && overrideRoots.length > 0)
+      ? overrideRoots
+      : (prefs.getItem('presetScanDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
     const result = unifiedResult
       ? await unifiedResult
       : await window.vstUpdater.scanPresets(presetRoots.length ? presetRoots : undefined, excludePaths);
