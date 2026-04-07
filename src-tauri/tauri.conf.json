@@ -5,7 +5,8 @@
   "identifier": "com.menketechnologies.audio-haxor",
   "build": {
     "frontendDist": "../frontend",
-    "beforeBuildCommand": "node ../scripts/prepare-audio-engine-sidecar.mjs"
+    "beforeDevCommand": "cargo build -p audio-engine",
+    "beforeBuildCommand": "node scripts/prepare-audio-engine-sidecar.mjs"
   },
   "app": {
     "withGlobalTauri": true,

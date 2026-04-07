@@ -624,6 +624,7 @@
   "tray.stop_all": "Tümünü Durdur",
   "tray.tooltip": "AUDIO_HAXOR",
   "ui.ae.apply_device": "Apply",
+  "ui.ae.device_caps": "{rate} Hz · {channels} ch · {format}",
   "ui.ae.err_no_ipc": "Audio engine IPC unavailable (not running in the app shell).",
   "ui.ae.heading": "Audio Engine",
   "ui.ae.intro": "Dedicated audio process for system output, device selection, and insert effects. Implementation in progress.",

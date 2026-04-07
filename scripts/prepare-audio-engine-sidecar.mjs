@@ -2,6 +2,9 @@
 /**
  * Build `audio-engine` in release and copy to `src-tauri/binaries/` with the target-triple suffix
  * required by Tauri `bundle.externalBin`. Run before `pnpm tauri build` (see `tauri.conf.json`).
+ *
+ * Tauri runs `beforeBuildCommand` with cwd = repository root (parent of `src-tauri/`), so
+ * `tauri.conf.json` must invoke `node scripts/prepare-audio-engine-sidecar.mjs`, not `../scripts/...`.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

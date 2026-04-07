@@ -1,4 +1,4 @@
-//! **Audio engine** subprocess: the main app spawns `audio-engine` (see `src/bin/audio_engine.rs`),
+//! **Audio engine** subprocess: the main app spawns `audio-engine` (crate `audio-engine/`),
 //! sends one JSON request line on stdin, reads one JSON line from stdout. Used for output device
 //! discovery (cpal) and stubs for future real-time I/O and plugin hosting.
 

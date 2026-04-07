@@ -8262,7 +8262,8 @@ mod tests {
     // ── Multi-scan semantics ──
     //
     // Each new scan inserts rows with a fresh scan_id (tables accumulate rows across history).
-    // Default UI queries use the **library** (one row per `path` via `MAX(id) GROUP BY path`),
+    // Default UI queries use the **library** (one row per `path` — audio: `audio_library`; PDF/MIDI/presets:
+    // `pdf_library` / `midi_library` / `preset_library`; plugins/DAW: `MAX(id) GROUP BY path` in SQL),
     // not “latest scan only” and not raw `COUNT(*)` of all rows.
 
     fn daw_snap(id: &str, ts: &str, projects: Vec<DawProject>) -> DawScanSnapshot {

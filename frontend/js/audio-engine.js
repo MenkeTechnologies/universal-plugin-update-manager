@@ -28,6 +28,40 @@ function initAudioEngineTab() {
 }
 
 /**
+ * @param {function} inv — `window.vstUpdater.audioEngineInvoke`
+ * @param {string} deviceId — sidecar device id (stable name-based or legacy index)
+ */
+async function fillAeDeviceCaps(inv, deviceId) {
+    const capsEl = document.getElementById('aeDeviceCaps');
+    if (!capsEl || typeof inv !== 'function' || !deviceId) {
+        if (capsEl) capsEl.textContent = '—';
+        return;
+    }
+    try {
+        const info = await inv({cmd: 'get_output_device_info', device_id: deviceId});
+        if (info && info.ok === true && typeof catalogFmt === 'function') {
+            const ch = info.channels != null ? String(info.channels) : '?';
+            const fmt = info.sample_format != null ? String(info.sample_format) : '?';
+            const rate = info.sample_rate_hz != null ? String(info.sample_rate_hz) : '?';
+            let rateLabel = rate;
+            const r = info.sample_rate_range_hz;
+            if (r && r.min != null && r.max != null && String(r.min) !== String(r.max)) {
+                rateLabel = `${r.min}–${r.max}`;
+            }
+            capsEl.textContent = catalogFmt('ui.ae.device_caps', {
+                rate: rateLabel,
+                channels: ch,
+                format: fmt,
+            });
+        } else {
+            capsEl.textContent = '—';
+        }
+    } catch {
+        capsEl.textContent = '—';
+    }
+}
+
+/**
  * Reload ping, device list, and plugin stub from the sidecar.
  */
 async function refreshAudioEnginePanel() {
@@ -87,11 +121,16 @@ async function refreshAudioEnginePanel() {
             }
             if (pick != null && pick !== '') {
                 selectEl.value = pick;
-            } else if (devices.length > 0) {
+            }
+            const valid = pick != null && pick !== '' && [...selectEl.options].some((o) => o.value === pick);
+            if (!valid && devices.length > 0) {
                 const def = devices.find((x) => x.is_default === true);
                 selectEl.value = def && def.id != null ? String(def.id) : String(devices[0].id);
             }
         }
+
+        const selId = selectEl && selectEl.value ? String(selectEl.value) : '';
+        await fillAeDeviceCaps(inv, selId);
 
         const chain = await inv({cmd: 'plugin_chain'});
         if (pluginEl && typeof catalogFmt === 'function') {
@@ -128,6 +167,7 @@ async function applyAudioEngineDevice() {
         if (statusEl && typeof catalogFmt === 'function') {
             statusEl.textContent = catalogFmt('ui.ae.status_applied', {id});
         }
+        await fillAeDeviceCaps(inv, id);
     } catch (e) {
         const msg = e && e.message ? String(e.message) : String(e);
         if (statusEl && typeof catalogFmt === 'function') {
