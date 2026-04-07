@@ -86,9 +86,12 @@ fn should_suppress_app_log_line(msg: &str) -> bool {
     if LOG_VERBOSITY_LEVEL.load(Ordering::Relaxed) != 0 {
         return false;
     }
-    let m = msg.trim_start();
     // Optional normal-level prefixes to hide in Quiet (high-volume `write_app_log` only).
     const PREFIXES: &[&str] = &[];
+    if PREFIXES.is_empty() {
+        return false;
+    }
+    let m = msg.trim_start();
     PREFIXES.iter().any(|p| m.starts_with(p))
 }
 

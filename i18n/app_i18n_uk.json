@@ -1287,7 +1287,7 @@
   "ui.sd.additional_directories_to_scan_for_plugins_one_per": "Додаткові каталоги для пошуку плагінів (по одному на рядок)",
   "ui.sd.animated_pulsing_neon_borders_on_panels_modals_and": "Анімовані пульсуючі неонові рамки на панелях, модалах і плитках",
   "ui.sd.animated_scanline_overlays_and_vignette": "Анімовані накладки сканового рядка та віньєтка",
-  "ui.sd.app_log_verbosity_desc": "Quiet omits high-volume scan diagnostics (network dedup, mount traces). Normal logs everything. Verbose is reserved for future extra detail.",
+  "ui.sd.app_log_verbosity_desc": "Normal: scan lifecycle, errors, TCC/readdir failures, incremental warnings. Verbose: SMB dedup/retry/enter traces, MIDI mount/dedup, each live KVR fetch, incremental snapshot key count, entry counts per directory at depth 0–2. Quiet: optional prefix filter on normal lines (none by default).",
   "ui.sd.automatically_check_for_plugin_updates_after_scann": "Автоматично перевіряти наявність оновлень плагіна після сканування",
   "ui.sd.automatically_play_the_next_sample_when_the_curren": "Автоматично відтворювати наступний семпл після закінчення поточного",
   "ui.sd.automatically_run_bpm_key_lufs_analysis_on_startup": "Автоматично запускати фоновий аналіз BPM/Key/LUFS під час запуску програми",

@@ -1287,7 +1287,7 @@
   "ui.sd.additional_directories_to_scan_for_plugins_one_per": "플러그인을 검색할 추가 디렉터리(한 줄에 하나씩)",
   "ui.sd.animated_pulsing_neon_borders_on_panels_modals_and": "패널, 모달, 타일의 애니메이션 펄스 네온 테두리",
   "ui.sd.animated_scanline_overlays_and_vignette": "애니메이션된 스캔라인 오버레이 및 비네팅",
-  "ui.sd.app_log_verbosity_desc": "Quiet omits high-volume scan diagnostics (network dedup, mount traces). Normal logs everything. Verbose is reserved for future extra detail.",
+  "ui.sd.app_log_verbosity_desc": "Normal: scan lifecycle, errors, TCC/readdir failures, incremental warnings. Verbose: SMB dedup/retry/enter traces, MIDI mount/dedup, each live KVR fetch, incremental snapshot key count, entry counts per directory at depth 0–2. Quiet: optional prefix filter on normal lines (none by default).",
   "ui.sd.automatically_check_for_plugin_updates_after_scann": "스캔 후 플러그인 업데이트 자동 확인",
   "ui.sd.automatically_play_the_next_sample_when_the_curren": "현재 샘플이 끝나면 자동으로 다음 샘플을 재생합니다.",
   "ui.sd.automatically_run_bpm_key_lufs_analysis_on_startup": "앱 시작 시 BPM/키/LUFS 백그라운드 분석을 자동으로 실행합니다",
