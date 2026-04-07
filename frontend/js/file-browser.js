@@ -343,25 +343,31 @@ async function drawMiniWaveform(canvas, filePath) {
         return;
     }
 
-    try {
-        if (!window._fbAudioCtx) window._fbAudioCtx = new AudioContext();
-        const src = typeof convertFileSrc === 'function' ? convertFileSrc(filePath) : filePath;
-        const resp = await fetch(src);
-        const buf = await resp.arrayBuffer();
-        const audioBuf = await window._fbAudioCtx.decodeAudioData(buf);
-        const raw = audioBuf.getChannelData(0);
+    const src = typeof convertFileSrc === 'function' ? convertFileSrc(filePath) : filePath;
 
-        const bars = w;
-        const step = Math.floor(raw.length / bars);
-        const peaks = [];
-        for (let i = 0; i < bars; i++) {
-            let max = 0, min = 0;
-            const start = i * step;
-            for (let j = start; j < start + step && j < raw.length; j++) {
-                if (raw[j] > max) max = raw[j];
-                if (raw[j] < min) min = raw[j];
+    try {
+        let peaks;
+        if (typeof window._decodePeaksViaWorker === 'function') {
+            peaks = await window._decodePeaksViaWorker(src, w);
+        } else {
+            if (!window._fbAudioCtx) window._fbAudioCtx = new AudioContext();
+            const resp = await fetch(src);
+            const buf = await resp.arrayBuffer();
+            const audioBuf = await window._fbAudioCtx.decodeAudioData(buf);
+            const raw = audioBuf.getChannelData(0);
+
+            const bars = w;
+            const step = Math.floor(raw.length / bars);
+            peaks = [];
+            for (let i = 0; i < bars; i++) {
+                let max = 0, min = 0;
+                const start = i * step;
+                for (let j = start; j < start + step && j < raw.length; j++) {
+                    if (raw[j] > max) max = raw[j];
+                    if (raw[j] < min) min = raw[j];
+                }
+                peaks.push({max, min});
             }
-            peaks.push({max, min});
         }
 
         if (typeof _waveformCache !== 'undefined') _waveformCache[filePath] = peaks;
