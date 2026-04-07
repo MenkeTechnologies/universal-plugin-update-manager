@@ -299,6 +299,33 @@ fn open_format(path: &Path) -> Result<Box<dyn FormatReader>, String> {
     Ok(probed.format)
 }
 
+/// First decoded audio sample rate for `track_id` (advances `format`). MP3/LAME headers in
+/// `codec_params` can disagree with the first decoded `AudioSpec` — probing here aligns
+/// `playback_load` JSON, device `pick_output_config`, and initial `decode_loop` ratio before the
+/// output stream opens.
+fn probe_first_decoded_sample_rate(format: &mut Box<dyn FormatReader>, track_id: u32) -> Option<u32> {
+    let track = format
+        .tracks()
+        .iter()
+        .find(|t| t.id == track_id)
+        .or_else(|| format.default_track())?;
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .ok()?;
+    let tid = track.id;
+    loop {
+        let packet = format.next_packet().ok()?;
+        if packet.track_id() != tid {
+            continue;
+        }
+        let decoded = decoder.decode(&packet).ok()?;
+        let rate = decoded.spec().rate;
+        if rate > 0 {
+            return Some(rate);
+        }
+    }
+}
+
 fn decode_loop(path: String, shared: Arc<PlaybackShared>, device_rate: u32, track_id: u32) -> Result<(), String> {
     let path_buf = Path::new(&path).to_path_buf();
     let mut format = open_format(&path_buf)?;
@@ -426,18 +453,12 @@ fn decode_loop(path: String, shared: Arc<PlaybackShared>, device_rate: u32, trac
         }
         read_pos += ratio;
 
-        // Drop fully past source frames; keep ≥2 samples for interpolation.
-        while read_pos >= 1.0 && staging.len() > 4 {
-            let frames_to_drop = read_pos.floor() as usize;
-            if frames_to_drop == 0 {
-                break;
-            }
-            let drop = (frames_to_drop.saturating_sub(1) * 2).min(staging.len().saturating_sub(4));
-            if drop == 0 {
-                break;
-            }
-            staging.drain(0..drop);
-            read_pos -= (drop / 2) as f64;
+        // Normalize read_pos into [0, 1) frame offset by dropping consumed stereo frames from the
+        // front of staging (one frame = two interleaved samples). Requires ≥2 frames before drop
+        // so one frame remains for the next decode pass when only two frames were buffered.
+        while read_pos >= 1.0 && staging.len() >= 4 {
+            staging.drain(0..2);
+            read_pos -= 1.0;
         }
     }
     Ok(())
@@ -457,14 +478,22 @@ pub fn playback_load(path: String) -> Result<serde_json::Value, String> {
     if !p.is_file() {
         return Err(format!("not a file: {path}"));
     }
-    let format = open_format(p)?;
-    let track = format.default_track().ok_or_else(|| "no default track".to_string())?;
-    let track_id = track.id;
-    let src_rate = track
-        .codec_params
-        .sample_rate
-        .ok_or_else(|| "unknown sample rate".to_string())?;
-    let n_frames = track.codec_params.n_frames;
+    let mut format = open_format(p)?;
+    let (track_id, n_frames, codec_sr) = {
+        let track = format.default_track().ok_or_else(|| "no default track".to_string())?;
+        (
+            track.id,
+            track.codec_params.n_frames,
+            track
+                .codec_params
+                .sample_rate
+                .ok_or_else(|| "unknown sample rate".to_string())?,
+        )
+    };
+    let mut src_rate = codec_sr;
+    if let Some(rate) = probe_first_decoded_sample_rate(&mut format, track_id) {
+        src_rate = rate;
+    }
     let duration_sec = n_frames
         .map(|n| n as f64 / f64::from(src_rate))
         .unwrap_or(0.0);

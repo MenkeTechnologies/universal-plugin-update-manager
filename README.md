@@ -178,7 +178,7 @@ Requires [Node.js](https://nodejs.org/), [pnpm](https://pnpm.io/), and [Rust](ht
 
 ### Differences
 
-**Library playback (`start_playback`):** The sidecar prefers an **F32** `cpal` output configuration whose sample rate matches the loaded file’s **`src_rate`** (from **`playback_load`**) when the device reports a range that includes it, so playback is not forced through **`default_output_config()`** (often 48 kHz) when the file is e.g. 44.1 kHz. See `audio-engine/README.md`.
+**Library playback (`start_playback`):** **`playback_load`** decodes the first audio packet so **`src_rate`** matches the bitstream when **`codec_params`** from the probe does not. The sidecar then prefers an **F32** `cpal` output configuration whose sample rate matches that **`src_rate`** when the device reports a range that includes it, so playback is not forced through **`default_output_config()`** (often 48 kHz) when the file is e.g. 44.1 kHz. See `audio-engine/README.md`.
 
 | | Dev | Build |
 |---|---|---|
