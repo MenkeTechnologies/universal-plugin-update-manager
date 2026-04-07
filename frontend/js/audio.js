@@ -1293,6 +1293,17 @@ function _renderNpFft() {
         window._enginePlaybackActive === true &&
         window._engineSpectrumU8 &&
         window._engineSpectrumU8.length >= 1024;
+    if (!useEngineSpectrum) {
+        ensureAudioGraph();
+        if (
+            _playbackCtx &&
+            _playbackCtx.state === 'suspended' &&
+            typeof isAudioPlaying === 'function' &&
+            isAudioPlaying()
+        ) {
+            void _playbackCtx.resume();
+        }
+    }
     if (!useEngineSpectrum && !_analyser) return;
     const canvas = _npFftCanvas || document.getElementById('npFftCanvas');
     if (!canvas) return;
@@ -4659,8 +4670,9 @@ function updateMetaLine() {
         if (!ctx) return;
         const wrap = canvas.parentElement;
         if (wrap) {
-            const cw = Math.round(wrap.clientWidth);
-            const ch = Math.round(wrap.clientHeight);
+            const br = wrap.getBoundingClientRect();
+            const cw = Math.round(br.width > 1 ? br.width : wrap.clientWidth);
+            const ch = Math.round(br.height > 1 ? br.height : wrap.clientHeight);
             if (cw > 0 && ch > 0 && (Math.abs(cw - canvas.width) > 1 || Math.abs(ch - canvas.height) > 1)) {
                 canvas.width = cw;
                 canvas.height = ch;
@@ -4832,49 +4844,21 @@ function updateMetaLine() {
         if (!canvas) return;
         const wrap = canvas.parentElement;
         if (!wrap) return;
-        const w = Math.round(wrap.clientWidth);
-        const h = Math.round(wrap.clientHeight);
+        const br = wrap.getBoundingClientRect();
+        const w = Math.round(br.width > 1 ? br.width : wrap.clientWidth);
+        const h = Math.round(br.height > 1 ? br.height : wrap.clientHeight);
         if (w > 0 && h > 0) {
             canvas.width = w;
             canvas.height = h;
         }
     }
 
-    function bindCanvasDrag(canvas) {
-        if (!canvas) return;
-        canvas.addEventListener('pointerdown', (e) => {
-            if (e.button !== 0) return;
-            ensureAudioGraph();
-            const rect = canvas.getBoundingClientRect();
-            const cw = canvas.width || 800, ch = canvas.height || 120;
-            const scaleX = cw / rect.width, scaleY = ch / rect.height;
-            const mx = (e.clientX - rect.left) * scaleX, my = (e.clientY - rect.top) * scaleY;
-            for (const band of bands) {
-                if (!band.filter) continue;
-                const bx = freqToX(band.filter.frequency.value, cw);
-                const by = gainToY(band.filter.gain.value, ch);
-                if (Math.hypot(mx - bx, my - by) < 14) {
-                    _dragState = {band, canvas};
-                    e.preventDefault();
-                    try {
-                        canvas.setPointerCapture(e.pointerId);
-                    } catch (_) {}
-                    return;
-                }
-            }
-        });
-    }
-
-    if (npCanvas) bindCanvasDrag(npCanvas);
-    if (aeCanvas) bindCanvasDrag(aeCanvas);
-
-    document.addEventListener('mousemove', (e) => {
+    function applyEqDragFromClient(canvas, clientX, clientY) {
         if (!_dragState || !_dragState.band || !_dragState.canvas) return;
-        const canvas = _dragState.canvas;
         const rect = canvas.getBoundingClientRect();
         const w = canvas.width || 800, h = canvas.height || 120;
         const scaleX = w / rect.width, scaleY = h / rect.height;
-        const mx = (e.clientX - rect.left) * scaleX, my = (e.clientY - rect.top) * scaleY;
+        const mx = (clientX - rect.left) * scaleX, my = (clientY - rect.top) * scaleY;
         const freq = Math.max(FREQ_MIN, Math.min(FREQ_MAX, xToFreq(mx, w)));
         const gain = Math.max(GAIN_MIN, Math.min(GAIN_MAX, yToGain(my, h)));
         _dragState.band.filter.frequency.value = freq;
@@ -4907,15 +4891,78 @@ function updateMetaLine() {
             if (el) el.value = Math.round(gain);
             if (lab) lab.textContent = Math.round(gain) + ' dB';
         }
-    });
+    }
 
-    document.addEventListener('mouseup', () => {
-        if (_dragState && _dragState.band && typeof setEqBand === 'function') {
+    function onWindowEqPointerMove(e) {
+        if (!_dragState || !_dragState.band || !_dragState.canvas) return;
+        if (e.pointerId !== _dragState.pointerId) return;
+        ensureAudioGraph();
+        applyEqDragFromClient(_dragState.canvas, e.clientX, e.clientY);
+    }
+
+    function onWindowEqPointerEnd(e) {
+        if (!_dragState || !_dragState.canvas) return;
+        if (e.pointerId !== _dragState.pointerId) return;
+        window.removeEventListener('pointermove', onWindowEqPointerMove, true);
+        window.removeEventListener('pointerup', onWindowEqPointerEnd, true);
+        window.removeEventListener('pointercancel', onWindowEqPointerEnd, true);
+        const c = _dragState.canvas;
+        const pid = _dragState.pointerId;
+        if (_dragState.band && typeof setEqBand === 'function') {
             setEqBand(_dragState.band.id, String(_dragState.band.filter.gain.value));
         }
         _eqDragEngineSyncTs = 0;
         _dragState = null;
-    });
+        try {
+            if (c && typeof pid === 'number' && typeof c.hasPointerCapture === 'function' && c.hasPointerCapture(pid)) {
+                c.releasePointerCapture(pid);
+            }
+        } catch (_) {}
+    }
+
+    function bindCanvasDrag(canvas) {
+        if (!canvas) return;
+        canvas.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            ensureAudioGraph();
+            const rect = canvas.getBoundingClientRect();
+            const cw = canvas.width || 800, ch = canvas.height || 120;
+            const scaleX = cw / rect.width, scaleY = ch / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX, my = (e.clientY - rect.top) * scaleY;
+            for (const band of bands) {
+                if (!band.filter) continue;
+                const bx = freqToX(band.filter.frequency.value, cw);
+                const by = gainToY(band.filter.gain.value, ch);
+                if (Math.hypot(mx - bx, my - by) < 14) {
+                    _dragState = {band, canvas, pointerId: e.pointerId};
+                    e.preventDefault();
+                    try {
+                        canvas.setPointerCapture(e.pointerId);
+                    } catch (_) {}
+                    window.addEventListener('pointermove', onWindowEqPointerMove, true);
+                    window.addEventListener('pointerup', onWindowEqPointerEnd, true);
+                    window.addEventListener('pointercancel', onWindowEqPointerEnd, true);
+                    return;
+                }
+            }
+        });
+    }
+
+    if (npCanvas) bindCanvasDrag(npCanvas);
+    if (aeCanvas) bindCanvasDrag(aeCanvas);
+
+    function setupEqCanvasResizeObserver(canvas) {
+        if (!canvas || typeof ResizeObserver === 'undefined') return;
+        const wrap = canvas.parentElement;
+        if (!wrap) return;
+        const ro = new ResizeObserver(() => {
+            primeCanvasSize(canvas);
+            scheduleParametricEqFrame();
+        });
+        ro.observe(wrap);
+    }
+    setupEqCanvasResizeObserver(npCanvas);
+    setupEqCanvasResizeObserver(aeCanvas);
 
     const eqSection = document.getElementById('npEqSection');
     if (eqSection) {
