@@ -18,6 +18,8 @@ let _vizParams = {
     fftSmoothing: 0.8,
     fftLogScale: true,
     oscilloscopeTraceColor: 'cyan',
+    /** True: align trace to first rising zero-cross (scope-style). False: free-run (raw buffer order). */
+    oscilloscopeTriggeredSweep: true,
     spectrogramSpeed: 1,
     levelsHold: true,
     bandsCount: 10,
@@ -26,6 +28,8 @@ let _vizPeakHold = -96;
 let _vizPeakTimer = null;
 /** Last spectrum snapshot for FFT tile when `prefs.fftAnimationPaused` freezes animation. */
 let _vizFftFrozenCopy = null;
+/** Last rising-edge trigger index for oscilloscope when the current buffer has no crossing. */
+let _vizOscLastTrigger = 0;
 
 /** AudioEngine is sending usable spectrum bins (`playback_status.spectrum`). */
 function _vizEngineSpectrumOk() {
@@ -169,6 +173,17 @@ function _vizFillRoundTopBar(ctx, x, yTop, bw, bh, fillStyle) {
     ctx.lineTo(x + bw, yTop + bh);
     ctx.closePath();
     ctx.fill();
+}
+
+/**
+ * First rising zero-crossing in a time-domain snapshot (AnalyserNode / engine shim).
+ * Returns sample index of the first crossing, or -1 if none (silence / DC / noise floor).
+ */
+function _vizOscilloscopeTriggerIndex(data, bufLen) {
+    for (let i = 1; i < bufLen; i++) {
+        if (data[i - 1] < 0 && data[i] >= 0) return i;
+    }
+    return -1;
 }
 
 /** Cached canvas + 2D context per tile mode — avoids `querySelector` every frame. */
@@ -421,6 +436,15 @@ function _drawOscilloscope(ctx, w, h, analyser) {
     const data = _vizTimeData;
     _vizHudBackdrop(ctx, w, h);
 
+    const useTrig = _vizParams.oscilloscopeTriggeredSweep === true;
+    let start = 0;
+    if (useTrig) {
+        let t0 = _vizOscilloscopeTriggerIndex(data, bufLen);
+        if (t0 < 0) t0 = _vizOscLastTrigger;
+        else _vizOscLastTrigger = t0;
+        start = t0;
+    }
+
     const color = _vizParams.oscilloscopeTraceColor === 'magenta' ? 'rgba(211,0,197,0.92)' :
         _vizParams.oscilloscopeTraceColor === 'green' ? 'rgba(57,255,20,0.9)' : 'rgba(5,217,232,0.92)';
     const glow = _vizParams.oscilloscopeTraceColor === 'magenta' ? 'rgba(211,0,197,0.35)' :
@@ -430,8 +454,9 @@ function _drawOscilloscope(ctx, w, h, analyser) {
     ctx.beginPath();
     const sliceW = w / bufLen;
     for (let i = 0; i < bufLen; i++) {
+        const idx = useTrig ? (start + i) % bufLen : i;
         const x = i * sliceW;
-        const y = (0.5 - data[i] * 0.5) * h;
+        const y = (0.5 - data[idx] * 0.5) * h;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.shadowColor = glow;
@@ -1010,6 +1035,14 @@ document.addEventListener('contextmenu', (e) => {
             icon: '&#127912;', label: appFmt('menu.viz_color_green'), action: () => {
                 _vizParams.oscilloscopeTraceColor = 'green';
             }
+        });
+        items.push({
+            icon: _vizParams.oscilloscopeTriggeredSweep ? '&#10003;' : '&#9634;',
+            label: appFmt('menu.viz_oscilloscope_triggered_sweep'),
+            action: () => {
+                _vizParams.oscilloscopeTriggeredSweep = !_vizParams.oscilloscopeTriggeredSweep;
+            },
+            ..._vizMenuNoEcho,
         });
     }
     if (mode === 'levels') {
