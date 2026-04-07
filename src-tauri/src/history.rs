@@ -457,6 +457,9 @@ pub type PrefsMap = serde_json::Map<String, serde_json::Value>;
 /// thread-local temp data dir) and the main app never share a `PrefsMap` across different files.
 static PREF_CACHE: Mutex<Option<(u64, PathBuf, PrefsMap)>> = Mutex::new(None);
 const PREF_CACHE_TTL_MS: u64 = 2000;
+/// Serializes read-modify-write preference updates so concurrent `prefs_set` / `prefs_remove`
+/// calls (e.g. color scheme + removing `customSchemeVars`) cannot clobber each other on disk.
+static PREF_RMW_LOCK: Mutex<()> = Mutex::new(());
 
 fn prefs_cache_now_ms() -> u64 {
     SystemTime::now()
@@ -759,6 +762,7 @@ pub fn save_preferences(prefs: &PrefsMap) {
 }
 
 pub fn set_preference(key: &str, value: serde_json::Value) {
+    let _guard = PREF_RMW_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut prefs = load_preferences();
     prefs.insert(key.to_string(), value);
     save_preferences(&prefs);
@@ -770,6 +774,7 @@ pub fn get_preference(key: &str) -> Option<serde_json::Value> {
 }
 
 pub fn remove_preference(key: &str) {
+    let _guard = PREF_RMW_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut prefs = load_preferences();
     prefs.remove(key);
     save_preferences(&prefs);
