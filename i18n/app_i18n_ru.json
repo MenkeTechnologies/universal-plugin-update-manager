@@ -755,6 +755,8 @@
   "ui.audio.similar_count": "{n} похожих образцов",
   "ui.audio.similar_empty": "Похожих образцов не обнаружено. Сначала отсканируйте больше образцов.",
   "ui.audio.similar_error_prefix": "Ошибка:",
+  "ui.audio.similar_fp_detail": "{cached} already cached for this search — {uncached} to compute. First run is slow; subsequent searches are fast.",
+  "ui.audio.similar_fp_status": "Computing fingerprints for {uncached} of {total} library samples...",
   "ui.audio.stat_aiff": "АИФФ:",
   "ui.audio.stat_flac": "ФЛАК:",
   "ui.audio.stat_mp3": "МП3:",

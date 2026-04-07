@@ -755,6 +755,8 @@
   "ui.audio.similar_count": "{n} 유사한 샘플",
   "ui.audio.similar_empty": "유사한 샘플을 찾을 수 없습니다. 먼저 더 많은 샘플을 스캔하세요.",
   "ui.audio.similar_error_prefix": "오류:",
+  "ui.audio.similar_fp_detail": "{cached} already cached for this search — {uncached} to compute. First run is slow; subsequent searches are fast.",
+  "ui.audio.similar_fp_status": "Computing fingerprints for {uncached} of {total} library samples...",
   "ui.audio.stat_aiff": "AIFF:",
   "ui.audio.stat_flac": "FLAC:",
   "ui.audio.stat_mp3": "MP3:",

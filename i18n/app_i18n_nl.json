@@ -755,6 +755,8 @@
   "ui.audio.similar_count": "{n} vergelijkbare monsters",
   "ui.audio.similar_empty": "Er zijn geen vergelijkbare monsters gevonden. Scan eerst meer monsters.",
   "ui.audio.similar_error_prefix": "Fout:",
+  "ui.audio.similar_fp_detail": "{cached} already cached for this search — {uncached} to compute. First run is slow; subsequent searches are fast.",
+  "ui.audio.similar_fp_status": "Computing fingerprints for {uncached} of {total} library samples...",
   "ui.audio.stat_aiff": "AIFF:",
   "ui.audio.stat_flac": "FLAC:",
   "ui.audio.stat_mp3": "MP3:",

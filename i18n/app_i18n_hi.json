@@ -755,6 +755,8 @@
   "ui.audio.similar_count": "{n} समान नमूने",
   "ui.audio.similar_empty": "कोई समान नमूना नहीं मिला. पहले और नमूने स्कैन करें.",
   "ui.audio.similar_error_prefix": "गलती:",
+  "ui.audio.similar_fp_detail": "{cached} already cached for this search — {uncached} to compute. First run is slow; subsequent searches are fast.",
+  "ui.audio.similar_fp_status": "Computing fingerprints for {uncached} of {total} library samples...",
   "ui.audio.stat_aiff": "एआईएफएफ:",
   "ui.audio.stat_flac": "FLAC:",
   "ui.audio.stat_mp3": "एमपी3:",

@@ -755,6 +755,8 @@
   "ui.audio.similar_count": "{n} 个相似样本",
   "ui.audio.similar_empty": "未发现类似样品。首先扫描更多样本。",
   "ui.audio.similar_error_prefix": "错误：",
+  "ui.audio.similar_fp_detail": "{cached} already cached for this search — {uncached} to compute. First run is slow; subsequent searches are fast.",
+  "ui.audio.similar_fp_status": "Computing fingerprints for {uncached} of {total} library samples...",
   "ui.audio.stat_aiff": "国际电影节：",
   "ui.audio.stat_flac": "FLAC：",
   "ui.audio.stat_mp3": "MP3：",

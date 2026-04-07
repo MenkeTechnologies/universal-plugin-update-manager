@@ -1611,8 +1611,21 @@ async function findSimilarSamples(filePath) {
             const statusText = document.getElementById('similarStatusText');
             const statusDetail = document.getElementById('similarStatusDetail');
             if (d.phase === 'computing' && statusText && statusDetail) {
-                statusText.textContent = `Computing fingerprints for ${d.total} samples...`;
-                statusDetail.textContent = `${d.cached} already cached — ${d.total} remaining. First run is slow, subsequent searches are instant.`;
+                const cached = d.cached_count ?? d.cached;
+                const uncached = d.uncached_count ?? d.total;
+                const total =
+                    d.candidate_count ??
+                    (typeof cached === 'number' && typeof uncached === 'number'
+                        ? cached + uncached
+                        : uncached);
+                statusText.textContent = _audioFmt('ui.audio.similar_fp_status', {
+                    total,
+                    uncached
+                });
+                statusDetail.textContent = _audioFmt('ui.audio.similar_fp_detail', {
+                    cached,
+                    uncached
+                });
             }
         }).then(fn => {
             progressCleanup = fn;

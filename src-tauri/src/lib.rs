@@ -55,6 +55,7 @@ pub fn format_size(bytes: u64) -> String {
 }
 
 use history::{AudioSample, DawProject, KvrCacheUpdateEntry, PdfFile, PresetFile};
+use path_norm::normalize_path_for_db;
 use scanner::PluginInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -83,6 +84,21 @@ fn refresh_log_verbosity_from_prefs() {
         _ => 1u8,
     };
     LOG_VERBOSITY_LEVEL.store(n, Ordering::Relaxed);
+}
+
+/// Fingerprint cache keys in SQLite are written with [`normalize_path_for_db`]; align in-memory
+/// lookups and inserts so `contains_key` matches paths from the UI (`allAudioSamples`).
+fn normalize_fingerprint_cache_map(
+    cache: HashMap<String, similarity::AudioFingerprint>,
+) -> HashMap<String, similarity::AudioFingerprint> {
+    cache
+        .into_iter()
+        .map(|(k, mut v)| {
+            let nk = normalize_path_for_db(&k);
+            v.path = nk.clone();
+            (nk, v)
+        })
+        .collect()
 }
 
 fn should_suppress_app_log_line(msg: &str) -> bool {
@@ -2575,12 +2591,13 @@ async fn build_fingerprint_cache(
         let fp_json = db::global()
             .read_cache("fingerprint-cache.json")
             .unwrap_or_default();
-        let mut cache: std::collections::HashMap<String, similarity::AudioFingerprint> =
+        let raw: HashMap<String, similarity::AudioFingerprint> =
             serde_json::from_value(fp_json).unwrap_or_default();
+        let mut cache = normalize_fingerprint_cache_map(raw);
         use rayon::prelude::*;
         let uncached: Vec<&String> = candidate_paths
             .iter()
-            .filter(|p| !cache.contains_key(p.as_str()))
+            .filter(|p| !cache.contains_key(&normalize_path_for_db(p.as_str())))
             .collect();
         let total = uncached.len();
         if total == 0 {
@@ -2599,8 +2616,10 @@ async fn build_fingerprint_cache(
                 .par_iter()
                 .filter_map(|p| similarity::compute_fingerprint(p))
                 .collect();
-            for fp in new_fps {
-                cache.insert(fp.path.clone(), fp);
+            for mut fp in new_fps {
+                let k = normalize_path_for_db(&fp.path);
+                fp.path = k.clone();
+                cache.insert(k, fp);
             }
             done += chunk.len();
             let _ = app.emit(
@@ -2635,16 +2654,20 @@ async fn find_similar_samples(
         let fp_json = db::global()
             .read_cache("fingerprint-cache.json")
             .unwrap_or_default();
-        let mut cache: std::collections::HashMap<String, similarity::AudioFingerprint> =
+        let raw: HashMap<String, similarity::AudioFingerprint> =
             serde_json::from_value(fp_json).unwrap_or_default();
+        let mut cache = normalize_fingerprint_cache_map(raw);
 
+        let file_key = normalize_path_for_db(&file_path);
         // Compute reference fingerprint (use cache if available)
-        let reference = if let Some(fp) = cache.get(&file_path) {
+        let reference = if let Some(fp) = cache.get(&file_key) {
             fp.clone()
         } else {
             match similarity::compute_fingerprint(&file_path) {
-                Some(fp) => {
-                    cache.insert(file_path.clone(), fp.clone());
+                Some(mut fp) => {
+                    let k = normalize_path_for_db(&fp.path);
+                    fp.path = k.clone();
+                    cache.insert(k.clone(), fp.clone());
                     fp
                 }
                 None => return vec![],
@@ -2655,16 +2678,23 @@ async fn find_similar_samples(
         use rayon::prelude::*;
         let uncached: Vec<&String> = candidate_paths
             .iter()
-            .filter(|p| !cache.contains_key(p.as_str()))
+            .filter(|p| !cache.contains_key(&normalize_path_for_db(p.as_str())))
             .collect();
 
         if !uncached.is_empty() {
-            // Emit progress
-            let total = uncached.len();
+            // Emit progress (explicit counts — `total` alone was uncached-only and confused the UI)
+            let uncached_count = uncached.len();
+            let candidate_count = candidate_paths.len();
+            let cached_count = candidate_count.saturating_sub(uncached_count);
             let _ = app.emit(
                 "similarity-progress",
                 serde_json::json!({
-                    "phase": "computing", "total": total, "cached": candidate_paths.len() - total
+                    "phase": "computing",
+                    "candidate_count": candidate_count,
+                    "uncached_count": uncached_count,
+                    "cached_count": cached_count,
+                    "total": uncached_count,
+                    "cached": cached_count
                 }),
             );
 
@@ -2673,8 +2703,10 @@ async fn find_similar_samples(
                 .filter_map(|p| similarity::compute_fingerprint(p))
                 .collect();
 
-            for fp in new_fps {
-                cache.insert(fp.path.clone(), fp);
+            for mut fp in new_fps {
+                let k = normalize_path_for_db(&fp.path);
+                fp.path = k.clone();
+                cache.insert(k, fp);
             }
 
             // Save cache to SQLite
@@ -2686,7 +2718,7 @@ async fn find_similar_samples(
         // Collect cached fingerprints for candidates
         let candidates: Vec<similarity::AudioFingerprint> = candidate_paths
             .iter()
-            .filter_map(|p| cache.get(p).cloned())
+            .filter_map(|p| cache.get(&normalize_path_for_db(p.as_str())).cloned())
             .collect();
 
         similarity::find_similar(&reference, &candidates, max_results)
