@@ -446,6 +446,30 @@ function fillAeStreamsFromEngineState(es) {
 }
 
 /**
+ * After a failed IPC action, re-read `engine_state` when possible so stream lines match the sidecar; else clear.
+ * @param {function|null|undefined} inv — `window.vstUpdater.audioEngineInvoke`
+ * @returns {Promise<object|null>} last `engine_state` payload when `ok === true`, else `null`
+ */
+async function fillAeStreamsAfterEngineError(inv) {
+    if (!inv || typeof inv !== 'function') {
+        fillAeStreamsFromEngineState(null);
+        return null;
+    }
+    try {
+        const es = await inv({cmd: 'engine_state'});
+        if (es && es.ok === true) {
+            fillAeStreamsFromEngineState(es);
+            return es;
+        }
+        fillAeStreamsFromEngineState(null);
+        return null;
+    } catch {
+        fillAeStreamsFromEngineState(null);
+        return null;
+    }
+}
+
+/**
  * @param {function} inv — `window.vstUpdater.audioEngineInvoke`
  */
 async function fillAeStreamStatus(inv) {
@@ -467,7 +491,6 @@ async function fillAeStreamStatus(inv) {
  */
 async function refreshAudioEnginePanel() {
     const statusEl = document.getElementById('aeEngineStatus');
-    const streamEl = document.getElementById('aeStreamStatus');
     const selectEl = document.getElementById('aeOutputDevice');
     const pluginEl = document.getElementById('aePluginStub');
     const toneCb = document.getElementById('aeTestTone');
@@ -637,7 +660,7 @@ async function toggleAeTestTone(enabled) {
     const inv = window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function'
         ? window.vstUpdater.audioEngineInvoke
         : null;
-    const streamEl = document.getElementById('aeStreamStatus');
+    const statusEl = document.getElementById('aeEngineStatus');
     if (!inv) return;
     try {
         const r = await inv({cmd: 'set_output_tone', tone: enabled});
@@ -652,19 +675,25 @@ async function toggleAeTestTone(enabled) {
             toneCb.checked = es.stream.tone_on === true;
         }
     } catch (e) {
+        const es = await fillAeStreamsAfterEngineError(inv);
         const msg = e && e.message ? String(e.message) : String(e);
-        if (streamEl && typeof catalogFmt === 'function') {
-            streamEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
+        if (statusEl && typeof catalogFmt === 'function') {
+            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
         }
         const toneCb = document.getElementById('aeTestTone');
-        if (toneCb) toneCb.checked = !enabled;
+        if (toneCb) {
+            if (es && es.stream && es.stream.tone_on != null) {
+                toneCb.checked = es.stream.tone_on === true;
+            } else {
+                toneCb.checked = !enabled;
+            }
+        }
     }
 }
 
 async function applyAudioEngineDevice() {
     const selectEl = document.getElementById('aeOutputDevice');
     const statusEl = document.getElementById('aeEngineStatus');
-    const streamEl = document.getElementById('aeStreamStatus');
     const toneCb = document.getElementById('aeTestTone');
     const bufOut = document.getElementById('aeBufferFramesOutput');
     const inv = window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function'
@@ -708,15 +737,19 @@ async function applyAudioEngineDevice() {
             if (es.stream.tone_on != null) toneCb.checked = es.stream.tone_on === true;
         }
     } catch (e) {
+        const es = await fillAeStreamsAfterEngineError(inv);
         const msg = e && e.message ? String(e.message) : String(e);
         if (statusEl && typeof catalogFmt === 'function') {
             statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
+        }
+        if (toneCb && es && es.stream) {
+            toneCb.disabled = !(es.stream.running === true && es.stream.tone_supported === true);
+            if (es.stream.tone_on != null) toneCb.checked = es.stream.tone_on === true;
         }
     }
 }
 
 async function startAeInputCapture() {
-    const inputStreamEl = document.getElementById('aeInputStreamStatus');
     const statusEl = document.getElementById('aeEngineStatus');
     const inSel = document.getElementById('aeInputDevice');
     const bufInCap = document.getElementById('aeBufferFramesInput');
@@ -753,16 +786,15 @@ async function startAeInputCapture() {
             statusEl.textContent = catalogFmt('ui.ae.status_ok', {version: ver, host});
         }
     } catch (e) {
-        stopAeInputPeakPoll();
+        await fillAeStreamsAfterEngineError(inv);
         const msg = e && e.message ? String(e.message) : String(e);
-        if (inputStreamEl && typeof catalogFmt === 'function') {
-            inputStreamEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
+        if (statusEl && typeof catalogFmt === 'function') {
+            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
         }
     }
 }
 
 async function stopAeInputCapture() {
-    const inputStreamEl = document.getElementById('aeInputStreamStatus');
     const statusEl = document.getElementById('aeEngineStatus');
     const inv = window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function'
         ? window.vstUpdater.audioEngineInvoke
@@ -783,16 +815,16 @@ async function stopAeInputCapture() {
             statusEl.textContent = catalogFmt('ui.ae.status_ok', {version: ver, host});
         }
     } catch (e) {
+        await fillAeStreamsAfterEngineError(inv);
         const msg = e && e.message ? String(e.message) : String(e);
-        if (inputStreamEl && typeof catalogFmt === 'function') {
-            inputStreamEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
+        if (statusEl && typeof catalogFmt === 'function') {
+            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
         }
     }
 }
 
 async function stopAeOutputStream() {
     const statusEl = document.getElementById('aeEngineStatus');
-    const streamEl = document.getElementById('aeStreamStatus');
     const toneCb = document.getElementById('aeTestTone');
     const inv = window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function'
         ? window.vstUpdater.audioEngineInvoke
@@ -817,9 +849,14 @@ async function stopAeOutputStream() {
             toneCb.checked = false;
         }
     } catch (e) {
+        const es = await fillAeStreamsAfterEngineError(inv);
         const msg = e && e.message ? String(e.message) : String(e);
         if (statusEl && typeof catalogFmt === 'function') {
             statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
+        }
+        if (toneCb && es && es.stream) {
+            toneCb.disabled = !(es.stream.running === true && es.stream.tone_supported === true);
+            if (es.stream.tone_on != null) toneCb.checked = es.stream.tone_on === true;
         }
     }
 }
