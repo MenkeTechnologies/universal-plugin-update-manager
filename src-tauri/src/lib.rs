@@ -13,11 +13,13 @@
 //! - [`preset_scanner`] — Plugin preset discovery
 //! - [`kvr`] — KVR Audio scraper and version checker
 //! - [`history`] — Scan history persistence, diffing, and preferences
+//! - [`content_hash`] — SHA-256 file hashing for byte-identical duplicate detection
 
 pub mod app_i18n;
 pub mod audio_scanner;
 pub mod bpm;
 pub mod bulk_stat;
+pub mod content_hash;
 pub mod daw_scanner;
 pub mod db;
 pub mod file_watcher;
@@ -2577,6 +2579,20 @@ async fn find_similar_samples(
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// Byte-identical files across the scanned library (SHA-256 after grouping by stored size).
+#[tauri::command]
+async fn find_content_duplicates(app: AppHandle) -> Result<serde_json::Value, String> {
+    let app_pb = Arc::new(app);
+    tokio::task::spawn_blocking(move || {
+        let entries = db::global().library_paths_for_content_hash()?;
+        let progress = Some((app_pb, 25usize));
+        let r = content_hash::find_byte_duplicate_groups(entries, progress);
+        serde_json::to_value(&r).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -6586,6 +6602,7 @@ pub fn run() {
             compute_fingerprint,
             find_similar_samples,
             build_fingerprint_cache,
+            find_content_duplicates,
             open_update_url,
             open_plugin_folder,
             open_audio_folder,

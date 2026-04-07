@@ -5165,6 +5165,55 @@ impl Database {
         }))
     }
 
+    /// All library paths with byte sizes for content-hash duplicate detection.
+    /// Uses the same per-domain library rules as [`Database::active_scan_inventory_counts`].
+    pub fn library_paths_for_content_hash(&self) -> Result<Vec<(String, u64, String)>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut out: Vec<(String, u64, String)> = Vec::new();
+
+        let mut push_sql = |sql: &str, kind: &str| -> Result<(), String> {
+            let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([], |r| {
+                    let path: String = r.get(0)?;
+                    let sz: i64 = r.get(1)?;
+                    Ok((path, sz.max(0) as u64, kind.to_string()))
+                })
+                .map_err(|e| e.to_string())?;
+            for row in rows {
+                out.push(row.map_err(|e| e.to_string())?);
+            }
+            Ok(())
+        };
+
+        push_sql(
+            "SELECT path, size_bytes FROM plugins WHERE id IN (SELECT MAX(id) FROM plugins GROUP BY path)",
+            "plugins",
+        )?;
+        push_sql(
+            &format!("SELECT path, size FROM audio_samples WHERE {AUDIO_LIBRARY_IDS}"),
+            "audio",
+        )?;
+        push_sql(
+            "SELECT path, size FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
+            "daw",
+        )?;
+        push_sql(
+            "SELECT path, size FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID','MIDI')",
+            "presets",
+        )?;
+        push_sql(
+            "SELECT path, size FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
+            "pdf",
+        )?;
+        push_sql(
+            "SELECT path, size FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path)",
+            "midi",
+        )?;
+
+        Ok(out)
+    }
+
     /// Get stats for all caches: item count and estimated size.
     pub fn cache_stats(&self) -> Result<Vec<CacheStat>, String> {
         let conn = self.conn.lock().unwrap();

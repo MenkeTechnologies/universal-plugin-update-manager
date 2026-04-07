@@ -35,6 +35,7 @@ zip = { version = "8", default-features = false, features = ["deflate"] }
 notify = "8"
 sysinfo = "0.38"
 image_crate = { version = "0.25", default-features = false, features = ["png"], package = "image" }
+sha2 = "0.10"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

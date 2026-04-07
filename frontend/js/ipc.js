@@ -1297,6 +1297,7 @@ window.vstUpdater = {
         maxResults: maxResults || 20
     }),
     buildFingerprintCache: (candidatePaths) => invoke('build_fingerprint_cache', {candidatePaths}),
+    findContentDuplicates: () => invoke('find_content_duplicates', {}),
     pdfMetadataGet: (paths) => invoke('pdf_metadata_get', {paths}),
     pdfMetadataExtractBatch: (paths) => invoke('pdf_metadata_extract_batch', {paths}),
     pdfMetadataUnindexed: (limit) => invoke('pdf_metadata_unindexed', {limit: limit || 100000}),
