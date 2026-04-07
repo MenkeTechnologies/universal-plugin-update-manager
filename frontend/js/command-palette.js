@@ -10,6 +10,10 @@ const PALETTE_MAX = 50;
 /** Monotonic id so stale palette DB searches never repaint after a newer query. */
 let _paletteDbSeq = 0;
 
+function _paletteSwitchTab(id) {
+  if (typeof switchTab === 'function') switchTab(id);
+}
+
 /**
  * Library hits for Cmd+K from SQLite (same scope as tab search: deduped by path across scans).
  * In-memory `allPlugins` / `allDawProjects` / etc. are only one paginated page (or empty) after
@@ -19,26 +23,26 @@ async function fetchPaletteDatabaseItems(query) {
   const q = query.trim();
   if (q.length < 2) return [];
   const vu = window.vstUpdater;
-  if (!vu || typeof vu.dbQueryPlugins !== 'function') return [];
+  if (!vu || typeof vu.dbQueryPalettePreview !== 'function') return [];
 
-  const LIMIT = 6;
-  const off = { offset: 0, limit: LIMIT };
-  const safe = async (fn) => {
-    try {
-      return await fn();
-    } catch {
-      return null;
-    }
-  };
-
-  const [rPlug, rAud, rDaw, rPreset, rPdf, rMidi] = await Promise.all([
-    safe(() => vu.dbQueryPlugins({ search: q, type_filter: null, sort_key: 'name', sort_asc: true, ...off })),
-    safe(() => vu.dbQueryAudio({ params: { search: q, format_filter: null, sort_key: 'name', sort_asc: true, ...off } })),
-    safe(() => vu.dbQueryDaw({ search: q, daw_filter: null, sort_key: 'name', sort_asc: true, ...off })),
-    safe(() => vu.dbQueryPresets({ search: q, format_filter: null, sort_key: 'name', sort_asc: true, ...off })),
-    safe(() => vu.dbQueryPdfs({ search: q, sort_key: 'name', sort_asc: true, ...off })),
-    safe(() => vu.dbQueryMidi({ search: q, format_filter: null, sort_key: 'name', sort_asc: true, ...off })),
-  ]);
+  let rPlug;
+  let rAud;
+  let rDaw;
+  let rPreset;
+  let rPdf;
+  let rMidi;
+  try {
+    const combined = await vu.dbQueryPalettePreview(q);
+    if (!combined) return [];
+    rPlug = combined.plugins;
+    rAud = combined.audio;
+    rDaw = combined.daw;
+    rPreset = combined.presets;
+    rPdf = combined.pdfs;
+    rMidi = combined.midi;
+  } catch {
+    return [];
+  }
 
   const out = [];
 
@@ -51,7 +55,7 @@ async function fetchPaletteDatabaseItems(query) {
         fields: [p.name, p.type, p.manufacturer || ''],
         icon: '&#9889;',
         action: () => {
-          switchTab('plugins');
+          _paletteSwitchTab('plugins');
           setTimeout(() => {
             const el = document.getElementById('pluginSearchInput');
             if (el) {
@@ -73,7 +77,7 @@ async function fetchPaletteDatabaseItems(query) {
         fields: [s.name, s.path || '', s.format || ''],
         icon: '&#127925;',
         action: () => {
-          switchTab('samples');
+          _paletteSwitchTab('samples');
           setTimeout(() => {
             const el = document.getElementById('audioSearchInput');
             if (el) {
@@ -95,7 +99,7 @@ async function fetchPaletteDatabaseItems(query) {
         fields: [d.name, d.daw, d.format],
         icon: '&#127911;',
         action: () => {
-          switchTab('daw');
+          _paletteSwitchTab('daw');
           setTimeout(() => {
             const el = document.getElementById('dawSearchInput');
             if (el) {
@@ -117,7 +121,7 @@ async function fetchPaletteDatabaseItems(query) {
         fields: [p.name, p.format],
         icon: '&#127924;',
         action: () => {
-          switchTab('presets');
+          _paletteSwitchTab('presets');
           setTimeout(() => {
             const el = document.getElementById('presetSearchInput');
             if (el) {
@@ -139,7 +143,7 @@ async function fetchPaletteDatabaseItems(query) {
         fields: [p.name, p.directory || ''],
         icon: '&#128196;',
         action: () => {
-          switchTab('pdf');
+          _paletteSwitchTab('pdf');
           setTimeout(() => {
             const el = document.getElementById('pdfSearchInput');
             if (el) {
@@ -162,7 +166,7 @@ async function fetchPaletteDatabaseItems(query) {
         fields: [m.name, m.path || '', m.format || ''],
         icon: '&#127924;',
         action: () => {
-          switchTab('midi');
+          _paletteSwitchTab('midi');
           setTimeout(() => {
             const el = document.getElementById('midiSearchInput');
             if (el) {
@@ -183,44 +187,51 @@ function collectPaletteItems() {
 
   // Tabs — always available
   const tabs = [
-    { type: 'tab', name: appFmt('menu.tab_plugins'), icon: '&#9889;', action: () => switchTab('plugins') },
-    { type: 'tab', name: appFmt('menu.tab_samples'), icon: '&#127925;', action: () => switchTab('samples') },
-    { type: 'tab', name: appFmt('menu.tab_daw'), icon: '&#127911;', action: () => switchTab('daw') },
-    { type: 'tab', name: appFmt('menu.tab_presets'), icon: '&#127924;', action: () => switchTab('presets') },
-    { type: 'tab', name: appFmt('menu.tab_favorites'), icon: '&#9733;', action: () => switchTab('favorites') },
-    { type: 'tab', name: appFmt('menu.tab_notes'), icon: '&#128221;', action: () => switchTab('notes') },
-    { type: 'tab', name: appFmt('menu.tab_tags'), icon: '&#127991;', action: () => switchTab('tags') },
-    { type: 'tab', name: appFmt('menu.tab_history'), icon: '&#128197;', action: () => switchTab('history') },
-    { type: 'tab', name: appFmt('menu.tab_files'), icon: '&#128193;', action: () => switchTab('files') },
-    { type: 'tab', name: appFmt('menu.tab_visualizer'), icon: '&#127911;', action: () => switchTab('visualizer') },
-    { type: 'tab', name: appFmt('menu.tab_walkers'), icon: '&#128270;', action: () => switchTab('walkers') },
-    { type: 'tab', name: appFmt('menu.tab_midi'), icon: '&#127924;', action: () => switchTab('midi') },
-    { type: 'tab', name: appFmt('menu.tab_pdf'), icon: '&#128196;', action: () => switchTab('pdf') },
-    { type: 'tab', name: appFmt('menu.tab_settings'), icon: '&#9881;', action: () => switchTab('settings') },
+    { type: 'tab', name: appFmt('menu.tab_plugins'), icon: '&#9889;', action: () => _paletteSwitchTab('plugins') },
+    { type: 'tab', name: appFmt('menu.tab_samples'), icon: '&#127925;', action: () => _paletteSwitchTab('samples') },
+    { type: 'tab', name: appFmt('menu.tab_daw'), icon: '&#127911;', action: () => _paletteSwitchTab('daw') },
+    { type: 'tab', name: appFmt('menu.tab_presets'), icon: '&#127924;', action: () => _paletteSwitchTab('presets') },
+    { type: 'tab', name: appFmt('menu.tab_favorites'), icon: '&#9733;', action: () => _paletteSwitchTab('favorites') },
+    { type: 'tab', name: appFmt('menu.tab_notes'), icon: '&#128221;', action: () => _paletteSwitchTab('notes') },
+    { type: 'tab', name: appFmt('menu.tab_tags'), icon: '&#127991;', action: () => _paletteSwitchTab('tags') },
+    { type: 'tab', name: appFmt('menu.tab_history'), icon: '&#128197;', action: () => _paletteSwitchTab('history') },
+    { type: 'tab', name: appFmt('menu.tab_files'), icon: '&#128193;', action: () => _paletteSwitchTab('files') },
+    { type: 'tab', name: appFmt('menu.tab_visualizer'), icon: '&#127911;', action: () => _paletteSwitchTab('visualizer') },
+    { type: 'tab', name: appFmt('menu.tab_walkers'), icon: '&#128270;', action: () => _paletteSwitchTab('walkers') },
+    { type: 'tab', name: appFmt('menu.tab_midi'), icon: '&#127924;', action: () => _paletteSwitchTab('midi') },
+    { type: 'tab', name: appFmt('menu.tab_pdf'), icon: '&#128196;', action: () => _paletteSwitchTab('pdf') },
+    { type: 'tab', name: appFmt('menu.tab_settings'), icon: '&#9881;', action: () => _paletteSwitchTab('settings') },
   ];
   items.push(...tabs);
 
   // Actions — all trigger toast confirmation
-  items.push({ type: 'action', name: appFmt('menu.scan_plugins'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_plugins')); scanPlugins(); } });
-  items.push({ type: 'action', name: appFmt('menu.scan_samples'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_samples')); scanAudioSamples(); } });
-  items.push({ type: 'action', name: appFmt('menu.scan_daw'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_daw_projects')); scanDawProjects(); } });
-  items.push({ type: 'action', name: appFmt('menu.scan_presets'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_presets')); scanPresets(); } });
-  items.push({ type: 'action', name: appFmt('ui.btn.scan_pdfs'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_pdfs_progress')); scanPdfs(); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_plugins'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_plugins')); typeof scanPlugins === 'function' && scanPlugins(); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_samples'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_samples')); typeof scanAudioSamples === 'function' && scanAudioSamples(); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_daw'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_daw_projects')); typeof scanDawProjects === 'function' && scanDawProjects(); } });
+  items.push({ type: 'action', name: appFmt('menu.scan_presets'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_presets')); typeof scanPresets === 'function' && scanPresets(); } });
+  items.push({ type: 'action', name: appFmt('ui.btn.scan_pdfs'), icon: '&#8635;', action: () => { showToast(toastFmt('toast.scanning_pdfs_progress')); typeof scanPdfs === 'function' && scanPdfs(); } });
   items.push({ type: 'action', name: appFmt('menu.stop_pdf_scan'), icon: '&#9632;', action: () => { if (typeof stopPdfScan === 'function') stopPdfScan(); } });
   items.push({ type: 'action', name: appFmt('menu.export_pdfs'), icon: '&#8615;', action: () => { if (typeof exportPdfs === 'function' && typeof runExport === 'function') runExport(exportPdfs); else if (typeof exportPdfs === 'function') exportPdfs(); } });
   items.push({ type: 'action', name: appFmt('menu.import_pdfs'), icon: '&#8613;', action: () => { if (typeof importPdfs === 'function') importPdfs(); } });
   items.push({ type: 'action', name: appFmt('menu.extract_pdf_page_counts'), icon: '&#128196;', action: () => { if (typeof buildPdfPagesCache === 'function') buildPdfPagesCache(); } });
   items.push({ type: 'action', name: appFmt('menu.build_fingerprint_cache'), icon: '&#127925;', action: () => {
-    const paths = (typeof allAudioSamples !== 'undefined' ? allAudioSamples : []).map(s => s.path);
-    if (paths.length === 0) { showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error'); return; }
-    showToast(toastFmt('toast.fingerprint_building_n', { n: paths.length.toLocaleString() }), 4000);
-    window.vstUpdater.buildFingerprintCache(paths)
-      .then(res => showToast(toastFmt('toast.fingerprint_build_complete_n', { n: res.built.toLocaleString() })))
-      .catch(e => showToast(toastFmt('toast.fingerprint_build_failed', { err: e.message || e }), 4000, 'error'));
+    void (async () => {
+      const paths = await fetchAudioLibraryPathsForFingerprint();
+      if (paths.length === 0) { showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error'); return; }
+      showToast(toastFmt('toast.fingerprint_building_n', { n: paths.length.toLocaleString() }), 4000);
+      const vu = window.vstUpdater;
+      if (!vu || typeof vu.buildFingerprintCache !== 'function') return;
+      try {
+        const res = await vu.buildFingerprintCache(paths);
+        showToast(toastFmt('toast.fingerprint_build_complete_n', { n: res.built.toLocaleString() }));
+      } catch (e) {
+        showToast(toastFmt('toast.fingerprint_build_failed', { err: e.message || e }), 4000, 'error');
+      }
+    })();
   } });
-  items.push({ type: 'action', name: appFmt('menu.check_updates'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.checking_updates')); checkUpdates(); } });
-  items.push({ type: 'action', name: appFmt('menu.find_duplicates'), icon: '&#128270;', action: () => { showToast(toastFmt('toast.scanning_duplicates')); showDuplicateReport(); } });
-  items.push({ type: 'action', name: appFmt('menu.reset_all_scans'), icon: '&#128465;', action: () => { showToast(toastFmt('toast.resetting_scans')); resetAllScans(); } });
+  items.push({ type: 'action', name: appFmt('menu.check_updates'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.checking_updates')); typeof checkUpdates === 'function' && checkUpdates(); } });
+  items.push({ type: 'action', name: appFmt('menu.find_duplicates'), icon: '&#128270;', action: () => { showToast(toastFmt('toast.scanning_duplicates')); typeof showDuplicateReport === 'function' && showDuplicateReport(); } });
+  items.push({ type: 'action', name: appFmt('menu.reset_all_scans'), icon: '&#128465;', action: () => { showToast(toastFmt('toast.resetting_scans')); typeof resetAllScans === 'function' && resetAllScans(); } });
   if (typeof buildXrefIndex === 'function') {
     items.push({ type: 'action', name: appFmt('menu.build_plugin_index'), icon: '&#9889;', action: () => { showToast(toastFmt('toast.building_plugin_index')); buildXrefIndex(); } });
   }
@@ -233,7 +244,7 @@ function collectPaletteItems() {
   if (typeof showPlayer === 'function') {
     const np = document.getElementById('audioNowPlaying');
     const visible = np && np.classList.contains('active');
-    items.push({ type: 'action', name: visible ? appFmt('menu.hide_audio_player') : appFmt('menu.show_audio_player'), icon: '&#9835;', action: () => { visible ? hidePlayer() : showPlayer(); showToast(visible ? toastFmt('toast.player_hidden') : toastFmt('toast.player_shown')); } });
+    items.push({ type: 'action', name: visible ? appFmt('menu.hide_audio_player') : appFmt('menu.show_audio_player'), icon: '&#9835;', action: () => { visible ? (typeof hidePlayer === 'function' && hidePlayer()) : (typeof showPlayer === 'function' && showPlayer()); showToast(visible ? toastFmt('toast.player_hidden') : toastFmt('toast.player_shown')); } });
   }
   if (typeof showHeatmapDashboard === 'function') {
     items.push({ type: 'action', name: appFmt('menu.heatmap_dashboard'), icon: '&#128202;', action: () => { showToast(toastFmt('toast.opening_dashboard')); showHeatmapDashboard(); } });
@@ -257,8 +268,10 @@ function collectPaletteItems() {
     items.push({ type: 'action', name: appFmt('menu.export_smart_playlists'), icon: '&#127926;', action: () => { showToast(toastFmt('toast.exporting_playlists')); exportSmartPlaylists(); } });
   }
   items.push({ type: 'action', name: appFmt('menu.clear_all_caches'), icon: '&#128465;', action: () => {
+    const vu = window.vstUpdater;
+    if (!vu || typeof vu.dbClearCaches !== 'function') return;
     showToast(toastFmt('toast.clearing_caches'));
-    window.vstUpdater.dbClearCaches().then(() => {
+    vu.dbClearCaches().then(() => {
       if (typeof _bpmCache !== 'undefined') { _bpmCache = {}; _keyCache = {}; _lufsCache = {}; }
       if (typeof _waveformCache !== 'undefined') { _waveformCache = {}; _spectrogramCache = {}; }
       showToast(toastFmt('toast.all_caches_cleared'));
@@ -272,7 +285,15 @@ function collectPaletteItems() {
   items.push({ type: 'action', name: appFmt('menu.export_current_tab'), icon: '&#8615;', action: () => { typeof _exportCurrentTab === 'function' && _exportCurrentTab(); } });
   items.push({ type: 'action', name: appFmt('menu.import_to_current_tab'), icon: '&#8613;', action: () => { typeof _importCurrentTab === 'function' && _importCurrentTab(); } });
   items.push({ type: 'action', name: appFmt('menu.help_keyboard_shortcuts'), icon: '&#10068;', action: () => { typeof toggleHelpOverlay === 'function' && toggleHelpOverlay(); } });
-  items.push({ type: 'action', name: appFmt('menu.open_log_file'), icon: '&#128196;', action: () => { showToast(toastFmt('toast.opening_log')); window.vstUpdater.getPrefsPath().then(p => { const lp = p.replace(/preferences\.toml$/, 'app.log'); window.vstUpdater.openWithApp(lp, 'TextEdit').catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); }); }); } });
+  items.push({ type: 'action', name: appFmt('menu.open_log_file'), icon: '&#128196;', action: () => {
+    const vu = window.vstUpdater;
+    if (!vu || typeof vu.getPrefsPath !== 'function' || typeof vu.openWithApp !== 'function') return;
+    showToast(toastFmt('toast.opening_log'));
+    vu.getPrefsPath().then(p => {
+      const lp = p.replace(/preferences\.toml$/, 'app.log');
+      vu.openWithApp(lp, 'TextEdit').catch(e => { if (typeof showToast === 'function') showToast(String(e), 4000, 'error'); });
+    });
+  } });
 
   // Toggles
   if (typeof settingToggleCrt === 'function') items.push({ type: 'action', name: appFmt('menu.toggle_crt'), icon: '&#128187;', action: () => settingToggleCrt() });
@@ -297,9 +318,21 @@ function collectPaletteItems() {
   if (typeof settingClearAllHistory === 'function') items.push({ type: 'action', name: appFmt('menu.clear_all_scan_history'), icon: '&#128465;', action: () => { settingClearAllHistory(); showToast(toastFmt('toast.all_history_cleared')); } });
   if (typeof settingClearAllDatabases === 'function') items.push({ type: 'action', name: appFmt('menu.clear_all_databases'), icon: '&#128465;', action: () => settingClearAllDatabases() });
   if (typeof settingClearKvrCache === 'function') items.push({ type: 'action', name: appFmt('menu.clear_kvr'), icon: '&#128465;', action: () => { settingClearKvrCache(); showToast(toastFmt('toast.kvr_cache_cleared_palette')); } });
-  items.push({ type: 'action', name: appFmt('menu.clear_app_log'), icon: '&#128465;', action: () => { window.vstUpdater.clearLog().then(() => showToast(toastFmt('toast.log_cleared'))).catch(() => showToast(toastFmt('toast.failed_clear_log'), 4000, 'error')); } });
+  items.push({ type: 'action', name: appFmt('menu.clear_app_log'), icon: '&#128465;', action: () => {
+    const vu = window.vstUpdater;
+    if (!vu || typeof vu.clearLog !== 'function') return;
+    vu.clearLog().then(() => showToast(toastFmt('toast.log_cleared'))).catch(() => showToast(toastFmt('toast.failed_clear_log'), 4000, 'error'));
+  } });
   items.push({ type: 'action', name: appFmt('menu.preferences'), icon: '&#128196;', action: () => { showToast(toastFmt('toast.opening_preferences')); typeof openPrefsFile === 'function' && openPrefsFile(); } });
-  items.push({ type: 'action', name: appFmt('menu.open_data_directory'), icon: '&#128193;', action: () => { showToast(toastFmt('toast.opening_data_dir')); window.vstUpdater.getPrefsPath().then(p => { const dir = p.replace(/[/\\][^/\\]+$/, ''); window.vstUpdater.openPluginFolder(dir); }); } });
+  items.push({ type: 'action', name: appFmt('menu.open_data_directory'), icon: '&#128193;', action: () => {
+    const vu = window.vstUpdater;
+    if (!vu || typeof vu.getPrefsPath !== 'function' || typeof vu.openPluginFolder !== 'function') return;
+    showToast(toastFmt('toast.opening_data_dir'));
+    vu.getPrefsPath().then(p => {
+      const dir = p.replace(/[/\\][^/\\]+$/, '');
+      vu.openPluginFolder(dir);
+    });
+  } });
   if (typeof clearRecentlyPlayed === 'function') items.push({ type: 'action', name: appFmt('menu.clear_play_history'), icon: '&#128465;', action: () => clearRecentlyPlayed() });
   if (typeof clearFavorites === 'function') items.push({ type: 'action', name: appFmt('menu.clear_favorites'), icon: '&#128465;', action: () => clearFavorites() });
   if (typeof clearAllNotes === 'function') items.push({ type: 'action', name: appFmt('menu.clear_all_notes_tags'), icon: '&#128465;', action: () => clearAllNotes() });
@@ -358,7 +391,7 @@ function collectPaletteItems() {
       items.push({
         type: 'bookmark', name: d.name, detail: d.path,
         icon: '&#128278;', fields: [d.name, d.path],
-        action: () => { switchTab('files'); loadDirectory(d.path); }
+        action: () => { _paletteSwitchTab('files'); typeof loadDirectory === 'function' && loadDirectory(d.path); }
       });
     }
   }
@@ -369,7 +402,7 @@ function collectPaletteItems() {
       items.push({
         type: 'tag', name: t, detail: catalogFmt('ui.palette.type_tag'),
         icon: '&#127991;', fields: [t],
-        action: () => { if (typeof setGlobalTag === 'function') setGlobalTag(t); switchTab('plugins'); }
+        action: () => { if (typeof setGlobalTag === 'function') setGlobalTag(t); _paletteSwitchTab('plugins'); }
       });
     }
   }
@@ -449,7 +482,7 @@ function paintPaletteRows(container) {
       daw: catalogFmt('ui.palette.type_daw'),
       pdf: catalogFmt('ui.palette.type_pdf'),
       preset: catalogFmt('ui.palette.type_preset'),
-      midi: catalogFmt('menu.tab_midi'),
+      midi: catalogFmt('ui.palette.type_midi'),
       bookmark: catalogFmt('ui.palette.type_bookmark'),
       tag: catalogFmt('ui.palette.type_tag'),
     })[item.type] || item.type;
@@ -473,7 +506,7 @@ async function renderPaletteResults() {
 
   let merged = filterPaletteItems(q, allItems);
 
-  if (qTrim.length >= 2 && typeof window.vstUpdater?.dbQueryPlugins === 'function') {
+  if (qTrim.length >= 2 && typeof window.vstUpdater?.dbQueryPalettePreview === 'function') {
     const seq = ++_paletteDbSeq;
     const dbItems = await fetchPaletteDatabaseItems(qTrim);
     if (seq !== _paletteDbSeq) return;

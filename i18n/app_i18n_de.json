@@ -1161,6 +1161,7 @@
   "ui.palette.type_action": "Aktion",
   "ui.palette.type_bookmark": "Ordner",
   "ui.palette.type_daw": "DAW",
+  "ui.palette.type_midi": "MIDI",
   "ui.palette.type_pdf": "PDF",
   "ui.palette.type_plugin": "Plug-in",
   "ui.palette.type_preset": "Voreingestellt",

@@ -2049,6 +2049,19 @@ impl Database {
             .map_err(|e| e.to_string())
     }
 
+    /// All canonical `path` values in the audio library (one row per path via `audio_library`).
+    pub fn audio_library_paths(&self) -> Result<Vec<String>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("SELECT path FROM audio_library ORDER BY path")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<String>, _>>()
+            .map_err(|e| e.to_string())
+    }
+
     /// Delete a scan and its samples.
     pub fn delete_scan(&self, scan_id: &str) -> Result<(), String> {
         let conn = self.conn.lock().unwrap();

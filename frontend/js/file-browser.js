@@ -1,9 +1,31 @@
 // ── File Browser ──
 const _ctxMenuNoEcho = { skipEchoToast: true };
 
+/** Rust `fs_list_dir` may return `\` on Windows; normalize for split/join logic. */
+function normalizePathSeparators(p) {
+  if (p == null || typeof p !== 'string') return '';
+  return p.replace(/\\/g, '/');
+}
+
+/** Parent directory for Unix paths and Windows `C:/...` paths (after normalization). */
+function parentDirectoryPath(p) {
+  const n = normalizePathSeparators(p).replace(/\/+$/, '');
+  if (n === '' || n === '/') return '/';
+  if (/^[A-Za-z]:$/.test(n)) return n + '/';
+  const i = n.lastIndexOf('/');
+  if (i < 0) return '/';
+  if (i === 0) return '/';
+  const parent = n.slice(0, i);
+  if (/^[A-Za-z]:$/.test(parent)) return parent + '/';
+  return parent || '/';
+}
+
 let _fileBrowserPath = null;
 let _fileBrowserEntries = [];
 let _fileBrowserInited = false;
+/** Invalidate in-flight chunked file list renders when directory or filter changes. */
+let _fileListRenderSeq = 0;
+const FILE_LIST_CHUNK = 80;
 
 // ── Favorite Directories ──
 function getFavDirs() {
@@ -107,6 +129,7 @@ async function initFileBrowser() {
 }
 
 async function loadDirectory(dirPath) {
+  _fileListRenderSeq += 1;
   _fileBrowserPath = dirPath;
   // Reset cursor cache when directory changes
   window._fbCursorPath = null;
@@ -129,7 +152,23 @@ async function loadDirectory(dirPath) {
 function renderBreadcrumb(dirPath) {
   const el = document.getElementById('fileBreadcrumb');
   if (!el) return;
-  const parts = dirPath.split('/').filter(Boolean);
+  const norm = normalizePathSeparators(dirPath);
+
+  if (/^[A-Za-z]:/.test(norm)) {
+    const drive = norm.slice(0, 2);
+    const rest = norm.slice(2).replace(/^\/+/, '');
+    const segments = rest ? rest.split('/').filter(Boolean) : [];
+    let html = `<span class="file-crumb" data-file-nav="${escapeHtml(drive + '/')}" title="${escapeHtml(drive)}">${escapeHtml(drive)}</span>`;
+    let acc = drive;
+    for (const part of segments) {
+      acc = acc.endsWith(':') ? acc + '/' + part : acc + '/' + part;
+      html += `<span class="file-crumb-sep">/</span><span class="file-crumb" data-file-nav="${escapeHtml(acc)}">${escapeHtml(part)}</span>`;
+    }
+    el.innerHTML = html;
+    return;
+  }
+
+  const parts = norm.split('/').filter(Boolean);
   let html = `<span class="file-crumb" data-file-nav="/">/</span>`;
   let accumulated = '';
   for (const part of parts) {
@@ -137,6 +176,48 @@ function renderBreadcrumb(dirPath) {
     html += `<span class="file-crumb-sep">/</span><span class="file-crumb" data-file-nav="${escapeHtml(accumulated)}">${escapeHtml(part)}</span>`;
   }
   el.innerHTML = html;
+}
+
+function buildFileListRowHtml(e, search, sampleByPath) {
+  const note = typeof noteIndicator === 'function' ? noteIndicator(e.path) : '';
+  const cls = e.isDir ? ' file-dir' : '';
+  const isAudio = !e.isDir && AUDIO_EXTS.includes(e.ext);
+
+  const parts = [];
+  if (typeof isFavorite === 'function' && isFavorite(e.path)) {
+    parts.push('<span class="file-meta-tag file-meta-fav" title="Favorited">&#9733;</span>');
+  }
+  if (typeof getNote === 'function') {
+    const n = getNote(e.path);
+    if (n && n.tags && n.tags.length > 0) {
+      parts.push(`<span class="file-meta-tag file-meta-tags" title="Tags: ${escapeHtml(n.tags.join(', '))}">${escapeHtml(n.tags.slice(0, 2).join(', '))}${n.tags.length > 2 ? '…' : ''}</span>`);
+    }
+  }
+  if (isAudio) {
+    if (typeof _bpmCache !== 'undefined' && _bpmCache[e.path]) {
+      parts.push(`<span class="file-meta-tag file-meta-bpm" title="BPM">${_bpmCache[e.path]}</span>`);
+    }
+    if (typeof _keyCache !== 'undefined' && _keyCache[e.path]) {
+      parts.push(`<span class="file-meta-tag file-meta-key" title="Musical key">${escapeHtml(_keyCache[e.path])}</span>`);
+    }
+    if (sampleByPath) {
+      const sample = sampleByPath.get(e.path);
+      if (sample && sample.duration) {
+        parts.push(`<span class="file-meta-tag file-meta-dur" title="Duration">${typeof formatTime === 'function' ? formatTime(sample.duration) : sample.duration.toFixed(1) + 's'}</span>`);
+      }
+    }
+  }
+  const extras = parts.length > 0 ? `<span class="file-meta-tags-row">${parts.join('')}</span>` : '';
+
+  const wfBg = isAudio ? `<canvas class="file-waveform" data-wf-path="${escapeHtml(e.path)}" height="36" title="Waveform"></canvas><span class="file-wf-cursor"></span>` : '';
+  return `<div class="file-row${cls}${isAudio ? ' file-audio' : ''}" data-file-path="${escapeHtml(e.path)}" data-file-dir="${e.isDir}" ${isAudio ? `data-wf-file="${escapeHtml(e.path)}"` : ''}>
+      ${wfBg}
+      <span class="file-icon">${fileIcon(e)}</span>
+      <span class="file-name">${search && typeof highlightMatch === 'function' ? highlightMatch(e.name, search, 'fuzzy') : escapeHtml(e.name)}${extras}${note}</span>
+      <span class="file-ext">${e.isDir ? 'DIR' : e.ext}</span>
+      <span class="file-size">${e.isDir ? '' : e.sizeFormatted}</span>
+      <span class="file-date">${e.modified}</span>
+    </div>`;
 }
 
 function renderFileList() {
@@ -156,58 +237,43 @@ function renderFileList() {
   }
 
   if (filtered.length === 0) {
+    _fileListRenderSeq += 1;
     list.innerHTML = '<div class="state-message"><div class="state-icon">&#128193;</div><h2>Empty Directory</h2></div>';
     return;
   }
 
-  list.innerHTML = filtered.map(e => {
-    const note = typeof noteIndicator === 'function' ? noteIndicator(e.path) : '';
-    const cls = e.isDir ? ' file-dir' : '';
-    const isAudio = !e.isDir && AUDIO_EXTS.includes(e.ext);
-
-    // Metadata badges — favorites/tags for ALL files and dirs, audio-specific for audio
-    const parts = [];
-    // Favorite (all files and dirs)
-    if (typeof isFavorite === 'function' && isFavorite(e.path)) {
-      parts.push('<span class="file-meta-tag file-meta-fav" title="Favorited">&#9733;</span>');
+  let sampleByPath = null;
+  if (typeof allAudioSamples !== 'undefined' && Array.isArray(allAudioSamples) && allAudioSamples.length > 0) {
+    sampleByPath = new Map();
+    for (let i = 0; i < allAudioSamples.length; i++) {
+      const s = allAudioSamples[i];
+      if (s && s.path) sampleByPath.set(s.path, s);
     }
-    // Tags from notes (all files and dirs)
-    if (typeof getNote === 'function') {
-      const n = getNote(e.path);
-      if (n && n.tags && n.tags.length > 0) {
-        parts.push(`<span class="file-meta-tag file-meta-tags" title="Tags: ${escapeHtml(n.tags.join(', '))}">${escapeHtml(n.tags.slice(0, 2).join(', '))}${n.tags.length > 2 ? '…' : ''}</span>`);
-      }
-    }
-    // Audio-specific metadata
-    if (isAudio) {
-      if (typeof _bpmCache !== 'undefined' && _bpmCache[e.path]) {
-        parts.push(`<span class="file-meta-tag file-meta-bpm" title="BPM">${_bpmCache[e.path]}</span>`);
-      }
-      if (typeof _keyCache !== 'undefined' && _keyCache[e.path]) {
-        parts.push(`<span class="file-meta-tag file-meta-key" title="Musical key">${escapeHtml(_keyCache[e.path])}</span>`);
-      }
-      if (typeof allAudioSamples !== 'undefined') {
-        const sample = findByPath(allAudioSamples, e.path);
-        if (sample && sample.duration) {
-          parts.push(`<span class="file-meta-tag file-meta-dur" title="Duration">${typeof formatTime === 'function' ? formatTime(sample.duration) : sample.duration.toFixed(1) + 's'}</span>`);
-        }
-      }
-    }
-    const extras = parts.length > 0 ? `<span class="file-meta-tags-row">${parts.join('')}</span>` : '';
+  }
 
-    const wfBg = isAudio ? `<canvas class="file-waveform" data-wf-path="${escapeHtml(e.path)}" height="36" title="Waveform"></canvas><span class="file-wf-cursor"></span>` : '';
-    return `<div class="file-row${cls}${isAudio ? ' file-audio' : ''}" data-file-path="${escapeHtml(e.path)}" data-file-dir="${e.isDir}" ${isAudio ? `data-wf-file="${escapeHtml(e.path)}"` : ''}>
-      ${wfBg}
-      <span class="file-icon">${fileIcon(e)}</span>
-      <span class="file-name">${search && typeof highlightMatch === 'function' ? highlightMatch(e.name, search, 'fuzzy') : escapeHtml(e.name)}${extras}${note}</span>
-      <span class="file-ext">${e.isDir ? 'DIR' : e.ext}</span>
-      <span class="file-size">${e.isDir ? '' : e.sizeFormatted}</span>
-      <span class="file-date">${e.modified}</span>
-    </div>`;
-  }).join('');
+  const seq = ++_fileListRenderSeq;
+  list.innerHTML = '';
+  let idx = 0;
 
-  // Lazy-load waveforms for visible audio files
-  requestAnimationFrame(() => initFileBrowserWaveforms());
+  function appendChunk() {
+    if (seq !== _fileListRenderSeq) return;
+    const end = Math.min(idx + FILE_LIST_CHUNK, filtered.length);
+    const slice = filtered.slice(idx, end);
+    const html = slice.map((e) => buildFileListRowHtml(e, search, sampleByPath)).join('');
+    list.insertAdjacentHTML('beforeend', html);
+    idx = end;
+    if (idx < filtered.length) {
+      const cont = appendChunk;
+      if (typeof yieldToBrowser === 'function') {
+        yieldToBrowser().then(cont);
+      } else {
+        setTimeout(cont, 0);
+      }
+    } else {
+      requestAnimationFrame(() => initFileBrowserWaveforms());
+    }
+  }
+  appendChunk();
 }
 
 // ── Lazy waveform rendering for file browser audio rows ──
@@ -474,9 +540,14 @@ document.addEventListener('click', (e) => {
   const action = e.target.closest('[data-action]');
   if (!action) return;
   if (action.dataset.action === 'fileUp') {
-    if (_fileBrowserPath && _fileBrowserPath !== '/') {
-      const parent = _fileBrowserPath.replace(/\/[^/]+\/?$/, '') || '/';
-      loadDirectory(parent);
+    if (_fileBrowserPath) {
+      const n = normalizePathSeparators(_fileBrowserPath);
+      if (n !== '/' && !/^[A-Za-z]:\/?$/.test(n.replace(/\/+$/, ''))) {
+        const parent = parentDirectoryPath(_fileBrowserPath);
+        if (normalizePathSeparators(parent) !== n.replace(/\/+$/, '')) {
+          loadDirectory(parent);
+        }
+      }
     }
   } else if (action.dataset.action === 'fileHome') {
     window.vstUpdater.getHomeDir().then(h => loadDirectory(h)).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
@@ -485,7 +556,10 @@ document.addEventListener('click', (e) => {
     if (dir === '/') {
       loadDirectory('/');
     } else {
-      window.vstUpdater.getHomeDir().then(h => loadDirectory(h + '/' + dir)).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
+      window.vstUpdater.getHomeDir().then((h) => {
+        const home = normalizePathSeparators(h).replace(/\/+$/, '');
+        loadDirectory(home + '/' + dir);
+      }).catch(e => { if(typeof showToast==='function') showToast(String(e),4000,'error'); });
     }
   } else if (action.dataset.action === 'fileFav') {
     if (_fileBrowserPath) {
@@ -513,6 +587,7 @@ document.addEventListener('click', (e) => {
 registerFilter('filterFiles', {
   inputId: 'fileSearchInput',
   fetchFn() { renderFileList(); },
+  debounceMs: 150,
 });
 
 // Right-click context menu
@@ -536,10 +611,7 @@ document.addEventListener('contextmenu', (e) => {
       items.push({ icon: '&#9654;', label: appFmt('menu.play'), ..._ctxMenuNoEcho, action: () => previewAudio(path) });
     }
     items.push({ icon: '&#128194;', label: appFmt('menu.open'), ..._ctxMenuNoEcho, action: () => opener_open(path) });
-    items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._ctxMenuNoEcho, action: () => {
-      const dir = path.replace(/\/[^/]+$/, '');
-      window.vstUpdater.openPresetFolder(path);
-    }});
+    items.push({ icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._ctxMenuNoEcho, action: () => window.vstUpdater.openPresetFolder(path) });
   }
   items.push('---');
   items.push({ icon: '&#128203;', label: appFmt('menu.copy_path'), ..._ctxMenuNoEcho, action: () => copyToClipboard(path) });
@@ -677,12 +749,17 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'ArrowLeft' || e.key === 'h') {
     // Left arrow: go to parent directory
     e.preventDefault();
-    if (_fileBrowserPath && _fileBrowserPath !== '/') {
-      const parent = _fileBrowserPath.replace(/\/[^/]+\/?$/, '') || '/';
-      loadDirectory(parent).then(() => {
-        _fileNavIdx = -1;
-        fileNavSelect(0);
-      });
+    if (_fileBrowserPath) {
+      const n = normalizePathSeparators(_fileBrowserPath);
+      if (n !== '/' && !/^[A-Za-z]:\/?$/.test(n.replace(/\/+$/, ''))) {
+        const parent = parentDirectoryPath(_fileBrowserPath);
+        if (normalizePathSeparators(parent) !== n.replace(/\/+$/, '')) {
+          loadDirectory(parent).then(() => {
+            _fileNavIdx = -1;
+            fileNavSelect(0);
+          });
+        }
+      }
     }
   } else if (e.key === ' ') {
     // Global shortcut handles Space for play/pause; do not restart preview on top of it.

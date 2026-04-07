@@ -120,9 +120,9 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Real FFT Spectrogram** | True frequency-domain spectrogram in metadata panel using Cooley-Tukey radix-2 FFT with Hann window, precomputed twiddle factors, log-frequency display mapping. Cyan→magenta color map. Spans same width as waveform |
 | **File Browser Metadata** | Click any audio file to expand full metadata panel: format, size, sample rate, bit depth, channels, duration, byte rate, BPM, key, created/modified dates, permissions, path, favorite status, tags, notes. Full-width waveform background with playback cursor on each audio row |
 | **Full Vim Keybindings** | j/k move, gg top, G bottom, Ctrl+D/U half-page, / search, o reveal, y yank path, p play, x favorite, v select, V select-all, w find-similar, e expand player, q EQ, u mono, d dashboard, b A-B loop. 49 total customizable keybindings |
-| **Command Palette** | Press <kbd>Cmd+K</kbd> to open a fuzzy search across tabs, actions, bookmarked directories, and tags. For queries of **2+ characters**, inventory hits (plugins, samples, DAW projects, presets, PDFs, MIDI) are loaded from **SQLite** via the same paginated `db_query_*` commands as the main tabs — not from in-memory arrays, which after restart only hold the current page (or are empty). Arrow keys to navigate, Enter to select, Escape to dismiss. Uses the same fzf scoring engine as tab search bars |
+| **Command Palette** | Press <kbd>Cmd+K</kbd> to open a fuzzy search across tabs, actions, bookmarked directories, and tags. For queries of **2+ characters**, inventory hits (plugins, samples, DAW projects, presets, PDFs, MIDI) load from **SQLite** via **`db_query_palette_preview`** (one IPC round-trip, six `LIMIT 6` queries on the blocking pool) — not from in-memory arrays. Arrow keys to navigate, Enter to select, Escape to dismiss. Uses the same fzf scoring engine as tab search bars |
 | **Directory Bookmarks** | Bookmark favorite directories in the File Browser for instant navigation. Chips displayed above the file list, persisted across sessions. Right-click any folder to bookmark it |
-| **Quick Nav Buttons** | File browser toolbar has Desktop, Downloads, Music, Documents, and Root (/) buttons for instant navigation |
+| **Quick Nav Buttons** | File browser toolbar has Desktop, Downloads, Music, Documents, and Root (/) buttons for instant navigation. Large listings append in chunks (`FILE_LIST_CHUNK` in `file-browser.js`) with `yieldToBrowser` between chunks; filter input uses **150ms** debounce (`debounceMs` on `filterFiles`) |
 | **Splash Screen** | Cyberpunk boot sequence with animated gradient title sweep, progress bar, version display. Fades out after init before data loads |
 | **Cyberpunk Animations** | 30 CSS animations: neon focus pulse, button hover glow, modal zoom-in, context menu scale, format badge shimmer, toast glow pulse, neon gradient scrollbars, tactile depth shadows on every interactive element |
 | **System Info** | Real-time display in 7 sections: System (OS, arch, hostname, CPU, disk), Process (PID, version, memory, threads, FD limits, uptime), Thread Pools (rayon, per-scanner, channel buffers), Scanner State (live dots), Scan Results (counts), Database (SQLite size, per-table row counts), Storage (data dir) |
@@ -416,7 +416,7 @@ frontend/
     app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals from SQLite (`get_active_scan_inventory_counts`: one row per path, library scope — not tied to a single `scan_id`); scans stream-insert per batch; `applyInventoryCountsPartial` throttles DB refresh on progress
     audio.js           -- Audio sample scanning + inline playback + floating player
     batch-select.js    -- Checkbox selection + batch operations
-    command-palette.js -- Cmd+K fuzzy search; 2+ char inventory hits use `db_query_*` (SQLite), not in-memory paginated arrays
+    command-palette.js -- Cmd+K fuzzy search; 2+ char inventory hits use `db_query_palette_preview` (SQLite), not in-memory paginated arrays; **Build fingerprint cache** loads paths from `db_audio_library_paths` (SQLite `audio_library`), same as Settings → cache fingerprint build
     columns.js         -- Resizable table columns with width persistence
     context-menu.js    -- Right-click context menus for all elements
     daw.js             -- DAW project scanning + stats
@@ -425,7 +425,7 @@ frontend/
     duplicates.js      -- Duplicate modal: name heuristics + optional content (SHA-256) scan via `find_content_duplicates`
     export.js          -- Export/import (JSON/TOML/CSV/TSV/PDF); tab exports pull the full filtered result set from SQLite when the UI holds only a paginated page (plugins, presets, samples, DAW, MIDI, PDF)
     favorites.js       -- Favorites management
-    file-browser.js    -- Filesystem navigation with tags + notes
+    file-browser.js    -- Filesystem navigation with tags + notes; breadcrumbs/parent/quick-nav normalize `\\` vs `/` for Windows paths from `fs_list_dir`; chunked row append + path→sample `Map` for duration badges; filter debounce 150ms
     help-overlay.js    -- Keyboard shortcuts reference overlay
     history.js         -- Scan history management + merged timeline
     ipc.js             -- Tauri v2 IPC bridge + event delegation; `stopAll` stops every scanner plus KVR update check (`stop_updates`); native menu actions use `typeof` guards; Tauri `listen` unlisteners use `.catch` so teardown never rejects
@@ -438,7 +438,7 @@ frontend/
     settings.js        -- Color schemes, themes, toggles, preferences
     shortcuts.js       -- Customizable keyboard shortcuts
     sort-persist.js    -- Sort column/direction persistence per tab
-    utils.js           -- fzf search, escaping, slugs, formatting, `postScanCompleteToast` (scan-finished slide-ins; suppressed during Scan All)
+    utils.js           -- fzf search, escaping, slugs, formatting, `postScanCompleteToast` (scan-finished slide-ins; suppressed during Scan All), `fetchAudioLibraryPathsForFingerprint` (SQLite `audio_library` paths for fingerprint cache builds; falls back to in-memory list)
     xref.js            -- Plugin ↔ DAW cross-reference UI + project viewer (11 formats)
     dep-graph.js       -- Plugin dependency graph visualization
     visualizer.js      -- 6 real-time audio displays (FFT, waveform, spectrogram, Lissajous, levels, bands)

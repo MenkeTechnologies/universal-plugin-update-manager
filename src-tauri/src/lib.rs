@@ -6180,6 +6180,87 @@ async fn db_query_pdfs(
     .map_err(|e| format!("db_query_pdfs task: {e}"))?
 }
 
+/// Single IPC round-trip for Cmd+K inventory preview (same limits as six separate `db_query_*` calls).
+#[derive(Debug, Serialize)]
+pub struct PalettePreviewResult {
+    pub plugins: db::PluginQueryResult,
+    pub audio: db::AudioQueryResult,
+    pub daw: db::DawQueryResult,
+    pub presets: db::PresetQueryResult,
+    pub pdfs: db::PdfQueryResult,
+    pub midi: db::MidiQueryResult,
+}
+
+fn palette_preview_empty() -> PalettePreviewResult {
+    PalettePreviewResult {
+        plugins: db::PluginQueryResult {
+            plugins: vec![],
+            total_count: 0,
+            total_unfiltered: 0,
+        },
+        audio: db::AudioQueryResult {
+            samples: vec![],
+            total_count: 0,
+            total_unfiltered: 0,
+        },
+        daw: db::DawQueryResult {
+            projects: vec![],
+            total_count: 0,
+            total_unfiltered: 0,
+        },
+        presets: db::PresetQueryResult {
+            presets: vec![],
+            total_count: 0,
+            total_unfiltered: 0,
+        },
+        pdfs: db::PdfQueryResult {
+            pdfs: vec![],
+            total_count: 0,
+            total_unfiltered: 0,
+        },
+        midi: db::MidiQueryResult {
+            midi_files: vec![],
+            total_count: 0,
+            total_unfiltered: 0,
+        },
+    }
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn db_query_palette_preview(search: String) -> Result<PalettePreviewResult, String> {
+    let search = search.trim().to_string();
+    if search.len() < 2 {
+        return Ok(palette_preview_empty());
+    }
+    tokio::task::spawn_blocking(move || {
+        let db = db::global();
+        let plugins = db.query_plugins(Some(&search), None, "name", true, 0, 6)?;
+        let audio = db.query_audio(&db::AudioQueryParams {
+            scan_id: None,
+            search: Some(search.clone()),
+            format_filter: None,
+            sort_key: "name".into(),
+            sort_asc: true,
+            offset: 0,
+            limit: 6,
+        })?;
+        let daw = db.query_daw(Some(&search), None, "name", true, 0, 6)?;
+        let presets = db.query_presets(Some(&search), None, "name", true, 0, 6)?;
+        let pdfs = db.query_pdfs(Some(&search), "name", true, 0, 6)?;
+        let midi = db.query_midi(Some(&search), None, "name", true, 0, 6)?;
+        Ok(PalettePreviewResult {
+            plugins,
+            audio,
+            daw,
+            presets,
+            pdfs,
+            midi,
+        })
+    })
+    .await
+    .map_err(|e| format!("db_query_palette_preview task: {e}"))?
+}
+
 #[tauri::command]
 async fn db_pdf_stats(scan_id: Option<String>) -> Result<db::PdfStatsResult, String> {
     blocking_res(move || db::global().pdf_stats(scan_id.as_deref())).await
@@ -6314,6 +6395,11 @@ async fn db_get_analysis(path: String) -> Result<serde_json::Value, String> {
 #[tauri::command]
 async fn db_unanalyzed_paths(limit: Option<u64>) -> Result<Vec<String>, String> {
     blocking_res(move || db::global().unanalyzed_paths(limit.unwrap_or(100))).await
+}
+
+#[tauri::command]
+async fn db_audio_library_paths() -> Result<Vec<String>, String> {
+    blocking_res(move || db::global().audio_library_paths()).await
 }
 
 #[tauri::command]
@@ -6762,6 +6848,7 @@ pub fn run() {
             db_daw_stats,
             db_preset_stats,
             db_query_pdfs,
+            db_query_palette_preview,
             db_pdf_stats,
             db_audio_filter_stats,
             db_daw_filter_stats,
@@ -6776,6 +6863,7 @@ pub fn run() {
             db_backfill_audio_meta,
             db_get_analysis,
             db_unanalyzed_paths,
+            db_audio_library_paths,
             db_migrate_json,
             db_cache_stats,
             db_clear_caches,

@@ -1161,6 +1161,7 @@
   "ui.palette.type_action": "Acción",
   "ui.palette.type_bookmark": "Directorio",
   "ui.palette.type_daw": "GRAJILLA",
+  "ui.palette.type_midi": "MIDI",
   "ui.palette.type_pdf": "PDF",
   "ui.palette.type_plugin": "Complemento",
   "ui.palette.type_preset": "Programar",

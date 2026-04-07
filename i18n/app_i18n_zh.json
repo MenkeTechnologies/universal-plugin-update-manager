@@ -1161,6 +1161,7 @@
   "ui.palette.type_action": "行动",
   "ui.palette.type_bookmark": "目录",
   "ui.palette.type_daw": "数字音频工作站",
+  "ui.palette.type_midi": "MIDI",
   "ui.palette.type_pdf": "PDF",
   "ui.palette.type_plugin": "插件",
   "ui.palette.type_preset": "预设",

@@ -672,21 +672,24 @@ document.addEventListener('click', (e) => {
                         if (typeof renderCacheStats === 'function') renderCacheStats();
                     });
                 } else if (c === 'fingerprint') {
-                    const paths = (typeof allAudioSamples !== 'undefined' ? allAudioSamples : []).map(s => s.path);
-                    if (paths.length === 0) {
-                        showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error');
-                        break;
-                    }
-                    showToast(toastFmt('toast.fingerprint_building_n_slow', {n: paths.length.toLocaleString()}), 4000);
-                    window.vstUpdater.buildFingerprintCache(paths)
-                        .then(res => {
+                    void (async () => {
+                        const paths = await fetchAudioLibraryPathsForFingerprint();
+                        if (paths.length === 0) {
+                            showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error');
+                            return;
+                        }
+                        showToast(toastFmt('toast.fingerprint_building_n_slow', { n: paths.length.toLocaleString() }), 4000);
+                        try {
+                            const res = await window.vstUpdater.buildFingerprintCache(paths);
                             showToast(toastFmt('toast.fingerprint_build_complete_n_cached', {
                                 built: res.built.toLocaleString(),
                                 cached: res.cached.toLocaleString()
                             }));
                             if (typeof renderCacheStats === 'function') renderCacheStats();
-                        })
-                        .catch(e => showToast(toastFmt('toast.fingerprint_build_failed', {err: e.message || e}), 4000, 'error'));
+                        } catch (e) {
+                            showToast(toastFmt('toast.fingerprint_build_failed', { err: e.message || e }), 4000, 'error');
+                        }
+                    })();
                 }
                 break;
             }
@@ -1330,6 +1333,10 @@ window.vstUpdater = {
     dbQueryDaw: (params) => invoke('db_query_daw', params || {}),
     dbQueryPresets: (params) => invoke('db_query_presets', params || {}),
     dbQueryPdfs: (params) => invoke('db_query_pdfs', params || {}),
+    /** One blocking-pool task: six `LIMIT 6` inventory queries (Cmd+K preview). */
+    dbQueryPalettePreview: (search) => invoke('db_query_palette_preview', { search: search || '' }),
+    /** Full audio library paths (SQLite `audio_library`) — not the in-memory paginated slice. */
+    dbAudioLibraryPaths: () => invoke('db_audio_library_paths', {}),
     dbPdfStats: (scanId) => invoke('db_pdf_stats', {scanId: scanId || null}),
     dbAudioFilterStats: (search, formatFilter) => invoke('db_audio_filter_stats', {
         search: search || null,

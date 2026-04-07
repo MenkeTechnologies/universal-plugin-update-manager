@@ -577,7 +577,7 @@ const _filterRegistry = {};
 let _filterDebounceTimers = {};
 
 function registerFilter(action, config) {
-  // config: { inputId, regexToggleId, formatDropdownId, resetOffset, fetchFn, clientFilter }
+  // config: { inputId, regexToggleId, formatDropdownId, resetOffset, fetchFn, clientFilter, debounceMs? }
   _filterRegistry[action] = config;
 }
 
@@ -602,7 +602,9 @@ function applyFilter(action) {
 
 function applyFilterDebounced(action) {
   clearTimeout(_filterDebounceTimers[action]);
-  _filterDebounceTimers[action] = setTimeout(() => applyFilter(action), 250);
+  const cfg = _filterRegistry[action];
+  const ms = cfg && typeof cfg.debounceMs === 'number' ? cfg.debounceMs : 250;
+  _filterDebounceTimers[action] = setTimeout(() => applyFilter(action), ms);
 }
 
 /**
@@ -1094,3 +1096,21 @@ function postScanCompleteToast(stopped, completeKey, stoppedKey, vars) {
   showToast(toastFmt(key, vars), stopped ? 4500 : 3500, stopped ? 'warning' : '');
 }
 window.postScanCompleteToast = postScanCompleteToast;
+
+/**
+ * Paths for fingerprint cache build: SQLite `audio_library` (full library), not the in-memory
+ * paginated `allAudioSamples` slice. Falls back to `allAudioSamples` if IPC is unavailable.
+ */
+async function fetchAudioLibraryPathsForFingerprint() {
+  const vu = window.vstUpdater;
+  if (vu && typeof vu.dbAudioLibraryPaths === 'function') {
+    try {
+      const paths = await vu.dbAudioLibraryPaths();
+      if (Array.isArray(paths) && paths.length > 0) return paths;
+    } catch {
+      /* fall through */
+    }
+  }
+  const arr = typeof allAudioSamples !== 'undefined' && Array.isArray(allAudioSamples) ? allAudioSamples : [];
+  return arr.map((s) => s && s.path).filter(Boolean);
+}
