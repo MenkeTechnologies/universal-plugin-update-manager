@@ -48,6 +48,13 @@ jobs:
       - name: Run JS tests
         run: node scripts/run-js-tests.mjs
 
+      # `cargo test` runs tauri-build, which validates `bundle.externalBin` paths (see `tauri.conf.json`).
+      # The JUCE binary is not committed; dev uses `beforeDevCommand`, release uses `beforeBuildCommand`.
+      - name: Prepare audio-engine for Tauri externalBin
+        env:
+          AUDIO_ENGINE_TAURI_BIN_PROFILE: debug
+        run: node scripts/prepare-audio-engine-audioengine.mjs
+
       - name: Run Rust tests (library)
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 

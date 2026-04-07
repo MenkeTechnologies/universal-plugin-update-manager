@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * Build `audio-engine` in release (JUCE + CMake) and copy to `src-tauri/binaries/` with the target-triple suffix
+ * Build `audio-engine` (JUCE + CMake) and copy to `src-tauri/binaries/` with the target-triple suffix
  * required by Tauri `bundle.externalBin`. Run before `pnpm tauri build` (see `tauri.conf.json`).
+ *
+ * Set `AUDIO_ENGINE_TAURI_BIN_PROFILE=debug` for a faster Debug build (e.g. GitHub Actions test job).
+ * Default is release (distribution builds).
  *
  * Tauri runs `beforeBuildCommand` with cwd = repository root (parent of `src-tauri/`), so
  * `tauri.conf.json` must invoke `node scripts/prepare-audio-engine-audioengine.mjs`, not `../scripts/...`.
@@ -23,16 +26,18 @@ if (!triple) {
 
 const ext = process.platform === 'win32' ? '.exe' : '';
 const cargoDir = path.join(root, 'src-tauri');
-const built = path.join(root, 'target', 'release', `audio-engine${ext}`);
+const useDebug = process.env.AUDIO_ENGINE_TAURI_BIN_PROFILE === 'debug';
+const profileDir = useDebug ? 'debug' : 'release';
+const buildTypeEnv = useDebug ? 'debug' : 'release';
+const built = path.join(root, 'target', profileDir, `audio-engine${ext}`);
 const outDir = path.join(cargoDir, 'binaries');
 const outName = `audio-engine-${triple}${ext}`;
 const dest = path.join(outDir, outName);
 
-process.env.AUDIO_ENGINE_BUILD_TYPE = 'release';
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-audio-engine.mjs')], {
   stdio: 'inherit',
   cwd: root,
-  env: { ...process.env, AUDIO_ENGINE_BUILD_TYPE: 'release' },
+  env: { ...process.env, AUDIO_ENGINE_BUILD_TYPE: buildTypeEnv },
 });
 
 if (!fs.existsSync(built)) {
