@@ -254,12 +254,15 @@ listen('menu-action', (event) => {
 
 // Event delegation — replaces inline onclick/oninput/onchange for Tauri v2 CSP compatibility
 document.addEventListener('click', (e) => {
-    if (e.target.closest('.col-resize')) return;
-    const el = e.target.closest('[data-action]');
+    const t = e.target;
+    const clickEl = t && t.nodeType === Node.ELEMENT_NODE ? t : t?.parentElement;
+    if (!clickEl) return;
+    if (clickEl.closest('.col-resize')) return;
+    const el = clickEl.closest('[data-action]');
     if (!el) return;
     // If there's a data-action-stop container between the target and the matched action element, skip parent actions
     if (el.dataset.action === 'toggleMetadata') {
-        const stop = e.target.closest('[data-action-stop]');
+        const stop = clickEl.closest('[data-action-stop]');
         if (stop && el.contains(stop)) return;
     }
     const action = el.dataset.action;

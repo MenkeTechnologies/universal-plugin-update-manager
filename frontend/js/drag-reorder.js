@@ -418,7 +418,9 @@ function initRecentlyPlayedDragReorder() {
       if (e.button !== 0 || _colDrag) return;
       const th = e.target.closest('th');
       if (!th || e.target.closest('.col-resize, input, button')) return;
-      e.preventDefault();
+      // Do not call preventDefault() here — it suppresses the follow-up click in WKWebView,
+      // so delegated header actions (sortAudio, sortDaw, …) never run. Text selection is
+      // already blocked by CSS user-select on table headers; drag start sets user-select:none.
       const rect = th.getBoundingClientRect();
       _colDrag = { table, thead, prefsKey, getColKey, th, origIdx: [...thead.children].indexOf(th), startX: e.clientX, offsetX: e.clientX - rect.left, isDragging: false, ghost: null, placeholder: null };
     });
