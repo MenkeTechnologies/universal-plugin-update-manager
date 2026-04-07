@@ -757,11 +757,11 @@
             width: 100%;
         }
 
-        /* Scan Directories: heading + description above, full-width path textarea */
+        /* Scan Directories: heading + description above; path field capped + spaced */
         .settings-row.settings-scan-dirs-row {
             flex-direction: column;
             align-items: stretch;
-            gap: 6px;
+            gap: 14px;
         }
 
         .settings-row.settings-scan-dirs-row .settings-label {
@@ -772,8 +772,9 @@
 
         .settings-row.settings-scan-dirs-row .settings-control {
             width: 100%;
-            max-width: 100%;
+            max-width: min(640px, 100%);
             flex-shrink: 1;
+            align-self: flex-start;
         }
 
         .settings-row.settings-scan-dirs-row .settings-textarea-scan-paths {
