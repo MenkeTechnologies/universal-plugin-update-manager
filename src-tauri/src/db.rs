@@ -453,6 +453,47 @@ pub struct CacheStat {
     pub size_bytes: u64,
 }
 
+/// Approximate on-disk bytes for btree objects (table + indexes) for `scan_table` + `item_table`.
+/// Uses SQLite [`dbstat`](https://www.sqlite.org/dbstat.html) when available.
+/// Returns `None` if `dbstat` is not compiled in (caller splits DB file size by row count).
+fn dbstat_bytes_for_scan_group(
+    conn: &Connection,
+    scan_table: &str,
+    item_table: &str,
+) -> Option<u64> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT name FROM sqlite_master WHERE type IN ('table','index') AND tbl_name IN (?1, ?2)",
+        )
+        .ok()?;
+    let mut rows = stmt.query(rusqlite::params![scan_table, item_table]).ok()?;
+    let mut names = Vec::new();
+    loop {
+        match rows.next() {
+            Ok(Some(row)) => {
+                names.push(row.get::<_, String>(0).ok()?);
+            }
+            Ok(None) => break,
+            Err(_) => return None,
+        }
+    }
+    if names.is_empty() {
+        return Some(0);
+    }
+    let mut total: u64 = 0;
+    for name in names {
+        let v: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name = ?1",
+                [&name],
+                |r| r.get(0),
+            )
+            .ok()?;
+        total = total.saturating_add(v.max(0) as u64);
+    }
+    Some(total)
+}
+
 /// Canonical inventory: one row per `path` (highest `id` wins — newest insert for that path).
 /// Materialized in `audio_library` (migration v14) so library queries avoid `GROUP BY path` on hot paths.
 const AUDIO_LIBRARY_IDS: &str = "id IN (SELECT sample_id FROM audio_library)";
@@ -6210,9 +6251,6 @@ DROP TABLE _pl_refresh_paths;"#;
     /// Get stats for all caches: item count and estimated size.
     pub fn cache_stats(&self) -> Result<Vec<CacheStat>, String> {
         let conn = self.read_conn();
-        let page_size: u64 = conn
-            .query_row("PRAGMA page_size", [], |r| r.get::<_, i64>(0))
-            .unwrap_or(4096) as u64;
         let mut stats = Vec::new();
 
         // Analysis caches (columns on audio_samples — library rows only)
@@ -6279,7 +6317,27 @@ DROP TABLE _pl_refresh_paths;"#;
             });
         }
 
-        // Scan histories
+        // Scan histories — per-group on-disk size via `dbstat` (table + indexes), not
+        // `(whole DB pages) / row_count` (that made every category ≈ full file size).
+        let db_path = history::get_data_dir().join("audio_haxor.db");
+        let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
+        let total_inv_rows: u64 = [
+            "plugins",
+            "audio_samples",
+            "daw_projects",
+            "presets",
+            "midi_files",
+            "pdfs",
+        ]
+        .iter()
+        .map(|t| {
+            conn.query_row(&format!("SELECT COUNT(*) FROM {t}"), [], |r| {
+                r.get::<_, i64>(0).map(|v| v as u64)
+            })
+            .unwrap_or(0)
+        })
+        .sum();
+
         for (label, scan_table, item_table, key) in [
             ("Plugin Scans", "plugin_scans", "plugins", "plugin_scans"),
             ("Audio Scans", "audio_scans", "audio_samples", "audio_scans"),
@@ -6298,18 +6356,12 @@ DROP TABLE _pl_refresh_paths;"#;
                     r.get::<_, i64>(0).map(|v| v as u64)
                 })
                 .unwrap_or(0);
-            // Estimate size from number of items * avg row size
-            let avg_row: u64 = if item_count > 0 {
-                let pages: u64 = conn
-                    .query_row("SELECT page_count FROM pragma_page_count()", [], |r| {
-                        r.get::<_, i64>(0).map(|v| v as u64)
-                    })
-                    .unwrap_or(0);
-                if pages > 0 {
-                    (pages * page_size) / item_count.max(1)
-                } else {
-                    200
-                }
+            let size_bytes = if let Some(b) =
+                dbstat_bytes_for_scan_group(&conn, scan_table, item_table)
+            {
+                b
+            } else if total_inv_rows > 0 {
+                db_size.saturating_mul(item_count) / total_inv_rows.max(1)
             } else {
                 0
             };
@@ -6318,13 +6370,11 @@ DROP TABLE _pl_refresh_paths;"#;
                 label: label.into(),
                 count: item_count,
                 total: scan_count,
-                size_bytes: item_count * avg_row,
+                size_bytes,
             });
         }
 
         // Total DB file size
-        let db_path = history::get_data_dir().join("audio_haxor.db");
-        let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
         stats.push(CacheStat {
             key: "database".into(),
             label: "Total Database".into(),
