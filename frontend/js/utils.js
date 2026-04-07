@@ -253,6 +253,9 @@ function resetFzfParams() {
     BONUS_FIRST_CHAR_MULT = FZF_DEFAULTS.BONUS_FIRST_CHAR_MULT;
     saveFzfParams();
     if (typeof renderFzfSettings === 'function') renderFzfSettings();
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.search_weights_reset'));
+    }
 }
 
 function charClass(c) {

@@ -550,10 +550,7 @@ function buildPaletteStaticItems() {
         type: 'action',
         name: appFmt('menu.reset_search_weights'),
         icon: '&#8634;',
-        action: () => {
-            resetFzfParams();
-            showToast(toastFmt('toast.search_weights_reset'));
-        }
+        action: () => resetFzfParams()
     });
     if (typeof settingResetAllUI === 'function') items.push({
         type: 'action',
