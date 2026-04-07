@@ -220,52 +220,51 @@ async function scanPlugins(resume = false) {
     allPlugins = [];
   }
 
-  // Listen for streaming progress from the worker
-  let firstBatch = true;
   const eta = createETA();
-  if (scanProgressCleanup) scanProgressCleanup();
-  scanProgressCleanup = window.vstUpdater.onScanProgress((data) => {
-    if (data.phase === 'start') {
-      list.innerHTML = '';
-      btn.innerHTML = `&#8635; 0 / ${data.total}`;
-      eta.start();
-    } else if (data.phase === 'scanning') {
-      // Append new plugins to the list incrementally
-      allPlugins.push(...data.plugins);
-      const total = data.total || 0;
-      const pct = total ? Math.round((data.processed / total) * 100) : 0;
-      progressFill.style.width = pct + '%';
-      const etaStr = eta.estimate(data.processed, data.total);
-      btn.innerHTML = `&#8635; ${data.processed} / ${data.total}${etaStr ? ' — ' + etaStr : ''}`;
-      if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({ plugins: allPlugins.length });
-      else document.getElementById('totalCount').textContent = allPlugins.length.toLocaleString();
-
-      // Render the new batch directly into the list
-      const fragment = document.createDocumentFragment();
-      const temp = document.createElement('div');
-      temp.innerHTML = data.plugins.map(p => buildPluginCardHtml(p)).join('');
-      // Apply active filter so newly-streamed cards respect user's checkbox/search.
-      const scanTypeSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('typeFilter') : null;
-      const scanSearch = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-      const hasFilter = !!(scanTypeSet || scanSearch);
-      while (temp.firstChild) {
-        const c = temp.firstChild;
-        if (hasFilter && c.dataset) {
-          const t = c.dataset.pluginType;
-          const n = c.dataset.pluginName || '';
-          const m = c.dataset.pluginMfg || '';
-          let match = true;
-          if (scanTypeSet && t && !scanTypeSet.has(t)) match = false;
-          if (match && scanSearch && !n.includes(scanSearch) && !m.includes(scanSearch)) match = false;
-          if (!match) c.style.display = 'none';
-        }
-        fragment.appendChild(c);
-      }
-      list.appendChild(fragment);
-    }
-  });
-
   try {
+    if (scanProgressCleanup) scanProgressCleanup();
+    // `listen()` is async — must await subscription before invoke or `scan-progress` events are lost.
+    scanProgressCleanup = await window.vstUpdater.onScanProgress((data) => {
+      if (data.phase === 'start') {
+        list.innerHTML = '';
+        btn.innerHTML = `&#8635; 0 / ${data.total}`;
+        eta.start();
+      } else if (data.phase === 'scanning') {
+        // Append new plugins to the list incrementally
+        allPlugins.push(...data.plugins);
+        const total = data.total || 0;
+        const pct = total ? Math.round((data.processed / total) * 100) : 0;
+        progressFill.style.width = pct + '%';
+        const etaStr = eta.estimate(data.processed, data.total);
+        btn.innerHTML = `&#8635; ${data.processed} / ${data.total}${etaStr ? ' — ' + etaStr : ''}`;
+        if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({ plugins: allPlugins.length });
+        else document.getElementById('totalCount').textContent = allPlugins.length.toLocaleString();
+
+        // Render the new batch directly into the list
+        const fragment = document.createDocumentFragment();
+        const temp = document.createElement('div');
+        temp.innerHTML = data.plugins.map(p => buildPluginCardHtml(p)).join('');
+        // Apply active filter so newly-streamed cards respect user's checkbox/search.
+        const scanTypeSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('typeFilter') : null;
+        const scanSearch = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+        const hasFilter = !!(scanTypeSet || scanSearch);
+        while (temp.firstChild) {
+          const c = temp.firstChild;
+          if (hasFilter && c.dataset) {
+            const t = c.dataset.pluginType;
+            const n = c.dataset.pluginName || '';
+            const m = c.dataset.pluginMfg || '';
+            let match = true;
+            if (scanTypeSet && t && !scanTypeSet.has(t)) match = false;
+            if (match && scanSearch && !n.includes(scanSearch) && !m.includes(scanSearch)) match = false;
+            if (!match) c.style.display = 'none';
+          }
+          fragment.appendChild(c);
+        }
+        list.appendChild(fragment);
+      }
+    });
+
     const customDirs = (prefs.getItem('customDirs') || '').split('\n').map(s => s.trim()).filter(Boolean);
     const result = await window.vstUpdater.scanPlugins(customDirs.length ? customDirs : undefined, excludePaths);
     // Final state -- merge with existing on resume

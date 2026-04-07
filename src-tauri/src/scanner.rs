@@ -6,6 +6,7 @@
 
 use crate::unified_walker::IncrementalDirState;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -64,6 +65,25 @@ pub fn get_vst_directories() -> Vec<String> {
     }
 
     #[cfg(target_os = "linux")]
+    {
+        dirs_list.extend([
+            PathBuf::from("/usr/lib/vst"),
+            PathBuf::from("/usr/lib/vst3"),
+            PathBuf::from("/usr/lib/clap"),
+            PathBuf::from("/usr/local/lib/vst"),
+            PathBuf::from("/usr/local/lib/vst3"),
+            PathBuf::from("/usr/local/lib/clap"),
+            home.join(".vst"),
+            home.join(".vst3"),
+            home.join(".clap"),
+        ]);
+    }
+
+    #[cfg(not(any(
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "windows"
+    )))]
     {
         dirs_list.extend([
             PathBuf::from("/usr/lib/vst"),
@@ -183,6 +203,64 @@ fn read_plist_info(_plugin_path: &Path) -> (Option<String>, Option<String>, Opti
     (None, None, None)
 }
 
+fn json_pick_str(v: &Value, keys: &[&str]) -> Option<String> {
+    for k in keys {
+        if let Some(s) = v.get(*k).and_then(|x| x.as_str()) {
+            return Some(s.to_string());
+        }
+    }
+    None
+}
+
+/// VST3 bundles ship `moduleinfo.json` (macOS, Windows, Linux). Fills version / vendor when
+/// [`read_plist_info`] does not apply (non-macOS or missing plist).
+fn read_vst3_moduleinfo(plugin_path: &Path) -> (Option<String>, Option<String>, Option<String>) {
+    let candidates = [
+        plugin_path.join("Contents").join("moduleinfo.json"),
+        plugin_path.join("Contents").join("Resources").join("moduleinfo.json"),
+    ];
+    for path in candidates {
+        let Ok(s) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(v) = serde_json::from_str::<Value>(&s) else {
+            continue;
+        };
+        let root = v.get("JSON").unwrap_or(&v);
+        let version = json_pick_str(root, &["Version", "version"]);
+        let manufacturer = json_pick_str(
+            root,
+            &[
+                "Vendor",
+                "vendor",
+                "Manufacturer",
+                "manufacturer",
+                "Company",
+                "company",
+            ],
+        );
+        let manufacturer_url = json_pick_str(
+            root,
+            &["URL", "url", "Homepage", "homepage", "VendorURL", "vendorURL"],
+        );
+        if version.is_some() || manufacturer.is_some() || manufacturer_url.is_some() {
+            return (version, manufacturer, manufacturer_url);
+        }
+    }
+    (None, None, None)
+}
+
+fn read_bundle_metadata(plugin_path: &Path) -> (Option<String>, Option<String>, Option<String>) {
+    #[cfg(target_os = "macos")]
+    {
+        let p = read_plist_info(plugin_path);
+        if p.0.is_some() || p.1.is_some() || p.2.is_some() {
+            return p;
+        }
+    }
+    read_vst3_moduleinfo(plugin_path)
+}
+
 /// Detect binary architectures for a plugin bundle.
 /// Reads Mach-O headers directly — no subprocess spawning for speed.
 fn detect_architectures(plugin_path: &Path) -> Vec<String> {
@@ -299,7 +377,7 @@ pub fn get_plugin_info(file_path: &Path) -> Option<PluginInfo> {
 
     let meta = fs::metadata(file_path).ok()?;
 
-    let (version, manufacturer, manufacturer_url) = read_plist_info(file_path);
+    let (version, manufacturer, manufacturer_url) = read_bundle_metadata(file_path);
 
     let size = if meta.is_dir() {
         get_directory_size(file_path)

@@ -1085,12 +1085,8 @@ window.vstUpdater = {
         excludePaths: excludePaths || null
     }),
     stopScan: () => invoke('stop_scan'),
-    onScanProgress: (callback) => {
-        const p = listen('scan-progress', (event) => callback(event.payload));
-        return () => {
-            p.then((fn) => fn()).catch(() => {});
-        };
-    },
+    /** Returns `Promise<UnlistenFn>` — await before `invoke('scan_plugins')` or early events are dropped. */
+    onScanProgress: (callback) => listen('scan-progress', (event) => callback(event.payload)),
     checkUpdates: (plugins) => invoke('check_updates', {plugins}),
     stopUpdates: () => invoke('stop_updates'),
     onUpdateProgress: (callback) => {

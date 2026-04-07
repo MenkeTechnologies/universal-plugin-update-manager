@@ -433,7 +433,7 @@ frontend/
     kvr.js             -- KVR Audio resolver + cache management
     multi-filter.js    -- Multi-select checkbox dropdowns
     notes.js           -- Note editor + tag management + tag cloud
-    plugins.js         -- Plugin scanning, filtering, sorting, updates
+    plugins.js         -- Plugin scanning, filtering, sorting, updates; awaits `onScanProgress` (`listen('scan-progress')`) before `invoke('scan_plugins')` so streamed batches are not dropped
     presets.js         -- Preset scanning + filtering
     settings.js        -- Color schemes, themes, toggles, preferences
     shortcuts.js       -- Customizable keyboard shortcuts

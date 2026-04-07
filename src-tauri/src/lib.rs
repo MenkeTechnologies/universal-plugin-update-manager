@@ -30,6 +30,7 @@ pub mod lufs;
 pub mod midi;
 pub mod midi_scanner;
 pub mod native_menu;
+mod open_with_app;
 pub mod pdf_meta;
 pub mod path_norm;
 pub mod pdf_scanner;
@@ -2687,49 +2688,7 @@ async fn open_file_default(file_path: String) -> Result<(), String> {
 async fn open_with_app(file_path: String, app_name: String) -> Result<(), String> {
     blocking_res(move || {
         let path = std::path::Path::new(&file_path);
-        if !path.exists() {
-            return Err(format!("File not found: {}", file_path));
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            let output = std::process::Command::new("open")
-                .args(["-a", &app_name, &file_path])
-                .output()
-                .map_err(|e| e.to_string())?;
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(format!(
-                    "Could not open with {}: {}",
-                    app_name,
-                    stderr.trim()
-                ));
-            }
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            let output = std::process::Command::new("cmd")
-                .args(["/C", "start", "", &file_path])
-                .output()
-                .map_err(|e| e.to_string())?;
-            if !output.status.success() {
-                return Err(format!("Could not open with {}", app_name));
-            }
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            let output = std::process::Command::new("xdg-open")
-                .arg(&file_path)
-                .output()
-                .map_err(|e| e.to_string())?;
-            if !output.status.success() {
-                return Err(format!("Could not open with {}", app_name));
-            }
-        }
-
-        Ok(())
+        open_with_app::open_with_application(path, &app_name)
     })
     .await
 }
@@ -3923,6 +3882,20 @@ fn get_open_fd_count() -> u32 {
         for dir in &["/dev/fd", "/proc/self/fd"] {
             if let Ok(entries) = std::fs::read_dir(dir) {
                 return entries.count() as u32;
+            }
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetCurrentProcess() -> isize;
+            fn GetProcessHandleCount(h_process: isize, p_count: *mut u32) -> i32;
+        }
+        unsafe {
+            let mut count = 0u32;
+            if GetProcessHandleCount(GetCurrentProcess(), &mut count) != 0 {
+                return count;
             }
         }
     }
