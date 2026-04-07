@@ -7,6 +7,177 @@ let _paletteSelected = 0;
 
 const PALETTE_MAX = 50;
 
+/** Monotonic id so stale palette DB searches never repaint after a newer query. */
+let _paletteDbSeq = 0;
+
+/**
+ * Library hits for Cmd+K from SQLite (same scope as tab search: deduped by path across scans).
+ * In-memory `allPlugins` / `allDawProjects` / etc. are only one paginated page (or empty) after
+ * restart — the palette must not rely on them for discovery.
+ */
+async function fetchPaletteDatabaseItems(query) {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const vu = window.vstUpdater;
+  if (!vu || typeof vu.dbQueryPlugins !== 'function') return [];
+
+  const LIMIT = 6;
+  const off = { offset: 0, limit: LIMIT };
+  const safe = async (fn) => {
+    try {
+      return await fn();
+    } catch {
+      return null;
+    }
+  };
+
+  const [rPlug, rAud, rDaw, rPreset, rPdf, rMidi] = await Promise.all([
+    safe(() => vu.dbQueryPlugins({ search: q, type_filter: null, sort_key: 'name', sort_asc: true, ...off })),
+    safe(() => vu.dbQueryAudio({ params: { search: q, format_filter: null, sort_key: 'name', sort_asc: true, ...off } })),
+    safe(() => vu.dbQueryDaw({ search: q, daw_filter: null, sort_key: 'name', sort_asc: true, ...off })),
+    safe(() => vu.dbQueryPresets({ search: q, format_filter: null, sort_key: 'name', sort_asc: true, ...off })),
+    safe(() => vu.dbQueryPdfs({ search: q, sort_key: 'name', sort_asc: true, ...off })),
+    safe(() => vu.dbQueryMidi({ search: q, format_filter: null, sort_key: 'name', sort_asc: true, ...off })),
+  ]);
+
+  const out = [];
+
+  if (rPlug && rPlug.plugins) {
+    for (const p of rPlug.plugins) {
+      out.push({
+        type: 'plugin',
+        name: p.name,
+        detail: p.type + (p.manufacturer ? ' · ' + p.manufacturer : ''),
+        fields: [p.name, p.type, p.manufacturer || ''],
+        icon: '&#9889;',
+        action: () => {
+          switchTab('plugins');
+          setTimeout(() => {
+            const el = document.getElementById('pluginSearchInput');
+            if (el) {
+              el.value = p.name;
+              if (typeof filterPlugins === 'function') filterPlugins();
+            }
+          }, 100);
+        },
+      });
+    }
+  }
+
+  if (rAud && rAud.samples) {
+    for (const s of rAud.samples) {
+      out.push({
+        type: 'sample',
+        name: s.name,
+        detail: (s.format || '') + (s.sizeFormatted ? ' · ' + s.sizeFormatted : ''),
+        fields: [s.name, s.path || '', s.format || ''],
+        icon: '&#127925;',
+        action: () => {
+          switchTab('samples');
+          setTimeout(() => {
+            const el = document.getElementById('audioSearchInput');
+            if (el) {
+              el.value = s.name;
+              if (typeof filterAudioSamples === 'function') filterAudioSamples();
+            }
+          }, 100);
+        },
+      });
+    }
+  }
+
+  if (rDaw && rDaw.projects) {
+    for (const d of rDaw.projects) {
+      out.push({
+        type: 'daw',
+        name: d.name,
+        detail: d.daw + ' · ' + (d.sizeFormatted || ''),
+        fields: [d.name, d.daw, d.format],
+        icon: '&#127911;',
+        action: () => {
+          switchTab('daw');
+          setTimeout(() => {
+            const el = document.getElementById('dawSearchInput');
+            if (el) {
+              el.value = d.name;
+              if (typeof filterDawProjects === 'function') filterDawProjects();
+            }
+          }, 100);
+        },
+      });
+    }
+  }
+
+  if (rPreset && rPreset.presets) {
+    for (const p of rPreset.presets) {
+      out.push({
+        type: 'preset',
+        name: p.name,
+        detail: p.format,
+        fields: [p.name, p.format],
+        icon: '&#127924;',
+        action: () => {
+          switchTab('presets');
+          setTimeout(() => {
+            const el = document.getElementById('presetSearchInput');
+            if (el) {
+              el.value = p.name;
+              if (typeof filterPresets === 'function') filterPresets();
+            }
+          }, 100);
+        },
+      });
+    }
+  }
+
+  if (rPdf && rPdf.pdfs) {
+    for (const p of rPdf.pdfs) {
+      out.push({
+        type: 'pdf',
+        name: p.name,
+        detail: p.sizeFormatted || '',
+        fields: [p.name, p.directory || ''],
+        icon: '&#128196;',
+        action: () => {
+          switchTab('pdf');
+          setTimeout(() => {
+            const el = document.getElementById('pdfSearchInput');
+            if (el) {
+              el.value = p.name;
+              if (typeof filterPdfs === 'function') filterPdfs();
+            }
+          }, 100);
+        },
+      });
+    }
+  }
+
+  const midiFiles = rMidi && (rMidi.midiFiles || rMidi.midi_files);
+  if (midiFiles) {
+    for (const m of midiFiles) {
+      out.push({
+        type: 'midi',
+        name: m.name,
+        detail: (m.format || '') + (m.sizeFormatted ? ' · ' + m.sizeFormatted : ''),
+        fields: [m.name, m.path || '', m.format || ''],
+        icon: '&#127924;',
+        action: () => {
+          switchTab('midi');
+          setTimeout(() => {
+            const el = document.getElementById('midiSearchInput');
+            if (el) {
+              el.value = m.name;
+              if (typeof filterMidi === 'function') filterMidi();
+            }
+          }, 100);
+        },
+      });
+    }
+  }
+
+  return out;
+}
+
 function collectPaletteItems() {
   const items = [];
 
@@ -216,23 +387,8 @@ function filterPaletteItems(query, items) {
     const score = searchScore(query, fields, 'fuzzy');
     if (score > 0) scored.push({ item, score });
   }
-  // Lazy search data items only when query is 2+ chars (avoids blocking on single char)
-  if (query.length >= 2) {
-    const dataSearch = (arr, type, icon, mkItem) => {
-      if (!arr) return;
-      const limit = 20; let count = 0;
-      for (const item of arr) {
-        if (count >= limit) break;
-        const built = mkItem(item);
-        const score = searchScore(query, built.fields, 'fuzzy');
-        if (score > 0) { scored.push({ item: { ...built, type, icon }, score }); count++; }
-      }
-    };
-    if (typeof allPlugins !== 'undefined') dataSearch(allPlugins, 'plugin', '&#9889;', p => ({ name: p.name, detail: p.type + (p.manufacturer ? ' · ' + p.manufacturer : ''), fields: [p.name, p.type, p.manufacturer || ''], action: () => { switchTab('plugins'); setTimeout(() => { const el = document.getElementById('pluginSearchInput'); if (el) { el.value = p.name; filterPlugins(); } }, 100); } }));
-    if (typeof allDawProjects !== 'undefined') dataSearch(allDawProjects, 'daw', '&#127911;', d => ({ name: d.name, detail: d.daw + ' · ' + d.sizeFormatted, fields: [d.name, d.daw, d.format], action: () => { switchTab('daw'); setTimeout(() => { const el = document.getElementById('dawSearchInput'); if (el) { el.value = d.name; filterDawProjects(); } }, 100); } }));
-    if (typeof allPresets !== 'undefined') dataSearch(allPresets.slice(0, 5000), 'preset', '&#127924;', p => ({ name: p.name, detail: p.format, fields: [p.name, p.format], action: () => { switchTab('presets'); setTimeout(() => { const el = document.getElementById('presetSearchInput'); if (el) { el.value = p.name; filterPresets(); } }, 100); } }));
-    if (typeof allPdfs !== 'undefined') dataSearch(allPdfs.slice(0, 5000), 'pdf', '&#128196;', p => ({ name: p.name, detail: p.sizeFormatted || '', fields: [p.name, p.directory || ''], action: () => { switchTab('pdf'); setTimeout(() => { const el = document.getElementById('pdfSearchInput'); if (el) { el.value = p.name; filterPdfs(); } }, 100); } }));
-  }
+  // Inventory hits (2+ chars) come from `fetchPaletteDatabaseItems` in `renderPaletteResults`
+  // — not from in-memory paginated arrays, which are empty or partial after restart.
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, PALETTE_MAX).map(s => s.item);
 }
@@ -255,7 +411,7 @@ function openPalette() {
   const input = document.getElementById('paletteInput');
   if (input) input.placeholder = ph;
   if (input) input.focus();
-  renderPaletteResults();
+  void renderPaletteResults();
 
   let _palTimer;
   if (input) {
@@ -263,7 +419,7 @@ function openPalette() {
       _paletteQuery = input.value;
       _paletteSelected = 0;
       clearTimeout(_palTimer);
-      _palTimer = setTimeout(renderPaletteResults, 150);
+      _palTimer = setTimeout(() => { void renderPaletteResults(); }, 150);
     });
   }
 }
@@ -275,13 +431,7 @@ function closePalette() {
   if (overlay) overlay.remove();
 }
 
-function renderPaletteResults() {
-  const container = document.getElementById('paletteResults');
-  if (!container) return;
-
-  const allItems = collectPaletteItems();
-  _paletteResults = filterPaletteItems(_paletteQuery, allItems);
-
+function paintPaletteRows(container) {
   if (_paletteResults.length === 0) {
     const empty = catalogFmt('ui.palette.empty');
     container.innerHTML = '<div class="palette-empty">' + escapeHtml(empty) + '</div>';
@@ -299,6 +449,7 @@ function renderPaletteResults() {
       daw: catalogFmt('ui.palette.type_daw'),
       pdf: catalogFmt('ui.palette.type_pdf'),
       preset: catalogFmt('ui.palette.type_preset'),
+      midi: catalogFmt('menu.tab_midi'),
       bookmark: catalogFmt('ui.palette.type_bookmark'),
       tag: catalogFmt('ui.palette.type_tag'),
     })[item.type] || item.type;
@@ -310,6 +461,38 @@ function renderPaletteResults() {
       <span class="palette-badge ${typeCls}">${typeLabel}</span>
     </div>`;
   }).join('');
+}
+
+async function renderPaletteResults() {
+  const container = document.getElementById('paletteResults');
+  if (!container) return;
+
+  const allItems = collectPaletteItems();
+  const q = _paletteQuery;
+  const qTrim = q.trim();
+
+  let merged = filterPaletteItems(q, allItems);
+
+  if (qTrim.length >= 2 && typeof window.vstUpdater?.dbQueryPlugins === 'function') {
+    const seq = ++_paletteDbSeq;
+    const dbItems = await fetchPaletteDatabaseItems(qTrim);
+    if (seq !== _paletteDbSeq) return;
+
+    const scored = [];
+    for (const item of merged) {
+      const fields = item.fields || [item.name];
+      scored.push({ item, score: searchScore(qTrim, fields, 'fuzzy') });
+    }
+    for (const item of dbItems) {
+      const fields = item.fields || [item.name];
+      scored.push({ item, score: searchScore(qTrim, fields, 'fuzzy') });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    merged = scored.slice(0, PALETTE_MAX).map((s) => s.item);
+  }
+
+  _paletteResults = merged;
+  paintPaletteRows(container);
 }
 
 function executePaletteItem(idx) {
@@ -341,8 +524,9 @@ document.addEventListener('keydown', (e) => {
 
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    _paletteSelected = Math.min(_paletteSelected + 1, _paletteResults.length - 1);
-    renderPaletteResults();
+    _paletteSelected = Math.min(_paletteSelected + 1, Math.max(0, _paletteResults.length - 1));
+    const container = document.getElementById('paletteResults');
+    if (container) paintPaletteRows(container);
     scrollPaletteSelection();
     return;
   }
@@ -350,7 +534,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowUp') {
     e.preventDefault();
     _paletteSelected = Math.max(_paletteSelected - 1, 0);
-    renderPaletteResults();
+    const container = document.getElementById('paletteResults');
+    if (container) paintPaletteRows(container);
     scrollPaletteSelection();
     return;
   }

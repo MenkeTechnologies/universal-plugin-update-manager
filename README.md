@@ -118,7 +118,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Real FFT Spectrogram** | True frequency-domain spectrogram in metadata panel using Cooley-Tukey radix-2 FFT with Hann window, precomputed twiddle factors, log-frequency display mapping. Cyan→magenta color map. Spans same width as waveform |
 | **File Browser Metadata** | Click any audio file to expand full metadata panel: format, size, sample rate, bit depth, channels, duration, byte rate, BPM, key, created/modified dates, permissions, path, favorite status, tags, notes. Full-width waveform background with playback cursor on each audio row |
 | **Full Vim Keybindings** | j/k move, gg top, G bottom, Ctrl+D/U half-page, / search, o reveal, y yank path, p play, x favorite, v select, V select-all, w find-similar, e expand player, q EQ, u mono, d dashboard, b A-B loop. 49 total customizable keybindings |
-| **Command Palette** | Press <kbd>Cmd+K</kbd> to open a fuzzy search across all items — plugins, samples, DAW projects, presets, bookmarked directories, tags, tabs, and actions. Arrow keys to navigate, Enter to select, Escape to dismiss. Uses the same fzf scoring engine as tab search bars |
+| **Command Palette** | Press <kbd>Cmd+K</kbd> to open a fuzzy search across tabs, actions, bookmarked directories, and tags. For queries of **2+ characters**, inventory hits (plugins, samples, DAW projects, presets, PDFs, MIDI) are loaded from **SQLite** via the same paginated `db_query_*` commands as the main tabs — not from in-memory arrays, which after restart only hold the current page (or are empty). Arrow keys to navigate, Enter to select, Escape to dismiss. Uses the same fzf scoring engine as tab search bars |
 | **Directory Bookmarks** | Bookmark favorite directories in the File Browser for instant navigation. Chips displayed above the file list, persisted across sessions. Right-click any folder to bookmark it |
 | **Quick Nav Buttons** | File browser toolbar has Desktop, Downloads, Music, Documents, and Root (/) buttons for instant navigation |
 | **Splash Screen** | Cyberpunk boot sequence with animated gradient title sweep, progress bar, version display. Fades out after init before data loads |
@@ -414,7 +414,7 @@ frontend/
     app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals from SQLite (`get_active_scan_inventory_counts`: one row per path, library scope — not tied to a single `scan_id`); scans stream-insert per batch; `applyInventoryCountsPartial` throttles DB refresh on progress
     audio.js           -- Audio sample scanning + inline playback + floating player
     batch-select.js    -- Checkbox selection + batch operations
-    command-palette.js -- Cmd+K universal fuzzy search across all items
+    command-palette.js -- Cmd+K fuzzy search; 2+ char inventory hits use `db_query_*` (SQLite), not in-memory paginated arrays
     columns.js         -- Resizable table columns with width persistence
     context-menu.js    -- Right-click context menus for all elements
     daw.js             -- DAW project scanning + stats
