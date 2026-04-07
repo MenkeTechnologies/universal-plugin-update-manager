@@ -480,6 +480,7 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
             ("dawScanDirs", "dawScanDirs"),
             ("presetScanDirs", "presetScanDirs"),
             ("includeAbletonBackups", "includeAbletonBackups"),
+            ("incrementalDirectoryScan", "incrementalDirectoryScan"),
         ],
     ),
     (

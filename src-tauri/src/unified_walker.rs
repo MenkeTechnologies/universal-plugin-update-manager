@@ -25,11 +25,78 @@ use crate::bulk_stat::{read_dir_bulk, BulkEntry};
 use crate::history::{AudioSample, DawProject, PdfFile, PresetFile};
 use crate::scanner_skip_dirs::SCANNER_SKIP_DIRS as SKIP_DIRS;
 use rayon::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+/// Same path key string as visit deduplication: `canonicalize` when possible, else normalized original.
+fn directory_incremental_key(dir: &Path) -> String {
+    let orig = normalize_macos_path(dir.to_path_buf());
+    let canon = fs::canonicalize(dir).ok().map(normalize_macos_path);
+    let key = canon.unwrap_or(orig);
+    key.to_string_lossy().to_string()
+}
+
+fn dir_mtime_secs(dir: &Path) -> i64 {
+    fs::metadata(dir)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// Snapshot + in-scan updates for incremental directory skipping (unified walker).
+pub struct IncrementalDirState {
+    mtimes: Arc<Mutex<HashMap<String, i64>>>,
+    pending: Arc<Mutex<Vec<(String, i64)>>>,
+}
+
+impl IncrementalDirState {
+    pub fn new(snapshot: HashMap<String, i64>) -> Self {
+        Self {
+            mtimes: Arc::new(Mutex::new(snapshot)),
+            pending: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    fn should_skip(&self, dir: &Path) -> bool {
+        let key = directory_incremental_key(dir);
+        let cur = dir_mtime_secs(dir);
+        if cur <= 0 {
+            return false;
+        }
+        let map = self.mtimes.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(&stored) = map.get(&key) {
+            if cur <= stored {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn record_scanned_dir(&self, dir: &Path) {
+        let key = directory_incremental_key(dir);
+        let cur = dir_mtime_secs(dir);
+        if cur <= 0 {
+            return;
+        }
+        let mut map = self.mtimes.lock().unwrap_or_else(|e| e.into_inner());
+        map.insert(key.clone(), cur);
+        drop(map);
+        self.pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push((key, cur));
+    }
+
+    pub fn take_pending(&self) -> Vec<(String, i64)> {
+        let mut p = self.pending.lock().unwrap_or_else(|e| e.into_inner());
+        std::mem::take(&mut *p)
+    }
+}
 
 /// Format a UNIX timestamp (seconds since epoch) as "YYYY-MM-DD" in UTC.
 /// Returns empty string for invalid/zero timestamps.
@@ -284,6 +351,7 @@ pub fn walk_unified(
     on_batch: &mut dyn FnMut(ClassifiedBatch, UnifiedCounts),
     should_stop: &(dyn Fn() -> bool + Sync),
     active_dirs: Vec<Arc<Mutex<Vec<String>>>>,
+    incremental: Option<Arc<IncrementalDirState>>,
 ) {
     let batch_size = 100;
     let stop = Arc::new(AtomicBool::new(false));
@@ -351,7 +419,7 @@ pub fn walk_unified(
                 }
                 walk_dir_parallel(
                     root, 0, &visited, &tx, &audio_f2, &daw_f2, &preset_f2, &pdf_f2, batch_size,
-                    &stop2, &spec, &active, &tcc_denied,
+                    &stop2, &spec, &active, &tcc_denied, incremental.clone(),
                 );
             });
         });
@@ -406,6 +474,7 @@ fn walk_dir_parallel(
     spec: &Arc<UnifiedSpec>,
     active_dirs: &[Arc<Mutex<Vec<String>>>],
     tcc_denied: &Arc<Mutex<HashSet<PathBuf>>>,
+    incremental: Option<Arc<IncrementalDirState>>,
 ) {
     if depth > 30 || stop.load(Ordering::Relaxed) {
         return;
@@ -445,6 +514,12 @@ fn walk_dir_parallel(
             return;
         }
         vis.insert(orig);
+    }
+
+    if let Some(ref inc) = incremental {
+        if inc.should_skip(dir) {
+            return;
+        }
     }
 
     let dir_str = dir.to_string_lossy().to_string();
@@ -787,6 +862,10 @@ fn walk_dir_parallel(
         let _ = tx.send(ClassifiedBatch::Pdf(pdf_batch));
     }
 
+    if let Some(ref inc) = incremental {
+        inc.record_scanned_dir(dir);
+    }
+
     subdirs.par_iter().for_each(|subdir| {
         walk_dir_parallel(
             subdir,
@@ -802,6 +881,7 @@ fn walk_dir_parallel(
             spec,
             active_dirs,
             tcc_denied,
+            incremental.clone(),
         );
     });
 }
@@ -809,8 +889,10 @@ fn walk_dir_parallel(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs::{self, File};
     use std::io::Write;
+    use std::sync::Arc;
 
     struct TestDir {
         path: PathBuf,
@@ -901,6 +983,7 @@ mod tests {
             },
             &|| false,
             Vec::new(),
+            None,
         );
 
         assert_eq!(audio.len(), 1, "expected 1 audio file");
@@ -940,6 +1023,7 @@ mod tests {
             },
             &|| false,
             Vec::new(),
+            None,
         );
         assert_eq!(audio, 1);
         assert_eq!(other, 0, "no batches for unconfigured types");
@@ -980,6 +1064,7 @@ mod tests {
             },
             &|| false,
             Vec::new(),
+            None,
         );
         assert_eq!(names, vec!["keep".to_string()]);
     }
@@ -1013,6 +1098,7 @@ mod tests {
             },
             &|| false,
             Vec::new(),
+            None,
         );
         assert_eq!(audio.len(), 1, "only audio under audio_roots counts");
         assert_eq!(audio[0].name, "a");
@@ -1030,7 +1116,7 @@ mod tests {
             audio_roots: vec![root.clone()],
             ..Default::default()
         };
-        walk_unified(&spec, &mut |_, _| {}, &|| true, Vec::new());
+        walk_unified(&spec, &mut |_, _| {}, &|| true, Vec::new(), None);
         // No assertion — just ensure stop=true returns promptly (test timeout
         // would catch a hang).
     }
@@ -1059,6 +1145,7 @@ mod tests {
             },
             &|| false,
             Vec::new(),
+            None,
         );
         assert_eq!(names, vec!["keep".to_string()]);
     }
@@ -1077,8 +1164,40 @@ mod tests {
             },
             &|| false,
             Vec::new(),
+            None,
         );
         assert_eq!(batches, 0, "empty spec produces no output");
+    }
+
+    #[test]
+    fn test_incremental_skips_unchanged_directory_tree() {
+        let tmp = TestDir::new("incskip");
+        let root = tmp.path.clone();
+        touch(&root.join("a.wav"), b"RIFF");
+        let key = directory_incremental_key(&root);
+        let m = dir_mtime_secs(&root);
+        let mut snap = HashMap::new();
+        snap.insert(key, m);
+        let spec = UnifiedSpec {
+            audio_roots: vec![root.clone()],
+            ..Default::default()
+        };
+        let mut count = 0usize;
+        walk_unified(
+            &spec,
+            &mut |batch, _| {
+                if let ClassifiedBatch::Audio(b) = batch {
+                    count += b.len();
+                }
+            },
+            &|| false,
+            Vec::new(),
+            Some(Arc::new(IncrementalDirState::new(snap))),
+        );
+        assert_eq!(
+            count, 0,
+            "snapshot matching current dir mtime skips subtree"
+        );
     }
 
     /// Display names for DAW `format` codes must stay aligned with `daw_scanner` / UI.

@@ -1680,6 +1680,27 @@ async fn scan_unified(
         let pdf_roots_strs = to_strs(&pdf_roots);
 
         let db = db::global();
+        let prefs = history::load_preferences();
+        let incremental_enabled = prefs
+            .get("incrementalDirectoryScan")
+            .and_then(|v| v.as_str())
+            .map(|s| s != "off")
+            .unwrap_or(true);
+        let incremental_state: Option<Arc<unified_walker::IncrementalDirState>> =
+            if incremental_enabled {
+                match db.load_directory_scan_snapshot("unified") {
+                    Ok(m) => Some(Arc::new(unified_walker::IncrementalDirState::new(m))),
+                    Err(e) => {
+                        crate::write_app_log(format!(
+                            "SCAN INCREMENTAL — load directory snapshot failed ({e}); full walk",
+                        ));
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
         let _ = db.audio_scan_parent_create(&audio_scan_id, &now_iso, &audio_roots_strs);
         let _ = db.daw_scan_parent_create(&daw_scan_id, &now_iso, &daw_roots_strs);
         let _ = db.preset_scan_parent_create(&preset_scan_id, &now_iso, &preset_roots_strs);
@@ -1791,7 +1812,15 @@ async fn scan_unified(
                     Arc::clone(&ws.pdf_dirs),
                 ]
             },
+            incremental_state.clone(),
         );
+
+        if let Some(ref inc) = incremental_state {
+            let pending = inc.take_pending();
+            if !pending.is_empty() {
+                let _ = db.upsert_directory_scan_batch("unified", &pending, Some(&audio_scan_id));
+            }
+        }
 
         let stopped = audio_state2.stop_scan.load(Ordering::Relaxed)
             || daw_state2.stop_scan.load(Ordering::Relaxed)

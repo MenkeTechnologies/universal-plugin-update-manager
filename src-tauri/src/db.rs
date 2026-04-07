@@ -861,6 +861,23 @@ impl Database {
                 .map_err(|e| format!("Migration v9 schema_version failed: {e}"))?;
         }
 
+        if current < 10 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS directory_scan_state (
+                    domain          TEXT NOT NULL,
+                    path            TEXT NOT NULL,
+                    mtime_secs      INTEGER NOT NULL,
+                    last_scan_id    TEXT,
+                    PRIMARY KEY (domain, path)
+                );
+                CREATE INDEX IF NOT EXISTS idx_directory_scan_state_domain
+                    ON directory_scan_state(domain);",
+            )
+            .map_err(|e| format!("Migration v10 (directory_scan_state) failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (10)", [])
+                .map_err(|e| format!("Migration v10 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
@@ -3378,6 +3395,56 @@ impl Database {
         }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(inserted)
+    }
+
+    // ── Directory scan state (incremental unified walker) ──
+
+    /// Load stored directory mtimes for a domain (e.g. `"unified"`).
+    pub fn load_directory_scan_snapshot(
+        &self,
+        domain: &str,
+    ) -> Result<HashMap<String, i64>, String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT path, mtime_secs FROM directory_scan_state WHERE domain = ?1")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![domain], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(|e| e.to_string())?;
+        let mut out = HashMap::new();
+        for r in rows {
+            let (p, m) = r.map_err(|e| e.to_string())?;
+            out.insert(p, m);
+        }
+        Ok(out)
+    }
+
+    pub fn upsert_directory_scan_batch(
+        &self,
+        domain: &str,
+        rows: &[(String, i64)],
+        last_scan_id: Option<&str>,
+    ) -> Result<(), String> {
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        {
+            let mut stmt = tx
+                .prepare_cached(
+                    "INSERT OR REPLACE INTO directory_scan_state (domain, path, mtime_secs, last_scan_id) VALUES (?1, ?2, ?3, ?4)",
+                )
+                .map_err(|e| e.to_string())?;
+            for (path, mtime_secs) in rows {
+                stmt.execute(params![domain, path, mtime_secs, last_scan_id])
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     pub fn save_pdf_scan(&self, snap: &PdfScanSnapshot) -> Result<(), String> {

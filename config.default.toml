@@ -20,6 +20,7 @@ audioScanDirs = ""
 dawScanDirs = ""
 presetScanDirs = ""
 includeAbletonBackups = "off"
+incrementalDirectoryScan = "on"
 
 [sorting]
 pluginSort = "name-asc"
