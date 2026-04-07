@@ -8,6 +8,7 @@
 #include <cmath>
 #include <deque>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -789,6 +790,8 @@ public:
 
 struct Engine::Impl
 {
+    /** Serializes `waveform_preview` / `spectrogram_preview` decode (not the main `mutex`). */
+    std::mutex previewMutex;
     std::mutex mutex;
     juce::AudioDeviceManager outputManager;
     juce::AudioDeviceManager inputManager;
@@ -1810,8 +1813,23 @@ Engine::~Engine() = default;
 
 juce::var Engine::dispatch(const juce::var& req)
 {
-    std::lock_guard<std::mutex> lock(impl->mutex);
     const juce::String cmd = cmdKey(req);
+    if (cmd == "waveform_preview" || cmd == "spectrogram_preview")
+    {
+        // High-frequency IPC: omit from engine.log (same as ping / playback_status polls).
+        if (cmd.isNotEmpty() && cmd != "ping" && cmd != "playback_status" && cmd != "playback_seek")
+            appLogLine("cmd " + cmd);
+        // Decode off the stdin thread; do not hold `impl->mutex` during heavy IIR/FFT work.
+        auto fut = std::async(std::launch::async, [this, req, cmd]() -> juce::var {
+            std::lock_guard<std::mutex> lk(impl->previewMutex);
+            if (cmd == "waveform_preview")
+                return waveformPreview(impl->formatManager, req);
+            return spectrogramPreview(impl->formatManager, req);
+        });
+        return fut.get();
+    }
+
+    std::lock_guard<std::mutex> lock(impl->mutex);
     // High-frequency IPC: omit from engine.log (same as ping / playback_status polls).
     if (cmd.isNotEmpty() && cmd != "ping" && cmd != "playback_status" && cmd != "playback_seek")
         appLogLine("cmd " + cmd);
@@ -1824,12 +1842,6 @@ juce::var Engine::dispatch(const juce::var& req)
         o->setProperty("host", juce::String("juce"));
         return o;
     }
-
-    if (cmd == "waveform_preview")
-        return waveformPreview(impl->formatManager, req);
-
-    if (cmd == "spectrogram_preview")
-        return spectrogramPreview(impl->formatManager, req);
 
     /** Only reads the file / session fields — no `AudioDeviceManager` needed; defer CoreAudio init to `start_output_stream`. */
     if (cmd == "playback_load")

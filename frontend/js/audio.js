@@ -238,6 +238,14 @@ async function fetchWaveformPreviewFromEngine(absPath, widthPx) {
     return wfRes.peaks;
 }
 
+/** Shared with `file-browser.js`: evict + debounced persist after inserting waveform peaks. */
+function storeWaveformPeaksInCache(filePath, peaks) {
+    if (typeof _waveformCache === 'undefined' || !peaks) return;
+    _waveformCache[filePath] = peaks;
+    _evictCache(_waveformCache);
+    _debounceWfSave();
+}
+
 async function fetchSpectrogramPreviewFromEngine(absPath, dims) {
     const invoke = audioEngineInvokeMetaVisuals();
     if (!invoke) return null;
@@ -5198,6 +5206,8 @@ function updateMetaLine() {
 
 window.isAudioPlaying = isAudioPlaying;
 window._decodePeaksViaWorker = decodePeaksViaWorker;
+window._fetchWaveformPeaksFromAudioEngine = fetchWaveformPreviewFromEngine;
+window._storeWaveformPeaksInCache = storeWaveformPeaksInCache;
 
 /**
  * Compile/load `audio-decode-worker.js` after first paint — avoids paying V8 worker script
