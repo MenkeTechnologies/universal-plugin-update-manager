@@ -86,15 +86,50 @@ static juce::File pluginScanSkipFilePath()
     return audio_haxor::appDataDirectoryForSidecar().getChildFile("plugin-scan-skip.txt");
 }
 
+/** File lines + built-in IDs (hangs that never throw) + `AUDIO_HAXOR_PLUGIN_SCAN_SKIP` (comma-separated). */
+static juce::StringArray mergePluginScanSkipList(const juce::File& skipFile)
+{
+    juce::StringArray skips = readDeadMansPedalLines(skipFile);
+    // Apple's AUVectorPanner / AU Panner — can hang indefinitely inside `scanNextFile` (no exception → FAIL_SKIP never runs).
+    static const char* const kBuiltin[] = {
+        "AudioUnit:Panners/aupn,vbas,appl",
+    };
+    for (const char* s : kBuiltin)
+    {
+        const juce::String id(s);
+        if (!skips.contains(id))
+            skips.add(id);
+    }
+    const juce::String env = juce::SystemStats::getEnvironmentVariable("AUDIO_HAXOR_PLUGIN_SCAN_SKIP", {}).trim();
+    if (env.isNotEmpty())
+    {
+        juce::StringArray parts;
+        parts.addTokens(env, ",", {});
+        for (const juce::String& t : parts)
+        {
+            const juce::String u = t.trim();
+            if (u.isNotEmpty() && !skips.contains(u))
+                skips.add(u);
+        }
+    }
+    return skips;
+}
+
 static juce::StringArray filterOutSkippedPluginIdentifiers(const juce::StringArray& files, const juce::File& skipFile)
 {
-    const juce::StringArray skips = readDeadMansPedalLines(skipFile);
+    const juce::StringArray skips = mergePluginScanSkipList(skipFile);
     if (skips.isEmpty())
         return files;
     juce::StringArray out;
     for (const juce::String& f : files)
-        if (!skips.contains(f))
-            out.add(f);
+    {
+        if (skips.contains(f))
+        {
+            appLogLine("plugin scan: SKIP_LIST file=\"" + f + "\"");
+            continue;
+        }
+        out.add(f);
+    }
     return out;
 }
 
