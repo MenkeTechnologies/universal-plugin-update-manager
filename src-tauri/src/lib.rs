@@ -1814,10 +1814,40 @@ async fn scan_unified(
         preset_state.scanning.store(false, Ordering::SeqCst);
         return Err("PDF scan already in progress".into());
     }
-    audio_state.stop_scan.store(false, Ordering::SeqCst);
-    daw_state.stop_scan.store(false, Ordering::SeqCst);
-    preset_state.stop_scan.store(false, Ordering::SeqCst);
-    pdf_state.stop_scan.store(false, Ordering::SeqCst);
+    // Do NOT clear stop flags here — `prepare_unified_scan` clears stale flags
+    // when Scan All begins; if the user hit Stop during the frontend delay, flags
+    // stay true and we honour that below.
+    if audio_state.stop_scan.load(Ordering::SeqCst)
+        || daw_state.stop_scan.load(Ordering::SeqCst)
+        || preset_state.stop_scan.load(Ordering::SeqCst)
+        || pdf_state.stop_scan.load(Ordering::SeqCst)
+    {
+        audio_state.scanning.store(false, Ordering::SeqCst);
+        daw_state.scanning.store(false, Ordering::SeqCst);
+        preset_state.scanning.store(false, Ordering::SeqCst);
+        pdf_state.scanning.store(false, Ordering::SeqCst);
+        app.state::<WalkerStatus>()
+            .unified_scanning
+            .store(false, Ordering::SeqCst);
+        append_log("SCAN CANCELLED — unified (stop before walk)".into());
+        return Ok(serde_json::json!({
+            "audioCount": 0u64,
+            "dawCount": 0u64,
+            "presetCount": 0u64,
+            "pdfCount": 0u64,
+            "audioRoots": serde_json::json!([]),
+            "dawRoots": serde_json::json!([]),
+            "presetRoots": serde_json::json!([]),
+            "pdfRoots": serde_json::json!([]),
+            "audioScanId": "",
+            "dawScanId": "",
+            "presetScanId": "",
+            "pdfScanId": "",
+            "unifiedRunId": "",
+            "stopped": true,
+            "streamed": true,
+        }));
+    }
     // Signal walker-status tiles to collapse 4 → 1 while we hold the walker.
     app.state::<WalkerStatus>()
         .unified_scanning
@@ -2152,6 +2182,27 @@ async fn scan_unified(
 #[tauri::command]
 async fn get_unified_scan_run() -> Result<db::UnifiedScanRunRow, String> {
     blocking_res(|| db::global().get_unified_scan_run()).await
+}
+
+/// Clears unified stop flags **before** the `scan_unified` invoke (after the
+/// frontend's listener-registration delay). Without this, `scan_unified` would
+/// reset `stop_scan` to false at entry and erase a Stop All that happened during
+/// that delay — scans looked like they "could not stop".
+#[tauri::command]
+async fn prepare_unified_scan(app: AppHandle) -> Result<(), String> {
+    app.state::<AudioScanState>()
+        .stop_scan
+        .store(false, Ordering::SeqCst);
+    app.state::<DawScanState>()
+        .stop_scan
+        .store(false, Ordering::SeqCst);
+    app.state::<PresetScanState>()
+        .stop_scan
+        .store(false, Ordering::SeqCst);
+    app.state::<PdfScanState>()
+        .stop_scan
+        .store(false, Ordering::SeqCst);
+    Ok(())
 }
 
 // Stops a running unified scan by setting stop flags on all four per-type
@@ -6782,6 +6833,7 @@ pub fn run() {
             stop_pdf_scan,
             scan_unified,
             get_unified_scan_run,
+            prepare_unified_scan,
             stop_unified_scan,
             pdf_history_save,
             pdf_history_get_scans,

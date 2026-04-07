@@ -539,6 +539,12 @@ async function scanAll(resume = false) {
     scanAllRunning = true;
 
     try {
+        // Clear stale unified stop flags from a previous run, then register listeners.
+        // `scan_unified` runs after a short delay; without this, it used to reset
+        // stop_scan at entry and wipe Stop All pressed during that window.
+        if (typeof window.vstUpdater?.prepareUnifiedScan === 'function') {
+            await window.vstUpdater.prepareUnifiedScan();
+        }
         window.__suppressPostScanToasts = true;
         // Resolve per-type custom roots + resume excludes from prefs / current state.
         const rootsOf = (k) => {
@@ -661,19 +667,11 @@ async function stopAll() {
         window.vstUpdater.stopScan().catch(e => {
             if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
         }),
-        window.vstUpdater.stopAudioScan().catch(e => {
-            if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
-        }),
-        window.vstUpdater.stopDawScan().catch(e => {
-            if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
-        }),
-        window.vstUpdater.stopPresetScan().catch(e => {
+        // One IPC for audio+daw+preset+pdf unified walker (same flags as stop_* per type).
+        window.vstUpdater.stopUnifiedScan().catch(e => {
             if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
         }),
         window.vstUpdater.stopMidiScan().catch(e => {
-            if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
-        }),
-        window.vstUpdater.stopPdfScan().catch(e => {
             if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
         }),
         window.vstUpdater.stopUpdates().catch(e => {

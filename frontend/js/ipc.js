@@ -1207,6 +1207,7 @@ window.vstUpdater = {
         pdfCustomRoots: args.pdfCustomRoots || null,
         pdfExcludePaths: args.pdfExcludePaths || null,
     }),
+    prepareUnifiedScan: () => invoke('prepare_unified_scan'),
     stopUnifiedScan: () => invoke('stop_unified_scan'),
     getUnifiedScanRun: () => invoke('get_unified_scan_run', {}),
     onPdfScanProgress: (callback) => {

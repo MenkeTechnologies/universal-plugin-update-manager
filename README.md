@@ -75,7 +75,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Manufacturer Link** | Globe button on each plugin opens the manufacturer's website directly (derived from bundle ID). Shows a disabled icon when no website is available |
 | **Reveal in Finder** | Folder button opens the plugin's filesystem location. Double-click any preset row to reveal it in Finder. Tooltip shows the full path on hover |
 | **Directory Breakdown** | Expandable table showing plugin counts and type breakdown per scanned directory |
-| **Stop Control** | Cancel any in-progress scan, update check, or KVR resolution without losing already-discovered results |
+| **Stop Control** | Cancel any in-progress scan, update check, or KVR resolution without losing already-discovered results. **Scan All** calls `prepare_unified_scan` before the delayed `scan_unified` invoke so Stop All during that window is not cleared when the walk starts (`scan_unified` no longer resets `stop_scan` at entry) |
 | **Post-scan toasts** | In-app slide-in toasts when each scanner finishes (`toast.post_scan_*` keys): full completion vs user-stopped, with locale-formatted counts. **Scan All** sets `window.__suppressPostScanToasts` so only one summary toast runs (library totals via `get_active_scan_inventory_counts`) |
 | **Auto-Restore** | Last scan results + KVR cache load automatically on app startup -- no need to re-scan or re-check every launch |
 | **Unknown Tracking** | Plugins where no version info was found online show "Unknown Latest" badge and are counted separately from "Up to Date" |
@@ -414,7 +414,7 @@ src-tauri/
 frontend/
   index.html           -- Cyberpunk CRT UI (HTML/CSS)
   js/
-    app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals from SQLite (`get_active_scan_inventory_counts`: one row per path, library scope — not tied to a single `scan_id`); scans stream-insert per batch; `applyInventoryCountsPartial` throttles DB refresh on progress; `handleFileWatcherChange` runs targeted per-root rescans from `roots_by_category` (sequential `await` per category)
+    app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals from SQLite (`get_active_scan_inventory_counts`: one row per path, library scope — not tied to a single `scan_id`); scans stream-insert per batch; `applyInventoryCountsPartial` throttles DB refresh on progress; `handleFileWatcherChange` runs targeted per-root rescans from `roots_by_category` (sequential `await` per category); **Scan All** `prepareUnifiedScan` then delayed `scanUnified`; **Stop All** uses `stopUnifiedScan` for the four inventory types
     audio.js           -- Audio sample scanning + inline playback + floating player
     batch-select.js    -- Checkbox selection + batch operations
     command-palette.js -- Cmd+K fuzzy search; static rows + session item list + type-label cache; arrow keys update selection class only; 2+ char DB merge uses `db_query_palette_preview` (SQLite); **Build fingerprint cache** loads paths from `db_audio_library_paths` (SQLite `audio_library`), same as Settings → cache fingerprint build
