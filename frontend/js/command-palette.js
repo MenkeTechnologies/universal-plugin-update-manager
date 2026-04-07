@@ -13,6 +13,12 @@ let _paletteDbSeq = 0;
 /** Cached palette rows (tabs + actions + toggles); labels from appFmt. Cleared on locale change. */
 let _paletteStaticItemsCache = null;
 
+/** Full list for one palette session (static + dynamic). Avoids rebuilding bookmarks/tags on every keystroke. */
+let _paletteSessionItems = null;
+
+/** Row type badges: one catalogFmt per type per session, not per row. */
+let _paletteOpenTypeLabels = null;
+
 function _paletteSwitchTab(id) {
     if (typeof switchTab === 'function') switchTab(id);
 }
@@ -798,12 +804,35 @@ function collectPaletteItems() {
 /** Call after reloadAppStrings so menu labels match the active locale. */
 function invalidatePaletteStaticCache() {
     _paletteStaticItemsCache = null;
+    _paletteSessionItems = null;
+    _paletteOpenTypeLabels = null;
 }
 window.invalidatePaletteStaticCache = invalidatePaletteStaticCache;
 
-function filterPaletteItems(query, items) {
+function ensurePaletteTypeLabels() {
+    if (!_paletteOpenTypeLabels) {
+        _paletteOpenTypeLabels = {
+            tab: catalogFmt('ui.palette.type_tab'),
+            action: catalogFmt('ui.palette.type_action'),
+            plugin: catalogFmt('ui.palette.type_plugin'),
+            sample: catalogFmt('ui.palette.type_sample'),
+            daw: catalogFmt('ui.palette.type_daw'),
+            pdf: catalogFmt('ui.palette.type_pdf'),
+            preset: catalogFmt('ui.palette.type_preset'),
+            midi: catalogFmt('ui.palette.type_midi'),
+            bookmark: catalogFmt('ui.palette.type_bookmark'),
+            tag: catalogFmt('ui.palette.type_tag'),
+        };
+    }
+    return _paletteOpenTypeLabels;
+}
+
+/**
+ * @returns {{item: object, score: number}[]}
+ */
+function filterPaletteItemsScored(query, items) {
     if (!query) {
-        return items.filter(i => i.type === 'tab' || i.type === 'action');
+        return items.filter(i => i.type === 'tab' || i.type === 'action').map(item => ({item, score: 1}));
     }
     const scored = [];
     for (const item of items) {
@@ -812,9 +841,20 @@ function filterPaletteItems(query, items) {
         if (score > 0) scored.push({item, score});
     }
     // Inventory hits (2+ chars) come from `fetchPaletteDatabaseItems` in `renderPaletteResults`
-    // — not from in-memory paginated arrays, which are empty or partial after restart.
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, PALETTE_MAX).map(s => s.item);
+    return scored.slice(0, PALETTE_MAX);
+}
+
+function filterPaletteItems(query, items) {
+    return filterPaletteItemsScored(query, items).map(s => s.item);
+}
+
+/** Session list: built when the palette opens; cleared on close or locale/static invalidation. */
+function getPaletteSearchItems() {
+    if (_paletteSessionItems === null && _paletteOpen) {
+        _paletteSessionItems = collectPaletteItems();
+    }
+    return _paletteSessionItems;
 }
 
 function openPalette() {
@@ -835,6 +875,7 @@ function openPalette() {
     const input = document.getElementById('paletteInput');
     if (input) input.placeholder = ph;
     if (input) input.focus();
+    _paletteSessionItems = collectPaletteItems();
     void renderPaletteResults();
 
     let _palTimer;
@@ -853,6 +894,8 @@ function openPalette() {
 function closePalette() {
     if (!_paletteOpen) return;
     _paletteOpen = false;
+    _paletteSessionItems = null;
+    _paletteOpenTypeLabels = null;
     const overlay = document.getElementById('paletteOverlay');
     if (overlay) overlay.remove();
 }
@@ -864,21 +907,11 @@ function paintPaletteRows(container) {
         return;
     }
 
+    const typeLabels = ensurePaletteTypeLabels();
     container.innerHTML = _paletteResults.map((item, i) => {
         const typeCls = 'palette-type-' + item.type;
         const sel = i === _paletteSelected ? ' palette-selected' : '';
-        const typeLabel = ({
-            tab: catalogFmt('ui.palette.type_tab'),
-            action: catalogFmt('ui.palette.type_action'),
-            plugin: catalogFmt('ui.palette.type_plugin'),
-            sample: catalogFmt('ui.palette.type_sample'),
-            daw: catalogFmt('ui.palette.type_daw'),
-            pdf: catalogFmt('ui.palette.type_pdf'),
-            preset: catalogFmt('ui.palette.type_preset'),
-            midi: catalogFmt('ui.palette.type_midi'),
-            bookmark: catalogFmt('ui.palette.type_bookmark'),
-            tag: catalogFmt('ui.palette.type_tag'),
-        })[item.type] || item.type;
+        const typeLabel = typeLabels[item.type] || item.type;
         const detail = item.detail ? `<span class="palette-detail">${escapeHtml(item.detail)}</span>` : '';
         return `<div class="palette-row${sel}" data-palette-idx="${i}">
       <span class="palette-icon">${item.icon}</span>
@@ -889,15 +922,29 @@ function paintPaletteRows(container) {
     }).join('');
 }
 
+/** Arrow keys: toggle selection class only (no full innerHTML + highlight rebuild). */
+function updatePaletteRowSelection(container) {
+    if (_paletteResults.length === 0) return;
+    const rows = container.querySelectorAll('.palette-row[data-palette-idx]');
+    rows.forEach((row) => {
+        const i = parseInt(row.dataset.paletteIdx, 10);
+        row.classList.toggle('palette-selected', i === _paletteSelected);
+    });
+    scrollPaletteSelection();
+}
+
 async function renderPaletteResults() {
     const container = document.getElementById('paletteResults');
     if (!container) return;
 
-    const allItems = collectPaletteItems();
+    const allItems = getPaletteSearchItems();
+    if (!allItems) return;
+
     const q = _paletteQuery;
     const qTrim = q.trim();
 
-    let merged = filterPaletteItems(qTrim, allItems);
+    let scoredLocal = filterPaletteItemsScored(qTrim, allItems);
+    let merged = scoredLocal.map(s => s.item);
 
     // Paint in-memory fuzzy matches immediately. The 2+ char branch used to await SQLite
     // before any paint, so typed queries looked ignored until IPC returned.
@@ -909,11 +956,7 @@ async function renderPaletteResults() {
         const dbItems = await fetchPaletteDatabaseItems(qTrim);
         if (seq !== _paletteDbSeq) return;
 
-        const scored = [];
-        for (const item of merged) {
-            const fields = item.fields || [item.name];
-            scored.push({item, score: searchScore(qTrim, fields, 'fuzzy')});
-        }
+        const scored = scoredLocal.slice();
         for (const item of dbItems) {
             const fields = item.fields || [item.name];
             scored.push({item, score: searchScore(qTrim, fields, 'fuzzy')});
@@ -957,8 +1000,7 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         _paletteSelected = Math.min(_paletteSelected + 1, Math.max(0, _paletteResults.length - 1));
         const container = document.getElementById('paletteResults');
-        if (container) paintPaletteRows(container);
-        scrollPaletteSelection();
+        if (container) updatePaletteRowSelection(container);
         return;
     }
 
@@ -966,8 +1008,7 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         _paletteSelected = Math.max(_paletteSelected - 1, 0);
         const container = document.getElementById('paletteResults');
-        if (container) paintPaletteRows(container);
-        scrollPaletteSelection();
+        if (container) updatePaletteRowSelection(container);
         return;
     }
 
