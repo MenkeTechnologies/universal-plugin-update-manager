@@ -441,7 +441,7 @@ frontend/
     content_hash.rs    -- SHA-256 streaming hash for byte-identical duplicate groups
     duplicates.js      -- Duplicate modal: name heuristics + optional content (SHA-256) scan via `find_content_duplicates`
     export.js          -- Export/import (JSON/TOML/CSV/TSV/PDF); **format modal** opens immediately (counts from in-memory rows or DB totals); **full SQLite pull** runs after you choose format and save path when the paginated UI has not already loaded every row (plugins, presets, samples, DAW, MIDI, PDF)
-    favorites.js       -- Favorites management
+    favorites.js       -- Favorites management; path keys normalized (`/` vs `\\`); `saveFavorites` calls `window.updateFavBtn` so the floating player star stays in sync when favoriting from rows/context menus
     file-browser.js    -- Filesystem navigation with tags + notes; breadcrumbs/parent/quick-nav/bookmark chip names use `normalizePathSeparators` + `pathFileName` / `parentDirectoryPath` for Windows paths from `fs_list_dir`; chunked row append + path→sample `Map` for duration badges; filter debounce 150ms; lazy row waveforms prefer **`waveform_preview`** via **`_fetchWaveformPeaksFromAudioEngine`**, then **`_decodePeaksViaWorker`**
     help-overlay.js    -- Keyboard shortcuts reference overlay
     history.js         -- Scan history management + merged timeline

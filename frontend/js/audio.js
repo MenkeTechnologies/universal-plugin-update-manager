@@ -3708,22 +3708,22 @@ function togglePlayerExpanded() {
 
 function favCurrentTrack() {
     if (!audioPlayerPath) return;
-    const btn = document.getElementById('npBtnFav');
     if (isFavorite(audioPlayerPath)) {
         removeFavorite(audioPlayerPath);
-        if (btn) btn.style.color = '';
     } else {
         const sample = findByPath(allAudioSamples, audioPlayerPath);
         const name = sample ? sample.name : audioPlayerPath.split('/').pop().replace(/\.[^.]+$/, '');
         addFavorite('sample', audioPlayerPath, name, {format: sample ? sample.format : ''});
-        if (btn) btn.style.color = 'var(--yellow)';
     }
 }
 
-// Update favorite button state when track changes
+// Update favorite button state when track changes (also `window.updateFavBtn` from `saveFavorites` in favorites.js)
 function updateFavBtn() {
     const btn = document.getElementById('npBtnFav');
-    if (btn) btn.style.color = audioPlayerPath && isFavorite(audioPlayerPath) ? 'var(--yellow)' : '';
+    if (!btn) return;
+    const fav = !!(audioPlayerPath && isFavorite(audioPlayerPath));
+    btn.classList.toggle('np-fav-active', fav);
+    btn.style.color = fav ? 'var(--yellow)' : '';
 }
 
 function tagCurrentTrack() {
@@ -5222,6 +5222,7 @@ function updateMetaLine() {
 })();
 
 window.isAudioPlaying = isAudioPlaying;
+window.updateFavBtn = updateFavBtn;
 window._decodePeaksViaWorker = decodePeaksViaWorker;
 window._fetchWaveformPeaksFromAudioEngine = fetchWaveformPreviewFromEngine;
 window._storeWaveformPeaksInCache = storeWaveformPeaksInCache;

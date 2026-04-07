@@ -1,6 +1,12 @@
 // ── Favorites ──
 // Stored in prefs as an array of { type, path, name, ... }
 
+/** Same rule as file-browser: Rust may emit `\\` on Windows; `audioPlayerPath` uses `/`. */
+function normalizeFavoritePathKey(p) {
+    if (p == null || typeof p !== 'string') return '';
+    return p.replace(/\\/g, '/');
+}
+
 // Cache favorites array + Set for O(1) isFavorite lookups.
 let _favsCache = null;
 let _favsPathSet = null;
@@ -8,7 +14,7 @@ let _favsPathSet = null;
 function getFavorites() {
     if (!_favsCache) {
         _favsCache = prefs.getObject('favorites', []);
-        _favsPathSet = new Set(_favsCache.map(f => f.path));
+        _favsPathSet = new Set(_favsCache.map((f) => normalizeFavoritePathKey(f.path)));
     }
     return _favsCache;
 }
@@ -17,30 +23,33 @@ function saveFavorites(favs) {
     _favsCache = null;
     _favsPathSet = null;
     prefs.setItem('favorites', favs);
+    if (typeof window.updateFavBtn === 'function') window.updateFavBtn();
 }
 
 function isFavorite(path) {
     if (!_favsPathSet) getFavorites();
-    return _favsPathSet.has(path);
+    return _favsPathSet.has(normalizeFavoritePathKey(path));
 }
 
 function addFavorite(type, path, name, extra) {
+    const key = normalizeFavoritePathKey(path);
     const favs = getFavorites();
-    if (favs.some(f => f.path === path)) {
+    if (favs.some((f) => normalizeFavoritePathKey(f.path) === key)) {
         showToast(toastFmt('toast.already_in_favorites', {name}));
         return;
     }
-    favs.unshift({type, path, name, ...extra, addedAt: new Date().toISOString()});
+    favs.unshift({type, path: key, name, ...extra, addedAt: new Date().toISOString()});
     saveFavorites(favs);
     showToast(toastFmt('toast.added_to_favorites', {name}));
-    if (typeof refreshRowBadges === 'function') refreshRowBadges(path);
+    if (typeof refreshRowBadges === 'function') refreshRowBadges(key);
 }
 
 function removeFavorite(path) {
-    const favs = getFavorites().filter(f => f.path !== path);
+    const key = normalizeFavoritePathKey(path);
+    const favs = getFavorites().filter((f) => normalizeFavoritePathKey(f.path) !== key);
     saveFavorites(favs);
     showToast(toastFmt('toast.removed_from_favorites'));
-    if (typeof refreshRowBadges === 'function') refreshRowBadges(path);
+    if (typeof refreshRowBadges === 'function') refreshRowBadges(key);
     renderFavorites();
 }
 
@@ -98,12 +107,14 @@ async function importFavorites() {
         }
         if (!Array.isArray(imported)) throw new Error('Expected an array');
         const favs = getFavorites();
-        const existing = new Set(favs.map(f => f.path));
+        const existing = new Set(favs.map((f) => normalizeFavoritePathKey(f.path)));
         let added = 0;
         for (const item of imported) {
-            if (item.path && !existing.has(item.path)) {
-                favs.push(item);
-                existing.add(item.path);
+            if (!item.path) continue;
+            const k = normalizeFavoritePathKey(item.path);
+            if (!existing.has(k)) {
+                favs.push({...item, path: k});
+                existing.add(k);
                 added++;
             }
         }
@@ -193,7 +204,11 @@ function renderFavorites() {
         const extra = f.format ? `<span class="format-badge format-default">${escapeHtml(f.format)}</span>` : '';
         const daw = f.daw ? `<span class="format-badge ${getDawBadgeClass ? getDawBadgeClass(f.daw) : 'format-default'}">${escapeHtml(f.daw)}</span>` : '';
         const hp = escapeHtml(f.path);
-        const isPlaying = f.type === 'sample' && typeof audioPlayerPath !== 'undefined' && audioPlayerPath === f.path && (typeof isAudioPlaying === 'function' ? isAudioPlaying() : typeof audioPlayer !== 'undefined' && audioPlayer && !audioPlayer.paused);
+        const isPlaying =
+            f.type === 'sample' &&
+            typeof audioPlayerPath !== 'undefined' &&
+            normalizeFavoritePathKey(audioPlayerPath) === normalizeFavoritePathKey(f.path) &&
+            (typeof isAudioPlaying === 'function' ? isAudioPlaying() : typeof audioPlayer !== 'undefined' && audioPlayer && !audioPlayer.paused);
         const playBtn = f.type === 'sample'
             ? `<button class="btn-small btn-play${isPlaying ? ' playing' : ''}" data-action="previewAudio" data-path="${hp}" title="Play">${isPlaying ? '&#9646;&#9646;' : '&#9654;'}</button>`
             : '';

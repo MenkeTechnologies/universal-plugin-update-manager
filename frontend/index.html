@@ -6973,6 +6973,11 @@
             animation: np-glow-pulse 2s ease-in-out infinite;
         }
 
+        #npBtnFav.np-fav-active {
+            color: var(--yellow);
+            filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.35));
+        }
+
         @keyframes np-glow-pulse {
             0%, 100% {
                 box-shadow: 0 0 20px var(--cyan-glow), 0 4px 24px rgba(0, 0, 0, 0.5);
