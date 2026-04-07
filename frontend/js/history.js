@@ -68,6 +68,9 @@ function historyScanTypeLabel(scanType) {
 
 /** Monotonic id so a stale in-flight History refresh does not toast after a newer load. */
 let _historyFetchSeq = 0;
+/** Monotonic id so stale chunked sidebar renders stop if `renderHistoryList` runs again. */
+let _historySidebarRenderSeq = 0;
+const HISTORY_SIDEBAR_CHUNK = 100;
 
 async function fetchHistoryListsAndRender() {
   const [pluginScans, audioScans, dawScans, presetScans, pdfScans, midiScans] = await Promise.all([
@@ -125,43 +128,34 @@ async function loadHistory(opts) {
   }
 }
 
-function renderHistoryList() {
-  const container = document.getElementById('historyList');
-  if (historyMergedList.length === 0) {
-    const p1 = escapeHtml(historyFmt('ui.p.no_scan_history_yet'));
-    const p2 = escapeHtml(historyFmt('ui.history.empty_run_hint'));
-    container.innerHTML = `<div class="empty-history"><div class="empty-history-icon">&#128197;</div><p>${p1}<br>${p2}</p></div>`;
-    return;
-  }
-
-  container.innerHTML = historyMergedList.map(s => {
-    const d = new Date(s.timestamp);
-    const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    const selected = s.id === selectedScanId ? ' selected' : '';
-    const isAudio = s._type === 'audio';
-    const isDaw = s._type === 'daw';
-    const isPreset = s._type === 'preset';
-    const isPdf = s._type === 'pdf';
-    const isMidi = s._type === 'midi';
-    const icon = isPreset ? '&#127924;' : isDaw ? '&#127911;' : isAudio ? '&#127925;' : isPdf ? '&#128196;' : isMidi ? '&#127932;' : '&#127911;';
-    const label = isPreset
-      ? historyCount(historyScanCountField(s, 'presetCount', 'preset_count'), 'ui.history.presets_one', 'ui.history.presets_other')
-      : isDaw
-      ? historyCount(historyScanCountField(s, 'projectCount', 'project_count'), 'ui.history.projects_one', 'ui.history.projects_other')
-      : isAudio
-      ? historyCount(historyScanCountField(s, 'sampleCount', 'sample_count'), 'ui.history.samples_one', 'ui.history.samples_other')
-      : isPdf
-      ? historyCount(historyScanCountField(s, 'pdfCount', 'pdf_count'), 'ui.history.pdfs_one', 'ui.history.pdfs_other')
-      : isMidi
-      ? historyCount(historyScanCountField(s, 'midiCount', 'midi_count'), 'ui.history.midi_one', 'ui.history.midi_other')
-      : historyCount(historyScanCountField(s, 'pluginCount', 'plugin_count'), 'ui.history.plugins_one', 'ui.history.plugins_other');
-    const typeTag = historyScanTypeLabel(s._type);
-    const typeColor = isPreset ? 'var(--orange)' : isDaw ? 'var(--magenta)' : isAudio ? 'var(--yellow)' : isPdf ? 'var(--accent)' : isMidi ? 'var(--green)' : 'var(--cyan)';
-    const rootsHint = s.roots && s.roots.length > 0
-      ? `<div class="history-item-roots" title="${s.roots.map(r => escapeHtml(r)).join('\n')}">${s.roots.map(r => escapeHtml(r)).join(', ')}</div>`
-      : '';
-    return `
+function buildHistorySidebarItemHtml(s) {
+  const d = new Date(s.timestamp);
+  const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const selected = s.id === selectedScanId ? ' selected' : '';
+  const isAudio = s._type === 'audio';
+  const isDaw = s._type === 'daw';
+  const isPreset = s._type === 'preset';
+  const isPdf = s._type === 'pdf';
+  const isMidi = s._type === 'midi';
+  const icon = isPreset ? '&#127924;' : isDaw ? '&#127911;' : isAudio ? '&#127925;' : isPdf ? '&#128196;' : isMidi ? '&#127932;' : '&#127911;';
+  const label = isPreset
+    ? historyCount(historyScanCountField(s, 'presetCount', 'preset_count'), 'ui.history.presets_one', 'ui.history.presets_other')
+    : isDaw
+    ? historyCount(historyScanCountField(s, 'projectCount', 'project_count'), 'ui.history.projects_one', 'ui.history.projects_other')
+    : isAudio
+    ? historyCount(historyScanCountField(s, 'sampleCount', 'sample_count'), 'ui.history.samples_one', 'ui.history.samples_other')
+    : isPdf
+    ? historyCount(historyScanCountField(s, 'pdfCount', 'pdf_count'), 'ui.history.pdfs_one', 'ui.history.pdfs_other')
+    : isMidi
+    ? historyCount(historyScanCountField(s, 'midiCount', 'midi_count'), 'ui.history.midi_one', 'ui.history.midi_other')
+    : historyCount(historyScanCountField(s, 'pluginCount', 'plugin_count'), 'ui.history.plugins_one', 'ui.history.plugins_other');
+  const typeTag = historyScanTypeLabel(s._type);
+  const typeColor = isPreset ? 'var(--orange)' : isDaw ? 'var(--magenta)' : isAudio ? 'var(--yellow)' : isPdf ? 'var(--accent)' : isMidi ? 'var(--green)' : 'var(--cyan)';
+  const rootsHint = s.roots && s.roots.length > 0
+    ? `<div class="history-item-roots" title="${s.roots.map(r => escapeHtml(r)).join('\n')}">${s.roots.map(r => escapeHtml(r)).join(', ')}</div>`
+    : '';
+  return `
       <div class="history-item${selected}" data-action="selectScan" data-id="${s.id}" data-type="${s._type}">
         <div class="history-item-date">${icon} ${escapeHtml(historyFmt('ui.history.sidebar_datetime', { date: dateStr, time: timeStr }))}</div>
         <div class="history-item-meta">
@@ -171,7 +165,40 @@ function renderHistoryList() {
         </div>
         ${rootsHint}
       </div>`;
-  }).join('');
+}
+
+function renderHistoryList() {
+  const container = document.getElementById('historyList');
+  if (!container) return;
+  if (historyMergedList.length === 0) {
+    _historySidebarRenderSeq += 1;
+    const p1 = escapeHtml(historyFmt('ui.p.no_scan_history_yet'));
+    const p2 = escapeHtml(historyFmt('ui.history.empty_run_hint'));
+    container.innerHTML = `<div class="empty-history"><div class="empty-history-icon">&#128197;</div><p>${p1}<br>${p2}</p></div>`;
+    return;
+  }
+
+  const seq = ++_historySidebarRenderSeq;
+  container.innerHTML = '';
+  let idx = 0;
+
+  function appendChunk() {
+    if (seq !== _historySidebarRenderSeq) return;
+    const end = Math.min(idx + HISTORY_SIDEBAR_CHUNK, historyMergedList.length);
+    const slice = historyMergedList.slice(idx, end);
+    const html = slice.map(buildHistorySidebarItemHtml).join('');
+    container.insertAdjacentHTML('beforeend', html);
+    idx = end;
+    if (idx < historyMergedList.length) {
+      const cont = appendChunk;
+      if (typeof yieldToBrowser === 'function') {
+        yieldToBrowser().then(cont);
+      } else {
+        setTimeout(cont, 0);
+      }
+    }
+  }
+  appendChunk();
 }
 
 async function selectScan(id, type) {
