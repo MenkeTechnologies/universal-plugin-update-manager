@@ -250,6 +250,9 @@ function applyColorScheme(name) {
     root.setProperty(k, v);
   }
   refreshSettingsUI();
+  if (typeof window !== 'undefined' && typeof window.invalidateNativeDragIconCache === 'function') {
+    window.invalidateNativeDragIconCache();
+  }
 }
 
 function settingColorScheme(name) {
@@ -304,6 +307,9 @@ function applySchemeVars(vars) {
     ? Object.fromEntries(Object.entries(vars).filter(([k]) => !lightKeep.has(k)))
     : vars;
   applyCustomVars(filtered);
+  if (typeof window !== 'undefined' && typeof window.invalidateNativeDragIconCache === 'function') {
+    window.invalidateNativeDragIconCache();
+  }
 }
 
 function applyCustomScheme() {
