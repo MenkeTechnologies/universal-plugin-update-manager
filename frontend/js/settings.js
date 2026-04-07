@@ -1582,6 +1582,10 @@ function refreshSettingsUI() {
   const dawSortEl = document.getElementById('settingDawSort');
   if (dawSortEl) dawSortEl.value = dawSort;
 
+  const logVerbosity = getSettingValue('logVerbosity', 'normal');
+  const logVerbosityEl = document.getElementById('settingLogVerbosity');
+  if (logVerbosityEl) logVerbosityEl.value = logVerbosity;
+
   // Custom scheme presets
   refreshCustomPresetUI();
 

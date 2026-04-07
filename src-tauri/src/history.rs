@@ -545,6 +545,7 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
             ("batchSize", "batchSize"),
         ],
     ),
+    ("logging", &[("logVerbosity", "verbosity")]),
     ("player", &[("playerDock", "dock")]),
     ("tabs", &[("tabOrder", "order")]),
     (

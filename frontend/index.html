@@ -6203,6 +6203,19 @@
           </div>
           <div class="settings-row">
             <div class="settings-label">
+              <span class="settings-title" data-i18n="ui.st.app_log_verbosity">App log verbosity</span>
+              <span class="settings-desc" data-i18n="ui.sd.app_log_verbosity_desc">Quiet omits high-volume scan diagnostics (network dedup, mount traces). Normal logs everything. Verbose is reserved for future extra detail.</span>
+            </div>
+            <div class="settings-control">
+              <select class="settings-select" id="settingLogVerbosity" data-action="settingLogVerbosity" title="How much detail is written to app.log" data-i18n-title="ui.tt.app_log_verbosity_select">
+                <option value="quiet" data-i18n="ui.opt.log_verbosity_quiet">Quiet</option>
+                <option value="normal" data-i18n="ui.opt.log_verbosity_normal">Normal</option>
+                <option value="verbose" data-i18n="ui.opt.log_verbosity_verbose">Verbose</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
               <span class="settings-title" data-i18n="ui.st.data_directory">Data Directory</span>
               <span class="settings-desc" data-i18n="ui.sd.open_the_app_s_preferences_database_and_log_direct">Open the app's preferences, database, and log directory in Finder</span>
             </div>

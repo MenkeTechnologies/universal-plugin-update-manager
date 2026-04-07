@@ -55,12 +55,44 @@ use history::{AudioSample, DawProject, KvrCacheUpdateEntry, PdfFile, PresetFile}
 use scanner::PluginInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
 /// Domain string for SQLite `directory_scan_state` — shared by unified and standalone walkers.
 pub const DIRECTORY_SCAN_INCREMENTAL_DOMAIN: &str = "unified";
+
+/// Cached `app.log` verbosity: `0` = quiet (suppress high-volume scan diagnostics), `1` = normal, `2` = verbose (reserved).
+static LOG_VERBOSITY_LEVEL: AtomicU8 = AtomicU8::new(1);
+
+fn refresh_log_verbosity_from_prefs() {
+    let level = history::get_preference("logVerbosity")
+        .and_then(|v| v.as_str().map(std::string::ToString::to_string))
+        .unwrap_or_else(|| "normal".to_string());
+    let n = match level.as_str() {
+        "quiet" => 0u8,
+        "verbose" => 2u8,
+        _ => 1u8,
+    };
+    LOG_VERBOSITY_LEVEL.store(n, Ordering::Relaxed);
+}
+
+fn should_suppress_app_log_line(msg: &str) -> bool {
+    if LOG_VERBOSITY_LEVEL.load(Ordering::Relaxed) != 0 {
+        return false;
+    }
+    let m = msg.trim_start();
+    const PREFIXES: &[&str] = &[
+        "SCAN ROOT — unified |",
+        "SCAN NETWORK CANONICALIZE FAIL",
+        "SCAN DEDUP SKIP",
+        "SCAN NETWORK ENTER",
+        "SCAN NETWORK RETRY",
+        "SCAN NETWORK RECOVERED",
+        "SCAN MOUNT — midi",
+    ];
+    PREFIXES.iter().any(|p| m.starts_with(p))
+}
 
 fn incremental_directory_scan_enabled() -> bool {
     let prefs = history::load_preferences();
@@ -2738,11 +2770,15 @@ async fn prefs_get_all() -> history::PrefsMap {
 
 #[tauri::command]
 async fn prefs_set(key: String, value: serde_json::Value) {
+    let refresh_log = key == "logVerbosity";
     let _ = blocking_res(move || {
         history::set_preference(&key, value);
         Ok(())
     })
     .await;
+    if refresh_log {
+        refresh_log_verbosity_from_prefs();
+    }
 }
 
 #[tauri::command]
@@ -2761,6 +2797,7 @@ async fn prefs_save_all(prefs: history::PrefsMap) {
         Ok(())
     })
     .await;
+    refresh_log_verbosity_from_prefs();
 }
 
 #[tauri::command]
@@ -2800,6 +2837,9 @@ fn append_log(msg: String) {
 /// timestamped line to `<data-dir>/app.log`, rotating to `.log.1` at 5MB.
 /// The `append_log` Tauri command delegates to this.
 pub fn write_app_log(msg: String) {
+    if should_suppress_app_log_line(&msg) {
+        return;
+    }
     let path = history::get_data_dir().join("app.log");
     // Ensure dir exists
     if let Some(parent) = path.parent() {
@@ -6374,6 +6414,7 @@ pub fn run() {
 
     // Load preferences once for all startup config
     let prefs = history::load_preferences();
+    refresh_log_verbosity_from_prefs();
 
     // Log startup with system info
     let rss = get_rss_bytes();
@@ -6419,6 +6460,10 @@ pub fn run() {
         .get("folderWatch")
         .and_then(|v| v.as_str())
         .unwrap_or("off");
+    let log_verbosity = prefs
+        .get("logVerbosity")
+        .and_then(|v| v.as_str())
+        .unwrap_or("normal");
 
     append_log(format!(
         "APP START — v{} | {} {} | {} | {} cores | {} rayon threads | pid {} | RSS {} | DB {}",
@@ -6433,8 +6478,8 @@ pub fn run() {
         format_size(db_size),
     ));
     append_log(format!(
-        "CONFIG — fd_limit: {} | batch_size: {} | channel_buffer: {} | flush_interval: {}ms | analysis_pause: {}ms | page_size: {} | auto_scan: {} | folder_watch: {}",
-        fd_target, batch_size, channel_buffer, flush_interval, analysis_pause, page_size, auto_scan, folder_watch,
+        "CONFIG — fd_limit: {} | batch_size: {} | channel_buffer: {} | flush_interval: {}ms | analysis_pause: {}ms | page_size: {} | auto_scan: {} | folder_watch: {} | log_verbosity: {}",
+        fd_target, batch_size, channel_buffer, flush_interval, analysis_pause, page_size, auto_scan, folder_watch, log_verbosity,
     ));
 
     #[cfg(unix)]
@@ -6808,6 +6853,28 @@ pub fn run() {
             }
             _ => {}
         });
+}
+
+#[cfg(test)]
+mod log_verbosity_tests {
+    use super::{should_suppress_app_log_line, LOG_VERBOSITY_LEVEL};
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn quiet_suppresses_scan_chatter() {
+        LOG_VERBOSITY_LEVEL.store(0, Ordering::Relaxed);
+        assert!(should_suppress_app_log_line("SCAN DEDUP SKIP — unified | x"));
+        assert!(should_suppress_app_log_line("SCAN NETWORK RETRY — unified | x"));
+        assert!(!should_suppress_app_log_line("SCAN ERROR — daw | x"));
+        assert!(!should_suppress_app_log_line("SCAN TCC DENIED — unified | x"));
+        LOG_VERBOSITY_LEVEL.store(1, Ordering::Relaxed);
+    }
+
+    #[test]
+    fn normal_keeps_diagnostics() {
+        LOG_VERBOSITY_LEVEL.store(1, Ordering::Relaxed);
+        assert!(!should_suppress_app_log_line("SCAN DEDUP SKIP — unified | x"));
+    }
 }
 
 fn log_shutdown() {

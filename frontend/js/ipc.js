@@ -1046,6 +1046,9 @@ document.addEventListener('change', (e) => {
         const v = e.target.value || 'en';
         prefs.setItem('uiLocale', v);
         if (typeof showToast === 'function') showToast(toastFmt('toast.locale_changed'), 4000, '');
+    } else if (action === 'settingLogVerbosity') {
+        settingSaveSelect('logVerbosity', e.target.value);
+        if (typeof showToast === 'function') showToast(toastFmt('toast.log_verbosity_saved'));
     }
 });
 
