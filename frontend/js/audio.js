@@ -428,6 +428,13 @@ let _reverseDecodeBusy = false;
 /** Library playback through `audio-engine` sidecar (no Web Audio output). */
 let _enginePlaybackActive = false;
 
+function setEnginePlaybackActive(value) {
+    _enginePlaybackActive = value;
+    if (typeof window !== 'undefined') {
+        window._enginePlaybackActive = value;
+    }
+}
+
 /**
  * Waveform click-to-seek diagnostics. In DevTools, filter by `[audio-haxor] waveform-seek`.
  * Set `window.__AUDIO_HAXOR_WAVEFORM_SEEK_LOG = false` to silence (default is on).
@@ -445,7 +452,7 @@ function logWaveformSeek(phase, detail) {
 
 /** Audio Engine tab "Stop stream" calls `stop_output_stream` + `playback_stop`; sync JS so `isAudioPlaying()` matches. */
 function syncEnginePlaybackStoppedFromSidecar() {
-    _enginePlaybackActive = false;
+    setEnginePlaybackActive(false);
     if (typeof window.stopEnginePlaybackPoll === 'function') {
         window.stopEnginePlaybackPoll();
     }
@@ -468,7 +475,7 @@ function syncEnginePlaybackStoppedFromSidecar() {
  * @param {object|null} loadMeta — optional `playback_load` response (`duration_sec`, …)
  */
 function resumeEnginePlaybackAfterApply(loadMeta) {
-    _enginePlaybackActive = true;
+    setEnginePlaybackActive(true);
     if (typeof window !== 'undefined') window._aeOutputStreamRunning = true;
     if (loadMeta && typeof loadMeta.duration_sec === 'number' && !Number.isNaN(loadMeta.duration_sec) && loadMeta.duration_sec > 0) {
         window._enginePlaybackDurSec = loadMeta.duration_sec;
@@ -1217,7 +1224,7 @@ let _enginePlaybackFftRafId = null;
 
 function shouldRunEngineSpectrumRaf() {
     if (typeof window === 'undefined') return false;
-    if (window._enginePlaybackActive === true && typeof isAudioPlaying === 'function' && isAudioPlaying()) return true;
+    if (_enginePlaybackActive === true && typeof isAudioPlaying === 'function' && isAudioPlaying()) return true;
     if (window._aeOutputStreamRunning === true) return true;
     return false;
 }
@@ -1275,7 +1282,7 @@ let _npFftEngineAxisSrHz = null;
 let _npFftEngineAxisFftSize = null;
 
 function getPinnedEngineSpectrumAxis() {
-    if (typeof window === 'undefined' || window._enginePlaybackActive !== true) {
+    if (typeof window === 'undefined' || !_enginePlaybackActive) {
         _npFftEngineAxisSrHz = null;
         _npFftEngineAxisFftSize = null;
         return null;
@@ -1319,8 +1326,8 @@ function getPinnedEngineSpectrumAxis() {
 
 function _renderNpFft() {
     const useEngineSpectrum =
+        _enginePlaybackActive === true &&
         typeof window !== 'undefined' &&
-        window._enginePlaybackActive === true &&
         window._engineSpectrumU8 &&
         window._engineSpectrumU8.length >= 1024;
     if (!useEngineSpectrum) {
@@ -2406,7 +2413,7 @@ async function previewAudio(filePath) {
             /* Mute / disconnect `<audio>` before sidecar audio starts so WebView path cannot overlap. */
             silenceWebViewAudioForEngine();
             await window.enginePlaybackStart(filePath);
-            _enginePlaybackActive = true;
+            setEnginePlaybackActive(true);
             if (typeof window !== 'undefined') {
                 window._enginePlaybackResumePath = filePath;
             }
@@ -2430,7 +2437,7 @@ async function previewAudio(filePath) {
         } else {
             if (_enginePlaybackActive && typeof window.enginePlaybackStop === 'function') {
                 void window.enginePlaybackStop();
-                _enginePlaybackActive = false;
+                setEnginePlaybackActive(false);
             }
             if (typeof window !== 'undefined') {
                 window._enginePlaybackResumePath = '';
@@ -2488,7 +2495,7 @@ async function previewAudio(filePath) {
         // Deferred one task — layout for the waveform flex child is often 0×0 until after paint (WKWebView).
         scheduleNowPlayingWaveform(filePath);
     } catch (err) {
-        _enginePlaybackActive = false;
+        setEnginePlaybackActive(false);
         if (typeof window.stopEnginePlaybackPoll === 'function') window.stopEnginePlaybackPoll();
         showToast(toastFmt('toast.playback_failed', {
             ext: ext.toUpperCase(),
@@ -2563,7 +2570,7 @@ function updateLoopBtnStates() {
 function stopAudioPlayback() {
     if (_enginePlaybackActive && typeof window !== 'undefined' && typeof window.enginePlaybackStop === 'function') {
         void window.enginePlaybackStop();
-        _enginePlaybackActive = false;
+        setEnginePlaybackActive(false);
     }
     stopReverseBufferPlayback();
     restoreWebViewAudioAfterEngine();
@@ -4738,8 +4745,8 @@ function updateMetaLine() {
             window._engineSpectrumU8 &&
             window._engineSpectrumU8.length >= 1024 &&
             (canvas.id === 'aeEqCanvas'
-                ? window._aeOutputStreamRunning === true || window._enginePlaybackActive === true
-                : window._enginePlaybackActive === true && typeof isAudioPlaying === 'function' && isAudioPlaying());
+                ? window._aeOutputStreamRunning === true || _enginePlaybackActive === true
+                : _enginePlaybackActive === true && typeof isAudioPlaying === 'function' && isAudioPlaying());
 
         if (useEngineEqSpectrum) {
             const axis = getPinnedEngineSpectrumAxis();
