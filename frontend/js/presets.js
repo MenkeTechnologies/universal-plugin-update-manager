@@ -117,6 +117,8 @@ async function fetchPresetPage() {
     filteredPresets = presets;
     _presetTotalCount = result.totalCount || 0;
     _presetTotalUnfiltered = result.totalUnfiltered || 0;
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    if (seq !== _presetQuerySeq) return;
     renderPresetTable();
     rebuildPresetStats();
   } catch (e) {
@@ -185,8 +187,15 @@ async function rebuildPresetStats(force) {
   {
     const cacheHit = !force && key === _lastPresetAggKey && _presetAggCache;
     try {
-      const agg = cacheHit ? _presetAggCache : await window.vstUpdater.dbPresetFilterStats(search.trim(), formatFilter);
-      if (!cacheHit) { _lastPresetAggKey = key; _presetAggCache = agg; }
+      let agg;
+      if (cacheHit) {
+        agg = _presetAggCache;
+      } else {
+        agg = await window.vstUpdater.dbPresetFilterStats(search.trim(), formatFilter);
+        if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+        _lastPresetAggKey = key;
+        _presetAggCache = agg;
+      }
       count = agg.count || 0;
       bytes = agg.totalBytes || 0;
       unfiltered = agg.totalUnfiltered || 0;

@@ -130,6 +130,9 @@ async function fetchPluginPage() {
       plugins = scored.map(s => s.p);
     }
 
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    if (seq !== _pluginQuerySeq) return;
+
     // Keep allPlugins in sync for KVR/export compat
     if (_pluginOffset === 0) {
       allPlugins = plugins;

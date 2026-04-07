@@ -98,6 +98,8 @@ async function fetchDawPage() {
     filteredDawProjects = projects;
     _dawTotalCount = result.totalCount || 0;
     _dawTotalUnfiltered = result.totalUnfiltered || 0;
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    if (seq !== _dawQuerySeq) return;
     renderDawTable();
     // Counts + per-DAW breakdown + size reflect current filter via one aggregate query.
     refreshDawStatsSnapshot();
@@ -165,8 +167,9 @@ async function refreshDawStatsSnapshot(force) {
     const dawFilter = dawSet ? [...dawSet].join(',') : null;
     const key = search.trim() + '|' + (dawFilter || '');
     if (!force && key === _lastDawAggKey) { updateDawStats(); return; }
-    _lastDawAggKey = key;
     const agg = await window.vstUpdater.dbDawFilterStats(search.trim(), dawFilter);
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    _lastDawAggKey = key;
     _dawStatsSnapshot = {
       counts: agg.byType || {},
       bytesByType: agg.bytesByType || {},

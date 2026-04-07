@@ -104,6 +104,8 @@ async function fetchPdfPage() {
     filteredPdfs = pdfs;
     _pdfTotalCount = result.totalCount || 0;
     _pdfTotalUnfiltered = result.totalUnfiltered || 0;
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    if (seq !== _pdfQuerySeq) return;
     renderPdfTable();
     rebuildPdfStats();
     // Hydrate the pages cache for visible rows, then kick off background extract.
@@ -136,8 +138,15 @@ async function rebuildPdfStats(force) {
   {
     const cacheHit = !force && key === _lastPdfAggKey && _pdfAggCache;
     try {
-      const agg = cacheHit ? _pdfAggCache : await window.vstUpdater.dbPdfFilterStats(search.trim());
-      if (!cacheHit) { _lastPdfAggKey = key; _pdfAggCache = agg; }
+      let agg;
+      if (cacheHit) {
+        agg = _pdfAggCache;
+      } else {
+        agg = await window.vstUpdater.dbPdfFilterStats(search.trim());
+        if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+        _lastPdfAggKey = key;
+        _pdfAggCache = agg;
+      }
       displayCount = agg.count || 0;
       displayBytes = agg.totalBytes || 0;
       unfiltered = agg.totalUnfiltered || 0;

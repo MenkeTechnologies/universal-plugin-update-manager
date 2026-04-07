@@ -144,6 +144,8 @@ async function fetchMidiPage() {
     if (metadataKeys.has(midiSortKey)) {
       sortMidiArray();
     }
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    if (seq !== _midiQuerySeq) return;
     renderMidiTable();
     updateMidiCount();
   } catch (e) {
@@ -157,6 +159,7 @@ async function refreshMidiStatsSnapshot(force) {
   try {
     const search = _midiSearch || '';
     const agg = await window.vstUpdater.dbMidiFilterStats(search, null);
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
     _midiStatsSnapshot = {
       count: agg.count || 0,
       totalBytes: agg.totalBytes || 0,

@@ -1477,8 +1477,8 @@ fn midi_history_diff(old_id: String, new_id: String) -> Option<history::MidiScan
     Some(history::compute_midi_diff(&old, &new))
 }
 
-#[tauri::command]
-fn db_query_midi(
+#[tauri::command(rename_all = "snake_case")]
+async fn db_query_midi(
     search: Option<String>,
     format_filter: Option<String>,
     sort_key: Option<String>,
@@ -1486,22 +1486,30 @@ fn db_query_midi(
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::MidiQueryResult, String> {
-    db::global().query_midi(
-        search.as_deref(),
-        format_filter.as_deref(),
-        sort_key.as_deref().unwrap_or("name"),
-        sort_asc.unwrap_or(true),
-        offset.unwrap_or(0),
-        limit.unwrap_or(500),
-    )
+    tokio::task::spawn_blocking(move || {
+        db::global().query_midi(
+            search.as_deref(),
+            format_filter.as_deref(),
+            sort_key.as_deref().unwrap_or("name"),
+            sort_asc.unwrap_or(true),
+            offset.unwrap_or(0),
+            limit.unwrap_or(500),
+        )
+    })
+    .await
+    .map_err(|e| format!("db_query_midi task: {e}"))?
 }
 
-#[tauri::command]
-fn db_midi_filter_stats(
+#[tauri::command(rename_all = "snake_case")]
+async fn db_midi_filter_stats(
     search: Option<String>,
     format_filter: Option<String>,
 ) -> Result<db::FilterStatsResult, String> {
-    db::global().midi_filter_stats(search.as_deref(), format_filter.as_deref())
+    tokio::task::spawn_blocking(move || {
+        db::global().midi_filter_stats(search.as_deref(), format_filter.as_deref())
+    })
+    .await
+    .map_err(|e| format!("db_midi_filter_stats task: {e}"))?
 }
 
 // PDF scanner commands
@@ -5745,7 +5753,7 @@ async fn db_query_audio(params: db::AudioQueryParams) -> Result<db::AudioQueryRe
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_query_plugins(
+async fn db_query_plugins(
     search: Option<String>,
     type_filter: Option<String>,
     sort_key: Option<String>,
@@ -5753,18 +5761,22 @@ fn db_query_plugins(
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::PluginQueryResult, String> {
-    db::global().query_plugins(
-        search.as_deref(),
-        type_filter.as_deref(),
-        &sort_key.unwrap_or("name".into()),
-        sort_asc.unwrap_or(true),
-        offset.unwrap_or(0),
-        limit.unwrap_or(200),
-    )
+    tokio::task::spawn_blocking(move || {
+        db::global().query_plugins(
+            search.as_deref(),
+            type_filter.as_deref(),
+            &sort_key.unwrap_or("name".into()),
+            sort_asc.unwrap_or(true),
+            offset.unwrap_or(0),
+            limit.unwrap_or(200),
+        )
+    })
+    .await
+    .map_err(|e| format!("db_query_plugins task: {e}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_query_daw(
+async fn db_query_daw(
     search: Option<String>,
     daw_filter: Option<String>,
     sort_key: Option<String>,
@@ -5772,18 +5784,22 @@ fn db_query_daw(
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::DawQueryResult, String> {
-    db::global().query_daw(
-        search.as_deref(),
-        daw_filter.as_deref(),
-        &sort_key.unwrap_or("name".into()),
-        sort_asc.unwrap_or(true),
-        offset.unwrap_or(0),
-        limit.unwrap_or(200),
-    )
+    tokio::task::spawn_blocking(move || {
+        db::global().query_daw(
+            search.as_deref(),
+            daw_filter.as_deref(),
+            &sort_key.unwrap_or("name".into()),
+            sort_asc.unwrap_or(true),
+            offset.unwrap_or(0),
+            limit.unwrap_or(200),
+        )
+    })
+    .await
+    .map_err(|e| format!("db_query_daw task: {e}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_query_presets(
+async fn db_query_presets(
     search: Option<String>,
     format_filter: Option<String>,
     sort_key: Option<String>,
@@ -5791,14 +5807,18 @@ fn db_query_presets(
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::PresetQueryResult, String> {
-    db::global().query_presets(
-        search.as_deref(),
-        format_filter.as_deref(),
-        &sort_key.unwrap_or("name".into()),
-        sort_asc.unwrap_or(true),
-        offset.unwrap_or(0),
-        limit.unwrap_or(200),
-    )
+    tokio::task::spawn_blocking(move || {
+        db::global().query_presets(
+            search.as_deref(),
+            format_filter.as_deref(),
+            &sort_key.unwrap_or("name".into()),
+            sort_asc.unwrap_or(true),
+            offset.unwrap_or(0),
+            limit.unwrap_or(200),
+        )
+    })
+    .await
+    .map_err(|e| format!("db_query_presets task: {e}"))?
 }
 
 #[tauri::command]
@@ -5817,20 +5837,24 @@ fn db_preset_stats(scan_id: Option<String>) -> Result<db::PresetStatsResult, Str
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_query_pdfs(
+async fn db_query_pdfs(
     search: Option<String>,
     sort_key: Option<String>,
     sort_asc: Option<bool>,
     offset: Option<u64>,
     limit: Option<u64>,
 ) -> Result<db::PdfQueryResult, String> {
-    db::global().query_pdfs(
-        search.as_deref(),
-        &sort_key.unwrap_or("name".into()),
-        sort_asc.unwrap_or(true),
-        offset.unwrap_or(0),
-        limit.unwrap_or(200),
-    )
+    tokio::task::spawn_blocking(move || {
+        db::global().query_pdfs(
+            search.as_deref(),
+            &sort_key.unwrap_or("name".into()),
+            sort_asc.unwrap_or(true),
+            offset.unwrap_or(0),
+            limit.unwrap_or(200),
+        )
+    })
+    .await
+    .map_err(|e| format!("db_query_pdfs task: {e}"))?
 }
 
 #[tauri::command]
@@ -5851,32 +5875,46 @@ async fn db_audio_filter_stats(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_daw_filter_stats(
+async fn db_daw_filter_stats(
     search: Option<String>,
     daw_filter: Option<String>,
 ) -> Result<db::FilterStatsResult, String> {
-    db::global().daw_filter_stats(search.as_deref(), daw_filter.as_deref())
+    tokio::task::spawn_blocking(move || {
+        db::global().daw_filter_stats(search.as_deref(), daw_filter.as_deref())
+    })
+    .await
+    .map_err(|e| format!("db_daw_filter_stats task: {e}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_preset_filter_stats(
+async fn db_preset_filter_stats(
     search: Option<String>,
     format_filter: Option<String>,
 ) -> Result<db::FilterStatsResult, String> {
-    db::global().preset_filter_stats(search.as_deref(), format_filter.as_deref())
+    tokio::task::spawn_blocking(move || {
+        db::global().preset_filter_stats(search.as_deref(), format_filter.as_deref())
+    })
+    .await
+    .map_err(|e| format!("db_preset_filter_stats task: {e}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_plugin_filter_stats(
+async fn db_plugin_filter_stats(
     search: Option<String>,
     type_filter: Option<String>,
 ) -> Result<db::FilterStatsResult, String> {
-    db::global().plugin_filter_stats(search.as_deref(), type_filter.as_deref())
+    tokio::task::spawn_blocking(move || {
+        db::global().plugin_filter_stats(search.as_deref(), type_filter.as_deref())
+    })
+    .await
+    .map_err(|e| format!("db_plugin_filter_stats task: {e}"))?
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn db_pdf_filter_stats(search: Option<String>) -> Result<db::FilterStatsResult, String> {
-    db::global().pdf_filter_stats(search.as_deref())
+async fn db_pdf_filter_stats(search: Option<String>) -> Result<db::FilterStatsResult, String> {
+    tokio::task::spawn_blocking(move || db::global().pdf_filter_stats(search.as_deref()))
+        .await
+        .map_err(|e| format!("db_pdf_filter_stats task: {e}"))?
 }
 
 /// Per-category row counts for the header strip — **library** scope (one row per `path`), not the
