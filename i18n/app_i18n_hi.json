@@ -1390,7 +1390,7 @@
   "ui.ph.recycle_10_eadir_10_spotlight_v100_10_recycle_bin_": "#recycle&#10;@eaDir&#10;.Spotlight-V100&#10;$RECYCLE.BIN&#10;सिस्टम वॉल्यूम जानकारी&#10;नोड_मॉड्यूल&#10;.git&#10;.ट्रैश",
   "ui.ph.recycle_eadir_spotlight_v100_recycle_bin_system_vo": "#recycle @eaDir .Spotlight-V100 $RECYCLE.BIN System Volume Information node_modules .git .Trash",
   "ui.ph.search_favorites": "Fuzzy search favorites...",
-  "ui.ph.search_notes_and_tags": "नोट्स और टैग खोजें...",
+  "ui.ph.search_notes_and_tags": "Fuzzy search notes and tags...",
   "ui.ph.search_settings": "सेटिंग खोजें...",
   "ui.ph.search_songs": "गाने खोजें...",
   "ui.ph.search_tags": "टैग खोजें...",

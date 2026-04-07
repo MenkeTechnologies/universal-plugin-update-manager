@@ -320,11 +320,14 @@ function refreshRowBadges(path) {
 
 // ── Notes Tab ──
 let _notesSearch = '';
+let _lastNotesMode = 'fuzzy';
 
 registerFilter('filterNotes', {
     inputId: 'noteSearchInput',
+    regexToggleId: 'regexNotes',
     fetchFn() {
         _notesSearch = this.lastSearch || '';
+        _lastNotesMode = this.lastMode || 'fuzzy';
         renderNotesTab();
     },
 });
@@ -347,7 +350,7 @@ function renderNotesTab() {
         const scored = filtered.map(([path, n]) => {
             const name = path.split('/').pop() || '';
             const fields = [name, path, n.note || '', ...(n.tags || [])];
-            return {entry: [path, n], score: searchScore(search, fields, 'fuzzy')};
+            return {entry: [path, n], score: searchScore(search, fields, _lastNotesMode)};
         }).filter(s => s.score > 0);
         scored.sort((a, b) => b.score - a.score);
         filtered = scored.map(s => s.entry);
@@ -389,7 +392,7 @@ function renderNotesTab() {
         const date = n.updatedAt ? new Date(n.updatedAt).toLocaleString() : '';
         return `<div class="note-card" data-path="${escapeHtml(path)}">
       <div class="note-card-header">
-        <span class="note-card-name" title="${escapeHtml(path)}">${_notesSearch ? highlightMatch(name, _notesSearch, 'fuzzy') : escapeHtml(name)}</span>
+        <span class="note-card-name" title="${escapeHtml(path)}">${_notesSearch ? highlightMatch(name, _notesSearch, _lastNotesMode) : escapeHtml(name)}</span>
         <span class="note-card-date">${date}</span>
         <div class="note-card-actions" data-action-stop>
           <button class="btn-small btn-secondary" data-action-note="edit" data-path="${escapeHtml(path)}" data-name="${escapeHtml(name)}" title="Edit note" style="padding:3px 8px;font-size:10px;">Edit</button>
