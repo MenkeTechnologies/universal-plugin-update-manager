@@ -190,6 +190,87 @@ async function decodeSpectrogramViaWorker(url) {
     }
 }
 
+/** @returns {null | ((req: object) => Promise<unknown>)} */
+function audioEngineInvokeMetaVisuals() {
+    if (
+        typeof window !== 'undefined' &&
+        window.vstUpdater &&
+        typeof window.vstUpdater.audioEngineInvoke === 'function'
+    ) {
+        return window.vstUpdater.audioEngineInvoke.bind(window.vstUpdater);
+    }
+    return null;
+}
+
+/**
+ * `spectrogram_preview` returns `rows`[freq][time] in dB; `renderSpectrogramData` expects
+ * `sgData`[time][freq] as linear magnitudes (same post-processing as worker FFT path).
+ */
+function spectrogramEngineRowsToSgData(rows) {
+    if (!rows || !rows.length || !rows[0] || !rows[0].length) return [];
+    const nFreq = rows.length;
+    const nTime = rows[0].length;
+    const sgData = [];
+    for (let t = 0; t < nTime; t++) {
+        const col = new Array(nFreq);
+        for (let r = 0; r < nFreq; r++) {
+            const db = Number(rows[r][t]);
+            col[r] = Number.isFinite(db) ? Math.pow(10, db / 20) : 0;
+        }
+        sgData.push(col);
+    }
+    return sgData;
+}
+
+/** Modest `width_px` / `height_px` for sidecar spectrogram JSON (smaller payloads on weak devices). */
+function metaSpectrogramEnginePixelDims() {
+    const cores = typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 8;
+    const memGb = typeof navigator !== 'undefined' && navigator.deviceMemory ? navigator.deviceMemory : 8;
+    if (cores <= 4 || memGb <= 4) return { width_px: 192, height_px: 48 };
+    return { width_px: 256, height_px: 64 };
+}
+
+async function fetchWaveformPreviewFromEngine(absPath, widthPx) {
+    const invoke = audioEngineInvokeMetaVisuals();
+    if (!invoke) return null;
+    const wfRes = await invoke({ cmd: 'waveform_preview', path: absPath, width_px: widthPx });
+    if (!wfRes || wfRes.ok !== true || !wfRes.peaks) return null;
+    return wfRes.peaks;
+}
+
+async function fetchSpectrogramPreviewFromEngine(absPath, dims) {
+    const invoke = audioEngineInvokeMetaVisuals();
+    if (!invoke) return null;
+    const sgRes = await invoke({
+        cmd: 'spectrogram_preview',
+        path: absPath,
+        width_px: dims.width_px,
+        height_px: dims.height_px,
+    });
+    if (!sgRes || sgRes.ok !== true || !sgRes.rows) return null;
+    const sgData = spectrogramEngineRowsToSgData(sgRes.rows);
+    return sgData.length ? sgData : null;
+}
+
+async function fetchMetaVisualsFromAudioEngine(filePath, wfWidthPx, sgDims) {
+    const invoke = audioEngineInvokeMetaVisuals();
+    if (!invoke) return null;
+    const [wfRes, sgRes] = await Promise.all([
+        invoke({ cmd: 'waveform_preview', path: filePath, width_px: wfWidthPx }),
+        invoke({
+            cmd: 'spectrogram_preview',
+            path: filePath,
+            width_px: sgDims.width_px,
+            height_px: sgDims.height_px,
+        }),
+    ]);
+    if (!wfRes || wfRes.ok !== true || !wfRes.peaks) return null;
+    if (!sgRes || sgRes.ok !== true || !sgRes.rows) return null;
+    const sgData = spectrogramEngineRowsToSgData(sgRes.rows);
+    if (!sgData.length) return null;
+    return { peaks: wfRes.peaks, sgData };
+}
+
 async function decodeChannelsInWorker(url) {
     const res = await postAudioDecodeWorker({ type: 'channels', url, bars: 0 });
     return {
@@ -3707,8 +3788,10 @@ function _metaPanelStale(metaSeq, filePath) {
 }
 
 /**
- * Expanded-row waveform + spectrogram: prefer worker (`decodeMetaVisualsViaWorker` / related).
- * On any failure, fall back to main-thread `drawMetaWaveform` → `drawSpectrogram` (known-good path).
+ * Expanded-row waveform + spectrogram: prefer `audio_engine_invoke` (`waveform_preview` +
+ * `spectrogram_preview`) when `vstUpdater.audioEngineInvoke` is available, else worker
+ * (`decodeMetaVisualsViaWorker` / related). On failure, main-thread `drawMetaWaveform` →
+ * `drawSpectrogram`. Spectrogram sidecar size uses `metaSpectrogramEnginePixelDims` (modest JSON).
  */
 async function drawMetaPanelVisuals(filePath, metaSeq) {
     const wfCanvas = document.getElementById('metaWaveformCanvas');
@@ -3745,12 +3828,23 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
 
     const url = fileSrcForDecode(filePath);
     const bars = Math.max(1, Math.min(Math.max(1, Math.floor(cw)), 800));
+    const sgDims = metaSpectrogramEnginePixelDims();
 
     try {
         if (typeof yieldToBrowser === 'function') await yieldToBrowser();
         if (_metaPanelStale(metaSeq, filePath)) return;
         if (!wfCached && !sgCached) {
-            const { peaks, sgData } = await decodeMetaVisualsViaWorker(url, bars);
+            let peaks;
+            let sgData;
+            const fromEngine = await fetchMetaVisualsFromAudioEngine(filePath, bars, sgDims);
+            if (fromEngine) {
+                peaks = fromEngine.peaks;
+                sgData = fromEngine.sgData;
+            } else {
+                const decoded = await decodeMetaVisualsViaWorker(url, bars);
+                peaks = decoded.peaks;
+                sgData = decoded.sgData;
+            }
             if (_metaPanelStale(metaSeq, filePath)) return;
             _waveformCache[filePath] = peaks;
             _spectrogramCache[filePath] = sgData;
@@ -3766,7 +3860,8 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
             return;
         }
         if (wfCached && !sgCached) {
-            const sgData = await decodeSpectrogramViaWorker(url);
+            let sgData = await fetchSpectrogramPreviewFromEngine(filePath, sgDims);
+            if (!sgData) sgData = await decodeSpectrogramViaWorker(url);
             if (_metaPanelStale(metaSeq, filePath)) return;
             _spectrogramCache[filePath] = sgData;
             _evictCache(_spectrogramCache);
@@ -3780,7 +3875,8 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
             return;
         }
         if (!wfCached && sgCached) {
-            const peaks = await decodePeaksViaWorker(url, bars);
+            let peaks = await fetchWaveformPreviewFromEngine(filePath, bars);
+            if (!peaks) peaks = await decodePeaksViaWorker(url, bars);
             if (_metaPanelStale(metaSeq, filePath)) return;
             _waveformCache[filePath] = peaks;
             _evictCache(_waveformCache);
