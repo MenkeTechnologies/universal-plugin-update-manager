@@ -1789,20 +1789,29 @@ function updatePlaybackTime() {
   }
 }
 
-function seekAudio(event) {
+/** Seek current playback to a normalized position [0, 1]. Used by now-playing and metadata waveforms. */
+function seekPlaybackToPercent(pct) {
   if (!audioPlayerPath) return;
-  const bar = document.getElementById('npWaveform');
-  const rect = bar.getBoundingClientRect();
-  const pct = (event.clientX - rect.left) / rect.width;
+  const p = Math.max(0, Math.min(1, pct));
   if (audioReverseMode && _reversedBuf) {
     const d = _reversedBuf.duration;
-    const origT = pct * d;
+    const origT = p * d;
     stopReverseBufferPlayback();
     startReverseBufferFromOffset(Math.max(0, d - origT));
     return;
   }
   if (!audioPlayer.duration) return;
-  audioPlayer.currentTime = pct * audioPlayer.duration;
+  audioPlayer.currentTime = p * audioPlayer.duration;
+}
+
+function seekAudio(event) {
+  if (!audioPlayerPath) return;
+  const bar = document.getElementById('npWaveform');
+  if (!bar) return;
+  const rect = bar.getBoundingClientRect();
+  if (rect.width <= 0) return;
+  const pct = (event.clientX - rect.left) / rect.width;
+  seekPlaybackToPercent(pct);
 }
 
 function setAudioVolume(value) {
@@ -2844,12 +2853,13 @@ function renderSpectrogramData(ctx, w, h, sgData) {
 }
 
 function seekMetaWaveform(event) {
-  if (!audioPlayerPath || !audioPlayer.duration) return;
   const box = document.getElementById('metaWaveformBox');
   if (!box) return;
+  if (!audioPlayerPath || audioPlayerPath !== box.dataset.path) return;
   const rect = box.getBoundingClientRect();
+  if (rect.width <= 0) return;
   const pct = (event.clientX - rect.left) / rect.width;
-  seekAudio(pct * audioPlayer.duration);
+  seekPlaybackToPercent(pct);
 }
 
 function updateMetaLine() {
