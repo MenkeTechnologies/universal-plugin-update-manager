@@ -10,6 +10,9 @@ const PALETTE_MAX = 50;
 /** Monotonic id so stale palette DB searches never repaint after a newer query. */
 let _paletteDbSeq = 0;
 
+/** Cached palette rows (tabs + actions + toggles); labels from appFmt. Cleared on locale change. */
+let _paletteStaticItemsCache = null;
+
 function _paletteSwitchTab(id) {
     if (typeof switchTab === 'function') switchTab(id);
 }
@@ -182,7 +185,7 @@ async function fetchPaletteDatabaseItems(query) {
     return out;
 }
 
-function collectPaletteItems() {
+function buildPaletteStaticItems() {
     const items = [];
 
     // Tabs — always available
@@ -316,27 +319,6 @@ function collectPaletteItems() {
             type: 'action', name: appFmt('menu.dep_graph'), icon: '&#128200;', action: () => {
                 showToast(toastFmt('toast.opening_dep_graph'));
                 showDepGraph();
-            }
-        });
-    }
-    if (typeof findSimilarSamples === 'function' && typeof audioPlayerPath !== 'undefined' && audioPlayerPath) {
-        items.push({
-            type: 'action', name: appFmt('menu.find_similar_current'), icon: '&#128270;', action: () => {
-                showToast(toastFmt('toast.finding_similar'));
-                findSimilarSamples(audioPlayerPath);
-            }
-        });
-    }
-    if (typeof showPlayer === 'function') {
-        const np = document.getElementById('audioNowPlaying');
-        const visible = np && np.classList.contains('active');
-        items.push({
-            type: 'action',
-            name: visible ? appFmt('menu.hide_audio_player') : appFmt('menu.show_audio_player'),
-            icon: '&#9835;',
-            action: () => {
-                visible ? (typeof hidePlayer === 'function' && hidePlayer()) : (typeof showPlayer === 'function' && showPlayer());
-                showToast(visible ? toastFmt('toast.player_hidden') : toastFmt('toast.player_shown'));
             }
         });
     }
@@ -746,9 +728,35 @@ function collectPaletteItems() {
 
     // Data items (plugins, samples, DAW, presets) are searched lazily
     // in filterPaletteResults to avoid blocking UI on palette open.
-    // See _searchDataItems() below.
+    // Bookmarks/tags/player/similar are appended in buildPaletteDynamicItems().
 
-    // Bookmarked dirs
+    return items;
+}
+
+/** Rows that depend on current track, player visibility, or live bookmark/tag lists. */
+function buildPaletteDynamicItems() {
+    const items = [];
+    if (typeof findSimilarSamples === 'function' && typeof audioPlayerPath !== 'undefined' && audioPlayerPath) {
+        items.push({
+            type: 'action', name: appFmt('menu.find_similar_current'), icon: '&#128270;', action: () => {
+                showToast(toastFmt('toast.finding_similar'));
+                findSimilarSamples(audioPlayerPath);
+            }
+        });
+    }
+    if (typeof showPlayer === 'function') {
+        const np = document.getElementById('audioNowPlaying');
+        const visible = np && np.classList.contains('active');
+        items.push({
+            type: 'action',
+            name: visible ? appFmt('menu.hide_audio_player') : appFmt('menu.show_audio_player'),
+            icon: '&#9835;',
+            action: () => {
+                visible ? (typeof hidePlayer === 'function' && hidePlayer()) : (typeof showPlayer === 'function' && showPlayer());
+                showToast(visible ? toastFmt('toast.player_hidden') : toastFmt('toast.player_shown'));
+            }
+        });
+    }
     if (typeof getFavDirs === 'function') {
         for (const d of getFavDirs()) {
             items.push({
@@ -761,8 +769,6 @@ function collectPaletteItems() {
             });
         }
     }
-
-    // Tags
     if (typeof getAllTags === 'function') {
         for (const t of getAllTags()) {
             items.push({
@@ -775,9 +781,25 @@ function collectPaletteItems() {
             });
         }
     }
-
     return items;
 }
+
+function getPaletteStaticItems() {
+    if (_paletteStaticItemsCache === null) {
+        _paletteStaticItemsCache = buildPaletteStaticItems();
+    }
+    return _paletteStaticItemsCache;
+}
+
+function collectPaletteItems() {
+    return getPaletteStaticItems().concat(buildPaletteDynamicItems());
+}
+
+/** Call after reloadAppStrings so menu labels match the active locale. */
+function invalidatePaletteStaticCache() {
+    _paletteStaticItemsCache = null;
+}
+window.invalidatePaletteStaticCache = invalidatePaletteStaticCache;
 
 function filterPaletteItems(query, items) {
     if (!query) {

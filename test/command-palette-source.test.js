@@ -9,12 +9,13 @@ const { loadFrontendScripts, defaultDocument } = require('./frontend-vm-harness.
 
 const COMMAND_PALETTE_PATH = path.join(__dirname, '..', 'frontend', 'js', 'command-palette.js');
 
-describe('frontend/js/command-palette.js collectPaletteItems (source)', () => {
+describe('frontend/js/command-palette.js palette item builders (source)', () => {
   it('does not register the same appFmt key twice (duplicate palette rows)', () => {
     const src = fs.readFileSync(COMMAND_PALETTE_PATH, 'utf8');
-    const m = src.match(/function collectPaletteItems\(\) \{[\s\S]*?\n\}\n\nfunction filterPaletteItems/);
-    assert.ok(m, 'expected collectPaletteItems block before filterPaletteItems');
-    const body = m[0];
+    const start = src.indexOf('function buildPaletteStaticItems()');
+    const end = src.indexOf('function getPaletteStaticItems()');
+    assert.ok(start >= 0 && end > start, 'expected buildPaletteStaticItems … buildPaletteDynamicItems … getPaletteStaticItems order');
+    const body = src.slice(start, end);
     const keys = [];
     const re = /appFmt\('([^']+)'\)/g;
     let x;
@@ -25,7 +26,7 @@ describe('frontend/js/command-palette.js collectPaletteItems (source)', () => {
     assert.deepStrictEqual(
       dups,
       [],
-      `duplicate appFmt keys in collectPaletteItems: ${dups.map(([k, n]) => `${k}×${n}`).join(', ')}`,
+      `duplicate appFmt keys in palette static+dynamic builders: ${dups.map(([k, n]) => `${k}×${n}`).join(', ')}`,
     );
   });
 });

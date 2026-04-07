@@ -1,7 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-// ── Static tab entries from frontend/js/command-palette.js collectPaletteItems ──
+// ── Static tab entries from frontend/js/command-palette.js buildPaletteStaticItems ──
 const PALETTE_TAB_NAMES = [
   'Plugins',
   'Samples',
