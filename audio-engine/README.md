@@ -13,7 +13,7 @@ Notable commands:
 | `ping` | Version + host id |
 | `engine_state` | `version`, `host`, and `stream` (same shape as `output_stream_status`) |
 | `list_output_devices` / `list_input_devices` | Enumerate devices with stable string ids |
-| `get_output_device_info` / `get_input_device_info` | Default config + `buffer_size` object (`kind`: `range` \| `unknown`) |
+| `get_output_device_info` / `get_input_device_info` | Default config + `buffer_size` object (`kind`: `range` \| `unknown`). Omit `device_id` to query the host default input/output device. |
 | `set_output_device` | Validate `device_id` only |
 | `start_output_stream` | Open default config; optional `buffer_frames` → `BufferSize::Fixed` (clamped); **F32** supports `tone` (440 Hz sine at low gain). Response + `output_stream_status` include `stream_buffer_frames` when fixed buffering was applied. |
 | `stop_output_stream` | Drop stream |

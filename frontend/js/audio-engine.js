@@ -1,6 +1,7 @@
 // ── Audio Engine tab: separate `audio-engine` process (cpal devices, future plugin graph) ──
 
 const AE_PREFS_DEVICE = 'audioEngineOutputDeviceId';
+const AE_PREFS_INPUT_DEVICE = 'audioEngineInputDeviceId';
 const AE_PREFS_TONE = 'audioEngineTestTone';
 const AE_PREFS_BUFFER_FRAMES = 'audioEngineBufferFrames';
 
@@ -111,6 +112,17 @@ function initAudioEngineTab() {
         bufIn.addEventListener('blur', saveBufPref);
     }
 
+    const inSel = document.getElementById('aeInputDevice');
+    if (inSel && typeof inSel.addEventListener === 'function' && typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
+        inSel.addEventListener('change', () => {
+            prefs.setItem(AE_PREFS_INPUT_DEVICE, inSel.value != null ? String(inSel.value) : '');
+            const inv = window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function'
+                ? window.vstUpdater.audioEngineInvoke
+                : null;
+            if (inv) void fillAeInputDeviceCaps(inv, inSel.value);
+        });
+    }
+
     void refreshAudioEnginePanel();
 }
 
@@ -134,17 +146,23 @@ async function fillAeDeviceCaps(inv, deviceId) {
 }
 
 /**
- * Default input device (`get_input_device_info` with no `device_id`).
+ * `get_input_device_info`: omit `device_id` when empty for system default input.
  * @param {function} inv — `window.vstUpdater.audioEngineInvoke`
+ * @param {string} [deviceId] — sidecar id or "" for default
  */
-async function fillAeInputDeviceCaps(inv) {
+async function fillAeInputDeviceCaps(inv, deviceId) {
     const el = document.getElementById('aeInputDeviceCaps');
     if (!el || typeof inv !== 'function') {
         if (el) el.textContent = '—';
         return;
     }
     try {
-        const info = await inv({cmd: 'get_input_device_info'});
+        const payload = {cmd: 'get_input_device_info'};
+        const id = deviceId != null ? String(deviceId).trim() : '';
+        if (id !== '') {
+            payload.device_id = id;
+        }
+        const info = await inv(payload);
         const line = buildAeDeviceCapsLine(info);
         el.textContent = line != null ? line : '—';
     } catch {
@@ -306,6 +324,7 @@ async function refreshAudioEnginePanel() {
         }
 
         const inListEl = document.getElementById('aeInputDevicesList');
+        const inSelectEl = document.getElementById('aeInputDevice');
         try {
             const ins = await inv({cmd: 'list_input_devices'});
             if (inListEl && ins && ins.ok === true && Array.isArray(ins.devices)) {
@@ -316,13 +335,63 @@ async function refreshAudioEnginePanel() {
                     return `${name} (${id})${def}`;
                 });
                 inListEl.textContent = lines.length ? lines.join('\n') : '—';
+
+                const inSaved = typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+                    ? prefs.getItem(AE_PREFS_INPUT_DEVICE)
+                    : null;
+                /** `null`/`undefined`: never saved — follow cpal default id; `''`: user chose system default. */
+                let inPick;
+                if (inSaved === null || inSaved === undefined) {
+                    inPick = ins.default_device_id != null ? String(ins.default_device_id) : '';
+                } else {
+                    inPick = String(inSaved);
+                }
+                if (inSelectEl && typeof inSelectEl.replaceChildren === 'function' && typeof catalogFmt === 'function') {
+                    inSelectEl.replaceChildren();
+                    const defOpt = document.createElement('option');
+                    defOpt.value = '';
+                    defOpt.textContent = catalogFmt('ui.ae.input_device_default_option');
+                    inSelectEl.appendChild(defOpt);
+                    for (const d of ins.devices) {
+                        const id = d.id != null ? String(d.id) : '';
+                        const name = d.name != null ? String(d.name) : id;
+                        const opt = document.createElement('option');
+                        opt.value = id;
+                        opt.textContent = name;
+                        if (d.is_default === true) {
+                            opt.dataset.default = '1';
+                        }
+                        inSelectEl.appendChild(opt);
+                    }
+                    if (inPick !== '') {
+                        inSelectEl.value = inPick;
+                    }
+                    const valid = inPick === '' || [...inSelectEl.options].some((o) => o.value === inPick);
+                    if (!valid && ins.devices.length > 0) {
+                        const defD = ins.devices.find((x) => x.is_default === true);
+                        inSelectEl.value = defD && defD.id != null ? String(defD.id) : String(ins.devices[0].id);
+                    } else if (!valid) {
+                        inSelectEl.value = '';
+                    }
+                    await fillAeInputDeviceCaps(inv, inSelectEl.value);
+                } else {
+                    await fillAeInputDeviceCaps(inv, inPick);
+                }
             } else if (inListEl) {
                 inListEl.textContent = '—';
+                if (inSelectEl && typeof inSelectEl.replaceChildren === 'function' && typeof catalogFmt === 'function') {
+                    inSelectEl.replaceChildren();
+                    const defOpt = document.createElement('option');
+                    defOpt.value = '';
+                    defOpt.textContent = catalogFmt('ui.ae.input_device_default_option');
+                    inSelectEl.appendChild(defOpt);
+                }
+                await fillAeInputDeviceCaps(inv, '');
             }
         } catch {
             if (inListEl) inListEl.textContent = '—';
+            await fillAeInputDeviceCaps(inv, '');
         }
-        await fillAeInputDeviceCaps(inv);
     } catch (e) {
         const msg = e && e.message ? String(e.message) : String(e);
         if (statusEl && typeof catalogFmt === 'function') {
