@@ -19,6 +19,20 @@ function appFmt(key, vars) {
 window.appFmt = appFmt;
 window.toastFmt = appFmt;
 
+/** Locale codes with seeded i18n in SQLite (must match shipped `i18n/app_i18n_*.json`). */
+const SUPPORTED_UI_LOCALES = Object.freeze([
+    'cs', 'da', 'de', 'el', 'en', 'es', 'es-419', 'fi', 'fr', 'hi', 'hu', 'id', 'it',
+    'ja', 'ko', 'nb', 'nl', 'pl', 'pt', 'pt-BR', 'ro', 'ru', 'sv', 'tr', 'uk', 'vi', 'zh',
+]);
+
+function normalizeUiLocale(locale) {
+    if (locale == null || locale === '') return null;
+    return SUPPORTED_UI_LOCALES.includes(locale) ? locale : null;
+}
+
+window.SUPPORTED_UI_LOCALES = SUPPORTED_UI_LOCALES;
+window.normalizeUiLocale = normalizeUiLocale;
+
 /** Async exports return promises; catch so menu/click handlers never leave unhandled rejections. */
 function runExport(fn) {
     if (typeof fn !== 'function') return;
@@ -38,36 +52,7 @@ window.__appReady = invoke('get_app_strings', {locale: null}).then((m) => {
 window.__toastReady = window.__appReady;
 
 async function reloadAppStrings(locale) {
-    const loc =
-        locale === 'de' ||
-        locale === 'es' ||
-        locale === 'es-419' ||
-        locale === 'sv' ||
-        locale === 'fr' ||
-        locale === 'pt' ||
-        locale === 'pt-BR' ||
-        locale === 'nl' ||
-        locale === 'it' ||
-        locale === 'el' ||
-        locale === 'pl' ||
-        locale === 'ru' ||
-        locale === 'zh' ||
-        locale === 'ja' ||
-        locale === 'ko' ||
-        locale === 'fi' ||
-        locale === 'da' ||
-        locale === 'nb' ||
-        locale === 'tr' ||
-        locale === 'cs' ||
-        locale === 'hu' ||
-        locale === 'ro' ||
-        locale === 'uk' ||
-        locale === 'vi' ||
-        locale === 'id' ||
-        locale === 'hi' ||
-        locale === 'en'
-            ? locale
-            : null;
+    const loc = normalizeUiLocale(locale);
     try {
         const m = await invoke('get_app_strings', {locale: loc});
         window.__appStr = m || {};
@@ -1089,7 +1074,6 @@ function showToast(message, duration = 2500, type = '') {
 }
 
 window.vstUpdater = {
-    appendLog: (msg) => invoke('append_log', {msg}),
     getVersion: () => invoke('get_version'),
     getAppStrings: (locale) => invoke('get_app_strings', {locale: locale ?? null}),
     getToastStrings: (locale) => invoke('get_toast_strings', {locale: locale ?? null}),

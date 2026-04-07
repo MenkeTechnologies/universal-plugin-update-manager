@@ -49,37 +49,9 @@ document.getElementById('headerStats')?.addEventListener('click', (e) => e.stopP
     await prefs.load();
     const uiLoc = prefs.getItem('uiLocale');
     if (typeof reloadAppStrings === 'function') {
+        const locs = window.SUPPORTED_UI_LOCALES;
         await reloadAppStrings(
-            [
-                'de',
-                'es',
-                'es-419',
-                'sv',
-                'fr',
-                'nl',
-                'pt',
-                'pt-BR',
-                'it',
-                'el',
-                'pl',
-                'ru',
-                'zh',
-                'ja',
-                'ko',
-                'fi',
-                'da',
-                'nb',
-                'tr',
-                'cs',
-                'hu',
-                'ro',
-                'uk',
-                'vi',
-                'id',
-                'hi',
-            ].includes(uiLoc)
-                ? uiLoc
-                : 'en'
+            Array.isArray(locs) && locs.includes(uiLoc) ? uiLoc : 'en'
         );
     }
     // Ensure stop/resume buttons are hidden on fresh start

@@ -2,7 +2,7 @@
  * Loads ipc.js with Tauri stubs — verifies reloadAppStrings maps locales to backend
  * and forwards null for unsupported codes (seeded locales pass through).
  */
-const { describe, it, before } = require('node:test');
+const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -42,62 +42,18 @@ function loadIpcSandbox(invokeImpl) {
 }
 
 describe('frontend/js/ipc.js (vm-loaded)', () => {
-  it('reloadAppStrings passes through supported locale codes to get_app_strings', async () => {
-    const { sandbox, calls } = loadIpcSandbox(async () => ({}));
-    await sandbox.reloadAppStrings('de');
-    const getStr = calls.filter((c) => c.cmd === 'get_app_strings');
-    assert.ok(getStr.length >= 1);
-    assert.strictEqual(getStr[getStr.length - 1].args.locale, 'de');
+  const { sandbox: ipcSandbox } = loadIpcSandbox(async () => ({}));
+  const locales = ipcSandbox.SUPPORTED_UI_LOCALES;
+
+  it('exposes SUPPORTED_UI_LOCALES matching normalizeUiLocale', () => {
+    assert.ok(Array.isArray(locales));
+    assert.ok(locales.includes('en'));
+    for (const loc of locales) {
+      assert.strictEqual(ipcSandbox.normalizeUiLocale(loc), loc);
+    }
   });
 
-  it('reloadAppStrings passes it (seed locale)', async () => {
-    const { sandbox, calls } = loadIpcSandbox(async () => ({}));
-    await sandbox.reloadAppStrings('it');
-    const getStr = calls.filter((c) => c.cmd === 'get_app_strings');
-    assert.strictEqual(getStr[getStr.length - 1].args.locale, 'it');
-  });
-
-  it('reloadAppStrings sends null for arbitrary garbage locale', async () => {
-    const { sandbox, calls } = loadIpcSandbox(async () => ({}));
-    await sandbox.reloadAppStrings('xx-YY');
-    const getStr = calls.filter((c) => c.cmd === 'get_app_strings');
-    assert.strictEqual(getStr[getStr.length - 1].args.locale, null);
-  });
-
-  it('reloadAppStrings passes en and fr (seed locales)', async () => {
-    const { sandbox, calls } = loadIpcSandbox(async () => ({}));
-    await sandbox.reloadAppStrings('en');
-    let getStr = calls.filter((c) => c.cmd === 'get_app_strings');
-    assert.strictEqual(getStr[getStr.length - 1].args.locale, 'en');
-    await sandbox.reloadAppStrings('fr');
-    getStr = calls.filter((c) => c.cmd === 'get_app_strings');
-    assert.strictEqual(getStr[getStr.length - 1].args.locale, 'fr');
-  });
-
-  const supportedLocales = [
-    'es',
-    'es-419',
-    'sv',
-    'pt',
-    'pt-BR',
-    'nl',
-    'pl',
-    'ru',
-    'el',
-    'zh',
-    'ja',
-    'ko',
-    'fi',
-    'da',
-    'nb',
-    'tr',
-    'cs',
-    'hu',
-    'ro',
-    'hi',
-  ];
-
-  for (const loc of supportedLocales) {
+  for (const loc of locales) {
     it(`reloadAppStrings passes ${loc} to get_app_strings`, async () => {
       const { sandbox, calls } = loadIpcSandbox(async () => ({}));
       await sandbox.reloadAppStrings(loc);
@@ -105,6 +61,13 @@ describe('frontend/js/ipc.js (vm-loaded)', () => {
       assert.strictEqual(getStr[getStr.length - 1].args.locale, loc);
     });
   }
+
+  it('reloadAppStrings sends null for arbitrary garbage locale', async () => {
+    const { sandbox, calls } = loadIpcSandbox(async () => ({}));
+    await sandbox.reloadAppStrings('xx-YY');
+    const getStr = calls.filter((c) => c.cmd === 'get_app_strings');
+    assert.strictEqual(getStr[getStr.length - 1].args.locale, null);
+  });
 
   it('reloadAppStrings passes null for undefined locale', async () => {
     const { sandbox, calls } = loadIpcSandbox(async () => ({}));
