@@ -7203,6 +7203,10 @@
             transition: none;
         }
 
+        #npCursor {
+            pointer-events: none;
+        }
+
         @keyframes meta-slide {
             from {
                 opacity: 0;
@@ -7595,7 +7599,7 @@
                             title="Add note/tags to current track (N)">&#127991;
                     </button>
                 </div>
-                <div class="now-playing-waveform" data-action="seekAudio" id="npWaveform">
+                <div class="now-playing-waveform" id="npWaveform">
                     <canvas class="waveform-canvas" id="npWaveformCanvas"></canvas>
                     <div class="now-playing-progress" id="npProgress"></div>
                     <div class="waveform-cursor" id="npCursor" style="left:0;display:none;"></div>
@@ -8691,18 +8695,31 @@
                 Separate process for low-latency output: choose the system output device and (later) an insert plugin chain. The sidecar binary talks to the UI over JSON.
             </p>
             <div class="hm-card ae-panel">
-                <div class="ae-panel-head" data-i18n="ui.ae.status_label">Engine status</div>
+                <div class="ae-panel-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                    <span data-i18n="ui.ae.status_label">Engine status</span>
+                    <button class="btn btn-secondary" type="button" id="aeRestartSidecar" data-i18n="ui.ae.restart_sidecar" data-i18n-title="ui.ae.restart_sidecar_tt" style="padding:6px 12px;font-size:12px;">Restart sidecar</button>
+                </div>
                 <div id="aeEngineStatus" class="ae-mono" style="font-size:13px;">—</div>
                 <div id="aeStreamStatus" class="ae-mono" style="margin-top:8px;font-size:12px;">—</div>
                 <div id="aeInputStreamStatus" class="ae-mono" style="margin-top:8px;font-size:12px;line-height:1.4;">—</div>
             </div>
             <div class="hm-card ae-panel">
                 <div class="ae-panel-head" data-i18n="ui.ae.output_device_label">Output device</div>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;">
+                    <label for="aeAudioDeviceType" style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);cursor:default;user-select:none;">
+                        <span data-i18n="ui.ae.audio_device_type_label">Driver</span>
+                        <select id="aeAudioDeviceType" class="ae-input" data-i18n-title="ui.ae.audio_device_type_tt" style="min-width:200px;max-width:100%;padding:8px 10px;font-size:13px;"></select>
+                    </label>
+                    <label for="aeSampleRate" style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);cursor:default;user-select:none;">
+                        <span data-i18n="ui.ae.sample_rate_label">Sample rate</span>
+                        <select id="aeSampleRate" class="ae-input" data-i18n-title="ui.ae.sample_rate_tt" style="min-width:160px;max-width:100%;padding:8px 10px;font-size:13px;"></select>
+                    </label>
+                </div>
                 <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
                     <select id="aeOutputDevice" class="ae-input" data-i18n-title="ui.ae.output_device_tt" style="min-width:280px;max-width:100%;padding:8px 10px;font-size:13px;" title="System output device for the engine"></select>
                     <button class="btn btn-secondary" type="button" id="aeRefreshDevices" data-i18n="ui.ae.refresh_devices" style="padding:8px 14px;">Refresh list</button>
                     <button class="btn btn-primary" type="button" id="aeApplyDevice" data-i18n="ui.ae.apply_device" style="padding:8px 14px;">Apply</button>
-                    <button class="btn btn-stop" type="button" id="aeStopStream" data-i18n="ui.ae.stop_stream" data-i18n-title="ui.ae.stop_stream_tt" style="padding:8px 14px;" title="Stop cpal output stream">Stop stream</button>
+                    <button class="btn btn-stop" type="button" id="aeStopStream" data-i18n="ui.ae.stop_stream" data-i18n-title="ui.ae.stop_stream_tt" style="padding:8px 14px;">Stop stream</button>
                     <label data-i18n-title="ui.ae.test_tone_tt" style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);cursor:pointer;user-select:none;" title="Low-level sine on F32 default stream; toggle live if supported">
                         <input type="checkbox" id="aeTestTone" />
                         <span data-i18n="ui.ae.test_tone_label">Test tone (440 Hz)</span>
@@ -8797,6 +8814,20 @@
             <div class="hm-card ae-panel">
                 <div class="ae-panel-head" data-i18n="ui.ae.plugins_heading">Insert plugins</div>
                 <p id="aePluginStub" style="margin:0 0 10px 0;font-size:13px;color:var(--text-muted);line-height:1.5;">—</p>
+                <p id="aePluginInsertIntro" style="margin:0 0 10px 0;font-size:12px;color:var(--text-dim);line-height:1.45;" data-i18n="ui.ae.plugins_insert_intro">—</p>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">
+                    <select id="aeInsertSlot0" class="ae-input" data-i18n-title="ui.ae.insert_slot_tt" style="min-width:220px;max-width:100%;padding:6px 8px;font-size:12px;"></select>
+                    <select id="aeInsertSlot1" class="ae-input" data-i18n-title="ui.ae.insert_slot_tt" style="min-width:220px;max-width:100%;padding:6px 8px;font-size:12px;"></select>
+                    <select id="aeInsertSlot2" class="ae-input" data-i18n-title="ui.ae.insert_slot_tt" style="min-width:220px;max-width:100%;padding:6px 8px;font-size:12px;"></select>
+                    <select id="aeInsertSlot3" class="ae-input" data-i18n-title="ui.ae.insert_slot_tt" style="min-width:220px;max-width:100%;padding:6px 8px;font-size:12px;"></select>
+                    <button class="btn btn-primary" type="button" id="aeApplyInserts" data-i18n="ui.ae.apply_inserts" data-i18n-title="ui.ae.apply_inserts_tt" style="padding:8px 14px;">Apply inserts</button>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;" data-i18n-title="ui.ae.insert_editors_row_tt">
+                    <button class="btn btn-secondary" type="button" id="aeInsertEditor0" data-i18n="ui.ae.insert_editor_slot_1" data-i18n-title="ui.ae.insert_editor_tt" style="padding:6px 12px;font-size:12px;">Editor (1)</button>
+                    <button class="btn btn-secondary" type="button" id="aeInsertEditor1" data-i18n="ui.ae.insert_editor_slot_2" data-i18n-title="ui.ae.insert_editor_tt" style="padding:6px 12px;font-size:12px;">Editor (2)</button>
+                    <button class="btn btn-secondary" type="button" id="aeInsertEditor2" data-i18n="ui.ae.insert_editor_slot_3" data-i18n-title="ui.ae.insert_editor_tt" style="padding:6px 12px;font-size:12px;">Editor (3)</button>
+                    <button class="btn btn-secondary" type="button" id="aeInsertEditor3" data-i18n="ui.ae.insert_editor_slot_4" data-i18n-title="ui.ae.insert_editor_tt" style="padding:6px 12px;font-size:12px;">Editor (4)</button>
+                </div>
                 <ul id="aePluginSlotList" style="margin:0;padding:0;list-style:none;font-size:12px;color:var(--text-dim);font-family:var(--font-mono,monospace);line-height:1.6;"></ul>
             </div>
         </div>
@@ -10017,44 +10048,44 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=27688"></script>
-<script src="js/utils.js?v=27688"></script>
-<script src="js/ipc.js?v=27688"></script>
-<script src="js/drag-reorder.js?v=27688"></script>
-<script src="js/modal-drag.js?v=27688"></script>
-<script src="js/columns.js?v=27688"></script>
-<script src="js/notes.js?v=27688"></script>
-<script src="js/favorites.js?v=27688"></script>
-<script src="js/export.js?v=27688"></script>
-<script src="js/plugins.js?v=27688"></script>
-<script src="js/settings.js?v=27688"></script>
-<script src="js/history.js?v=27688"></script>
-<script src="js/kvr.js?v=27688"></script>
-<script src="js/audio.js?v=27688"></script>
-<script src="js/daw.js?v=27688"></script>
-<script src="js/presets.js?v=27688"></script>
-<script src="js/disk-usage.js?v=27688"></script>
-<script src="js/batch-select.js?v=27688"></script>
-<script src="js/native-file-drag.js?v=27688"></script>
-<script src="js/sort-persist.js?v=27688"></script>
-<script src="js/multi-filter.js?v=27688"></script>
-<script src="js/file-browser.js?v=27688"></script>
-<script src="js/duplicates.js?v=27688"></script>
-<script src="js/command-palette.js?v=27688"></script>
-<script src="js/xref.js?v=27688"></script>
-<script src="js/dep-graph.js?v=27688"></script>
-<script src="js/smart-playlists.js?v=27688"></script>
-<script src="js/heatmap-dashboard.js?v=27688"></script>
-<script src="js/midi.js?v=27688"></script>
-<script src="js/pdf.js?v=27688"></script>
-<script src="js/settings-search.js?v=27688"></script>
-<script src="js/visualizer.js?v=27688"></script>
-<script src="js/walker-status.js?v=27688"></script>
-<script src="js/audio-engine.js?v=27688"></script>
-<script src="js/context-menu.js?v=27688"></script>
-<script src="js/shortcuts.js?v=27688"></script>
-<script src="js/help-overlay.js?v=27688"></script>
-<script src="js/keyboard-nav.js?v=27688"></script>
-<script src="js/app.js?v=27688"></script>
+<script src="js/i18n-ui.js?v=1710"></script>
+<script src="js/utils.js?v=1710"></script>
+<script src="js/ipc.js?v=1710"></script>
+<script src="js/drag-reorder.js?v=1710"></script>
+<script src="js/modal-drag.js?v=1710"></script>
+<script src="js/columns.js?v=1710"></script>
+<script src="js/notes.js?v=1710"></script>
+<script src="js/favorites.js?v=1710"></script>
+<script src="js/export.js?v=1710"></script>
+<script src="js/plugins.js?v=1710"></script>
+<script src="js/settings.js?v=1710"></script>
+<script src="js/history.js?v=1710"></script>
+<script src="js/kvr.js?v=1710"></script>
+<script src="js/audio.js?v=1710"></script>
+<script src="js/daw.js?v=1710"></script>
+<script src="js/presets.js?v=1710"></script>
+<script src="js/disk-usage.js?v=1710"></script>
+<script src="js/batch-select.js?v=1710"></script>
+<script src="js/native-file-drag.js?v=1710"></script>
+<script src="js/sort-persist.js?v=1710"></script>
+<script src="js/multi-filter.js?v=1710"></script>
+<script src="js/file-browser.js?v=1710"></script>
+<script src="js/duplicates.js?v=1710"></script>
+<script src="js/command-palette.js?v=1710"></script>
+<script src="js/xref.js?v=1710"></script>
+<script src="js/dep-graph.js?v=1710"></script>
+<script src="js/smart-playlists.js?v=1710"></script>
+<script src="js/heatmap-dashboard.js?v=1710"></script>
+<script src="js/midi.js?v=1710"></script>
+<script src="js/pdf.js?v=1710"></script>
+<script src="js/settings-search.js?v=1710"></script>
+<script src="js/visualizer.js?v=1710"></script>
+<script src="js/walker-status.js?v=1710"></script>
+<script src="js/audio-engine.js?v=1710"></script>
+<script src="js/context-menu.js?v=1710"></script>
+<script src="js/shortcuts.js?v=1710"></script>
+<script src="js/help-overlay.js?v=1710"></script>
+<script src="js/keyboard-nav.js?v=1710"></script>
+<script src="js/app.js?v=1710"></script>
 </body>
 </html>

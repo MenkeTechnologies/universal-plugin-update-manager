@@ -13,6 +13,9 @@ public:
 
     juce::var dispatch(const juce::var& req);
 
+    /** Close all hosted insert editor windows (JUCE message thread). Call before stopping the message loop. */
+    void shutdownEditors();
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl;

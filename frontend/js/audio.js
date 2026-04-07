@@ -347,6 +347,21 @@ let _reverseDecodeBusy = false;
 /** Library playback through `audio-engine` sidecar (no Web Audio output). */
 let _enginePlaybackActive = false;
 
+/**
+ * Waveform click-to-seek diagnostics. In DevTools, filter by `[audio-haxor] waveform-seek`.
+ * Set `window.__AUDIO_HAXOR_WAVEFORM_SEEK_LOG = false` to silence (default is on).
+ */
+function logWaveformSeek(phase, detail) {
+    try {
+        if (typeof window !== 'undefined' && window.__AUDIO_HAXOR_WAVEFORM_SEEK_LOG === false) return;
+        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+            console.warn('[audio-haxor] waveform-seek', phase, detail == null ? '' : detail);
+        }
+    } catch (_) {
+        /* ignore */
+    }
+}
+
 /** Audio Engine tab "Stop stream" calls `stop_output_stream` + `playback_stop`; sync JS so `isAudioPlaying()` matches. */
 function syncEnginePlaybackStoppedFromSidecar() {
     _enginePlaybackActive = false;
@@ -2536,36 +2551,92 @@ function updatePlaybackTime() {
 
 /** Seek current playback to a normalized position [0, 1]. Used by now-playing and metadata waveforms. */
 function seekPlaybackToPercent(pct) {
-    if (!audioPlayerPath) return;
     const p = Math.max(0, Math.min(1, pct));
-    if (_enginePlaybackActive && typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
+    const hasInvoke =
+        typeof window !== 'undefined' &&
+        window.vstUpdater &&
+        typeof window.vstUpdater.audioEngineInvoke === 'function';
+    logWaveformSeek('seekPlaybackToPercent', {
+        pct: p,
+        audioPlayerPath: audioPlayerPath || null,
+        enginePlaybackActive: _enginePlaybackActive,
+        hasAudioEngineInvoke: !!hasInvoke,
+        audioReverseMode,
+        hasReversedBuf: !!_reversedBuf,
+        durHintSec: typeof enginePlaybackDurationSec === 'function' ? enginePlaybackDurationSec() : null,
+        html5duration:
+            typeof audioPlayer !== 'undefined' && audioPlayer && Number.isFinite(audioPlayer.duration)
+                ? audioPlayer.duration
+                : audioPlayer?.duration,
+        html5muted: typeof audioPlayer !== 'undefined' && audioPlayer ? audioPlayer.muted : null,
+    });
+    if (!audioPlayerPath) {
+        logWaveformSeek('abort', { reason: 'no_audioPlayerPath' });
+        return;
+    }
+    if (_enginePlaybackActive && hasInvoke) {
         let dur = enginePlaybackDurationSec();
         if (dur <= 0) {
+            logWaveformSeek('engine_seek_async_duration', { dur, pct: p });
             void (async () => {
                 try {
                     const st = await window.vstUpdater.audioEngineInvoke({cmd: 'playback_status'});
+                    logWaveformSeek('engine_playback_status', { st });
                     if (st && st.ok === true && typeof st.duration_sec === 'number' && st.duration_sec > 0) {
                         window._enginePlaybackDurSec = st.duration_sec;
-                        await window.vstUpdater.audioEngineInvoke({cmd: 'playback_seek', position_sec: p * st.duration_sec});
+                        const pos = p * st.duration_sec;
+                        const seekRes = await window.vstUpdater.audioEngineInvoke({
+                            cmd: 'playback_seek',
+                            position_sec: pos,
+                        });
+                        logWaveformSeek('engine_playback_seek_result', { position_sec: pos, seekRes });
+                    } else {
+                        logWaveformSeek('engine_seek_skip', {
+                            reason: 'playback_status_missing_duration',
+                            st,
+                        });
                     }
-                } catch {
-                    /* ignore */
+                } catch (err) {
+                    logWaveformSeek('engine_seek_async_error', { err: err && err.message ? err.message : String(err) });
                 }
             })();
             return;
         }
-        void window.vstUpdater.audioEngineInvoke({cmd: 'playback_seek', position_sec: p * dur});
+        const pos = p * dur;
+        logWaveformSeek('engine_seek', { position_sec: pos, dur });
+        void (async () => {
+            try {
+                const seekRes = await window.vstUpdater.audioEngineInvoke({
+                    cmd: 'playback_seek',
+                    position_sec: pos,
+                });
+                logWaveformSeek('engine_playback_seek_result', { position_sec: pos, seekRes });
+            } catch (err) {
+                logWaveformSeek('engine_seek_error', { err: err && err.message ? err.message : String(err) });
+            }
+        })();
         return;
     }
     if (audioReverseMode && _reversedBuf) {
         const d = _reversedBuf.duration;
         const origT = p * d;
+        logWaveformSeek('reverse_buffer_seek', { d, origT });
         stopReverseBufferPlayback();
         startReverseBufferFromOffset(Math.max(0, d - origT));
         return;
     }
-    if (!audioPlayer.duration) return;
-    audioPlayer.currentTime = p * audioPlayer.duration;
+    if (!audioPlayer.duration) {
+        logWaveformSeek('abort', {
+            reason: 'html5_no_duration',
+            enginePlaybackActive: _enginePlaybackActive,
+            hasInvoke: !!hasInvoke,
+            hint: 'If output is from audio-engine but _enginePlaybackActive is false, seek IPC will not run.',
+        });
+        return;
+    }
+    const t = p * audioPlayer.duration;
+    logWaveformSeek('html5_seek', { currentTime: t, duration: audioPlayer.duration });
+    audioPlayer.currentTime = t;
 }
 
 /**
@@ -2609,17 +2680,30 @@ async function skipPlaybackSeconds(delta) {
 }
 
 function seekAudio(event) {
-    if (!audioPlayerPath) return;
+    logWaveformSeek('seekAudio', { hasPath: !!audioPlayerPath });
+    if (!audioPlayerPath) {
+        logWaveformSeek('seekAudio_abort', { reason: 'no_audioPlayerPath' });
+        return;
+    }
     const bar = document.getElementById('npWaveform');
-    if (!bar) return;
+    if (!bar) {
+        logWaveformSeek('seekAudio_abort', { reason: 'missing_npWaveform' });
+        return;
+    }
     const rect = bar.getBoundingClientRect();
-    if (rect.width <= 0) return;
+    if (rect.width <= 0) {
+        logWaveformSeek('seekAudio_abort', { reason: 'zero_width_rect', rect: { w: rect.width, h: rect.height } });
+        return;
+    }
     const pct = (event.clientX - rect.left) / rect.width;
+    logWaveformSeek('seekAudio', { clientX: event.clientX, pct, rectLeft: rect.left, rectWidth: rect.width });
     seekPlaybackToPercent(pct);
 }
 
 function setAudioVolume(value) {
     const vol = parseInt(value, 10) / 100;
+    const npSlider = document.getElementById('npVolume');
+    if (npSlider) npSlider.value = String(value);
     const npPct = document.getElementById('npVolumePct');
     if (npPct) npPct.textContent = value + '%';
     const aeV = document.getElementById('aeVolume');
@@ -2725,7 +2809,7 @@ async function expandMetaForPath(filePath) {
         items += metaItem('Permissions', meta.permissions);
 
         // Waveform preview with seek support
-        const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" data-action="seekMetaWaveform" title="Click to seek playback position">
+        const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" title="Click to seek playback position">
       <canvas id="metaWaveformCanvas" title="Waveform — click to seek"></canvas>
       <div class="waveform-progress-fill"></div>
       <div class="waveform-cursor" style="left:0;"></div>
@@ -3967,11 +4051,30 @@ function renderSpectrogramData(ctx, w, h, sgData) {
 
 function seekMetaWaveform(event) {
     const box = document.getElementById('metaWaveformBox');
-    if (!box) return;
-    if (!audioPlayerPath || audioPlayerPath !== box.dataset.path) return;
+    logWaveformSeek('seekMetaWaveform', {
+        hasBox: !!box,
+        boxPath: box?.dataset?.path || null,
+        audioPlayerPath: audioPlayerPath || null,
+    });
+    if (!box) {
+        logWaveformSeek('seekMetaWaveform_abort', { reason: 'missing_metaWaveformBox' });
+        return;
+    }
+    if (!audioPlayerPath || audioPlayerPath !== box.dataset.path) {
+        logWaveformSeek('seekMetaWaveform_abort', {
+            reason: 'path_mismatch',
+            expected: box.dataset.path || null,
+            current: audioPlayerPath || null,
+        });
+        return;
+    }
     const rect = box.getBoundingClientRect();
-    if (rect.width <= 0) return;
+    if (rect.width <= 0) {
+        logWaveformSeek('seekMetaWaveform_abort', { reason: 'zero_width_rect', rect: { w: rect.width, h: rect.height } });
+        return;
+    }
     const pct = (event.clientX - rect.left) / rect.width;
+    logWaveformSeek('seekMetaWaveform', { clientX: event.clientX, pct, rectLeft: rect.left, rectWidth: rect.width });
     seekPlaybackToPercent(pct);
 }
 
@@ -4507,4 +4610,26 @@ window.preloadAudioDecodeWorker = preloadAudioDecodeWorker;
     } else if (typeof globalThis !== 'undefined' && typeof globalThis.setTimeout === 'function') {
         globalThis.setTimeout(run, 2500);
     }
+})();
+
+/** Now-playing + expanded-row waveforms: pointerdown seeks (click delegation can miss in some WebViews; canvas is pointer-events:none). */
+(function initWaveformPointerSeek() {
+    function onPointerDown(e) {
+        if (e.button !== 0) return;
+        const t = e.target;
+        if (!t || (t.closest && t.closest('button, input, select, textarea'))) return;
+        const meta = typeof t.closest === 'function' ? t.closest('#metaWaveformBox') : null;
+        if (meta && typeof seekMetaWaveform === 'function') {
+            e.preventDefault();
+            seekMetaWaveform(e);
+            return;
+        }
+        const np = typeof t.closest === 'function' ? t.closest('#npWaveform') : null;
+        if (np && typeof seekAudio === 'function') {
+            e.preventDefault();
+            seekAudio(e);
+        }
+    }
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    document.addEventListener('pointerdown', onPointerDown, true);
 })();

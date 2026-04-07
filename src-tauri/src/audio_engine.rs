@@ -5,7 +5,8 @@
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::SystemTime;
 
 /// Placeholder struct kept for serde stability / future prefs sync.
@@ -26,10 +27,36 @@ struct EngineChild {
     child: Child,
     stdin: std::process::ChildStdin,
     stdout: BufReader<std::process::ChildStdout>,
+    /// Recent stderr from the sidecar (crash/assert output) for `app.log` when IPC fails.
+    stderr_tail: Arc<Mutex<String>>,
     /// Which binary we spawned; must respawn if [`resolve_audio_engine_binary`] starts returning a different path.
     binary_path: PathBuf,
     /// `metadata().modified()` + `len()` when spawned — same path can be overwritten when the sidecar is rebuilt.
     binary_identity: Option<(SystemTime, u64)>,
+}
+
+fn format_stderr_suffix(tail: &Arc<Mutex<String>>) -> String {
+    tail.lock()
+        .ok()
+        .map(|g| {
+            let s = g.trim();
+            if s.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " | stderr (last): {}",
+                    s.chars().take(800).collect::<String>()
+                )
+            }
+        })
+        .unwrap_or_default()
+}
+
+/// Log host-side IPC failure to `app.log`, appending recent sidecar stderr when available.
+fn log_ipc_failure(msg: impl Into<String>, tail: Option<&Arc<Mutex<String>>>) {
+    let msg = msg.into();
+    let suffix = tail.map(format_stderr_suffix).unwrap_or_default();
+    crate::write_app_log(format!("audio-engine IPC error: {msg}{suffix}"));
 }
 
 static ENGINE_CHILD: Mutex<Option<EngineChild>> = Mutex::new(None);
@@ -108,19 +135,50 @@ fn child_dead(child: &mut Child) -> bool {
 
 fn spawn_engine_child(path: &Path) -> Result<EngineChild, String> {
     let identity = std::fs::metadata(path).ok().map(|m| (m.modified().unwrap_or_else(|_| SystemTime::UNIX_EPOCH), m.len()));
+    let app_log = crate::history::get_data_dir().join("app.log");
     let mut child = Command::new(path)
+        .env("AUDIO_HAXOR_APP_LOG", app_log.as_os_str())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("spawn {}: {e}", path.display()))?;
+        .map_err(|e| {
+            log_ipc_failure(format!("failed to spawn {}: {e}", path.display()), None);
+            format!("spawn {}: {e}", path.display())
+        })?;
     let stdin = child.stdin.take().ok_or_else(|| "audio-engine: no stdin".to_string())?;
     let stdout = child.stdout.take().ok_or_else(|| "audio-engine: no stdout".to_string())?;
+    let stderr = child.stderr.take().ok_or_else(|| "audio-engine: no stderr".to_string())?;
+
+    let stderr_tail = Arc::new(Mutex::new(String::new()));
+    let tail_for_thread = Arc::clone(&stderr_tail);
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stderr);
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => break,
+                Ok(_) => {
+                    if let Ok(mut g) = tail_for_thread.lock() {
+                        g.push_str(&line);
+                        if g.len() > 8192 {
+                            let trim = g.len().saturating_sub(4096);
+                            g.drain(..trim);
+                        }
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
     let stdout = BufReader::new(stdout);
     Ok(EngineChild {
         child,
         stdin,
         stdout,
+        stderr_tail,
         binary_path: path.to_path_buf(),
         binary_identity: identity,
     })
@@ -145,6 +203,20 @@ fn ensure_engine_child(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Drop the long-lived `audio-engine` child so the next IPC spawns a fresh process.
+/// Use after a crash or when the sidecar stops responding.
+pub fn restart_audio_engine_child() -> Result<(), String> {
+    let mut guard = ENGINE_CHILD
+        .lock()
+        .map_err(|_| "audio-engine child mutex poisoned".to_string())?;
+    if let Some(mut eng) = guard.take() {
+        let _ = eng.child.kill();
+        let _ = eng.child.wait();
+    }
+    crate::write_app_log("audio-engine: sidecar process restarted (user request)".to_string());
+    Ok(())
+}
+
 /// Run one request against the audio-engine subprocess (stdin / stdout JSON lines).
 pub fn spawn_audio_engine_request(request: &serde_json::Value) -> Result<serde_json::Value, String> {
     spawn_audio_engine_request_at(request)
@@ -154,11 +226,14 @@ fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_js
     let payload = serde_json::to_string(request).map_err(|e| e.to_string())?;
 
     for attempt in 0..2 {
-        let path = resolve_audio_engine_binary()?;
+        let path = resolve_audio_engine_binary().map_err(|e| {
+            log_ipc_failure(format!("failed to resolve audio-engine binary: {e}"), None);
+            e
+        })?;
         ensure_engine_child(&path)?;
         let mut guard = ENGINE_CHILD
             .lock()
-            .map_err(|_| "audio-engine child mutex poisoned")?;
+            .map_err(|_| "audio-engine child mutex poisoned".to_string())?;
         let eng = guard.as_mut().ok_or_else(|| "audio-engine child missing".to_string())?;
 
         if eng
@@ -173,8 +248,10 @@ fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_js
             .and_then(|_| eng.stdin.flush().map_err(|e| format!("audio-engine stdin: {e}")))
             .is_err()
         {
+            let stderr_tail = Arc::clone(&eng.stderr_tail);
             *guard = None;
             if attempt == 1 {
+                log_ipc_failure("stdin write failed", Some(&stderr_tail));
                 return Err("audio-engine stdin write failed".to_string());
             }
             continue;
@@ -183,8 +260,13 @@ fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_js
         let mut line = String::new();
         match eng.stdout.read_line(&mut line) {
             Ok(0) => {
+                let stderr_tail = Arc::clone(&eng.stderr_tail);
                 *guard = None;
                 if attempt == 1 {
+                    log_ipc_failure(
+                        "sidecar closed stdout (process exited or crashed)",
+                        Some(&stderr_tail),
+                    );
                     return Err("audio-engine closed stdout".to_string());
                 }
                 continue;
@@ -192,14 +274,24 @@ fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_js
             Ok(_) => {
                 let line = line.trim();
                 if line.is_empty() {
+                    let stderr_tail = Arc::clone(&eng.stderr_tail);
                     *guard = None;
                     if attempt == 1 {
+                        log_ipc_failure("empty JSON line on stdout", Some(&stderr_tail));
                         return Err("audio-engine returned empty stdout".to_string());
                     }
                     continue;
                 }
-                let v: serde_json::Value = serde_json::from_str(line)
-                    .map_err(|e| format!("audio-engine JSON: {e}: {line}"))?;
+                let v: serde_json::Value = match serde_json::from_str(line) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log_ipc_failure(
+                            format!("invalid JSON on stdout: {e}; line={line:?}"),
+                            Some(&eng.stderr_tail),
+                        );
+                        return Err(format!("audio-engine JSON: {e}: {line}"));
+                    }
+                };
                 // Long-lived child can outlive a fresh `node scripts/build-audio-engine.mjs`; the old process may
                 // return `unknown cmd` for verbs added in a newer sidecar. Respawn once (see also
                 // [`ensure_engine_child`] binary identity). Retry even if `ok` is missing — some
@@ -215,13 +307,16 @@ fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_js
                 return Ok(v);
             }
             Err(e) => {
+                let stderr_tail = Arc::clone(&eng.stderr_tail);
                 *guard = None;
                 if attempt == 1 {
+                    log_ipc_failure(format!("stdout read: {e}"), Some(&stderr_tail));
                     return Err(format!("audio-engine stdout: {e}"));
                 }
             }
         }
     }
+    log_ipc_failure("request failed after retry", None);
     Err("audio-engine request failed after retry".to_string())
 }
 

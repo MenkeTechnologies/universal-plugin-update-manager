@@ -1,11 +1,17 @@
+#include "AppLog.hpp"
 #include "Engine.hpp"
 
 #include <bit>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <thread>
 #include <unordered_map>
+
+#include <juce_events/juce_events.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -47,6 +53,16 @@ static juce::String cmdKey(const juce::var& req)
     return {};
 }
 
+/** JUCE dead-man's-pedal: plugins that crash during scan are deferred to the end on later runs. */
+static juce::File deadMansPedalFilePath()
+{
+    juce::File dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                         .getChildFile("MenkeTechnologies")
+                         .getChildFile("audio-haxor");
+    (void) dir.createDirectory();
+    return dir.getChildFile("plugin-scan-dead-mans-pedal.txt");
+}
+
 static juce::var bufferSizeJson(juce::AudioIODevice* dev)
 {
     if (dev == nullptr)
@@ -86,54 +102,106 @@ static juce::String uniqueDeviceId(const juce::String& name, std::unordered_map<
     return name + "#" + juce::String((int) it->second);
 }
 
-static void enumerateOutputIds(juce::StringArray& outIds, juce::StringArray& outNames)
+static void copyDeviceType(const juce::AudioDeviceManager& src, juce::AudioDeviceManager& dst)
+{
+    const juce::String t = src.getCurrentAudioDeviceType();
+    if (t.isNotEmpty())
+        dst.setCurrentAudioDeviceType(t, false);
+}
+
+/** Platform device-type objects not wired into `dm`'s internal list — avoids `getAvailableDeviceTypes()` → `scanDevicesIfNeeded()` (fragile with two managers in one process). */
+static void createFreshDeviceTypes(juce::AudioDeviceManager& dm, juce::OwnedArray<juce::AudioIODeviceType>& out)
+{
+    out.clear();
+    dm.createAudioDeviceTypes(out);
+}
+
+static void enumerateOutputIds(juce::AudioDeviceManager& dm, juce::StringArray& outIds, juce::StringArray& outNames)
 {
     outIds.clear();
     outNames.clear();
-    juce::AudioDeviceManager dm;
-    dm.initialise(0, 2, nullptr, true);
-    juce::AudioIODeviceType* t = dm.getCurrentDeviceTypeObject();
-    if (t == nullptr)
-        return;
-    const juce::StringArray names = t->getDeviceNames(false);
     std::unordered_map<juce::String, uint32_t> seen;
-    for (int i = 0; i < names.size(); ++i)
+    if (auto* t = dm.getCurrentDeviceTypeObject())
     {
-        const juce::String& n = names[i];
-        outNames.add(n);
-        outIds.add(uniqueDeviceId(n, seen));
+        const juce::StringArray names = t->getDeviceNames(false);
+        for (int i = 0; i < names.size(); ++i)
+        {
+            const juce::String& n = names[i];
+            outNames.add(n);
+            outIds.add(uniqueDeviceId(n, seen));
+        }
+    }
+    if (outNames.isEmpty())
+    {
+        juce::OwnedArray<juce::AudioIODeviceType> types;
+        createFreshDeviceTypes(dm, types);
+        for (auto* t : types)
+        {
+            if (t == nullptr)
+                continue;
+            t->scanForDevices();
+            const juce::StringArray names = t->getDeviceNames(false);
+            for (int i = 0; i < names.size(); ++i)
+            {
+                const juce::String& n = names[i];
+                if (outNames.contains(n))
+                    continue;
+                outNames.add(n);
+                outIds.add(uniqueDeviceId(n, seen));
+            }
+        }
     }
 }
 
-static void enumerateInputIds(juce::StringArray& outIds, juce::StringArray& outNames)
+static void enumerateInputIds(juce::AudioDeviceManager& dm, juce::StringArray& outIds, juce::StringArray& outNames)
 {
     outIds.clear();
     outNames.clear();
-    juce::AudioDeviceManager dm;
-    dm.initialise(2, 0, nullptr, true);
-    juce::AudioIODeviceType* t = dm.getCurrentDeviceTypeObject();
-    if (t == nullptr)
-        return;
-    const juce::StringArray names = t->getDeviceNames(true);
     std::unordered_map<juce::String, uint32_t> seen;
-    for (int i = 0; i < names.size(); ++i)
+    if (auto* t = dm.getCurrentDeviceTypeObject())
     {
-        const juce::String& n = names[i];
-        outNames.add(n);
-        outIds.add(uniqueDeviceId(n, seen));
+        const juce::StringArray names = t->getDeviceNames(true);
+        for (int i = 0; i < names.size(); ++i)
+        {
+            const juce::String& n = names[i];
+            outNames.add(n);
+            outIds.add(uniqueDeviceId(n, seen));
+        }
+    }
+    if (outNames.isEmpty())
+    {
+        juce::OwnedArray<juce::AudioIODeviceType> types;
+        createFreshDeviceTypes(dm, types);
+        for (auto* t : types)
+        {
+            if (t == nullptr)
+                continue;
+            t->scanForDevices();
+            const juce::StringArray names = t->getDeviceNames(true);
+            for (int i = 0; i < names.size(); ++i)
+            {
+                const juce::String& n = names[i];
+                if (outNames.contains(n))
+                    continue;
+                outNames.add(n);
+                outIds.add(uniqueDeviceId(n, seen));
+            }
+        }
     }
 }
 
-static juce::String resolveOutputDeviceName(const juce::String& id)
+static juce::String resolveOutputDeviceName(juce::AudioDeviceManager& dm, const juce::String& id)
 {
     juce::StringArray ids, names;
-    enumerateOutputIds(ids, names);
+    enumerateOutputIds(dm, ids, names);
     if (id.isEmpty())
     {
-        juce::AudioDeviceManager dm;
-        dm.initialise(0, 2, nullptr, true);
         juce::AudioIODevice* dev = dm.getCurrentAudioDevice();
-        return dev != nullptr ? dev->getName() : juce::String();
+        if (dev != nullptr)
+            return dev->getName();
+        if (names.size() > 0)
+            return names[0];
+        return {};
     }
     for (int i = 0; i < ids.size(); ++i)
         if (ids[i] == id)
@@ -147,16 +215,18 @@ static juce::String resolveOutputDeviceName(const juce::String& id)
     return {};
 }
 
-static juce::String resolveInputDeviceName(const juce::String& id)
+static juce::String resolveInputDeviceName(juce::AudioDeviceManager& dm, const juce::String& id)
 {
     juce::StringArray ids, names;
-    enumerateInputIds(ids, names);
+    enumerateInputIds(dm, ids, names);
     if (id.isEmpty())
     {
-        juce::AudioDeviceManager dm;
-        dm.initialise(2, 0, nullptr, true);
         juce::AudioIODevice* dev = dm.getCurrentAudioDevice();
-        return dev != nullptr ? dev->getName() : juce::String();
+        if (dev != nullptr)
+            return dev->getName();
+        if (names.size() > 0)
+            return names[0];
+        return {};
     }
     for (int i = 0; i < ids.size(); ++i)
         if (ids[i] == id)
@@ -170,20 +240,20 @@ static juce::String resolveInputDeviceName(const juce::String& id)
     return {};
 }
 
-static juce::String outputIdForDeviceName(const juce::String& deviceName)
+static juce::String outputIdForDeviceName(juce::AudioDeviceManager& dm, const juce::String& deviceName)
 {
     juce::StringArray ids, names;
-    enumerateOutputIds(ids, names);
+    enumerateOutputIds(dm, ids, names);
     for (int i = 0; i < names.size(); ++i)
         if (names[i] == deviceName)
             return ids[i];
     return deviceName;
 }
 
-static juce::String inputIdForDeviceName(const juce::String& deviceName)
+static juce::String inputIdForDeviceName(juce::AudioDeviceManager& dm, const juce::String& deviceName)
 {
     juce::StringArray ids, names;
-    enumerateInputIds(ids, names);
+    enumerateInputIds(dm, ids, names);
     for (int i = 0; i < names.size(); ++i)
         if (names[i] == deviceName)
             return ids[i];
@@ -240,6 +310,99 @@ static void applyDspFrame(float& l, float& r, double sr, const DspAtomics& dsp, 
     r = (float) (dr * std::sin(ang));
 }
 
+/** Stereo insert chain (VST3 / AU) after file decode + built-in DSP. Not applied in reverse-playback mode (sample-at-a-time path). */
+class InsertChainRunner
+{
+public:
+    std::vector<std::unique_ptr<juce::AudioPluginInstance>> instances;
+    std::vector<juce::String> paths;
+
+    bool isActive() const { return !instances.empty(); }
+
+    void release()
+    {
+        for (auto& p : instances)
+            if (p != nullptr)
+                p->releaseResources();
+    }
+
+    void clear()
+    {
+        release();
+        instances.clear();
+        paths.clear();
+    }
+
+    void prepare(double sr, int maxBlock)
+    {
+        scratch.setSize(2, juce::jmax(1, maxBlock), false, false, true);
+        for (auto& p : instances)
+            if (p != nullptr)
+                p->prepareToPlay(sr, maxBlock);
+    }
+
+    void process(juce::AudioBuffer<float>& buf, int start, int n)
+    {
+        if (instances.empty() || n <= 0)
+            return;
+        if (scratch.getNumSamples() < n)
+            scratch.setSize(2, n, false, false, true);
+        scratch.copyFrom(0, 0, buf, 0, start, n);
+        scratch.copyFrom(1, 0, buf, 1, start, n);
+        juce::MidiBuffer midi;
+        for (auto& p : instances)
+            if (p != nullptr)
+                p->processBlock(scratch, midi);
+        buf.copyFrom(0, start, scratch, 0, 0, n);
+        buf.copyFrom(1, start, scratch, 1, 0, n);
+    }
+
+private:
+    juce::AudioBuffer<float> scratch;
+};
+
+/** Native VST3/AU editor window; must be created/destroyed on the JUCE message thread. */
+class PluginEditorHostWindow : public juce::DocumentWindow
+{
+public:
+    PluginEditorHostWindow(int chainSlot, std::function<void(int)> onClose, juce::AudioPluginInstance& inst)
+        : DocumentWindow(inst.getName() + " (insert)", juce::Colours::lightgrey, DocumentWindow::allButtons),
+          slot(chainSlot),
+          closeFn(std::move(onClose))
+    {
+        setUsingNativeTitleBar(true);
+        inst.suspendProcessing(true);
+        juce::AudioProcessorEditor* ed = inst.createEditorIfNeeded();
+        inst.suspendProcessing(false);
+        if (ed != nullptr)
+        {
+            setContentOwned(ed, true);
+            const int w = juce::jmax(200, ed->getWidth());
+            const int h = juce::jmax(150, ed->getHeight());
+            setSize(w, h);
+        }
+        setResizable(true, true);
+    }
+
+    bool hasEditorContent() const { return getContentComponent() != nullptr; }
+
+    void closeButtonPressed() override
+    {
+        if (!closeFn)
+            return;
+        const int s = slot;
+        std::function<void(int)> fn = closeFn;
+        juce::MessageManager::callAsync([fn, s]() {
+            if (fn)
+                fn(s);
+        });
+    }
+
+private:
+    int slot = -1;
+    std::function<void(int)> closeFn;
+};
+
 class ToneAudioSource final : public juce::AudioSource
 {
 public:
@@ -289,6 +452,7 @@ public:
     std::atomic<float>* peak = nullptr;
     juce::dsp::IIR::Filter<float> lowL, lowR, midL, midR, hiL, hiR;
     double processRate = 44100.0;
+    InsertChainRunner* insertChain = nullptr;
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override
     {
@@ -305,12 +469,16 @@ public:
         hiR.prepare(spec);
         if (readerSource != nullptr)
             readerSource->prepareToPlay(samplesPerBlockExpected, sampleRate);
+        if (insertChain != nullptr)
+            insertChain->prepare(sampleRate, samplesPerBlockExpected);
     }
 
     void releaseResources() override
     {
         if (readerSource != nullptr)
             readerSource->releaseResources();
+        if (insertChain != nullptr)
+            insertChain->release();
     }
 
     void setNextReadPosition(juce::int64 newPosition) override
@@ -390,6 +558,7 @@ public:
                     peak->store(pk);
                 }
             }
+            /* Reverse path is sample-wise; VST block processing skipped. */
             return;
         }
 
@@ -424,6 +593,9 @@ public:
                 peak->store(pk);
             }
         }
+
+        if (insertChain != nullptr && insertChain->isActive())
+            insertChain->process(*bufferToFill.buffer, bufferToFill.startSample, n);
     }
 };
 
@@ -499,42 +671,332 @@ struct Engine::Impl
     bool reverseWanted = false;
     bool paused = false;
 
-    juce::KnownPluginList pluginList;
     juce::VST3PluginFormat vst3;
 #if JUCE_MAC
     juce::AudioUnitPluginFormat auFormat;
 #endif
-    bool pluginScanDone = false;
+    juce::AudioPluginFormatManager pluginFormatManager;
+    std::unique_ptr<InsertChainRunner> insertRunner;
+    std::vector<std::unique_ptr<PluginEditorHostWindow>> insertEditorWindows;
+
+    enum class PluginScanPhase
+    {
+        Idle,
+        Running,
+        Done,
+        Failed
+    };
+
+    std::mutex pluginScanMutex;
+    std::thread pluginScanThread;
+    juce::Array<juce::PluginDescription> pluginScanCache;
+    PluginScanPhase pluginScanPhase = PluginScanPhase::Idle;
+    juce::String pluginScanLastError;
 
     Impl()
     {
         formatManager.registerBasicFormats();
         outputManager.initialise(0, 2, nullptr, true);
         inputManager.initialise(2, 0, nullptr, true);
+        pluginFormatManager.addDefaultFormats();
     }
 
-    void scanPluginsOnce()
+    ~Impl()
     {
-        if (pluginScanDone)
-            return;
+        if (pluginScanThread.joinable())
+            pluginScanThread.join();
+    }
+
+    static void scanPluginFormatWithRecovery(juce::KnownPluginList& list, juce::AudioPluginFormat& format, const juce::FileSearchPath& dirs,
+                                             const juce::File& deadMans)
+    {
         juce::String name;
+        juce::PluginDirectoryScanner scanner(list, format, dirs, true, deadMans, false);
+        for (;;)
         {
-            const juce::FileSearchPath dirs = vst3.getDefaultLocationsToSearch();
-            juce::PluginDirectoryScanner scanner(pluginList, vst3, dirs, true, {});
-            while (scanner.scanNextFile(true, name))
+            bool more = false;
+            try
             {
+                more = scanner.scanNextFile(true, name);
             }
+            catch (const std::exception&)
+            {
+                continue;
+            }
+            catch (...)
+            {
+                continue;
+            }
+            if (!more)
+                break;
         }
+    }
+
+    void runPluginScanWorker()
+    {
+        juce::KnownPluginList list;
+        const juce::File deadMans = deadMansPedalFilePath();
+        try
+        {
+            {
+                const juce::FileSearchPath dirs = vst3.getDefaultLocationsToSearch();
+                scanPluginFormatWithRecovery(list, vst3, dirs, deadMans);
+            }
 #if JUCE_MAC
-        {
-            const juce::FileSearchPath auDirs = auFormat.getDefaultLocationsToSearch();
-            juce::PluginDirectoryScanner scanner(pluginList, auFormat, auDirs, true, {});
-            while (scanner.scanNextFile(true, name))
             {
+                const juce::FileSearchPath auDirs = auFormat.getDefaultLocationsToSearch();
+                scanPluginFormatWithRecovery(list, auFormat, auDirs, deadMans);
+            }
+#endif
+        }
+        catch (const std::exception& e)
+        {
+            std::lock_guard<std::mutex> lock(pluginScanMutex);
+            pluginScanPhase = PluginScanPhase::Failed;
+            pluginScanLastError = "scan failed: " + juce::String(e.what());
+            return;
+        }
+        catch (...)
+        {
+            std::lock_guard<std::mutex> lock(pluginScanMutex);
+            pluginScanPhase = PluginScanPhase::Failed;
+            pluginScanLastError = "scan failed: unknown exception";
+            return;
+        }
+
+        const juce::Array<juce::PluginDescription> types = list.getTypes();
+        std::lock_guard<std::mutex> lock(pluginScanMutex);
+        pluginScanCache = types;
+        pluginScanPhase = PluginScanPhase::Done;
+    }
+
+    juce::var pluginChainLocked()
+    {
+        juce::Array<juce::var> slotRows;
+        juce::Array<juce::var> insertPathVars;
+        if (insertRunner != nullptr)
+        {
+            for (const auto& p : insertRunner->paths)
+            {
+                insertPathVars.add(p);
+                auto* slot = new juce::DynamicObject();
+                slot->setProperty("path", p);
+                slotRows.add(slot);
             }
         }
+
+        juce::Array<juce::var> fmts;
+        fmts.add("VST3");
+#if JUCE_MAC
+        fmts.add("AU");
 #endif
-        pluginScanDone = true;
+
+        std::lock_guard<std::mutex> scanLock(pluginScanMutex);
+        if (pluginScanPhase == PluginScanPhase::Failed)
+        {
+            const juce::String err = pluginScanLastError;
+            pluginScanPhase = PluginScanPhase::Idle;
+            pluginScanLastError.clear();
+            juce::var out = okObj();
+            if (auto* o = out.getDynamicObject())
+            {
+                o->setProperty("phase", "failed");
+                o->setProperty("api_version", 2);
+                o->setProperty("slots", juce::var(slotRows));
+                o->setProperty("insert_paths", juce::var(insertPathVars));
+                o->setProperty("formats_planned", juce::var(fmts));
+                o->setProperty("plugins", juce::Array<juce::var>());
+                o->setProperty("plugin_count", 0);
+                o->setProperty("error", err);
+                o->setProperty("note", err.isNotEmpty() ? err : juce::String("plugin scan failed"));
+            }
+            return out;
+        }
+
+        if (pluginScanPhase == PluginScanPhase::Idle)
+        {
+            pluginScanPhase = PluginScanPhase::Running;
+            if (pluginScanThread.joinable())
+                pluginScanThread.join();
+            pluginScanThread = std::thread([this]() { runPluginScanWorker(); });
+            juce::var out = okObj();
+            if (auto* o = out.getDynamicObject())
+            {
+                o->setProperty("phase", "scanning");
+                o->setProperty("api_version", 2);
+                o->setProperty("slots", juce::var(slotRows));
+                o->setProperty("insert_paths", juce::var(insertPathVars));
+                o->setProperty("formats_planned", juce::var(fmts));
+                o->setProperty("plugins", juce::Array<juce::var>());
+                o->setProperty("plugin_count", 0);
+                o->setProperty("note", "JUCE plugin scan running on background thread; poll plugin_chain until phase is not scanning.");
+            }
+            return out;
+        }
+
+        if (pluginScanPhase == PluginScanPhase::Running)
+        {
+            juce::var out = okObj();
+            if (auto* o = out.getDynamicObject())
+            {
+                o->setProperty("phase", "scanning");
+                o->setProperty("api_version", 2);
+                o->setProperty("slots", juce::var(slotRows));
+                o->setProperty("insert_paths", juce::var(insertPathVars));
+                o->setProperty("formats_planned", juce::var(fmts));
+                o->setProperty("plugins", juce::Array<juce::var>());
+                o->setProperty("plugin_count", 0);
+                o->setProperty("note", "JUCE plugin scan running on background thread; poll plugin_chain until phase is not scanning.");
+            }
+            return out;
+        }
+
+        juce::Array<juce::var> plugins;
+        for (const auto& t : pluginScanCache)
+        {
+            auto* row = new juce::DynamicObject();
+            row->setProperty("name", t.name);
+            row->setProperty("format", t.pluginFormatName);
+            row->setProperty("path", t.fileOrIdentifier);
+            plugins.add(row);
+        }
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("phase", "juce");
+            o->setProperty("api_version", 2);
+            o->setProperty("slots", juce::var(slotRows));
+            o->setProperty("insert_paths", juce::var(insertPathVars));
+            o->setProperty("formats_planned", juce::var(fmts));
+            o->setProperty("plugins", juce::var(plugins));
+            o->setProperty("plugin_count", plugins.size());
+            o->setProperty(
+                "note",
+                "playback_set_inserts loads VST3/AU; order is serial before device. Stop output stream first. "
+                "playback_open_insert_editor opens native plug-in UIs (chain slot index).");
+        }
+        return out;
+    }
+
+    juce::var playbackSetInsertsLocked(const juce::var& req)
+    {
+        closeAllInsertEditorsLocked();
+        if (outputRunning)
+            return errObj("stop_output_stream before changing inserts");
+        const juce::var pathsVar = req["paths"];
+        if (!pathsVar.isArray())
+            return errObj("paths must be an array");
+        auto* arr = pathsVar.getArray();
+        if (arr == nullptr)
+            return errObj("paths must be an array");
+        if (arr->isEmpty())
+        {
+            insertRunner.reset();
+            juce::var out = okObj();
+            if (auto* o = out.getDynamicObject())
+            {
+                juce::Array<juce::var> empty;
+                o->setProperty("insert_paths", juce::var(empty));
+            }
+            return out;
+        }
+        auto next = std::make_unique<InsertChainRunner>();
+        constexpr int kMaxSlots = 8;
+        for (int i = 0; i < arr->size() && i < kMaxSlots; ++i)
+        {
+            const juce::String path = (*arr)[i].toString();
+            if (path.isEmpty())
+                continue;
+            const juce::File f(path);
+            if (!f.existsAsFile())
+            {
+                next->clear();
+                return errObj("not a file: " + path);
+            }
+            juce::OwnedArray<juce::PluginDescription> types;
+            vst3.findAllTypesForFile(types, f.getFullPathName());
+#if JUCE_MAC
+            if (types.isEmpty())
+                auFormat.findAllTypesForFile(types, f.getFullPathName());
+#endif
+            if (types.isEmpty())
+            {
+                next->clear();
+                return errObj("no plugin type in file: " + path);
+            }
+            juce::String err;
+            auto inst = pluginFormatManager.createPluginInstance(*types[0], 44100.0, 512, err);
+            if (inst == nullptr)
+            {
+                next->clear();
+                return errObj("plugin load failed: " + err);
+            }
+            next->paths.push_back(path);
+            next->instances.push_back(std::move(inst));
+        }
+        insertRunner = std::move(next);
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            juce::Array<juce::var> pathVars;
+            for (const auto& p : insertRunner->paths)
+                pathVars.add(p);
+            o->setProperty("insert_paths", juce::var(pathVars));
+        }
+        return out;
+    }
+
+    void closeAllInsertEditorsLocked()
+    {
+        insertEditorWindows.clear();
+    }
+
+    void requestCloseInsertEditor(int slot)
+    {
+        juce::MessageManager::callAsync([this, slot]() {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (slot >= 0 && slot < (int) insertEditorWindows.size())
+                insertEditorWindows[(size_t) slot].reset();
+        });
+    }
+
+    juce::var openInsertEditorLocked(const juce::var& req)
+    {
+        const int slot = (int) req["slot"];
+        if (insertRunner == nullptr || slot < 0 || slot >= (int) insertRunner->instances.size())
+            return errObj("invalid insert slot");
+        juce::AudioPluginInstance* inst = insertRunner->instances[(size_t) slot].get();
+        if (inst == nullptr)
+            return errObj("empty insert slot");
+
+        insertEditorWindows.resize(insertRunner->instances.size());
+        insertEditorWindows[(size_t) slot].reset();
+
+        auto w = std::make_unique<PluginEditorHostWindow>(
+            slot,
+            [this](int s) { requestCloseInsertEditor(s); },
+            *inst);
+        if (!w->hasEditorContent())
+        {
+            w.reset();
+            return errObj("plugin has no editor");
+        }
+        insertEditorWindows[(size_t) slot] = std::move(w);
+        insertEditorWindows[(size_t) slot]->setVisible(true);
+        insertEditorWindows[(size_t) slot]->toFront(true);
+        return okObj();
+    }
+
+    juce::var closeInsertEditorLocked(const juce::var& req)
+    {
+        const int slot = (int) req["slot"];
+        if (insertRunner == nullptr || slot < 0)
+            return errObj("invalid insert slot");
+        insertEditorWindows.resize(insertRunner->instances.size());
+        if (slot >= (int) insertEditorWindows.size())
+            return errObj("invalid insert slot");
+        insertEditorWindows[(size_t) slot].reset();
+        return okObj();
     }
 
     void stopOutputLocked()
@@ -577,11 +1039,14 @@ struct Engine::Impl
         reverseWanted = false;
         paused = false;
         playbackPeak.store(0.0f);
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("duration_sec", sessionDurationSec);
-        o->setProperty("sample_rate_hz", (int) sessionSrcRate);
-        o->setProperty("track_id", 0);
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("duration_sec", sessionDurationSec);
+            o->setProperty("sample_rate_hz", (int) sessionSrcRate);
+            o->setProperty("track_id", 0);
+        }
+        return out;
     }
 
     juce::var playbackStopLocked()
@@ -617,7 +1082,7 @@ struct Engine::Impl
         if (startPlayback && sessionPath.isEmpty())
             return errObj("playback_load required before start_playback");
 
-        juce::String devName = resolveOutputDeviceName(deviceId);
+        juce::String devName = resolveOutputDeviceName(outputManager, deviceId);
         if (devName.isEmpty() && !deviceId.isEmpty())
             return errObj("unknown device_id: " + deviceId);
 
@@ -628,7 +1093,14 @@ struct Engine::Impl
         if (bf > 0)
             setup.bufferSize = (int) bf;
 
-        if (startPlayback)
+        const bool userSr = req.hasProperty("sample_rate_hz") && !req["sample_rate_hz"].isVoid();
+        if (userSr)
+        {
+            const double sr = (double) (int) req["sample_rate_hz"];
+            if (sr > 1000.0)
+                setup.sampleRate = sr;
+        }
+        else if (startPlayback)
         {
             std::unique_ptr<juce::AudioFormatReader> probe(formatManager.createReaderFor(juce::File(sessionPath)));
             if (probe == nullptr)
@@ -643,7 +1115,7 @@ struct Engine::Impl
 
         deviceRate.store((uint32_t) dev->getCurrentSampleRate());
 
-        outDeviceId = outputIdForDeviceName(dev->getName());
+        outDeviceId = outputIdForDeviceName(outputManager, dev->getName());
         outDeviceName = dev->getName();
         outSampleRate = (int) dev->getCurrentSampleRate();
         outChannels = juce::jmax(1, dev->getActiveOutputChannels().countNumberOfSetBits());
@@ -700,6 +1172,7 @@ struct Engine::Impl
             }
 
             transport.setSource(fileSource.get(), 0, nullptr, (double) sessionSrcRate);
+            fileSource->insertChain = insertRunner.get();
             sourcePlayer.setSource(&transport);
             outputManager.addAudioCallback(&sourcePlayer);
             transport.start();
@@ -718,18 +1191,21 @@ struct Engine::Impl
 
         outputRunning = true;
 
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("device_id", outDeviceId);
-        o->setProperty("device_name", outDeviceName);
-        o->setProperty("sample_rate_hz", outSampleRate);
-        o->setProperty("channels", outChannels);
-        o->setProperty("sample_format", juce::String("F32"));
-        o->setProperty("buffer_size", outBufferSizeJson);
-        o->setProperty("stream_buffer_frames", outStreamBufferFrames.has_value() ? juce::var(*outStreamBufferFrames) : juce::var());
-        o->setProperty("tone_supported", true);
-        o->setProperty("tone_on", !startPlayback && tone);
-        o->setProperty("note", startPlayback ? juce::String("file playback via JUCE") : juce::String("silence or test tone"));
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("device_id", outDeviceId);
+            o->setProperty("device_name", outDeviceName);
+            o->setProperty("sample_rate_hz", outSampleRate);
+            o->setProperty("channels", outChannels);
+            o->setProperty("sample_format", juce::String("F32"));
+            o->setProperty("buffer_size", outBufferSizeJson);
+            o->setProperty("stream_buffer_frames", outStreamBufferFrames.has_value() ? juce::var(*outStreamBufferFrames) : juce::var());
+            o->setProperty("tone_supported", true);
+            o->setProperty("tone_on", !startPlayback && tone);
+            o->setProperty("note", startPlayback ? juce::String("file playback via JUCE") : juce::String("silence or test tone"));
+        }
+        return out;
     }
 
     juce::var startInputStreamLocked(const juce::var& req)
@@ -743,7 +1219,7 @@ struct Engine::Impl
         stopInputLocked();
 
         const juce::String deviceId = req["device_id"].toString();
-        juce::String devName = resolveInputDeviceName(deviceId);
+        juce::String devName = resolveInputDeviceName(inputManager, deviceId);
         if (devName.isEmpty() && !deviceId.isEmpty())
             return errObj("unknown device_id: " + deviceId);
 
@@ -753,13 +1229,19 @@ struct Engine::Impl
         setup.outputDeviceName = "";
         if (bf > 0)
             setup.bufferSize = (int) bf;
+        if (req.hasProperty("sample_rate_hz") && !req["sample_rate_hz"].isVoid())
+        {
+            const double sr = (double) (int) req["sample_rate_hz"];
+            if (sr > 1000.0)
+                setup.sampleRate = sr;
+        }
 
         inputManager.setAudioDeviceSetup(setup, true);
         juce::AudioIODevice* dev = inputManager.getCurrentAudioDevice();
         if (dev == nullptr)
             return errObj("no input device");
 
-        inDeviceId = inputIdForDeviceName(dev->getName());
+        inDeviceId = inputIdForDeviceName(inputManager, dev->getName());
         inDeviceName = dev->getName();
         inSampleRate = (int) dev->getCurrentSampleRate();
         inChannels = juce::jmax(1, dev->getActiveInputChannels().countNumberOfSetBits());
@@ -771,28 +1253,33 @@ struct Engine::Impl
 
         inputRunning = true;
 
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("device_id", inDeviceId);
-        o->setProperty("device_name", inDeviceName);
-        o->setProperty("sample_rate_hz", inSampleRate);
-        o->setProperty("channels", inChannels);
-        o->setProperty("sample_format", juce::String("F32"));
-        o->setProperty("buffer_size", inBufferSizeJson);
-        o->setProperty("stream_buffer_frames", inStreamBufferFrames.has_value() ? juce::var(*inStreamBufferFrames) : juce::var());
-        o->setProperty("input_peak", 0.0);
-        o->setProperty("note", "input capture running; samples discarded; input_peak is block peak with decay");
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("device_id", inDeviceId);
+            o->setProperty("device_name", inDeviceName);
+            o->setProperty("sample_rate_hz", inSampleRate);
+            o->setProperty("channels", inChannels);
+            o->setProperty("sample_format", juce::String("F32"));
+            o->setProperty("buffer_size", inBufferSizeJson);
+            o->setProperty("stream_buffer_frames", inStreamBufferFrames.has_value() ? juce::var(*inStreamBufferFrames) : juce::var());
+            o->setProperty("input_peak", 0.0);
+            o->setProperty("note", "input capture running; samples discarded; input_peak is block peak with decay");
+        }
+        return out;
     }
 
     juce::var playbackStatusLocked()
     {
+        juce::var out = okObj();
+        auto* o = out.getDynamicObject();
+        if (o == nullptr)
+            return out;
         if (sessionPath.isEmpty())
         {
-            auto* o = okObj().getDynamicObject();
             o->setProperty("loaded", false);
-            return o;
+            return out;
         }
-        auto* o = okObj().getDynamicObject();
         o->setProperty("loaded", true);
         o->setProperty("duration_sec", sessionDurationSec);
         o->setProperty("sample_rate_hz", (int) deviceRate.load());
@@ -804,7 +1291,7 @@ struct Engine::Impl
             o->setProperty("peak", playbackPeak.load());
             o->setProperty("paused", false);
             o->setProperty("eof", false);
-            return o;
+            return out;
         }
         const double posSrc = transport.getCurrentPosition();
         double pos = reverseWanted ? (sessionDurationSec - posSrc) : posSrc;
@@ -813,7 +1300,7 @@ struct Engine::Impl
         o->setProperty("peak", playbackPeak.load());
         o->setProperty("paused", paused);
         o->setProperty("eof", transport.hasStreamFinished());
-        return o;
+        return out;
     }
 
     juce::var outputStreamStatusLocked()
@@ -901,6 +1388,8 @@ juce::var Engine::dispatch(const juce::var& req)
 {
     std::lock_guard<std::mutex> lock(impl->mutex);
     const juce::String cmd = cmdKey(req);
+    if (cmd.isNotEmpty() && cmd != "ping")
+        appLogLine("cmd " + cmd);
 
     if (cmd == "ping")
     {
@@ -923,11 +1412,9 @@ juce::var Engine::dispatch(const juce::var& req)
     if (cmd == "list_output_devices")
     {
         juce::StringArray ids, names;
-        enumerateOutputIds(ids, names);
+        enumerateOutputIds(impl->outputManager, ids, names);
         juce::String defaultId;
-        juce::AudioDeviceManager dm;
-        dm.initialise(0, 2, nullptr, true);
-        juce::AudioIODevice* cur = dm.getCurrentAudioDevice();
+        juce::AudioIODevice* cur = impl->outputManager.getCurrentAudioDevice();
         const juce::String curName = cur != nullptr ? cur->getName() : juce::String();
         for (int i = 0; i < names.size(); ++i)
             if (names[i] == curName)
@@ -941,20 +1428,21 @@ juce::var Engine::dispatch(const juce::var& req)
             row->setProperty("is_default", ids[i] == defaultId);
             rows.add(row);
         }
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("default_device_id", defaultId.isEmpty() ? juce::var() : juce::var(defaultId));
-        o->setProperty("devices", juce::var(rows));
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("default_device_id", defaultId.isEmpty() ? juce::var() : juce::var(defaultId));
+            o->setProperty("devices", juce::var(rows));
+        }
+        return out;
     }
 
     if (cmd == "list_input_devices")
     {
         juce::StringArray ids, names;
-        enumerateInputIds(ids, names);
+        enumerateInputIds(impl->inputManager, ids, names);
         juce::String defaultId;
-        juce::AudioDeviceManager dm;
-        dm.initialise(2, 0, nullptr, true);
-        juce::AudioIODevice* cur = dm.getCurrentAudioDevice();
+        juce::AudioIODevice* cur = impl->inputManager.getCurrentAudioDevice();
         const juce::String curName = cur != nullptr ? cur->getName() : juce::String();
         for (int i = 0; i < names.size(); ++i)
             if (names[i] == curName)
@@ -968,58 +1456,154 @@ juce::var Engine::dispatch(const juce::var& req)
             row->setProperty("is_default", ids[i] == defaultId);
             rows.add(row);
         }
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("default_device_id", defaultId.isEmpty() ? juce::var() : juce::var(defaultId));
-        o->setProperty("devices", juce::var(rows));
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("default_device_id", defaultId.isEmpty() ? juce::var() : juce::var(defaultId));
+            o->setProperty("devices", juce::var(rows));
+        }
+        return out;
     }
 
     if (cmd == "get_output_device_info")
     {
         const juce::String id = req["device_id"].toString();
-        const juce::String name = resolveOutputDeviceName(id);
+        juce::AudioDeviceManager probe;
+        probe.initialise(0, 2, nullptr, true);
+        copyDeviceType(impl->outputManager, probe);
+        juce::String name = resolveOutputDeviceName(probe, id);
         if (name.isEmpty() && !id.isEmpty())
             return errObj("unknown device_id: " + id);
-        juce::AudioDeviceManager dm;
-        dm.initialise(0, 2, nullptr, true);
+        if (name.isEmpty())
+        {
+            juce::StringArray ids, names;
+            enumerateOutputIds(probe, ids, names);
+            if (names.size() > 0)
+                name = names[0];
+        }
         juce::AudioDeviceManager::AudioDeviceSetup setup;
-        setup.outputDeviceName = name.isEmpty() ? (dm.getCurrentAudioDevice() != nullptr ? dm.getCurrentAudioDevice()->getName() : juce::String()) : name;
+        setup.outputDeviceName = name;
         setup.inputDeviceName = "";
-        dm.setAudioDeviceSetup(setup, true);
-        juce::AudioIODevice* dev = dm.getCurrentAudioDevice();
+        probe.setAudioDeviceSetup(setup, true);
+        juce::AudioIODevice* dev = probe.getCurrentAudioDevice();
         if (dev == nullptr)
             return errObj("no output device");
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("device_name", dev->getName());
-        o->setProperty("sample_rate_hz", dev->getCurrentSampleRate());
-        o->setProperty("channels", dev->getActiveOutputChannels().countNumberOfSetBits());
-        o->setProperty("sample_format", juce::String("F32"));
-        o->setProperty("buffer_size", bufferSizeJson(dev));
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("device_name", dev->getName());
+            o->setProperty("sample_rate_hz", dev->getCurrentSampleRate());
+            o->setProperty("channels", dev->getActiveOutputChannels().countNumberOfSetBits());
+            o->setProperty("sample_format", juce::String("F32"));
+            o->setProperty("buffer_size", bufferSizeJson(dev));
+            {
+                juce::Array<juce::var> rates;
+                for (double r : dev->getAvailableSampleRates())
+                    rates.add(r);
+                o->setProperty("sample_rates", juce::var(rates));
+            }
+            {
+                juce::Array<juce::var> bufs;
+                for (int b : dev->getAvailableBufferSizes())
+                    bufs.add(b);
+                o->setProperty("buffer_sizes", juce::var(bufs));
+            }
+            o->setProperty("audio_device_type", impl->outputManager.getCurrentAudioDeviceType());
+        }
+        return out;
     }
 
     if (cmd == "get_input_device_info")
     {
         const juce::String id = req["device_id"].toString();
-        const juce::String name = resolveInputDeviceName(id);
+        juce::AudioDeviceManager probe;
+        probe.initialise(2, 0, nullptr, true);
+        copyDeviceType(impl->inputManager, probe);
+        juce::String name = resolveInputDeviceName(probe, id);
         if (name.isEmpty() && !id.isEmpty())
             return errObj("unknown device_id: " + id);
-        juce::AudioDeviceManager dm;
-        dm.initialise(2, 0, nullptr, true);
+        if (name.isEmpty())
+        {
+            juce::StringArray ids, names;
+            enumerateInputIds(probe, ids, names);
+            if (names.size() > 0)
+                name = names[0];
+        }
         juce::AudioDeviceManager::AudioDeviceSetup setup;
-        setup.inputDeviceName = name.isEmpty() ? (dm.getCurrentAudioDevice() != nullptr ? dm.getCurrentAudioDevice()->getName() : juce::String()) : name;
+        setup.inputDeviceName = name;
         setup.outputDeviceName = "";
-        dm.setAudioDeviceSetup(setup, true);
-        juce::AudioIODevice* dev = dm.getCurrentAudioDevice();
+        probe.setAudioDeviceSetup(setup, true);
+        juce::AudioIODevice* dev = probe.getCurrentAudioDevice();
         if (dev == nullptr)
             return errObj("no input device");
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("device_name", dev->getName());
-        o->setProperty("sample_rate_hz", dev->getCurrentSampleRate());
-        o->setProperty("channels", dev->getActiveInputChannels().countNumberOfSetBits());
-        o->setProperty("sample_format", juce::String("F32"));
-        o->setProperty("buffer_size", bufferSizeJson(dev));
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("device_name", dev->getName());
+            o->setProperty("sample_rate_hz", dev->getCurrentSampleRate());
+            o->setProperty("channels", dev->getActiveInputChannels().countNumberOfSetBits());
+            o->setProperty("sample_format", juce::String("F32"));
+            o->setProperty("buffer_size", bufferSizeJson(dev));
+            {
+                juce::Array<juce::var> rates;
+                for (double r : dev->getAvailableSampleRates())
+                    rates.add(r);
+                o->setProperty("sample_rates", juce::var(rates));
+            }
+            {
+                juce::Array<juce::var> bufs;
+                for (int b : dev->getAvailableBufferSizes())
+                    bufs.add(b);
+                o->setProperty("buffer_sizes", juce::var(bufs));
+            }
+            o->setProperty("audio_device_type", impl->inputManager.getCurrentAudioDeviceType());
+        }
+        return out;
+    }
+
+    if (cmd == "list_audio_device_types")
+    {
+        juce::OwnedArray<juce::AudioIODeviceType> types;
+        createFreshDeviceTypes(impl->outputManager, types);
+        /* Array of string vars only — avoids nested DynamicObject::setProperty per row (SIGSEGV on macOS
+           when building {type:…} objects after createAudioDeviceTypes). JSON: ["CoreAudio", …]. */
+        juce::Array<juce::var> typeNames;
+        juce::StringArray seenTypeNames;
+        for (auto* ty : types)
+        {
+            if (ty == nullptr)
+                continue;
+            const juce::String tn = ty->getTypeName();
+            if (tn.isEmpty() || seenTypeNames.contains(tn))
+                continue;
+            seenTypeNames.add(tn);
+            typeNames.add(juce::var(tn));
+        }
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("types", juce::var(typeNames));
+            o->setProperty("current", impl->outputManager.getCurrentAudioDeviceType());
+        }
+        return out;
+    }
+
+    if (cmd == "set_audio_device_type")
+    {
+        const juce::String t = req["type"].toString();
+        if (t.isEmpty())
+            return errObj("type required");
+        impl->stopOutputLocked();
+        impl->stopInputLocked();
+        impl->outputManager.setCurrentAudioDeviceType(t, true);
+        impl->inputManager.setCurrentAudioDeviceType(t, true);
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("type", t);
+            o->setProperty("note", "streams stopped; device lists refreshed for this driver");
+        }
+        return out;
     }
 
     if (cmd == "set_output_device")
@@ -1027,12 +1611,15 @@ juce::var Engine::dispatch(const juce::var& req)
         const juce::String id = req["device_id"].toString();
         if (id.isEmpty())
             return errObj("device_id required");
-        if (resolveOutputDeviceName(id).isEmpty())
+        if (resolveOutputDeviceName(impl->outputManager, id).isEmpty())
             return errObj("unknown device_id: " + id);
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("device_id", id);
-        o->setProperty("note", "validated; use start_output_stream to open the device");
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("device_id", id);
+            o->setProperty("note", "validated; use start_output_stream to open the device");
+        }
+        return out;
     }
 
     if (cmd == "set_input_device")
@@ -1040,12 +1627,15 @@ juce::var Engine::dispatch(const juce::var& req)
         const juce::String id = req["device_id"].toString();
         if (id.isEmpty())
             return errObj("device_id required");
-        if (resolveInputDeviceName(id).isEmpty())
+        if (resolveInputDeviceName(impl->inputManager, id).isEmpty())
             return errObj("unknown device_id: " + id);
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("device_id", id);
-        o->setProperty("note", "validated; use start_input_stream to open capture");
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("device_id", id);
+            o->setProperty("note", "validated; use start_input_stream to open capture");
+        }
+        return out;
     }
 
     if (cmd == "start_output_stream")
@@ -1071,9 +1661,10 @@ juce::var Engine::dispatch(const juce::var& req)
                 impl->transport.start();
         }
         impl->paused = p;
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("paused", p);
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+            o->setProperty("paused", p);
+        return out;
     }
 
     if (cmd == "playback_seek")
@@ -1107,19 +1698,23 @@ juce::var Engine::dispatch(const juce::var& req)
         float s = req["speed"].isVoid() ? 1.0f : (float) req["speed"];
         s = juce::jlimit(0.25f, 2.0f, s);
         // JUCE AudioTransportSource has no setSpeed; rodio-style pitch-change would need a ResamplingAudioSource wrapper.
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("speed", s);
-        o->setProperty("note", "speed stored; playback rate change not yet wired in JUCE engine");
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+        {
+            o->setProperty("speed", s);
+            o->setProperty("note", "speed stored; playback rate change not yet wired in JUCE engine");
+        }
+        return out;
     }
 
     if (cmd == "playback_set_reverse")
     {
         const bool en = req["reverse"].isVoid() ? false : (bool) req["reverse"];
         impl->reverseWanted = en;
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("reverse", en);
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+            o->setProperty("reverse", en);
+        return out;
     }
 
     if (cmd == "playback_status")
@@ -1131,59 +1726,51 @@ juce::var Engine::dispatch(const juce::var& req)
         if (!impl->outputRunning)
             return errObj("no output stream");
         impl->toneSource.toneOn.store(t);
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("tone", t);
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+            o->setProperty("tone", t);
+        return out;
     }
 
     if (cmd == "stop_output_stream")
     {
         const bool was = impl->outputRunning;
         impl->stopOutputLocked();
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("was_running", was);
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+            o->setProperty("was_running", was);
+        return out;
     }
 
     if (cmd == "stop_input_stream")
     {
         const bool was = impl->inputRunning;
         impl->stopInputLocked();
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("was_running", was);
-        return o;
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+            o->setProperty("was_running", was);
+        return out;
     }
+
+    if (cmd == "playback_set_inserts")
+        return impl->playbackSetInsertsLocked(req);
+
+    if (cmd == "playback_open_insert_editor")
+        return impl->openInsertEditorLocked(req);
+
+    if (cmd == "playback_close_insert_editor")
+        return impl->closeInsertEditorLocked(req);
 
     if (cmd == "plugin_chain")
-    {
-        impl->scanPluginsOnce();
-        const juce::Array<juce::PluginDescription> types = impl->pluginList.getTypes();
-        juce::Array<juce::var> plugins;
-        for (const auto& t : types)
-        {
-            auto* row = new juce::DynamicObject();
-            row->setProperty("name", t.name);
-            row->setProperty("format", t.pluginFormatName);
-            row->setProperty("path", t.fileOrIdentifier);
-            plugins.add(row);
-        }
-        auto* o = okObj().getDynamicObject();
-        o->setProperty("phase", "juce");
-        o->setProperty("api_version", 1);
-        o->setProperty("slots", juce::Array<juce::var>());
-        juce::Array<juce::var> fmts;
-        fmts.add("VST3");
-#if JUCE_MAC
-        fmts.add("AU");
-#endif
-        o->setProperty("formats_planned", juce::var(fmts));
-        o->setProperty("plugins", juce::var(plugins));
-        o->setProperty("plugin_count", plugins.size());
-        o->setProperty("note", "JUCE KnownPluginList scan; real-time insert chain next.");
-        return o;
-    }
+        return impl->pluginChainLocked();
 
     return errObj("unknown cmd: " + cmd);
+}
+
+void Engine::shutdownEditors()
+{
+    std::lock_guard<std::mutex> lock(impl->mutex);
+    impl->closeAllInsertEditorsLocked();
 }
 
 } // namespace audio_haxor

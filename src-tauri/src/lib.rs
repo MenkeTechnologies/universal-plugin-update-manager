@@ -2879,7 +2879,24 @@ fn normalize_audio_engine_ipc_payload(v: &serde_json::Value) -> serde_json::Valu
 #[tauri::command]
 fn audio_engine_invoke(request: serde_json::Value) -> Result<serde_json::Value, String> {
     let payload = normalize_audio_engine_ipc_payload(&request);
-    audio_engine::spawn_audio_engine_request(&payload)
+    let v = audio_engine::spawn_audio_engine_request(&payload)?;
+    if v.get("ok") == Some(&serde_json::Value::Bool(false)) {
+        let cmd = payload
+            .get("cmd")
+            .and_then(|c| c.as_str())
+            .unwrap_or("?");
+        let err = v
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("?");
+        write_app_log(format!("audio-engine [{cmd}] {err}"));
+    }
+    Ok(v)
+}
+
+#[tauri::command]
+fn audio_engine_restart() -> Result<(), String> {
+    audio_engine::restart_audio_engine_child()
 }
 
 #[tauri::command]
@@ -6880,6 +6897,7 @@ pub fn run() {
             read_cache_file,
             write_cache_file,
             audio_engine_invoke,
+            audio_engine_restart,
             append_log,
             read_log,
             clear_log,

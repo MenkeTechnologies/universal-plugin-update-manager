@@ -329,12 +329,6 @@ document.addEventListener('click', (e) => {
             case 'toggleAudioLoop':
                 toggleAudioLoop();
                 break;
-            case 'seekAudio':
-                seekAudio(e);
-                break;
-            case 'seekMetaWaveform':
-                seekMetaWaveform(e);
-                break;
             case 'stopAudioPlayback':
                 stopAudioPlayback();
                 break;
@@ -1343,8 +1337,9 @@ window.vstUpdater = {
     getFileWatcherStatus: () => invoke('get_file_watcher_status'),
     // MIDI
     getMidiInfo: (filePath) => invoke('get_midi_info', {filePath}),
-    /** Audio engine sidecar (persistent stdin loop): `{ cmd, ... }` → JSON. Includes `engine_state`, `start_output_stream` (`start_playback` for file PCM decode), `playback_load` / `playback_pause` / `playback_seek` / `playback_set_dsp` / `playback_set_speed` / `playback_set_reverse` / `playback_status` / `playback_stop`, `stop_output_stream`, `start_input_stream` / `stop_input_stream`, `set_output_tone`, `plugin_chain` (stub / future inserts), device list/info/validate. UI: `audio-engine.js` (`applyAudioEngineDevice` reloads `playback_load` from `window._enginePlaybackResumePath` when the session is empty after Stop stream) + `audio.js` (`enginePlaybackStart`, `resumeEnginePlaybackAfterApply`, mute/volume via prefs for engine DSP). */
+    /** Audio engine sidecar (persistent stdin loop): `{ cmd, ... }` → JSON. Includes `engine_state`, `start_output_stream` (`start_playback` for file PCM decode), `playback_load` / `playback_pause` / `playback_seek` / `playback_set_dsp` / `playback_set_speed` / `playback_set_reverse` / `playback_status` / `playback_stop`, `playback_set_inserts` (VST3/AU paths; stop stream first), `playback_open_insert_editor` / `playback_close_insert_editor` (native plug-in UI; `slot` is chain index), `stop_output_stream`, `start_input_stream` / `stop_input_stream`, `set_output_tone`, `plugin_chain` (scan + active insert list). UI: `audio-engine.js` + `audio.js` (`enginePlaybackStart`, waveform `pointerdown` seek, DSP). */
     audioEngineInvoke: (request) => invoke('audio_engine_invoke', {request}),
+    audioEngineRestart: () => invoke('audio_engine_restart'),
     batchAnalyze: (paths) => invoke('batch_analyze', {paths}),
     dbQueryPlugins: (params) => invoke('db_query_plugins', params || {}),
     dbQueryDaw: (params) => invoke('db_query_daw', params || {}),

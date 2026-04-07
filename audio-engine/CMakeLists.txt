@@ -23,6 +23,8 @@ set_target_properties(audio_engine PROPERTIES OUTPUT_NAME "audio-engine")
 
 target_sources(audio_engine PRIVATE
   src/Main.cpp
+  src/AppLog.cpp
+  src/CrashHandler.cpp
   src/Engine.cpp
 )
 
@@ -52,6 +54,7 @@ target_link_libraries(audio_engine PRIVATE
   juce::juce_audio_utils
   juce::juce_dsp
   juce::juce_core
+  juce::juce_events
   juce::juce_gui_basics
   PUBLIC
   juce::juce_recommended_config_flags

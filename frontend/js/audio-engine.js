@@ -1,12 +1,22 @@
-// ── Audio Engine tab: separate `audio-engine` process (JUCE devices + playback; VST3/AU scan; plugin insert graph planned) ──
+// ── Audio Engine tab: separate `audio-engine` process (JUCE devices + playback; VST3/AU scan; insert chain + native editor windows) ──
 
 const AE_PREFS_DEVICE = 'audioEngineOutputDeviceId';
 const AE_PREFS_INPUT_DEVICE = 'audioEngineInputDeviceId';
+const AE_PREFS_DEVICE_TYPE = 'audioEngineJuceDeviceType';
+const AE_PREFS_SAMPLE_RATE_HZ = 'audioEngineSampleRateHz';
 const AE_PREFS_TONE = 'audioEngineTestTone';
 const AE_PREFS_BUFFER_FRAMES_OUTPUT = 'audioEngineBufferFramesOutput';
 const AE_PREFS_BUFFER_FRAMES_INPUT = 'audioEngineBufferFramesInput';
+/** JSON array of up to four host paths for `playback_set_inserts` (UI mirror). */
+const AE_PREFS_INSERT_PATHS_JSON = 'audioEngineInsertPathsJson';
 /** @deprecated Legacy single pref; migrated once to output/input */
 const AE_LEGACY_BUFFER_FRAMES = 'audioEngineBufferFrames';
+
+const AE_INSERT_SLOT_IDS = ['aeInsertSlot0', 'aeInsertSlot1', 'aeInsertSlot2', 'aeInsertSlot3'];
+const AE_INSERT_EDITOR_IDS = ['aeInsertEditor0', 'aeInsertEditor1', 'aeInsertEditor2', 'aeInsertEditor3'];
+
+/** After first successful `list_audio_device_types`, restore saved driver from prefs once per page load (and again after sidecar restart). */
+let aeInitialDeviceTypeRestored = false;
 
 function migrateAeBufferPrefs() {
     if (typeof prefs === 'undefined' || typeof prefs.getItem !== 'function' || typeof prefs.setItem !== 'function') {
@@ -145,6 +155,86 @@ function bindAeInputPeakVisibilityOnce() {
  */
 /** Matches sidecar `MAX_BUFFER_FRAMES` — typos like 144000 are ~3s @ 48 kHz and sound like delayed mute after stop. */
 const AE_MAX_BUFFER_FRAMES = 8192;
+
+/**
+ * @param {HTMLSelectElement|null} sel
+ * @returns {number|undefined} integer Hz for `sample_rate_hz` IPC, or undefined for driver default
+ */
+function parseAeSampleRateHzFromSelect(sel) {
+    if (!sel || typeof sel.value !== 'string') return undefined;
+    const s = sel.value.trim();
+    if (s === '') return undefined;
+    const n = Number.parseInt(s, 10);
+    if (!Number.isFinite(n) || n < 1000) return undefined;
+    return n;
+}
+
+/**
+ * @param {HTMLSelectElement|null} selectEl
+ * @param {object|null} info — `get_output_device_info` / `get_input_device_info` payload
+ * @param {string} [preferredHz] — saved pref string (numeric or empty)
+ */
+function aePopulateSampleRateSelect(selectEl, info, preferredHz) {
+    if (!selectEl || typeof selectEl.replaceChildren !== 'function' || typeof catalogFmt !== 'function') return;
+    selectEl.replaceChildren();
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = catalogFmt('ui.ae.sample_rate_driver_default');
+    selectEl.appendChild(defOpt);
+    const rates = info && Array.isArray(info.sample_rates) ? info.sample_rates : [];
+    const nums = [];
+    for (const x of rates) {
+        const n = typeof x === 'number' ? x : Number.parseFloat(String(x));
+        if (Number.isFinite(n)) nums.push(n);
+    }
+    nums.sort((a, b) => a - b);
+    for (const hz of nums) {
+        const opt = document.createElement('option');
+        const r = Math.round(hz);
+        opt.value = String(r);
+        opt.textContent = catalogFmt('ui.ae.sample_rate_option_hz', {hz: String(r)});
+        selectEl.appendChild(opt);
+    }
+    const pref = preferredHz != null ? String(preferredHz).trim() : '';
+    if (pref !== '' && [...selectEl.options].some((o) => o.value === pref)) {
+        selectEl.value = pref;
+    } else {
+        selectEl.value = '';
+    }
+}
+
+/**
+ * @param {HTMLSelectElement|null} selectEl
+ * @param {object} typeRes — `list_audio_device_types` payload (`ok`, `types`, `current`)
+ */
+function aePopulateAudioDeviceTypeSelect(selectEl, typeRes) {
+    if (!selectEl || typeof selectEl.replaceChildren !== 'function') return;
+    if (!typeRes || typeRes.ok !== true) {
+        selectEl.replaceChildren();
+        return;
+    }
+    const rows = Array.isArray(typeRes.types) ? typeRes.types : [];
+    selectEl.replaceChildren();
+    for (const row of rows) {
+        let t = '';
+        if (typeof row === 'string') {
+            t = row.trim();
+        } else if (row && typeof row === 'object' && row.type != null) {
+            t = String(row.type).trim();
+        }
+        if (t === '') continue;
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        selectEl.appendChild(opt);
+    }
+    const cur = typeRes.current != null ? String(typeRes.current) : '';
+    if (cur !== '' && [...selectEl.options].some((o) => o.value === cur)) {
+        selectEl.value = cur;
+    } else if (selectEl.options.length > 0) {
+        selectEl.selectedIndex = 0;
+    }
+}
 
 function parseAeBufferFramesPref(raw) {
     const s = String(raw ?? '').trim();
@@ -368,6 +458,97 @@ function bindAePlaybackControls() {
 /**
  * @param {object|null} chain — `plugin_chain` payload
  */
+function aePopulateInsertSlotSelects(chain) {
+    const plugins = chain && Array.isArray(chain.plugins) ? chain.plugins : [];
+    const emptyLabel =
+        typeof catalogFmt === 'function' ? catalogFmt('ui.ae.insert_slot_empty_opt') : '—';
+    for (const id of AE_INSERT_SLOT_IDS) {
+        const sel = document.getElementById(id);
+        if (!sel || typeof sel.replaceChildren !== 'function') continue;
+        sel.replaceChildren();
+        const opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = emptyLabel;
+        sel.appendChild(opt0);
+        for (const p of plugins) {
+            const path = p && p.path != null ? String(p.path) : '';
+            if (!path) continue;
+            const name = p && p.name != null ? String(p.name) : path.split('/').pop();
+            const opt = document.createElement('option');
+            opt.value = path;
+            opt.textContent = name;
+            sel.appendChild(opt);
+        }
+    }
+    const fromServer = chain && Array.isArray(chain.insert_paths) ? chain.insert_paths.map((x) => String(x)) : [];
+    let pick = [];
+    if (fromServer.length > 0) {
+        pick = fromServer;
+    } else if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+        try {
+            const raw = prefs.getItem(AE_PREFS_INSERT_PATHS_JSON);
+            if (typeof raw === 'string' && raw.trim() !== '') pick = JSON.parse(raw);
+        } catch {
+            pick = [];
+        }
+    }
+    if (!Array.isArray(pick)) pick = [];
+    for (let i = 0; i < AE_INSERT_SLOT_IDS.length; i++) {
+        const sel = document.getElementById(AE_INSERT_SLOT_IDS[i]);
+        if (!sel) continue;
+        const v = pick[i] != null ? String(pick[i]).trim() : '';
+        if (v && [...sel.options].some((o) => o.value === v)) sel.value = v;
+        else sel.value = '';
+    }
+}
+
+/**
+ * Poll `plugin_chain` until the sidecar finishes scanning (`phase` !== `scanning`) or attempts exhausted.
+ * @param {function} inv — `audioEngineInvoke`
+ * @returns {Promise<object>}
+ */
+async function fetchPluginChainUntilSettled(inv) {
+    const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+    const toast = (key, params, ms, kind) => {
+        if (typeof showToast !== 'function' || typeof toastFmt !== 'function') return;
+        showToast(toastFmt(key, params || {}), ms, kind);
+    };
+
+    let chain = await inv({cmd: 'plugin_chain'});
+    const sawScanning = chain && chain.phase === 'scanning';
+    if (sawScanning) {
+        toast('toast.ae_plugin_scan_started', {}, 4200, 'info');
+    }
+
+    let attempts = 0;
+    const maxAttempts = 600;
+    while (chain && chain.phase === 'scanning' && attempts < maxAttempts) {
+        await delay(250);
+        chain = await inv({cmd: 'plugin_chain'});
+        attempts++;
+    }
+
+    if (chain && chain.phase === 'scanning' && attempts >= maxAttempts) {
+        toast('toast.ae_plugin_scan_timeout', {}, 6500, 'warning');
+    } else if (sawScanning && chain && chain.phase === 'juce') {
+        const n = chain.plugin_count != null ? Number(chain.plugin_count) : 0;
+        toast(
+            'toast.ae_plugin_scan_done',
+            {count: Number.isFinite(n) ? String(n) : '0'},
+            4800,
+            'success',
+        );
+    } else if (chain && chain.phase === 'failed') {
+        const err = chain.error != null ? String(chain.error) : '';
+        toast('toast.ae_plugin_scan_failed', {err}, 6500, 'error');
+    }
+
+    return chain;
+}
+
+/**
+ * @param {object|null} chain — `plugin_chain` payload
+ */
 function fillAePluginSection(chain) {
     const stub = document.getElementById('aePluginStub');
     const ul = document.getElementById('aePluginSlotList');
@@ -377,26 +558,163 @@ function fillAePluginSection(chain) {
         chain && Array.isArray(chain.formats_planned) && chain.formats_planned.length
             ? chain.formats_planned.join(', ')
             : '—';
-    const n = chain && Array.isArray(chain.slots) ? chain.slots.length : 0;
+    const n =
+        chain && chain.plugin_count != null && Number.isFinite(Number(chain.plugin_count))
+            ? Number(chain.plugin_count)
+            : chain && Array.isArray(chain.slots)
+              ? chain.slots.length
+              : 0;
     const note = chain && chain.note != null ? String(chain.note) : '';
-    stub.textContent = catalogFmt('ui.ae.plugins_stub', {
-        phase,
-        formats: fmts,
-        count: String(n),
-        note,
-    });
+    if (phase === 'failed') {
+        const err =
+            chain && chain.error != null ? String(chain.error) : note || '—';
+        stub.textContent = catalogFmt('ui.ae.plugins_scan_failed', {err});
+    } else if (phase === 'scanning') {
+        stub.textContent = catalogFmt('ui.ae.plugins_scanning_note');
+    } else {
+        stub.textContent = catalogFmt('ui.ae.plugins_stub', {
+            phase,
+            formats: fmts,
+            count: String(n),
+            note,
+        });
+    }
+    aePopulateInsertSlotSelects(chain);
     if (!ul || typeof ul.replaceChildren !== 'function') return;
     ul.replaceChildren();
+    if (phase === 'scanning') {
+        const li = document.createElement('li');
+        li.textContent = catalogFmt('ui.ae.plugins_scanning_list');
+        ul.appendChild(li);
+        return;
+    }
+    if (phase === 'failed') {
+        const li = document.createElement('li');
+        li.textContent =
+            chain && chain.error != null ? String(chain.error) : catalogFmt('ui.ae.plugins_slot_empty');
+        ul.appendChild(li);
+        return;
+    }
     if (chain && Array.isArray(chain.slots) && chain.slots.length > 0) {
         for (const s of chain.slots) {
             const li = document.createElement('li');
-            li.textContent = typeof s === 'string' ? s : JSON.stringify(s);
+            const path = s && typeof s === 'object' && s.path != null ? String(s.path) : '';
+            li.textContent = path || (typeof s === 'string' ? s : JSON.stringify(s));
             ul.appendChild(li);
         }
     } else {
         const li = document.createElement('li');
         li.textContent = catalogFmt('ui.ae.plugins_slot_empty');
         ul.appendChild(li);
+    }
+}
+
+/**
+ * Map UI insert slot index (0–3) to serial chain index for `playback_open_insert_editor`.
+ * @returns {number} chain index, or -1 if this UI slot has no plug-in selected
+ */
+function aeChainIndexForInsertUiSlot(uiSlotIndex) {
+    if (uiSlotIndex < 0 || uiSlotIndex >= AE_INSERT_SLOT_IDS.length) return -1;
+    let idx = 0;
+    for (let i = 0; i < uiSlotIndex; i++) {
+        const sel = document.getElementById(AE_INSERT_SLOT_IDS[i]);
+        const v = sel && sel.value != null ? String(sel.value).trim() : '';
+        if (v) idx++;
+    }
+    const sel = document.getElementById(AE_INSERT_SLOT_IDS[uiSlotIndex]);
+    const v = sel && sel.value != null ? String(sel.value).trim() : '';
+    if (!v) return -1;
+    return idx;
+}
+
+/**
+ * @param {number} uiSlotIndex 0–3 matching `AE_INSERT_SLOT_IDS`
+ */
+async function openAeInsertEditorForUiSlot(uiSlotIndex) {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) {
+        aeNotifyNoAudioEngineIpc();
+        return;
+    }
+    const chainIdx = aeChainIndexForInsertUiSlot(uiSlotIndex);
+    if (chainIdx < 0) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.ae_insert_editor_no_plugin'), 4000, 'warning');
+        }
+        return;
+    }
+    try {
+        const r = await inv({cmd: 'playback_open_insert_editor', slot: chainIdx});
+        throwIfAeNotOk(r, 'playback_open_insert_editor failed');
+    } catch (e) {
+        const err = e && e.message ? String(e.message) : String(e);
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.ae_insert_editor_failed', {err}), 5000, 'error');
+        }
+    }
+}
+
+async function applyAePlaybackInserts() {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) {
+        aeNotifyNoAudioEngineIpc();
+        return;
+    }
+    const paths = [];
+    for (const id of AE_INSERT_SLOT_IDS) {
+        const sel = document.getElementById(id);
+        const v = sel && sel.value != null ? String(sel.value).trim() : '';
+        if (v) paths.push(v);
+    }
+    try {
+        const r = await inv({cmd: 'playback_set_inserts', paths});
+        throwIfAeNotOk(r, 'playback_set_inserts failed');
+        if (typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
+            prefs.setItem(AE_PREFS_INSERT_PATHS_JSON, JSON.stringify(paths));
+        }
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.ae_inserts_applied'), 3000, 'success');
+        }
+        const chain = await fetchPluginChainUntilSettled(inv);
+        fillAePluginSection(chain);
+    } catch (e) {
+        const err = e && e.message ? String(e.message) : String(e);
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.ae_inserts_failed', {err}), 5000, 'error');
+        }
+    }
+}
+
+/**
+ * Kill the `audio-engine` subprocess; next IPC spawns a fresh process. Clears JS engine playback state.
+ */
+async function restartAeSidecar() {
+    const u = typeof window !== 'undefined' ? window.vstUpdater : undefined;
+    const restart =
+        u && typeof u.audioEngineRestart === 'function' ? u.audioEngineRestart.bind(u) : null;
+    if (!restart) {
+        aeNotifyNoAudioEngineIpc();
+        return;
+    }
+    try {
+        await restart();
+        aeInitialDeviceTypeRestored = false;
+        if (typeof window !== 'undefined' && typeof window.syncEnginePlaybackStoppedFromSidecar === 'function') {
+            window.syncEnginePlaybackStoppedFromSidecar();
+        }
+        if (typeof window !== 'undefined' && typeof window.stopEnginePlaybackPoll === 'function') {
+            window.stopEnginePlaybackPoll();
+        }
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.ae_sidecar_restarted'), 3000, 'success');
+        }
+        void refreshAudioEnginePanel();
+    } catch (e) {
+        const err = e && e.message ? String(e.message) : String(e);
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.ae_sidecar_restart_failed', {err}), 5000, 'error');
+        }
+        void refreshAudioEnginePanel();
     }
 }
 
@@ -423,11 +741,32 @@ function initAudioEngineTab() {
             void refreshAudioEnginePanel();
         });
     }
+    const restartSidecarBtn = document.getElementById('aeRestartSidecar');
+    if (restartSidecarBtn && typeof restartSidecarBtn.addEventListener === 'function') {
+        restartSidecarBtn.addEventListener('click', () => {
+            void restartAeSidecar();
+        });
+    }
     const applyBtn = document.getElementById('aeApplyDevice');
     if (applyBtn && typeof applyBtn.addEventListener === 'function') {
         applyBtn.addEventListener('click', () => {
             void applyAudioEngineDevice();
         });
+    }
+    const applyInsertsBtn = document.getElementById('aeApplyInserts');
+    if (applyInsertsBtn && typeof applyInsertsBtn.addEventListener === 'function') {
+        applyInsertsBtn.addEventListener('click', () => {
+            void applyAePlaybackInserts();
+        });
+    }
+    for (let i = 0; i < AE_INSERT_EDITOR_IDS.length; i++) {
+        const edBtn = document.getElementById(AE_INSERT_EDITOR_IDS[i]);
+        if (edBtn && typeof edBtn.addEventListener === 'function') {
+            const slot = i;
+            edBtn.addEventListener('click', () => {
+                void openAeInsertEditorForUiSlot(slot);
+            });
+        }
     }
     const stopBtn = document.getElementById('aeStopStream');
     if (stopBtn && typeof stopBtn.addEventListener === 'function') {
@@ -474,6 +813,30 @@ function initAudioEngineTab() {
         bufInCap.addEventListener('blur', saveIn);
     }
 
+    const typeSel = document.getElementById('aeAudioDeviceType');
+    if (typeSel && typeof typeSel.addEventListener === 'function') {
+        typeSel.addEventListener('change', () => {
+            void aeApplyAudioDeviceTypeChange();
+        });
+    }
+    const outDevSel = document.getElementById('aeOutputDevice');
+    if (outDevSel && typeof outDevSel.addEventListener === 'function') {
+        outDevSel.addEventListener('change', () => {
+            const inv = getAeAudioEngineInvoke();
+            if (!inv) return;
+            const id = outDevSel.value != null ? String(outDevSel.value) : '';
+            void fillAeDeviceCaps(inv, id);
+        });
+    }
+    const srSel = document.getElementById('aeSampleRate');
+    if (srSel && typeof srSel.addEventListener === 'function' && typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
+        const saveSr = () => {
+            prefs.setItem(AE_PREFS_SAMPLE_RATE_HZ, srSel.value != null ? String(srSel.value).trim() : '');
+        };
+        srSel.addEventListener('change', saveSr);
+        srSel.addEventListener('blur', saveSr);
+    }
+
     const inSel = document.getElementById('aeInputDevice');
     if (inSel && typeof inSel.addEventListener === 'function' && typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
         inSel.addEventListener('change', () => {
@@ -505,16 +868,33 @@ function initAudioEngineTab() {
  */
 async function fillAeDeviceCaps(inv, deviceId) {
     const capsEl = document.getElementById('aeDeviceCaps');
-    if (!capsEl || typeof inv !== 'function' || !deviceId) {
+    const srSel = document.getElementById('aeSampleRate');
+    if (!capsEl || typeof inv !== 'function') {
         if (capsEl) capsEl.textContent = '—';
         return;
     }
+    let prefSr = '';
+    if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+        const p = prefs.getItem(AE_PREFS_SAMPLE_RATE_HZ);
+        prefSr = p != null ? String(p).trim() : '';
+    }
     try {
-        const info = await inv({cmd: 'get_output_device_info', device_id: deviceId});
+        const payload = {cmd: 'get_output_device_info'};
+        const id = deviceId != null ? String(deviceId).trim() : '';
+        if (id !== '') {
+            payload.device_id = id;
+        }
+        const info = await inv(payload);
         const line = buildAeDeviceCapsLine(info);
         capsEl.textContent = line != null ? line : '—';
+        if (srSel) {
+            aePopulateSampleRateSelect(srSel, info && info.ok === true ? info : null, prefSr);
+        }
     } catch {
         capsEl.textContent = '—';
+        if (srSel) {
+            aePopulateSampleRateSelect(srSel, null, prefSr);
+        }
     }
 }
 
@@ -731,11 +1111,39 @@ function aePopulateInputDeviceSelectOptions(selectEl, devices, inPick) {
 }
 
 /**
+ * JUCE audio device type (CoreAudio, ASIO, etc.): applies to both managers; stops streams.
+ */
+async function aeApplyAudioDeviceTypeChange() {
+    const inv = getAeAudioEngineInvoke();
+    const typeSel = document.getElementById('aeAudioDeviceType');
+    const statusEl = document.getElementById('aeEngineStatus');
+    if (!inv || !typeSel) {
+        if (!inv) aeNotifyNoAudioEngineIpc();
+        return;
+    }
+    const t = typeSel.value != null ? String(typeSel.value) : '';
+    if (t === '') return;
+    try {
+        const r = await inv({cmd: 'set_audio_device_type', type: t});
+        throwIfAeNotOk(r, 'set_audio_device_type failed');
+        if (typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
+            prefs.setItem(AE_PREFS_DEVICE_TYPE, t);
+        }
+        await refreshAudioEnginePanel();
+    } catch (e) {
+        await fillAeStreamsAfterEngineError();
+        fillAeEngineStatusFromError(statusEl, e);
+        await refreshAudioEnginePanel();
+    }
+}
+
+/**
  * Reload engine_state (ping + stream), device list, caps, plugin stub.
  */
 async function refreshAudioEnginePanel() {
     const statusEl = document.getElementById('aeEngineStatus');
     const selectEl = document.getElementById('aeOutputDevice');
+    const typeSelectEl = document.getElementById('aeAudioDeviceType');
     const toneCb = document.getElementById('aeTestTone');
     const inv = getAeAudioEngineInvoke();
 
@@ -754,6 +1162,30 @@ async function refreshAudioEnginePanel() {
         fillAeEngineStatusOkFromState(statusEl, es);
         fillAeStreamsFromEngineState(es);
         syncAeToneCheckboxFromStream(toneCb, es.stream);
+
+        let typeRes = await inv({cmd: 'list_audio_device_types'});
+        throwIfAeNotOk(typeRes, 'list_audio_device_types failed');
+        if (!aeInitialDeviceTypeRestored) {
+            aeInitialDeviceTypeRestored = true;
+            const savedType =
+                typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+                    ? prefs.getItem(AE_PREFS_DEVICE_TYPE)
+                    : null;
+            const cur = typeRes.current != null ? String(typeRes.current) : '';
+            if (savedType != null && String(savedType).trim() !== '' && String(savedType) !== cur) {
+                try {
+                    const sr = await inv({cmd: 'set_audio_device_type', type: String(savedType).trim()});
+                    throwIfAeNotOk(sr, 'set_audio_device_type failed');
+                    typeRes = await inv({cmd: 'list_audio_device_types'});
+                    throwIfAeNotOk(typeRes, 'list_audio_device_types failed');
+                } catch {
+                    /* keep engine driver */
+                }
+            }
+        }
+        if (typeSelectEl) {
+            aePopulateAudioDeviceTypeSelect(typeSelectEl, typeRes);
+        }
 
         const list = await inv({cmd: 'list_output_devices'});
         throwIfAeNotOk(list, 'list_output_devices failed');
@@ -789,7 +1221,7 @@ async function refreshAudioEnginePanel() {
         const selId = selectEl && selectEl.value ? String(selectEl.value) : '';
         await fillAeDeviceCaps(inv, selId);
 
-        const chain = await inv({cmd: 'plugin_chain'});
+        const chain = await fetchPluginChainUntilSettled(inv);
         fillAePluginSection(chain);
 
         syncAePlaybackControlsFromPrefs();
@@ -887,6 +1319,10 @@ async function applyAudioEngineDevice() {
         prefs.setItem(AE_PREFS_DEVICE, id);
         prefs.setItem(AE_PREFS_TONE, toneOn ? '1' : '0');
         prefs.setItem(AE_PREFS_BUFFER_FRAMES_OUTPUT, bfRaw.trim());
+        const srSel = document.getElementById('aeSampleRate');
+        if (srSel) {
+            prefs.setItem(AE_PREFS_SAMPLE_RATE_HZ, srSel.value != null ? String(srSel.value).trim() : '');
+        }
     }
 
     try {
@@ -919,6 +1355,11 @@ async function applyAudioEngineDevice() {
         const startPayload = {cmd: 'start_output_stream', device_id: id, tone: toneOn};
         if (bufferFrames !== undefined) {
             startPayload.buffer_frames = bufferFrames;
+        }
+        const srSelApply = document.getElementById('aeSampleRate');
+        const srHz = parseAeSampleRateHzFromSelect(srSelApply);
+        if (srHz !== undefined) {
+            startPayload.sample_rate_hz = srHz;
         }
         if (playbackLoaded) {
             startPayload.start_playback = true;
@@ -974,6 +1415,11 @@ async function startAeInputCapture() {
         }
         if (bufferFrames !== undefined) {
             payload.buffer_frames = bufferFrames;
+        }
+        const srSelIn = document.getElementById('aeSampleRate');
+        const srHzIn = parseAeSampleRateHzFromSelect(srSelIn);
+        if (srHzIn !== undefined) {
+            payload.sample_rate_hz = srHzIn;
         }
         const r = await inv(payload);
         throwIfAeNotOk(r, 'start_input_stream failed');
