@@ -10,6 +10,7 @@
 #include "AppLog.hpp"
 #include "CrashHandler.hpp"
 #include "Engine.hpp"
+#include "ParentWatchdog.hpp"
 
 #ifndef AUDIO_ENGINE_VERSION_STRING
 #define AUDIO_ENGINE_VERSION_STRING "2.0.0"
@@ -26,12 +27,15 @@ static juce::var errObjSimple(const juce::String& msg)
 int main()
 {
     audio_haxor::initAppLogFromEnv();
+    audio_haxor::startParentWatchdogFromEnv();
     audio_haxor::installEngineCrashHandlers();
     juce::ScopedJuceInitialiser_GUI juceInit;
     audio_haxor::appLogLine(juce::String("started v") + AUDIO_ENGINE_VERSION_STRING);
     audio_haxor::Engine engine;
+    audio_haxor::appLogLine("Engine constructed");
 
     std::thread stdinThread([&engine]() {
+        audio_haxor::appLogLine("stdin reader thread started");
         std::string line;
         while (std::getline(std::cin, line))
         {
@@ -56,10 +60,12 @@ int main()
                 }
                 catch (const std::exception& e)
                 {
+                    audio_haxor::appLogLine(juce::String("dispatch exception: ") + e.what());
                     prom->set_value(errObjSimple(juce::String("exception: ") + e.what()));
                 }
                 catch (...)
                 {
+                    audio_haxor::appLogLine("dispatch exception: ...");
                     prom->set_value(errObjSimple("internal error"));
                 }
             });
@@ -72,7 +78,9 @@ int main()
         });
     });
 
+    audio_haxor::appLogLine("entering runDispatchLoop (message thread)");
     juce::MessageManager::getInstance()->runDispatchLoop();
+    audio_haxor::appLogLine("runDispatchLoop returned");
     stdinThread.join();
     return 0;
 }

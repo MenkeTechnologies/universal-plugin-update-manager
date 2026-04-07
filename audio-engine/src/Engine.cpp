@@ -693,11 +693,23 @@ struct Engine::Impl
     PluginScanPhase pluginScanPhase = PluginScanPhase::Idle;
     juce::String pluginScanLastError;
 
+    /** Deferred so `ping` / stdin smoke tests do not block on CoreAudio before any line is read. */
+    bool audioDeviceManagersInitialised = false;
+
+    void ensureAudioDeviceManagersInitialised()
+    {
+        if (audioDeviceManagersInitialised)
+            return;
+        appLogLine("AudioDeviceManager: initialising output + input (first non-ping cmd)");
+        audioDeviceManagersInitialised = true;
+        outputManager.initialise(0, 2, nullptr, true);
+        inputManager.initialise(2, 0, nullptr, true);
+        appLogLine("AudioDeviceManager: initialised");
+    }
+
     Impl()
     {
         formatManager.registerBasicFormats();
-        outputManager.initialise(0, 2, nullptr, true);
-        inputManager.initialise(2, 0, nullptr, true);
         pluginFormatManager.addDefaultFormats();
     }
 
@@ -1400,6 +1412,8 @@ juce::var Engine::dispatch(const juce::var& req)
         return o;
     }
 
+    impl->ensureAudioDeviceManagersInitialised();
+
     if (cmd == "engine_state")
         return impl->engineStateLocked();
 
@@ -1563,6 +1577,8 @@ juce::var Engine::dispatch(const juce::var& req)
 
     if (cmd == "list_audio_device_types")
     {
+        // createAudioDeviceTypes → CoreAudio: can block a long time or appear to hang when the
+        // binary is driven by a shell pipe (no normal GUI app context); use ping for pipe smoke tests.
         juce::OwnedArray<juce::AudioIODeviceType> types;
         createFreshDeviceTypes(impl->outputManager, types);
         /* Array of string vars only — avoids nested DynamicObject::setProperty per row (SIGSEGV on macOS

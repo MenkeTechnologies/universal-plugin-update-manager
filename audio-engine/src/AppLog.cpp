@@ -1,8 +1,10 @@
 #include "AppLog.hpp"
 
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <iostream>
 #include <mutex>
 
 namespace audio_haxor {
@@ -10,6 +12,7 @@ namespace {
 
 std::mutex g_appLogMutex;
 juce::String g_appLogPath;
+bool g_mirrorEngineLogToStderr = false;
 
 static juce::String utcTimestampString()
 {
@@ -32,14 +35,24 @@ static juce::String utcTimestampString()
 void initAppLogFromEnv()
 {
     g_appLogPath = juce::SystemStats::getEnvironmentVariable("AUDIO_HAXOR_APP_LOG", {}).trim();
+    const char* mirror = std::getenv("AUDIO_HAXOR_ENGINE_LOG_STDERR");
+    g_mirrorEngineLogToStderr = (mirror != nullptr && mirror[0] != '\0');
 }
 
 void appLogLine(const juce::String& message)
 {
+    const std::lock_guard<std::mutex> lock(g_appLogMutex);
+
+    const juce::String line = juce::String("[") + utcTimestampString() + "] ENGINE: " + message + "\n";
+
+    if (g_mirrorEngineLogToStderr)
+    {
+        std::cerr << line.toRawUTF8();
+        std::cerr.flush();
+    }
+
     if (g_appLogPath.isEmpty())
         return;
-
-    const std::lock_guard<std::mutex> lock(g_appLogMutex);
 
     juce::File f(g_appLogPath);
     const juce::File parent = f.getParentDirectory();
@@ -52,7 +65,6 @@ void appLogLine(const juce::String& message)
         (void) f.moveFileTo(backup);
     }
 
-    const juce::String line = juce::String("[") + utcTimestampString() + "] ENGINE: " + message + "\n";
     const auto path = f.getFullPathName().toStdString();
     std::ofstream out(path, std::ios::app | std::ios::binary);
     if (!out.is_open())
