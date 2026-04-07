@@ -360,7 +360,7 @@ async function scanMidi(resume = false, overrideRoots = null) {
     if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
     if (typeof btnLoading === 'function') btnLoading(btn, false);
     setBtn(
-        '&#127924; ' + catalogFmt('ui.btn.127924_scan_midi'),
+        '&#127929; ' + catalogFmt('ui.btn.127924_scan_midi'),
         false,
     );
     if (stopBtn) stopBtn.style.display = 'none';
@@ -571,7 +571,7 @@ function renderMidiTable() {
         const h2 = esc(_midiFmt('ui.h2.midi_index'));
         const p = esc(_midiFmt('ui.midi.empty_state'));
         wrap.innerHTML = `<div class="state-message" id="midiEmptyState">
-      <div class="state-icon">&#127924;</div>
+      <div class="state-icon">&#127929;</div>
       <h2>${h2}</h2>
       <p>${p}</p>
     </div>`;

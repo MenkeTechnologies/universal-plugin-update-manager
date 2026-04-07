@@ -140,7 +140,7 @@ function buildHistorySidebarItemHtml(s) {
     const isPreset = s._type === 'preset';
     const isPdf = s._type === 'pdf';
     const isMidi = s._type === 'midi';
-    const icon = isPreset ? '&#127924;' : isDaw ? '&#127911;' : isAudio ? '&#127925;' : isPdf ? '&#128196;' : isMidi ? '&#127932;' : '&#127911;';
+    const icon = isPreset ? '&#127924;' : isDaw ? '&#127911;' : isAudio ? '&#127925;' : isPdf ? '&#128196;' : isMidi ? '&#127929;' : '&#127911;';
     const label = isPreset
         ? historyCount(historyScanCountField(s, 'presetCount', 'preset_count'), 'ui.history.presets_one', 'ui.history.presets_other')
         : isDaw
@@ -820,7 +820,7 @@ async function selectMidiScan(id) {
     container.innerHTML = `
     <div class="history-detail-header">
       <div>
-        <h2>&#127932; ${dateStr}</h2>
+        <h2>&#127929; ${dateStr}</h2>
         <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${metaMidiHtml}</div>
         ${midiRootsHtml}
       </div>

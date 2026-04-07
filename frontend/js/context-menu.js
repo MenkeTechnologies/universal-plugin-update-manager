@@ -970,7 +970,7 @@ document.addEventListener('contextmenu', (e) => {
                 items.push({icon: '&#8613;', label: appFmt('menu.import_presets'), action: () => importPresets()});
             } else if (tabId === 'tabMidi') {
                 items.push({
-                    icon: '&#127924;', label: appFmt('menu.scan_midi'), action: () => {
+                    icon: '&#127929;', label: appFmt('menu.scan_midi'), action: () => {
                         if (typeof scanMidi === 'function') scanMidi();
                     }
                 });

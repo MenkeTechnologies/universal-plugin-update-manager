@@ -173,7 +173,7 @@ async function fetchPaletteDatabaseItems(query) {
                 name: m.name,
                 detail: (m.format || '') + (m.sizeFormatted ? ' · ' + m.sizeFormatted : ''),
                 fields: [m.name, m.path || '', m.format || ''],
-                icon: '&#127924;',
+                icon: '&#127929;',
                 action: () => {
                     _paletteSwitchTab('midi');
                     setTimeout(() => {
@@ -218,7 +218,7 @@ function buildPaletteStaticItems() {
         },
         {type: 'tab', name: appFmt('menu.tab_walkers'), icon: '&#128270;', action: () => _paletteSwitchTab('walkers')},
         {type: 'tab', name: appFmt('menu.tab_audio_engine'), icon: '&#127898;', action: () => _paletteSwitchTab('audioEngine')},
-        {type: 'tab', name: appFmt('menu.tab_midi'), icon: '&#127924;', action: () => _paletteSwitchTab('midi')},
+        {type: 'tab', name: appFmt('menu.tab_midi'), icon: '&#127929;', action: () => _paletteSwitchTab('midi')},
         {type: 'tab', name: appFmt('menu.tab_pdf'), icon: '&#128196;', action: () => _paletteSwitchTab('pdf')},
         {type: 'tab', name: appFmt('menu.tab_settings'), icon: '&#9881;', action: () => _paletteSwitchTab('settings')},
     ];
@@ -363,7 +363,7 @@ function buildPaletteStaticItems() {
     }
     if (typeof exportMidi === 'function') {
         items.push({
-            type: 'action', name: appFmt('menu.export_midi_files'), icon: '&#127924;', action: () => {
+            type: 'action', name: appFmt('menu.export_midi_files'), icon: '&#127929;', action: () => {
                 showToast(toastFmt('toast.exporting_midi'));
                 if (typeof runExport === 'function') runExport(exportMidi); else exportMidi();
             }
