@@ -983,6 +983,7 @@ document.addEventListener('input', (e) => {
         return;
     }
     if (action === 'setVolume') setAudioVolume(e.target.value);
+    else if (action === 'setPlaybackSpeed') setPlaybackSpeed(e.target.value);
     else if (action === 'setEqLow') setEqBand('low', e.target.value);
     else if (action === 'setEqMid') setEqBand('mid', e.target.value);
     else if (action === 'setEqHigh') setEqBand('high', e.target.value);

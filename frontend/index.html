@@ -5963,6 +5963,72 @@
             align-items: flex-end;
             gap: 14px;
             justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .np-eq-engine-tools {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 6px;
+            padding: 0 2px 0 10px;
+            border-left: 1px solid var(--border);
+            margin-left: 2px;
+            max-width: 100%;
+        }
+
+        .np-eq-engine-tools-title {
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .np-eq-engine-tools-row {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .np-eq-band-speed-h label {
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        .np-eq-band-speed-h {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .np-eq-speed-h {
+            width: 92px;
+            height: 8px;
+            accent-color: var(--cyan);
+        }
+
+        .np-eq-engine-rev-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding-bottom: 2px;
+        }
+
+        .np-eq-engine-rev-wrap label {
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
         }
 
         .np-eq-band {
@@ -7789,6 +7855,29 @@
                            step="0.05" title="Stereo pan (L-C-R)" type="range"
                            value="0">
                     <span class="eq-val" id="npPanVal">C</span>
+                </div>
+                <div class="np-eq-engine-tools">
+                    <div class="np-eq-engine-tools-title" data-i18n="ui.np.engine_dsp_title">JUCE output</div>
+                    <div class="np-eq-engine-tools-row">
+                        <div class="np-eq-band">
+                            <label data-i18n="ui.np.label_vol_short">Vol</label>
+                            <input class="eq-slider" data-action="setVolume" data-i18n-title="ui.tt.volume_cmd_up_down" id="npEqVolSlider" max="100" min="0"
+                                   orient="vertical" step="1" title="Volume" type="range" value="100">
+                            <span class="eq-val" id="npEqVolVal">100%</span>
+                        </div>
+                        <div class="np-eq-band np-eq-band-speed-h">
+                            <label data-i18n="ui.np.label_speed">Speed</label>
+                            <input class="np-eq-speed-h" data-action="setPlaybackSpeed" data-i18n-title="ui.tt.playback_speed" id="npEqSpeedSlider" max="2" min="0.25"
+                                   step="0.25" title="Playback speed" type="range" value="1">
+                            <span class="eq-val" id="npEqSpeedVal">1×</span>
+                        </div>
+                        <div class="np-eq-engine-rev-wrap">
+                            <label data-i18n="ui.np.label_rev_short">Rev</label>
+                            <button class="btn-small btn-loop" data-action="toggleReversePlayback" data-i18n-title="ui.tt.reverse_playback" id="npEqBtnReverse"
+                                    style="padding:3px 6px;font-size:10px;min-width:28px;" title="Reverse playback" type="button">&#8630;
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="np-eq-divider"></div>
                 <div class="np-eq-buttons">
@@ -10171,44 +10260,44 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=96798"></script>
-<script src="js/utils.js?v=96798"></script>
-<script src="js/ipc.js?v=96798"></script>
-<script src="js/drag-reorder.js?v=96798"></script>
-<script src="js/modal-drag.js?v=96798"></script>
-<script src="js/columns.js?v=96798"></script>
-<script src="js/notes.js?v=96798"></script>
-<script src="js/favorites.js?v=96798"></script>
-<script src="js/export.js?v=96798"></script>
-<script src="js/plugins.js?v=96798"></script>
-<script src="js/settings.js?v=96798"></script>
-<script src="js/history.js?v=96798"></script>
-<script src="js/kvr.js?v=96798"></script>
-<script src="js/audio.js?v=96798"></script>
-<script src="js/daw.js?v=96798"></script>
-<script src="js/presets.js?v=96798"></script>
-<script src="js/disk-usage.js?v=96798"></script>
-<script src="js/batch-select.js?v=96798"></script>
-<script src="js/native-file-drag.js?v=96798"></script>
-<script src="js/sort-persist.js?v=96798"></script>
-<script src="js/multi-filter.js?v=96798"></script>
-<script src="js/file-browser.js?v=96798"></script>
-<script src="js/duplicates.js?v=96798"></script>
-<script src="js/command-palette.js?v=96798"></script>
-<script src="js/xref.js?v=96798"></script>
-<script src="js/dep-graph.js?v=96798"></script>
-<script src="js/smart-playlists.js?v=96798"></script>
-<script src="js/heatmap-dashboard.js?v=96798"></script>
-<script src="js/midi.js?v=96798"></script>
-<script src="js/pdf.js?v=96798"></script>
-<script src="js/settings-search.js?v=96798"></script>
-<script src="js/visualizer.js?v=96798"></script>
-<script src="js/walker-status.js?v=96798"></script>
-<script src="js/audio-engine.js?v=96798"></script>
-<script src="js/context-menu.js?v=96798"></script>
-<script src="js/shortcuts.js?v=96798"></script>
-<script src="js/help-overlay.js?v=96798"></script>
-<script src="js/keyboard-nav.js?v=96798"></script>
-<script src="js/app.js?v=96798"></script>
+<script src="js/i18n-ui.js?v=50504"></script>
+<script src="js/utils.js?v=50504"></script>
+<script src="js/ipc.js?v=50504"></script>
+<script src="js/drag-reorder.js?v=50504"></script>
+<script src="js/modal-drag.js?v=50504"></script>
+<script src="js/columns.js?v=50504"></script>
+<script src="js/notes.js?v=50504"></script>
+<script src="js/favorites.js?v=50504"></script>
+<script src="js/export.js?v=50504"></script>
+<script src="js/plugins.js?v=50504"></script>
+<script src="js/settings.js?v=50504"></script>
+<script src="js/history.js?v=50504"></script>
+<script src="js/kvr.js?v=50504"></script>
+<script src="js/audio.js?v=50504"></script>
+<script src="js/daw.js?v=50504"></script>
+<script src="js/presets.js?v=50504"></script>
+<script src="js/disk-usage.js?v=50504"></script>
+<script src="js/batch-select.js?v=50504"></script>
+<script src="js/native-file-drag.js?v=50504"></script>
+<script src="js/sort-persist.js?v=50504"></script>
+<script src="js/multi-filter.js?v=50504"></script>
+<script src="js/file-browser.js?v=50504"></script>
+<script src="js/duplicates.js?v=50504"></script>
+<script src="js/command-palette.js?v=50504"></script>
+<script src="js/xref.js?v=50504"></script>
+<script src="js/dep-graph.js?v=50504"></script>
+<script src="js/smart-playlists.js?v=50504"></script>
+<script src="js/heatmap-dashboard.js?v=50504"></script>
+<script src="js/midi.js?v=50504"></script>
+<script src="js/pdf.js?v=50504"></script>
+<script src="js/settings-search.js?v=50504"></script>
+<script src="js/visualizer.js?v=50504"></script>
+<script src="js/walker-status.js?v=50504"></script>
+<script src="js/audio-engine.js?v=50504"></script>
+<script src="js/context-menu.js?v=50504"></script>
+<script src="js/shortcuts.js?v=50504"></script>
+<script src="js/help-overlay.js?v=50504"></script>
+<script src="js/keyboard-nav.js?v=50504"></script>
+<script src="js/app.js?v=50504"></script>
 </body>
 </html>
