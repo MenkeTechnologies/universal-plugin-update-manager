@@ -8,7 +8,7 @@ Each line is a JSON object with at least `cmd`. Optional fields include `device_
 
 ### Library playback (decode + ring + DSP)
 
-Symphonia decodes the file on a **decoder thread**; resampling is linear from the file’s sample rate to the device rate. The real-time callback applies **3-band EQ** (lowshelf / peaking / highshelf, same corner frequencies as the Web Audio now‑playing graph), **gain**, and **constant-power stereo pan**, then writes interleaved samples to the cpal buffer.
+Symphonia decodes the file on a **decoder thread**; resampling is linear from the file’s sample rate to the device rate. The resample ratio prefers **`decoded.spec().rate`** from the first decoded packet when it disagrees with **`codec_params.sample_rate`** (some MP3 probes report the wrong rate). The real-time callback applies **3-band EQ** (lowshelf / peaking / highshelf, same corner frequencies as the Web Audio now‑playing graph), **gain**, and **constant-power stereo pan**, then writes interleaved samples to the cpal buffer.
 
 | Command | Fields | Purpose |
 |--------|--------|---------|

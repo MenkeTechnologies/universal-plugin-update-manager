@@ -309,12 +309,14 @@ fn decode_loop(path: String, shared: Arc<PlaybackShared>, device_rate: u32, trac
         .or_else(|| format.default_track())
         .ok_or_else(|| "no track".to_string())?;
     let tid = track.id;
-    let src_rate = track.codec_params.sample_rate.ok_or_else(|| "unknown sample rate".to_string())?;
+    let mut src_rate = track.codec_params.sample_rate.ok_or_else(|| "unknown sample rate".to_string())?;
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| e.to_string())?;
 
-    let ratio = f64::from(src_rate) / f64::from(device_rate);
+    // `codec_params.sample_rate` can disagree with the decoded stream (notably some MP3 probes).
+    // Wrong `src_rate` here makes `ratio` wrong → wrong resample speed vs device clock.
+    let mut ratio = f64::from(src_rate) / f64::from(device_rate);
     let mut staging: Vec<f32> = Vec::new();
     // Fractional index in **stereo frames** from the start of `staging` (linear interp).
     let mut read_pos: f64 = 0.0;
@@ -372,6 +374,14 @@ fn decode_loop(path: String, shared: Arc<PlaybackShared>, device_rate: u32, trac
                 Err(_) => continue,
             };
             let spec = *decoded.spec();
+            let rate = spec.rate;
+            if rate > 0 && rate != src_rate {
+                src_rate = rate;
+                shared.src_rate.store(src_rate, Ordering::Relaxed);
+                ratio = f64::from(src_rate) / f64::from(device_rate);
+                staging.clear();
+                read_pos = 0.0;
+            }
             let dur = decoded.capacity() as u64;
             let mut sample_buf = SampleBuffer::<f32>::new(dur, spec);
             sample_buf.copy_interleaved_ref(decoded);
