@@ -9620,16 +9620,18 @@ mod tests {
         db.insert_pdf_batch("p1", &[pdf("/same/x.pdf")]).unwrap();
         db.pdf_scan_parent_create("p2", "2024-01-02T00:00:00", &[]).unwrap();
         db.insert_pdf_batch("p2", &[pdf("/same/x.pdf")]).unwrap();
-        let conn = db.read_conn();
-        let n: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM pdf_library lib
+        {
+            let conn = db.read_conn();
+            let n: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM pdf_library lib
                  WHERE lib.pdf_id = (SELECT MAX(id) FROM pdfs p WHERE p.path = lib.path)",
-                [],
-                |r| r.get::<_, i64>(0),
-            )
-            .unwrap();
-        assert_eq!(n, 1);
+                    [],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1);
+        }
 
         let m = |path: &str| MidiFile {
             name: "a.mid".into(),
@@ -9644,15 +9646,18 @@ mod tests {
         db.insert_midi_batch("m1", &[m("/same/y.mid")]).unwrap();
         db.midi_scan_parent_create("m2", "2024-01-02T00:00:00", &[]).unwrap();
         db.insert_midi_batch("m2", &[m("/same/y.mid")]).unwrap();
-        let n: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM midi_library lib
+        {
+            let conn = db.read_conn();
+            let n: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM midi_library lib
                  WHERE lib.midi_id = (SELECT MAX(id) FROM midi_files f WHERE f.path = lib.path)",
-                [],
-                |r| r.get::<_, i64>(0),
-            )
-            .unwrap();
-        assert_eq!(n, 1);
+                    [],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1);
+        }
 
         let pr = |path: &str| PresetFile {
             name: "a.fxp".into(),
@@ -9667,15 +9672,18 @@ mod tests {
         db.insert_preset_batch("r1", &[pr("/same/z.fxp")]).unwrap();
         db.preset_scan_parent_create("r2", "2024-01-02T00:00:00", &[]).unwrap();
         db.insert_preset_batch("r2", &[pr("/same/z.fxp")]).unwrap();
-        let n: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM preset_library lib
+        {
+            let conn = db.read_conn();
+            let n: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM preset_library lib
                  WHERE lib.preset_id = (SELECT MAX(id) FROM presets p WHERE p.path = lib.path)",
-                [],
-                |r| r.get::<_, i64>(0),
-            )
-            .unwrap();
-        assert_eq!(n, 1);
+                    [],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1);
+        }
     }
 
     #[test]

@@ -135,7 +135,7 @@ describe('frontend/js/dep-graph.js buildDepGraphData (vm-loaded)', () => {
     assert.strictEqual(d.orphaned.length, 0);
   });
 
-  it('xref entries without matching DAW project row are skipped', () => {
+  it('xref entries without matching DAW project row use path fallback (paginated DAW tab)', () => {
     G.allDawProjects = [];
     G._xrefCache = {
       '/ghost/path.als': [
@@ -144,8 +144,10 @@ describe('frontend/js/dep-graph.js buildDepGraphData (vm-loaded)', () => {
     };
     G.allPlugins = [];
     const d = G.buildDepGraphData();
-    assert.strictEqual(d.totalProjects, 0);
-    assert.strictEqual(d.pluginsByUsage.length, 0);
+    assert.strictEqual(d.totalProjects, 1);
+    assert.strictEqual(d.pluginsByUsage.length, 1);
+    assert.strictEqual(d.pluginsByUsage[0].name, 'Ghost');
+    assert.strictEqual(d.projectsByCount[0].name, 'path.als');
   });
 
   it('returns empty orphaned list when allPlugins is undefined (guard)', () => {
