@@ -9,6 +9,32 @@ function _ui(k, vars) {
 let _pluginOffset = 0;
 let _pluginTotalCount = 0;
 let _pluginTotalUnfiltered = 0;
+/** Monotonic id so stale `dbQueryPlugins` results never overwrite a newer filter. */
+let _pluginQuerySeq = 0;
+
+function showPluginQueryLoading(isLoadMore) {
+  const list = document.getElementById('pluginList');
+  if (!list) return;
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (x) => String(x);
+  const label = typeof queryLoadingLabel === 'function' ? queryLoadingLabel() : 'Loading…';
+  document.getElementById('pluginQueryLoading')?.remove();
+  const div = document.createElement('div');
+  div.id = 'pluginQueryLoading';
+  div.setAttribute('role', 'status');
+  div.style.cssText = 'text-align:center;padding:32px 16px;';
+  div.innerHTML = `<div class="spinner" style="width:26px;height:26px;margin:0 auto 10px;"></div><span style="color:var(--text-muted);font-size:12px;">${esc(label)}</span>`;
+  if (isLoadMore) {
+    document.getElementById('pluginLoadMore')?.remove();
+    list.appendChild(div);
+  } else {
+    list.innerHTML = '';
+    list.appendChild(div);
+  }
+}
+
+function clearPluginQueryLoading() {
+  document.getElementById('pluginQueryLoading')?.remove();
+}
 let _pluginSortKey = 'name';
 let _pluginSortAsc = true;
 
@@ -79,6 +105,10 @@ async function fetchPluginPage() {
     }
     return;
   }
+  const seq = ++_pluginQuerySeq;
+  const isLoadMore = _pluginOffset > 0;
+  showPluginQueryLoading(isLoadMore);
+  await new Promise((r) => requestAnimationFrame(r));
   try {
     const result = await window.vstUpdater.dbQueryPlugins({
       search: search || null,
@@ -88,6 +118,7 @@ async function fetchPluginPage() {
       offset: _pluginOffset,
       limit: AUDIO_PAGE_SIZE,
     });
+    if (seq !== _pluginQuerySeq) return;
     let plugins = result.plugins || [];
     _pluginTotalCount = result.totalCount || 0;
     _pluginTotalUnfiltered = result.totalUnfiltered || 0;
@@ -113,6 +144,8 @@ async function fetchPluginPage() {
     if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({ plugins: _pluginTotalUnfiltered || allPlugins.length || 0 });
     else document.getElementById('totalCount').textContent = (_pluginTotalUnfiltered || allPlugins.length || 0).toLocaleString();
   } catch (e) {
+    if (seq !== _pluginQuerySeq) return;
+    clearPluginQueryLoading();
     showToast(toastFmt('toast.plugin_query_failed', { err: e }), 4000, 'error');
   }
 }
@@ -481,6 +514,7 @@ let _pluginRenderCount = 0;
 let _renderedPlugins = [];
 
 function renderPlugins(plugins) {
+  clearPluginQueryLoading();
   updateExportButton();
   _renderedPlugins = plugins;
   _pluginRenderCount = 0;
@@ -520,6 +554,7 @@ function enablePluginCardAnimation() {
 }
 
 function loadMorePlugins() {
+  clearPluginQueryLoading();
   // Remove the load-more button
   const loadMore = document.getElementById('pluginLoadMore');
   if (loadMore) loadMore.remove();

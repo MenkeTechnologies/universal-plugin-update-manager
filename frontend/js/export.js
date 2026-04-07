@@ -672,7 +672,7 @@ async function importAudio() {
       return;
     }
     allAudioSamples = imported;
-    rebuildAudioStats();
+    await rebuildAudioStats(true);
     filterAudioSamples();
     document.getElementById('btnExportAudio').style.display = '';
     showToast(toastFmt('toast.imported_n_samples', { n: imported.length }));

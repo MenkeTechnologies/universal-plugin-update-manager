@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Teljes:",
   "ui.audio.pan_center": "C‌",
   "ui.audio.player_time_zero": "0:00 / 0:00‌",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Hurok",
   "ui.audio.row_btn_preview": "Előnézet",
   "ui.audio.scan_error_title": "Szkennelési hiba",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Nincs gyártói weboldal",
   "ui.js.no_plugins_found": "Nem található beépülő modul",
   "ui.js.no_plugins_found_body": "Nem található VST2, VST3 vagy Audio Unit beépülő modul a szabványos rendszerkönyvtárban.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— {eta} maradt",
   "ui.js.resuming_btn": "Folytatás...",
   "ui.js.scan_error": "Szkennelési hiba",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "További betöltése ({n} maradt)",
   "ui.preset.stats_word": "előbeállítások",
   "ui.scan_status.daw": "CSÓKA",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF-ek",
   "ui.scan_status.plugins": "Beépülő modulok",
   "ui.scan_status.presets": "Előbeállítások",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Előbeállítások",
   "ui.welcome.recently_played": "Nemrég játszott",
   "ui.welcome.samples": "Minták",
-  "ui.welcome.tags": "Címkék",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Címkék"
 }

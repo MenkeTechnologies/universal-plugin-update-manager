@@ -53,6 +53,53 @@ function appTableCol(key) {
   return appFmt(key);
 }
 
+/**
+ * Label for in-table SQLite query spinner (filter / sort / load-more).
+ * Shared across inventory tabs via `ui.js.query_loading`.
+ */
+function queryLoadingLabel() {
+  if (typeof appFmt === 'function') return appFmt('ui.js.query_loading');
+  return 'Loading…';
+}
+
+/**
+ * Show a centered spinner row while a paginated `db_query_*` round-trip is in flight.
+ * Pair with `requestAnimationFrame` before `await invoke` so the shell paints (audio tab pattern).
+ */
+function showTableQueryLoadingRow(opts) {
+  const {
+    tbodyId,
+    rowId,
+    tableId,
+    colspan,
+    append,
+    label,
+  } = opts;
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (x) => String(x);
+  const safeLabel = esc(label || queryLoadingLabel());
+  const old = document.getElementById(rowId);
+  if (old) old.remove();
+  const loadMore = tbody.querySelector('tr[id$="LoadMore"]');
+  if (loadMore) loadMore.remove();
+  const rowHtml = `<tr id="${rowId}"><td colspan="${colspan}" style="text-align:center;padding:28px 16px;"><div class="spinner" style="width:26px;height:26px;margin:0 auto 10px;"></div><span style="color:var(--text-muted);font-size:12px;">${safeLabel}</span></td></tr>`;
+  if (append) {
+    tbody.insertAdjacentHTML('beforeend', rowHtml);
+  } else {
+    tbody.innerHTML = rowHtml;
+  }
+  const tbl = tableId && document.getElementById(tableId);
+  if (tbl) tbl.setAttribute('aria-busy', 'true');
+}
+
+function clearTableQueryLoadingRow(rowId, tableId) {
+  const row = document.getElementById(rowId);
+  if (row) row.remove();
+  const tbl = tableId && document.getElementById(tableId);
+  if (tbl) tbl.removeAttribute('aria-busy');
+}
+
 // ── fzf-style fuzzy matching with scoring ──
 
 // Scoring constants (from fzf) — configurable via settings

@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Общий:",
   "ui.audio.pan_center": "С",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Петля",
   "ui.audio.row_btn_preview": "Предварительный просмотр",
   "ui.audio.scan_error_title": "Ошибка сканирования",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Нет сайта производителя",
   "ui.js.no_plugins_found": "Плагины не найдены",
   "ui.js.no_plugins_found_body": "В стандартных системных каталогах не обнаружено плагинов VST2, VST3 или Audio Unit.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— осталось {eta}",
   "ui.js.resuming_btn": "Возобновление...",
   "ui.js.scan_error": "Ошибка сканирования",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Загрузите еще (осталось {n})",
   "ui.preset.stats_word": "пресеты",
   "ui.scan_status.daw": "DAW",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF-файлы",
   "ui.scan_status.plugins": "Плагины",
   "ui.scan_status.presets": "Пресеты",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Пресеты",
   "ui.welcome.recently_played": "Недавно играл",
   "ui.welcome.samples": "Образцы",
-  "ui.welcome.tags": "Теги",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Теги"
 }

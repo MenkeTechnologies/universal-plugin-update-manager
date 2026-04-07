@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Gesamt:",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Loop",
   "ui.audio.row_btn_preview": "Preview",
   "ui.audio.scan_error_title": "Scanfehler",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Keine Hersteller-Website",
   "ui.js.no_plugins_found": "Keine Plugins gefunden",
   "ui.js.no_plugins_found_body": "In den Standardsystemverzeichnissen wurden keine VST2-, VST3- oder Audio Unit-Plugins gefunden.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "– {eta} übrig",
   "ui.js.resuming_btn": "Fortsetzung...",
   "ui.js.scan_error": "Scanfehler",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Load more ({n} remaining)",
   "ui.preset.stats_word": "Voreinstellungen",
   "ui.scan_status.daw": "DAW",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDFs",
   "ui.scan_status.plugins": "Plug-ins",
   "ui.scan_status.presets": "Voreinstellungen",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Voreinstellungen",
   "ui.welcome.recently_played": "Kürzlich gespielt",
   "ui.welcome.samples": "Proben",
-  "ui.welcome.tags": "Schlagworte",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Schlagworte"
 }

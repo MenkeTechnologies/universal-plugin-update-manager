@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Total:",
   "ui.audio.pan_center": "do",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Bucle",
   "ui.audio.row_btn_preview": "Avance",
   "ui.audio.scan_error_title": "Error de escaneo",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Sin sitio web del fabricante",
   "ui.js.no_plugins_found": "No se encontraron complementos",
   "ui.js.no_plugins_found_body": "No se encontraron complementos VST2, VST3 o Audio Unit en los directorios estándar del sistema.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— {eta} restante",
   "ui.js.resuming_btn": "Reanudando...",
   "ui.js.scan_error": "Error de escaneo",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Cargar más (quedan {n})",
   "ui.preset.stats_word": "preajustes",
   "ui.scan_status.daw": "GRAJILLA",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF",
   "ui.scan_status.plugins": "Complementos",
   "ui.scan_status.presets": "Preajustes",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Preajustes",
   "ui.welcome.recently_played": "Jugado recientemente",
   "ui.welcome.samples": "Muestras",
-  "ui.welcome.tags": "Etiquetas",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Etiquetas"
 }

@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Total:",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Løkke",
   "ui.audio.row_btn_preview": "Forhåndsvisning",
   "ui.audio.scan_error_title": "Scanningsfejl",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Ingen producent hjemmeside",
   "ui.js.no_plugins_found": "Ingen plugins fundet",
   "ui.js.no_plugins_found_body": "Ingen VST2-, VST3- eller Audio Unit-plugins blev fundet i standard systemmapper.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— {eta} tilbage",
   "ui.js.resuming_btn": "Genoptager...",
   "ui.js.scan_error": "Scanningsfejl",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Indlæs mere ({n} tilbage)",
   "ui.preset.stats_word": "forudindstillinger",
   "ui.scan_status.daw": "DAW",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF'er",
   "ui.scan_status.plugins": "Plugins",
   "ui.scan_status.presets": "Forudindstillinger",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Forudindstillinger",
   "ui.welcome.recently_played": "For nylig spillet",
   "ui.welcome.samples": "Prøver",
-  "ui.welcome.tags": "Tags",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Tags"
 }

@@ -8,6 +8,8 @@ let audioSortKey = 'name';
 let audioSortAsc = true;
 let audioScanProgressCleanup = null;
 let _audioScanActive = false;
+/** Monotonic id so stale `dbQueryAudio` results never overwrite a newer filter/sort. */
+let _audioQuerySeq = 0;
 
 /** `appFmt` wrapper — same pattern as `plugins.js` `_ui`. */
 function _audioFmt(key, vars) {
@@ -843,7 +845,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null) {
     }
     // Fetch first page from DB (no in-memory array needed)
     audioCurrentOffset = 0;
-    await rebuildAudioStats();
+    await rebuildAudioStats(true);
     await fetchAudioPage();
     if (prefs.getItem('autoAnalysis') !== 'off') startBackgroundAnalysis();
     if (result.stopped && audioTotalUnfiltered > 0) {
@@ -919,7 +921,11 @@ function updateAudioStats() {
 }
 
 let _lastAudioAggKey = null;
-let _audioBytesByType = {};
+let _pendingAudioAggKey = '';
+/** Debounce heavy `GROUP BY format` stats IPC so typing a filter does not block the UI on 200k+ rows. */
+let _audioStatsDebounceTimer = null;
+const AUDIO_STATS_DEBOUNCE_MS = 450;
+
 async function rebuildAudioStats(force) {
   try {
     const search = _lastAudioSearch || '';
@@ -927,7 +933,43 @@ async function rebuildAudioStats(force) {
     const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
     const key = search + '|' + (formatFilter || '');
     // Skip the aggregate query if filter/search hasn't changed (e.g. load-more, sort).
-    if (!force && key === _lastAudioAggKey) { updateAudioStats(); return; }
+    if (!force && key === _lastAudioAggKey) {
+      updateAudioStats();
+      return;
+    }
+    _pendingAudioAggKey = key;
+    updateAudioStats();
+
+    if (force) {
+      if (_audioStatsDebounceTimer !== null) {
+        clearTimeout(_audioStatsDebounceTimer);
+        _audioStatsDebounceTimer = null;
+      }
+      await _runAudioFilterStatsAgg();
+      return;
+    }
+    if (_audioStatsDebounceTimer !== null) {
+      clearTimeout(_audioStatsDebounceTimer);
+    }
+    _audioStatsDebounceTimer = setTimeout(() => {
+      _audioStatsDebounceTimer = null;
+      void _runAudioFilterStatsAgg();
+    }, AUDIO_STATS_DEBOUNCE_MS);
+  } catch {
+    resetAudioStats();
+    updateAudioStats();
+  }
+}
+
+async function _runAudioFilterStatsAgg() {
+  try {
+    const search = _lastAudioSearch || '';
+    const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('audioFormatFilter') : null;
+    const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
+    const key = search + '|' + (formatFilter || '');
+    if (key !== _pendingAudioAggKey) {
+      return;
+    }
     _lastAudioAggKey = key;
     const agg = await window.vstUpdater.dbAudioFilterStats(search, formatFilter);
     audioStatCounts = agg.byType || {};
@@ -1009,6 +1051,23 @@ registerFilter('filterAudioSamples', {
 });
 function filterAudioSamples() { applyFilter('filterAudioSamples'); }
 
+function showAudioQueryLoading(isLoadMore) {
+  if (!document.getElementById('audioTableBody')) return;
+  const label = typeof _audioFmt === 'function' ? _audioFmt('ui.audio.query_loading') : queryLoadingLabel();
+  showTableQueryLoadingRow({
+    tbodyId: 'audioTableBody',
+    rowId: 'audioQueryLoadingRow',
+    tableId: 'audioTable',
+    colspan: 12,
+    append: isLoadMore,
+    label,
+  });
+}
+
+function clearAudioQueryLoadingRow() {
+  clearTableQueryLoadingRow('audioQueryLoadingRow', 'audioTable');
+}
+
 /** Full list for export when SQLite-backed UI has left `allAudioSamples` empty (paginated DB model). */
 const _AUDIO_EXPORT_MAX = 100000;
 async function fetchAudioSamplesForExport() {
@@ -1078,6 +1137,10 @@ async function fetchAudioPage() {
     }
     return;
   }
+  const seq = ++_audioQuerySeq;
+  const isLoadMore = audioCurrentOffset > 0;
+  showAudioQueryLoading(isLoadMore);
+  await new Promise((r) => requestAnimationFrame(r));
   try {
     const result = await window.vstUpdater.dbQueryAudio({
       search: search || null,
@@ -1087,6 +1150,7 @@ async function fetchAudioPage() {
       offset: audioCurrentOffset,
       limit: AUDIO_PAGE_SIZE,
     });
+    if (seq !== _audioQuerySeq) return;
     filteredAudioSamples = result.samples || [];
     audioTotalCount = result.totalCount || 0;
     audioTotalUnfiltered = result.totalUnfiltered || 0;
@@ -1097,12 +1161,18 @@ async function fetchAudioPage() {
       filteredAudioSamples = scored.map(x => x.s);
     }
     renderAudioTable();
-    // Update stats from DB
+    // Header totals from paginated query (fast); per-format breakdown debounced.
+    updateAudioStats();
     rebuildAudioStats();
     // Backfill duration/channels for rows missing metadata (legacy scans)
     backfillAudioMeta(filteredAudioSamples);
   } catch (e) {
+    if (seq !== _audioQuerySeq) return;
+    clearAudioQueryLoadingRow();
     if (typeof showToast === 'function') showToast(toastFmt('toast.audio_query_failed', { err: e.message || e }), 4000, 'error');
+    if (audioCurrentOffset === 0) {
+      renderAudioTable();
+    }
   }
 }
 
@@ -1135,6 +1205,10 @@ function renderAudioTable() {
   if (!document.getElementById('audioTable')) initAudioTable();
   const tbody = document.getElementById('audioTableBody');
   if (!tbody) return;
+  const loadingRow = document.getElementById('audioQueryLoadingRow');
+  if (loadingRow) loadingRow.remove();
+  const tblBusy = document.getElementById('audioTable');
+  if (tblBusy) tblBusy.removeAttribute('aria-busy');
   audioRenderCount = audioCurrentOffset + filteredAudioSamples.length;
   if (audioCurrentOffset === 0) {
     tbody.innerHTML = filteredAudioSamples.map(buildAudioRow).join('');

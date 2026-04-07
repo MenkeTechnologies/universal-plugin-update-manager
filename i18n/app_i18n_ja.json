@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "合計：",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "ループ",
   "ui.audio.row_btn_preview": "プレビュー",
   "ui.audio.scan_error_title": "スキャンエラー",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "メーカーサイトはありません",
   "ui.js.no_plugins_found": "プラグインが見つかりません",
   "ui.js.no_plugins_found_body": "標準システム ディレクトリに VST2、VST3、または Audio Unit プラグインが見つかりませんでした。",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— {eta} が残っています",
   "ui.js.resuming_btn": "再開中...",
   "ui.js.scan_error": "スキャンエラー",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "さらにロード (残り {n})",
   "ui.preset.stats_word": "プリセット",
   "ui.scan_status.daw": "DAW",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF",
   "ui.scan_status.plugins": "プラグイン",
   "ui.scan_status.presets": "プリセット",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "プリセット",
   "ui.welcome.recently_played": "最近プレイした曲",
   "ui.welcome.samples": "サンプル",
-  "ui.welcome.tags": "タグ",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "タグ"
 }

@@ -12,6 +12,25 @@ let dawScanProgressCleanup = null;
 let _dawOffset = 0;
 let _dawTotalCount = 0;
 let _dawTotalUnfiltered = 0;
+/** Monotonic id so stale `dbQueryDaw` results never overwrite a newer filter. */
+let _dawQuerySeq = 0;
+
+function ensureDawTableForQuery() {
+  if (document.getElementById('dawTable')) return;
+  initDawTable();
+}
+
+function showDawQueryLoading(isLoadMore) {
+  ensureDawTableForQuery();
+  showTableQueryLoadingRow({
+    tbodyId: 'dawTableBody',
+    rowId: 'dawQueryLoadingRow',
+    tableId: 'dawTable',
+    colspan: 8,
+    append: isLoadMore,
+    label: typeof queryLoadingLabel === 'function' ? queryLoadingLabel() : 'Loading…',
+  });
+}
 
 let dawStatCounts = {};
 let dawStatBytes = 0;
@@ -53,6 +72,10 @@ async function fetchDawPage() {
     }
     return;
   }
+  const seq = ++_dawQuerySeq;
+  const isLoadMore = _dawOffset > 0;
+  showDawQueryLoading(isLoadMore);
+  await new Promise((r) => requestAnimationFrame(r));
   try {
     const result = await window.vstUpdater.dbQueryDaw({
       search: search || null,
@@ -62,6 +85,7 @@ async function fetchDawPage() {
       offset: _dawOffset,
       limit: typeof DAW_PAGE_SIZE !== 'undefined' ? DAW_PAGE_SIZE : 200,
     });
+    if (seq !== _dawQuerySeq) return;
     let projects = result.projects || [];
     // Re-sort by fzf relevance score
     if (search && projects.length > 1) {
@@ -78,6 +102,8 @@ async function fetchDawPage() {
     // Counts + per-DAW breakdown + size reflect current filter via one aggregate query.
     refreshDawStatsSnapshot();
   } catch (e) {
+    if (seq !== _dawQuerySeq) return;
+    clearTableQueryLoadingRow('dawQueryLoadingRow', 'dawTable');
     showToast(toastFmt('toast.daw_query_failed', { err: e }), 4000, 'error');
   }
 }
@@ -298,6 +324,7 @@ function sortDawArray() {
 let dawRenderCount = 0;
 
 function renderDawTable() {
+  clearTableQueryLoadingRow('dawQueryLoadingRow', 'dawTable');
   const wrap = document.getElementById('dawTableWrap');
   // No data at all — restore the initial state-message (unfiltered empty scan).
   if (filteredDawProjects.length === 0 && _dawTotalCount === 0 && _dawTotalUnfiltered === 0) {

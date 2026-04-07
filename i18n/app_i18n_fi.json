@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Kokonais:",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Silmukka",
   "ui.audio.row_btn_preview": "Esikatselu",
   "ui.audio.scan_error_title": "Skannausvirhe",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Ei valmistajan nettisivuja",
   "ui.js.no_plugins_found": "Lisäosia ei löytynyt",
   "ui.js.no_plugins_found_body": "Vakiojärjestelmähakemistoista ei löytynyt VST2-, VST3- tai Audio Unit -laajennuksia.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "- {eta} jäljellä",
   "ui.js.resuming_btn": "Jatketaan...",
   "ui.js.scan_error": "Skannausvirhe",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Lataa lisää ({n} jäljellä)",
   "ui.preset.stats_word": "esiasetukset",
   "ui.scan_status.daw": "DAW",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF-tiedostoja",
   "ui.scan_status.plugins": "Plugins",
   "ui.scan_status.presets": "Esiasetukset",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Esiasetukset",
   "ui.welcome.recently_played": "Äskettäin pelattu",
   "ui.welcome.samples": "Näytteet",
-  "ui.welcome.tags": "Tunnisteet",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Tunnisteet"
 }

@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Toplam:",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Döngü",
   "ui.audio.row_btn_preview": "Önizleme",
   "ui.audio.scan_error_title": "Tarama Hatası",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Üretici web sitesi yok",
   "ui.js.no_plugins_found": "Hiçbir Eklenti Bulunamadı",
   "ui.js.no_plugins_found_body": "Standart sistem dizinlerinde VST2, VST3 veya Audio Unit eklentisi bulunamadı.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— {eta} kaldı",
   "ui.js.resuming_btn": "Devam ediliyor...",
   "ui.js.scan_error": "Tarama Hatası",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Daha fazlasını yükle ({n} kaldı)",
   "ui.preset.stats_word": "ön ayarlar",
   "ui.scan_status.daw": "DAW",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF'ler",
   "ui.scan_status.plugins": "Eklentiler",
   "ui.scan_status.presets": "Ön ayarlar",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Ön ayarlar",
   "ui.welcome.recently_played": "Son Oynananlar",
   "ui.welcome.samples": "Örnekler",
-  "ui.welcome.tags": "Etiketler",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Etiketler"
 }

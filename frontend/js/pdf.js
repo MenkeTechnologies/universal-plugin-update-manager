@@ -14,6 +14,29 @@ let pdfRenderCount = 0;
 let _pdfOffset = 0;
 let _pdfTotalCount = 0;
 let _pdfTotalUnfiltered = 0;
+/** Monotonic id so stale `dbQueryPdfs` results never overwrite a newer filter. */
+let _pdfQuerySeq = 0;
+
+function ensurePdfTableForQuery() {
+  if (document.getElementById('pdfTable')) return;
+  const tableWrap = document.getElementById('pdfTableWrap');
+  if (!tableWrap) return;
+  tableWrap.innerHTML = buildPdfTableHtml();
+  if (typeof initColumnResize === 'function') initColumnResize(document.getElementById('pdfTable'));
+  if (typeof initTableColumnReorder === 'function') initTableColumnReorder('pdfTable', 'pdfColumnOrder');
+}
+
+function showPdfQueryLoading(isLoadMore) {
+  ensurePdfTableForQuery();
+  showTableQueryLoadingRow({
+    tbodyId: 'pdfTableBody',
+    rowId: 'pdfQueryLoadingRow',
+    tableId: 'pdfTable',
+    colspan: 7,
+    append: isLoadMore,
+    label: typeof queryLoadingLabel === 'function' ? queryLoadingLabel() : 'Loading…',
+  });
+}
 // Incremental stats for PDFs — avoids O(N) rebuild on every scan flush.
 let _pdfStatsTotalBytes = 0;
 // Page-count cache: path -> number (or null if extraction failed).
@@ -27,7 +50,6 @@ let _lastPdfMode = 'fuzzy';
 
 async function fetchPdfPage() {
   const search = _lastPdfSearch || '';
-  if (typeof showGlobalProgress === 'function') showGlobalProgress();
   // During an active scan, DOM-toggle filter existing rendered rows instead of
   // hitting the DB (scan isn't saved yet, query would wipe live results).
   if (pdfScanProgressCleanup) {
@@ -56,6 +78,10 @@ async function fetchPdfPage() {
     if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
     return;
   }
+  const seq = ++_pdfQuerySeq;
+  const isLoadMore = _pdfOffset > 0;
+  showPdfQueryLoading(isLoadMore);
+  await new Promise((r) => requestAnimationFrame(r));
   try {
     // Backend only knows filesystem sort keys. When user picks 'pages' (client-side),
     // fetch by name and re-sort in renderPdfTable using the _pdfPagesCache.
@@ -67,6 +93,7 @@ async function fetchPdfPage() {
       offset: _pdfOffset,
       limit: PDF_PAGE_SIZE,
     });
+    if (seq !== _pdfQuerySeq) return;
     let pdfs = result.pdfs || [];
     if (search && pdfs.length > 1) {
       const scored = pdfs.map(p => ({ p, score: searchScore(search, [p.name], _lastPdfMode) }));
@@ -82,9 +109,9 @@ async function fetchPdfPage() {
     // Hydrate the pages cache for visible rows, then kick off background extract.
     loadPdfPagesForVisible();
   } catch (e) {
+    if (seq !== _pdfQuerySeq) return;
+    clearTableQueryLoadingRow('pdfQueryLoadingRow', 'pdfTable');
     showToast(toastFmt('toast.pdf_query_failed', { err: e && e.message ? e.message : e }), 4000, 'error');
-  } finally {
-    if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
   }
 }
 
@@ -171,6 +198,7 @@ function buildPdfRow(p) {
 }
 
 function renderPdfTable() {
+  clearTableQueryLoadingRow('pdfQueryLoadingRow', 'pdfTable');
   if (!document.getElementById('pdfTable')) {
     const tableWrap = document.getElementById('pdfTableWrap');
     if (tableWrap && filteredPdfs.length > 0) {

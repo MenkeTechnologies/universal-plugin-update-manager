@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "총:",
   "ui.audio.pan_center": "기음",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "고리",
   "ui.audio.row_btn_preview": "시사",
   "ui.audio.scan_error_title": "스캔 오류",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "제조사 홈페이지 없음",
   "ui.js.no_plugins_found": "플러그인을 찾을 수 없습니다",
   "ui.js.no_plugins_found_body": "표준 시스템 디렉토리에서 VST2, VST3 또는 Audio Unit 플러그인을 찾을 수 없습니다.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— {eta} 남음",
   "ui.js.resuming_btn": "재개 중...",
   "ui.js.scan_error": "스캔 오류",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "더 로드하세요({n} 남음)",
   "ui.preset.stats_word": "사전 설정",
   "ui.scan_status.daw": "갈가마귀",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF",
   "ui.scan_status.plugins": "플러그인",
   "ui.scan_status.presets": "사전 설정",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "사전 설정",
   "ui.welcome.recently_played": "최근 플레이한 게임",
   "ui.welcome.samples": "샘플",
-  "ui.welcome.tags": "태그",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "태그"
 }

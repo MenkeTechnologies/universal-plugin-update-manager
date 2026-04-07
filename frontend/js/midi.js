@@ -20,6 +20,57 @@ let _midiTotalCount = 0;      // filtered count from DB
 let _midiTotalUnfiltered = 0; // unfiltered count from DB
 let _midiStatsSnapshot = null;
 const MIDI_PAGE_SIZE = 200;
+/** Monotonic id so stale `dbQueryMidi` results never overwrite a newer filter. */
+let _midiQuerySeq = 0;
+
+function mountMidiTableShell() {
+  const wrap = document.getElementById('midiTableWrap');
+  if (!wrap) return;
+  _midiRenderCount = 0;
+  const tc = typeof appTableCol === 'function' ? appTableCol : (k) => k;
+  const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s);
+  const selTitle = esc(tc('ui.audio.th_select_all'));
+  const arrow = (k) => `<span class="sort-arrow" id="midiSortArrow${k}">${midiSortKey === k.toLowerCase() ? (midiSortAsc ? '&#9650;' : '&#9660;') : ''}</span>`;
+  wrap.innerHTML = `<table class="audio-table" id="midiTable">
+      <thead>
+        <tr>
+          <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="${selTitle}"></th>
+          <th data-action="sortMidi" data-key="name" style="width:22%;" title="${esc(tc('ui.midi.tt_sort_name'))}">${tc('ui.export.col_name')} ${arrow('Name')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="tracks" style="width:55px;" title="${esc(tc('ui.midi.tt_sort_tracks'))}">${tc('ui.export.col_tracks')} ${arrow('Tracks')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="bpm" style="width:65px;" title="${esc(tc('ui.midi.tt_sort_bpm'))}">${tc('ui.export.col_bpm')} ${arrow('Bpm')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="time" style="width:55px;" title="${esc(tc('ui.midi.tt_sort_time_sig'))}">${tc('ui.midi.th_time')} ${arrow('Time')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="key" style="width:80px;" title="${esc(tc('ui.midi.tt_sort_key'))}">${tc('ui.export.col_key')} ${arrow('Key')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="notes" style="width:60px;" title="${esc(tc('ui.midi.tt_sort_notes'))}">${tc('ui.export.col_notes')} ${arrow('Notes')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="ch" style="width:45px;" title="${esc(tc('ui.midi.tt_sort_ch'))}">${tc('ui.export.col_ch')} ${arrow('Ch')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="duration" style="width:65px;" title="${esc(tc('ui.midi.tt_sort_duration'))}">${tc('ui.audio.th_dur')} ${arrow('Duration')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="size" style="width:60px;" title="${esc(tc('ui.midi.tt_sort_size'))}">${tc('ui.export.col_size')} ${arrow('Size')}<span class="col-resize"></span></th>
+          <th data-action="sortMidi" data-key="path" style="width:22%;" title="${esc(tc('ui.midi.tt_sort_path'))}">${tc('ui.export.col_path')} ${arrow('Path')}<span class="col-resize"></span></th>
+          <th class="col-actions" style="width:50px;"></th>
+        </tr>
+      </thead>
+      <tbody id="midiTableBody"></tbody>
+    </table>`;
+  if (typeof initColumnResize === 'function') initColumnResize(document.getElementById('midiTable'));
+  if (typeof initTableColumnReorder === 'function') initTableColumnReorder('midiTable', 'midiColumnOrder');
+  _midiTableInit = true;
+}
+
+function ensureMidiTableForQuery() {
+  if (document.getElementById('midiTable')) return;
+  mountMidiTableShell();
+}
+
+function showMidiQueryLoading(isLoadMore) {
+  ensureMidiTableForQuery();
+  showTableQueryLoadingRow({
+    tbodyId: 'midiTableBody',
+    rowId: 'midiQueryLoadingRow',
+    tableId: 'midiTable',
+    colspan: 12,
+    append: isLoadMore,
+    label: typeof queryLoadingLabel === 'function' ? queryLoadingLabel() : 'Loading…',
+  });
+}
 
 async function loadMidiFiles() {
   // Initial paginated load from SQLite — mirrors audio.js pattern. Memory stays
@@ -61,6 +112,10 @@ async function fetchMidiPage() {
     }
     return;
   }
+  const seq = ++_midiQuerySeq;
+  const isLoadMore = _midiOffset > 0;
+  showMidiQueryLoading(isLoadMore);
+  await new Promise((r) => requestAnimationFrame(r));
   try {
     const result = await window.vstUpdater.dbQueryMidi({
       search: search || null,
@@ -70,6 +125,7 @@ async function fetchMidiPage() {
       offset: _midiOffset,
       limit: MIDI_PAGE_SIZE,
     });
+    if (seq !== _midiQuerySeq) return;
     let files = result.midiFiles || [];
     // Re-sort by fzf relevance when searching
     if (search && files.length > 1 && typeof searchScore === 'function') {
@@ -91,6 +147,8 @@ async function fetchMidiPage() {
     renderMidiTable();
     updateMidiCount();
   } catch (e) {
+    if (seq !== _midiQuerySeq) return;
+    clearTableQueryLoadingRow('midiQueryLoadingRow', 'midiTable');
     if (typeof showToast === 'function') showToast(toastFmt('toast.midi_load_failed', { err: e.message || e }), 4000, 'error');
   }
 }
@@ -403,6 +461,7 @@ function sortMidiArray() {
 }
 
 function renderMidiTable() {
+  clearTableQueryLoadingRow('midiQueryLoadingRow', 'midiTable');
   const wrap = document.getElementById('midiTableWrap');
   if (!wrap) return;
   const hasAny = filteredMidi.length > 0 || allMidiFiles.length > 0 || _midiTotalUnfiltered > 0;
@@ -415,36 +474,11 @@ function renderMidiTable() {
       <h2>${h2}</h2>
       <p>${p}</p>
     </div>`;
+    _midiTableInit = false;
     return;
   }
-  if (!_midiTableInit) {
-    _midiTableInit = true;
-    _midiRenderCount = 0;
-    const tc = typeof appTableCol === 'function' ? appTableCol : (k) => k;
-    const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s);
-    const selTitle = esc(tc('ui.audio.th_select_all'));
-    const arrow = (k) => `<span class="sort-arrow" id="midiSortArrow${k}">${midiSortKey === k.toLowerCase() ? (midiSortAsc ? '&#9650;' : '&#9660;') : ''}</span>`;
-    wrap.innerHTML = `<table class="audio-table" id="midiTable">
-      <thead>
-        <tr>
-          <th class="col-cb"><input type="checkbox" class="batch-cb batch-cb-all" data-batch-action="toggleAll" title="${selTitle}"></th>
-          <th data-action="sortMidi" data-key="name" style="width:22%;" title="${esc(tc('ui.midi.tt_sort_name'))}">${tc('ui.export.col_name')} ${arrow('Name')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="tracks" style="width:55px;" title="${esc(tc('ui.midi.tt_sort_tracks'))}">${tc('ui.export.col_tracks')} ${arrow('Tracks')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="bpm" style="width:65px;" title="${esc(tc('ui.midi.tt_sort_bpm'))}">${tc('ui.export.col_bpm')} ${arrow('Bpm')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="time" style="width:55px;" title="${esc(tc('ui.midi.tt_sort_time_sig'))}">${tc('ui.midi.th_time')} ${arrow('Time')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="key" style="width:80px;" title="${esc(tc('ui.midi.tt_sort_key'))}">${tc('ui.export.col_key')} ${arrow('Key')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="notes" style="width:60px;" title="${esc(tc('ui.midi.tt_sort_notes'))}">${tc('ui.export.col_notes')} ${arrow('Notes')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="ch" style="width:45px;" title="${esc(tc('ui.midi.tt_sort_ch'))}">${tc('ui.export.col_ch')} ${arrow('Ch')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="duration" style="width:65px;" title="${esc(tc('ui.midi.tt_sort_duration'))}">${tc('ui.audio.th_dur')} ${arrow('Duration')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="size" style="width:60px;" title="${esc(tc('ui.midi.tt_sort_size'))}">${tc('ui.export.col_size')} ${arrow('Size')}<span class="col-resize"></span></th>
-          <th data-action="sortMidi" data-key="path" style="width:22%;" title="${esc(tc('ui.midi.tt_sort_path'))}">${tc('ui.export.col_path')} ${arrow('Path')}<span class="col-resize"></span></th>
-          <th class="col-actions" style="width:50px;"></th>
-        </tr>
-      </thead>
-      <tbody id="midiTableBody"></tbody>
-    </table>`;
-    if (typeof initColumnResize === 'function') initColumnResize(document.getElementById('midiTable'));
-    if (typeof initTableColumnReorder === 'function') initTableColumnReorder('midiTable', 'midiColumnOrder');
+  if (!document.getElementById('midiTable')) {
+    mountMidiTableShell();
   }
   const tbody = document.getElementById('midiTableBody');
   if (!tbody) return;

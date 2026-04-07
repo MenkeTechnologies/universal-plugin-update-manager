@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "कुल:",
   "ui.audio.pan_center": "सी",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "कुंडली",
   "ui.audio.row_btn_preview": "पूर्व दर्शन",
   "ui.audio.scan_error_title": "स्कैन त्रुटि",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "कोई निर्माता वेबसाइट नहीं",
   "ui.js.no_plugins_found": "कोई प्लगइन्स नहीं मिला",
   "ui.js.no_plugins_found_body": "मानक सिस्टम निर्देशिकाओं में कोई VST2, VST3, या ऑडियो यूनिट प्लगइन्स नहीं पाए गए।",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— {eta} शेष",
   "ui.js.resuming_btn": "फिर से शुरू हो रहा है...",
   "ui.js.scan_error": "स्कैन त्रुटि",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "अधिक लोड करें ({n} शेष)",
   "ui.preset.stats_word": "प्रीसेट",
   "ui.scan_status.daw": "काला कौवा",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "पीडीएफ़",
   "ui.scan_status.plugins": "प्लग-इन",
   "ui.scan_status.presets": "प्रीसेट",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "प्रीसेट",
   "ui.welcome.recently_played": "हाल ही में खेला गया",
   "ui.welcome.samples": "नमूने",
-  "ui.welcome.tags": "टैग",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "टैग"
 }

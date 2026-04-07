@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Всього:",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Петля",
   "ui.audio.row_btn_preview": "Попередній перегляд",
   "ui.audio.scan_error_title": "Помилка сканування",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Немає сайту виробника",
   "ui.js.no_plugins_found": "Плагіни не знайдено",
   "ui.js.no_plugins_found_body": "У стандартних системних каталогах не знайдено плагінів VST2, VST3 або Audio Unit.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— залишилося {eta}",
   "ui.js.resuming_btn": "Відновлення...",
   "ui.js.scan_error": "Помилка сканування",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Завантажити більше (залишилося {n})",
   "ui.preset.stats_word": "попередні налаштування",
   "ui.scan_status.daw": "DAW",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF-файли",
   "ui.scan_status.plugins": "Плагіни",
   "ui.scan_status.presets": "Предустановки",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Предустановки",
   "ui.welcome.recently_played": "Нещодавно зіграно",
   "ui.welcome.samples": "Зразки",
-  "ui.welcome.tags": "Теги",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Теги"
 }

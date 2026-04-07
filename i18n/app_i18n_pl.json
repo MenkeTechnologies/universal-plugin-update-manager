@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Całkowity:",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Loop",
   "ui.audio.row_btn_preview": "Preview",
   "ui.audio.scan_error_title": "Błąd skanowania",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Brak strony internetowej producenta",
   "ui.js.no_plugins_found": "Nie znaleziono wtyczek",
   "ui.js.no_plugins_found_body": "W standardowych katalogach systemowych nie znaleziono wtyczek VST2, VST3 ani Audio Unit.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— Pozostało {eta}",
   "ui.js.resuming_btn": "Wznawianie...",
   "ui.js.scan_error": "Błąd skanowania",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Load more ({n} remaining)",
   "ui.preset.stats_word": "ustawienia wstępne",
   "ui.scan_status.daw": "KAWKA",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "pliki PDF",
   "ui.scan_status.plugins": "Wtyczki",
   "ui.scan_status.presets": "Ustawienia wstępne",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Ustawienia wstępne",
   "ui.welcome.recently_played": "Ostatnio odtwarzane",
   "ui.welcome.samples": "Próbki",
-  "ui.welcome.tags": "Tagi",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Tagi"
 }

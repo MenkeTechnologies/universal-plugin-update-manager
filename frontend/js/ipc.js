@@ -1211,6 +1211,7 @@ window.vstUpdater = {
         pdfExcludePaths: args.pdfExcludePaths || null,
     }),
     stopUnifiedScan: () => invoke('stop_unified_scan'),
+    getUnifiedScanRun: () => invoke('get_unified_scan_run', {}),
     onPdfScanProgress: (callback) => {
         const p = listen('pdf-scan-progress', (event) => callback(event.payload));
         return () => {

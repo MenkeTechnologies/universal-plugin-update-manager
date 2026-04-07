@@ -355,6 +355,23 @@ pub struct FilterStatsResult {
     pub total_unfiltered: u64,
 }
 
+/// One row persisted for the last unified home-tree scan (SQLite `unified_scan_run.id` is always 1).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnifiedScanRunRow {
+    pub run_id: String,
+    pub started_at: String,
+    pub finished_at: Option<String>,
+    pub outcome: String,
+    pub audio_scan_id: Option<String>,
+    pub daw_scan_id: Option<String>,
+    pub preset_scan_id: Option<String>,
+    pub pdf_scan_id: Option<String>,
+    pub roots_json: String,
+    pub last_directory_path: Option<String>,
+    pub error_message: Option<String>,
+}
+
 /// Current schema version — bump when adding migrations.
 #[allow(dead_code)]
 const SCHEMA_VERSION: i64 = 4;
@@ -891,6 +908,30 @@ impl Database {
                 .map_err(|e| format!("Migration v10 schema_version failed: {e}"))?;
         }
 
+        if current < 11 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS unified_scan_run (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    run_id            TEXT NOT NULL DEFAULT '',
+                    started_at        TEXT NOT NULL DEFAULT '',
+                    finished_at       TEXT,
+                    outcome           TEXT NOT NULL DEFAULT 'complete',
+                    audio_scan_id     TEXT,
+                    daw_scan_id       TEXT,
+                    preset_scan_id    TEXT,
+                    pdf_scan_id       TEXT,
+                    roots_json        TEXT NOT NULL DEFAULT '{}',
+                    last_directory_path TEXT,
+                    error_message     TEXT
+                );
+                INSERT OR IGNORE INTO unified_scan_run (id, outcome, roots_json)
+                    VALUES (1, 'complete', '{}');",
+            )
+            .map_err(|e| format!("Migration v11 (unified_scan_run) failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (11)", [])
+                .map_err(|e| format!("Migration v11 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
@@ -1219,10 +1260,53 @@ impl Database {
             .unwrap_or(0)
         };
 
+        // Filtered total: separate COUNT so the main SELECT can use LIMIT without
+        // COUNT(*) OVER(), which SQLite evaluates before LIMIT (full scan / lockup at 200k+ rows).
+        let count_sql = format!("SELECT COUNT(*) FROM audio_samples WHERE {where_clause}");
+        let total_count: u64 = {
+            let mut count_stmt = conn.prepare(&count_sql).map_err(|e| e.to_string())?;
+            let mut idx = 1;
+            if single_scan {
+                count_stmt
+                    .raw_bind_parameter(idx, &scan_id)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+            if let Some(ref m) = fts_match {
+                count_stmt
+                    .raw_bind_parameter(idx, m)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+                if single_scan {
+                    count_stmt
+                        .raw_bind_parameter(idx, &scan_id)
+                        .map_err(|e| e.to_string())?;
+                    idx += 1;
+                }
+            } else if let Some(ref pat) = like_pat {
+                count_stmt
+                    .raw_bind_parameter(idx, pat)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+            if let Some(ref fmt) = params.format_filter {
+                if !fmt.is_empty() && fmt != "all" && !fmt.contains(',') {
+                    count_stmt
+                        .raw_bind_parameter(idx, fmt)
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+            let mut count_rows = count_stmt.raw_query();
+            let row = count_rows
+                .next()
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| "COUNT returned no rows".to_string())?;
+            row.get::<_, i64>(0).map_err(|e| e.to_string())? as u64
+        };
+
         let query_sql = format!(
             "SELECT name, path, directory, format, size, size_formatted, modified,
-                    duration, channels, sample_rate, bits_per_sample, bpm, key_name, lufs,
-                    COUNT(*) OVER() AS _total
+                    duration, channels, sample_rate, bits_per_sample, bpm, key_name, lufs
              FROM audio_samples
              WHERE {where_clause}
              ORDER BY {sort_col} {sort_dir} {nulls}
@@ -1265,12 +1349,8 @@ impl Database {
             .map_err(|e| e.to_string())?;
 
         let mut samples = Vec::new();
-        let mut total_count = 0u64;
         let mut rows = stmt.raw_query();
         while let Some(row) = rows.next().map_err(|e| e.to_string())? {
-            if total_count == 0 {
-                total_count = row.get::<_, i64>(14).unwrap_or(0) as u64;
-            }
             samples.push(AudioSampleRow {
                 name: row.get(0).unwrap_or_default(),
                 path: row.get(1).unwrap_or_default(),
@@ -3615,6 +3695,125 @@ impl Database {
         }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    /// Remove all incremental directory rows for a domain (e.g. `"unified"`).
+    pub fn delete_directory_scan_state_domain(&self, domain: &str) -> Result<u64, String> {
+        let conn = self.conn.lock().unwrap();
+        let n = conn
+            .execute(
+                "DELETE FROM directory_scan_state WHERE domain = ?1",
+                params![domain],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(n as u64)
+    }
+
+    /// True when the last persisted unified scan finished successfully; incremental mtime
+    /// snapshots are only trusted in that case.
+    pub fn unified_scan_incremental_snapshot_is_trusted(&self) -> Result<bool, String> {
+        let conn = self.conn.lock().unwrap();
+        let outcome: String = conn
+            .query_row(
+                "SELECT outcome FROM unified_scan_run WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(outcome == "complete")
+    }
+
+    pub fn unified_scan_run_start(
+        &self,
+        run_id: &str,
+        started_at: &str,
+        audio_scan_id: &str,
+        daw_scan_id: &str,
+        preset_scan_id: &str,
+        pdf_scan_id: &str,
+        roots_json: &str,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO unified_scan_run (id, run_id, started_at, finished_at, outcome, audio_scan_id, daw_scan_id, preset_scan_id, pdf_scan_id, roots_json, last_directory_path, error_message)
+             VALUES (1, ?1, ?2, NULL, 'in_progress', ?3, ?4, ?5, ?6, ?7, NULL, NULL)
+             ON CONFLICT(id) DO UPDATE SET
+               run_id = excluded.run_id,
+               started_at = excluded.started_at,
+               finished_at = NULL,
+               outcome = 'in_progress',
+               audio_scan_id = excluded.audio_scan_id,
+               daw_scan_id = excluded.daw_scan_id,
+               preset_scan_id = excluded.preset_scan_id,
+               pdf_scan_id = excluded.pdf_scan_id,
+               roots_json = excluded.roots_json,
+               last_directory_path = NULL,
+               error_message = NULL",
+            params![
+                run_id,
+                started_at,
+                audio_scan_id,
+                daw_scan_id,
+                preset_scan_id,
+                pdf_scan_id,
+                roots_json,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Persists final unified scan outcome. When `outcome` is not `complete`, clears incremental
+    /// `directory_scan_state` rows for domain `"unified"` so partial walks are not reused.
+    pub fn unified_scan_run_finish(
+        &self,
+        finished_at: &str,
+        outcome: &str,
+        error_message: Option<&str>,
+        last_directory_path: Option<&str>,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE unified_scan_run SET finished_at = ?1, outcome = ?2, error_message = ?3, last_directory_path = ?4 WHERE id = 1",
+            params![
+                finished_at,
+                outcome,
+                error_message,
+                last_directory_path,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        if outcome != "complete" {
+            let _ = conn.execute(
+                "DELETE FROM directory_scan_state WHERE domain = ?1",
+                params![crate::DIRECTORY_SCAN_INCREMENTAL_DOMAIN],
+            );
+        }
+        Ok(())
+    }
+
+    pub fn get_unified_scan_run(&self) -> Result<UnifiedScanRunRow, String> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT run_id, started_at, finished_at, outcome, audio_scan_id, daw_scan_id, preset_scan_id, pdf_scan_id, roots_json, last_directory_path, error_message FROM unified_scan_run WHERE id = 1",
+            [],
+            |row| {
+                Ok(UnifiedScanRunRow {
+                    run_id: row.get(0)?,
+                    started_at: row.get(1)?,
+                    finished_at: row.get(2)?,
+                    outcome: row.get(3)?,
+                    audio_scan_id: row.get(4)?,
+                    daw_scan_id: row.get(5)?,
+                    preset_scan_id: row.get(6)?,
+                    pdf_scan_id: row.get(7)?,
+                    roots_json: row.get(8)?,
+                    last_directory_path: row.get(9)?,
+                    error_message: row.get(10)?,
+                })
+            },
+        )
+        .map_err(|e| e.to_string())
     }
 
     pub fn save_pdf_scan(&self, snap: &PdfScanSnapshot) -> Result<(), String> {

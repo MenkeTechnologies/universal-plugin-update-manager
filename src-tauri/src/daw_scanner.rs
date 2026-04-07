@@ -434,10 +434,6 @@ fn walk_dir_parallel(
         let _ = tx.send(batch);
     }
 
-    if let Some(ref inc) = incremental {
-        inc.record_scanned_dir(dir);
-    }
-
     subdirs.par_iter().for_each(|subdir| {
         walk_dir_parallel(
             subdir,
@@ -453,6 +449,10 @@ fn walk_dir_parallel(
             incremental.clone(),
         );
     });
+
+    if let Some(ref inc) = incremental {
+        inc.record_scanned_dir(dir);
+    }
 }
 
 #[cfg(test)]

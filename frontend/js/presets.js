@@ -9,6 +9,32 @@ let presetRenderCount = 0;
 let _presetOffset = 0;
 let _presetTotalCount = 0;
 let _presetTotalUnfiltered = 0;
+/** Monotonic id so stale `dbQueryPresets` results never overwrite a newer filter. */
+let _presetQuerySeq = 0;
+
+function ensurePresetTableShellForQuery() {
+  if (document.getElementById('presetTable')) return;
+  const tableWrap = document.getElementById('presetTableWrap');
+  if (!tableWrap) return;
+  tableWrap.innerHTML = `<table class="audio-table" id="presetTable">
+    ${presetTableHeadHtml()}
+    <tbody id="presetTableBody"></tbody>
+  </table>`;
+  if (typeof initColumnResize === 'function') initColumnResize(document.getElementById('presetTable'));
+  if (typeof initTableColumnReorder === 'function') initTableColumnReorder('presetTable', 'presetColumnOrder');
+}
+
+function showPresetQueryLoading(isLoadMore) {
+  ensurePresetTableShellForQuery();
+  showTableQueryLoadingRow({
+    tbodyId: 'presetTableBody',
+    rowId: 'presetQueryLoadingRow',
+    tableId: 'presetTable',
+    colspan: 7,
+    append: isLoadMore,
+    label: typeof queryLoadingLabel === 'function' ? queryLoadingLabel() : 'Loading…',
+  });
+}
 // Incremental stats for presets — avoids O(N) rebuild on every scan flush.
 let _presetStatsTotalBytes = 0;
 let _presetStatsFormatCounts = {};
@@ -66,6 +92,10 @@ async function fetchPresetPage() {
     }
     return;
   }
+  const seq = ++_presetQuerySeq;
+  const isLoadMore = _presetOffset > 0;
+  showPresetQueryLoading(isLoadMore);
+  await new Promise((r) => requestAnimationFrame(r));
   try {
     const result = await window.vstUpdater.dbQueryPresets({
       search: search || null,
@@ -75,6 +105,7 @@ async function fetchPresetPage() {
       offset: _presetOffset,
       limit: PRESET_PAGE_SIZE,
     });
+    if (seq !== _presetQuerySeq) return;
     let presets = result.presets || [];
     // Re-sort by fzf relevance score
     if (search && presets.length > 1) {
@@ -89,6 +120,8 @@ async function fetchPresetPage() {
     renderPresetTable();
     rebuildPresetStats();
   } catch (e) {
+    if (seq !== _presetQuerySeq) return;
+    clearTableQueryLoadingRow('presetQueryLoadingRow', 'presetTable');
     showToast(toastFmt('toast.preset_query_failed', { err: e }), 4000, 'error');
   }
 }
@@ -315,6 +348,7 @@ function _legacyFilterPresets() {
 }
 
 function renderPresetTable() {
+  clearTableQueryLoadingRow('presetQueryLoadingRow', 'presetTable');
   if (!document.getElementById('presetTable')) {
     // Table not initialized yet — will be created by scan flush
     const tableWrap = document.getElementById('presetTableWrap');

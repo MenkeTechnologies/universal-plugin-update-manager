@@ -73,14 +73,30 @@ fn load_incremental_dir_state_for_walk() -> Option<Arc<unified_walker::Increment
     if !incremental_directory_scan_enabled() {
         return None;
     }
-    match db::global().load_directory_scan_snapshot(DIRECTORY_SCAN_INCREMENTAL_DOMAIN) {
-        Ok(m) => Some(Arc::new(unified_walker::IncrementalDirState::new(m))),
+    match db::global().unified_scan_incremental_snapshot_is_trusted() {
+        Ok(false) => {
+            crate::write_app_log(
+                "SCAN INCREMENTAL — last unified scan did not finish successfully; full walk"
+                    .into(),
+            );
+            None
+        }
         Err(e) => {
             crate::write_app_log(format!(
-                "SCAN INCREMENTAL — load directory snapshot failed ({e}); full walk",
+                "SCAN INCREMENTAL — could not read unified scan outcome ({e}); full walk",
             ));
             None
         }
+        Ok(true) => match db::global().load_directory_scan_snapshot(DIRECTORY_SCAN_INCREMENTAL_DOMAIN)
+        {
+            Ok(m) => Some(Arc::new(unified_walker::IncrementalDirState::new(m))),
+            Err(e) => {
+                crate::write_app_log(format!(
+                    "SCAN INCREMENTAL — load directory snapshot failed ({e}); full walk",
+                ));
+                None
+            }
+        },
     }
 }
 
@@ -1695,7 +1711,7 @@ async fn scan_unified(
     }
 
     let app_handle = app.clone();
-    let result = tokio::task::spawn_blocking(move || {
+    let result = tokio::task::spawn_blocking(move || -> Result<serde_json::Value, String> {
         let resolve = |custom: Option<Vec<String>>,
                        default: &dyn Fn() -> Vec<std::path::PathBuf>|
          -> Vec<std::path::PathBuf> {
@@ -1748,8 +1764,26 @@ async fn scan_unified(
         let preset_roots_strs = to_strs(&preset_roots);
         let pdf_roots_strs = to_strs(&pdf_roots);
 
-        let db = db::global();
+        let unified_run_id = history::gen_id();
+        let roots_json = serde_json::json!({
+            "audio": &audio_roots_strs,
+            "daw": &daw_roots_strs,
+            "preset": &preset_roots_strs,
+            "pdf": &pdf_roots_strs,
+        })
+        .to_string();
+
         let incremental_state = load_incremental_dir_state_for_walk();
+        let db = db::global();
+        let _ = db.unified_scan_run_start(
+            &unified_run_id,
+            &now_iso,
+            &audio_scan_id,
+            &daw_scan_id,
+            &preset_scan_id,
+            &pdf_scan_id,
+            &roots_json,
+        );
 
         let _ = db.audio_scan_parent_create(&audio_scan_id, &now_iso, &audio_roots_strs);
         let _ = db.daw_scan_parent_create(&daw_scan_id, &now_iso, &daw_roots_strs);
@@ -1773,153 +1807,185 @@ async fn scan_unified(
         let preset_state2 = app_handle.state::<PresetScanState>();
         let pdf_state2 = app_handle.state::<PdfScanState>();
 
-        unified_walker::walk_unified(
-            &spec,
-            &mut |batch, _counts| {
-                use unified_walker::ClassifiedBatch;
-                match batch {
-                    ClassifiedBatch::Audio(b) => {
-                        for s in &b {
-                            audio_bytes += s.size;
-                            *audio_format_counts.entry(s.format.clone()).or_insert(0) += 1;
+        let closure_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            unified_walker::walk_unified(
+                &spec,
+                &mut |batch, _counts| {
+                    use unified_walker::ClassifiedBatch;
+                    match batch {
+                        ClassifiedBatch::Audio(b) => {
+                            for s in &b {
+                                audio_bytes += s.size;
+                                *audio_format_counts.entry(s.format.clone()).or_insert(0) += 1;
+                            }
+                            let inserted = db.insert_audio_batch(&audio_scan_id, &b).unwrap_or(0);
+                            audio_count += inserted;
+                            let _ = app_handle.emit(
+                                "audio-scan-progress",
+                                serde_json::json!({
+                                    "phase": "scanning",
+                                    "samples": &b,
+                                    "found": audio_count,
+                                }),
+                            );
                         }
-                        let inserted = db.insert_audio_batch(&audio_scan_id, &b).unwrap_or(0);
-                        audio_count += inserted;
-                        let _ = app_handle.emit(
-                            "audio-scan-progress",
-                            serde_json::json!({
-                                "phase": "scanning",
-                                "samples": &b,
-                                "found": audio_count,
-                            }),
-                        );
-                    }
-                    ClassifiedBatch::Daw(b) => {
-                        let inserted_idx = db.insert_daw_batch(&daw_scan_id, &b).unwrap_or_default();
-                        let deduped: Vec<&DawProject> = inserted_idx.iter().map(|&i| &b[i]).collect();
-                        for p in &deduped {
-                            daw_bytes += p.size;
-                            *daw_daw_counts.entry(p.daw.clone()).or_insert(0) += 1;
+                        ClassifiedBatch::Daw(b) => {
+                            let inserted_idx =
+                                db.insert_daw_batch(&daw_scan_id, &b).unwrap_or_default();
+                            let deduped: Vec<&DawProject> =
+                                inserted_idx.iter().map(|&i| &b[i]).collect();
+                            for p in &deduped {
+                                daw_bytes += p.size;
+                                *daw_daw_counts.entry(p.daw.clone()).or_insert(0) += 1;
+                            }
+                            daw_count += deduped.len() as u64;
+                            let _ = app_handle.emit(
+                                "daw-scan-progress",
+                                serde_json::json!({
+                                    "phase": "scanning",
+                                    "projects": &deduped,
+                                    "found": daw_count,
+                                }),
+                            );
                         }
-                        daw_count += deduped.len() as u64;
-                        let _ = app_handle.emit(
-                            "daw-scan-progress",
-                            serde_json::json!({
-                                "phase": "scanning",
-                                "projects": &deduped,
-                                "found": daw_count,
-                            }),
-                        );
-                    }
-                    ClassifiedBatch::Preset(b) => {
-                        for p in &b {
-                            preset_bytes += p.size;
-                            *preset_format_counts.entry(p.format.clone()).or_insert(0) += 1;
+                        ClassifiedBatch::Preset(b) => {
+                            for p in &b {
+                                preset_bytes += p.size;
+                                *preset_format_counts.entry(p.format.clone()).or_insert(0) += 1;
+                            }
+                            let inserted = db.insert_preset_batch(&preset_scan_id, &b).unwrap_or(0);
+                            preset_count += inserted;
+                            let _ = app_handle.emit(
+                                "preset-scan-progress",
+                                serde_json::json!({
+                                    "phase": "scanning",
+                                    "presets": &b,
+                                    "found": preset_count,
+                                }),
+                            );
                         }
-                        let inserted = db.insert_preset_batch(&preset_scan_id, &b).unwrap_or(0);
-                        preset_count += inserted;
-                        let _ = app_handle.emit(
-                            "preset-scan-progress",
-                            serde_json::json!({
-                                "phase": "scanning",
-                                "presets": &b,
-                                "found": preset_count,
-                            }),
-                        );
-                    }
-                    ClassifiedBatch::Pdf(b) => {
-                        for p in &b {
-                            pdf_bytes += p.size;
+                        ClassifiedBatch::Pdf(b) => {
+                            for p in &b {
+                                pdf_bytes += p.size;
+                            }
+                            let inserted = db.insert_pdf_batch(&pdf_scan_id, &b).unwrap_or(0);
+                            pdf_count += inserted;
+                            let _ = app_handle.emit(
+                                "pdf-scan-progress",
+                                serde_json::json!({
+                                    "phase": "scanning",
+                                    "pdfs": &b,
+                                    "found": pdf_count,
+                                }),
+                            );
                         }
-                        let inserted = db.insert_pdf_batch(&pdf_scan_id, &b).unwrap_or(0);
-                        pdf_count += inserted;
-                        let _ = app_handle.emit(
-                            "pdf-scan-progress",
-                            serde_json::json!({
-                                "phase": "scanning",
-                                "pdfs": &b,
-                                "found": pdf_count,
-                            }),
-                        );
                     }
-                }
-            },
-            &|| {
-                // Any individual stop_* command cancels the unified scan.
-                audio_state2.stop_scan.load(Ordering::SeqCst)
-                    || daw_state2.stop_scan.load(Ordering::SeqCst)
-                    || preset_state2.stop_scan.load(Ordering::SeqCst)
-                    || pdf_state2.stop_scan.load(Ordering::SeqCst)
-            },
-            // Fan the walker's current-dir updates into all 4 WalkerStatus
-            // lists so each walker-status tile shows live progress.
+                },
+                &|| {
+                    // Any individual stop_* command cancels the unified scan.
+                    audio_state2.stop_scan.load(Ordering::SeqCst)
+                        || daw_state2.stop_scan.load(Ordering::SeqCst)
+                        || preset_state2.stop_scan.load(Ordering::SeqCst)
+                        || pdf_state2.stop_scan.load(Ordering::SeqCst)
+                },
+                // Fan the walker's current-dir updates into all 4 WalkerStatus
+                // lists so each walker-status tile shows live progress.
+                {
+                    let ws = app_handle.state::<WalkerStatus>();
+                    vec![
+                        Arc::clone(&ws.audio_dirs),
+                        Arc::clone(&ws.daw_dirs),
+                        Arc::clone(&ws.preset_dirs),
+                        Arc::clone(&ws.pdf_dirs),
+                    ]
+                },
+                incremental_state.clone(),
+            );
+
+            let stopped = audio_state2.stop_scan.load(Ordering::Relaxed)
+                || daw_state2.stop_scan.load(Ordering::Relaxed)
+                || preset_state2.stop_scan.load(Ordering::Relaxed)
+                || pdf_state2.stop_scan.load(Ordering::Relaxed);
+
+            if !stopped {
+                persist_incremental_dir_state_after_walk(incremental_state.as_ref(), &audio_scan_id);
+            }
+
+            // Clear WalkerStatus dir lists so tiles return to idle state.
             {
                 let ws = app_handle.state::<WalkerStatus>();
-                vec![
-                    Arc::clone(&ws.audio_dirs),
-                    Arc::clone(&ws.daw_dirs),
-                    Arc::clone(&ws.preset_dirs),
-                    Arc::clone(&ws.pdf_dirs),
-                ]
-            },
-            incremental_state.clone(),
-        );
+                for sink in [&ws.audio_dirs, &ws.daw_dirs, &ws.preset_dirs, &ws.pdf_dirs] {
+                    sink.lock().unwrap_or_else(|e| e.into_inner()).clear();
+                }
+            }
 
-        persist_incremental_dir_state_after_walk(incremental_state.as_ref(), &audio_scan_id);
+            // Finalize parent scan rows with real totals now that streaming is done.
+            let _ = db.audio_scan_parent_finalize(
+                &audio_scan_id,
+                audio_count,
+                audio_bytes,
+                &audio_format_counts,
+            );
+            let _ = db.daw_scan_parent_finalize(
+                &daw_scan_id,
+                daw_count as usize,
+                daw_bytes,
+                &daw_daw_counts,
+            );
+            let _ = db.preset_scan_parent_finalize(
+                &preset_scan_id,
+                preset_count as usize,
+                preset_bytes,
+                &preset_format_counts,
+            );
+            let _ = db.pdf_scan_parent_finalize(&pdf_scan_id, pdf_count as usize, pdf_bytes);
+            db.checkpoint();
 
-        let stopped = audio_state2.stop_scan.load(Ordering::Relaxed)
-            || daw_state2.stop_scan.load(Ordering::Relaxed)
-            || preset_state2.stop_scan.load(Ordering::Relaxed)
-            || pdf_state2.stop_scan.load(Ordering::Relaxed);
+            let finished_at = history::now_iso();
+            if stopped {
+                let _ = db.unified_scan_run_finish(&finished_at, "stopped", None, None);
+            } else {
+                let _ = db.unified_scan_run_finish(&finished_at, "complete", None, None);
+            }
 
-        // Clear WalkerStatus dir lists so tiles return to idle state.
-        {
-            let ws = app_handle.state::<WalkerStatus>();
-            for sink in [&ws.audio_dirs, &ws.daw_dirs, &ws.preset_dirs, &ws.pdf_dirs] {
-                sink.lock().unwrap_or_else(|e| e.into_inner()).clear();
+            serde_json::json!({
+                "audioCount": audio_count,
+                "dawCount": daw_count,
+                "presetCount": preset_count,
+                "pdfCount": pdf_count,
+                "audioRoots": audio_roots_strs,
+                "dawRoots": daw_roots_strs,
+                "presetRoots": preset_roots_strs,
+                "pdfRoots": pdf_roots_strs,
+                "audioScanId": audio_scan_id,
+                "dawScanId": daw_scan_id,
+                "presetScanId": preset_scan_id,
+                "pdfScanId": pdf_scan_id,
+                "unifiedRunId": unified_run_id,
+                "stopped": stopped,
+                "streamed": true,
+            })
+        }));
+
+        match closure_result {
+            Ok(v) => Ok(v),
+            Err(_) => {
+                let _ = db.unified_scan_run_finish(
+                    &history::now_iso(),
+                    "error",
+                    Some("panic"),
+                    None,
+                );
+                Err("unified scan panicked".into())
             }
         }
-
-        // Finalize parent scan rows with real totals now that streaming is done.
-        let _ = db.audio_scan_parent_finalize(
-            &audio_scan_id,
-            audio_count,
-            audio_bytes,
-            &audio_format_counts,
-        );
-        let _ = db.daw_scan_parent_finalize(
-            &daw_scan_id,
-            daw_count as usize,
-            daw_bytes,
-            &daw_daw_counts,
-        );
-        let _ = db.preset_scan_parent_finalize(
-            &preset_scan_id,
-            preset_count as usize,
-            preset_bytes,
-            &preset_format_counts,
-        );
-        let _ = db.pdf_scan_parent_finalize(&pdf_scan_id, pdf_count as usize, pdf_bytes);
-        db.checkpoint();
-
-        serde_json::json!({
-            "audioCount": audio_count,
-            "dawCount": daw_count,
-            "presetCount": preset_count,
-            "pdfCount": pdf_count,
-            "audioRoots": audio_roots_strs,
-            "dawRoots": daw_roots_strs,
-            "presetRoots": preset_roots_strs,
-            "pdfRoots": pdf_roots_strs,
-            "audioScanId": audio_scan_id,
-            "dawScanId": daw_scan_id,
-            "presetScanId": preset_scan_id,
-            "pdfScanId": pdf_scan_id,
-            "stopped": stopped,
-            "streamed": true,
-        })
     })
     .await;
+
+    let result: Result<serde_json::Value, String> = match result {
+        Ok(inner) => inner,
+        Err(e) => Err(e.to_string()),
+    };
 
     audio_state.scanning.store(false, Ordering::SeqCst);
     daw_state.scanning.store(false, Ordering::SeqCst);
@@ -1945,7 +2011,12 @@ async fn scan_unified(
             e
         )),
     }
-    result.map_err(|e| e.to_string())
+    result
+}
+
+#[tauri::command]
+fn get_unified_scan_run() -> Result<db::UnifiedScanRunRow, String> {
+    db::global().get_unified_scan_run()
 }
 
 // Stops a running unified scan by setting stop flags on all four per-type
@@ -6271,6 +6342,7 @@ pub fn run() {
             scan_pdfs,
             stop_pdf_scan,
             scan_unified,
+            get_unified_scan_run,
             stop_unified_scan,
             pdf_history_save,
             pdf_history_get_scans,

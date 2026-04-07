@@ -2,9 +2,14 @@
 
 ## Behavior (unified scan)
 
-- Each successfully scanned directory is stored in `directory_scan_state` with its modification time (Unix seconds from `metadata(path).modified()`).
+- Each successfully scanned directory is stored in `directory_scan_state` with its modification time (Unix seconds from `metadata(path).modified()`). A directory is recorded **after** its subtree has been walked so partial runs do not mark a parent as fully scanned.
 - On a later run, before reading a directory’s children, if the stored mtime exists and **current mtime ≤ stored mtime**, the walker **skips** that entire subtree (no `read_dir` for that branch).
 - If **current mtime > stored mtime** (or there is no row yet), the directory is fully walked and the row is **updated** after processing that directory.
+
+## Unified scan run state (`unified_scan_run`)
+
+- A single SQLite row (`id = 1`) records the **last** unified scan: `run_id`, `started_at`, `finished_at`, `outcome` (`complete` | `stopped` | `error` | `in_progress`), per-type scan ids, `roots_json`, and optional `error_message` / `last_directory_path`.
+- Incremental mtime snapshots in `directory_scan_state` are **only** used when the last persisted outcome is `complete`. If the user stopped the scan, the scan panicked, or a run was interrupted while still `in_progress`, the app does not trust the snapshot (and clears stored directory rows for non-complete outcomes). The Tauri command `get_unified_scan_run` returns the persisted row for UI or diagnostics.
 
 ## Limitations
 

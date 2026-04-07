@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "全部的：",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "环形",
   "ui.audio.row_btn_preview": "预览",
   "ui.audio.scan_error_title": "扫描错误",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "无制造商网站",
   "ui.js.no_plugins_found": "未找到插件",
   "ui.js.no_plugins_found_body": "在标准系统目录中找不到 VST2、VST3 或 Audio Unit 插件。",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— 剩余 {eta}",
   "ui.js.resuming_btn": "正在恢复...",
   "ui.js.scan_error": "扫描错误",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "加载更多（剩余 {n} 个）",
   "ui.preset.stats_word": "预设",
   "ui.scan_status.daw": "数字音频工作站",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF 文件",
   "ui.scan_status.plugins": "插件",
   "ui.scan_status.presets": "预设",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "预设",
   "ui.welcome.recently_played": "最近玩过",
   "ui.welcome.samples": "样品",
-  "ui.welcome.tags": "标签",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "标签"
 }

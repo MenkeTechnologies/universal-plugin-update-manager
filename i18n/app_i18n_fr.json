@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Total:",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Boucle",
   "ui.audio.row_btn_preview": "Aperçu",
   "ui.audio.scan_error_title": "Erreur de numérisation",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Pas de site Web du fabricant",
   "ui.js.no_plugins_found": "Aucun plugin trouvé",
   "ui.js.no_plugins_found_body": "Aucun plugin VST2, VST3 ou Audio Unit n'a été trouvé dans les répertoires système standard.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— {eta} restant",
   "ui.js.resuming_btn": "Reprise...",
   "ui.js.scan_error": "Erreur de numérisation",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Charger davantage ({n} restants)",
   "ui.preset.stats_word": "préréglages",
   "ui.scan_status.daw": "CHOUCAS",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF",
   "ui.scan_status.plugins": "Plugins",
   "ui.scan_status.presets": "Préréglages",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Préréglages",
   "ui.welcome.recently_played": "Joué récemment",
   "ui.welcome.samples": "Échantillons",
-  "ui.welcome.tags": "Balises",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Balises"
 }

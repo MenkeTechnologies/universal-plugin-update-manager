@@ -606,6 +606,7 @@
   "ui.audio.midi_stat_total": "Celkový:",
   "ui.audio.pan_center": "C",
   "ui.audio.player_time_zero": "0:00 / 0:00",
+  "ui.audio.query_loading": "Loading samples…",
   "ui.audio.row_btn_loop": "Smyčka",
   "ui.audio.row_btn_preview": "Náhled",
   "ui.audio.scan_error_title": "Chyba skenování",
@@ -956,6 +957,7 @@
   "ui.js.no_mfg_website": "Žádný web výrobce",
   "ui.js.no_plugins_found": "Nebyly nalezeny žádné pluginy",
   "ui.js.no_plugins_found_body": "Ve standardních systémových adresářích nebyly nalezeny žádné pluginy VST2, VST3 nebo Audio Unit.",
+  "ui.js.query_loading": "Loading…",
   "ui.js.remaining": "— zbývá {eta}",
   "ui.js.resuming_btn": "Obnovování...",
   "ui.js.scan_error": "Chyba skenování",
@@ -1213,6 +1215,7 @@
   "ui.preset.load_more_btn": "Načíst další (zbývá {n})",
   "ui.preset.stats_word": "předvolby",
   "ui.scan_status.daw": "DAW",
+  "ui.scan_status.midi": "MIDI",
   "ui.scan_status.pdfs": "PDF",
   "ui.scan_status.plugins": "Pluginy",
   "ui.scan_status.presets": "Předvolby",
@@ -1768,6 +1771,5 @@
   "ui.welcome.presets": "Předvolby",
   "ui.welcome.recently_played": "Nedávno hrané",
   "ui.welcome.samples": "Vzorky",
-  "ui.welcome.tags": "Tagy",
-  "ui.scan_status.midi": "MIDI"
+  "ui.welcome.tags": "Tagy"
 }
