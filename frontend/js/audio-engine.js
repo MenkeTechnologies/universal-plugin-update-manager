@@ -184,6 +184,32 @@ function appendAeStreamBufferFixedSuffix(line, st) {
 }
 
 /**
+ * Running-stream line (detail vs simple). Caller must ensure `catalogFmt` and a valid `device_id` on `st`.
+ * @param {object} st
+ * @param {'ui.ae.output_stream_on_detail'|'ui.ae.input_stream_on_detail'} detailKey
+ * @param {'ui.ae.output_stream_on'|'ui.ae.input_stream_on'} simpleKey
+ * @returns {string}
+ */
+function buildAeStreamStatusLineCore(st, detailKey, simpleKey) {
+    const name = st.device_name != null ? String(st.device_name) : String(st.device_id);
+    const rate = st.sample_rate_hz != null ? String(st.sample_rate_hz) : null;
+    const ch = st.channels != null ? String(st.channels) : null;
+    const fmt = st.sample_format != null ? String(st.sample_format) : '';
+    const buf = formatAeBufferSize(st.buffer_size);
+    if (rate != null && ch != null) {
+        return catalogFmt(detailKey, {
+            name,
+            device: String(st.device_id),
+            rate,
+            channels: ch,
+            format: fmt,
+            buffer: buf,
+        });
+    }
+    return catalogFmt(simpleKey, {device: String(st.device_id)});
+}
+
+/**
  * Shared line for `get_output_device_info` / `get_input_device_info` payloads (same JSON shape).
  * @param {object|null} info
  * @returns {string|null}
@@ -362,24 +388,7 @@ function fillAeStreamLineFromPayload(st, el) {
         return;
     }
     if (st.running === true && st.device_id != null && st.device_id !== '') {
-        const name = st.device_name != null ? String(st.device_name) : String(st.device_id);
-        const rate = st.sample_rate_hz != null ? String(st.sample_rate_hz) : null;
-        const ch = st.channels != null ? String(st.channels) : null;
-        const fmt = st.sample_format != null ? String(st.sample_format) : '';
-        const buf = formatAeBufferSize(st.buffer_size);
-        let line;
-        if (rate != null && ch != null) {
-            line = catalogFmt('ui.ae.output_stream_on_detail', {
-                name,
-                device: String(st.device_id),
-                rate,
-                channels: ch,
-                format: fmt,
-                buffer: buf,
-            });
-        } else {
-            line = catalogFmt('ui.ae.output_stream_on', {device: String(st.device_id)});
-        }
+        let line = buildAeStreamStatusLineCore(st, 'ui.ae.output_stream_on_detail', 'ui.ae.output_stream_on');
         if (st.tone_on === true && st.tone_supported === true) {
             line += catalogFmt('ui.ae.tone_active');
         }
@@ -405,24 +414,7 @@ function fillAeInputStreamLineFromPayload(st, el) {
         return;
     }
     if (st.running === true && st.device_id != null && st.device_id !== '') {
-        const name = st.device_name != null ? String(st.device_name) : String(st.device_id);
-        const rate = st.sample_rate_hz != null ? String(st.sample_rate_hz) : null;
-        const ch = st.channels != null ? String(st.channels) : null;
-        const fmt = st.sample_format != null ? String(st.sample_format) : '';
-        const buf = formatAeBufferSize(st.buffer_size);
-        let line;
-        if (rate != null && ch != null) {
-            line = catalogFmt('ui.ae.input_stream_on_detail', {
-                name,
-                device: String(st.device_id),
-                rate,
-                channels: ch,
-                format: fmt,
-                buffer: buf,
-            });
-        } else {
-            line = catalogFmt('ui.ae.input_stream_on', {device: String(st.device_id)});
-        }
+        let line = buildAeStreamStatusLineCore(st, 'ui.ae.input_stream_on_detail', 'ui.ae.input_stream_on');
         line = appendAeStreamBufferFixedSuffix(line, st);
         const ipk = st.input_peak;
         if (ipk != null && typeof ipk === 'number' && Number.isFinite(ipk)) {
@@ -532,6 +524,43 @@ function syncAeToneCheckboxFromStream(toneCb, stream) {
 }
 
 /**
+ * Rebuild `#aeInputDevice` options (system-default row + devices) and apply `inPick` with fallback.
+ * @param {HTMLSelectElement} selectEl
+ * @param {object[]} devices
+ * @param {string} inPick — desired value; `''` = system default
+ */
+function aePopulateInputDeviceSelectOptions(selectEl, devices, inPick) {
+    if (!selectEl || typeof selectEl.replaceChildren !== 'function' || typeof catalogFmt !== 'function') return;
+    const list = Array.isArray(devices) ? devices : [];
+    selectEl.replaceChildren();
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = catalogFmt('ui.ae.input_device_default_option');
+    selectEl.appendChild(defOpt);
+    for (const d of list) {
+        const id = d.id != null ? String(d.id) : '';
+        const name = d.name != null ? String(d.name) : id;
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = name;
+        if (d.is_default === true) {
+            opt.dataset.default = '1';
+        }
+        selectEl.appendChild(opt);
+    }
+    if (inPick !== '') {
+        selectEl.value = inPick;
+    }
+    const valid = inPick === '' || [...selectEl.options].some((o) => o.value === inPick);
+    if (!valid && list.length > 0) {
+        const defD = list.find((x) => x.is_default === true);
+        selectEl.value = defD && defD.id != null ? String(defD.id) : String(list[0].id);
+    } else if (!valid) {
+        selectEl.value = '';
+    }
+}
+
+/**
  * Reload engine_state (ping + stream), device list, caps, plugin stub.
  */
 async function refreshAudioEnginePanel() {
@@ -621,45 +650,14 @@ async function refreshAudioEnginePanel() {
                     inPick = String(inSaved);
                 }
                 if (inSelectEl && typeof inSelectEl.replaceChildren === 'function' && typeof catalogFmt === 'function') {
-                    inSelectEl.replaceChildren();
-                    const defOpt = document.createElement('option');
-                    defOpt.value = '';
-                    defOpt.textContent = catalogFmt('ui.ae.input_device_default_option');
-                    inSelectEl.appendChild(defOpt);
-                    for (const d of ins.devices) {
-                        const id = d.id != null ? String(d.id) : '';
-                        const name = d.name != null ? String(d.name) : id;
-                        const opt = document.createElement('option');
-                        opt.value = id;
-                        opt.textContent = name;
-                        if (d.is_default === true) {
-                            opt.dataset.default = '1';
-                        }
-                        inSelectEl.appendChild(opt);
-                    }
-                    if (inPick !== '') {
-                        inSelectEl.value = inPick;
-                    }
-                    const valid = inPick === '' || [...inSelectEl.options].some((o) => o.value === inPick);
-                    if (!valid && ins.devices.length > 0) {
-                        const defD = ins.devices.find((x) => x.is_default === true);
-                        inSelectEl.value = defD && defD.id != null ? String(defD.id) : String(ins.devices[0].id);
-                    } else if (!valid) {
-                        inSelectEl.value = '';
-                    }
+                    aePopulateInputDeviceSelectOptions(inSelectEl, ins.devices, inPick);
                     await fillAeInputDeviceCaps(inv, inSelectEl.value);
                 } else {
                     await fillAeInputDeviceCaps(inv, inPick);
                 }
             } else if (inListEl) {
                 inListEl.textContent = '—';
-                if (inSelectEl && typeof inSelectEl.replaceChildren === 'function' && typeof catalogFmt === 'function') {
-                    inSelectEl.replaceChildren();
-                    const defOpt = document.createElement('option');
-                    defOpt.value = '';
-                    defOpt.textContent = catalogFmt('ui.ae.input_device_default_option');
-                    inSelectEl.appendChild(defOpt);
-                }
+                aePopulateInputDeviceSelectOptions(inSelectEl, [], '');
                 await fillAeInputDeviceCaps(inv, '');
             }
         } catch {
