@@ -2509,19 +2509,34 @@ async fn measure_lufs(file_path: String) -> Result<Option<f64>, String> {
 /// Batch analyze: BPM + Key + LUFS for multiple files in parallel, save to SQLite.
 /// Analyzes files in parallel (rayon), batch-writes to DB, returns results
 /// directly so the frontend can update visible rows without extra IPC.
+///
+/// Uses a **small dedicated rayon pool** (at most 4 threads) so a full batch does not claim every
+/// CPU core during a library scan — unbounded default rayon was starving other work (including
+/// audio I/O in the separate engine process on the same machine).
 #[tauri::command]
 async fn batch_analyze(paths: Vec<String>) -> Result<serde_json::Value, String> {
     tokio::task::spawn_blocking(move || {
         use rayon::prelude::*;
-        let results: Vec<db::AnalysisBatchRow> = paths
-            .par_iter()
-            .map(|path| {
-                let bpm_val = bpm::estimate_bpm(path);
-                let key_val = key_detect::detect_key(path);
-                let lufs_val = lufs::measure_lufs(path);
-                (path.clone(), bpm_val, key_val, lufs_val)
-            })
-            .collect();
+        if paths.is_empty() {
+            return serde_json::json!({ "count": 0, "results": [] });
+        }
+        const MAX_BATCH_ANALYSIS_THREADS: usize = 4;
+        let num_threads = std::cmp::min(paths.len(), MAX_BATCH_ANALYSIS_THREADS).max(1);
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build()
+            .expect("batch_analyze rayon pool");
+        let results: Vec<db::AnalysisBatchRow> = pool.install(|| {
+            paths
+                .par_iter()
+                .map(|path| {
+                    let bpm_val = bpm::estimate_bpm(path);
+                    let key_val = key_detect::detect_key(path);
+                    let lufs_val = lufs::measure_lufs(path);
+                    (path.clone(), bpm_val, key_val, lufs_val)
+                })
+                .collect()
+        });
         // Batch all DB writes in a single transaction
         let count = db::global().batch_update_analysis(&results).unwrap_or(0);
         // Return results so frontend skips N individual dbGetAnalysis IPC calls

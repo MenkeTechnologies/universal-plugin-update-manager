@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <bit>
+#include <chrono>
 #include <cmath>
 #include <deque>
 #include <functional>
@@ -995,6 +996,11 @@ struct Engine::Impl
         const int n = files.size();
         juce::String name;
         int processed = 0;
+        /* Same process as JUCE output: plugin scan can peg CPU / disk and starve the audio callback. */
+        auto yieldIfPlayback = [this]() {
+            if (outputRunning && playbackMode)
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        };
         while (processed < n)
         {
             const juce::String fileId = files[static_cast<size_t>(n - 1 - processed)];
@@ -1030,6 +1036,7 @@ struct Engine::Impl
                 processed++;
                 pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
                 persistKnownPluginListCache(list);
+                yieldIfPlayback();
                 continue;
             }
             catch (...)
@@ -1041,11 +1048,13 @@ struct Engine::Impl
                 processed++;
                 pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
                 persistKnownPluginListCache(list);
+                yieldIfPlayback();
                 continue;
             }
             processed++;
             pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
             persistKnownPluginListCache(list);
+            yieldIfPlayback();
             if (!more)
                 break;
         }
