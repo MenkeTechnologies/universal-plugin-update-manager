@@ -203,7 +203,7 @@ function buildPdfRow(p) {
     <td class="col-size">${p.sizeFormatted}</td>
     <td class="col-pages" data-pdf-pages-cell="${hp}" style="text-align:right;">${pagesCell}</td>
     <td class="col-date">${p.modified}</td>
-    <td class="col-actions">
+    <td class="col-actions" data-action-stop>
       <button class="btn-small btn-folder" data-action="openPdfFile" data-path="${hp}" title="${hp}">&#128193;</button>
     </td>
   </tr>`;

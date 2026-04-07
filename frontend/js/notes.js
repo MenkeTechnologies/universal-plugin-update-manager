@@ -357,11 +357,11 @@ function renderNotesTab() {
       `<span class="note-tag" style="cursor:pointer;" data-action-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`
     ).join('');
     const date = n.updatedAt ? new Date(n.updatedAt).toLocaleString() : '';
-    return `<div class="note-card">
+    return `<div class="note-card" data-path="${escapeHtml(path)}">
       <div class="note-card-header">
         <span class="note-card-name" title="${escapeHtml(path)}">${_notesSearch ? highlightMatch(name, _notesSearch, 'fuzzy') : escapeHtml(name)}</span>
         <span class="note-card-date">${date}</span>
-        <div class="note-card-actions">
+        <div class="note-card-actions" data-action-stop>
           <button class="btn-small btn-secondary" data-action-note="edit" data-path="${escapeHtml(path)}" data-name="${escapeHtml(name)}" title="Edit note" style="padding:3px 8px;font-size:10px;">Edit</button>
           <button class="btn-small btn-stop" data-action-note="delete" data-path="${escapeHtml(path)}" title="Delete note" style="padding:3px 8px;font-size:10px;">&#10005;</button>
         </div>

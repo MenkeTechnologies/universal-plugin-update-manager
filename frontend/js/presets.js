@@ -152,7 +152,7 @@ function buildPresetRow(p) {
     <td class="col-path" title="${hp}">${_lastPresetSearch ? highlightMatch(p.directory, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.directory)}</td>
     <td class="col-size">${p.sizeFormatted || formatPresetSize(p.size)}</td>
     <td class="col-date">${p.modified}</td>
-    <td class="col-actions">
+    <td class="col-actions" data-action-stop>
       <button class="btn-small btn-folder" data-action="openPresetFolder" data-path="${hp}" title="${hp}">&#128193;</button>
     </td>
   </tr>`;

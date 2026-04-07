@@ -5,7 +5,7 @@ const batchSelected = new Set();
 
 function getRowPath(tr) {
   if (!tr) return null;
-  return tr.dataset.audioPath || tr.dataset.dawPath || tr.dataset.presetPath || tr.dataset.midiPath || null;
+  return tr.dataset.audioPath || tr.dataset.dawPath || tr.dataset.presetPath || tr.dataset.midiPath || tr.dataset.pdfPath || null;
 }
 
 function toggleBatchSelect(path, checked) {

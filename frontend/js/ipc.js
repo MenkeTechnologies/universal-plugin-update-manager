@@ -375,10 +375,6 @@ document.addEventListener('click', (e) => {
                 if (typeof loadMoreFavs === 'function') loadMoreFavs();
                 break;
             case 'toggleMetadata':
-                if (typeof window !== 'undefined' && window.__suppressAudioMetadataToggle) {
-                    window.__suppressAudioMetadataToggle = false;
-                    return;
-                }
                 toggleMetadata(el.dataset.path, e);
                 break;
             case 'previewAudio':
