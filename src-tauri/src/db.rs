@@ -116,6 +116,113 @@ fn short_like(search: &str) -> Option<String> {
     Some(format!("%{escaped}%"))
 }
 
+/// Backfill FTS5 contentless shadow tables from primary tables for rows missing from FTS.
+/// Migration v9 created empty FTS tables; existing `audio_samples` (etc.) rows were never
+/// indexed, so `MATCH` returned no hits while the base tables still showed full library counts.
+fn backfill_contentless_fts(conn: &rusqlite::Connection) -> Result<(), String> {
+    let n_audio: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM audio_samples a WHERE NOT EXISTS (SELECT 1 FROM audio_samples_fts f WHERE f.rowid = a.id)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if n_audio > 0 {
+        crate::append_log(format!(
+            "DB migration v13: backfilling {n_audio} audio_samples rows into FTS"
+        ));
+        conn.execute(
+            "INSERT INTO audio_samples_fts(rowid, name, path, scan_id)
+             SELECT a.id, a.name, a.path, a.scan_id FROM audio_samples a
+             WHERE NOT EXISTS (SELECT 1 FROM audio_samples_fts f WHERE f.rowid = a.id)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    let n_daw: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM daw_projects p WHERE NOT EXISTS (SELECT 1 FROM daw_projects_fts f WHERE f.rowid = p.id)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if n_daw > 0 {
+        crate::append_log(format!(
+            "DB migration v13: backfilling {n_daw} daw_projects rows into FTS"
+        ));
+        conn.execute(
+            "INSERT INTO daw_projects_fts(rowid, name, path, daw, scan_id)
+             SELECT p.id, p.name, p.path, p.daw, p.scan_id FROM daw_projects p
+             WHERE NOT EXISTS (SELECT 1 FROM daw_projects_fts f WHERE f.rowid = p.id)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    let n_preset: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM presets p WHERE NOT EXISTS (SELECT 1 FROM presets_fts f WHERE f.rowid = p.id)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if n_preset > 0 {
+        crate::append_log(format!(
+            "DB migration v13: backfilling {n_preset} presets rows into FTS"
+        ));
+        conn.execute(
+            "INSERT INTO presets_fts(rowid, name, path, format, scan_id)
+             SELECT p.id, p.name, p.path, p.format, p.scan_id FROM presets p
+             WHERE NOT EXISTS (SELECT 1 FROM presets_fts f WHERE f.rowid = p.id)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    let n_midi: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM midi_files m WHERE NOT EXISTS (SELECT 1 FROM midi_files_fts f WHERE f.rowid = m.id)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if n_midi > 0 {
+        crate::append_log(format!(
+            "DB migration v13: backfilling {n_midi} midi_files rows into FTS"
+        ));
+        conn.execute(
+            "INSERT INTO midi_files_fts(rowid, name, path, scan_id)
+             SELECT m.id, m.name, m.path, m.scan_id FROM midi_files m
+             WHERE NOT EXISTS (SELECT 1 FROM midi_files_fts f WHERE f.rowid = m.id)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    let n_pdf: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pdfs p WHERE NOT EXISTS (SELECT 1 FROM pdfs_fts f WHERE f.rowid = p.id)",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if n_pdf > 0 {
+        crate::append_log(format!(
+            "DB migration v13: backfilling {n_pdf} pdfs rows into FTS"
+        ));
+        conn.execute(
+            "INSERT INTO pdfs_fts(rowid, name, path, scan_id)
+             SELECT p.id, p.name, p.path, p.scan_id FROM pdfs p
+             WHERE NOT EXISTS (SELECT 1 FROM pdfs_fts f WHERE f.rowid = p.id)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
 /// A single row returned from a paginated query, with analysis data inline.
 #[derive(Debug, Serialize)]
 pub struct AudioSampleRow {
@@ -1016,6 +1123,14 @@ impl Database {
             .map_err(|e| format!("Migration v12 (scan_complete) failed: {e}"))?;
             conn.execute("INSERT INTO schema_version (version) VALUES (12)", [])
                 .map_err(|e| format!("Migration v12 schema_version failed: {e}"))?;
+        }
+
+        if current < 13 {
+            // FTS5 tables from v9 were never populated for rows that existed before FTS or for
+            // restored/copied DBs — substring search used `MATCH` on empty FTS and found nothing.
+            backfill_contentless_fts(&conn)?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (13)", [])
+                .map_err(|e| format!("Migration v13 schema_version failed: {e}"))?;
         }
 
         if conn
@@ -5642,6 +5757,53 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.total_count, 2);
+    }
+
+    /// v13 backfill: rows in `audio_samples` without FTS shadow rows produced zero `MATCH` hits.
+    #[test]
+    fn test_backfill_contentless_fts_restores_audio_match() {
+        let db = test_db();
+        let samples = vec![sample("kick.wav", "/test/kick.wav", "WAV", 1000)];
+        db.save_scan("s1", "2024-01-01T00:00:00", 1, 1000, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &samples).unwrap();
+
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute("DELETE FROM audio_samples_fts", [])
+                .expect("clear FTS");
+        }
+
+        let empty = db
+            .query_audio(&AudioQueryParams {
+                scan_id: Some("s1".into()),
+                search: Some("kick".into()),
+                format_filter: None,
+                sort_key: "name".into(),
+                sort_asc: true,
+                offset: 0,
+                limit: 100,
+            })
+            .unwrap();
+        assert_eq!(empty.total_count, 0);
+
+        {
+            let conn = db.conn.lock().unwrap();
+            backfill_contentless_fts(&conn).expect("backfill");
+        }
+
+        let restored = db
+            .query_audio(&AudioQueryParams {
+                scan_id: Some("s1".into()),
+                search: Some("kick".into()),
+                format_filter: None,
+                sort_key: "name".into(),
+                sort_asc: true,
+                offset: 0,
+                limit: 100,
+            })
+            .unwrap();
+        assert_eq!(restored.total_count, 1);
     }
 
     /// Search (name subsequence) + sort by size DESC + pagination: verifies full query_audio path.
