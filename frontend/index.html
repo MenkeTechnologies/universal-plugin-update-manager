@@ -251,11 +251,17 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(5, 217, 232, 0.08);
         }
 
-        /* Frosted glass effect for overlays */
+        /* Frosted glass effect for overlays — must follow `--bg-card` (light theme was ignored when this used fixed dark rgba). */
         .modal-content, .ctx-menu, .palette-box {
             backdrop-filter: blur(12px) saturate(1.4);
             -webkit-backdrop-filter: blur(12px) saturate(1.4);
-            background: rgba(10, 10, 20, 0.92) !important;
+            background: color-mix(in srgb, var(--bg-card) 92%, transparent) !important;
+        }
+
+        @supports not (background: color-mix(in srgb, var(--bg-card) 92%, transparent)) {
+            .modal-content, .ctx-menu, .palette-box {
+                background: var(--bg-card) !important;
+            }
         }
 
         /* Neon bloom on focused inputs */
@@ -1422,6 +1428,12 @@
             border-bottom: 1px solid var(--cyan);
             padding: 0;
             border-radius: 0;
+        }
+
+        [data-theme="light"] .fzf-hl {
+            background: color-mix(in srgb, var(--cyan) 18%, transparent);
+            color: var(--cyan);
+            border-bottom-color: var(--cyan);
         }
 
         .plugin-meta {
@@ -3718,6 +3730,10 @@
             animation: fadeIn 0.1s ease-out;
         }
 
+        [data-theme="light"] .palette-overlay {
+            background: rgba(30, 41, 59, 0.38);
+        }
+
         .palette-box {
             width: 580px;
             max-height: 60vh;
@@ -3729,6 +3745,10 @@
             flex-direction: column;
             overflow: hidden;
             animation: neon-border-glow 2.5s ease-in-out infinite;
+        }
+
+        [data-theme="light"] .palette-box {
+            box-shadow: 0 0 48px var(--cyan-glow), 0 20px 48px rgba(15, 23, 42, 0.12);
         }
 
         .palette-input {
@@ -3763,8 +3783,7 @@
         }
 
         .palette-row:hover, .palette-selected {
-            background: rgba(5, 217, 232, 0.08);
-            box-shadow: inset 0 0 12px rgba(5, 217, 232, 0.06);
+            background: var(--cyan-dim);
         }
 
         .palette-icon {
@@ -3804,51 +3823,63 @@
         }
 
         .palette-type-tab {
-            background: rgba(5, 217, 232, 0.1);
+            background: color-mix(in srgb, var(--cyan) 12%, transparent);
             color: var(--cyan);
-            border: 1px solid rgba(5, 217, 232, 0.3);
+            border: 1px solid color-mix(in srgb, var(--cyan) 32%, transparent);
         }
 
         .palette-type-action {
-            background: rgba(249, 240, 2, 0.1);
+            background: color-mix(in srgb, var(--yellow) 12%, transparent);
             color: var(--yellow);
-            border: 1px solid rgba(249, 240, 2, 0.3);
+            border: 1px solid color-mix(in srgb, var(--yellow) 32%, transparent);
         }
 
         .palette-type-plugin {
-            background: rgba(57, 255, 20, 0.1);
+            background: color-mix(in srgb, var(--green) 12%, transparent);
             color: var(--green);
-            border: 1px solid rgba(57, 255, 20, 0.3);
+            border: 1px solid color-mix(in srgb, var(--green) 32%, transparent);
         }
 
         .palette-type-sample {
-            background: rgba(211, 0, 197, 0.1);
+            background: color-mix(in srgb, var(--magenta) 12%, transparent);
             color: var(--magenta);
-            border: 1px solid rgba(211, 0, 197, 0.3);
+            border: 1px solid color-mix(in srgb, var(--magenta) 32%, transparent);
         }
 
         .palette-type-daw {
-            background: rgba(255, 42, 109, 0.1);
+            background: color-mix(in srgb, var(--accent) 12%, transparent);
             color: var(--accent);
-            border: 1px solid rgba(255, 42, 109, 0.3);
+            border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
         }
 
         .palette-type-preset {
-            background: rgba(5, 217, 232, 0.1);
+            background: color-mix(in srgb, var(--cyan) 12%, transparent);
             color: var(--cyan);
-            border: 1px solid rgba(5, 217, 232, 0.3);
+            border: 1px solid color-mix(in srgb, var(--cyan) 32%, transparent);
         }
 
         .palette-type-bookmark {
-            background: rgba(57, 255, 20, 0.1);
+            background: color-mix(in srgb, var(--green) 12%, transparent);
             color: var(--green);
-            border: 1px solid rgba(57, 255, 20, 0.3);
+            border: 1px solid color-mix(in srgb, var(--green) 32%, transparent);
         }
 
         .palette-type-tag {
-            background: rgba(249, 240, 2, 0.1);
+            background: color-mix(in srgb, var(--yellow) 12%, transparent);
             color: var(--yellow);
-            border: 1px solid rgba(249, 240, 2, 0.3);
+            border: 1px solid color-mix(in srgb, var(--yellow) 32%, transparent);
+        }
+
+        .palette-type-pdf {
+            background: color-mix(in srgb, var(--cyan) 10%, transparent);
+            color: var(--cyan);
+            border: 1px solid color-mix(in srgb, var(--cyan) 28%, transparent);
+        }
+
+        .palette-type-midi {
+            background: color-mix(in srgb, var(--magenta) 10%, transparent);
+            color: var(--magenta);
+            border: 1px solid color-mix(in srgb, var(--magenta) 28%, transparent);
         }
 
         .palette-empty {
@@ -9480,43 +9511,43 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=23394"></script>
-<script src="js/utils.js?v=23394"></script>
-<script src="js/ipc.js?v=23394"></script>
-<script src="js/drag-reorder.js?v=23394"></script>
-<script src="js/modal-drag.js?v=23394"></script>
-<script src="js/columns.js?v=23394"></script>
-<script src="js/notes.js?v=23394"></script>
-<script src="js/favorites.js?v=23394"></script>
-<script src="js/export.js?v=23394"></script>
-<script src="js/plugins.js?v=23394"></script>
-<script src="js/settings.js?v=23394"></script>
-<script src="js/history.js?v=23394"></script>
-<script src="js/kvr.js?v=23394"></script>
-<script src="js/audio.js?v=23394"></script>
-<script src="js/daw.js?v=23394"></script>
-<script src="js/presets.js?v=23394"></script>
-<script src="js/disk-usage.js?v=23394"></script>
-<script src="js/batch-select.js?v=23394"></script>
-<script src="js/native-file-drag.js?v=23394"></script>
-<script src="js/sort-persist.js?v=23394"></script>
-<script src="js/multi-filter.js?v=23394"></script>
-<script src="js/file-browser.js?v=23394"></script>
-<script src="js/duplicates.js?v=23394"></script>
-<script src="js/command-palette.js?v=23394"></script>
-<script src="js/xref.js?v=23394"></script>
-<script src="js/dep-graph.js?v=23394"></script>
-<script src="js/smart-playlists.js?v=23394"></script>
-<script src="js/heatmap-dashboard.js?v=23394"></script>
-<script src="js/midi.js?v=23394"></script>
-<script src="js/pdf.js?v=23394"></script>
-<script src="js/settings-search.js?v=23394"></script>
-<script src="js/visualizer.js?v=23394"></script>
-<script src="js/walker-status.js?v=23394"></script>
-<script src="js/context-menu.js?v=23394"></script>
-<script src="js/shortcuts.js?v=23394"></script>
-<script src="js/help-overlay.js?v=23394"></script>
-<script src="js/keyboard-nav.js?v=23394"></script>
-<script src="js/app.js?v=23394"></script>
+<script src="js/i18n-ui.js?v=39554"></script>
+<script src="js/utils.js?v=39554"></script>
+<script src="js/ipc.js?v=39554"></script>
+<script src="js/drag-reorder.js?v=39554"></script>
+<script src="js/modal-drag.js?v=39554"></script>
+<script src="js/columns.js?v=39554"></script>
+<script src="js/notes.js?v=39554"></script>
+<script src="js/favorites.js?v=39554"></script>
+<script src="js/export.js?v=39554"></script>
+<script src="js/plugins.js?v=39554"></script>
+<script src="js/settings.js?v=39554"></script>
+<script src="js/history.js?v=39554"></script>
+<script src="js/kvr.js?v=39554"></script>
+<script src="js/audio.js?v=39554"></script>
+<script src="js/daw.js?v=39554"></script>
+<script src="js/presets.js?v=39554"></script>
+<script src="js/disk-usage.js?v=39554"></script>
+<script src="js/batch-select.js?v=39554"></script>
+<script src="js/native-file-drag.js?v=39554"></script>
+<script src="js/sort-persist.js?v=39554"></script>
+<script src="js/multi-filter.js?v=39554"></script>
+<script src="js/file-browser.js?v=39554"></script>
+<script src="js/duplicates.js?v=39554"></script>
+<script src="js/command-palette.js?v=39554"></script>
+<script src="js/xref.js?v=39554"></script>
+<script src="js/dep-graph.js?v=39554"></script>
+<script src="js/smart-playlists.js?v=39554"></script>
+<script src="js/heatmap-dashboard.js?v=39554"></script>
+<script src="js/midi.js?v=39554"></script>
+<script src="js/pdf.js?v=39554"></script>
+<script src="js/settings-search.js?v=39554"></script>
+<script src="js/visualizer.js?v=39554"></script>
+<script src="js/walker-status.js?v=39554"></script>
+<script src="js/context-menu.js?v=39554"></script>
+<script src="js/shortcuts.js?v=39554"></script>
+<script src="js/help-overlay.js?v=39554"></script>
+<script src="js/keyboard-nav.js?v=39554"></script>
+<script src="js/app.js?v=39554"></script>
 </body>
 </html>

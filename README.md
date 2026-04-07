@@ -79,7 +79,7 @@ A high-voltage **Tauri v2** desktop app that jacks into your system's audio plug
 | **Post-scan toasts** | In-app slide-in toasts when each scanner finishes (`toast.post_scan_*` keys): full completion vs user-stopped, with locale-formatted counts. **Scan All** sets `window.__suppressPostScanToasts` so only one summary toast runs (library totals via `get_active_scan_inventory_counts`) |
 | **Auto-Restore** | Last scan results + KVR cache load automatically on app startup -- no need to re-scan or re-check every launch |
 | **Unknown Tracking** | Plugins where no version info was found online show "Unknown Latest" badge and are counted separately from "Up to Date" |
-| **Color Schemes** | Multiple themes including cyberpunk (default), light mode, and custom schemes with configurable CSS variables |
+| **Color Schemes** | Multiple themes including cyberpunk (default), light mode, and custom schemes with configurable CSS variables. Modals, context menus, and the command palette use `color-mix`/`var(--bg-card)` for frosted panels (not a fixed dark tint) so light mode matches |
 | **Fuzzy Search** | All search bars default to fuzzy matching (characters match in order, not contiguous). Toggle the `.*` button to switch to regex mode with full pattern support. Available in all tabs. Matched characters are highlighted (cyan) in list and table rows |
 | **Favorites** | Right-click any plugin, sample, DAW project, or preset to add/remove from favorites. Dedicated Favorites tab shows all starred items with type filter, search, reveal in Finder, and remove actions. Persisted across sessions |
 | **Resizable Columns** | Drag column borders to resize. Widths persist across sessions |
