@@ -26,6 +26,8 @@ function migrateAeBufferPrefs() {
 
 /** @type {ReturnType<typeof setInterval> | null} */
 let aeInputPeakPollTimer = null;
+let aeInputPeakPollInFlight = false;
+let aeInputPeakVisibilityBound = false;
 const AE_INPUT_PEAK_POLL_MS = 100;
 
 function aeAudioEngineTabIsActive() {
@@ -44,6 +46,10 @@ function stopAeInputPeakPoll() {
  * @param {object|null|undefined} es — `engine_state` payload (or `{ input_stream }` from status)
  */
 function syncAeInputPeakPollFromEngineState(es) {
+    if (!aeAudioEngineTabIsActive()) {
+        stopAeInputPeakPoll();
+        return;
+    }
     if (es && es.input_stream && es.input_stream.running === true) {
         startAeInputPeakPoll();
     } else {
@@ -65,6 +71,10 @@ async function tickAeInputPeakPoll() {
         stopAeInputPeakPoll();
         return;
     }
+    if (typeof document !== 'undefined' && document.hidden) {
+        stopAeInputPeakPoll();
+        return;
+    }
     const inv = window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function'
         ? window.vstUpdater.audioEngineInvoke
         : null;
@@ -72,6 +82,8 @@ async function tickAeInputPeakPoll() {
         stopAeInputPeakPoll();
         return;
     }
+    if (aeInputPeakPollInFlight) return;
+    aeInputPeakPollInFlight = true;
     try {
         const st = await inv({cmd: 'input_stream_status'});
         const el = document.getElementById('aeInputStreamStatus');
@@ -85,11 +97,15 @@ async function tickAeInputPeakPoll() {
         }
     } catch {
         stopAeInputPeakPoll();
+    } finally {
+        aeInputPeakPollInFlight = false;
     }
 }
 
 /** When the tab was already initialized, re-sync input line + peak poll (e.g. user left tab and returned). */
 async function resumeAeInputPeakPollIfNeeded() {
+    if (!aeAudioEngineTabIsActive()) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
     const inv = window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function'
         ? window.vstUpdater.audioEngineInvoke
         : null;
@@ -102,6 +118,19 @@ async function resumeAeInputPeakPollIfNeeded() {
     } catch {
         /* ignore */
     }
+}
+
+function bindAeInputPeakVisibilityOnce() {
+    if (aeInputPeakVisibilityBound) return;
+    aeInputPeakVisibilityBound = true;
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopAeInputPeakPoll();
+        } else {
+            void resumeAeInputPeakPollIfNeeded();
+        }
+    });
 }
 
 /**
@@ -170,6 +199,7 @@ function initAudioEngineTab() {
         return;
     }
     root.dataset.aeInit = '1';
+    bindAeInputPeakVisibilityOnce();
 
     const refreshBtn = document.getElementById('aeRefreshDevices');
     if (refreshBtn && typeof refreshBtn.addEventListener === 'function') {
