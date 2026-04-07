@@ -493,6 +493,16 @@ function fillAeEngineStatusOkFromState(statusEl, es) {
 }
 
 /**
+ * @param {HTMLElement|null} statusEl
+ * @param {unknown} err
+ */
+function fillAeEngineStatusFromError(statusEl, err) {
+    if (!statusEl || typeof catalogFmt !== 'function') return;
+    const msg = err && err.message ? String(err.message) : String(err);
+    statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
+}
+
+/**
  * @param {HTMLInputElement|null|undefined} toneCb
  * @param {object|null|undefined} stream — `engine_state.stream`
  */
@@ -645,10 +655,7 @@ async function refreshAudioEnginePanel() {
         }
     } catch (e) {
         fillAeStreamsFromEngineState(null);
-        const msg = e && e.message ? String(e.message) : String(e);
-        if (statusEl && typeof catalogFmt === 'function') {
-            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
-        }
+        fillAeEngineStatusFromError(statusEl, e);
     }
 }
 
@@ -672,22 +679,15 @@ async function toggleAeTestTone(enabled) {
         const es = await inv({cmd: 'engine_state'});
         fillAeStreamsFromEngineState(es);
         const toneCb = document.getElementById('aeTestTone');
-        if (toneCb && es && es.stream && es.stream.tone_on != null) {
-            toneCb.checked = es.stream.tone_on === true;
-        }
+        syncAeToneCheckboxFromStream(toneCb, es.stream);
     } catch (e) {
         const es = await fillAeStreamsAfterEngineError();
-        const msg = e && e.message ? String(e.message) : String(e);
-        if (statusEl && typeof catalogFmt === 'function') {
-            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
-        }
+        fillAeEngineStatusFromError(statusEl, e);
         const toneCb = document.getElementById('aeTestTone');
-        if (toneCb) {
-            if (es && es.stream && es.stream.tone_on != null) {
-                toneCb.checked = es.stream.tone_on === true;
-            } else {
-                toneCb.checked = !enabled;
-            }
+        if (es && es.stream) {
+            syncAeToneCheckboxFromStream(toneCb, es.stream);
+        } else if (toneCb) {
+            toneCb.checked = !enabled;
         }
     }
 }
@@ -737,10 +737,7 @@ async function applyAudioEngineDevice() {
         syncAeToneCheckboxFromStream(toneCb, es.stream);
     } catch (e) {
         const es = await fillAeStreamsAfterEngineError();
-        const msg = e && e.message ? String(e.message) : String(e);
-        if (statusEl && typeof catalogFmt === 'function') {
-            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
-        }
+        fillAeEngineStatusFromError(statusEl, e);
         if (es && es.stream) syncAeToneCheckboxFromStream(toneCb, es.stream);
     }
 }
@@ -780,10 +777,7 @@ async function startAeInputCapture() {
         fillAeEngineStatusOkFromState(statusEl, es);
     } catch (e) {
         await fillAeStreamsAfterEngineError();
-        const msg = e && e.message ? String(e.message) : String(e);
-        if (statusEl && typeof catalogFmt === 'function') {
-            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
-        }
+        fillAeEngineStatusFromError(statusEl, e);
     }
 }
 
@@ -806,10 +800,7 @@ async function stopAeInputCapture() {
         fillAeEngineStatusOkFromState(statusEl, es);
     } catch (e) {
         await fillAeStreamsAfterEngineError();
-        const msg = e && e.message ? String(e.message) : String(e);
-        if (statusEl && typeof catalogFmt === 'function') {
-            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
-        }
+        fillAeEngineStatusFromError(statusEl, e);
     }
 }
 
@@ -837,10 +828,7 @@ async function stopAeOutputStream() {
         }
     } catch (e) {
         const es = await fillAeStreamsAfterEngineError();
-        const msg = e && e.message ? String(e.message) : String(e);
-        if (statusEl && typeof catalogFmt === 'function') {
-            statusEl.textContent = catalogFmt('ui.ae.status_error', {message: msg});
-        }
+        fillAeEngineStatusFromError(statusEl, e);
         if (es && es.stream) syncAeToneCheckboxFromStream(toneCb, es.stream);
     }
 }
