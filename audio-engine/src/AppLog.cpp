@@ -14,6 +14,33 @@ std::mutex g_engineLogMutex;
 juce::String g_engineLogPath;
 bool g_mirrorEngineLogToStderr = false;
 
+/** Same cap as host `write_app_log_line` (`src-tauri/src/lib.rs`). */
+static constexpr juce::int64 kMaxEngineLogBytes = 5 * 1024 * 1024;
+
+/** Rename to `*.1` (replacing an old backup); if rename fails, delete or truncate so the log cannot grow without bound. */
+static void rotateEngineLogIfNeeded(const juce::File& logFile)
+{
+    if (logFile.getFullPathName().isEmpty())
+        return;
+    if (!logFile.existsAsFile())
+        return;
+    if (logFile.getSize() <= kMaxEngineLogBytes)
+        return;
+
+    const juce::File parent = logFile.getParentDirectory();
+    (void) parent.createDirectory();
+    const juce::File backup = parent.getChildFile(logFile.getFileName() + ".1");
+    if (backup.existsAsFile())
+        (void) backup.deleteFile();
+
+    if (logFile.moveFileTo(backup))
+        return;
+
+    if (logFile.deleteFile())
+        return;
+    (void) logFile.replaceWithText("");
+}
+
 static juce::String utcTimestampString()
 {
     using namespace std::chrono;
@@ -40,6 +67,9 @@ void initAppLogFromEnv()
     g_engineLogPath = p;
     const char* mirror = std::getenv("AUDIO_HAXOR_ENGINE_LOG_STDERR");
     g_mirrorEngineLogToStderr = (mirror != nullptr && mirror[0] != '\0');
+
+    if (g_engineLogPath.isNotEmpty())
+        rotateEngineLogIfNeeded(juce::File(g_engineLogPath));
 }
 
 void appLogLine(const juce::String& message)
@@ -61,12 +91,7 @@ void appLogLine(const juce::String& message)
     const juce::File parent = f.getParentDirectory();
     (void) parent.createDirectory();
 
-    constexpr juce::int64 kMaxLogSize = 5 * 1024 * 1024;
-    if (f.existsAsFile() && f.getSize() > kMaxLogSize)
-    {
-        const juce::File backup = parent.getChildFile(f.getFileName() + ".1");
-        (void) f.moveFileTo(backup);
-    }
+    rotateEngineLogIfNeeded(f);
 
     const auto path = f.getFullPathName().toStdString();
     std::ofstream out(path, std::ios::app | std::ios::binary);

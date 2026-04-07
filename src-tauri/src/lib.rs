@@ -2915,12 +2915,15 @@ fn write_app_log_line(msg: &str) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    // Rotate if > 5MB — rename to app.log.1, truncate
+    // Rotate if > 5MB — rename to app.log.1 (drop prior backup); if rename fails, truncate in place
     const MAX_LOG_SIZE: u64 = 5 * 1024 * 1024;
     if let Ok(meta) = std::fs::metadata(&path) {
         if meta.len() > MAX_LOG_SIZE {
             let backup = path.with_extension("log.1");
-            let _ = std::fs::rename(&path, &backup);
+            let _ = std::fs::remove_file(&backup);
+            if std::fs::rename(&path, &backup).is_err() {
+                let _ = std::fs::write(&path, "");
+            }
         }
     }
     let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
