@@ -428,11 +428,19 @@ function fillAeInputStreamLineFromPayload(st, el) {
 function fillAeStreamsFromEngineState(es) {
     const streamEl = document.getElementById('aeStreamStatus');
     const inputStreamEl = document.getElementById('aeInputStreamStatus');
-    if (es && es.stream && streamEl) {
-        fillAeStreamLineFromPayload(es.stream, streamEl);
+    if (streamEl) {
+        if (es && es.stream) {
+            fillAeStreamLineFromPayload(es.stream, streamEl);
+        } else {
+            streamEl.textContent = '—';
+        }
     }
-    if (es && es.input_stream && inputStreamEl) {
-        fillAeInputStreamLineFromPayload(es.input_stream, inputStreamEl);
+    if (inputStreamEl) {
+        if (es && es.input_stream) {
+            fillAeInputStreamLineFromPayload(es.input_stream, inputStreamEl);
+        } else {
+            inputStreamEl.textContent = '—';
+        }
     }
     syncAeInputPeakPollFromEngineState(es);
 }
