@@ -110,10 +110,33 @@ async function decodePeaksInWorker(url, bars) {
     return res.peaks;
 }
 
+function peaksFromChannelData(raw, nBars) {
+    const step = Math.floor(raw.length / nBars);
+    const peaks = [];
+    for (let i = 0; i < nBars; i++) {
+        let max = 0;
+        let min = 0;
+        const start = i * step;
+        for (let j = start; j < start + step && j < raw.length; j++) {
+            if (raw[j] > max) max = raw[j];
+            if (raw[j] < min) min = raw[j];
+        }
+        peaks.push({ max, min });
+    }
+    return peaks;
+}
+
+/** Main-thread `decodeAudioData` + peak envelope (last resort when worker decode fails). */
+async function decodePeaksMainThreadFromUrl(url, nBars) {
+    const ab = await fetchAudioArrayBuffer(url);
+    if (!_audioCtx) _audioCtx = new AudioContext();
+    const audioBuf = await _audioCtx.decodeAudioData(ab.slice(0));
+    return peaksFromChannelData(audioBuf.getChannelData(0), nBars);
+}
+
 /**
- * Prefer worker `fetch`+decode; if that fails (e.g. `tauri://` URL not visible to the worker),
- * fetch on the main thread and transfer the `ArrayBuffer` to the worker so `decodeAudioData`
- * does not run on the UI thread. If `Worker` is unavailable, decode on main (rare).
+ * Prefer worker `fetch`+decode; if that fails, main-thread fetch + transfer to worker; if that fails
+ * too (worker broken, bad decode, etc.), decode on the main thread so waveforms never stay blank.
  */
 async function decodePeaksViaWorker(url, bars) {
     const nBars = Math.max(1, Math.min(Math.floor(Number(bars)) || 1, 800));
@@ -122,27 +145,15 @@ async function decodePeaksViaWorker(url, bars) {
     } catch {
         /* fall through */
     }
-    if (!getAudioDecodeWorker()) {
-        const ab = await fetchAudioArrayBuffer(url);
-        if (!_audioCtx) _audioCtx = new AudioContext();
-        const audioBuf = await _audioCtx.decodeAudioData(ab.slice(0));
-        const raw = audioBuf.getChannelData(0);
-        const step = Math.floor(raw.length / nBars);
-        const peaks = [];
-        for (let i = 0; i < nBars; i++) {
-            let max = 0;
-            let min = 0;
-            const start = i * step;
-            for (let j = start; j < start + step && j < raw.length; j++) {
-                if (raw[j] > max) max = raw[j];
-                if (raw[j] < min) min = raw[j];
-            }
-            peaks.push({ max, min });
+    if (getAudioDecodeWorker()) {
+        try {
+            const ab = await fetchAudioArrayBuffer(url);
+            return await decodePeaksFromArrayBuffer(ab, nBars);
+        } catch {
+            /* fall through */
         }
-        return peaks;
     }
-    const ab = await fetchAudioArrayBuffer(url);
-    return await decodePeaksFromArrayBuffer(ab, nBars);
+    return await decodePeaksMainThreadFromUrl(url, nBars);
 }
 
 async function decodeMetaVisualsInWorker(url, bars) {

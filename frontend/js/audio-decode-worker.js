@@ -2,20 +2,15 @@
  * Off-main-thread fetch + decodeAudioData + peak / spectrogram / PCM extraction.
  * Keeps the UI responsive for large WAVs and long MP3s.
  *
- * WKWebView does not bind `OfflineAudioContext` as a bare global in workers — use
- * `self.OfflineAudioContext || self.webkitOfflineAudioContext`, with `AudioContext` as last resort.
+ * WKWebView: use `self.OfflineAudioContext || self.webkitOfflineAudioContext` only — do not use
+ * `AudioContext` in workers here; it can break `decodeAudioData` / leave peaks empty in release WebView.
  */
 /* global self, fetch */
 
-/**
- * @returns {OfflineAudioContext|AudioContext}
- */
 function createDecodeContext() {
     const Off = self.OfflineAudioContext || self.webkitOfflineAudioContext;
-    if (Off) return new Off(1, 1, 48000);
-    const AC = self.AudioContext || self.webkitAudioContext;
-    if (AC) return new AC({ sampleRate: 48000 });
-    throw new Error('No Web Audio decode API in worker');
+    if (!Off) throw new Error('OfflineAudioContext unavailable in worker');
+    return new Off(1, 1, 48000);
 }
 
 function computePeaksFromChannel(raw, bars) {
