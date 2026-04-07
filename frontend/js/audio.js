@@ -2906,14 +2906,23 @@ async function expandMetaForPath(filePath) {
 
         // Expanded-row visuals are lowest priority: idle-scheduled so they never preempt playback.
         // Run sequentially so we decode once per visual (not two parallel full-file decodes).
+        // When this row is the current track, defer one rAF so the first paint after `play()` / engine
+        // start lands before waveform/spectrogram IPC or worker decode.
         cancelIdleSchedule(_metaPanelIdleId);
         _metaPanelIdleId = null;
         _metaPanelDrawSeq++;
         const metaSeq = _metaPanelDrawSeq;
-        _metaPanelIdleId = scheduleIdleVisualWork(() => {
-            _metaPanelIdleId = null;
-            void drawMetaPanelVisuals(filePath, metaSeq);
-        }, { delayMs: 0 });
+        const scheduleMetaDraw = () => {
+            _metaPanelIdleId = scheduleIdleVisualWork(() => {
+                _metaPanelIdleId = null;
+                void drawMetaPanelVisuals(filePath, metaSeq);
+            }, { delayMs: 0 });
+        };
+        if (filePath === audioPlayerPath) {
+            requestAnimationFrame(scheduleMetaDraw);
+        } else {
+            scheduleMetaDraw();
+        }
 
         // Sync cursor if already playing this track
         if (audioPlayerPath === filePath && audioPlayer.duration > 0) {
@@ -2966,7 +2975,9 @@ async function toggleMetadata(filePath, event) {
     {
         const sc = prefs.getItem('singleClickPlay');
         if (sc !== 'off' && sc !== 'false') {
-            previewAudio(filePath);
+            // Await so expanded-row waveform/spectrogram IPC/decode runs after playback has started
+            // (engine `playback_load` / `<audio>.play()`), not in parallel with it.
+            await previewAudio(filePath);
         }
     }
 
@@ -3527,8 +3538,10 @@ function prevTrack() {
     const idx = recentlyPlayed.findIndex(r => r.path === audioPlayerPath);
     const nextIdx = idx >= 0 && idx < recentlyPlayed.length - 1 ? idx + 1 : 0;
     const prevPath = recentlyPlayed[nextIdx].path;
-    previewAudio(prevPath);
-    if (hadExpanded) expandMetaForPath(prevPath);
+    void (async () => {
+        await previewAudio(prevPath);
+        if (hadExpanded) await expandMetaForPath(prevPath);
+    })();
 }
 
 function nextTrack() {
@@ -3545,9 +3558,10 @@ function nextTrack() {
         if (filteredAudioSamples.length === 0) return;
         nextPath = filteredAudioSamples[nextIdx].path;
     }
-    previewAudio(nextPath);
-    // Follow expanded row to the new track
-    if (hadExpanded) expandMetaForPath(nextPath);
+    void (async () => {
+        await previewAudio(nextPath);
+        if (hadExpanded) await expandMetaForPath(nextPath);
+    })();
 }
 
 function toggleShuffle() {
