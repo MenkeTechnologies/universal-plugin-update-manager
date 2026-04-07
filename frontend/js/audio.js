@@ -18,6 +18,38 @@ let _npWaveformDrawSeq = 0;
 let _metaPanelDrawSeq = 0;
 /** One `AudioBuffer` from the meta waveform decode, reused by spectrogram in the same expand (avoids double full-file decode). */
 let _metaSharedDecoded = { path: null, buffer: null };
+/** Pending `requestIdleCallback` / `setTimeout` id for now-playing waveform (cancelled on track change). */
+let _npWaveformIdleId = null;
+/** Pending idle schedule for expanded-row waveform + spectrogram. */
+let _metaPanelIdleId = null;
+
+/**
+ * Lowest-priority UI work: run when the main thread is idle so playback and input stay first.
+ * Uses `requestIdleCallback` with a long `timeout` so work still runs eventually if the system stays busy.
+ */
+function scheduleIdleVisualWork(fn, opts) {
+    const idleTimeout = opts && typeof opts.idleTimeout === 'number' ? opts.idleTimeout : 20000;
+    const fallbackMs = opts && typeof opts.fallbackMs === 'number' ? opts.fallbackMs : 1500;
+    if (typeof requestIdleCallback === 'function') {
+        return requestIdleCallback(() => {
+            fn();
+        }, { timeout: idleTimeout });
+    }
+    return setTimeout(fn, fallbackMs);
+}
+
+function cancelIdleSchedule(id) {
+    if (id == null) return;
+    if (typeof cancelIdleCallback === 'function') {
+        try {
+            cancelIdleCallback(id);
+        } catch (_) {
+            clearTimeout(id);
+        }
+    } else {
+        clearTimeout(id);
+    }
+}
 
 /** `appFmt` wrapper — same pattern as `plugins.js` `_ui`. */
 function _audioFmt(key, vars) {
@@ -1724,10 +1756,15 @@ async function previewAudio(filePath) {
         updateNowPlayingBtn();
         updateFavBtn();
         updateMetaLine();
-        // Defer waveform fetch/decode so <audio> can start output before main-thread work (canvas layout + decode).
+        // Waveform is lowest priority: only run when idle (never compete with decode/play on the next macrotask).
+        cancelIdleSchedule(_npWaveformIdleId);
+        _npWaveformIdleId = null;
         _npWaveformDrawSeq++;
         const wfSeq = _npWaveformDrawSeq;
-        setTimeout(() => drawWaveform(filePath, wfSeq), 0);
+        _npWaveformIdleId = scheduleIdleVisualWork(() => {
+            _npWaveformIdleId = null;
+            void drawWaveform(filePath, wfSeq);
+        }, { idleTimeout: 20000, fallbackMs: 1500 });
     } catch (err) {
         showToast(toastFmt('toast.playback_failed', {
             ext: ext.toUpperCase(),
@@ -2065,14 +2102,19 @@ async function expandMetaForPath(filePath) {
         const _closeT = typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.meta_close_title')) : _audioFmt('ui.audio.meta_close_title');
         metaRow.innerHTML = `<td colspan="12"><div class="audio-meta-panel"><span class="meta-close-btn" data-action="closeMetaRow" title="${_closeT}">&#10005;</span>${waveformHtml}${items}</div></td>`;
 
-        // Defer heavy decode/FFT so UI paint and playback aren’t blocked in the same turn as DOM insert.
+        // Expanded-row visuals are lowest priority: idle-scheduled so they never preempt playback.
         // Run sequentially so we decode once per visual (not two parallel full-file decodes).
+        cancelIdleSchedule(_metaPanelIdleId);
+        _metaPanelIdleId = null;
         _metaPanelDrawSeq++;
         const metaSeq = _metaPanelDrawSeq;
-        setTimeout(async () => {
-            await drawMetaWaveform(filePath, metaSeq);
-            await drawSpectrogram(filePath, metaSeq);
-        }, 0);
+        _metaPanelIdleId = scheduleIdleVisualWork(() => {
+            _metaPanelIdleId = null;
+            void (async () => {
+                await drawMetaWaveform(filePath, metaSeq);
+                await drawSpectrogram(filePath, metaSeq);
+            })();
+        }, { idleTimeout: 25000, fallbackMs: 2000 });
 
         // Sync cursor if already playing this track
         if (audioPlayerPath === filePath && audioPlayer.duration > 0) {
