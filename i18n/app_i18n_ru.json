@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "Открыть в DAW/KVR/приложении по умолчанию/показать в Finder",
   "help.mouse.drag_player": "Перетащите игрока",
   "help.mouse.drag_player_desc": "Закрепите в любом углу",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "Перетаскивание вкладок",
   "help.mouse.drag_tabs_desc": "Изменение порядка вкладок",
   "help.mouse.right": "Щелкните правой кнопкой мыши",

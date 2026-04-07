@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "Ouvrir dans DAW / KVR / appli par défaut / afficher dans le Finder",
   "help.mouse.drag_player": "Faites glisser le joueur",
   "help.mouse.drag_player_desc": "Amarrez-vous à n’importe quel coin",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "Faites glisser les onglets",
   "help.mouse.drag_tabs_desc": "Réorganiser les onglets",
   "help.mouse.right": "Clic droit",

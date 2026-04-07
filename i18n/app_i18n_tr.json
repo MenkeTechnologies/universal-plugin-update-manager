@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "DAW / KVR / varsayılan uygulama / Finder'da göster",
   "help.mouse.drag_player": "Oyuncuyu sürükleyin",
   "help.mouse.drag_player_desc": "Herhangi bir köşeye sabitleyin",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "Sekmeleri sürükleyin",
   "help.mouse.drag_tabs_desc": "Sekmeleri yeniden sırala",
   "help.mouse.right": "Sağ tıklayın",

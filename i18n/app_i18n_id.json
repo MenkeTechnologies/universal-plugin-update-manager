@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "Buka di DAW / KVR / aplikasi default / tampilkan di Finder",
   "help.mouse.drag_player": "Tarik pemain",
   "help.mouse.drag_player_desc": "Berlabuh di sudut mana pun",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "Seret tab",
   "help.mouse.drag_tabs_desc": "Susun ulang tab",
   "help.mouse.right": "Klik kanan",

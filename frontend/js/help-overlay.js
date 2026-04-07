@@ -146,6 +146,7 @@ function toggleHelpOverlay() {
           <div class="help-section">
             <h3>${h('help.section.mouse')}</h3>
             <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.click')}</span> <span>${h('help.mouse.click_desc')}</span></div>
+            <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.drag_samples')}</span> <span>${h('help.mouse.drag_samples_desc')}</span></div>
             <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.dblclick')}</span> <span>${h('help.mouse.dblclick_desc')}</span></div>
             <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.right')}</span> <span>${h('help.mouse.right_desc')}</span></div>
             <div class="help-row"><span style="color:var(--cyan);">${h('help.mouse.drag_tabs')}</span> <span>${h('help.mouse.drag_tabs_desc')}</span></div>

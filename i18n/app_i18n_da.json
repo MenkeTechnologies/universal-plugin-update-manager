@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "Åbn i DAW / KVR / standardapp / vis i Finder",
   "help.mouse.drag_player": "Træk afspiller",
   "help.mouse.drag_player_desc": "Dock til ethvert hjørne",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "Træk faner",
   "help.mouse.drag_tabs_desc": "Omarranger faner",
   "help.mouse.right": "Højreklik",

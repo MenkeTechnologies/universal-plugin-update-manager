@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "Otwórz w DAW / KVR / domyślnej aplikacji / pokaż w Finderze",
   "help.mouse.drag_player": "Przeciągnij odtwarzacz",
   "help.mouse.drag_player_desc": "Zadokuj w dowolnym rogu",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "Przeciągnij karty",
   "help.mouse.drag_tabs_desc": "Zmień kolejność zakładek",
   "help.mouse.right": "Kliknij prawym przyciskiem myszy",

@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "Open in DAW / KVR / default app / reveal in Finder‌",
   "help.mouse.drag_player": "Drag player‌",
   "help.mouse.drag_player_desc": "Dock to any corner‌",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "Drag tabs‌",
   "help.mouse.drag_tabs_desc": "Reorder tabs‌",
   "help.mouse.right": "Right-click‌",

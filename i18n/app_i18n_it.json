@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "Apri in DAW/KVR/app predefinita/mostra in Finder",
   "help.mouse.drag_player": "Trascina il giocatore",
   "help.mouse.drag_player_desc": "Aggancialo a qualsiasi angolo",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "Trascina le schede",
   "help.mouse.drag_tabs_desc": "Riordina le schede",
   "help.mouse.right": "Fare clic con il pulsante destro del mouse",

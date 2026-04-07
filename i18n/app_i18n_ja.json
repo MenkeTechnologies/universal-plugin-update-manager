@@ -44,6 +44,8 @@
   "help.mouse.dblclick_desc": "DAW / KVR / デフォルトアプリ / Finderで開く",
   "help.mouse.drag_player": "ドラッグプレーヤー",
   "help.mouse.drag_player_desc": "どこにでもドッキング",
+  "help.mouse.drag_samples": "Drag samples",
+  "help.mouse.drag_samples_desc": "Move the pointer before release to drag files into a DAW or Finder; batch selection drags all selected",
   "help.mouse.drag_tabs": "タブをドラッグする",
   "help.mouse.drag_tabs_desc": "タブを並べ替える",
   "help.mouse.right": "右クリック",
