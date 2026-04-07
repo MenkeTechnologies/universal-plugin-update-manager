@@ -3847,3 +3847,28 @@ function updateMetaLine() {
 window.isAudioPlaying = isAudioPlaying;
 /** Used by `file-browser.js` list-row mini waveforms — same worker peak path as now-playing. */
 window._decodePeaksViaWorker = decodePeaksViaWorker;
+
+/**
+ * Compile/load `audio-decode-worker.js` off the first play gesture — first WAV peak/decode
+ * used to block the UI while V8 parses the worker script. Call from idle + after splash (app.js).
+ */
+function preloadAudioDecodeWorker() {
+    try {
+        getAudioDecodeWorker();
+    } catch (_) {
+        /* ignore */
+    }
+}
+window.preloadAudioDecodeWorker = preloadAudioDecodeWorker;
+
+(function schedulePrewarmAudioDecodeWorker() {
+    function run() {
+        preloadAudioDecodeWorker();
+    }
+    if (typeof window === 'undefined') return;
+    if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(run, { timeout: 5000 });
+    } else if (typeof globalThis !== 'undefined' && typeof globalThis.setTimeout === 'function') {
+        globalThis.setTimeout(run, 2500);
+    }
+})();
