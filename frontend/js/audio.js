@@ -198,6 +198,7 @@ async function decodeChannelsViaWorker(url) {
     }
 }
 
+let allAudioSamples = []; // kept for export/compatibility — lazily populated
 let filteredAudioSamples = []; // current visible page from DB
 let audioTotalCount = 0; // total matching rows in DB
 let audioTotalUnfiltered = 0; // total rows in scan
@@ -224,7 +225,7 @@ let _metaPanelIdleId = null;
 /**
  * Defer waveform/spectrogram work to after the current task. Do not use `requestIdleCallback`:
  * in Tauri/WKWebView it is often starved so callbacks never run and `drawWaveform` /
- * `drawMetaWaveform` / `drawSpectrogram` never execute.
+ * `drawMetaPanelVisuals` never execute.
  */
 function scheduleIdleVisualWork(fn, opts) {
     const ms = opts && typeof opts.delayMs === 'number' ? opts.delayMs : 0;
@@ -2398,7 +2399,7 @@ async function expandMetaForPath(filePath) {
         const metaSeq = _metaPanelDrawSeq;
         _metaPanelIdleId = scheduleIdleVisualWork(() => {
             _metaPanelIdleId = null;
-            void drawMetaWaveform(filePath, metaSeq).then(() => drawSpectrogram(filePath, metaSeq));
+            void drawMetaPanelVisuals(filePath, metaSeq);
         }, { delayMs: 0 });
 
         // Sync cursor if already playing this track
@@ -3256,6 +3257,126 @@ function renderWaveformData(ctx, canvas, peaks) {
 
 function _metaPanelStale(metaSeq, filePath) {
     return (metaSeq !== undefined && metaSeq !== _metaPanelDrawSeq) || expandedMetaPath !== filePath;
+}
+
+/**
+ * Expanded-row waveform + spectrogram: prefer worker (`decodeMetaVisualsViaWorker` / related).
+ * On any failure, fall back to main-thread `drawMetaWaveform` → `drawSpectrogram` (known-good path).
+ */
+async function drawMetaPanelVisuals(filePath, metaSeq) {
+    const wfCanvas = document.getElementById('metaWaveformCanvas');
+    const sgCanvas = document.getElementById('metaSpectrogramCanvas');
+    if (!wfCanvas || !sgCanvas) return;
+    if (_metaPanelStale(metaSeq, filePath)) return;
+
+    const wfCached = _waveformCache[filePath];
+    const sgCached = _spectrogramCache[filePath];
+
+    const container = wfCanvas.parentElement;
+    const { w: cw, h: ch } = await resolveWaveformBoxSize(container, 560, 56);
+    if (_metaPanelStale(metaSeq, filePath)) return;
+    const dpr = window.devicePixelRatio || 1;
+    wfCanvas.width = Math.max(1, Math.round(cw * dpr));
+    wfCanvas.height = Math.max(1, Math.round(ch * dpr));
+    const wfCtx = wfCanvas.getContext('2d');
+    wfCtx.clearRect(0, 0, wfCanvas.width, wfCanvas.height);
+    const sgCtx = sgCanvas.getContext('2d');
+    const sgW = 800;
+    const sgH = 80;
+    sgCtx.clearRect(0, 0, sgW, sgH);
+
+    if (wfCached && sgCached) {
+        if (_metaPanelStale(metaSeq, filePath)) return;
+        renderWaveformData(wfCtx, wfCanvas, wfCached);
+        _metaSharedDecoded.path = filePath;
+        _metaSharedDecoded.buffer = null;
+        renderSpectrogramData(sgCtx, sgW, sgH, sgCached);
+        _metaSharedDecoded.path = null;
+        _metaSharedDecoded.buffer = null;
+        return;
+    }
+
+    const url = fileSrcForDecode(filePath);
+    const bars = Math.max(1, Math.min(Math.max(1, Math.floor(cw)), 800));
+
+    try {
+        if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+        if (_metaPanelStale(metaSeq, filePath)) return;
+        if (!wfCached && !sgCached) {
+            const { peaks, sgData } = await decodeMetaVisualsViaWorker(url, bars);
+            if (_metaPanelStale(metaSeq, filePath)) return;
+            _waveformCache[filePath] = peaks;
+            _spectrogramCache[filePath] = sgData;
+            _evictCache(_waveformCache);
+            _evictCache(_spectrogramCache);
+            _debounceWfSave();
+            renderWaveformData(wfCtx, wfCanvas, peaks);
+            _metaSharedDecoded.path = filePath;
+            _metaSharedDecoded.buffer = null;
+            renderSpectrogramData(sgCtx, sgW, sgH, sgData);
+            _metaSharedDecoded.path = null;
+            _metaSharedDecoded.buffer = null;
+            return;
+        }
+        if (wfCached && !sgCached) {
+            const sgData = await decodeSpectrogramViaWorker(url);
+            if (_metaPanelStale(metaSeq, filePath)) return;
+            _spectrogramCache[filePath] = sgData;
+            _evictCache(_spectrogramCache);
+            _debounceWfSave();
+            renderWaveformData(wfCtx, wfCanvas, wfCached);
+            _metaSharedDecoded.path = filePath;
+            _metaSharedDecoded.buffer = null;
+            renderSpectrogramData(sgCtx, sgW, sgH, sgData);
+            _metaSharedDecoded.path = null;
+            _metaSharedDecoded.buffer = null;
+            return;
+        }
+        if (!wfCached && sgCached) {
+            const peaks = await decodePeaksViaWorker(url, bars);
+            if (_metaPanelStale(metaSeq, filePath)) return;
+            _waveformCache[filePath] = peaks;
+            _evictCache(_waveformCache);
+            _debounceWfSave();
+            renderWaveformData(wfCtx, wfCanvas, peaks);
+            _metaSharedDecoded.path = filePath;
+            _metaSharedDecoded.buffer = null;
+            renderSpectrogramData(sgCtx, sgW, sgH, sgCached);
+            _metaSharedDecoded.path = null;
+            _metaSharedDecoded.buffer = null;
+            return;
+        }
+    } catch (err) {
+        if (_metaPanelStale(metaSeq, filePath)) return;
+        const msg = err && err.message ? String(err.message) : String(err);
+        console.warn('[audio-haxor] drawMetaPanelVisuals: worker decode failed, main-thread fallback', {
+            path: filePath,
+            url,
+            bars,
+            error: msg,
+        });
+        try {
+            await drawMetaWaveform(filePath, metaSeq);
+            if (_metaPanelStale(metaSeq, filePath)) return;
+            await drawSpectrogram(filePath, metaSeq);
+        } catch (fallbackErr) {
+            const fb = fallbackErr && fallbackErr.message ? String(fallbackErr.message) : String(fallbackErr);
+            console.warn('[audio-haxor] drawMetaPanelVisuals: main-thread fallback also failed', {
+                path: filePath,
+                error: fb,
+            });
+            if (_metaPanelStale(metaSeq, filePath)) return;
+            wfCtx.strokeStyle = 'rgba(5,217,232,0.3)';
+            wfCtx.lineWidth = 1;
+            wfCtx.beginPath();
+            wfCtx.moveTo(0, wfCanvas.height / 2);
+            wfCtx.lineTo(wfCanvas.width, wfCanvas.height / 2);
+            wfCtx.stroke();
+            sgCtx.fillStyle = 'var(--text-dim)';
+            sgCtx.font = '9px sans-serif';
+            sgCtx.fillText('Spectrogram unavailable', 10, 40);
+        }
+    }
 }
 
 async function drawMetaWaveform(filePath, metaSeq) {
