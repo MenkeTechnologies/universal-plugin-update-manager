@@ -82,6 +82,37 @@ static juce::StringArray readDeadMansPedalLines(const juce::File& deadMans)
     return lines;
 }
 
+/** One plugin identifier per line — modules that threw during `scanNextFile` or were manually listed; never rescanned. */
+static juce::File pluginScanSkipFilePath()
+{
+    return deadMansPedalFilePath().getParentDirectory().getChildFile("plugin-scan-skip.txt");
+}
+
+static juce::StringArray filterOutSkippedPluginIdentifiers(const juce::StringArray& files, const juce::File& skipFile)
+{
+    const juce::StringArray skips = readDeadMansPedalLines(skipFile);
+    if (skips.isEmpty())
+        return files;
+    juce::StringArray out;
+    for (const juce::String& f : files)
+        if (!skips.contains(f))
+            out.add(f);
+    return out;
+}
+
+static void appendPluginScanSkipIfNew(const juce::String& fileId)
+{
+    if (fileId.isEmpty())
+        return;
+    const juce::File path = pluginScanSkipFilePath();
+    (void) path.getParentDirectory().createDirectory();
+    juce::StringArray lines = readDeadMansPedalLines(path);
+    if (lines.contains(fileId))
+        return;
+    lines.add(fileId);
+    (void) path.replaceWithText(lines.joinIntoString("\n") + "\n", false, false);
+}
+
 /** Same file order as `juce::PluginDirectoryScanner` (searchPaths + dead-man's-pedal reorder). */
 static juce::StringArray buildOrderedPluginScanFiles(juce::AudioPluginFormat& format,
                                                      const juce::FileSearchPath& dirs,
@@ -914,7 +945,9 @@ struct Engine::Impl
                                       const juce::String& formatLabel)
     {
         juce::StringArray files = buildOrderedPluginScanFiles(format, dirs, true, deadMans);
+        files = filterOutSkippedPluginIdentifiers(files, pluginScanSkipFilePath());
         juce::PluginDirectoryScanner scanner(list, format, dirs, true, deadMans, false);
+        scanner.setFilesOrIdentifiersToScan(files);
         const int n = files.size();
         juce::String name;
         int processed = 0;
@@ -944,14 +977,24 @@ struct Engine::Impl
             }
             catch (const std::exception& e)
             {
-                appLogLine("plugin scan: EXCEPTION " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
+                // `scanNextFile` decrements the scanner index before loading; on throw we must advance
+                // our progress and blacklist/skip or we desync from JUCE and spin on the same slot.
+                appendPluginScanSkipIfNew(fileId);
+                list.addToBlacklist(fileId);
+                appLogLine("plugin scan: FAIL_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
                            + "\" what=\"" + juce::String(e.what()) + "\"");
+                processed++;
+                pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
                 continue;
             }
             catch (...)
             {
-                appLogLine("plugin scan: EXCEPTION " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
+                appendPluginScanSkipIfNew(fileId);
+                list.addToBlacklist(fileId);
+                appLogLine("plugin scan: FAIL_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
                            + "\" (non-std)");
+                processed++;
+                pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
                 continue;
             }
             processed++;
