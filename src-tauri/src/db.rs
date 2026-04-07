@@ -4957,6 +4957,7 @@ impl Database {
             "presets",
             "preset_scans",
             "pdfs",
+            "midi_files",
             "pdf_scans",
             "pdf_metadata",
             "kvr_cache",
@@ -4974,6 +4975,59 @@ impl Database {
                 .unwrap_or(0);
             map.insert(t.to_string(), serde_json::json!(count));
         }
+
+        // Library counts: one canonical row per `path` (matches Samples tab / `query_audio`).
+        // Raw `audio_samples` rows can exceed this when the same path appears in multiple scans.
+        let audio_lib: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM audio_samples WHERE id IN (SELECT MAX(id) FROM audio_samples GROUP BY path)",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        let plugins_lib: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM plugins WHERE id IN (SELECT MAX(id) FROM plugins GROUP BY path)",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        let daw_lib: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM daw_projects WHERE id IN (SELECT MAX(id) FROM daw_projects GROUP BY path)",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        let presets_lib: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM presets WHERE id IN (SELECT MAX(id) FROM presets GROUP BY path) AND format NOT IN ('MID','MIDI')",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        let pdfs_lib: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT MAX(id) FROM pdfs GROUP BY path)",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        let midi_lib: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM midi_files WHERE id IN (SELECT MAX(id) FROM midi_files GROUP BY path)",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+
+        map.insert("audio_samples_library".into(), serde_json::json!(audio_lib));
+        map.insert("plugins_library".into(), serde_json::json!(plugins_lib));
+        map.insert("daw_projects_library".into(), serde_json::json!(daw_lib));
+        map.insert("presets_library".into(), serde_json::json!(presets_lib));
+        map.insert("pdfs_library".into(), serde_json::json!(pdfs_lib));
+        map.insert("midi_files_library".into(), serde_json::json!(midi_lib));
+
         Ok(serde_json::Value::Object(map))
     }
 
@@ -8616,7 +8670,24 @@ mod tests {
         let counts = db.table_counts().unwrap();
         let obj = counts.as_object().unwrap();
         assert_eq!(obj["audio_samples"], 1);
+        assert_eq!(obj["audio_samples_library"], 1);
         assert_eq!(obj["audio_scans"], 1);
+    }
+
+    #[test]
+    fn test_table_counts_raw_vs_library_when_same_path_rescanned() {
+        let db = test_db();
+        let s = sample("x.wav", "/same/x.wav", "WAV", 100);
+        db.save_scan("s1", "2024-01-01T00:00:00", 1, 100, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &[s.clone()]).unwrap();
+        db.save_scan("s2", "2024-01-02T00:00:00", 1, 100, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s2", &[s]).unwrap();
+        let obj = db.table_counts().unwrap();
+        let obj = obj.as_object().unwrap();
+        assert_eq!(obj["audio_samples"], 2);
+        assert_eq!(obj["audio_samples_library"], 1);
     }
 
     #[test]

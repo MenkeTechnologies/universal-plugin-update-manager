@@ -1473,6 +1473,14 @@ function refreshSettingsUI() {
             midi: (tc.midi_files || 0).toLocaleString(),
             pdfs: (tc.pdfs || 0).toLocaleString(),
           }),
+          f('ui.perf.line_db_library', {
+            samples: (tc.audio_samples_library ?? tc.audio_samples ?? 0).toLocaleString(),
+            plugins: (tc.plugins_library ?? tc.plugins ?? 0).toLocaleString(),
+            daw: (tc.daw_projects_library ?? tc.daw_projects ?? 0).toLocaleString(),
+            presets: (tc.presets_library ?? tc.presets ?? 0).toLocaleString(),
+            midi: (tc.midi_files_library ?? tc.midi_files ?? 0).toLocaleString(),
+            pdfs: (tc.pdfs_library ?? tc.pdfs ?? 0).toLocaleString(),
+          }),
           f('ui.perf.line_db_caches', {
             kvr: (tc.kvr_cache || 0).toLocaleString(),
             waveforms: (tc.waveform_cache || 0).toLocaleString(),
