@@ -7,7 +7,7 @@
  * rest of the process inherits `cl`/Windows SDK without polluting CI (e.g. `cargo test` would hit
  * STATUS_ENTRYPOINT_NOT_FOUND if the job used a global MSVC PATH from `msvc-dev-cmd`).
  */
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,13 +40,14 @@ if (process.platform === 'win32' && !process.env.__AUDIO_ENGINE_VCVARS) {
     process.exit(1);
   }
   const node = process.execPath;
-  const inner = `call "${vcvars}" && set __AUDIO_ENGINE_VCVARS=1&& "${node}" "${scriptPath}"`;
-  const r = spawnSync('cmd.exe', ['/c', inner], {
-    stdio: 'inherit',
-    cwd: root,
-    env: process.env,
-  });
-  process.exit(r.status === null ? 1 : r.status);
+  // Use shell: true — spawnSync('cmd.exe', ['/c', ...]) can mangle quotes on GitHub windows-latest (pwsh).
+  const line = `call "${vcvars}" && set __AUDIO_ENGINE_VCVARS=1&& "${node}" "${scriptPath}"`;
+  try {
+    execSync(line, { stdio: 'inherit', cwd: root, env: process.env, shell: true });
+  } catch (e) {
+    process.exit(e && typeof e.status === 'number' ? e.status : 1);
+  }
+  process.exit(0);
 }
 
 const buildType = process.env.AUDIO_ENGINE_BUILD_TYPE === 'release' ? 'Release' : 'Debug';

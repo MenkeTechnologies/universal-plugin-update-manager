@@ -19,16 +19,25 @@
     }
 
     function listDragChildren(container, childSelector) {
-        const ch = container.children;
-        if (ch == null) {
-            if (typeof container.querySelectorAll === 'function') {
+        // Prefer querySelectorAll when available (matches real DOM; avoids mocks where `children` is not iterable).
+        if (typeof container.querySelectorAll === 'function') {
+            try {
                 return [...container.querySelectorAll(childSelector)].filter(
                     (c) => (c.parentElement || c.parentNode) === container
                 );
+            } catch {
+                /* invalid selector */
             }
+        }
+        const ch = container.children;
+        if (ch == null) {
             return [];
         }
-        return Array.from(ch).filter((c) => c.matches(childSelector));
+        try {
+            return Array.from(ch).filter((c) => c.matches(childSelector));
+        } catch {
+            return [];
+        }
     }
 
     document.addEventListener('mousemove', (e) => {
