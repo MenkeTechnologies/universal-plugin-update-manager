@@ -424,7 +424,7 @@ frontend/
     disk-usage.js      -- Stacked bar charts for storage breakdown
     content_hash.rs    -- SHA-256 streaming hash for byte-identical duplicate groups
     duplicates.js      -- Duplicate modal: name heuristics + optional content (SHA-256) scan via `find_content_duplicates`
-    export.js          -- Export/import (JSON/TOML/CSV/TSV/PDF); tab exports pull the full filtered result set from SQLite when the UI holds only a paginated page (plugins, presets, samples, DAW, MIDI, PDF)
+    export.js          -- Export/import (JSON/TOML/CSV/TSV/PDF); **format modal** opens immediately (counts from in-memory rows or DB totals); **full SQLite pull** runs after you choose format and save path when the paginated UI has not already loaded every row (plugins, presets, samples, DAW, MIDI, PDF)
     favorites.js       -- Favorites management
     file-browser.js    -- Filesystem navigation with tags + notes; breadcrumbs/parent/quick-nav/bookmark chip names use `normalizePathSeparators` + `pathFileName` / `parentDirectoryPath` for Windows paths from `fs_list_dir`; chunked row append + path→sample `Map` for duration badges; filter debounce 150ms
     help-overlay.js    -- Keyboard shortcuts reference overlay
