@@ -85,8 +85,13 @@ function fileIcon(entry) {
 
 async function initFileBrowser() {
   renderFavDirs();
+  // Tab revisit: listing is still in the DOM (panel hidden, not destroyed) — avoid IPC + full re-render.
+  if (_fileBrowserInited && _fileBrowserPath) {
+    return;
+  }
   if (_fileBrowserPath) {
     await loadDirectory(_fileBrowserPath);
+    _fileBrowserInited = true;
     return;
   }
   // Start at home or first scan dir
