@@ -1439,6 +1439,9 @@ async function applyAudioEngineDevice() {
         const es = await inv({cmd: 'engine_state'});
         fillAeStreamsFromEngineState(es);
         syncAeToneCheckboxFromStream(toneCb, es.stream);
+        if (typeof window !== 'undefined' && typeof window.applyAeEqCanvasHeightFromPrefs === 'function') {
+            window.applyAeEqCanvasHeightFromPrefs();
+        }
         if (es && es.stream && es.stream.running === true && typeof startEnginePlaybackPoll === 'function') {
             startEnginePlaybackPoll();
         }
@@ -1713,6 +1716,9 @@ async function enginePlaybackStart(filePath) {
     }
     r = await inv(payload);
     throwIfAeNotOk(r, 'start_output_stream failed');
+    if (typeof window !== 'undefined') {
+        window._aeOutputStreamRunning = true;
+    }
     syncEnginePlaybackDspFromPrefs();
     syncEnginePlaybackSpeedFromPrefs();
     startEnginePlaybackPoll();
@@ -1736,6 +1742,7 @@ async function enginePlaybackStop() {
     window._enginePlaybackDurSec = 0;
     window._enginePlaybackPaused = false;
     window._engineSpectrumU8 = null;
+    window._aeOutputStreamRunning = false;
     if (typeof window.stopEnginePlaybackFftRaf === 'function') window.stopEnginePlaybackFftRaf();
 }
 

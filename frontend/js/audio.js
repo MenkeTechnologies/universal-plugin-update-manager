@@ -453,6 +453,7 @@ function syncEnginePlaybackStoppedFromSidecar() {
     window._enginePlaybackDurSec = 0;
     window._enginePlaybackPaused = false;
     window._engineSpectrumU8 = null;
+    if (typeof window !== 'undefined') window._aeOutputStreamRunning = false;
     if (typeof stopEnginePlaybackFftRaf === 'function') stopEnginePlaybackFftRaf();
     if (typeof updatePlayBtnStates === 'function') {
         updatePlayBtnStates();
@@ -468,6 +469,7 @@ function syncEnginePlaybackStoppedFromSidecar() {
  */
 function resumeEnginePlaybackAfterApply(loadMeta) {
     _enginePlaybackActive = true;
+    if (typeof window !== 'undefined') window._aeOutputStreamRunning = true;
     if (loadMeta && typeof loadMeta.duration_sec === 'number' && !Number.isNaN(loadMeta.duration_sec) && loadMeta.duration_sec > 0) {
         window._enginePlaybackDurSec = loadMeta.duration_sec;
     }
@@ -1293,7 +1295,9 @@ function _renderNpFft() {
         window._engineSpectrumU8.length >= 1024;
     if (!useEngineSpectrum && !_analyser) return;
     const canvas = _npFftCanvas || document.getElementById('npFftCanvas');
-    if (!canvas || canvas.offsetParent === null) return;
+    if (!canvas) return;
+    const fftBox = canvas.getBoundingClientRect();
+    if (fftBox.width < 2 || fftBox.height < 2) return;
     const ctx = _npFftCtx || canvas.getContext('2d');
     if (!ctx) return;
     const w = canvas.width;
@@ -4438,6 +4442,8 @@ function updateMetaLine() {
         }
         if (!np.style.width) np.style.width = '360px';
         if (typeof window.applyNpFftHeightFromPrefs === 'function') window.applyNpFftHeightFromPrefs();
+        if (typeof window.applyNpEqCanvasHeightFromPrefs === 'function') window.applyNpEqCanvasHeightFromPrefs();
+        if (typeof window.applyAeEqCanvasHeightFromPrefs === 'function') window.applyAeEqCanvasHeightFromPrefs();
     };
     // Set a safe default immediately so the player has a size before prefs load.
     if (!np.style.width) np.style.width = '360px';
@@ -4448,8 +4454,8 @@ function updateMetaLine() {
     const handle = document.getElementById('npFftResizeHandle');
     const viz = document.getElementById('npVisualizer');
     if (!handle || !viz) return;
-    const MIN = 24;
-    const MAX = 200;
+    const MIN = 32;
+    const MAX = 480;
     const PREF_KEY = 'npFftHeight';
 
     function applyNpFftHeightFromPrefs() {
@@ -4491,6 +4497,109 @@ function updateMetaLine() {
         handle.addEventListener('pointerup', onUp);
         handle.addEventListener('pointercancel', onUp);
     });
+})();
+
+// ── Parametric EQ canvas height (floating player + Audio Engine tab; prefs `npEqCanvasHeight` / `aeEqCanvasHeight`) ──
+(function initNpEqCanvasResize() {
+    const handle = document.getElementById('npEqCanvasResizeHandle');
+    const wrap = document.getElementById('npEqCanvasWrap');
+    if (!handle || !wrap) return;
+    const MIN = 80;
+    const MAX = 480;
+    const PREF_KEY = 'npEqCanvasHeight';
+
+    function applyNpEqCanvasHeightFromPrefs() {
+        const raw = prefs.getItem(PREF_KEY);
+        if (raw != null && raw !== '') {
+            const h = parseInt(String(raw), 10);
+            if (Number.isFinite(h) && h >= MIN && h <= MAX) {
+                wrap.style.height = h + 'px';
+                return;
+            }
+        }
+        wrap.style.height = '';
+    }
+    window.applyNpEqCanvasHeightFromPrefs = applyNpEqCanvasHeightFromPrefs;
+
+    handle.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const startY = e.clientY;
+        const startH = wrap.getBoundingClientRect().height;
+        handle.setPointerCapture(e.pointerId);
+
+        function onMove(ev) {
+            const dy = ev.clientY - startY;
+            const nh = Math.round(Math.min(MAX, Math.max(MIN, startH + dy)));
+            wrap.style.height = nh + 'px';
+        }
+        function onUp(ev) {
+            handle.removeEventListener('pointermove', onMove);
+            handle.removeEventListener('pointerup', onUp);
+            handle.removeEventListener('pointercancel', onUp);
+            try {
+                handle.releasePointerCapture(ev.pointerId);
+            } catch (_) {}
+            prefs.setItem(PREF_KEY, String(Math.round(wrap.getBoundingClientRect().height)));
+            if (typeof window.scheduleParametricEqFrame === 'function') window.scheduleParametricEqFrame();
+        }
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
+    });
+    applyNpEqCanvasHeightFromPrefs();
+})();
+
+(function initAeEqCanvasResize() {
+    const handle = document.getElementById('aeEqCanvasResizeHandle');
+    const wrap = document.getElementById('aeEqCanvasWrap');
+    if (!handle || !wrap) return;
+    const MIN = 80;
+    const MAX = 480;
+    const PREF_KEY = 'aeEqCanvasHeight';
+
+    function applyAeEqCanvasHeightFromPrefs() {
+        const raw = prefs.getItem(PREF_KEY);
+        if (raw != null && raw !== '') {
+            const h = parseInt(String(raw), 10);
+            if (Number.isFinite(h) && h >= MIN && h <= MAX) {
+                wrap.style.height = h + 'px';
+                return;
+            }
+        }
+        wrap.style.height = '';
+    }
+    window.applyAeEqCanvasHeightFromPrefs = applyAeEqCanvasHeightFromPrefs;
+
+    handle.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const startY = e.clientY;
+        const startH = wrap.getBoundingClientRect().height;
+        handle.setPointerCapture(e.pointerId);
+
+        function onMove(ev) {
+            const dy = ev.clientY - startY;
+            const nh = Math.round(Math.min(MAX, Math.max(MIN, startH + dy)));
+            wrap.style.height = nh + 'px';
+        }
+        function onUp(ev) {
+            handle.removeEventListener('pointermove', onMove);
+            handle.removeEventListener('pointerup', onUp);
+            handle.removeEventListener('pointercancel', onUp);
+            try {
+                handle.releasePointerCapture(ev.pointerId);
+            } catch (_) {}
+            prefs.setItem(PREF_KEY, String(Math.round(wrap.getBoundingClientRect().height)));
+            if (typeof window.scheduleParametricEqFrame === 'function') window.scheduleParametricEqFrame();
+        }
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
+    });
+    applyAeEqCanvasHeightFromPrefs();
 })();
 
 // ── Parametric EQ Visualization (floating player + Audio Engine tab; shared Web Audio graph + FFT) ──
@@ -4543,16 +4652,18 @@ function updateMetaLine() {
 
     let _paramEqRafId = null;
     let _dragState = null;
+    let _eqDragEngineSyncTs = 0;
 
     function drawParametricEqOnCanvas(canvas) {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         const wrap = canvas.parentElement;
         if (wrap) {
-            const cw = wrap.offsetWidth;
-            if (cw > 0 && Math.abs(cw - canvas.width) > 2) {
+            const cw = Math.round(wrap.clientWidth);
+            const ch = Math.round(wrap.clientHeight);
+            if (cw > 0 && ch > 0 && (Math.abs(cw - canvas.width) > 1 || Math.abs(ch - canvas.height) > 1)) {
                 canvas.width = cw;
-                canvas.height = 120;
+                canvas.height = ch;
             }
         }
         const w = canvas.width || 800;
@@ -4583,7 +4694,7 @@ function updateMetaLine() {
             window._engineSpectrumU8 &&
             window._engineSpectrumU8.length >= 1024 &&
             (canvas.id === 'aeEqCanvas'
-                ? window._aeOutputStreamRunning === true
+                ? window._aeOutputStreamRunning === true || window._enginePlaybackActive === true
                 : window._enginePlaybackActive === true && typeof isAudioPlaying === 'function' && isAudioPlaying());
 
         if (useEngineEqSpectrum) {
@@ -4721,16 +4832,17 @@ function updateMetaLine() {
         if (!canvas) return;
         const wrap = canvas.parentElement;
         if (!wrap) return;
-        const w = wrap.offsetWidth;
-        if (w > 0) {
+        const w = Math.round(wrap.clientWidth);
+        const h = Math.round(wrap.clientHeight);
+        if (w > 0 && h > 0) {
             canvas.width = w;
-            canvas.height = 120;
+            canvas.height = h;
         }
     }
 
     function bindCanvasDrag(canvas) {
         if (!canvas) return;
-        canvas.addEventListener('mousedown', (e) => {
+        canvas.addEventListener('pointerdown', (e) => {
             if (e.button !== 0) return;
             ensureAudioGraph();
             const rect = canvas.getBoundingClientRect();
@@ -4744,6 +4856,9 @@ function updateMetaLine() {
                 if (Math.hypot(mx - bx, my - by) < 14) {
                     _dragState = {band, canvas};
                     e.preventDefault();
+                    try {
+                        canvas.setPointerCapture(e.pointerId);
+                    } catch (_) {}
                     return;
                 }
             }
@@ -4764,6 +4879,17 @@ function updateMetaLine() {
         const gain = Math.max(GAIN_MIN, Math.min(GAIN_MAX, yToGain(my, h)));
         _dragState.band.filter.frequency.value = freq;
         _dragState.band.filter.gain.value = Math.round(gain * 10) / 10;
+        const cap = _dragState.band.id.charAt(0).toUpperCase() + _dragState.band.id.slice(1);
+        if (typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
+            prefs.setItem('eq' + cap, String(Math.round(gain)));
+        }
+        if (_enginePlaybackActive && typeof window !== 'undefined' && typeof window.syncEnginePlaybackDspFromPrefs === 'function') {
+            const t = Date.now();
+            if (t - _eqDragEngineSyncTs >= 40) {
+                _eqDragEngineSyncTs = t;
+                window.syncEnginePlaybackDspFromPrefs();
+            }
+        }
         const id = _dragState.band.id;
         if (id === 'low') {
             const el = document.getElementById('npEqLow');
@@ -4787,6 +4913,7 @@ function updateMetaLine() {
         if (_dragState && _dragState.band && typeof setEqBand === 'function') {
             setEqBand(_dragState.band.id, String(_dragState.band.filter.gain.value));
         }
+        _eqDragEngineSyncTs = 0;
         _dragState = null;
     });
 
@@ -4795,6 +4922,7 @@ function updateMetaLine() {
         const observer = new MutationObserver(() => {
             if (eqSection.classList.contains('visible')) {
                 setTimeout(() => {
+                    if (typeof window.applyNpEqCanvasHeightFromPrefs === 'function') window.applyNpEqCanvasHeightFromPrefs();
                     primeCanvasSize(npCanvas);
                     scheduleParametricEqFrame();
                 }, 50);
@@ -4808,6 +4936,7 @@ function updateMetaLine() {
         const observer = new MutationObserver(() => {
             if (aeTab.classList.contains('active')) {
                 setTimeout(() => {
+                    if (typeof window.applyAeEqCanvasHeightFromPrefs === 'function') window.applyAeEqCanvasHeightFromPrefs();
                     primeCanvasSize(aeCanvas);
                     scheduleParametricEqFrame();
                 }, 50);
@@ -4824,6 +4953,7 @@ function updateMetaLine() {
     }
     if (aeTab && aeTab.classList.contains('active')) {
         setTimeout(() => {
+            if (typeof window.applyAeEqCanvasHeightFromPrefs === 'function') window.applyAeEqCanvasHeightFromPrefs();
             primeCanvasSize(aeCanvas);
             scheduleParametricEqFrame();
         }, 50);
