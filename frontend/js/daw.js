@@ -9,6 +9,7 @@ let filteredDawProjects = [];
 let dawSortKey = 'name';
 let dawSortAsc = true;
 let dawScanProgressCleanup = null;
+let _dawScanDbView = false;
 let _dawOffset = 0;
 let _dawTotalCount = 0;
 let _dawTotalUnfiltered = 0;
@@ -42,36 +43,6 @@ async function fetchDawPage() {
   const search = _lastDawSearch || '';
   const dawSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('dawDawFilter') : null;
   const dawFilter = dawSet ? [...dawSet].join(',') : null;
-  // During an active scan, DOM-toggle filter existing rendered rows (O(visible))
-  // instead of re-scanning the in-memory array. Scan streaming already filters
-  // incoming batches, so going forward stays consistent.
-  if (dawScanProgressCleanup) {
-    const tbody = document.getElementById('dawTableBody');
-    if (tbody) {
-      const needle = search ? search.trim().toLowerCase() : '';
-      const mode = _lastDawMode;
-      const rows = tbody.rows;
-      let visible = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        const daw = r.dataset.dawName;
-        if (!daw) continue;
-        let match = true;
-        if (dawSet && !dawSet.has(daw)) match = false;
-        if (match && needle && !r.dataset.dawSearch.includes(needle)) match = false;
-        r.style.display = match ? '' : 'none';
-        if (match) {
-          visible++;
-          const nameCell = r.querySelector('.col-name');
-          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, mode, highlightMatch);
-          const pathCell = r.querySelector('.col-path');
-          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, (t, q, m) => highlightMatch(t, q, m));
-        }
-      }
-      refreshDawStatsSnapshot();
-    }
-    return;
-  }
   const seq = ++_dawQuerySeq;
   const isLoadMore = _dawOffset > 0;
   showDawQueryLoading(isLoadMore);
@@ -103,6 +74,7 @@ async function fetchDawPage() {
     if (typeof yieldToBrowser === 'function') await yieldToBrowser();
     if (seq !== _dawQuerySeq) return;
     renderDawTable();
+    if (dawScanProgressCleanup) _dawScanDbView = true;
     // Counts + per-DAW breakdown + size reflect current filter via one aggregate query.
     refreshDawStatsSnapshot();
   } catch (e) {
@@ -271,9 +243,6 @@ function filterDawProjects() { applyFilter('filterDawProjects'); }
 /** Full list for export when SQLite-backed UI has left `allDawProjects` empty (paginated DB model). */
 const _DAW_EXPORT_MAX = 100000;
 async function fetchDawProjectsForExport() {
-  if (typeof dawScanProgressCleanup !== 'undefined' && dawScanProgressCleanup) {
-    return typeof allDawProjects !== 'undefined' && allDawProjects.length > 0 ? allDawProjects.slice() : [];
-  }
   const search = _lastDawSearch || '';
   const dawSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('dawDawFilter') : null;
   const dawFilter = dawSet ? [...dawSet].join(',') : null;
@@ -411,6 +380,7 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
   progressFill.style.width = '0%';
 
   if (!resume) {
+    _dawScanDbView = false;
     allDawProjects = [];
     filteredDawProjects = [];
     resetDawStats();
@@ -459,13 +429,15 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     if (matching.length > 0) {
       filteredDawProjects.push(...matching);
       if (filteredDawProjects.length > 100000) filteredDawProjects.length = 100000;
-      const tbody = document.getElementById('dawTableBody');
-      if (tbody && dawRenderCount < 2000) {
-        const loadMore = document.getElementById('dawLoadMore');
-        if (loadMore) loadMore.remove();
-        const toRender = matching.slice(0, 2000 - dawRenderCount);
-        tbody.insertAdjacentHTML('beforeend', toRender.map(buildDawRow).join(''));
-        dawRenderCount += toRender.length;
+      if (!_dawScanDbView) {
+        const tbody = document.getElementById('dawTableBody');
+        if (tbody && dawRenderCount < 2000) {
+          const loadMore = document.getElementById('dawLoadMore');
+          if (loadMore) loadMore.remove();
+          const toRender = matching.slice(0, 2000 - dawRenderCount);
+          tbody.insertAdjacentHTML('beforeend', toRender.map(buildDawRow).join(''));
+          dawRenderCount += toRender.length;
+        }
       }
     }
 
@@ -496,6 +468,7 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
       ? await unifiedResult
       : await window.vstUpdater.scanDawProjects(dawRoots.length ? dawRoots : undefined, excludePaths);
     if (dawScanProgressCleanup) { dawScanProgressCleanup(); dawScanProgressCleanup = null; }
+    _dawScanDbView = false;
     flushPendingProjects();
     if (result.streamed) {
       // Backend streamed results live — allDawProjects was built from progress events.
@@ -527,6 +500,7 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     }
   } catch (err) {
     if (dawScanProgressCleanup) { dawScanProgressCleanup(); dawScanProgressCleanup = null; }
+    _dawScanDbView = false;
     flushPendingProjects();
     const errMsg = err.message || err || 'Unknown error';
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;

@@ -1,4 +1,6 @@
 let scanProgressCleanup = null;
+/** After user runs a DB filter during scan, skip streaming DOM appends until scan ends. */
+let _pluginScanDbView = false;
 let _pluginsLoaded = false;
 
 function _ui(k, vars) {
@@ -76,38 +78,6 @@ async function fetchPluginPage() {
   const typeFilter = typeSet ? [...typeSet].join(',') : null;
   const statusSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('statusFilter') : null;
   const statusFilter = statusSet ? [...statusSet].join(',') : null;
-  // During an active scan, DOM-toggle filter existing cards (O(visible)) instead
-  // of iterating the full in-memory list.
-  if (scanProgressCleanup) {
-    const list = document.getElementById('pluginList');
-    if (list) {
-      const needle = search ? search.trim().toLowerCase() : '';
-      const mode = _lastPluginMode;
-      const cards = list.querySelectorAll('.plugin-card[data-plugin-type]');
-      let visible = 0;
-      for (let i = 0; i < cards.length; i++) {
-        const c = cards[i];
-        const t = c.dataset.pluginType;
-        let match = true;
-        if (typeSet && !typeSet.has(t)) match = false;
-        if (match && statusSet && c.dataset.pluginStatus && !statusSet.has(c.dataset.pluginStatus)) match = false;
-        if (match && needle && !c.dataset.pluginName.includes(needle) && !c.dataset.pluginMfg.includes(needle)) match = false;
-        c.style.display = match ? '' : 'none';
-        if (match) {
-          visible++;
-          // Apply search text highlights to visible cards
-          const h3 = c.querySelector('h3');
-          if (h3) applyScanCellHighlight(h3, h3.title || h3.textContent, search, mode, highlightMatch);
-          const mfgSpan = c.querySelector('.plugin-meta > span:nth-child(2)');
-          if (mfgSpan) mfgSpan.innerHTML = search ? highlightMatch(mfgSpan.textContent, search, mode) : escapeHtml(mfgSpan.textContent);
-        }
-      }
-      _pluginTotalCount = visible;
-      if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({ plugins: _pluginTotalUnfiltered || allPlugins.length || 0 });
-      else document.getElementById('totalCount').textContent = (_pluginTotalUnfiltered || allPlugins.length || 0).toLocaleString();
-    }
-    return;
-  }
   const seq = ++_pluginQuerySeq;
   const isLoadMore = _pluginOffset > 0;
   showPluginQueryLoading(isLoadMore);
@@ -150,6 +120,7 @@ async function fetchPluginPage() {
       // Append new batch to DOM without re-rendering everything
       loadMorePlugins();
     }
+    if (scanProgressCleanup) _pluginScanDbView = true;
     if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({ plugins: _pluginTotalUnfiltered || allPlugins.length || 0 });
     else document.getElementById('totalCount').textContent = (_pluginTotalUnfiltered || allPlugins.length || 0).toLocaleString();
   } catch (e) {
@@ -164,9 +135,6 @@ async function fetchPluginPage() {
 /** Full list for export when SQLite-backed UI has only paginated `allPlugins` (or scan-in-progress buffer). */
 const _PLUGIN_EXPORT_MAX = 100000;
 async function fetchPluginsForExport() {
-  if (typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) {
-    return typeof allPlugins !== 'undefined' && allPlugins.length > 0 ? allPlugins.slice() : [];
-  }
   const search = document.getElementById('searchInput')?.value || '';
   const typeSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('typeFilter') : null;
   const typeFilter = typeSet ? [...typeSet].join(',') : null;
@@ -195,6 +163,9 @@ async function fetchPluginsForExport() {
 
 function getPluginExportableCount() {
   if (typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) {
+    if (typeof _pluginScanDbView !== 'undefined' && _pluginScanDbView) {
+      return Math.max(_pluginTotalCount || 0, _pluginTotalUnfiltered || 0, typeof allPlugins !== 'undefined' ? allPlugins.length : 0);
+    }
     return typeof allPlugins !== 'undefined' ? allPlugins.length : 0;
   }
   return Math.max(_pluginTotalCount || 0, _pluginTotalUnfiltered || 0, typeof allPlugins !== 'undefined' ? allPlugins.length : 0);
@@ -223,6 +194,7 @@ async function scanPlugins(resume = false, overrideRoots = null) {
   progressFill.style.width = '0%';
 
   if (!resume) {
+    _pluginScanDbView = false;
     list.innerHTML = `<div class="state-message"><div class="spinner"></div><h2>${_ui('ui.js.scanning_for_plugins')}</h2><p>${_ui('ui.js.discovering_plugin_files')}</p></div>`;
     allPlugins = [];
   }
@@ -233,6 +205,7 @@ async function scanPlugins(resume = false, overrideRoots = null) {
     // `listen()` is async — must await subscription before invoke or `scan-progress` events are lost.
     scanProgressCleanup = await window.vstUpdater.onScanProgress((data) => {
       if (data.phase === 'start') {
+        _pluginScanDbView = false;
         list.innerHTML = '';
         btn.innerHTML = `&#8635; 0 / ${data.total}`;
         eta.start();
@@ -270,7 +243,7 @@ async function scanPlugins(resume = false, overrideRoots = null) {
           }
           fragment.appendChild(c);
         }
-        list.appendChild(fragment);
+        if (!_pluginScanDbView) list.appendChild(fragment);
       }
     });
 
@@ -320,6 +293,7 @@ async function scanPlugins(resume = false, overrideRoots = null) {
   }
 
   if (scanProgressCleanup) { scanProgressCleanup(); scanProgressCleanup = null; }
+  _pluginScanDbView = false;
   hideGlobalProgress();
   stopBtn.style.display = 'none';
   btn.disabled = false;

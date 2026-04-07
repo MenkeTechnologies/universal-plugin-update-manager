@@ -7,6 +7,8 @@ let audioCurrentOffset = 0; // pagination offset
 let audioSortKey = 'name';
 let audioSortAsc = true;
 let audioScanProgressCleanup = null;
+/** User ran a SQLite filter during scan — skip streaming row appends until scan ends. */
+let _audioScanDbView = false;
 let _audioScanActive = false;
 /** Monotonic id so stale `dbQueryAudio` results never overwrite a newer filter/sort. */
 let _audioQuerySeq = 0;
@@ -947,6 +949,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
   progressFill.style.width = '0%';
 
   if (!resume) {
+    _audioScanDbView = false;
     allAudioSamples = [];
     filteredAudioSamples = [];
     expandedMetaPath = null;
@@ -1003,14 +1006,16 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
     if (matching.length > 0) {
       filteredAudioSamples.push(...matching);
       if (filteredAudioSamples.length > 100000) filteredAudioSamples.length = 100000;
-      const tbody = document.getElementById('audioTableBody');
-      if (tbody && audioRenderCount < 2000) {
-        const loadMore = document.getElementById('audioLoadMore');
-        if (loadMore) loadMore.remove();
-        const toRender = matching.slice(0, 2000 - audioRenderCount);
-        tbody.insertAdjacentHTML('beforeend', toRender.map(buildAudioRow).join(''));
-        if (typeof reorderNewTableRows === 'function') reorderNewTableRows('audioTable');
-        audioRenderCount += toRender.length;
+      if (!_audioScanDbView) {
+        const tbody = document.getElementById('audioTableBody');
+        if (tbody && audioRenderCount < 2000) {
+          const loadMore = document.getElementById('audioLoadMore');
+          if (loadMore) loadMore.remove();
+          const toRender = matching.slice(0, 2000 - audioRenderCount);
+          tbody.insertAdjacentHTML('beforeend', toRender.map(buildAudioRow).join(''));
+          if (typeof reorderNewTableRows === 'function') reorderNewTableRows('audioTable');
+          audioRenderCount += toRender.length;
+        }
       }
     }
 
@@ -1065,6 +1070,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
     }
   } catch (err) {
     if (audioScanProgressCleanup) { audioScanProgressCleanup(); audioScanProgressCleanup = null; }
+    _audioScanDbView = false;
     flushPendingSamples();
     const errMsg = err.message || err || catalogFmt('toast.unknown_error');
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>${typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.scan_error_title')) : _audioFmt('ui.audio.scan_error_title')}</h2><p>${typeof escapeHtml === 'function' ? escapeHtml(errMsg) : errMsg}</p></div>`;
@@ -1073,6 +1079,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
 
   window.__audioScanPendingFound = 0;
   _audioScanActive = false;
+  _audioScanDbView = false;
   hideGlobalProgress();
   btn.disabled = false;
   if (typeof btnLoading === 'function') btnLoading(btn, false);
@@ -1290,9 +1297,6 @@ function clearAudioQueryLoadingRow() {
 /** Full list for export when SQLite-backed UI has left `allAudioSamples` empty (paginated DB model). */
 const _AUDIO_EXPORT_MAX = 100000;
 async function fetchAudioSamplesForExport() {
-  if (typeof audioScanProgressCleanup !== 'undefined' && audioScanProgressCleanup) {
-    return typeof allAudioSamples !== 'undefined' && allAudioSamples.length > 0 ? allAudioSamples.slice() : [];
-  }
   const search = _lastAudioSearch || '';
   const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('audioFormatFilter') : null;
   const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
@@ -1320,42 +1324,6 @@ async function fetchAudioPage() {
   const search = _lastAudioSearch || '';
   const fmtSet = getMultiFilterValues('audioFormatFilter');
   const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
-  // During an active scan, scan data hasn't been saved to the DB yet. DOM-toggle
-  // filter on the currently-rendered rows (capped ≤2000 by scan streaming) instead
-  // of re-iterating millions of in-memory samples. Scan's own flushPending applies
-  // the active filter to incoming batches, so state stays consistent.
-  if (audioScanProgressCleanup) {
-    const tbody = document.getElementById('audioTableBody');
-    if (tbody) {
-      const needle = search ? search.trim().toLowerCase() : '';
-      const mode = _lastAudioMode;
-      const rows = tbody.rows;
-      let visible = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        const fmt = r.dataset.audioFormat;
-        if (!fmt) continue; // skip non-data rows (load-more etc.)
-        let match = true;
-        if (fmtSet && !fmtSet.has(fmt)) match = false;
-        if (match && needle && !r.dataset.audioName.includes(needle)) match = false;
-        r.style.display = match ? '' : 'none';
-        if (match) {
-          visible++;
-          // Apply search text highlights to visible rows
-          const nameCell = r.querySelector('.col-name');
-          const path = r.dataset.audioPath;
-          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, mode, (t, q, m) => highlightBasenameFromPath(path, t, q, m));
-          const fmtSpan = r.querySelector('.col-format .format-badge');
-          if (fmtSpan) fmtSpan.innerHTML = search ? highlightMatch(fmt, search, mode) : escapeHtml(fmt);
-          const pathCell = r.querySelector('.col-path');
-          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, (t, q, m) => highlightPathPrefixFromPath(pathCell.title, t, q, m));
-        }
-      }
-      // DB has rows during scan — query it for accurate counts.
-      rebuildAudioStats();
-    }
-    return;
-  }
   const seq = ++_audioQuerySeq;
   const isLoadMore = audioCurrentOffset > 0;
   showAudioQueryLoading(isLoadMore);
@@ -1385,6 +1353,7 @@ async function fetchAudioPage() {
     if (typeof yieldToBrowser === 'function') await yieldToBrowser();
     if (seq !== _audioQuerySeq) return;
     renderAudioTable();
+    if (audioScanProgressCleanup) _audioScanDbView = true;
     // Header totals from paginated query (fast); per-format breakdown debounced.
     updateAudioStats();
     rebuildAudioStats();

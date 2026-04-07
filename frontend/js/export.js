@@ -207,7 +207,7 @@ document.addEventListener('click', (e) => {
 
 async function exportPlugins() {
   let plugins = null;
-  if (typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) {
+  if (typeof scanProgressCleanup === 'undefined' || !scanProgressCleanup) {
     plugins = typeof allPlugins !== 'undefined' && allPlugins.length > 0 ? allPlugins.slice() : null;
   }
   if (!plugins || plugins.length === 0) {
@@ -256,7 +256,10 @@ async function exportPlugins() {
 }
 
 async function exportAudio() {
-  let samples = typeof allAudioSamples !== 'undefined' && allAudioSamples.length > 0 ? allAudioSamples : null;
+  let samples = null;
+  if (typeof audioScanProgressCleanup === 'undefined' || !audioScanProgressCleanup) {
+    samples = typeof allAudioSamples !== 'undefined' && allAudioSamples.length > 0 ? allAudioSamples : null;
+  }
   if (!samples || samples.length === 0) {
     if (typeof fetchAudioSamplesForExport === 'function') {
       if (typeof showGlobalProgress === 'function') showGlobalProgress();
@@ -301,7 +304,10 @@ async function exportAudio() {
 }
 
 async function exportDaw() {
-  let projects = typeof allDawProjects !== 'undefined' && allDawProjects.length > 0 ? allDawProjects : null;
+  let projects = null;
+  if (typeof dawScanProgressCleanup === 'undefined' || !dawScanProgressCleanup) {
+    projects = typeof allDawProjects !== 'undefined' && allDawProjects.length > 0 ? allDawProjects : null;
+  }
   if (!projects || projects.length === 0) {
     if (typeof fetchDawProjectsForExport === 'function') {
       if (typeof showGlobalProgress === 'function') showGlobalProgress();
@@ -347,7 +353,10 @@ async function exportDaw() {
 }
 
 async function exportPdfs() {
-  let pdfs = typeof allPdfs !== 'undefined' && allPdfs.length > 0 ? allPdfs : null;
+  let pdfs = null;
+  if (typeof pdfScanProgressCleanup === 'undefined' || !pdfScanProgressCleanup) {
+    pdfs = typeof allPdfs !== 'undefined' && allPdfs.length > 0 ? allPdfs : null;
+  }
   if (!pdfs || pdfs.length === 0) {
     if (typeof fetchPdfsForExport === 'function') {
       if (typeof showGlobalProgress === 'function') showGlobalProgress();
@@ -421,7 +430,7 @@ async function importPdfs() {
 
 async function exportPresets() {
   let presets = null;
-  if (typeof presetScanProgressCleanup !== 'undefined' && presetScanProgressCleanup) {
+  if (typeof presetScanProgressCleanup === 'undefined' || !presetScanProgressCleanup) {
     presets = typeof allPresets !== 'undefined' && allPresets.length > 0 ? allPresets.slice() : null;
   }
   if (!presets || presets.length === 0) {
@@ -470,7 +479,10 @@ async function exportPresets() {
 // ── MIDI export ──
 
 async function exportMidi() {
-  let midiList = typeof allMidiFiles !== 'undefined' && allMidiFiles.length > 0 ? allMidiFiles : null;
+  let midiList = null;
+  if (typeof _midiScanProgressCleanup === 'undefined' || !_midiScanProgressCleanup) {
+    midiList = typeof allMidiFiles !== 'undefined' && allMidiFiles.length > 0 ? allMidiFiles : null;
+  }
   if (!midiList || midiList.length === 0) {
     if (typeof fetchMidiFilesForExport === 'function') {
       if (typeof showGlobalProgress === 'function') showGlobalProgress();

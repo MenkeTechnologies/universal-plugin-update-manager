@@ -4,6 +4,7 @@ let filteredPresets = [];
 let presetSortKey = 'name';
 let presetSortAsc = true;
 let presetScanProgressCleanup = null;
+let _presetScanDbView = false;
 let PRESET_PAGE_SIZE = 200;
 let presetRenderCount = 0;
 let _presetOffset = 0;
@@ -62,36 +63,6 @@ async function fetchPresetPage() {
   const search = _lastPresetSearch || '';
   const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('presetFormatFilter') : null;
   const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
-  // During an active scan, DOM-toggle filter existing rendered rows (O(visible))
-  // instead of re-scanning the in-memory array. Scan streaming already excludes
-  // MIDI and filters by active selection going forward.
-  if (presetScanProgressCleanup) {
-    const tbody = document.getElementById('presetTableBody');
-    if (tbody) {
-      const needle = search ? search.trim().toLowerCase() : '';
-      const mode = _lastPresetMode;
-      const rows = tbody.rows;
-      let visible = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        const fmt = r.dataset.presetFormat;
-        if (!fmt) continue;
-        let match = true;
-        if (fmtSet && !fmtSet.has(fmt)) match = false;
-        if (match && needle && !r.dataset.presetName.includes(needle)) match = false;
-        r.style.display = match ? '' : 'none';
-        if (match) {
-          visible++;
-          const nameCell = r.querySelector('.col-name');
-          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, mode, highlightMatch);
-          const pathCell = r.querySelector('.col-path');
-          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, highlightMatch);
-        }
-      }
-      rebuildPresetStats();
-    }
-    return;
-  }
   const seq = ++_presetQuerySeq;
   const isLoadMore = _presetOffset > 0;
   showPresetQueryLoading(isLoadMore);
@@ -122,6 +93,7 @@ async function fetchPresetPage() {
     if (typeof yieldToBrowser === 'function') await yieldToBrowser();
     if (seq !== _presetQuerySeq) return;
     renderPresetTable();
+    if (presetScanProgressCleanup) _presetScanDbView = true;
     rebuildPresetStats();
   } catch (e) {
     if (seq !== _presetQuerySeq) return;
@@ -281,9 +253,6 @@ function filterPresets() { applyFilter('filterPresets'); }
 /** Full list for export when SQLite-backed UI has only paginated rows (or scan-in-progress buffer). */
 const _PRESET_EXPORT_MAX = 100000;
 async function fetchPresetsForExport() {
-  if (typeof presetScanProgressCleanup !== 'undefined' && presetScanProgressCleanup) {
-    return typeof allPresets !== 'undefined' && allPresets.length > 0 ? allPresets.slice() : [];
-  }
   const search = _lastPresetSearch || '';
   const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('presetFormatFilter') : null;
   const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
@@ -310,12 +279,7 @@ async function fetchPresetsForExport() {
 function updatePresetExportButton() {
   const btn = document.getElementById('btnExportPresets');
   if (!btn) return;
-  let n = 0;
-  if (typeof presetScanProgressCleanup !== 'undefined' && presetScanProgressCleanup) {
-    n = typeof allPresets !== 'undefined' ? allPresets.length : 0;
-  } else {
-    n = Math.max(_presetTotalCount || 0, _presetTotalUnfiltered || 0, typeof allPresets !== 'undefined' ? allPresets.length : 0);
-  }
+  const n = Math.max(_presetTotalCount || 0, _presetTotalUnfiltered || 0, typeof allPresets !== 'undefined' ? allPresets.length : 0);
   btn.style.display = n > 0 ? '' : 'none';
 }
 
@@ -438,6 +402,7 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
   progressFill.style.width = '0%';
 
   if (!resume) {
+    _presetScanDbView = false;
     allPresets = [];
     filteredPresets = [];
     resetPresetStats();
@@ -484,13 +449,14 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
       allMidiFiles.push(...midiBatch);
       if (allMidiFiles.length > 100000) allMidiFiles.length = 100000;
       if (typeof filteredMidi !== 'undefined') filteredMidi.push(...midiBatch);
+      const skipMidiDom = typeof _midiScanDbView !== 'undefined' && _midiScanDbView;
       // Append rows instead of full rebuild
       const midiTbody = document.getElementById('midiTableBody');
-      if (midiTbody && typeof buildMidiRow === 'function' && typeof _midiRenderCount !== 'undefined' && _midiRenderCount < 2000) {
+      if (!skipMidiDom && midiTbody && typeof buildMidiRow === 'function' && typeof _midiRenderCount !== 'undefined' && _midiRenderCount < 2000) {
         const toRender = midiBatch.slice(0, 2000 - _midiRenderCount);
         midiTbody.insertAdjacentHTML('beforeend', toRender.map(buildMidiRow).join(''));
         _midiRenderCount += toRender.length;
-      } else if (!midiTbody && typeof renderMidiTable === 'function') {
+      } else if (!skipMidiDom && !midiTbody && typeof renderMidiTable === 'function') {
         renderMidiTable(); // first batch — init table
       }
       if (typeof updateMidiCount === 'function') updateMidiCount();
@@ -498,7 +464,7 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
       if (typeof _midiMetadataRunning !== 'undefined' && !_midiMetadataRunning && typeof loadMidiMetadata === 'function') loadMidiMetadata();
     }
     const tbody = document.getElementById('presetTableBody');
-    if (tbody && presetRenderCount < 2000) {
+    if (!_presetScanDbView && tbody && presetRenderCount < 2000) {
       const loadMore = document.getElementById('presetLoadMore');
       if (loadMore) loadMore.remove();
       // Apply active filter so newly-streamed rows respect user's checkbox/search.
@@ -566,6 +532,7 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
       try { await window.vstUpdater.savePresetScan(allPresets, result.roots); } catch (e) { showToast(toastFmt('toast.failed_save_preset_history', { err: e.message || e }), 4000, 'error'); }
     }
     if (presetScanProgressCleanup) { presetScanProgressCleanup(); presetScanProgressCleanup = null; }
+    _presetScanDbView = false;
     rebuildPresetStats(true);
     filterPresets();
     // MIDI tab has its own independent scanner/DB — don't reload from preset scan.
@@ -583,6 +550,7 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
     }
   } catch (err) {
     if (presetScanProgressCleanup) { presetScanProgressCleanup(); presetScanProgressCleanup = null; }
+    _presetScanDbView = false;
     flushPending();
     const errMsg = err.message || err || 'Unknown error';
     tableWrap.innerHTML = `<div class="state-message"><div class="state-icon">&#9888;</div><h2>Scan Error</h2><p>${errMsg}</p></div>`;

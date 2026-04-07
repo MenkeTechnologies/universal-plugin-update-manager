@@ -9,6 +9,7 @@ let filteredPdfs = [];
 let pdfSortKey = 'name';
 let pdfSortAsc = true;
 let pdfScanProgressCleanup = null;
+let _pdfScanDbView = false;
 let pdfRenderCount = 0;
 let _pdfOffset = 0;
 let _pdfTotalCount = 0;
@@ -49,34 +50,6 @@ let _lastPdfMode = 'fuzzy';
 
 async function fetchPdfPage() {
   const search = _lastPdfSearch || '';
-  // During an active scan, DOM-toggle filter existing rendered rows instead of
-  // hitting the DB (scan isn't saved yet, query would wipe live results).
-  if (pdfScanProgressCleanup) {
-    const tbody = document.getElementById('pdfTableBody');
-    if (tbody) {
-      const needle = search ? search.trim().toLowerCase() : '';
-      const mode = _lastPdfMode;
-      const rows = tbody.rows;
-      let visible = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        const name = r.dataset.pdfName;
-        if (name === undefined) continue;
-        const match = !needle || name.includes(needle);
-        r.style.display = match ? '' : 'none';
-        if (match) {
-          visible++;
-          const nameCell = r.querySelector('.col-name');
-          if (nameCell) applyScanCellHighlight(nameCell, nameCell.title, search, mode, highlightMatch);
-          const pathCell = r.querySelector('.col-path');
-          if (pathCell) applyScanCellHighlight(pathCell, pathCell.title.replace(/[/\\][^/\\]*$/, ''), search, mode, highlightMatch);
-        }
-      }
-      rebuildPdfStats();
-    }
-    if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
-    return;
-  }
   const seq = ++_pdfQuerySeq;
   const isLoadMore = _pdfOffset > 0;
   showPdfQueryLoading(isLoadMore);
@@ -108,6 +81,7 @@ async function fetchPdfPage() {
     if (typeof yieldToBrowser === 'function') await yieldToBrowser();
     if (seq !== _pdfQuerySeq) return;
     renderPdfTable();
+    if (pdfScanProgressCleanup) _pdfScanDbView = true;
     rebuildPdfStats();
     // Hydrate the pages cache for visible rows, then kick off background extract.
     loadPdfPagesForVisible();
@@ -308,9 +282,6 @@ function filterPdfs() { applyFilter('filterPdfs'); }
 /** Full list for export when cold-loaded from SQLite left `allPdfs` empty (paginated DB model). */
 const _PDF_EXPORT_MAX = 100000;
 async function fetchPdfsForExport() {
-  if (typeof pdfScanProgressCleanup !== 'undefined' && pdfScanProgressCleanup) {
-    return typeof allPdfs !== 'undefined' && allPdfs.length > 0 ? allPdfs.slice() : [];
-  }
   const search = _lastPdfSearch || '';
   const total = Math.max(_pdfTotalCount || 0, _pdfTotalUnfiltered || 0);
   const n = Math.min(total, _PDF_EXPORT_MAX);
@@ -370,6 +341,7 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
   progressFill.style.width = '0%';
 
   if (!resume) {
+    _pdfScanDbView = false;
     allPdfs = [];
     filteredPdfs = [];
     resetPdfStatsAccumulators();
@@ -409,7 +381,7 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
     accumulatePdfStats(batch);
 
     const tbody = document.getElementById('pdfTableBody');
-    if (tbody && pdfRenderCount < 2000) {
+    if (!_pdfScanDbView && tbody && pdfRenderCount < 2000) {
       const scanSearch = (document.getElementById('pdfSearchInput')?.value || '').trim().toLowerCase();
       const visibleBatch = scanSearch
         ? batch.filter(p => (p.name || '').toLowerCase().includes(scanSearch))
@@ -480,6 +452,7 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
       loadPdfPagesForVisible();
     }
     if (pdfScanProgressCleanup) { pdfScanProgressCleanup(); pdfScanProgressCleanup = null; }
+    _pdfScanDbView = false;
     rebuildPdfStats(true);
     filterPdfs();
     if (result.stopped && allPdfs.length > 0 && resumeBtn) {
@@ -496,6 +469,7 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
     }
   } catch (err) {
     if (pdfScanProgressCleanup) { pdfScanProgressCleanup(); pdfScanProgressCleanup = null; }
+    _pdfScanDbView = false;
     flushPending();
     const errMsg = err.message || err || catalogFmt('toast.unknown_error');
     const errTitle = typeof escapeHtml === 'function' ? escapeHtml(_pdfFmt('ui.audio.scan_error_title')) : _pdfFmt('ui.audio.scan_error_title');
