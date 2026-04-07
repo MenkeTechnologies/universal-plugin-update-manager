@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Nulstil indstillingssektionsrækkefølgen til standard",
   "ui.tt.reset_tab_order_to_default": "Nulstil fanerækkefølgen til standard",
   "ui.tt.resident_memory_rss": "Resident memory (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Genoptag alle pausede scanninger",
   "ui.tt.resume_daw_scan": "Genoptag DAW-scanning",
   "ui.tt.resume_midi_scan": "Genoptag MIDI-scanning",

@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "将设置部分顺序重置为默认值",
   "ui.tt.reset_tab_order_to_default": "将 Tab 键顺序重置为默认值",
   "ui.tt.resident_memory_rss": "常驻内存 (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "恢复所有暂停的扫描",
   "ui.tt.resume_daw_scan": "恢复 DAW 扫描",
   "ui.tt.resume_midi_scan": "Resume MIDI scan",

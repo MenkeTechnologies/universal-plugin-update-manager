@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Atur ulang urutan bagian pengaturan ke default",
   "ui.tt.reset_tab_order_to_default": "Atur ulang urutan tab ke default",
   "ui.tt.resident_memory_rss": "Memori penduduk (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Lanjutkan semua pemindaian yang dijeda",
   "ui.tt.resume_daw_scan": "Lanjutkan pemindaian DAW",
   "ui.tt.resume_midi_scan": "Lanjutkan pemindaian MIDI",

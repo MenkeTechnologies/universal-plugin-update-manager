@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Állítsa vissza a beállítások szakasz sorrendjét az alapértelmezettre",
   "ui.tt.reset_tab_order_to_default": "A lapok sorrendjének visszaállítása az alapértelmezettre",
   "ui.tt.resident_memory_rss": "Rezidens memória (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Folytassa az összes szüneteltetett vizsgálatot",
   "ui.tt.resume_daw_scan": "A DAW szkennelés folytatása",
   "ui.tt.resume_midi_scan": "A MIDI-keresés folytatása",

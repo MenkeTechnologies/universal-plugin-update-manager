@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Obnovit pořadí sekcí nastavení na výchozí",
   "ui.tt.reset_tab_order_to_default": "Resetovat pořadí karet na výchozí",
   "ui.tt.resident_memory_rss": "Rezidentní paměť (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Obnovte všechna pozastavená skenování",
   "ui.tt.resume_daw_scan": "Obnovit skenování DAW",
   "ui.tt.resume_midi_scan": "Obnovit skenování MIDI",

@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "設定セクションの順序をデフォルトにリセット",
   "ui.tt.reset_tab_order_to_default": "タブオーダーをデフォルトにリセット",
   "ui.tt.resident_memory_rss": "常駐メモリ（RSS）",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "一時停止したすべてのスキャンを再開します",
   "ui.tt.resume_daw_scan": "DAWスキャンを再開する",
   "ui.tt.resume_midi_scan": "Resume MIDI scan",

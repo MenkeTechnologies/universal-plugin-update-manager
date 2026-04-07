@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Đặt lại thứ tự phần cài đặt về mặc định",
   "ui.tt.reset_tab_order_to_default": "Đặt lại thứ tự tab về mặc định",
   "ui.tt.resident_memory_rss": "Bộ nhớ thường trú (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Tiếp tục tất cả các lần quét bị tạm dừng",
   "ui.tt.resume_daw_scan": "Tiếp tục quét DAW",
   "ui.tt.resume_midi_scan": "Tiếp tục quét MIDI",

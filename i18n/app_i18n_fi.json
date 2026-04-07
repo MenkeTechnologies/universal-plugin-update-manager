@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Palauta asetusosien järjestys oletusarvoon",
   "ui.tt.reset_tab_order_to_default": "Palauta välilehtien järjestys oletusarvoon",
   "ui.tt.resident_memory_rss": "Pysyvä muisti (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Jatka kaikkia keskeytettyjä tarkistuksia",
   "ui.tt.resume_daw_scan": "Jatka DAW-skannausta",
   "ui.tt.resume_midi_scan": "Jatka MIDI-skannausta",

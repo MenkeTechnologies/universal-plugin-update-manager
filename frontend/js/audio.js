@@ -12,6 +12,12 @@ let _audioScanDbView = false;
 let _audioScanActive = false;
 /** Monotonic id so stale `dbQueryAudio` results never overwrite a newer filter/sort. */
 let _audioQuerySeq = 0;
+/** Cancels in-flight now-playing waveform decode when the user switches tracks (full-file `decodeAudioData` is expensive for MP3). */
+let _npWaveformDrawSeq = 0;
+/** Cancels meta-panel waveform/spectrogram work when another row is expanded. */
+let _metaPanelDrawSeq = 0;
+/** One `AudioBuffer` from the meta waveform decode, reused by spectrogram in the same expand (avoids double full-file decode). */
+let _metaSharedDecoded = { path: null, buffer: null };
 
 /** `appFmt` wrapper — same pattern as `plugins.js` `_ui`. */
 function _audioFmt(key, vars) {
@@ -1719,7 +1725,9 @@ async function previewAudio(filePath) {
         updateFavBtn();
         updateMetaLine();
         // Defer waveform fetch/decode so <audio> can start output before main-thread work (canvas layout + decode).
-        setTimeout(() => drawWaveform(filePath), 0);
+        _npWaveformDrawSeq++;
+        const wfSeq = _npWaveformDrawSeq;
+        setTimeout(() => drawWaveform(filePath, wfSeq), 0);
     } catch (err) {
         showToast(toastFmt('toast.playback_failed', {
             ext: ext.toUpperCase(),
@@ -2058,9 +2066,12 @@ async function expandMetaForPath(filePath) {
         metaRow.innerHTML = `<td colspan="12"><div class="audio-meta-panel"><span class="meta-close-btn" data-action="closeMetaRow" title="${_closeT}">&#10005;</span>${waveformHtml}${items}</div></td>`;
 
         // Defer heavy decode/FFT so UI paint and playback aren’t blocked in the same turn as DOM insert.
-        setTimeout(() => {
-            drawMetaWaveform(filePath);
-            drawSpectrogram(filePath);
+        // Run sequentially so we decode once per visual (not two parallel full-file decodes).
+        _metaPanelDrawSeq++;
+        const metaSeq = _metaPanelDrawSeq;
+        setTimeout(async () => {
+            await drawMetaWaveform(filePath, metaSeq);
+            await drawSpectrogram(filePath, metaSeq);
         }, 0);
 
         // Sync cursor if already playing this track
@@ -2773,9 +2784,14 @@ function _debounceWfSave() {
     _wfCacheDirtyTimer = setTimeout(_saveWaveformCache, 30000);
 }
 
-async function drawWaveform(filePath) {
+function _npWaveformDrawStale(wfSeq) {
+    return wfSeq !== undefined && wfSeq !== _npWaveformDrawSeq;
+}
+
+async function drawWaveform(filePath, wfSeq) {
     const canvas = document.getElementById('npWaveformCanvas');
     if (!canvas) return;
+    if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
     const container = canvas.parentElement;
     canvas.width = container.offsetWidth * (window.devicePixelRatio || 1);
     canvas.height = container.offsetHeight * (window.devicePixelRatio || 1);
@@ -2784,16 +2800,22 @@ async function drawWaveform(filePath) {
 
     // Check cache
     if (_waveformCache[filePath]) {
+        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
         renderWaveformData(ctx, canvas, _waveformCache[filePath]);
         return;
     }
 
     try {
+        if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
         if (!_audioCtx) _audioCtx = new AudioContext();
         const src = convertFileSrc(filePath);
         const resp = await fetch(src);
+        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
         const buf = await resp.arrayBuffer();
+        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
         const audioBuf = await _audioCtx.decodeAudioData(buf);
+        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
         const raw = audioBuf.getChannelData(0);
 
         // Downsample to canvas width — use full resolution
@@ -2810,11 +2832,13 @@ async function drawWaveform(filePath) {
             peaks.push({max, min});
         }
 
+        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
         _waveformCache[filePath] = peaks;
         _evictCache(_waveformCache);
         _debounceWfSave();
         renderWaveformData(ctx, canvas, peaks);
     } catch {
+        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
         // Fallback: draw a simple centered line
         ctx.strokeStyle = 'rgba(5,217,232,0.3)';
         ctx.lineWidth = 1;
@@ -2895,9 +2919,14 @@ function renderWaveformData(ctx, canvas, peaks) {
     }
 }
 
-async function drawMetaWaveform(filePath) {
+function _metaPanelStale(metaSeq, filePath) {
+    return (metaSeq !== undefined && metaSeq !== _metaPanelDrawSeq) || expandedMetaPath !== filePath;
+}
+
+async function drawMetaWaveform(filePath, metaSeq) {
     const canvas = document.getElementById('metaWaveformCanvas');
     if (!canvas) return;
+    if (_metaPanelStale(metaSeq, filePath)) return;
     const container = canvas.parentElement;
     canvas.width = container.offsetWidth * (window.devicePixelRatio || 1);
     canvas.height = container.offsetHeight * (window.devicePixelRatio || 1);
@@ -2905,16 +2934,26 @@ async function drawMetaWaveform(filePath) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (_waveformCache[filePath]) {
+        if (_metaPanelStale(metaSeq, filePath)) return;
         renderWaveformData(ctx, canvas, _waveformCache[filePath]);
+        _metaSharedDecoded.path = filePath;
+        _metaSharedDecoded.buffer = null;
         return;
     }
 
     try {
+        if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+        if (_metaPanelStale(metaSeq, filePath)) return;
         if (!_audioCtx) _audioCtx = new AudioContext();
         const src = convertFileSrc(filePath);
         const resp = await fetch(src);
+        if (_metaPanelStale(metaSeq, filePath)) return;
         const buf = await resp.arrayBuffer();
+        if (_metaPanelStale(metaSeq, filePath)) return;
         const audioBuf = await _audioCtx.decodeAudioData(buf);
+        if (_metaPanelStale(metaSeq, filePath)) return;
+        _metaSharedDecoded.path = filePath;
+        _metaSharedDecoded.buffer = audioBuf;
         const raw = audioBuf.getChannelData(0);
 
         const bars = Math.min(Math.floor(canvas.width), 800);
@@ -2930,11 +2969,15 @@ async function drawMetaWaveform(filePath) {
             peaks.push({max, min});
         }
 
+        if (_metaPanelStale(metaSeq, filePath)) return;
         _waveformCache[filePath] = peaks;
         _evictCache(_waveformCache);
         _debounceWfSave();
         renderWaveformData(ctx, canvas, peaks);
     } catch {
+        if (_metaPanelStale(metaSeq, filePath)) return;
+        _metaSharedDecoded.path = filePath;
+        _metaSharedDecoded.buffer = null;
         ctx.strokeStyle = 'rgba(5,217,232,0.3)';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -2944,25 +2987,41 @@ async function drawMetaWaveform(filePath) {
     }
 }
 
-async function drawSpectrogram(filePath) {
+async function drawSpectrogram(filePath, metaSeq) {
     const canvas = document.getElementById('metaSpectrogramCanvas');
     if (!canvas) return;
+    if (_metaPanelStale(metaSeq, filePath)) return;
     const ctx = canvas.getContext('2d');
     const w = 800, h = 80;
     ctx.clearRect(0, 0, w, h);
 
     // Check cache
     if (_spectrogramCache[filePath]) {
+        if (_metaPanelStale(metaSeq, filePath)) return;
         renderSpectrogramData(ctx, w, h, _spectrogramCache[filePath]);
+        _metaSharedDecoded.path = null;
+        _metaSharedDecoded.buffer = null;
         return;
     }
 
     try {
-        if (!_audioCtx) _audioCtx = new AudioContext();
-        const src = convertFileSrc(filePath);
-        const resp = await fetch(src);
-        const buf = await resp.arrayBuffer();
-        const audioBuf = await _audioCtx.decodeAudioData(buf);
+        let audioBuf = null;
+        if (_metaSharedDecoded.path === filePath && _metaSharedDecoded.buffer) {
+            audioBuf = _metaSharedDecoded.buffer;
+        } else {
+            if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+            if (_metaPanelStale(metaSeq, filePath)) return;
+            if (!_audioCtx) _audioCtx = new AudioContext();
+            const src = convertFileSrc(filePath);
+            const resp = await fetch(src);
+            if (_metaPanelStale(metaSeq, filePath)) return;
+            const buf = await resp.arrayBuffer();
+            if (_metaPanelStale(metaSeq, filePath)) return;
+            audioBuf = await _audioCtx.decodeAudioData(buf);
+        }
+        _metaSharedDecoded.path = null;
+        _metaSharedDecoded.buffer = null;
+        if (_metaPanelStale(metaSeq, filePath)) return;
         const raw = audioBuf.getChannelData(0);
         const sr = audioBuf.sampleRate;
 
@@ -3009,6 +3068,10 @@ async function drawSpectrogram(filePath) {
         const sgData = []; // cols × freqBins magnitudes for caching
 
         for (let col = 0; col < cols; col++) {
+            if (col > 0 && col % 4 === 0) {
+                if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+                if (_metaPanelStale(metaSeq, filePath)) return;
+            }
             const frameIdx = col * frameStep;
             const offset = frameIdx * hop;
             if (offset + fftSize > raw.length) break;
@@ -3049,10 +3112,14 @@ async function drawSpectrogram(filePath) {
             sgData.push(mags);
         }
 
+        if (_metaPanelStale(metaSeq, filePath)) return;
         _spectrogramCache[filePath] = sgData;
         _debounceWfSave();
         renderSpectrogramData(ctx, w, h, sgData);
     } catch {
+        _metaSharedDecoded.path = null;
+        _metaSharedDecoded.buffer = null;
+        if (_metaPanelStale(metaSeq, filePath)) return;
         ctx.fillStyle = 'var(--text-dim)';
         ctx.font = '9px sans-serif';
         ctx.fillText('Spectrogram unavailable', 10, 40);
@@ -3275,9 +3342,60 @@ function updateMetaLine() {
             }
         }
         if (!np.style.width) np.style.width = '360px';
+        if (typeof window.applyNpFftHeightFromPrefs === 'function') window.applyNpFftHeightFromPrefs();
     };
     // Set a safe default immediately so the player has a size before prefs load.
     if (!np.style.width) np.style.width = '360px';
+})();
+
+// ── FFT spectrum strip — vertical resize (prefs `npFftHeight`) ──
+(function initNpFftResize() {
+    const handle = document.getElementById('npFftResizeHandle');
+    const viz = document.getElementById('npVisualizer');
+    if (!handle || !viz) return;
+    const MIN = 24;
+    const MAX = 200;
+    const PREF_KEY = 'npFftHeight';
+
+    function applyNpFftHeightFromPrefs() {
+        const raw = prefs.getItem(PREF_KEY);
+        if (raw != null && raw !== '') {
+            const h = parseInt(String(raw), 10);
+            if (Number.isFinite(h) && h >= MIN && h <= MAX) {
+                viz.style.height = h + 'px';
+                return;
+            }
+        }
+        viz.style.height = '';
+    }
+    window.applyNpFftHeightFromPrefs = applyNpFftHeightFromPrefs;
+
+    handle.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const startY = e.clientY;
+        const startH = viz.getBoundingClientRect().height;
+        handle.setPointerCapture(e.pointerId);
+
+        function onMove(ev) {
+            const dy = ev.clientY - startY;
+            const nh = Math.round(Math.min(MAX, Math.max(MIN, startH + dy)));
+            viz.style.height = nh + 'px';
+        }
+        function onUp(ev) {
+            handle.removeEventListener('pointermove', onMove);
+            handle.removeEventListener('pointerup', onUp);
+            handle.removeEventListener('pointercancel', onUp);
+            try {
+                handle.releasePointerCapture(ev.pointerId);
+            } catch (_) {}
+            prefs.setItem(PREF_KEY, String(Math.round(viz.getBoundingClientRect().height)));
+        }
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
+    });
 })();
 
 // ── Parametric EQ Visualization ──

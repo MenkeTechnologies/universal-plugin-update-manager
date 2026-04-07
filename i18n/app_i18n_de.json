@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Setzen Sie die Reihenfolge der Einstellungsabschnitte auf die Standardeinstellung zurück",
   "ui.tt.reset_tab_order_to_default": "Tab-Reihenfolge auf Standard zurücksetzen",
   "ui.tt.resident_memory_rss": "Residenter Speicher (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Setzen Sie alle angehaltenen Scans fort",
   "ui.tt.resume_daw_scan": "Setzen Sie den DAW-Scan fort",
   "ui.tt.resume_midi_scan": "Setzen Sie den MIDI-Scan fort",

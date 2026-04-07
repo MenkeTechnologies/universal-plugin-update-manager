@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Επαναφέρετε τη σειρά της ενότητας ρυθμίσεων στην προεπιλογή",
   "ui.tt.reset_tab_order_to_default": "Επαναφορά της σειράς καρτελών στην προεπιλογή",
   "ui.tt.resident_memory_rss": "Μνήμη κατοίκου (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Συνέχιση όλων των σαρώσεων σε παύση",
   "ui.tt.resume_daw_scan": "Συνέχιση της σάρωσης DAW",
   "ui.tt.resume_midi_scan": "Resume MIDI scan",

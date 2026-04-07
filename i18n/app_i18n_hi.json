@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "सेटिंग्स अनुभाग क्रम को डिफ़ॉल्ट पर रीसेट करें",
   "ui.tt.reset_tab_order_to_default": "टैब क्रम को डिफ़ॉल्ट पर रीसेट करें",
   "ui.tt.resident_memory_rss": "निवासी स्मृति (आरएसएस)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "सभी रुके हुए स्कैन फिर से शुरू करें",
   "ui.tt.resume_daw_scan": "DAW स्कैन फिर से शुरू करें",
   "ui.tt.resume_midi_scan": "MIDI स्कैन फिर से शुरू करें",

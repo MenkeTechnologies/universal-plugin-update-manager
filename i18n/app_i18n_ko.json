@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "설정 섹션 순서를 기본값으로 재설정",
   "ui.tt.reset_tab_order_to_default": "탭 순서를 기본값으로 재설정",
   "ui.tt.resident_memory_rss": "상주 메모리(RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "일시 중지된 모든 검사 재개",
   "ui.tt.resume_daw_scan": "DAW 스캔 재개",
   "ui.tt.resume_midi_scan": "Resume MIDI scan",

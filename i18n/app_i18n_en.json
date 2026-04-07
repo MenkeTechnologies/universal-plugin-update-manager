@@ -1621,6 +1621,7 @@
   "ui.tt.favorited_items_cmd_5": "Favorited items (Cmd+5)",
   "ui.tt.fft_spectrum_analyzer_right_click_for_options": "FFT Spectrum Analyzer — right-click for options",
   "ui.tt.fft_spectrum_analyzer_show_only_this": "FFT Spectrum Analyzer — show only this",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.file_browser_cmd_8": "File browser (Cmd+8)",
   "ui.tt.filter_by_audio_format": "Filter by audio format",
   "ui.tt.filter_by_daw_application": "Filter by DAW application",

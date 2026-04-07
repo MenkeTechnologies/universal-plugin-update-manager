@@ -6447,12 +6447,39 @@
 
         /* FFT spectrum canvas — explicit width for release WebView which
        doesn't resolve inherited width until a reflow event (drag). */
+        .np-visualizer-stack {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
         .np-visualizer {
             display: block;
             width: 100%;
             height: 32px;
             overflow: hidden;
             box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .np-fft-resize-handle {
+            flex-shrink: 0;
+            height: 6px;
+            margin: 0;
+            cursor: ns-resize;
+            border-radius: 0 0 3px 3px;
+            background: transparent;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .np-fft-resize-handle:hover {
+            background: rgba(5, 217, 232, 0.12);
+        }
+
+        .np-fft-resize-handle:active {
+            background: rgba(5, 217, 232, 0.22);
         }
 
         .audio-now-playing.np-playing {
@@ -7187,8 +7214,12 @@
             <div class="np-meta-line" id="npMetaLine"></div>
         </div>
         <div class="np-section" data-np-section="visualizer">
-            <div class="np-visualizer" id="npVisualizer">
-                <canvas height="48" id="npFftCanvas" style="width:100%;height:100%;display:block;" width="600"></canvas>
+            <div class="np-visualizer-stack">
+                <div class="np-visualizer" id="npVisualizer">
+                    <canvas height="48" id="npFftCanvas" style="width:100%;height:100%;display:block;" width="600"></canvas>
+                </div>
+                <div class="np-fft-resize-handle" id="npFftResizeHandle" data-i18n-title="ui.tt.resize_fft_spectrum" role="separator"
+                     aria-orientation="horizontal"></div>
             </div>
         </div>
         <div class="np-section" data-np-section="volume">

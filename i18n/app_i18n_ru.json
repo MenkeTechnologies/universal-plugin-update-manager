@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Сбросить порядок разделов настроек по умолчанию",
   "ui.tt.reset_tab_order_to_default": "Сбросить порядок вкладок по умолчанию",
   "ui.tt.resident_memory_rss": "Резидентная память (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Возобновить все приостановленные сканирования",
   "ui.tt.resume_daw_scan": "Возобновить сканирование DAW",
   "ui.tt.resume_midi_scan": "Resume MIDI scan",

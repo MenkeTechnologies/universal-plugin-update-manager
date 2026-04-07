@@ -1721,6 +1721,7 @@
   "ui.tt.reset_settings_section_order_to_default": "Zet de volgorde van de instellingensectie terug naar de standaardinstellingen",
   "ui.tt.reset_tab_order_to_default": "Zet de tabvolgorde terug naar de standaardwaarde",
   "ui.tt.resident_memory_rss": "Lokaal geheugen (RSS)",
+  "ui.tt.resize_fft_spectrum": "Drag to resize spectrum height",
   "ui.tt.resume_all_paused_scans": "Hervat alle gepauzeerde scans",
   "ui.tt.resume_daw_scan": "Hervat de DAW-scan",
   "ui.tt.resume_midi_scan": "Hervat de MIDI-scan",
