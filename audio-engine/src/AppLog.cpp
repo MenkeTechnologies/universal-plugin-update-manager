@@ -13,6 +13,8 @@ namespace {
 std::mutex g_engineLogMutex;
 juce::String g_engineLogPath;
 bool g_mirrorEngineLogToStderr = false;
+/** Set in `initAppLogFromEnv` when a log path is resolved — parent dir is the Tauri app data folder. */
+juce::File g_appDataDirFromLogEnv;
 
 /** Same cap as host `write_app_log_line` (`src-tauri/src/lib.rs`). */
 static constexpr juce::int64 kMaxEngineLogBytes = 5 * 1024 * 1024;
@@ -61,6 +63,7 @@ static juce::String utcTimestampString()
 
 void initAppLogFromEnv()
 {
+    g_appDataDirFromLogEnv = juce::File();
     juce::String p = juce::SystemStats::getEnvironmentVariable("AUDIO_HAXOR_ENGINE_LOG", {}).trim();
     if (p.isEmpty())
         p = juce::SystemStats::getEnvironmentVariable("AUDIO_HAXOR_APP_LOG", {}).trim();
@@ -69,7 +72,21 @@ void initAppLogFromEnv()
     g_mirrorEngineLogToStderr = (mirror != nullptr && mirror[0] != '\0');
 
     if (g_engineLogPath.isNotEmpty())
+    {
+        g_appDataDirFromLogEnv = juce::File(g_engineLogPath).getParentDirectory();
         rotateEngineLogIfNeeded(juce::File(g_engineLogPath));
+    }
+}
+
+juce::File appDataDirectoryForSidecar()
+{
+    if (g_appDataDirFromLogEnv.getFullPathName().isNotEmpty())
+        return g_appDataDirFromLogEnv;
+    juce::File dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                         .getChildFile("MenkeTechnologies")
+                         .getChildFile("audio-haxor");
+    (void) dir.createDirectory();
+    return dir;
 }
 
 void appLogLine(const juce::String& message)
