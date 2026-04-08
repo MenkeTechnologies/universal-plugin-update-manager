@@ -7420,14 +7420,10 @@ DROP TABLE _pl_refresh_paths;"#;
         let conn = self.read_conn();
         let mut stats = Vec::new();
 
-        // Analysis caches (columns on audio_samples — library rows only)
-        let total_samples: u64 = conn
-            .query_row(
-                &format!("SELECT COUNT(*) FROM audio_samples WHERE {AUDIO_LIBRARY_IDS}"),
-                [],
-                |r| r.get::<_, i64>(0).map(|v| v as u64),
-            )
-            .unwrap_or(0);
+        // Analysis caches (columns on audio_samples — library rows only).
+        // `total` stays 0 so Settings → Database Caches shows a plain row count (like KV caches),
+        // not "cached / entire library", which misread the Items column as cache capacity.
+        // Size: Key uses UTF-8 payload length; BPM/LUFS use an 8-byte float payload estimate.
         for (label, col, key) in [
             ("BPM", "bpm", "bpm"),
             ("Key", "key_name", "key"),
@@ -7439,12 +7435,24 @@ DROP TABLE _pl_refresh_paths;"#;
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
+            let size_bytes: u64 = if key == "key" {
+                conn.query_row(
+                    &format!(
+                        "SELECT COALESCE(SUM(LENGTH(key_name)), 0) FROM audio_samples WHERE key_name IS NOT NULL AND ({AUDIO_LIBRARY_IDS})"
+                    ),
+                    [],
+                    |r| r.get::<_, i64>(0).map(|v| v as u64),
+                )
+                .unwrap_or(0)
+            } else {
+                count.saturating_mul(8)
+            };
             stats.push(CacheStat {
                 key: key.into(),
                 label: label.into(),
                 count,
-                total: total_samples,
-                size_bytes: count * 8,
+                total: 0,
+                size_bytes,
             });
         }
 
@@ -8079,6 +8087,25 @@ mod tests {
         assert_eq!(p.offset, 0);
         assert_eq!(p.limit, 25);
         assert_eq!(p.sort_key, "name");
+    }
+
+    #[test]
+    fn cache_stats_analysis_rows_use_count_only_not_library_total() {
+        let db = test_db();
+        let samples = vec![sample("a.wav", "/a.wav", "WAV", 100)];
+        db.save_scan("s1", "2024-01-01T00:00:00", 1, 100, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &samples).unwrap();
+        db.update_lufs("/a.wav", Some(-12.0)).unwrap();
+        let stats = db.cache_stats().unwrap();
+        let bpm = stats.iter().find(|s| s.key == "bpm").unwrap();
+        let key = stats.iter().find(|s| s.key == "key").unwrap();
+        let lufs = stats.iter().find(|s| s.key == "lufs").unwrap();
+        assert_eq!(bpm.total, 0, "BPM row must not use library row count as Items denominator");
+        assert_eq!(key.total, 0);
+        assert_eq!(lufs.total, 0);
+        assert_eq!(lufs.count, 1);
+        assert_eq!(lufs.size_bytes, 8);
     }
 
     fn test_db() -> Database {
