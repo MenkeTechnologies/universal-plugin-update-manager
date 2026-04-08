@@ -1465,7 +1465,6 @@ function refreshSettingsUI() {
     const pruneKeepValEl = document.getElementById('settingPruneOldScansKeepValue');
     if (pruneKeepEl) {
         pruneKeepEl.value = String(pruneKeepNum);
-        pruneKeepEl.disabled = !pruneOn;
         if (pruneKeepValEl) pruneKeepValEl.textContent = String(pruneKeepNum);
     }
 
