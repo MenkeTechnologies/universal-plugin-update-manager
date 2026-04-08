@@ -403,6 +403,8 @@ between plugins. You can stop it anytime with the Stop button.
 
 ## // PROJECT ARCHITECTURE //
 
+**i18n (CI):** Top-level keys in every `i18n/app_i18n_*.json` must stay lexicographically sorted (`test/i18n-catalog-files.test.js`). User-visible toasts in `frontend/js` must go through `toastFmt('toast.*')`, not a raw English string as the first argument to `showToast` (`test/i18n-no-raw-showtoast.test.js`).
+
 ```
 Cargo.toml (repo root) -- Cargo workspace: member `src-tauri` (`audio-haxor` app). **AudioEngine** (`audio-engine` binary) is a **C++/JUCE** CMake target (not a Cargo crate); `audio-engine/README.md` + `scripts/build-audio-engine.mjs` build it into `target/debug|release/audio-engine`. Shared `target/` at repo root. Locale JSON must use the **same `{placeholder}` names** as English for `appFmt`; `scripts/sync_i18n_placeholders_from_en.py` copies English strings for any key that drifts (run after bulk locale edits if `cargo test` seed tests fail).
 

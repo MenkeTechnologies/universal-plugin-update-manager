@@ -1077,20 +1077,20 @@ async function aeWipeAndRescan() {
     const inv = getAeAudioEngineInvoke();
     if (!inv) { aeNotifyNoAudioEngineIpc(); return; }
     try {
-        if (typeof showToast === 'function')
-            showToast('Wiping plugin cache and starting fresh scan\u2026', 3000, 'info');
+        if (typeof showToast === 'function' && typeof toastFmt === 'function')
+            showToast(toastFmt('toast.ae_plugin_rescan_wiping'), 3000, 'info');
         const timeoutEl = document.getElementById('aeScanTimeout');
         const timeoutSec = timeoutEl ? Math.max(5, Math.min(3600, parseInt(timeoutEl.value, 10) || 30)) : 30;
         const r = await inv({cmd: 'plugin_rescan', timeout_sec: timeoutSec});
         throwIfAeNotOk(r, 'plugin_rescan failed');
         const chain = await fetchPluginChainUntilSettled(inv, undefined, ++aePluginChainPollGeneration);
         fillAePluginSection(chain);
-        if (typeof showToast === 'function')
-            showToast('Plugin rescan complete', 3000, 'success');
+        if (typeof showToast === 'function' && typeof toastFmt === 'function')
+            showToast(toastFmt('toast.ae_plugin_rescan_complete'), 3000, 'success');
     } catch (e) {
         const err = e && e.message ? String(e.message) : String(e);
-        if (typeof showToast === 'function')
-            showToast('Rescan failed: ' + err, 5000, 'error');
+        if (typeof showToast === 'function' && typeof toastFmt === 'function')
+            showToast(toastFmt('toast.ae_plugin_rescan_failed', {err}), 5000, 'error');
     }
 }
 
@@ -1711,7 +1711,8 @@ async function applyAudioEngineDevice() {
     const bufOut = document.getElementById('aeBufferFramesOutput');
     const inv = getAeAudioEngineInvoke();
     if (!inv || !selectEl) {
-        if (typeof showToast === 'function') showToast('DEBUG: device inv=' + !!inv + ' selectEl=' + !!selectEl, 3000, 'error');
+        if (typeof showToast === 'function' && typeof toastFmt === 'function')
+            showToast(toastFmt('toast.ae_debug_device_missing', {inv: !!inv, selectEl: !!selectEl}), 3000, 'error');
         if (!inv) aeNotifyNoAudioEngineIpc();
         return;
     }
