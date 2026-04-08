@@ -3038,6 +3038,52 @@
             font-size: 9px;
         }
 
+        /*
+         * Disk bar colors: data-kind + stylesheet — not inline `background: var(--…)`.
+         * WKWebView (release) often ignores CSS variables on innerHTML-injected inline styles.
+         */
+        .disk-usage .disk-segment[data-kind="cyan"],
+        .disk-usage .disk-legend-dot[data-kind="cyan"] {
+            background: var(--cyan);
+            box-shadow: 0 0 14px var(--cyan-glow);
+        }
+
+        .disk-usage .disk-segment[data-kind="accent"],
+        .disk-usage .disk-legend-dot[data-kind="accent"] {
+            background: var(--accent);
+            box-shadow: 0 0 14px var(--accent-glow);
+        }
+
+        .disk-usage .disk-segment[data-kind="green"],
+        .disk-usage .disk-legend-dot[data-kind="green"] {
+            background: var(--green);
+            box-shadow: 0 0 12px rgba(57, 255, 20, 0.35);
+        }
+
+        .disk-usage .disk-segment[data-kind="yellow"],
+        .disk-usage .disk-legend-dot[data-kind="yellow"] {
+            background: var(--yellow);
+            box-shadow: 0 0 12px var(--yellow-glow);
+        }
+
+        .disk-usage .disk-segment[data-kind="magenta"],
+        .disk-usage .disk-legend-dot[data-kind="magenta"] {
+            background: var(--magenta);
+            box-shadow: 0 0 12px var(--magenta-glow);
+        }
+
+        .disk-usage .disk-segment[data-kind="orange"],
+        .disk-usage .disk-legend-dot[data-kind="orange"] {
+            background: var(--orange);
+            box-shadow: 0 0 12px var(--orange-bg);
+        }
+
+        .disk-usage .disk-segment[data-kind="muted"],
+        .disk-usage .disk-legend-dot[data-kind="muted"] {
+            background: var(--text-dim);
+            box-shadow: 0 0 8px rgba(122, 139, 168, 0.25);
+        }
+
         /* Batch selection */
         /* Batch selection */
         .col-cb {
@@ -10546,7 +10592,7 @@
 <script src="js/kvr.js?v=83276"></script>
 <script src="js/audio.js?v=83276"></script>
 <script src="js/daw.js?v=83276"></script>
-<script src="js/disk-usage.js?v=83277"></script>
+<script src="js/disk-usage.js?v=83278"></script>
 <script src="js/presets.js?v=83276"></script>
 <script src="js/batch-select.js?v=83276"></script>
 <script src="js/native-file-drag.js?v=83276"></script>

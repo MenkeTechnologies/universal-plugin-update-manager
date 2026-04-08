@@ -1,6 +1,24 @@
 // ── Disk Usage Visualization ──
 // Renders horizontal stacked bar charts showing space breakdown by format/type
 
+/** Label → hue key; colors from `index.html` `.disk-usage [data-kind]` (not inline var() — WKWebView). */
+const DISK_LABEL_KIND = {
+    WAV: 'cyan', MP3: 'accent', AIFF: 'green', AIF: 'green', FLAC: 'yellow', OGG: 'magenta',
+    M4A: 'orange', AAC: 'orange',
+    VST2: 'cyan', VST3: 'accent', AU: 'green', CLAP: 'orange',
+    'Ableton Live': 'cyan', 'Logic Pro': 'green', 'FL Studio': 'orange', REAPER: 'yellow',
+    Cubase: 'accent', Nuendo: 'accent', 'Pro Tools': 'magenta', 'Bitwig Studio': 'accent',
+    'Studio One': 'orange', Reason: 'magenta', GarageBand: 'green', Audacity: 'cyan',
+    Other: 'muted',
+    FXP: 'cyan', FXB: 'accent', VSTPRESET: 'green', AUPRESET: 'yellow',
+    ADG: 'orange', ADV: 'magenta', NKI: 'cyan', H2P: 'accent', SYX: 'green',
+};
+
+function diskLabelKind(label) {
+    const k = label != null ? String(label) : '';
+    return DISK_LABEL_KIND[k] || 'muted';
+}
+
 function renderDiskUsageBar(containerId, data, totalBytes) {
     const el = document.getElementById(containerId);
     if (!el) return;
@@ -10,39 +28,22 @@ function renderDiskUsageBar(containerId, data, totalBytes) {
     }
     el.style.display = '';
 
-    const colors = {
-        'WAV': 'var(--cyan)', 'MP3': 'var(--accent)', 'AIFF': 'var(--green)',
-        'AIF': 'var(--green)', 'FLAC': 'var(--yellow)', 'OGG': 'var(--magenta)',
-        'M4A': 'var(--orange)', 'AAC': 'var(--orange)',
-        'VST2': 'var(--cyan)', 'VST3': 'var(--accent)', 'AU': 'var(--green)', 'CLAP': 'var(--orange)',
-        'Ableton Live': 'var(--cyan)', 'Logic Pro': 'var(--green)',
-        'FL Studio': 'var(--orange)', 'REAPER': 'var(--yellow)',
-        'Cubase': 'var(--accent)', 'Pro Tools': 'var(--magenta)',
-        'Other': 'var(--text-muted)',
-        // Preset formats (tab disk bar — same component as DAW/plugins/samples)
-        'FXP': 'var(--cyan)', 'FXB': 'var(--accent)',
-        'VSTPRESET': 'var(--green)', 'AUPRESET': 'var(--yellow)',
-        'ADG': 'var(--orange)', 'ADV': 'var(--magenta)',
-        'NKI': 'var(--cyan)', 'H2P': 'var(--accent)', 'SYX': 'var(--green)',
-    };
-    const defaultColor = 'var(--text-dim)';
-
     // Sort by size descending
     data.sort((a, b) => b.bytes - a.bytes);
 
     /** Release WKWebView often leaves width:0→% transitions unpainted; set final % inline (see utils.js switchTab settings reflow note). */
     const segments = data.map((d) => {
         const pct = ((d.bytes / totalBytes) * 100).toFixed(1);
-        const color = colors[d.label] || defaultColor;
-        return `<div class="disk-segment" style="width:${pct}%;min-width:2px;background:${color};flex-shrink:0;"
+        const kind = diskLabelKind(d.label);
+        return `<div class="disk-segment" data-kind="${kind}" style="width:${pct}%;min-width:2px;flex-shrink:0;"
       title="${d.label}: ${d.sizeStr} (${pct}%)"></div>`;
     }).join('');
 
     const legend = data.filter(d => d.bytes > 0).map(d => {
-        const color = colors[d.label] || defaultColor;
+        const kind = diskLabelKind(d.label);
         const pct = ((d.bytes / totalBytes) * 100).toFixed(1);
         return `<span class="disk-legend-item">
-      <span class="disk-legend-dot" style="background: ${color};"></span>
+      <span class="disk-legend-dot" data-kind="${kind}"></span>
       ${d.label} <span class="disk-legend-size">${d.sizeStr} (${pct}%)</span>
     </span>`;
     }).join('');
