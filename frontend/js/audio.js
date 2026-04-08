@@ -1411,8 +1411,12 @@ function getPinnedEngineSpectrumAxis() {
     function applyFftCanvasSize() {
         resizeRaf = null;
         const br = parent.getBoundingClientRect();
-        const cw = Math.max(1, Math.round(br.width));
-        const ch = Math.max(1, Math.round(br.height));
+        let cw = Math.round(br.width);
+        let ch = Math.round(br.height);
+        if (cw < 2 || ch < 2) {
+            cw = Math.max(2, parent.clientWidth || parseInt(canvas.getAttribute('width'), 10) || 600);
+            ch = Math.max(2, parent.clientHeight || parseInt(canvas.getAttribute('height'), 10) || 48);
+        }
         if (canvas.width === cw && canvas.height === ch) return;
         canvas.width = cw;
         canvas.height = ch;
@@ -4977,6 +4981,7 @@ function updateMetaLine() {
         if ((canvas.width || 0) < 2 || (canvas.height || 0) < 2) {
             primeCanvasSize(canvas);
         }
+        ensureParametricEqCanvasMinBitmap(canvas);
         const w = canvas.width || 800;
         const h = canvas.height || 120;
         ctx.clearRect(0, 0, w, h);
@@ -5114,15 +5119,26 @@ function updateMetaLine() {
         if (!wrap) return;
         const br = wrap.getBoundingClientRect();
         /* Floor dimensions to avoid subpixel oscillation (ResizeObserver ↔ canvas bitmap ↔ layout creep). */
-        const w = Math.max(1, Math.floor(br.width > 1 ? br.width : wrap.clientWidth));
-        const h = Math.max(1, Math.floor(br.height > 1 ? br.height : wrap.clientHeight));
-        if (w > 0 && h > 0) {
-            const dw = Math.abs(w - canvas.width);
-            const dh = Math.abs(h - canvas.height);
-            if (dw > 1 || dh > 1) {
-                canvas.width = w;
-                canvas.height = h;
-            }
+        let w = Math.floor(br.width > 1 ? br.width : wrap.clientWidth);
+        let h = Math.floor(br.height > 1 ? br.height : wrap.clientHeight);
+        /* Never set a 1×1 bitmap: WKWebView can report 0×0 before layout; scaling that up looks like a blank black panel. */
+        if (w < 2 || h < 2) return;
+        const dw = Math.abs(w - canvas.width);
+        const dh = Math.abs(h - canvas.height);
+        if (dw > 1 || dh > 1) {
+            canvas.width = w;
+            canvas.height = h;
+        }
+    }
+
+    /** When layout has not given the wrap real pixels yet, use HTML width/height attrs so the EQ is drawable. */
+    function ensureParametricEqCanvasMinBitmap(canvas) {
+        if (!canvas) return;
+        const attrW = parseInt(canvas.getAttribute('width'), 10) || 800;
+        const attrH = parseInt(canvas.getAttribute('height'), 10) || 120;
+        if ((canvas.width || 0) < 2 || (canvas.height || 0) < 2) {
+            canvas.width = Math.max(2, attrW);
+            canvas.height = Math.max(2, attrH);
         }
     }
 
