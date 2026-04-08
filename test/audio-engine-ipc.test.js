@@ -1,5 +1,7 @@
 /**
  * Integration tests: spawn built `audio-engine`, one JSON line per stdin line, assert stdout.
+ * Covers the full stdin JSON command surface (all `cmd` values), previews, device I/O with
+ * graceful handling when no hardware is present, insert-chain validation, and plugin cache.
  * Requires `audio-engine-artifacts/<debug|release>/audio-engine` (or legacy `target/…`, or `AUDIO_ENGINE_TEST_BIN`).
  * On Linux CI, run under `xvfb-run -a` (see `.github/workflows/ci.yml`) — JUCE needs a display.
  */
@@ -151,6 +153,48 @@ function pcm16WavMono(sampleRate, numSamples) {
   return buf;
 }
 
+/** Stereo PCM 16-bit LE WAV (silence), interleaved L/R. */
+function pcm16WavStereo(sampleRate, numFrames) {
+  const bitsPerSample = 16;
+  const numChannels = 2;
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = numFrames * blockAlign;
+  const buf = Buffer.alloc(44 + dataSize);
+  buf.write('RIFF', 0);
+  buf.writeUInt32LE(36 + dataSize, 4);
+  buf.write('WAVE', 8);
+  buf.write('fmt ', 12);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20);
+  buf.writeUInt16LE(numChannels, 22);
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(byteRate, 28);
+  buf.writeUInt16LE(blockAlign, 32);
+  buf.writeUInt16LE(bitsPerSample, 34);
+  buf.write('data', 36);
+  buf.writeUInt32LE(dataSize, 40);
+  let off = 44;
+  for (let i = 0; i < numFrames; i += 1) {
+    buf.writeInt16LE(0, off);
+    buf.writeInt16LE(0, off + 2);
+    off += 4;
+  }
+  return buf;
+}
+
+/**
+ * @param {{ ok?: boolean, error?: string }} j
+ * @param {'output' | 'input'} kind
+ */
+function assertOkOrNoAudioDevice(j, kind) {
+  if (j.ok) {
+    return;
+  }
+  const re = kind === 'output' ? /no output device/i : /no input device/i;
+  assert.match(String(j.error || ''), re);
+}
+
 if (!bin) {
   describe.skip('audio-engine IPC (no binary — build with node scripts/build-audio-engine.mjs)', () => {
     it('skipped', () => {});
@@ -166,6 +210,8 @@ if (!bin) {
     let tmpWav;
     /** Very short PCM WAV (4 mono samples) — spectrogram path needs ≥8 samples. */
     let tmpWavTiny;
+    /** Stereo PCM WAV for multi-channel decode checks. */
+    let tmpWavStereo;
 
     before(() => {
       tmpEmptyFile = path.join(os.tmpdir(), `audio-haxor-ipc-empty-${process.pid}.bin`);
@@ -175,6 +221,8 @@ if (!bin) {
       fs.writeFileSync(tmpWav, pcm16WavMono(44100, 8192));
       tmpWavTiny = path.join(os.tmpdir(), `audio-haxor-ipc-tiny-${process.pid}.wav`);
       fs.writeFileSync(tmpWavTiny, pcm16WavMono(44100, 4));
+      tmpWavStereo = path.join(os.tmpdir(), `audio-haxor-ipc-stereo-${process.pid}.wav`);
+      fs.writeFileSync(tmpWavStereo, pcm16WavStereo(44100, 2048));
     });
 
     after(() => {
@@ -195,6 +243,11 @@ if (!bin) {
       }
       try {
         fs.unlinkSync(tmpWavTiny);
+      } catch {
+        /* ignore */
+      }
+      try {
+        fs.unlinkSync(tmpWavStereo);
       } catch {
         /* ignore */
       }
@@ -815,7 +868,7 @@ if (!bin) {
       assert.match(String(j.error || ''), /unknown device_id/i);
     });
 
-    it('plugin_rescan returns ok (cache wipe, no scan worker until plugin_chain)', async () => {
+    it('plugin_rescan returns ok (cache wipe, phase reset)', async () => {
       const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'plugin_rescan' })], {
         timeoutMs: 90_000,
       });
@@ -935,6 +988,218 @@ if (!bin) {
       const j = JSON.parse(outLines[0]);
       assert.equal(j.ok, false);
       assert.match(String(j.error || ''), /empty segment/i);
+    });
+
+    it('waveform_preview peaks contain min and max per column', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'waveform_preview', path: tmpWav, width_px: 32 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      const p0 = j.peaks[0];
+      assert.ok(p0 && typeof p0 === 'object');
+      assert.ok(typeof p0.min === 'number');
+      assert.ok(typeof p0.max === 'number');
+    });
+
+    it('waveform_preview reports channels=2 for stereo WAV', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'waveform_preview', path: tmpWavStereo, width_px: 32 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.channels, 2);
+    });
+
+    it('spectrogram_preview includes db_min, db_max, hop', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'spectrogram_preview', path: tmpWav, width_px: 16, height_px: 16, fft_order: 8 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.db_min, -100);
+      assert.equal(j.db_max, 0);
+      assert.ok(typeof j.hop === 'number' && j.hop >= 1);
+    });
+
+    it('playback_set_speed omitted defaults to 1', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_speed' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.speed, 1);
+    });
+
+    it('playback_open_insert_editor without chain returns invalid insert slot', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_open_insert_editor', slot: 0 })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /invalid insert slot/i);
+    });
+
+    it('playback_close_insert_editor without chain returns invalid insert slot', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_close_insert_editor', slot: 0 })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /invalid insert slot/i);
+    });
+
+    it('start_output_stream rejects unknown device_id', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'start_output_stream', device_id: '__ipc_bad_out__' })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown device_id/i);
+    });
+
+    it('start_input_stream rejects unknown device_id', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'start_input_stream', device_id: '__ipc_bad_in__' })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown device_id/i);
+    });
+
+    it('start_output_stream default device succeeds or reports no output device', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'start_output_stream' })], {
+        timeoutMs: 120_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      if (j.ok) {
+        assert.ok(typeof j.device_name === 'string');
+        assert.equal(typeof j.sample_rate_hz, 'number');
+      } else {
+        assertOkOrNoAudioDevice(j, 'output');
+      }
+    });
+
+    it('start_input_stream default device succeeds or reports no input device', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'start_input_stream' })], {
+        timeoutMs: 120_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      if (j.ok) {
+        assert.ok(typeof j.device_name === 'string');
+        assert.equal(typeof j.sample_rate_hz, 'number');
+      } else {
+        assertOkOrNoAudioDevice(j, 'input');
+      }
+    });
+
+    it('start_output_stream then stop_output_stream sets was_running when open succeeded', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'start_output_stream' }), jl({ cmd: 'stop_output_stream' })],
+        { timeoutMs: 120_000 },
+      );
+      const start = JSON.parse(outLines[0]);
+      const stop = JSON.parse(outLines[1]);
+      if (!start.ok) {
+        assertOkOrNoAudioDevice(start, 'output');
+        return;
+      }
+      assert.equal(stop.ok, true);
+      assert.equal(stop.was_running, true);
+    });
+
+    it('start_input_stream then stop_input_stream sets was_running when open succeeded', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'start_input_stream' }), jl({ cmd: 'stop_input_stream' })],
+        { timeoutMs: 120_000 },
+      );
+      const start = JSON.parse(outLines[0]);
+      const stop = JSON.parse(outLines[1]);
+      if (!start.ok) {
+        assertOkOrNoAudioDevice(start, 'input');
+        return;
+      }
+      assert.equal(stop.ok, true);
+      assert.equal(stop.was_running, true);
+    });
+
+    it('list_audio_device_types returns ok with types and current', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'list_audio_device_types' })], {
+        timeoutMs: 120_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.ok(Array.isArray(j.types));
+      assert.ok(typeof j.current === 'string');
+    });
+
+    it('set_audio_device_type with listed driver name returns ok', async () => {
+      const { outLines: first } = await runEngineExchange(bin, [jl({ cmd: 'list_audio_device_types' })], {
+        timeoutMs: 120_000,
+      });
+      const list = JSON.parse(first[0]);
+      assert.equal(list.ok, true);
+      assert.ok(list.types.length > 0, 'expected at least one audio driver type');
+      const typeName = list.types[0];
+      assert.ok(typeof typeName === 'string' && typeName.length > 0);
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'set_audio_device_type', type: typeName })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.type, typeName);
+    });
+
+    it('playback_load then playback_status includes spectrum metadata keys when loaded', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'playback_load', path: tmpWav }), jl({ cmd: 'playback_status' })],
+        { timeoutMs: 90_000 },
+      );
+      const st = JSON.parse(outLines[1]);
+      assert.equal(st.ok, true);
+      assert.equal(st.loaded, true);
+      assert.ok('spectrum_fft_size' in st);
+      assert.ok('spectrum_bins' in st);
+      assert.ok('spectrum_sr_hz' in st);
+    });
+
+    it('plugin_chain returns ok with api_version 2 (may be slow on cold cache)', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'plugin_chain' })], {
+        timeoutMs: 120_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.api_version, 2);
+      assert.ok(typeof j.phase === 'string');
+    });
+
+    it('engine_state and ping in one session', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'engine_state' }), jl({ cmd: 'ping' })],
+        { timeoutMs: 90_000 },
+      );
+      const a = JSON.parse(outLines[0]);
+      const b = JSON.parse(outLines[1]);
+      assert.equal(a.ok, true);
+      assert.equal(a.version, cmakeVersion);
+      assert.equal(b.ok, true);
+      assert.equal(b.version, cmakeVersion);
     });
 
     it('mixed ping + preview validation in one session', async () => {

@@ -540,6 +540,20 @@ mod tests {
     }
 
     #[test]
+    fn normalize_ipc_request_payload_does_not_unwrap_when_cmd_is_null() {
+        let v = json!({ "cmd": null, "request": { "cmd": "ping" } });
+        let n = normalize_ipc_request_payload(&v);
+        assert_eq!(n, v);
+    }
+
+    #[test]
+    fn normalize_ipc_request_payload_unwraps_when_only_request_has_cmd() {
+        let v = json!({ "request": { "cmd": "playback_status" } });
+        let n = normalize_ipc_request_payload(&v);
+        assert_eq!(n, json!({ "cmd": "playback_status" }));
+    }
+
+    #[test]
     fn read_engine_json_line_skips_leading_warning_on_stdout() {
         let data = b"Warning: thread locking is not implemented\n{\"ok\":true,\"x\":1}\n";
         let mut r = BufReader::new(Cursor::new(&data[..]));
