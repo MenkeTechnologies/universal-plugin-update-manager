@@ -5,6 +5,9 @@
 
 namespace audio_haxor {
 
+/** Out-of-process single-plugin scan (`--plugin-scan-one`). Returns process exit code (0 = success). */
+int runPluginScanOneChild(int argc, char* argv[]);
+
 class Engine
 {
 public:

@@ -6,6 +6,7 @@
 #include <bit>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <deque>
 #include <functional>
 #include <future>
@@ -24,6 +25,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
+#include <juce_core/juce_core.h>
 
 namespace audio_haxor {
 namespace {
@@ -840,6 +842,98 @@ public:
 
 } // namespace
 
+enum class PluginScanOopResult
+{
+    Ok,
+    Timeout,
+    ChildFailed,
+    StartFailed
+};
+
+static int pluginScanTimeoutMsFromEnv()
+{
+    const char* e = std::getenv("AUDIO_HAXOR_PLUGIN_SCAN_TIMEOUT_SEC");
+    if (e == nullptr || e[0] == '\0')
+        return 120 * 1000;
+    char* end = nullptr;
+    const long sec = std::strtol(e, &end, 10);
+    if (end == e || sec <= 0)
+        return 120 * 1000;
+    return (int) juce::jlimit(5L, 3600L, sec) * 1000;
+}
+
+static PluginScanOopResult spawnPluginScanChildMerge(juce::KnownPluginList& list, const juce::String& formatLabel,
+                                                     const juce::String& fileId, int timeoutMs)
+{
+    persistKnownPluginListCacheSafe(list);
+    const juce::File outFile =
+        juce::File::getSpecialLocation(juce::File::tempDirectory)
+            .getChildFile("ahx_ps_" + juce::Uuid().toString() + ".xml");
+
+    const juce::File exe = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    juce::StringArray args;
+    args.add(exe.getFullPathName());
+    args.add("--plugin-scan-one");
+    args.add(formatLabel);
+    args.add(juce::Base64::toBase64(fileId.toRawUTF8(), fileId.getNumBytesAsUTF8()));
+    args.add(juce::Base64::toBase64(outFile.getFullPathName().toRawUTF8(), outFile.getFullPathName().getNumBytesAsUTF8()));
+
+    juce::ChildProcess child;
+    if (!child.start(args))
+    {
+        appLogLine("plugin scan: OOP start_failed file=\"" + fileId + "\"");
+        return PluginScanOopResult::StartFailed;
+    }
+
+    if (!child.waitForProcessToFinish(timeoutMs))
+    {
+        child.kill();
+        appLogLine("plugin scan: TIMEOUT_KILL timeout_ms=" + juce::String(timeoutMs) + " file=\"" + fileId + "\"");
+        (void) outFile.deleteFile();
+        return PluginScanOopResult::Timeout;
+    }
+
+    const int exitCode = (int) child.getExitCode();
+    if (exitCode != 0)
+    {
+        appLogLine("plugin scan: OOP child_exit=" + juce::String(exitCode) + " file=\"" + fileId + "\"");
+        (void) outFile.deleteFile();
+        return PluginScanOopResult::ChildFailed;
+    }
+
+    if (!outFile.existsAsFile())
+    {
+        appLogLine("plugin scan: OOP missing_output file=\"" + fileId + "\"");
+        return PluginScanOopResult::ChildFailed;
+    }
+
+    juce::XmlDocument doc(outFile);
+    std::unique_ptr<juce::XmlElement> root = doc.getDocumentElement();
+    (void) outFile.deleteFile();
+    if (root == nullptr)
+    {
+        appLogLine("plugin scan: OOP bad_xml file=\"" + fileId + "\"");
+        return PluginScanOopResult::ChildFailed;
+    }
+
+    try
+    {
+        list.recreateFromXml(*root);
+    }
+    catch (const std::exception& e)
+    {
+        appLogLine("plugin scan: OOP merge_xml failed: " + juce::String(e.what()));
+        return PluginScanOopResult::ChildFailed;
+    }
+    catch (...)
+    {
+        appLogLine("plugin scan: OOP merge_xml failed (non-std)");
+        return PluginScanOopResult::ChildFailed;
+    }
+
+    return PluginScanOopResult::Ok;
+}
+
 struct Engine::Impl
 {
     /** Serializes `waveform_preview` / `spectrogram_preview` decode (not the main `mutex`). */
@@ -1055,12 +1149,10 @@ struct Engine::Impl
         {
         juce::StringArray files = buildOrderedPluginScanFiles(format, dirs, true, deadMans);
         files = filterOutSkippedPluginIdentifiers(files, pluginScanSkipFilePath());
-        juce::PluginDirectoryScanner scanner(list, format, dirs, true, deadMans, false);
-        scanner.setFilesOrIdentifiersToScan(files);
         const int n = files.size();
-        juce::String name;
         int processed = 0;
-        /* Same process as JUCE output: plugin scan can peg CPU / disk and starve the audio callback. */
+        const int timeoutMs = pluginScanTimeoutMsFromEnv();
+        /* Each module is scanned in a separate process so a hang or crash cannot block the main engine. */
         auto yieldIfPlayback = [this]() {
             if (outputRunning && playbackMode)
                 std::this_thread::sleep_for(std::chrono::milliseconds(2));
@@ -1107,41 +1199,31 @@ struct Engine::Impl
             catch (...)
             {
             }
-            bool more = false;
-            try
+
+            const PluginScanOopResult oop = spawnPluginScanChildMerge(list, formatLabel, fileId, timeoutMs);
+            if (oop == PluginScanOopResult::Ok)
             {
-                more = scanner.scanNextFile(true, name);
-            }
-            catch (const std::exception& e)
-            {
-                // `scanNextFile` decrements the scanner index before loading; on throw we must advance
-                // our progress and blacklist/skip or we desync from JUCE and spin on the same slot.
-                appendPluginScanSkipAndBlacklistSafe(list, fileId);
-                appLogLine("plugin scan: FAIL_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
-                           + "\" what=\"" + juce::String(e.what()) + "\"");
                 processed++;
                 pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
                 persistKnownPluginListCacheSafe(list);
                 yieldIfPlayback();
                 continue;
             }
-            catch (...)
-            {
-                appendPluginScanSkipAndBlacklistSafe(list, fileId);
-                appLogLine("plugin scan: FAIL_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
-                           + "\" (non-std)");
-                processed++;
-                pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
-                persistKnownPluginListCacheSafe(list);
-                yieldIfPlayback();
-                continue;
-            }
+
+            appendPluginScanSkipAndBlacklistSafe(list, fileId);
+            if (oop == PluginScanOopResult::Timeout)
+                appLogLine("plugin scan: TIMEOUT_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
+                           + "\"");
+            else if (oop == PluginScanOopResult::StartFailed)
+                appLogLine("plugin scan: OOP_START_FAIL_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
+                           + "\"");
+            else
+                appLogLine("plugin scan: OOP_FAIL_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
+                           + "\"");
             processed++;
             pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
             persistKnownPluginListCacheSafe(list);
             yieldIfPlayback();
-            if (!more)
-                break;
         }
         }
         catch (const std::exception& e)
@@ -2310,6 +2392,81 @@ void Engine::shutdownEditors()
 {
     std::lock_guard<std::mutex> lock(impl->mutex);
     impl->closeAllInsertEditorsLocked();
+}
+
+int runPluginScanOneChild(int argc, char* argv[])
+{
+    juce::ignoreUnused(argc);
+    try
+    {
+        const juce::String formatLabel = argv[2];
+        juce::MemoryOutputStream mos;
+        if (!juce::Base64::convertFromBase64(mos, argv[3]))
+            return 30;
+        const juce::String fileId = mos.toString();
+        mos.reset();
+        if (!juce::Base64::convertFromBase64(mos, argv[4]))
+            return 31;
+        const juce::File outFile(mos.toString());
+
+        juce::KnownPluginList list;
+        const juce::File cacheFile = knownPluginListCacheFilePath();
+        if (cacheFile.existsAsFile())
+        {
+            juce::XmlDocument doc(cacheFile);
+            if (std::unique_ptr<juce::XmlElement> root = doc.getDocumentElement())
+                list.recreateFromXml(*root);
+        }
+
+        juce::VST3PluginFormat vst3;
+#if JUCE_MAC
+        juce::AudioUnitPluginFormat auFormat;
+#endif
+        juce::AudioPluginFormat* fmt = nullptr;
+        juce::FileSearchPath dirs;
+        if (formatLabel == "VST3")
+        {
+            fmt = &vst3;
+            dirs = vst3.getDefaultLocationsToSearch();
+        }
+#if JUCE_MAC
+        else if (formatLabel == "AU")
+        {
+            fmt = &auFormat;
+            dirs = auFormat.getDefaultLocationsToSearch();
+        }
+#endif
+        else
+            return 5;
+
+        const juce::File deadMans = deadMansPedalFilePath();
+        juce::StringArray single;
+        single.add(fileId);
+        juce::PluginDirectoryScanner scanner(list, *fmt, dirs, true, deadMans, false);
+        scanner.setFilesOrIdentifiersToScan(single);
+        juce::String name;
+        (void) scanner.scanNextFile(true, name);
+
+        if (auto xml = list.createXml())
+        {
+            (void) outFile.getParentDirectory().createDirectory();
+            if (!xml->writeTo(outFile, {}))
+                return 40;
+        }
+        else
+            return 41;
+        return 0;
+    }
+    catch (const std::exception& e)
+    {
+        appLogLine(juce::String("plugin-scan-one: exception ") + e.what());
+        return 1;
+    }
+    catch (...)
+    {
+        appLogLine("plugin-scan-one: exception (non-std)");
+        return 2;
+    }
 }
 
 } // namespace audio_haxor

@@ -3,6 +3,8 @@
 #include <string>
 #include <thread>
 
+#include <juce_core/juce_core.h>
+
 #include <juce_events/juce_events.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -69,8 +71,17 @@ static void runStdinJsonLoop(audio_haxor::Engine& engine)
     });
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+    if (argc >= 5 && juce::String(argv[1]) == "--plugin-scan-one")
+    {
+        audio_haxor::initAppLogFromEnv();
+        audio_haxor::installEngineCrashHandlers();
+        juce::ScopedJuceInitialiser_GUI juceInit;
+        audio_haxor::appLogLine(juce::String("plugin-scan-one child v") + AUDIO_ENGINE_VERSION_STRING);
+        return audio_haxor::runPluginScanOneChild(argc, argv);
+    }
+
     audio_haxor::initAppLogFromEnv();
     audio_haxor::startParentWatchdogFromEnv();
     audio_haxor::installEngineCrashHandlers();

@@ -77,6 +77,10 @@ pub struct Database {
     audio_library_total_cache: Mutex<Option<u64>>,
     /// Preset tab header: non-MIDI rows in library (`query_presets` / `preset_filter_stats`).
     preset_inventory_total_cache: Mutex<Option<u64>>,
+    /// `SELECT COUNT(*) FROM daw_library` — invalidated on DAW library writes.
+    daw_library_total_cache: Mutex<Option<u64>>,
+    /// `SELECT COUNT(*) FROM plugin_library` — invalidated on plugin library writes.
+    plugin_library_total_cache: Mutex<Option<u64>>,
 }
 
 /// Parameters for paginated audio sample queries.
@@ -940,6 +944,56 @@ impl Database {
         }
     }
 
+    fn daw_library_total_rows(&self, conn: &Connection) -> Result<u64, String> {
+        if let Ok(g) = self.daw_library_total_cache.lock() {
+            if let Some(n) = *g {
+                return Ok(n);
+            }
+        }
+        let n: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM daw_library",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        if let Ok(mut g) = self.daw_library_total_cache.lock() {
+            *g = Some(n);
+        }
+        Ok(n)
+    }
+
+    fn invalidate_daw_library_total_cache(&self) {
+        if let Ok(mut g) = self.daw_library_total_cache.lock() {
+            *g = None;
+        }
+    }
+
+    fn plugin_library_total_rows(&self, conn: &Connection) -> Result<u64, String> {
+        if let Ok(g) = self.plugin_library_total_cache.lock() {
+            if let Some(n) = *g {
+                return Ok(n);
+            }
+        }
+        let n: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM plugin_library",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        if let Ok(mut g) = self.plugin_library_total_cache.lock() {
+            *g = Some(n);
+        }
+        Ok(n)
+    }
+
+    fn invalidate_plugin_library_total_cache(&self) {
+        if let Ok(mut g) = self.plugin_library_total_cache.lock() {
+            *g = None;
+        }
+    }
+
     /// SQL bodies for [`sync_*_after_paths_refresh`] (standalone: wrapped in `BEGIN IMMEDIATE` by
     /// [`exec_sync_paths_refresh`]). For preset/midi/pdf flows already inside a
     /// [`Transaction`], use [`sync_preset_library_after_paths_refresh_tx`] /
@@ -1092,6 +1146,8 @@ DROP TABLE _pl_refresh_paths;"#;
             pdf_library_total_cache: Mutex::new(None),
             audio_library_total_cache: Mutex::new(None),
             preset_inventory_total_cache: Mutex::new(None),
+            daw_library_total_cache: Mutex::new(None),
+            plugin_library_total_cache: Mutex::new(None),
         };
         db.migrate()?;
         // At least one dedicated reader so `read_conn` never steals the primary handle (which
@@ -1167,6 +1223,10 @@ DROP TABLE _pl_refresh_paths;"#;
             ));
         } else {
             self.invalidate_preset_inventory_total_cache();
+            self.invalidate_midi_library_total_cache();
+            self.invalidate_pdf_library_total_cache();
+            self.invalidate_daw_library_total_cache();
+            self.invalidate_plugin_library_total_cache();
         }
     }
 
@@ -2437,9 +2497,10 @@ DROP TABLE _pl_refresh_paths;"#;
             None => conn
                 .query_row(
                     "SELECT COUNT(*) FROM (
-  SELECT 1 FROM daw_projects d
-  INNER JOIN daw_library lib ON d.id = lib.project_id
-  WHERE d.id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?1)
+  SELECT 1 FROM daw_projects_fts
+  INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
+  INNER JOIN daw_library lib ON lib.project_id = d.id
+  WHERE daw_projects_fts MATCH ?1
   LIMIT ?2)",
                     params![fts_match, cap],
                     |row| row.get::<_, i64>(0),
@@ -2448,9 +2509,10 @@ DROP TABLE _pl_refresh_paths;"#;
             Some(f) if f.trim().is_empty() || f == "all" => conn
                 .query_row(
                     "SELECT COUNT(*) FROM (
-  SELECT 1 FROM daw_projects d
-  INNER JOIN daw_library lib ON d.id = lib.project_id
-  WHERE d.id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?1)
+  SELECT 1 FROM daw_projects_fts
+  INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
+  INNER JOIN daw_library lib ON lib.project_id = d.id
+  WHERE daw_projects_fts MATCH ?1
   LIMIT ?2)",
                     params![fts_match, cap],
                     |row| row.get::<_, i64>(0),
@@ -2460,9 +2522,10 @@ DROP TABLE _pl_refresh_paths;"#;
                 let in_list = Self::in_list_sql(f);
                 let sql = format!(
                     "SELECT COUNT(*) FROM (
-  SELECT 1 FROM daw_projects d
-  INNER JOIN daw_library lib ON d.id = lib.project_id
-  WHERE d.id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?1)
+  SELECT 1 FROM daw_projects_fts
+  INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
+  INNER JOIN daw_library lib ON lib.project_id = d.id
+  WHERE daw_projects_fts MATCH ?1
   AND d.daw IN ({in_list})
   LIMIT ?2)"
                 );
@@ -2472,9 +2535,10 @@ DROP TABLE _pl_refresh_paths;"#;
             Some(f) => conn
                 .query_row(
                     "SELECT COUNT(*) FROM (
-  SELECT 1 FROM daw_projects d
-  INNER JOIN daw_library lib ON d.id = lib.project_id
-  WHERE d.id IN (SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH ?1)
+  SELECT 1 FROM daw_projects_fts
+  INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
+  INNER JOIN daw_library lib ON lib.project_id = d.id
+  WHERE daw_projects_fts MATCH ?1
   AND d.daw = ?2
   LIMIT ?3)",
                     params![fts_match, f, cap],
@@ -2965,11 +3029,7 @@ DROP TABLE _pl_refresh_paths;"#;
         let conn = self.read_conn();
         let library = scan_id.map(|s| s.is_empty()).unwrap_or(true);
         if library {
-            let project_count: u64 = conn
-                .query_row("SELECT COUNT(*) FROM daw_library", [], |row| {
-                    row.get::<_, i64>(0).map(|v| v as u64)
-                })
-                .unwrap_or(0);
+            let project_count: u64 = self.daw_library_total_rows(&conn)?;
             let total_bytes: u64 = conn
                 .query_row(
                     "SELECT COALESCE(SUM(s.size), 0) FROM daw_projects s INNER JOIN daw_library lib ON s.id = lib.project_id",
@@ -3313,11 +3373,7 @@ DROP TABLE _pl_refresh_paths;"#;
         limit: u64,
     ) -> Result<PluginQueryResult, String> {
         let conn = self.read_conn();
-        let total_unfiltered: u64 = conn
-            .query_row("SELECT COUNT(*) FROM plugin_library", [], |row| {
-                row.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
+        let total_unfiltered: u64 = self.plugin_library_total_rows(&conn)?;
         if total_unfiltered == 0 {
             return Ok(PluginQueryResult {
                 plugins: vec![],
@@ -3506,11 +3562,7 @@ DROP TABLE _pl_refresh_paths;"#;
         limit: u64,
     ) -> Result<DawQueryResult, String> {
         let conn = self.read_conn();
-        let total_unfiltered: u64 = conn
-            .query_row("SELECT COUNT(*) FROM daw_library", [], |row| {
-                row.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
+        let total_unfiltered: u64 = self.daw_library_total_rows(&conn)?;
         if total_unfiltered == 0 {
             return Ok(DawQueryResult {
                 projects: vec![],
@@ -3568,6 +3620,10 @@ DROP TABLE _pl_refresh_paths;"#;
         };
         let dir = if sort_asc { "ASC" } else { "DESC" };
 
+        // FTS substring search: ORDER BY column sorts the entire match set before LIMIT (stalls).
+        // Use bm25 + LIMIT like MIDI/PDF; frontend may re-rank with `searchScore`.
+        let use_fts_rank_page = fts_match.is_some();
+
         let (total_count, total_count_capped) = if fts_match.is_some() {
             let m = fts_match.as_ref().expect("fts");
             Self::daw_fts_bounded_count_library(&conn, m, daw_filter)?
@@ -3598,35 +3654,96 @@ DROP TABLE _pl_refresh_paths;"#;
             (n, false)
         };
 
-        let sql = format!(
-            "SELECT name, path, directory, format, daw, size, size_formatted, modified FROM daw_projects WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}",
-            bind_idx + 1
-        );
+        let sql = if use_fts_rank_page {
+            let mut w = String::from(
+                "SELECT d.name, d.path, d.directory, d.format, d.daw, d.size, d.size_formatted, d.modified
+                 FROM daw_projects_fts
+                 INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
+                 INNER JOIN daw_library lib ON lib.project_id = d.id
+                 WHERE daw_projects_fts MATCH ?1",
+            );
+            let mut next_ph = 2usize;
+            if let Some(f) = daw_filter {
+                if !f.is_empty() && f != "all" {
+                    if f.contains(',') {
+                        let vals: Vec<String> = f
+                            .split(',')
+                            .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
+                            .collect();
+                        w.push_str(&format!(" AND d.daw IN ({})", vals.join(",")));
+                    } else {
+                        w.push_str(&format!(" AND d.daw = ?{next_ph}"));
+                        next_ph += 1;
+                    }
+                }
+            }
+            let li = next_ph;
+            let oi = next_ph + 1;
+            w.push_str(&format!(
+                " ORDER BY bm25(daw_projects_fts) LIMIT ?{li} OFFSET ?{oi}"
+            ));
+            w
+        } else {
+            format!(
+                "SELECT name, path, directory, format, daw, size, size_formatted, modified FROM daw_projects WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}",
+                bind_idx + 1
+            )
+        };
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        if let Some(ref m) = fts_match {
+        if use_fts_rank_page {
+            let m = fts_match.as_ref().expect("fts");
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
             bi += 1;
+            if let Some(f) = daw_filter {
+                if !f.is_empty() && f != "all" && !f.contains(',') {
+                    stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                    bi += 1;
+                }
+            }
+            stmt.raw_bind_parameter(bi, limit as i64)
+                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi + 1, offset as i64)
+                .map_err(|e| e.to_string())?;
         } else if let Some(ref r) = regex_pat {
             stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
+            if let Some(f) = daw_filter {
+                if !f.is_empty() && f != "all" && !f.contains(',') {
+                    stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                    bi += 1;
+                }
+            }
+            stmt.raw_bind_parameter(bi, limit as i64)
+                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi + 1, offset as i64)
+                .map_err(|e| e.to_string())?;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat)
                 .map_err(|e| e.to_string())?;
             bi += 1;
-        }
-        if let Some(f) = daw_filter {
-            // Comma-separated filters are inlined into `daw IN (...)` by the SQL builder
-            // and have no placeholder to bind to — skip them here.
-            if !f.is_empty() && f != "all" && !f.contains(',') {
-                stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
-                bi += 1;
+            if let Some(f) = daw_filter {
+                if !f.is_empty() && f != "all" && !f.contains(',') {
+                    stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                    bi += 1;
+                }
             }
+            stmt.raw_bind_parameter(bi, limit as i64)
+                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi + 1, offset as i64)
+                .map_err(|e| e.to_string())?;
+        } else {
+            if let Some(f) = daw_filter {
+                if !f.is_empty() && f != "all" && !f.contains(',') {
+                    stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                    bi += 1;
+                }
+            }
+            stmt.raw_bind_parameter(bi, limit as i64)
+                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi + 1, offset as i64)
+                .map_err(|e| e.to_string())?;
         }
-        stmt.raw_bind_parameter(bi, limit as i64)
-            .map_err(|e| e.to_string())?;
-        stmt.raw_bind_parameter(bi + 1, offset as i64)
-            .map_err(|e| e.to_string())?;
 
         let mut projects = Vec::new();
         let mut rows = stmt.raw_query();
@@ -3904,6 +4021,7 @@ DROP TABLE _pl_refresh_paths;"#;
         }
         tx.commit().map_err(|e| e.to_string())?;
         Self::rebuild_plugin_library(&conn)?;
+        self.invalidate_plugin_library_total_cache();
         Ok(())
     }
 
@@ -3935,6 +4053,7 @@ DROP TABLE _pl_refresh_paths;"#;
         conn.execute("DELETE FROM plugins WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Self::sync_plugin_library_after_paths_refresh(&conn)?;
+        self.invalidate_plugin_library_total_cache();
         Ok(())
     }
 
@@ -3992,6 +4111,9 @@ DROP TABLE _pl_refresh_paths;"#;
             .map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())?;
+        if inserted > 0 {
+            self.invalidate_plugin_library_total_cache();
+        }
         Ok(inserted)
     }
 
@@ -4004,9 +4126,10 @@ DROP TABLE _pl_refresh_paths;"#;
         roots: &[String],
     ) -> Result<(), String> {
         let conn = self.read_conn();
-        let plugin_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM plugin_library", [], |r| r.get(0))
-            .unwrap_or(0);
+        let plugin_count: i64 = self
+            .plugin_library_total_rows(&conn)?
+            .try_into()
+            .unwrap_or(i64::MAX);
         let dirs_json = path_strings_json_normalized(directories);
         let roots_json = path_strings_json_normalized(roots);
         conn.execute(
@@ -4117,6 +4240,7 @@ DROP TABLE _pl_refresh_paths;"#;
         conn.execute("DELETE FROM plugin_scans WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Self::sync_plugin_library_after_paths_refresh(&conn)?;
+        self.invalidate_plugin_library_total_cache();
         Ok(())
     }
 
@@ -4129,7 +4253,9 @@ DROP TABLE _pl_refresh_paths;"#;
              DELETE FROM plugin_scans;
              COMMIT;",
         )
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+        self.invalidate_plugin_library_total_cache();
+        Ok(())
     }
 
     // ── Audio scan full CRUD (using existing tables) ──
@@ -4310,6 +4436,7 @@ DROP TABLE _pl_refresh_paths;"#;
         )
         .map_err(|e| e.to_string())?;
         Self::sync_daw_library_after_paths_refresh(&conn)?;
+        self.invalidate_daw_library_total_cache();
         Ok(())
     }
 
@@ -4322,9 +4449,10 @@ DROP TABLE _pl_refresh_paths;"#;
         _daw_counts: &HashMap<String, usize>,
     ) -> Result<(), String> {
         let conn = self.read_conn();
-        let project_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM daw_library", [], |r| r.get(0))
-            .unwrap_or(0);
+        let project_count: i64 = self
+            .daw_library_total_rows(&conn)?
+            .try_into()
+            .unwrap_or(i64::MAX);
         let total_bytes: i64 = conn
             .query_row(
                 "SELECT COALESCE(SUM(s.size), 0) FROM daw_projects s INNER JOIN daw_library lib ON s.id = lib.project_id",
@@ -4413,6 +4541,9 @@ DROP TABLE _pl_refresh_paths;"#;
             ).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())?;
+        if !inserted_idx.is_empty() {
+            self.invalidate_daw_library_total_cache();
+        }
         Ok(inserted_idx)
     }
 
@@ -4464,6 +4595,7 @@ DROP TABLE _pl_refresh_paths;"#;
         }
         tx.commit().map_err(|e| e.to_string())?;
         Self::rebuild_daw_library(&conn)?;
+        self.invalidate_daw_library_total_cache();
         Ok(())
     }
 
@@ -4572,6 +4704,7 @@ DROP TABLE _pl_refresh_paths;"#;
         conn.execute("DELETE FROM daw_scans WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Self::sync_daw_library_after_paths_refresh(&conn)?;
+        self.invalidate_daw_library_total_cache();
         Ok(())
     }
 
@@ -4585,7 +4718,9 @@ DROP TABLE _pl_refresh_paths;"#;
              DELETE FROM daw_scans;
              COMMIT;",
         )
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+        self.invalidate_daw_library_total_cache();
+        Ok(())
     }
 
     // ── Preset scan CRUD ──
@@ -6495,11 +6630,7 @@ DROP TABLE _pl_refresh_paths;"#;
         search_regex: bool,
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
-        let total_unfiltered: u64 = conn
-            .query_row("SELECT COUNT(*) FROM daw_library", [], |r| {
-                r.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
+        let total_unfiltered: u64 = self.daw_library_total_rows(&conn)?;
         let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
         let mut where_parts = vec![DAW_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
@@ -6726,11 +6857,7 @@ DROP TABLE _pl_refresh_paths;"#;
         search_regex: bool,
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
-        let total_unfiltered: u64 = conn
-            .query_row("SELECT COUNT(*) FROM plugin_library", [], |r| {
-                r.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
+        let total_unfiltered: u64 = self.plugin_library_total_rows(&conn)?;
         let (regex_pat, like_pat) = classify_plugins_search(search, search_regex);
         let mut where_parts = vec![PLUGIN_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
@@ -7105,21 +7232,9 @@ DROP TABLE _pl_refresh_paths;"#;
 
         // Library counts: one canonical row per `path` (matches Samples tab / `query_audio`).
         // Raw `audio_samples` rows can exceed this when the same path appears in multiple scans.
-        let audio_lib: u64 = conn
-            .query_row("SELECT COUNT(*) FROM audio_library", [], |r| {
-                r.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
-        let plugins_lib: u64 = conn
-            .query_row("SELECT COUNT(*) FROM plugin_library", [], |r| {
-                r.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
-        let daw_lib: u64 = conn
-            .query_row("SELECT COUNT(*) FROM daw_library", [], |r| {
-                r.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
+        let audio_lib: u64 = self.audio_library_total_rows(&conn)?;
+        let plugins_lib: u64 = self.plugin_library_total_rows(&conn)?;
+        let daw_lib: u64 = self.daw_library_total_rows(&conn)?;
         let presets_lib: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM presets WHERE id IN (SELECT preset_id FROM preset_library) AND format NOT IN ('MID','MIDI')",
@@ -7160,21 +7275,9 @@ DROP TABLE _pl_refresh_paths;"#;
     /// `COUNT(*)` on whole tables.
     pub fn active_scan_inventory_counts(&self) -> Result<serde_json::Value, String> {
         let conn = self.read_conn();
-        let count_plugins: u64 = conn
-            .query_row("SELECT COUNT(*) FROM plugin_library", [], |r| {
-                r.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
-        let count_audio: u64 = conn
-            .query_row("SELECT COUNT(*) FROM audio_library", [], |r| {
-                r.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
-        let count_daw: u64 = conn
-            .query_row("SELECT COUNT(*) FROM daw_library", [], |r| {
-                r.get::<_, i64>(0).map(|v| v as u64)
-            })
-            .unwrap_or(0);
+        let count_plugins: u64 = self.plugin_library_total_rows(&conn)?;
+        let count_audio: u64 = self.audio_library_total_rows(&conn)?;
+        let count_daw: u64 = self.daw_library_total_rows(&conn)?;
         let count_presets: u64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM presets WHERE id IN (SELECT preset_id FROM preset_library) AND format NOT IN ('MID','MIDI')",
@@ -7621,6 +7724,7 @@ DROP TABLE _pl_refresh_paths;"#;
             count += snap.plugins.len();
         }
         Self::rebuild_plugin_library(&conn)?;
+        self.invalidate_plugin_library_total_cache();
         Ok(count)
     }
 
@@ -7668,6 +7772,7 @@ DROP TABLE _pl_refresh_paths;"#;
             count += snap.projects.len();
         }
         Self::rebuild_daw_library(&conn)?;
+        self.invalidate_daw_library_total_cache();
         Ok(count)
     }
 
@@ -7842,6 +7947,7 @@ DROP TABLE _pl_refresh_paths;"#;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     /// `history::set_test_data_dir_path` is process-global; serialize migrate JSON tests.
     static MIGRATE_JSON_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -7938,6 +8044,8 @@ mod tests {
             pdf_library_total_cache: Mutex::new(None),
             audio_library_total_cache: Mutex::new(None),
             preset_inventory_total_cache: Mutex::new(None),
+            daw_library_total_cache: Mutex::new(None),
+            plugin_library_total_cache: Mutex::new(None),
         };
         db.migrate().unwrap();
         let read = Connection::open(uri.as_str()).unwrap();
@@ -9107,9 +9215,20 @@ mod tests {
             .query_daw(Some("mix"), None, "size", false, false, 0, 100)
             .unwrap();
         assert_eq!(res.total_count, 2);
-        assert_eq!(res.projects[0].name, "big_mix_master.als");
-        assert_eq!(res.projects[0].size, 10_000);
-        assert_eq!(res.projects[1].name, "small_mix_down.als");
+        let names: HashSet<_> = res.projects.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(
+            names,
+            HashSet::from(["big_mix_master.als", "small_mix_down.als"])
+        );
+
+        let by_size = db
+            .query_daw(None, None, "size", false, false, 0, 100)
+            .unwrap();
+        assert_eq!(by_size.projects.len(), 3);
+        assert_eq!(by_size.projects[0].name, "big_mix_master.als");
+        assert_eq!(by_size.projects[0].size, 10_000);
+        assert_eq!(by_size.projects[1].name, "vocal_take.als");
+        assert_eq!(by_size.projects[2].name, "small_mix_down.als");
     }
 
     #[test]
