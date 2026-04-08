@@ -103,8 +103,8 @@ fn default_limit() -> u64 {
 
 /// Exact FTS match counts above this force a bounded count and skip heavy aggregates (GROUP BY /
 /// size histogram over every hit) — common substrings like "loop" can match hundreds of
-/// thousands of library rows.
-const FTS_AUDIO_MATCH_COUNT_CAP: i64 = 100_000;
+/// thousands of library rows. Shared by audio, presets, MIDI, and PDF inventory queries.
+const FTS_INVENTORY_MATCH_COUNT_CAP: i64 = 100_000;
 
 /// Convert a user search string into an FTS5 phrase query for the trigram
 /// tokenizer. Returns `None` for empty/whitespace input. The result is wrapped
@@ -392,7 +392,7 @@ pub struct AudioQueryResult {
     pub samples: Vec<AudioSampleRow>,
     #[serde(rename = "totalCount")]
     pub total_count: u64,
-    /// True when `total_count` is a floor (`FTS_AUDIO_MATCH_COUNT_CAP`) — exact count not computed.
+    /// True when `total_count` is a floor (`FTS_INVENTORY_MATCH_COUNT_CAP`) — exact count not computed.
     #[serde(rename = "totalCountCapped", skip_serializing_if = "std::ops::Not::not")]
     pub total_count_capped: bool,
     #[serde(rename = "totalUnfiltered")]
@@ -609,6 +609,8 @@ pub struct PresetQueryResult {
     pub presets: Vec<PresetRow>,
     #[serde(rename = "totalCount")]
     pub total_count: u64,
+    #[serde(rename = "totalCountCapped", skip_serializing_if = "std::ops::Not::not")]
+    pub total_count_capped: bool,
     #[serde(rename = "totalUnfiltered")]
     pub total_unfiltered: u64,
 }
@@ -619,6 +621,8 @@ pub struct MidiQueryResult {
     pub midi_files: Vec<MidiFile>,
     #[serde(rename = "totalCount")]
     pub total_count: u64,
+    #[serde(rename = "totalCountCapped", skip_serializing_if = "std::ops::Not::not")]
+    pub total_count_capped: bool,
     #[serde(rename = "totalUnfiltered")]
     pub total_unfiltered: u64,
 }
@@ -639,6 +643,8 @@ pub struct PdfQueryResult {
     pub pdfs: Vec<PdfRow>,
     #[serde(rename = "totalCount")]
     pub total_count: u64,
+    #[serde(rename = "totalCountCapped", skip_serializing_if = "std::ops::Not::not")]
+    pub total_count_capped: bool,
     #[serde(rename = "totalUnfiltered")]
     pub total_unfiltered: u64,
 }
@@ -1990,7 +1996,7 @@ DROP TABLE _pl_refresh_paths;"#;
         fts_match: &str,
         scan_id: &str,
     ) -> Result<(u64, bool), String> {
-        let cap = FTS_AUDIO_MATCH_COUNT_CAP + 1;
+        let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
         let raw: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM (
@@ -2001,9 +2007,9 @@ DROP TABLE _pl_refresh_paths;"#;
                 |row| row.get::<_, i64>(0),
             )
             .map_err(|e| e.to_string())?;
-        let capped = raw > FTS_AUDIO_MATCH_COUNT_CAP;
+        let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
-            FTS_AUDIO_MATCH_COUNT_CAP as u64
+            FTS_INVENTORY_MATCH_COUNT_CAP as u64
         } else {
             raw as u64
         };
@@ -2016,7 +2022,7 @@ DROP TABLE _pl_refresh_paths;"#;
         fts_match: &str,
         format_filter: Option<&str>,
     ) -> Result<(u64, bool), String> {
-        let cap = FTS_AUDIO_MATCH_COUNT_CAP + 1;
+        let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
         let raw: i64 = match format_filter {
             None => conn
                 .query_row(
@@ -2064,9 +2070,163 @@ DROP TABLE _pl_refresh_paths;"#;
                 )
                 .map_err(|e| e.to_string())?,
         };
-        let capped = raw > FTS_AUDIO_MATCH_COUNT_CAP;
+        let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
-            FTS_AUDIO_MATCH_COUNT_CAP as u64
+            FTS_INVENTORY_MATCH_COUNT_CAP as u64
+        } else {
+            raw as u64
+        };
+        Ok((count, capped))
+    }
+
+    /// Bounded FTS hit count for presets library (non-MIDI formats only; matches [`Self::query_presets`]).
+    fn preset_fts_bounded_count_library(
+        conn: &Connection,
+        fts_match: &str,
+        format_filter: Option<&str>,
+    ) -> Result<(u64, bool), String> {
+        let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
+        let raw: i64 = match format_filter {
+            None => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM presets p
+  INNER JOIN preset_library lib ON p.id = lib.preset_id
+  WHERE p.id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?1)
+  AND p.format NOT IN ('MID','MIDI')
+  LIMIT ?2)",
+                    params![fts_match, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+            Some(f) if f.trim().is_empty() || f == "all" => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM presets p
+  INNER JOIN preset_library lib ON p.id = lib.preset_id
+  WHERE p.id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?1)
+  AND p.format NOT IN ('MID','MIDI')
+  LIMIT ?2)",
+                    params![fts_match, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+            Some(f) if f.contains(',') => {
+                let in_list = Self::in_list_sql(f);
+                let sql = format!(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM presets p
+  INNER JOIN preset_library lib ON p.id = lib.preset_id
+  WHERE p.id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?1)
+  AND p.format NOT IN ('MID','MIDI')
+  AND p.format IN ({in_list})
+  LIMIT ?2)"
+                );
+                conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
+                    .map_err(|e| e.to_string())?
+            }
+            Some(f) => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM presets p
+  INNER JOIN preset_library lib ON p.id = lib.preset_id
+  WHERE p.id IN (SELECT rowid FROM presets_fts WHERE presets_fts MATCH ?1)
+  AND p.format NOT IN ('MID','MIDI')
+  AND p.format = ?2
+  LIMIT ?3)",
+                    params![fts_match, f, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+        };
+        let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
+        let count = if capped {
+            FTS_INVENTORY_MATCH_COUNT_CAP as u64
+        } else {
+            raw as u64
+        };
+        Ok((count, capped))
+    }
+
+    /// Bounded FTS hit count for MIDI library (same `format_filter` rules as [`Self::query_midi`]).
+    fn midi_fts_bounded_count_library(
+        conn: &Connection,
+        fts_match: &str,
+        format_filter: Option<&str>,
+    ) -> Result<(u64, bool), String> {
+        let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
+        let raw: i64 = match format_filter {
+            None => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM midi_files_fts
+  WHERE midi_files_fts MATCH ?1 AND rowid IN (SELECT midi_id FROM midi_library)
+  LIMIT ?2)",
+                    params![fts_match, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+            Some(f) if f.trim().is_empty() || f == "all" => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM midi_files_fts
+  WHERE midi_files_fts MATCH ?1 AND rowid IN (SELECT midi_id FROM midi_library)
+  LIMIT ?2)",
+                    params![fts_match, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+            Some(f) if f.contains(',') => {
+                let in_list = Self::in_list_sql(f);
+                let sql = format!(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM midi_files m
+  INNER JOIN midi_library lib ON m.id = lib.midi_id
+  WHERE m.id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?1)
+  AND m.format IN ({in_list})
+  LIMIT ?2)"
+                );
+                conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
+                    .map_err(|e| e.to_string())?
+            }
+            Some(f) => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM midi_files m
+  INNER JOIN midi_library lib ON m.id = lib.midi_id
+  WHERE m.id IN (SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH ?1)
+  AND m.format = ?2
+  LIMIT ?3)",
+                    params![fts_match, f, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+        };
+        let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
+        let count = if capped {
+            FTS_INVENTORY_MATCH_COUNT_CAP as u64
+        } else {
+            raw as u64
+        };
+        Ok((count, capped))
+    }
+
+    /// Bounded FTS hit count for PDF library ([`Self::query_pdfs`] has no format filter).
+    fn pdf_fts_bounded_count_library(conn: &Connection, fts_match: &str) -> Result<(u64, bool), String> {
+        let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
+        let raw: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM (
+  SELECT 1 FROM pdfs_fts
+  WHERE pdfs_fts MATCH ?1 AND rowid IN (SELECT pdf_id FROM pdf_library)
+  LIMIT ?2)",
+                params![fts_match, cap],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|e| e.to_string())?;
+        let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
+        let count = if capped {
+            FTS_INVENTORY_MATCH_COUNT_CAP as u64
         } else {
             raw as u64
         };
@@ -2193,7 +2353,7 @@ DROP TABLE _pl_refresh_paths;"#;
         // Filtered total: separate COUNT so the main SELECT can use LIMIT without
         // COUNT(*) OVER(), which SQLite evaluates before LIMIT (full scan / lockup at 200k+ rows).
         //
-        // FTS: bounded COUNT (`FTS_AUDIO_MATCH_COUNT_CAP`) — common substrings can match
+        // FTS: bounded COUNT (`FTS_INVENTORY_MATCH_COUNT_CAP`) — common substrings can match
         // hundreds of thousands of rows; exact `COUNT(*)` over that set dominated latency.
         let count_sql = format!("SELECT COUNT(*) FROM audio_samples WHERE {where_clause}");
         let (total_count, total_count_capped) = if fts_match.is_some() {
@@ -3123,6 +3283,7 @@ DROP TABLE _pl_refresh_paths;"#;
             return Ok(PresetQueryResult {
                 presets: vec![],
                 total_count: 0,
+                total_count_capped: false,
                 total_unfiltered: 0,
             });
         }
@@ -3177,14 +3338,14 @@ DROP TABLE _pl_refresh_paths;"#;
         };
         let dir = if sort_asc { "ASC" } else { "DESC" };
 
-        let total_count: u64 = {
+        let (total_count, total_count_capped) = if fts_match.is_some() {
+            let m = fts_match.as_ref().expect("fts");
+            Self::preset_fts_bounded_count_library(&conn, m, format_filter)?
+        } else {
             let sql = format!("SELECT COUNT(*) FROM presets WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            if let Some(ref m) = fts_match {
-                stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-                bi += 1;
-            } else if let Some(ref r) = regex_pat {
+            if let Some(ref r) = regex_pat {
                 stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
                 bi += 1;
             } else if let Some(ref pat) = like_pat {
@@ -3198,10 +3359,12 @@ DROP TABLE _pl_refresh_paths;"#;
                 }
             }
             let mut rows = stmt.raw_query();
-            rows.next()
+            let n = rows
+                .next()
                 .map_err(|e| e.to_string())?
                 .map(|r| r.get::<_, i64>(0).unwrap_or(0) as u64)
-                .unwrap_or(0)
+                .unwrap_or(0);
+            (n, false)
         };
 
         let sql = format!(
@@ -3250,6 +3413,7 @@ DROP TABLE _pl_refresh_paths;"#;
         Ok(PresetQueryResult {
             presets,
             total_count,
+            total_count_capped,
             total_unfiltered,
         })
     }
@@ -4635,6 +4799,7 @@ DROP TABLE _pl_refresh_paths;"#;
             return Ok(MidiQueryResult {
                 midi_files: vec![],
                 total_count: 0,
+                total_count_capped: false,
                 total_unfiltered: 0,
             });
         }
@@ -4688,14 +4853,14 @@ DROP TABLE _pl_refresh_paths;"#;
         };
         let dir = if sort_asc { "ASC" } else { "DESC" };
 
-        let total_count: u64 = {
+        let (total_count, total_count_capped) = if fts_match.is_some() {
+            let m = fts_match.as_ref().expect("fts");
+            Self::midi_fts_bounded_count_library(&conn, m, format_filter)?
+        } else {
             let sql = format!("SELECT COUNT(*) FROM midi_files WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let mut bi = 1;
-            if let Some(ref m) = fts_match {
-                stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-                bi += 1;
-            } else if let Some(ref r) = regex_pat {
+            if let Some(ref r) = regex_pat {
                 stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
                 bi += 1;
             } else if let Some(ref pat) = like_pat {
@@ -4709,10 +4874,12 @@ DROP TABLE _pl_refresh_paths;"#;
                 }
             }
             let mut rows = stmt.raw_query();
-            rows.next()
+            let n = rows
+                .next()
                 .map_err(|e| e.to_string())?
                 .map(|r| r.get::<_, i64>(0).unwrap_or(0) as u64)
-                .unwrap_or(0)
+                .unwrap_or(0);
+            (n, false)
         };
 
         let sql = format!(
@@ -4761,6 +4928,7 @@ DROP TABLE _pl_refresh_paths;"#;
         Ok(MidiQueryResult {
             midi_files: out,
             total_count,
+            total_count_capped,
             total_unfiltered,
         })
     }
@@ -4810,6 +4978,32 @@ DROP TABLE _pl_refresh_paths;"#;
             }
         }
         let where_cl = where_parts.join(" AND ");
+        if fts_match.is_some() {
+            let m = fts_match.as_ref().expect("fts");
+            let (bc, capped) = Self::midi_fts_bounded_count_library(&conn, m, format_filter)?;
+            if bc == 0 {
+                return Ok(FilterStatsResult {
+                    count: 0,
+                    count_capped: false,
+                    total_bytes: 0,
+                    by_type: HashMap::new(),
+                    bytes_by_type: HashMap::new(),
+                    total_unfiltered,
+                    size_buckets: vec![],
+                });
+            }
+            if capped {
+                return Ok(FilterStatsResult {
+                    count: bc,
+                    count_capped: true,
+                    total_bytes: 0,
+                    by_type: HashMap::new(),
+                    bytes_by_type: HashMap::new(),
+                    total_unfiltered,
+                    size_buckets: vec![],
+                });
+            }
+        }
         let sql = format!(
             "SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM midi_files WHERE {where_cl} GROUP BY format"
         );
@@ -5446,6 +5640,7 @@ DROP TABLE _pl_refresh_paths;"#;
             return Ok(PdfQueryResult {
                 pdfs: vec![],
                 total_count: 0,
+                total_count_capped: false,
                 total_unfiltered: 0,
             });
         }
@@ -5482,13 +5677,14 @@ DROP TABLE _pl_refresh_paths;"#;
         };
         let dir = if sort_asc { "ASC" } else { "DESC" };
 
-        let total_count: u64 = {
+        let (total_count, total_count_capped) = if fts_match.is_some() {
+            let m = fts_match.as_ref().expect("fts");
+            Self::pdf_fts_bounded_count_library(&conn, m)?
+        } else {
             let sql = format!("SELECT COUNT(*) FROM pdfs WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
             let bi = 1;
-            if let Some(ref m) = fts_match {
-                stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            } else if let Some(ref r) = regex_pat {
+            if let Some(ref r) = regex_pat {
                 stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat)
@@ -5496,10 +5692,12 @@ DROP TABLE _pl_refresh_paths;"#;
             }
             let _ = bi;
             let mut rows = stmt.raw_query();
-            rows.next()
+            let n = rows
+                .next()
                 .map_err(|e| e.to_string())?
                 .map(|r| r.get::<_, i64>(0).unwrap_or(0) as u64)
-                .unwrap_or(0)
+                .unwrap_or(0);
+            (n, false)
         };
 
         let sql = format!(
@@ -5539,6 +5737,7 @@ DROP TABLE _pl_refresh_paths;"#;
         Ok(PdfQueryResult {
             pdfs,
             total_count,
+            total_count_capped,
             total_unfiltered,
         })
     }
@@ -5899,6 +6098,32 @@ DROP TABLE _pl_refresh_paths;"#;
             }
         }
         let where_cl = where_parts.join(" AND ");
+        if fts_match.is_some() {
+            let m = fts_match.as_ref().expect("fts");
+            let (bc, capped) = Self::preset_fts_bounded_count_library(&conn, m, format_filter)?;
+            if bc == 0 {
+                return Ok(FilterStatsResult {
+                    count: 0,
+                    count_capped: false,
+                    total_bytes: 0,
+                    by_type: HashMap::new(),
+                    bytes_by_type: HashMap::new(),
+                    total_unfiltered,
+                    size_buckets: vec![],
+                });
+            }
+            if capped {
+                return Ok(FilterStatsResult {
+                    count: bc,
+                    count_capped: true,
+                    total_bytes: 0,
+                    by_type: HashMap::new(),
+                    bytes_by_type: HashMap::new(),
+                    total_unfiltered,
+                    size_buckets: vec![],
+                });
+            }
+        }
         let sql = format!(
             "SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM presets WHERE {where_cl} GROUP BY format"
         );
@@ -6032,6 +6257,32 @@ DROP TABLE _pl_refresh_paths;"#;
             )
             .unwrap_or(0);
         let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        if fts_match.is_some() {
+            let m = fts_match.as_ref().expect("fts");
+            let (bc, capped) = Self::pdf_fts_bounded_count_library(&conn, m)?;
+            if bc == 0 {
+                return Ok(FilterStatsResult {
+                    count: 0,
+                    count_capped: false,
+                    total_bytes: 0,
+                    by_type: HashMap::new(),
+                    bytes_by_type: HashMap::new(),
+                    total_unfiltered,
+                    size_buckets: vec![],
+                });
+            }
+            if capped {
+                return Ok(FilterStatsResult {
+                    count: bc,
+                    count_capped: true,
+                    total_bytes: 0,
+                    by_type: HashMap::new(),
+                    bytes_by_type: HashMap::new(),
+                    total_unfiltered,
+                    size_buckets: vec![],
+                });
+            }
+        }
         let sql = if fts_match.is_some() {
             "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library) AND id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?1)"
         } else if regex_pat.is_some() {

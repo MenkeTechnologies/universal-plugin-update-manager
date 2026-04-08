@@ -17,6 +17,7 @@ let midiSortKey = 'name';
 let midiSortAsc = true;
 let _midiOffset = 0;
 let _midiTotalCount = 0;      // filtered count from DB
+let _midiTotalCountCapped = false;
 let _midiTotalUnfiltered = 0; // unfiltered count from DB
 let _midiStatsSnapshot = null;
 /** Monotonic id so stale `dbQueryMidi` results never overwrite a newer filter. (`MIDI_PAGE_SIZE` lives in ipc.js.) */
@@ -111,6 +112,7 @@ async function fetchMidiPage() {
         }
         filteredMidi = files;
         _midiTotalCount = result.totalCount || 0;
+        _midiTotalCountCapped = result.totalCountCapped === true;
         _midiTotalUnfiltered = result.totalUnfiltered || 0;
         // Metadata-based sorts (tracks/bpm/time/key/notes/ch/duration) aren't stored in
         // the DB — SQL can only sort by name/size/modified/directory. For metadata sorts
@@ -144,6 +146,7 @@ async function refreshMidiStatsSnapshot(force) {
             totalUnfiltered: agg.totalUnfiltered || 0,
         };
         _midiTotalCount = agg.count || 0;
+        _midiTotalCountCapped = agg.countCapped === true;
         _midiTotalUnfiltered = agg.totalUnfiltered || 0;
         updateMidiCount();
     } catch {
@@ -389,9 +392,10 @@ function updateMidiCount() {
     const isFiltered = total > 0 && filtered < total;
     const totalEl = document.getElementById('midiTotalCount');
     if (totalEl) {
+        const fp = _midiTotalCountCapped ? filtered.toLocaleString() + '+' : filtered.toLocaleString();
         totalEl.textContent = isFiltered
-            ? filtered.toLocaleString() + ' / ' + total.toLocaleString()
-            : (total || filtered).toLocaleString();
+            ? fp + ' / ' + total.toLocaleString()
+            : (_midiTotalCountCapped ? fp : (total || filtered).toLocaleString());
     }
     const count = document.getElementById('midiCount');
     if (count) count.textContent = (total || filtered).toLocaleString();
@@ -597,7 +601,10 @@ function renderMidiTable() {
         tbody.insertAdjacentHTML('beforeend', filteredMidi.map(buildMidiRow).join(''));
     }
     const total = streaming ? filteredMidi.length : _midiTotalCount;
-    if (_midiRenderCount < total) {
+    const hasMore = streaming
+        ? (_midiRenderCount < total)
+        : (_midiTotalCountCapped ? (filteredMidi.length === MIDI_PAGE_SIZE) : (_midiRenderCount < _midiTotalCount));
+    if (hasMore) {
         appendMidiLoadMoreRow(tbody);
     }
     if (!_midiMetadataRunning) loadMidiMetadata();
@@ -605,9 +612,12 @@ function renderMidiTable() {
 
 function appendMidiLoadMoreRow(tbody) {
     const total = (_midiScanProgressCleanup && !_midiScanDbView) ? filteredMidi.length : _midiTotalCount;
+    const totalShown = (_midiScanProgressCleanup && !_midiScanDbView)
+        ? total.toLocaleString()
+        : (_midiTotalCountCapped ? _midiTotalCount.toLocaleString() + '+' : total.toLocaleString());
     const line = catalogFmt('ui.js.load_more_hint', {
         shown: _midiRenderCount.toLocaleString(),
-        total: total.toLocaleString(),
+        total: totalShown,
     });
     tbody.insertAdjacentHTML('beforeend',
         `<tr id="midiLoadMore"><td colspan="12" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMoreMidi">

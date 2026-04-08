@@ -6375,16 +6375,19 @@ fn palette_preview_empty() -> PalettePreviewResult {
         presets: db::PresetQueryResult {
             presets: vec![],
             total_count: 0,
+            total_count_capped: false,
             total_unfiltered: 0,
         },
         pdfs: db::PdfQueryResult {
             pdfs: vec![],
             total_count: 0,
+            total_count_capped: false,
             total_unfiltered: 0,
         },
         midi: db::MidiQueryResult {
             midi_files: vec![],
             total_count: 0,
+            total_count_capped: false,
             total_unfiltered: 0,
         },
     }

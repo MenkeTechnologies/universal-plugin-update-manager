@@ -9,6 +9,7 @@ let PRESET_PAGE_SIZE = 200;
 let presetRenderCount = 0;
 let _presetOffset = 0;
 let _presetTotalCount = 0;
+let _presetTotalCountCapped = false;
 let _presetTotalUnfiltered = 0;
 /** Monotonic id so stale `dbQueryPresets` results never overwrite a newer filter. */
 let _presetQuerySeq = 0;
@@ -91,6 +92,7 @@ async function fetchPresetPage() {
         // Page-at-a-time: filteredPresets only holds the LATEST page, DOM accumulates.
         filteredPresets = presets;
         _presetTotalCount = result.totalCount || 0;
+        _presetTotalCountCapped = result.totalCountCapped === true;
         _presetTotalUnfiltered = result.totalUnfiltered || 0;
         if (typeof yieldToBrowser === 'function') await yieldToBrowser();
         if (seq !== _presetQuerySeq) return;
@@ -226,6 +228,7 @@ async function rebuildPresetStats(force) {
             unfiltered = agg.totalUnfiltered || 0;
             byType = agg.byType || {};
             _presetTotalCount = count;
+            _presetTotalCountCapped = agg.countCapped === true;
             _presetTotalUnfiltered = unfiltered;
         } catch {
             // Fallback to incremental accumulator
@@ -241,9 +244,10 @@ async function rebuildPresetStats(force) {
     const isFiltered = unfiltered > 0 && count > 0 && count < unfiltered;
     const displayCount = count || unfiltered;
     statsEl.style.display = (displayCount > 0 || unfiltered > 0) ? 'flex' : 'none';
+    const countPart = _presetTotalCountCapped ? count.toLocaleString() + '+' : count.toLocaleString();
     const countStr = isFiltered
-        ? count.toLocaleString() + ' / ' + unfiltered.toLocaleString()
-        : (unfiltered || count).toLocaleString();
+        ? countPart + ' / ' + unfiltered.toLocaleString()
+        : (_presetTotalCountCapped ? count.toLocaleString() + '+' : (unfiltered || count).toLocaleString());
     document.getElementById('presetCount').textContent = countStr;
     if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({presets: unfiltered || count});
     else {
@@ -419,10 +423,14 @@ function renderPresetTable() {
         if (loadMore) loadMore.remove();
         tbody.insertAdjacentHTML('beforeend', filteredPresets.map(buildPresetRow).join(''));
     }
-    if (presetRenderCount < _presetTotalCount) {
+    const presetHasMore = _presetTotalCountCapped
+        ? (filteredPresets.length === PRESET_PAGE_SIZE)
+        : (presetRenderCount < _presetTotalCount);
+    if (presetHasMore) {
+        const totalShown = _presetTotalCountCapped ? _presetTotalCount.toLocaleString() + '+' : _presetTotalCount.toLocaleString();
         const line = catalogFmt('ui.js.load_more_hint', {
             shown: presetRenderCount.toLocaleString(),
-            total: _presetTotalCount.toLocaleString(),
+            total: totalShown,
         });
         tbody.insertAdjacentHTML('beforeend',
             `<tr><td colspan="7" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMorePresets">

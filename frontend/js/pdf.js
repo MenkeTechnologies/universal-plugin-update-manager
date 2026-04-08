@@ -13,6 +13,7 @@ let _pdfScanDbView = false;
 let pdfRenderCount = 0;
 let _pdfOffset = 0;
 let _pdfTotalCount = 0;
+let _pdfTotalCountCapped = false;
 let _pdfTotalUnfiltered = 0;
 /** Monotonic id so stale `dbQueryPdfs` results never overwrite a newer filter. */
 let _pdfQuerySeq = 0;
@@ -79,6 +80,7 @@ async function fetchPdfPage() {
         // Page-at-a-time: filteredPdfs only holds the LATEST page, DOM accumulates.
         filteredPdfs = pdfs;
         _pdfTotalCount = result.totalCount || 0;
+        _pdfTotalCountCapped = result.totalCountCapped === true;
         _pdfTotalUnfiltered = result.totalUnfiltered || 0;
         if (typeof yieldToBrowser === 'function') await yieldToBrowser();
         if (seq !== _pdfQuerySeq) return;
@@ -132,6 +134,7 @@ async function rebuildPdfStats(force) {
             displayBytes = agg.totalBytes || 0;
             unfiltered = agg.totalUnfiltered || 0;
             _pdfTotalCount = displayCount;
+            _pdfTotalCountCapped = agg.countCapped === true;
             _pdfTotalUnfiltered = unfiltered;
         } catch {
             displayCount = allPdfs.length;
@@ -142,9 +145,10 @@ async function rebuildPdfStats(force) {
     }
     const isFiltered = search.trim() && displayCount < unfiltered;
     statsEl.style.display = (displayCount > 0 || unfiltered > 0) ? 'flex' : 'none';
+    const dcPart = _pdfTotalCountCapped ? displayCount.toLocaleString() + '+' : displayCount.toLocaleString();
     const countStr = isFiltered
-        ? displayCount.toLocaleString() + ' / ' + unfiltered.toLocaleString()
-        : (unfiltered || displayCount).toLocaleString();
+        ? dcPart + ' / ' + unfiltered.toLocaleString()
+        : (_pdfTotalCountCapped ? displayCount.toLocaleString() + '+' : (unfiltered || displayCount).toLocaleString());
     document.getElementById('pdfCount').textContent = countStr;
     document.getElementById('pdfTotalSize').textContent = formatAudioSize(displayBytes);
     const btn = document.getElementById('btnExportPdf');
@@ -220,10 +224,14 @@ function renderPdfTable() {
         if (loadMoreRow) loadMoreRow.remove();
         tbody.insertAdjacentHTML('beforeend', filteredPdfs.map(buildPdfRow).join(''));
     }
-    if (pdfRenderCount < _pdfTotalCount) {
+    const pdfHasMore = _pdfTotalCountCapped
+        ? (filteredPdfs.length === PDF_PAGE_SIZE)
+        : (pdfRenderCount < _pdfTotalCount);
+    if (pdfHasMore) {
+        const totalShown = _pdfTotalCountCapped ? _pdfTotalCount.toLocaleString() + '+' : _pdfTotalCount.toLocaleString();
         const line = catalogFmt('ui.js.load_more_hint', {
             shown: pdfRenderCount.toLocaleString(),
-            total: _pdfTotalCount.toLocaleString(),
+            total: totalShown,
         });
         tbody.insertAdjacentHTML('beforeend',
             `<tr><td colspan="7" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;" data-action="loadMorePdfs">

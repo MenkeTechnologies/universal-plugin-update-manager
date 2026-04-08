@@ -205,6 +205,7 @@ fn preset_row_and_query_result_shape() {
     let q = PresetQueryResult {
         presets: vec![row],
         total_count: 1,
+        total_count_capped: false,
         total_unfiltered: 2,
     };
     let v = serde_json::to_value(&q).unwrap();
@@ -225,6 +226,7 @@ fn pdf_row_query_and_stats_shape() {
     let q = PdfQueryResult {
         pdfs: vec![row],
         total_count: 1,
+        total_count_capped: false,
         total_unfiltered: 9,
     };
     let v = serde_json::to_value(&q).unwrap();
