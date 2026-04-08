@@ -2007,6 +2007,15 @@ function startEnginePlaybackPoll() {
                     window._enginePlaybackPaused = st.paused === true;
                     window._enginePlaybackPeak = typeof st.peak === 'number' ? st.peak : 0;
                     if (typeof updatePlaybackTime === 'function') updatePlaybackTime();
+                    if (st.eof !== true && typeof window.resetEnginePlaybackEofFlag === 'function') {
+                        window.resetEnginePlaybackEofFlag();
+                    }
+                    if (
+                        st.eof === true &&
+                        typeof window.handleEnginePlaybackEofFromPoll === 'function'
+                    ) {
+                        window.handleEnginePlaybackEofFromPoll();
+                    }
                 }
             }
             if (typeof window.ensureEnginePlaybackFftRaf === 'function') {
@@ -2118,6 +2127,9 @@ async function engineApplyReversePrefPlayback() {
  * @param {string} filePath — absolute host path
  */
 async function enginePlaybackStart(filePath) {
+    if (typeof window !== 'undefined' && typeof window.resetEnginePlaybackEofFlag === 'function') {
+        window.resetEnginePlaybackEofFlag();
+    }
     const inv = getAeAudioEngineInvoke();
     if (!inv) throw new Error('audio engine IPC unavailable');
     let r = await inv({cmd: 'playback_load', path: filePath});

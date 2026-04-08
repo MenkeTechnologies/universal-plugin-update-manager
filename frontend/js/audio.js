@@ -1277,6 +1277,31 @@ audioPlayer.addEventListener('ended', () => {
         }
     }
 });
+
+/** AudioEngine path mutes `<audio>` — no `ended` event; `playback_status.eof` drives the same logic. */
+let _enginePlaybackEofHandled = false;
+
+function resetEnginePlaybackEofFlag() {
+    _enginePlaybackEofHandled = false;
+}
+
+function handleEnginePlaybackEofFromPoll() {
+    if (_enginePlaybackEofHandled) return;
+    if (!_enginePlaybackActive) return;
+    if (audioLooping) return;
+    _enginePlaybackEofHandled = true;
+    if (filteredAudioSamples.length > 1 && prefs.getItem('autoplayNext') !== 'off') {
+        nextTrack();
+    } else {
+        updatePlayBtnStates();
+        updateNowPlayingBtn();
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.resetEnginePlaybackEofFlag = resetEnginePlaybackEofFlag;
+    window.handleEnginePlaybackEofFromPoll = handleEnginePlaybackEofFromPoll;
+}
 // Use rAF loop instead of timeupdate for smooth 60fps playhead
 let _playbackRafId = null;
 
