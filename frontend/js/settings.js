@@ -509,19 +509,11 @@ function cacheStatRowLabel(statKey, fallbackLabel, _cf) {
     return fallbackLabel;
 }
 
-/**
- * @param {{ silent?: boolean }} [opts] — `silent: true` keeps the existing table visible while
- * refetching (no “Loading…” flash). Use for throttled background refreshes; omit on first load / Refresh.
- */
-async function renderCacheStats(opts) {
+/** Fetches Settings → Database Caches table from `db_cache_stats`. Keeps prior markup until data returns (no loading placeholder). */
+async function renderCacheStats() {
     const grid = document.getElementById('cacheStatsGrid');
     if (!grid) return;
     const _cf = catalogFmt;
-    const silent = Boolean(opts && opts.silent);
-    const alreadyHasTable = Boolean(grid.querySelector('table'));
-    if (!silent || !alreadyHasTable) {
-        grid.innerHTML = `<span style="color:var(--text-muted);font-size:11px;font-family:'Share Tech Mono',monospace;">${typeof escapeHtml === 'function' ? escapeHtml(_cf('ui.settings.cache_stats_loading')) : _cf('ui.settings.cache_stats_loading')}</span>`;
-    }
     try {
         const stats = await window.vstUpdater.dbCacheStats();
         const rows = Array.isArray(stats) ? stats : [];
