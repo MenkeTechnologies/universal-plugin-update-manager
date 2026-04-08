@@ -7591,10 +7591,13 @@ DROP TABLE _pl_refresh_paths;"#;
     }
 
     /// Batch update BPM/Key/LUFS for multiple files in a single transaction.
+    ///
+    /// Returns the **sum of `sqlite3_changes()`** for each `UPDATE` (rows modified), not the
+    /// number of input paths — a path matching multiple `audio_samples` rows updates all of them.
     pub fn batch_update_analysis(&self, results: &[AnalysisBatchRow]) -> Result<u32, String> {
         let conn = self.read_conn();
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-        let mut count = 0u32;
+        let mut rows_changed: u32 = 0;
         {
             let mut stmt = tx
                 .prepare_cached(
@@ -7608,12 +7611,14 @@ DROP TABLE _pl_refresh_paths;"#;
                 } else {
                     0
                 };
-                let _ = stmt.execute(params![bpm, key, lufs, exhausted, path]);
-                count += 1;
+                let n = stmt
+                    .execute(params![bpm, key, lufs, exhausted, path])
+                    .map_err(|e| e.to_string())?;
+                rows_changed = rows_changed.saturating_add(n as u32);
             }
         }
         tx.commit().map_err(|e| e.to_string())?;
-        Ok(count)
+        Ok(rows_changed)
     }
 
     /// Clear a specific cache table.

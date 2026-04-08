@@ -2531,10 +2531,10 @@ async fn measure_lufs(file_path: String) -> Result<Option<f64>, String> {
 /// audio I/O in the separate engine process on the same machine).
 #[tauri::command]
 async fn batch_analyze(paths: Vec<String>) -> Result<serde_json::Value, String> {
-    tokio::task::spawn_blocking(move || {
+    let inner = tokio::task::spawn_blocking(move || {
         use rayon::prelude::*;
         if paths.is_empty() {
-            return serde_json::json!({ "count": 0, "results": [] });
+            return Ok(serde_json::json!({ "count": 0, "results": [] }));
         }
         const MAX_BATCH_ANALYSIS_THREADS: usize = 4;
         let num_threads = std::cmp::min(paths.len(), MAX_BATCH_ANALYSIS_THREADS).max(1);
@@ -2554,7 +2554,7 @@ async fn batch_analyze(paths: Vec<String>) -> Result<serde_json::Value, String> 
                 .collect()
         });
         // Batch all DB writes in a single transaction
-        let count = db::global().batch_update_analysis(&results).unwrap_or(0);
+        let count = db::global().batch_update_analysis(&results)?;
         // Return results so frontend skips N individual dbGetAnalysis IPC calls
         let items: Vec<serde_json::Value> = results
             .iter()
@@ -2567,10 +2567,11 @@ async fn batch_analyze(paths: Vec<String>) -> Result<serde_json::Value, String> 
                 })
             })
             .collect();
-        serde_json::json!({ "count": count, "results": items })
+        Ok(serde_json::json!({ "count": count, "results": items }))
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    inner
 }
 
 #[tauri::command]
