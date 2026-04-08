@@ -1048,14 +1048,51 @@ function settingUpdatePruneOldScansKeep(val) {
 }
 
 function settingUpdatePageSize(val) {
-    document.getElementById('settingPageSizeValue').textContent = val;
+    const pageSizeValEl = document.getElementById('settingPageSizeValue');
+    if (pageSizeValEl) pageSizeValEl.textContent = val;
+    const pageSizeEl = document.getElementById('settingPageSize');
+    if (pageSizeEl) pageSizeEl.value = val;
     prefs.setItem('pageSize', val);
     const n = parseInt(val, 10);
-    AUDIO_PAGE_SIZE = n;
-    DAW_PAGE_SIZE = n;
-    PRESET_PAGE_SIZE = n;
-    MIDI_PAGE_SIZE = n;
-    PDF_PAGE_SIZE = n;
+    if (!Number.isNaN(n)) {
+        AUDIO_PAGE_SIZE = n;
+        DAW_PAGE_SIZE = n;
+        PRESET_PAGE_SIZE = n;
+        MIDI_PAGE_SIZE = n;
+        PDF_PAGE_SIZE = n;
+    }
+}
+
+/** Step table page size (Performance). Safe when Settings tab is not in the DOM (e.g. Cmd+K). */
+function paletteNudgeTablePageSize(delta) {
+    const cur = parseInt(String(prefs.getItem('pageSize') || '200'), 10);
+    const base = Number.isNaN(cur) ? 200 : cur;
+    const next = Math.min(2000, Math.max(100, base + delta));
+    settingUpdatePageSize(String(next));
+    if (typeof showToast === 'function') {
+        showToast(toastFmt('toast.table_page_size_nudged', {val: next}));
+    }
+}
+
+/** Step prune retention count (Performance). */
+function paletteNudgePruneKeep(delta) {
+    const cur = parseInt(String(prefs.getItem('pruneOldScansKeep') || '3'), 10);
+    const base = Number.isNaN(cur) ? 3 : cur;
+    const next = Math.min(100, Math.max(1, base + delta));
+    settingUpdatePruneOldScansKeep(String(next));
+}
+
+/** Cycle quiet → normal → verbose (logging). */
+function paletteCycleLogVerbosity() {
+    const order = ['quiet', 'normal', 'verbose'];
+    const cur = prefs.getItem('logVerbosity') || 'normal';
+    let idx = order.indexOf(cur);
+    if (idx < 0) idx = 1;
+    const next = order[(idx + 1) % order.length];
+    prefs.setItem('logVerbosity', next);
+    const sel = document.getElementById('settingLogVerbosity');
+    if (sel) sel.value = next;
+    if (typeof showToast === 'function') showToast(toastFmt('toast.log_verbosity_saved'));
 }
 
 function settingUpdateFlushInterval(val) {

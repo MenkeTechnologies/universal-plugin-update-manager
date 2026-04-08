@@ -532,6 +532,54 @@ function buildPaletteStaticItems() {
         icon: '&#128190;',
         action: () => settingToggleIncludeBackups()
     });
+    if (typeof settingTogglePruneOldScans === 'function') items.push({
+        type: 'action',
+        name: appFmt('menu.toggle_prune_old_scans'),
+        icon: '&#128465;',
+        action: () => settingTogglePruneOldScans()
+    });
+    if (typeof paletteNudgeTablePageSize === 'function') {
+        items.push({
+            type: 'action',
+            name: appFmt('menu.increase_table_page_size'),
+            icon: '&#8593;',
+            action: () => paletteNudgeTablePageSize(100)
+        });
+        items.push({
+            type: 'action',
+            name: appFmt('menu.decrease_table_page_size'),
+            icon: '&#8595;',
+            action: () => paletteNudgeTablePageSize(-100)
+        });
+    }
+    if (typeof paletteNudgePruneKeep === 'function') {
+        items.push({
+            type: 'action',
+            name: appFmt('menu.increase_scan_history_keep'),
+            icon: '&#8593;',
+            action: () => paletteNudgePruneKeep(1)
+        });
+        items.push({
+            type: 'action',
+            name: appFmt('menu.decrease_scan_history_keep'),
+            icon: '&#8595;',
+            action: () => paletteNudgePruneKeep(-1)
+        });
+    }
+    if (typeof paletteCycleLogVerbosity === 'function') items.push({
+        type: 'action',
+        name: appFmt('menu.cycle_log_verbosity'),
+        icon: '&#128196;',
+        action: () => paletteCycleLogVerbosity()
+    });
+    if (typeof settingClearAnalysisCache === 'function') items.push({
+        type: 'action',
+        name: appFmt('menu.clear_analysis_cache'),
+        icon: '&#128465;',
+        action: () => {
+            void settingClearAnalysisCache();
+        }
+    });
 
     // Resets & Clears
     if (typeof resetTabOrder === 'function') items.push({
