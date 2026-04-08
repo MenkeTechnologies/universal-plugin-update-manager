@@ -79,14 +79,15 @@ jobs:
         if: matrix.os != 'ubuntu-latest'
         run: node scripts/run-audio-engine-tests.mjs
 
-      # Windows: Tauri/externalBin + MSVC can leave JUCE/vcrt DLLs beside `target/debug/deps/*.exe`.
-      # The loader resolves those first → STATUS_ENTRYPOINT_NOT_FOUND. Must compile the *same*
-      # cargo invocation as the run (`--no-run` then execute), strip sidecars, then run
-      # with zero compile work so build.rs does not re-copy DLLs before execute.
+      # Windows: see the Windows-only step below — a second `cargo test` after stripping DLLs
+      # re-invokes `tauri-build` and recopies JUCE/vcrt sidecars → STATUS_ENTRYPOINT_NOT_FOUND.
       - name: Run Rust tests (library + integration)
         if: matrix.os != 'windows-latest'
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      # Second `cargo test` after stripping DLLs re-runs build.rs / Tauri externalBin and copies
+      # JUCE/VC DLLs back beside test exes → STATUS_ENTRYPOINT_NOT_FOUND. Build once, strip, then
+      # run each `target/debug/deps/*-<rustc-hash>.exe` harness directly (no second Cargo invoke).
       - name: Run Rust tests (library + integration, Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
@@ -106,7 +107,17 @@ jobs:
           }
           $td = Join-Path $env:GITHUB_WORKSPACE 'target/debug'
           Remove-JuceSidecars $td
-          cargo test --manifest-path src-tauri/Cargo.toml -- --quiet
+          $deps = Join-Path $td 'deps'
+          if (-not (Test-Path $deps)) { throw "missing $deps after cargo test --no-run" }
+          $ran = 0
+          Get-ChildItem -Path $deps -Filter '*.exe' -ErrorAction SilentlyContinue | ForEach-Object {
+            $name = $_.Name
+            if ($name -inotmatch '-[a-f0-9]{16}\.exe$') { return }
+            $ran++
+            & $_.FullName --quiet
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if ($ran -lt 1) { throw "no Rust test harness exe matched in $deps" }
 
   build:
     needs: test
