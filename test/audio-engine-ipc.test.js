@@ -164,6 +164,8 @@ if (!bin) {
     let tmpDir;
     /** Short PCM WAV (~8k mono samples @ 44.1kHz) for decode success paths. */
     let tmpWav;
+    /** Very short PCM WAV (4 mono samples) — spectrogram path needs ≥8 samples. */
+    let tmpWavTiny;
 
     before(() => {
       tmpEmptyFile = path.join(os.tmpdir(), `audio-haxor-ipc-empty-${process.pid}.bin`);
@@ -171,6 +173,8 @@ if (!bin) {
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'audio-haxor-ipc-dir-'));
       tmpWav = path.join(os.tmpdir(), `audio-haxor-ipc-${process.pid}.wav`);
       fs.writeFileSync(tmpWav, pcm16WavMono(44100, 8192));
+      tmpWavTiny = path.join(os.tmpdir(), `audio-haxor-ipc-tiny-${process.pid}.wav`);
+      fs.writeFileSync(tmpWavTiny, pcm16WavMono(44100, 4));
     });
 
     after(() => {
@@ -189,6 +193,11 @@ if (!bin) {
       } catch {
         /* ignore */
       }
+      try {
+        fs.unlinkSync(tmpWavTiny);
+      } catch {
+        /* ignore */
+      }
     });
 
     it('ping returns ok, version matches CMake project, host juce', async () => {
@@ -199,6 +208,31 @@ if (!bin) {
       assert.equal(j.host, 'juce');
       assert.equal(typeof j.version, 'string');
       assert.equal(j.version, cmakeVersion);
+    });
+
+    it('engine_state returns ok, version, host, stream and input_stream objects', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'engine_state' })], {
+        timeoutMs: 90_000,
+      });
+      assert.equal(outLines.length, 1);
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.host, 'juce');
+      assert.equal(j.version, cmakeVersion);
+      assert.ok(j.stream && typeof j.stream === 'object');
+      assert.equal(j.stream.ok, true);
+      assert.ok('running' in j.stream);
+      assert.ok(j.input_stream && typeof j.input_stream === 'object');
+      assert.equal(j.input_stream.ok, true);
+      assert.ok('running' in j.input_stream);
+    });
+
+    it('unknown cmd returns ok:false and unknown cmd error', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'not_a_real_command_xyz' })]);
+      assert.equal(outLines.length, 1);
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown cmd/i);
     });
 
     it('bad JSON line yields ok:false and bad JSON error', async () => {
@@ -430,6 +464,156 @@ if (!bin) {
       const j = JSON.parse(outLines[0]);
       assert.equal(j.ok, true);
       assert.equal(j.loop, true);
+    });
+
+    it('playback_set_loop with loop false echoes loop false', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_loop', loop: false })]);
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.loop, false);
+    });
+
+    it('playback_status returns ok with loaded false when no file loaded', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_status' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.loaded, false);
+    });
+
+    it('playback_seek without active player returns no active player', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_seek', position_sec: 1 })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /no active player/i);
+    });
+
+    it('playback_pause returns ok and paused (no playback required)', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_pause' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.paused, true);
+    });
+
+    it('playback_stop returns ok when nothing was playing', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_stop' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+    });
+
+    it('playback_set_dsp returns ok without loaded file', async () => {
+      const { outLines } = await runEngineExchange(bin, [
+        jl({ cmd: 'playback_set_dsp', gain: 0.5, pan: -0.25, eq_low_db: 1, eq_mid_db: -2, eq_high_db: 0 }),
+      ], { timeoutMs: 90_000 });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+    });
+
+    it('output_stream_status returns ok with running false when stream not started', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'output_stream_status' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.running, false);
+    });
+
+    it('input_stream_status returns ok with running false when stream not started', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'input_stream_status' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.running, false);
+    });
+
+    it('set_output_device rejects empty device_id', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'set_output_device', device_id: '' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /device_id required/i);
+    });
+
+    it('set_input_device rejects empty device_id', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'set_input_device', device_id: '' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /device_id required/i);
+    });
+
+    it('start_output_stream with start_playback true rejects when no playback_load', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'start_output_stream', start_playback: true })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /playback_load required before start_playback/i);
+    });
+
+    it('waveform_preview omits width_px defaults to 800 peaks', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'waveform_preview', path: tmpWav })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.width_px, 800);
+      assert.ok(Array.isArray(j.peaks));
+      assert.equal(j.peaks.length, 800);
+    });
+
+    it('waveform_preview start_sec at file end yields empty segment', async () => {
+      const { outLines: first } = await runEngineExchange(bin, [jl({ cmd: 'waveform_preview', path: tmpWav })], {
+        timeoutMs: 90_000,
+      });
+      const meta = JSON.parse(first[0]);
+      assert.equal(meta.ok, true);
+      const fileDur = meta.file_duration_sec;
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'waveform_preview', path: tmpWav, start_sec: fileDur })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /empty segment/i);
+    });
+
+    it('spectrogram_preview clamps width_px below minimum (4 → 16)', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'spectrogram_preview', path: tmpWav, width_px: 4, height_px: 32, fft_order: 8 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.width_px, 16);
+      assert.equal(j.height_px, 32);
+      assert.ok(Array.isArray(j.rows));
+      assert.equal(j.rows.length, 32);
+    });
+
+    it('spectrogram_preview rejects segment too short on tiny WAV', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'spectrogram_preview', path: tmpWavTiny, width_px: 16, height_px: 16, fft_order: 8 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /segment too short for spectrogram/i);
     });
 
     it('mixed ping + preview validation in one session', async () => {
