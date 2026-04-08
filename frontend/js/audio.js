@@ -3513,7 +3513,7 @@ function _refreshCacheStatsIfSettingsTab(force) {
         const now = Date.now();
         if (!force && now - _lastBgCacheStatsRefreshMs < CACHE_STATS_BG_REFRESH_MS) return;
         _lastBgCacheStatsRefreshMs = now;
-        void renderCacheStats();
+        void renderCacheStats({ silent: true });
     } catch {
         /* ignore */
     }
