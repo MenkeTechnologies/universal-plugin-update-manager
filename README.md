@@ -410,6 +410,8 @@ between plugins. You can stop it anytime with the Stop button.
 
 **Rust cache (CI):** [Swatinem/rust-cache](https://github.com/Swatinem/rust-cache) must use `workspaces: .` (repo root). The virtual `[workspace]` writes **`target/`** at the repository root (`cargo metadata` → `target_directory`); `workspaces: src-tauri` would cache **`src-tauri/target`**, which this layout does not use and can misalign CI artifacts (e.g. Windows test runs).
 
+**Concurrency (CI):** The workflow cancels superseded runs (`cancel-in-progress`) per ref so rapid pushes do not leave dozens of full matrix jobs queued behind each other; the latest commit is what should finish.
+
 ```
 Cargo.toml (repo root) -- Cargo workspace: member `src-tauri` (`audio-haxor` app). **AudioEngine** (`audio-engine` binary) is a **C++/JUCE** CMake target (not a Cargo crate); `audio-engine/README.md` + `scripts/build-audio-engine.mjs` build it into `audio-engine-artifacts/<debug|release>/audio-engine` (kept out of Cargo `target/`). Shared `target/` at repo root is Rust-only. Locale JSON must use the **same `{placeholder}` names** as English for `appFmt`; `scripts/sync_i18n_placeholders_from_en.py` copies English strings for any key that drifts (run after bulk locale edits if `cargo test` seed tests fail).
 

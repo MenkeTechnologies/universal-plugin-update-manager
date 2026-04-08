@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Rapid pushes otherwise queue many full matrix runs; cancel older work on the same ref so the
+# latest commit is what finishes (saves queue time and avoids stale red X from superseded SHAs).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}
