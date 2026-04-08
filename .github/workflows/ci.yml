@@ -80,19 +80,40 @@ jobs:
 
       # Swatinem/rust-cache can restore an old `target/debug` that still had JUCE/MSVC outputs
       # from before audio-engine moved to `audio-engine-artifacts/` — stray DLLs next to Cargo's
-      # outputs break `cargo test` with STATUS_ENTRYPOINT_NOT_FOUND on Windows.
+      # outputs break `cargo test` with STATUS_ENTRYPOINT_NOT_FOUND on Windows. Test binaries run
+      # from `target/debug/deps/`; Windows resolves DLLs from that directory first, so clean both
+      # `target/debug` and `target/debug/deps`, not the debug root alone.
       - name: Clean legacy JUCE/MSVC junk from target/debug (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
+          function Remove-JuceSidecars([string]$dir) {
+            if (-not (Test-Path $dir)) { return }
+            Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $dir 'audio-engine.exe')
+            Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $dir 'audio-engine.pdb')
+            Get-ChildItem -Path $dir -File -Filter *.dll | Remove-Item -Force -ErrorAction SilentlyContinue
+          }
           $td = Join-Path $env:GITHUB_WORKSPACE 'target/debug'
-          if (-not (Test-Path $td)) { exit 0 }
-          Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $td 'audio-engine.exe')
-          Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $td 'audio-engine.pdb')
-          Get-ChildItem -Path $td -File -Filter *.dll | Remove-Item -Force -ErrorAction SilentlyContinue
+          Remove-JuceSidecars $td
+          Remove-JuceSidecars (Join-Path $td 'deps')
 
       - name: Run Rust tests (library)
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+      # Second pass: integration `cargo test` can relink and drop MSVC/JUCE DLLs into deps/ again.
+      - name: Clean legacy JUCE/MSVC junk from target/debug (Windows, before integration tests)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          function Remove-JuceSidecars([string]$dir) {
+            if (-not (Test-Path $dir)) { return }
+            Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $dir 'audio-engine.exe')
+            Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $dir 'audio-engine.pdb')
+            Get-ChildItem -Path $dir -File -Filter *.dll | Remove-Item -Force -ErrorAction SilentlyContinue
+          }
+          $td = Join-Path $env:GITHUB_WORKSPACE 'target/debug'
+          Remove-JuceSidecars $td
+          Remove-JuceSidecars (Join-Path $td 'deps')
 
       - name: Run Rust tests (behavioral_ultra + app_i18n + i18n catalog seed guards)
         run: cargo test --manifest-path src-tauri/Cargo.toml --test behavioral_ultra --test app_i18n_test --test i18n_catalog_html_guard_buckets --test i18n_catalog_no_nul_guard_buckets --test i18n_catalog_no_unsafe_char_guard_buckets
