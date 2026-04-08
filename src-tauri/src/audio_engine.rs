@@ -345,6 +345,20 @@ pub fn spawn_audio_engine_request(request: &serde_json::Value) -> Result<serde_j
     spawn_audio_engine_request_at(request)
 }
 
+/// Tauri may pass `{ "request": { "cmd": ... } }` from `invoke(..., { request: payload })`; unwrap so
+/// stdin matches the audio-engine line protocol. If the top-level object already has `cmd`, it is
+/// left unchanged (even when `request` is also present).
+pub(crate) fn normalize_ipc_request_payload(v: &serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = v.as_object() {
+        if !obj.contains_key("cmd") {
+            if let Some(inner) = obj.get("request") {
+                return inner.clone();
+            }
+        }
+    }
+    v.clone()
+}
+
 /// One response is one JSON object/array per line. A linked library may print warnings to **stdout**
 /// before the JSON line (e.g. `Warning: thread locking is not implemented`), which would break
 /// `serde_json::from_str` on the first `read_line`. Skip lines until one starts with `{` or `[`.
@@ -466,13 +480,63 @@ fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_js
 mod tests {
     use std::io::{BufReader, Cursor};
 
-    use super::read_engine_json_line;
+    use super::{normalize_ipc_request_payload, read_engine_json_line};
+    use serde_json::json;
 
     #[test]
     fn parse_engine_response_line() {
         let s = r#"{"ok":true,"version":"1.0.0"}"#;
         let v: serde_json::Value = serde_json::from_str(s).unwrap();
         assert_eq!(v["ok"], true);
+    }
+
+    #[test]
+    fn audio_engine_stub_default_and_json_roundtrip() {
+        let s = super::AudioEngineStub::default();
+        assert_eq!(s.state, "not_started");
+        let v = serde_json::to_value(&s).unwrap();
+        let back: super::AudioEngineStub = serde_json::from_value(v).unwrap();
+        assert_eq!(back.state, "not_started");
+    }
+
+    #[test]
+    fn normalize_ipc_request_payload_passes_through_when_cmd_present() {
+        let v = json!({ "cmd": "ping", "request": { "cmd": "other" } });
+        let n = normalize_ipc_request_payload(&v);
+        assert_eq!(n, v);
+    }
+
+    #[test]
+    fn normalize_ipc_request_payload_unwraps_tauri_request_wrapper() {
+        let v = json!({ "request": { "cmd": "ping", "x": 1 } });
+        let n = normalize_ipc_request_payload(&v);
+        assert_eq!(n, json!({ "cmd": "ping", "x": 1 }));
+    }
+
+    #[test]
+    fn normalize_ipc_request_payload_unwraps_when_no_top_level_cmd() {
+        let v = json!({ "foo": true, "request": { "cmd": "engine_state" } });
+        let n = normalize_ipc_request_payload(&v);
+        assert_eq!(n, json!({ "cmd": "engine_state" }));
+    }
+
+    #[test]
+    fn normalize_ipc_request_payload_leaves_non_object_unchanged() {
+        let v = json!("literal");
+        assert_eq!(normalize_ipc_request_payload(&v), v);
+    }
+
+    #[test]
+    fn normalize_ipc_request_payload_empty_object_unchanged() {
+        let v = json!({});
+        assert_eq!(normalize_ipc_request_payload(&v), json!({}));
+    }
+
+    #[test]
+    fn normalize_ipc_request_payload_does_not_unwrap_when_cmd_key_is_empty_string() {
+        let v = json!({ "cmd": "", "request": { "cmd": "ping" } });
+        let n = normalize_ipc_request_payload(&v);
+        assert_eq!(n, v);
     }
 
     #[test]
@@ -489,5 +553,61 @@ mod tests {
         let mut r = BufReader::new(Cursor::new(data));
         let line = read_engine_json_line(&mut r).unwrap();
         assert_eq!(line, r#"{"ok":false}"#);
+    }
+
+    #[test]
+    fn read_engine_json_line_accepts_json_array_line() {
+        let data = b"[1,2,3]\n";
+        let mut r = BufReader::new(Cursor::new(&data[..]));
+        let line = read_engine_json_line(&mut r).unwrap();
+        assert_eq!(line, "[1,2,3]");
+    }
+
+    #[test]
+    fn read_engine_json_line_trims_leading_whitespace_before_json() {
+        let data = b"   {\"a\":1}\n";
+        let mut r = BufReader::new(Cursor::new(&data[..]));
+        let line = read_engine_json_line(&mut r).unwrap();
+        assert_eq!(line, r#"{"a":1}"#);
+    }
+
+    #[test]
+    fn read_engine_json_line_skips_empty_and_blank_lines() {
+        let data = b"  \n\t\nnot json\n{\"ok\":true}\n";
+        let mut r = BufReader::new(Cursor::new(&data[..]));
+        let line = read_engine_json_line(&mut r).unwrap();
+        assert_eq!(line, r#"{"ok":true}"#);
+    }
+
+    #[test]
+    fn read_engine_json_line_eof_on_empty_stream() {
+        let data: &[u8] = b"";
+        let mut r = BufReader::new(Cursor::new(data));
+        let err = read_engine_json_line(&mut r).unwrap_err();
+        assert_eq!(err, "audio-engine closed stdout");
+    }
+
+    #[test]
+    fn read_engine_json_line_errors_after_max_non_json_lines() {
+        let mut s = String::with_capacity(256 * 6 + 32);
+        for _ in 0..256 {
+            s.push_str("noise\n");
+        }
+        s.push_str(r#"{"ok":true}"#);
+        s.push('\n');
+        let mut r = BufReader::new(Cursor::new(s.into_bytes()));
+        let err = read_engine_json_line(&mut r).unwrap_err();
+        assert!(
+            err.contains("exceeded line read limit"),
+            "unexpected err: {err}"
+        );
+    }
+
+    #[test]
+    fn read_engine_json_line_multiple_warnings_before_object() {
+        let data = b"Warning: a\nWarning: b\n{\"x\":0}\n";
+        let mut r = BufReader::new(Cursor::new(&data[..]));
+        let line = read_engine_json_line(&mut r).unwrap();
+        assert_eq!(line, r#"{"x":0}"#);
     }
 }

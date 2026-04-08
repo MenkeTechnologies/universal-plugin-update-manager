@@ -235,6 +235,20 @@ if (!bin) {
       assert.match(String(j.error || ''), /unknown cmd/i);
     });
 
+    it('empty object (no cmd) returns unknown cmd error', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({})], { timeoutMs: 90_000 });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown cmd/i);
+    });
+
+    it('empty cmd string returns unknown cmd error', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: '' })], { timeoutMs: 90_000 });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown cmd/i);
+    });
+
     it('bad JSON line yields ok:false and bad JSON error', async () => {
       const { outLines } = await runEngineExchange(bin, ['not valid json {{{']);
       assert.equal(outLines.length, 1);
@@ -640,6 +654,42 @@ if (!bin) {
       assert.equal(j.fft_size, 8192);
     });
 
+    it('spectrogram_preview clamps width_px above maximum (9999 → 512)', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'spectrogram_preview', path: tmpWav, width_px: 9999, height_px: 32, fft_order: 8 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.width_px, 512);
+      assert.equal(j.rows[0].length, 512);
+    });
+
+    it('spectrogram_preview clamps height_px above maximum (9999 → 512)', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'spectrogram_preview', path: tmpWav, width_px: 32, height_px: 9999, fft_order: 8 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.height_px, 512);
+      assert.equal(j.rows.length, 512);
+    });
+
+    it('waveform_preview succeeds on very short WAV (4 samples)', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'waveform_preview', path: tmpWavTiny, width_px: 32 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.width_px, 32);
+      assert.equal(j.peaks.length, 32);
+    });
+
     it('playback_set_speed clamps below minimum to 0.25', async () => {
       const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_speed', speed: 0.01 })], {
         timeoutMs: 90_000,
@@ -665,6 +715,24 @@ if (!bin) {
       const j = JSON.parse(outLines[0]);
       assert.equal(j.ok, true);
       assert.equal(j.reverse, true);
+    });
+
+    it('playback_set_reverse false echoes reverse false', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_reverse', reverse: false })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.reverse, false);
+    });
+
+    it('playback_pause with paused false returns ok', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_pause', paused: false })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.paused, false);
     });
 
     it('set_output_tone fails when no output stream', async () => {
@@ -753,6 +821,93 @@ if (!bin) {
       });
       const j = JSON.parse(outLines[0]);
       assert.equal(j.ok, true);
+    });
+
+    it('playback_set_inserts with empty paths array clears chain', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_inserts', paths: [] })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.ok(Array.isArray(j.insert_paths));
+      assert.equal(j.insert_paths.length, 0);
+    });
+
+    it('playback_set_inserts rejects omitted paths', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_inserts' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /paths must be an array/i);
+    });
+
+    it('playback_set_inserts rejects non-array paths', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'playback_set_inserts', paths: 'not-an-array' })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /paths must be an array/i);
+    });
+
+    it('list_output_devices returns ok with devices array', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'list_output_devices' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.ok(Array.isArray(j.devices));
+    });
+
+    it('list_input_devices returns ok with devices array', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'list_input_devices' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.ok(Array.isArray(j.devices));
+    });
+
+    it('get_output_device_info with empty device_id falls back to first device', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'get_output_device_info', device_id: '' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.ok(typeof j.device_name === 'string' && j.device_name.length > 0);
+      assert.ok(typeof j.sample_rate_hz === 'number');
+    });
+
+    it('get_input_device_info with empty device_id falls back to first device', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'get_input_device_info', device_id: '' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.ok(typeof j.device_name === 'string' && j.device_name.length > 0);
+      assert.ok(typeof j.sample_rate_hz === 'number');
+    });
+
+    it('plugin_rescan accepts timeout_sec in valid range', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'plugin_rescan', timeout_sec: 120 })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+    });
+
+    it('spectrogram_preview clamps fft_order below minimum (4 → 8)', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'spectrogram_preview', path: tmpWav, width_px: 16, height_px: 16, fft_order: 4 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.fft_size, 256);
     });
 
     it('playback_load then playback_status in one session reports loaded', async () => {
