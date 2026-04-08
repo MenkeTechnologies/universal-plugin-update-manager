@@ -924,7 +924,15 @@ if (!bin) {
       assert.ok(Array.isArray(j.devices));
     });
 
-    it('get_output_device_info with empty device_id falls back to first device', async () => {
+    it('get_output_device_info with empty device_id falls back to first device', async (t) => {
+      const listOut = await runEngineExchange(bin, [jl({ cmd: 'list_output_devices' })], {
+        timeoutMs: 90_000,
+      });
+      const listed = JSON.parse(listOut.outLines[0]);
+      if (!listed.ok || !Array.isArray(listed.devices) || listed.devices.length === 0) {
+        t.skip('no output devices enumerated (e.g. headless CI)');
+        return;
+      }
       const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'get_output_device_info', device_id: '' })], {
         timeoutMs: 90_000,
       });
@@ -934,7 +942,15 @@ if (!bin) {
       assert.ok(typeof j.sample_rate_hz === 'number');
     });
 
-    it('get_input_device_info with empty device_id falls back to first device', async () => {
+    it('get_input_device_info with empty device_id falls back to first device', async (t) => {
+      const listOut = await runEngineExchange(bin, [jl({ cmd: 'list_input_devices' })], {
+        timeoutMs: 90_000,
+      });
+      const listed = JSON.parse(listOut.outLines[0]);
+      if (!listed.ok || !Array.isArray(listed.devices) || listed.devices.length === 0) {
+        t.skip('no input devices enumerated (e.g. headless CI)');
+        return;
+      }
       const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'get_input_device_info', device_id: '' })], {
         timeoutMs: 90_000,
       });
