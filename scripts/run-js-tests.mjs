@@ -4,9 +4,8 @@
  * (Windows `cmd` / PowerShell do not expand `test/*.test.js` the same as bash).
  *
  * Excludes `test/audio-engine-ipc.test.js` (spawned JUCE binary; use `run-audio-engine-tests.mjs`).
- * Spawns in batches: the full argv list (~8.4k chars for 295 files) exceeds
- * Windows CreateProcess command-line limit (~8191), so CI would fail on
- * windows-latest without chunking.
+ * Spawns in batches: the full `node --test` argv can exceed Windows CreateProcess
+ * command-line limit (~8191 chars), so CI would fail on windows-latest without chunking.
  */
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';

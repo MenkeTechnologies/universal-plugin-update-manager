@@ -276,7 +276,7 @@ pnpm run test:audio-engine
 
 **AudioEngine** IPC tests spawn `audio-engine-artifacts/<debug|release>/audio-engine` (see `pnpm run test:audio-engine`). They are **not** included in `pnpm run test:js` so the main JS suite stays runnable without CMake. GitHub Actions runs them **after** `prepare-audio-engine-audioengine.mjs`; on **Linux** the workflow uses **`xvfb-run`** because JUCE needs a display.
 
-The **`pnpm run test:js`** suite also includes **vm-loaded** frontend regression tests (e.g. drag-reorder `handleSelector` / `restoreAnchor` paths and **settings-section** sibling ordering aligned with the context menu move up/down behavior).
+The **`pnpm run test:js`** suite is limited to tests that **read or execute repository sources**: **vm-loaded** frontend modules via `test/frontend-vm-harness.js`, **i18n** / **HTML** / **JS** catalog guards (`readFileSync` on `i18n/` and `frontend/`), plus the **audio-engine** IPC file (invoked only from `pnpm run test:audio-engine` / CI, not from `run-js-tests.mjs`). Standalone `node:test` files that only exercised inline algorithms (no app imports) were removed.
 
 ---
 
