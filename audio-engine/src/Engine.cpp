@@ -295,6 +295,45 @@ static juce::var bufferSizeJson(juce::AudioIODevice* dev)
     return o;
 }
 
+/** Smallest supported buffer size >= minFrames; if none, largest available. */
+static int pickNearestSupportedBufferAtLeast(juce::AudioIODevice* dev, int minFrames)
+{
+    if (dev == nullptr || minFrames <= 0)
+        return 0;
+    const juce::Array<int> sizes = dev->getAvailableBufferSizes();
+    if (sizes.isEmpty())
+        return juce::jmax(minFrames, dev->getCurrentBufferSizeSamples());
+    int best = -1;
+    for (int s : sizes)
+    {
+        if (s >= minFrames && (best < 0 || s < best))
+            best = s;
+    }
+    if (best >= 0)
+        return best;
+    int mx = sizes.getFirst();
+    for (int s : sizes)
+        mx = juce::jmax(mx, s);
+    return mx;
+}
+
+/** When the user omits `buffer_frames`, some drivers default to very small buffers (high xrun risk). */
+static constexpr int kStablePlaybackMinFrames = 512;
+
+static void maybeBumpBufferForStablePlayback(juce::AudioDeviceManager& mgr, juce::AudioIODevice*& dev, uint32_t userBf)
+{
+    if (userBf > 0 || dev == nullptr)
+        return;
+    const int cur = dev->getCurrentBufferSizeSamples();
+    const int want = pickNearestSupportedBufferAtLeast(dev, kStablePlaybackMinFrames);
+    if (want <= cur || want <= 0)
+        return;
+    juce::AudioDeviceManager::AudioDeviceSetup s = mgr.getAudioDeviceSetup();
+    s.bufferSize = want;
+    mgr.setAudioDeviceSetup(s, true);
+    dev = mgr.getCurrentAudioDevice();
+}
+
 static juce::String uniqueDeviceId(const juce::String& name, std::unordered_map<juce::String, uint32_t>& seen)
 {
     const auto it = seen.find(name);
@@ -2015,6 +2054,10 @@ struct Engine::Impl
         if (dev == nullptr)
             return errObj("no output device");
 
+        maybeBumpBufferForStablePlayback(outputManager, dev, bf);
+        if (dev == nullptr)
+            return errObj("no output device");
+
         deviceRate.store((uint32_t) dev->getCurrentSampleRate());
 
         outDeviceId = outputIdForDeviceName(outputManager, dev->getName());
@@ -2112,6 +2155,7 @@ struct Engine::Impl
             o->setProperty("sample_format", juce::String("F32"));
             o->setProperty("buffer_size", outBufferSizeJson);
             o->setProperty("stream_buffer_frames", outStreamBufferFrames.has_value() ? juce::var(*outStreamBufferFrames) : juce::var());
+            o->setProperty("current_buffer_frames", dev != nullptr ? dev->getCurrentBufferSizeSamples() : 0);
             o->setProperty("tone_supported", true);
             o->setProperty("tone_on", !startPlayback && tone);
             o->setProperty("note", startPlayback ? juce::String("file playback via JUCE") : juce::String("silence or test tone"));
@@ -2152,6 +2196,10 @@ struct Engine::Impl
         if (dev == nullptr)
             return errObj("no input device");
 
+        maybeBumpBufferForStablePlayback(inputManager, dev, bf);
+        if (dev == nullptr)
+            return errObj("no input device");
+
         inDeviceId = inputIdForDeviceName(inputManager, dev->getName());
         inDeviceName = dev->getName();
         inSampleRate = (int) dev->getCurrentSampleRate();
@@ -2174,6 +2222,7 @@ struct Engine::Impl
             o->setProperty("sample_format", juce::String("F32"));
             o->setProperty("buffer_size", inBufferSizeJson);
             o->setProperty("stream_buffer_frames", inStreamBufferFrames.has_value() ? juce::var(*inStreamBufferFrames) : juce::var());
+            o->setProperty("current_buffer_frames", dev != nullptr ? dev->getCurrentBufferSizeSamples() : 0);
             o->setProperty("input_peak", 0.0);
             o->setProperty("note", "input capture running; samples discarded; input_peak is block peak with decay");
         }
@@ -2253,6 +2302,12 @@ struct Engine::Impl
         o->setProperty("sample_format", juce::String("F32"));
         o->setProperty("buffer_size", outBufferSizeJson);
         o->setProperty("stream_buffer_frames", outStreamBufferFrames.has_value() ? juce::var(*outStreamBufferFrames) : juce::var());
+        {
+            int curBf = 0;
+            if (juce::AudioIODevice* d = outputManager.getCurrentAudioDevice())
+                curBf = d->getCurrentBufferSizeSamples();
+            o->setProperty("current_buffer_frames", curBf);
+        }
         o->setProperty("tone_supported", true);
         o->setProperty("tone_on", toneMode && toneSource.toneOn.load());
         return o;
@@ -2286,6 +2341,12 @@ struct Engine::Impl
         o->setProperty("sample_format", juce::String("F32"));
         o->setProperty("buffer_size", inBufferSizeJson);
         o->setProperty("stream_buffer_frames", inStreamBufferFrames.has_value() ? juce::var(*inStreamBufferFrames) : juce::var());
+        {
+            int curBf = 0;
+            if (juce::AudioIODevice* d = inputManager.getCurrentAudioDevice())
+                curBf = d->getCurrentBufferSizeSamples();
+            o->setProperty("current_buffer_frames", curBf);
+        }
         o->setProperty("input_peak", inputCb.peak.load());
         return o;
     }
