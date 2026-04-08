@@ -2605,6 +2605,9 @@ async function previewAudio(filePath) {
                 audioReverseMode = false;
                 syncReversePlaybackButtons(false);
             }
+            if (typeof window.syncEnginePlaybackLoop === 'function') {
+                window.syncEnginePlaybackLoop(audioLooping);
+            }
         } else {
             if (_enginePlaybackActive && typeof window.enginePlaybackStop === 'function') {
                 void window.enginePlaybackStop();
@@ -2715,6 +2718,9 @@ function toggleAudioLoop() {
     prefs.setItem('audioLoop', audioLooping ? 'on' : 'off');
     document.getElementById('npBtnLoop').classList.toggle('active', audioLooping);
     updateLoopBtnStates();
+    if (_enginePlaybackActive && typeof window.syncEnginePlaybackLoop === 'function') {
+        window.syncEnginePlaybackLoop(audioLooping);
+    }
 }
 
 function toggleRowLoop(filePath, event) {
@@ -2723,6 +2729,7 @@ function toggleRowLoop(filePath, event) {
     if (audioPlayerPath !== filePath) {
         audioLooping = true;
         audioPlayer.loop = true;
+        prefs.setItem('audioLoop', 'on');
         document.getElementById('npBtnLoop').classList.add('active');
         previewAudio(filePath);
         updateLoopBtnStates();

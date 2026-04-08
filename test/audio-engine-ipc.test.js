@@ -425,6 +425,13 @@ if (!bin) {
       assert.equal(j.height_px, 32);
     });
 
+    it('playback_set_loop returns ok (no active playback required)', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_loop', loop: true })]);
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.loop, true);
+    });
+
     it('mixed ping + preview validation in one session', async () => {
       const lines = [
         jl({ cmd: 'ping' }),

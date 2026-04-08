@@ -2053,6 +2053,23 @@ function syncEnginePlaybackSpeedFromPrefs() {
     void inv({cmd: 'playback_set_speed', speed: s});
 }
 
+/** Full-file loop → `playback_set_loop` on the JUCE reader path (forward playback only; engine reverse decode has no reader loop). */
+function syncEnginePlaybackLoop(loop) {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) return;
+    void inv({cmd: 'playback_set_loop', loop: !!loop});
+}
+
+function syncEnginePlaybackLoopFromPrefs() {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) return;
+    const on =
+        typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+            ? prefs.getItem('audioLoop') === 'on'
+            : false;
+    void inv({cmd: 'playback_set_loop', loop: on});
+}
+
 /**
  * Reopen output with `start_playback: true` (AudioEngine `start_output_stream` stops any prior stream first).
  * Used when reverse mode toggles (new rodio source).
@@ -2080,6 +2097,7 @@ async function enginePlaybackRestartStream() {
     throwIfAeNotOk(r, 'start_output_stream failed');
     syncEnginePlaybackDspFromPrefs();
     syncEnginePlaybackSpeedFromPrefs();
+    syncEnginePlaybackLoopFromPrefs();
 }
 
 /** Pref `audioReverse` on at load: decode reversed PCM in AudioEngine and reopen stream (see `playback_set_reverse`). */
@@ -2163,6 +2181,8 @@ if (typeof window !== 'undefined') {
     window.enginePlaybackRestartStream = enginePlaybackRestartStream;
     window.syncEnginePlaybackDspFromPrefs = syncEnginePlaybackDspFromPrefs;
     window.syncEnginePlaybackSpeedFromPrefs = syncEnginePlaybackSpeedFromPrefs;
+    window.syncEnginePlaybackLoop = syncEnginePlaybackLoop;
+    window.syncEnginePlaybackLoopFromPrefs = syncEnginePlaybackLoopFromPrefs;
     window.engineApplyReversePrefPlayback = engineApplyReversePrefPlayback;
     window.stopEnginePlaybackPoll = stopEnginePlaybackPoll;
     window.startEnginePlaybackPoll = startEnginePlaybackPoll;

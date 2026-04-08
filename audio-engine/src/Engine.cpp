@@ -1151,6 +1151,8 @@ struct Engine::Impl
     uint32_t sessionSrcRate = 44100;
     std::atomic<uint32_t> deviceRate{0};
     bool reverseWanted = false;
+    /** Forward path: `AudioFormatReaderSource::setLooping`. Stored for new streams and live updates. */
+    bool playbackLoopWanted = false;
     bool paused = false;
 
     juce::VST3PluginFormat vst3;
@@ -2050,6 +2052,8 @@ struct Engine::Impl
 
             transport.setSource(fileSource.get(), 0, nullptr, (double) sessionSrcRate);
             fileSource->insertChain = insertRunner.get();
+            if (!reverseWanted)
+                fileSource->setLooping(playbackLoopWanted);
             sourcePlayer.setSource(&transport);
             outputManager.addAudioCallback(&sourcePlayer);
             transport.start();
@@ -2643,6 +2647,18 @@ juce::var Engine::dispatch(const juce::var& req)
         juce::var out = okObj();
         if (auto* o = out.getDynamicObject())
             o->setProperty("reverse", en);
+        return out;
+    }
+
+    if (cmd == "playback_set_loop")
+    {
+        const bool loop = req["loop"].isVoid() ? false : (bool) req["loop"];
+        impl->playbackLoopWanted = loop;
+        if (impl->playbackMode && impl->fileSource != nullptr && !impl->reverseWanted)
+            impl->fileSource->setLooping(loop);
+        juce::var out = okObj();
+        if (auto* o = out.getDynamicObject())
+            o->setProperty("loop", loop);
         return out;
     }
 
