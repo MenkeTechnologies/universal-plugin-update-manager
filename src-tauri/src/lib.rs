@@ -2386,8 +2386,8 @@ async fn pdf_metadata_extract_batch(
     .map_err(|e| e.to_string())
 }
 
-/// Get paths from latest PDF scan that don't yet have metadata — caller uses this
-/// to kick off a background extraction pass.
+/// Paths in the PDF library (`pdf_library`) with no `pdf_metadata` row yet — used to kick off
+/// background page-count extraction for the whole inventory, not only the latest scan.
 #[tauri::command]
 async fn pdf_metadata_unindexed(limit: Option<u64>) -> Result<Vec<String>, String> {
     let lim = limit.unwrap_or(100000);

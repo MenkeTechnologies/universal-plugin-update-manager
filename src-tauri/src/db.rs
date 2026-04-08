@@ -6239,33 +6239,22 @@ DROP TABLE _pl_refresh_paths;"#;
 
     // ── PDF metadata (page count) ──
 
-    /// Return paths from the latest PDF scan that don't yet have metadata cached.
+    /// Paths in the materialized PDF **library** (newest row per filesystem path) that have no
+    /// `pdf_metadata` row yet. Uses `pdf_library`, not “latest scan only”, so PDFs whose
+    /// canonical `pdfs` row belongs to an older completed scan are still queued for page counts.
     pub fn unindexed_pdf_paths(&self, limit: u64) -> Result<Vec<String>, String> {
         let conn = self.read_conn();
-        let scan_id: String = conn
-            .query_row(
-                "SELECT id FROM pdf_scans WHERE scan_complete = 1 ORDER BY timestamp DESC LIMIT 1",
-                [],
-                |r| r.get(0),
-            )
-            .optional()
-            .map_err(|e| e.to_string())?
-            .unwrap_or_default();
-        if scan_id.is_empty() {
-            return Ok(vec![]);
-        }
         let mut stmt = conn
             .prepare(
                 "SELECT p.path FROM pdfs p
+             INNER JOIN pdf_library lib ON lib.pdf_id = p.id
              LEFT JOIN pdf_metadata m ON m.path = p.path
-             WHERE p.scan_id = ?1 AND m.path IS NULL
-             LIMIT ?2",
+             WHERE m.path IS NULL
+             LIMIT ?1",
             )
             .map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map(params![scan_id, limit as i64], |row| {
-                row.get::<_, String>(0)
-            })
+            .query_map(params![limit as i64], |row| row.get::<_, String>(0))
             .map_err(|e| e.to_string())?;
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())
@@ -9469,6 +9458,13 @@ mod tests {
         assert_eq!(res.pdfs.len(), 2);
         assert_eq!(res.pdfs[0].name, "new");
         assert_eq!(res.pdfs[1].name, "old");
+
+        // Regression: unindexed paths must include every library path missing metadata, not only
+        // PDFs whose `pdfs.scan_id` is the latest completed scan (otherwise /a/old.pdf would
+        // never be queued for page-count extraction).
+        let mut unindexed = db.unindexed_pdf_paths(100).unwrap();
+        unindexed.sort();
+        assert_eq!(unindexed, vec!["/a/old.pdf".to_string(), "/b/new.pdf".to_string()]);
     }
 
     #[test]
