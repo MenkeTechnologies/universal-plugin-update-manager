@@ -1312,6 +1312,8 @@ window.vstUpdater = {
     readProjectFile: (filePath) => invoke('read_project_file', {filePath}),
     // Preferences (file-backed)
     getProcessStats: () => invoke('get_process_stats'),
+    /** Subprocess `audio-engine`: same RSS/VIRT/CPU/thread/FD probes as the main header (`get_process_stats`). */
+    getAudioEngineProcessStats: () => invoke('get_audio_engine_process_stats'),
     getActiveScanInventoryCounts: () => invoke('get_active_scan_inventory_counts'),
     openPrefsFile: () => invoke('open_prefs_file'),
     getPrefsPath: () => invoke('get_prefs_path'),

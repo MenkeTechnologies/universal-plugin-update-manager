@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <meta content="AUDIO_HAXOR v1.18.12 — Tauri desktop app: VST/VST3/AU/CLAP plugin scanner, audio samples, DAW projects, KVR updates, SQLite history."
+    <meta content="AUDIO_HAXOR v1.18.13 — Tauri desktop app: VST/VST3/AU/CLAP plugin scanner, audio samples, DAW projects, KVR updates, SQLite history."
           name="description">
     <meta content="AUDIO_HAXOR" name="application-name">
     <title data-i18n="ui.page_title">AUDIO_HAXOR</title>
@@ -9178,6 +9178,32 @@
                         <div id="aeEngineStatus" class="ae-mono" style="font-size:13px;">—</div>
                         <div id="aeStreamStatus" class="ae-mono" style="margin-top:8px;font-size:12px;">—</div>
                         <div id="aeInputStreamStatus" class="ae-mono" style="margin-top:8px;font-size:12px;line-height:1.4;">—</div>
+                        <div id="aeProcessStatsInactive" class="ae-mono" style="display:none;margin-top:12px;font-size:12px;color:var(--text-muted);line-height:1.5;" data-i18n="ui.ae.process_stats_not_running">—</div>
+                        <div class="header-info" id="aeProcessStats" style="flex-wrap:wrap;gap:4px 12px;margin-top:12px;">
+                            <div class="header-info-item" data-i18n-title="ui.tt.cpu_cores" title="CPU cores"><span
+                                    data-i18n="ui.hdr.abbr_cores">CORES</span> <span class="header-info-value" id="aeStatCores">--</span>
+                            </div>
+                            <div class="header-info-item" data-i18n-title="ui.tt.cpu_usage" title="CPU usage (%)"><span
+                                    data-i18n="ui.hdr.abbr_cpu">CPU</span> <span class="header-info-value" id="aeStatCpu">--</span></div>
+                            <div class="header-info-item" data-i18n-title="ui.tt.resident_memory_rss"
+                                 title="Resident memory (RSS)"><span data-i18n="ui.hdr.abbr_rss">RSS</span> <span
+                                    class="header-info-value" id="aeStatRss">--</span></div>
+                            <div class="header-info-item" data-i18n-title="ui.tt.virtual_memory" title="Virtual memory"><span
+                                    data-i18n="ui.hdr.abbr_virt">VIRT</span> <span class="header-info-value"
+                                                                                   id="aeStatVirt">--</span></div>
+                            <div class="header-info-item" data-i18n-title="ui.tt.total_threads" title="Total threads"><span
+                                    data-i18n="ui.hdr.abbr_thr">THR</span> <span class="header-info-value"
+                                                                                 id="aeStatThr">--</span></div>
+                            <div class="header-info-item" data-i18n-title="ui.tt.open_file_descriptors"
+                                 title="Open file descriptors"><span data-i18n="ui.hdr.abbr_fd">FD</span> <span
+                                    class="header-info-value" id="aeStatFd">--</span></div>
+                            <div class="header-info-item" data-i18n-title="ui.tt.process_uptime" title="Process uptime"><span
+                                    data-i18n="ui.hdr.abbr_up">UP</span> <span class="header-info-value"
+                                                                               id="aeStatUp">--</span></div>
+                            <div class="header-info-item" data-i18n-title="ui.tt.process_id" title="Process ID"><span
+                                    data-i18n="ui.hdr.abbr_pid">PID</span> <span class="header-info-value"
+                                                                                 id="aeStatPid">--</span></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -10638,44 +10664,44 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=13794"></script>
-<script src="js/utils.js?v=13794"></script>
-<script src="js/ipc.js?v=13794"></script>
-<script src="js/drag-reorder.js?v=13794"></script>
-<script src="js/modal-drag.js?v=13794"></script>
-<script src="js/columns.js?v=13794"></script>
-<script src="js/notes.js?v=13794"></script>
-<script src="js/favorites.js?v=13794"></script>
-<script src="js/export.js?v=13794"></script>
-<script src="js/plugins.js?v=13794"></script>
-<script src="js/settings.js?v=13794"></script>
-<script src="js/history.js?v=13794"></script>
-<script src="js/kvr.js?v=13794"></script>
-<script src="js/audio.js?v=13794"></script>
-<script src="js/daw.js?v=13794"></script>
-<script src="js/disk-usage.js?v=13794"></script>
-<script src="js/presets.js?v=13794"></script>
-<script src="js/batch-select.js?v=13794"></script>
-<script src="js/native-file-drag.js?v=13794"></script>
-<script src="js/sort-persist.js?v=13794"></script>
-<script src="js/multi-filter.js?v=13794"></script>
-<script src="js/file-browser.js?v=13794"></script>
-<script src="js/duplicates.js?v=13794"></script>
-<script src="js/command-palette.js?v=13794"></script>
-<script src="js/xref.js?v=13794"></script>
-<script src="js/dep-graph.js?v=13794"></script>
-<script src="js/smart-playlists.js?v=13794"></script>
-<script src="js/heatmap-dashboard.js?v=13794"></script>
-<script src="js/midi.js?v=13794"></script>
-<script src="js/pdf.js?v=13794"></script>
-<script src="js/settings-search.js?v=13794"></script>
-<script src="js/visualizer.js?v=13794"></script>
-<script src="js/walker-status.js?v=13794"></script>
-<script src="js/audio-engine.js?v=13794"></script>
-<script src="js/context-menu.js?v=13794"></script>
-<script src="js/shortcuts.js?v=13794"></script>
-<script src="js/help-overlay.js?v=13794"></script>
-<script src="js/keyboard-nav.js?v=13794"></script>
-<script src="js/app.js?v=13794"></script>
+<script src="js/i18n-ui.js?v=65409"></script>
+<script src="js/utils.js?v=65409"></script>
+<script src="js/ipc.js?v=65409"></script>
+<script src="js/drag-reorder.js?v=65409"></script>
+<script src="js/modal-drag.js?v=65409"></script>
+<script src="js/columns.js?v=65409"></script>
+<script src="js/notes.js?v=65409"></script>
+<script src="js/favorites.js?v=65409"></script>
+<script src="js/export.js?v=65409"></script>
+<script src="js/plugins.js?v=65409"></script>
+<script src="js/settings.js?v=65409"></script>
+<script src="js/history.js?v=65409"></script>
+<script src="js/kvr.js?v=65409"></script>
+<script src="js/audio.js?v=65409"></script>
+<script src="js/daw.js?v=65409"></script>
+<script src="js/disk-usage.js?v=65409"></script>
+<script src="js/presets.js?v=65409"></script>
+<script src="js/batch-select.js?v=65409"></script>
+<script src="js/native-file-drag.js?v=65409"></script>
+<script src="js/sort-persist.js?v=65409"></script>
+<script src="js/multi-filter.js?v=65409"></script>
+<script src="js/file-browser.js?v=65409"></script>
+<script src="js/duplicates.js?v=65409"></script>
+<script src="js/command-palette.js?v=65409"></script>
+<script src="js/xref.js?v=65409"></script>
+<script src="js/dep-graph.js?v=65409"></script>
+<script src="js/smart-playlists.js?v=65409"></script>
+<script src="js/heatmap-dashboard.js?v=65409"></script>
+<script src="js/midi.js?v=65409"></script>
+<script src="js/pdf.js?v=65409"></script>
+<script src="js/settings-search.js?v=65409"></script>
+<script src="js/visualizer.js?v=65409"></script>
+<script src="js/walker-status.js?v=65409"></script>
+<script src="js/audio-engine.js?v=65409"></script>
+<script src="js/context-menu.js?v=65409"></script>
+<script src="js/shortcuts.js?v=65409"></script>
+<script src="js/help-overlay.js?v=65409"></script>
+<script src="js/keyboard-nav.js?v=65409"></script>
+<script src="js/app.js?v=65409"></script>
 </body>
 </html>

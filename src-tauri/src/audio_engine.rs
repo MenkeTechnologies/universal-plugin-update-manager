@@ -83,6 +83,12 @@ fn clear_engine_pid() {
     ENGINE_CHILD_PID.store(0, Ordering::SeqCst);
 }
 
+/// OS PID of the current AudioEngine subprocess (`Child::id`), or `0` if none has been spawned yet.
+#[inline]
+pub fn audio_engine_child_pid() -> u32 {
+    ENGINE_CHILD_PID.load(Ordering::SeqCst)
+}
+
 /// Hard-kill by PID so quit works even when no [`Child`] handle is available.
 fn kill_pid_raw(pid: u32) {
     if pid == 0 {

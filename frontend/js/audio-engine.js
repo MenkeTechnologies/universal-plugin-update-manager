@@ -24,6 +24,9 @@ let aeInitialDeviceTypeRestored = false;
 /** Incremented at the start of each `refreshAudioEnginePanel` so in-flight plugin-scan polls do not apply stale results. */
 let aePluginChainPollGeneration = 0;
 
+/** Poll AudioEngine subprocess stats (same cadence as main header `updateHeaderInfo`). */
+let aeProcStatsInterval = null;
+
 /** One live toast for plugin scan (`#aePluginScanProgressToast`); updated each poll, not stacked. */
 const AE_PLUGIN_SCAN_PROGRESS_TOAST_ID = 'aePluginScanProgressToast';
 /** When `scan_done` / current plug-in / skipped unchanged, we still show elapsed seconds on the toast. */
@@ -76,6 +79,57 @@ function migrateAeBufferPrefs() {
 function getAeAudioEngineInvoke() {
     const u = typeof window !== 'undefined' ? window.vstUpdater : undefined;
     return u && typeof u.audioEngineInvoke === 'function' ? u.audioEngineInvoke : null;
+}
+
+function aeStartProcessStatsPollingOnce() {
+    if (aeProcStatsInterval != null) return;
+    aeProcStatsInterval = setInterval(() => {
+        if (aeAudioEngineTabIsActive()) void refreshAeProcessStats();
+    }, 3000);
+}
+
+/**
+ * Fetches `get_audio_engine_process_stats` (RSS/VIRT/sysinfo CPU/threads/FDs/uptime) and fills `#aeProcessStats`.
+ */
+async function refreshAeProcessStats() {
+    const u = typeof window !== 'undefined' && window.vstUpdater ? window.vstUpdater : null;
+    if (!u || typeof u.getAudioEngineProcessStats !== 'function') return;
+    const inactive = document.getElementById('aeProcessStatsInactive');
+    const strip = document.getElementById('aeProcessStats');
+    if (!strip) return;
+    try {
+        const s = await u.getAudioEngineProcessStats();
+        if (!s || typeof s !== 'object') return;
+        const set = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        };
+        if (!s.running || !s.pid) {
+            if (inactive) {
+                inactive.style.display = '';
+                inactive.textContent =
+                    typeof catalogFmt === 'function'
+                        ? catalogFmt('ui.ae.process_stats_not_running')
+                        : 'AudioEngine not running.';
+            }
+            strip.style.display = 'none';
+            return;
+        }
+        if (inactive) inactive.style.display = 'none';
+        strip.style.display = '';
+        set('aeStatCores', s.numCpus != null ? String(s.numCpus) : '?');
+        set('aeStatCpu', (Number(s.cpuPercent) || 0).toFixed(1) + '%');
+        const fmtB = typeof formatBytes === 'function' ? formatBytes : (b) => String(b);
+        set('aeStatRss', fmtB(s.rssBytes || 0));
+        set('aeStatVirt', fmtB(s.virtualBytes || 0));
+        set('aeStatThr', s.threads != null ? String(s.threads) : '—');
+        set('aeStatFd', s.openFds != null ? String(s.openFds) : '—');
+        const fmtU = typeof formatUptime === 'function' ? formatUptime : (sec) => String(sec) + 's';
+        set('aeStatUp', fmtU(s.uptimeSecs || 0));
+        set('aeStatPid', s.pid != null ? String(s.pid) : '—');
+    } catch (_) {
+        /* ignore */
+    }
 }
 
 /** @type {ReturnType<typeof setInterval> | null} */
@@ -1104,6 +1158,7 @@ function initAudioEngineTab() {
     if (root.dataset.aeInit === '1') {
         syncAePlaybackControlsFromPrefs();
         void resumeAeInputPeakPollIfNeeded();
+        void refreshAeProcessStats();
         return;
     }
     root.dataset.aeInit = '1';
@@ -1251,6 +1306,7 @@ function initAudioEngineTab() {
         });
     }
 
+    aeStartProcessStatsPollingOnce();
     void refreshAudioEnginePanel();
 }
 
@@ -1544,6 +1600,7 @@ async function refreshAudioEnginePanel() {
 
     if (!inv) {
         aeNotifyNoAudioEngineIpc();
+        void refreshAeProcessStats();
         return;
     }
 
@@ -1671,6 +1728,8 @@ async function refreshAudioEnginePanel() {
     } catch (e) {
         fillAeStreamsFromEngineState(null);
         fillAeEngineStatusFromError(statusEl, e);
+    } finally {
+        void refreshAeProcessStats();
     }
 }
 

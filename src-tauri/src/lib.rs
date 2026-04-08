@@ -3947,6 +3947,180 @@ fn get_thread_count() -> u32 {
     0
 }
 
+/// Per-PID user+system CPU time in microseconds (same units as `libc::rusage` tv_sec/tv_usec combined).
+/// Used so AudioEngine CPU% matches the header formula: `(Δuser + Δsys) / Δwall * 100`.
+fn foreign_process_cpu_times_us(pid: u32) -> Option<(i64, i64)> {
+    if pid == 0 {
+        return None;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let path = format!("/proc/{pid}/stat");
+        let line = std::fs::read_to_string(&path).ok()?;
+        let idx = line.rfind(')')?;
+        let rest = line[idx + 1..].trim_start();
+        let fields: Vec<&str> = rest.split_whitespace().collect();
+        if fields.len() < 13 {
+            return None;
+        }
+        let utime_ticks: i64 = fields[11].parse().ok()?;
+        let stime_ticks: i64 = fields[12].parse().ok()?;
+        let clk = unsafe { libc::sysconf(libc::_SC_CLK_TCK) } as i64;
+        if clk <= 0 {
+            return None;
+        }
+        let user_us = utime_ticks * 1_000_000 / clk;
+        let sys_us = stime_ticks * 1_000_000 / clk;
+        return Some((user_us, sys_us));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // Must match `<sys/proc_info.h>` `struct proc_taskinfo` size for `proc_pidinfo`.
+        #[repr(C)]
+        struct ProcTaskInfo {
+            virtual_size: u64,
+            resident_size: u64,
+            total_user: u64,
+            total_system: u64,
+            threads_user: u64,
+            threads_system: u64,
+            policy: u64,
+            ssugg: u64,
+            flags: u64,
+        }
+        #[link(name = "proc", kind = "dylib")]
+        unsafe extern "C" {
+            fn proc_pidinfo(
+                pid: i32,
+                flavor: i32,
+                arg: u64,
+                buffer: *mut ProcTaskInfo,
+                buffersize: i32,
+            ) -> i32;
+        }
+        const PROC_PIDTASKINFO: i32 = 4;
+        let mut info: ProcTaskInfo = unsafe { std::mem::zeroed() };
+        let n = unsafe {
+            proc_pidinfo(
+                pid as i32,
+                PROC_PIDTASKINFO,
+                0,
+                &mut info,
+                std::mem::size_of::<ProcTaskInfo>() as i32,
+            )
+        };
+        if n <= 0 {
+            return None;
+        }
+        // Nanoseconds → microseconds (same scale as `getrusage` path in `get_cpu_percent`).
+        let user_us = (info.total_user / 1000) as i64;
+        let sys_us = (info.total_system / 1000) as i64;
+        return Some((user_us, sys_us));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::c_void;
+        use std::mem::MaybeUninit;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn OpenProcess(dwDesiredAccess: u32, bInheritHandle: i32, dwProcessId: u32) -> *mut c_void;
+            fn CloseHandle(h: *mut c_void) -> i32;
+            fn GetProcessTimes(
+                h: *mut c_void,
+                creation: *mut [u32; 2],
+                exit: *mut [u32; 2],
+                kernel: *mut [u32; 2],
+                user: *mut [u32; 2],
+            ) -> i32;
+        }
+        const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+        unsafe {
+            let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+            if h.is_null() {
+                return None;
+            }
+            let mut creation = MaybeUninit::<[u32; 2]>::uninit();
+            let mut exit = MaybeUninit::<[u32; 2]>::uninit();
+            let mut kernel = MaybeUninit::<[u32; 2]>::uninit();
+            let mut user = MaybeUninit::<[u32; 2]>::uninit();
+            let ok = GetProcessTimes(
+                h,
+                creation.as_mut_ptr(),
+                exit.as_mut_ptr(),
+                kernel.as_mut_ptr(),
+                user.as_mut_ptr(),
+            );
+            let _ = CloseHandle(h);
+            if ok == 0 {
+                return None;
+            }
+            let ft_to_us = |ft: [u32; 2]| -> i64 {
+                let ticks = (ft[1] as i64) << 32 | ft[0] as i64;
+                ticks / 10
+            };
+            let user_us = ft_to_us(user.assume_init());
+            let sys_us = ft_to_us(kernel.assume_init());
+            return Some((user_us, sys_us));
+        }
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
+/// Same formula as [`get_cpu_percent`] (`getrusage` user+sys deltas vs wall clock), for another PID.
+fn get_cpu_percent_like_rusage_for_pid(pid: u32) -> f64 {
+    use std::sync::{Mutex, OnceLock};
+    use std::time::Instant;
+
+    struct CpuSample {
+        wall: Instant,
+        user_us: i64,
+        sys_us: i64,
+    }
+
+    static PREV: OnceLock<Mutex<Option<(u32, CpuSample)>>> = OnceLock::new();
+    let prev_lock = PREV.get_or_init(|| Mutex::new(None));
+
+    if pid == 0 {
+        let mut prev = prev_lock.lock().unwrap();
+        *prev = None;
+        return 0.0;
+    }
+
+    let Some((user_us, sys_us)) = foreign_process_cpu_times_us(pid) else {
+        let mut prev = prev_lock.lock().unwrap();
+        *prev = None;
+        return 0.0;
+    };
+
+    let now = Instant::now();
+    let mut prev_guard = prev_lock.lock().unwrap();
+    let pct = match *prev_guard {
+        Some((prev_pid, ref p)) if prev_pid == pid => {
+            let wall_us = now.duration_since(p.wall).as_micros() as f64;
+            if wall_us > 0.0 {
+                let cpu_us = ((user_us - p.user_us) + (sys_us - p.sys_us)) as f64;
+                (cpu_us / wall_us) * 100.0
+            } else {
+                0.0
+            }
+        }
+        _ => 0.0,
+    };
+    *prev_guard = Some((
+        pid,
+        CpuSample {
+            wall: now,
+            user_us,
+            sys_us,
+        },
+    ));
+    pct
+}
+
 fn get_cpu_percent() -> f64 {
     use std::sync::{Mutex, OnceLock};
     use std::time::Instant;
@@ -4079,6 +4253,201 @@ fn get_open_fd_count() -> u32 {
         }
     }
     0
+}
+
+// ── AudioEngine subprocess stats (same probes as [`build_process_stats`] / header: sysinfo RSS/VIRT/CPU, FD count, threads) ──
+
+#[cfg(not(target_os = "linux"))]
+fn thread_count_for_pid_non_sysinfo(pid: u32) -> u32 {
+    if pid == 0 {
+        return 0;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(out) = std::process::Command::new("ps")
+            .args(["-M", "-p", &pid.to_string()])
+            .output()
+        {
+            return String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .count()
+                .saturating_sub(1) as u32;
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        if let Ok(out) = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                &format!("(Get-Process -Id {pid} -ErrorAction SilentlyContinue).Threads.Count"),
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+        {
+            if out.status.success() {
+                if let Ok(n) = String::from_utf8_lossy(&out.stdout).trim().parse::<u32>() {
+                    return n;
+                }
+            }
+        }
+    }
+    0
+}
+
+fn open_fd_count_for_pid(pid: u32) -> u32 {
+    if pid == 0 {
+        return 0;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let path = format!("/proc/{pid}/fd");
+        if let Ok(entries) = std::fs::read_dir(&path) {
+            return entries.count() as u32;
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(out) = std::process::Command::new("lsof")
+            .args(["-w", "-p", &pid.to_string()])
+            .output()
+        {
+            if !out.status.success() {
+                return 0;
+            }
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let lines: Vec<&str> = stdout
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .collect();
+            if lines.is_empty() {
+                return 0;
+            }
+            return lines.len().saturating_sub(1) as u32;
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::c_void;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn OpenProcess(dwDesiredAccess: u32, bInheritHandle: i32, dwProcessId: u32) -> *mut c_void;
+            fn CloseHandle(h: *mut c_void) -> i32;
+            fn GetProcessHandleCount(hProcess: *mut c_void, lpdwHandleCount: *mut u32) -> i32;
+        }
+        const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+        unsafe {
+            let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+            if h.is_null() {
+                return 0;
+            }
+            let mut count = 0u32;
+            let ok = GetProcessHandleCount(h, &mut count);
+            let _ = CloseHandle(h);
+            if ok != 0 {
+                return count;
+            }
+        }
+    }
+    0
+}
+
+fn collect_audio_engine_process_metrics(pid: u32) -> (u64, u64, u64, u32) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Mutex, OnceLock};
+    use sysinfo::{Pid, ProcessesToUpdate, System};
+
+    static SYS: OnceLock<Mutex<System>> = OnceLock::new();
+    static PRIMED: AtomicBool = AtomicBool::new(false);
+    static LAST_PID: Mutex<Option<u32>> = Mutex::new(None);
+
+    if pid == 0 {
+        return (0, 0, 0, 0);
+    }
+
+    let sys_mutex = SYS.get_or_init(|| Mutex::new(System::new()));
+    let mut sys = sys_mutex.lock().unwrap();
+    let spid = Pid::from_u32(pid);
+
+    {
+        let mut last = LAST_PID.lock().unwrap();
+        if *last != Some(pid) {
+            PRIMED.store(false, Ordering::Relaxed);
+            *last = Some(pid);
+        }
+    }
+
+    if !PRIMED.swap(true, Ordering::Relaxed) {
+        sys.refresh_processes(ProcessesToUpdate::Some(&[spid]), true);
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    sys.refresh_processes(ProcessesToUpdate::Some(&[spid]), true);
+
+    let Some(proc_info) = sys.process(spid) else {
+        return (0, 0, 0, 0);
+    };
+
+    let rss = proc_info.memory();
+    let virt = proc_info.virtual_memory();
+    let run_time = proc_info.run_time();
+
+    #[cfg(target_os = "linux")]
+    {
+        let threads = proc_info
+            .tasks()
+            .map(|t| (t.len() as u32).saturating_add(1))
+            .unwrap_or(0);
+        (rss, virt, run_time, threads)
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        drop(sys);
+        let threads = thread_count_for_pid_non_sysinfo(pid);
+        (rss, virt, run_time, threads)
+    }
+}
+
+fn build_audio_engine_process_stats() -> serde_json::Value {
+    let pid = audio_engine::audio_engine_child_pid();
+    let ncpus = num_cpus::get() as u32;
+    if pid == 0 {
+        return serde_json::json!({
+            "running": false,
+            "pid": 0u32,
+            "numCpus": ncpus,
+            "rssBytes": 0u64,
+            "virtualBytes": 0u64,
+            "cpuPercent": 0.0,
+            "threads": 0u32,
+            "openFds": 0u32,
+            "uptimeSecs": 0u64,
+        });
+    }
+    let (rss, virt, run_time, threads) = collect_audio_engine_process_metrics(pid);
+    let fds = open_fd_count_for_pid(pid);
+    let cpu_pct = get_cpu_percent_like_rusage_for_pid(pid);
+    serde_json::json!({
+        "running": true,
+        "pid": pid,
+        "numCpus": ncpus,
+        "rssBytes": rss,
+        "virtualBytes": virt,
+        "cpuPercent": cpu_pct,
+        "threads": threads,
+        "openFds": fds,
+        "uptimeSecs": run_time,
+    })
+}
+
+#[tauri::command]
+async fn get_audio_engine_process_stats() -> serde_json::Value {
+    blocking(move || build_audio_engine_process_stats())
+        .await
+        .unwrap_or_else(|_| serde_json::json!({}))
 }
 
 fn gethostname() -> String {
@@ -6974,6 +7343,7 @@ pub fn run() {
             write_cache_file,
             audio_engine_invoke,
             audio_engine_restart,
+            get_audio_engine_process_stats,
             append_log,
             read_log,
             clear_log,
