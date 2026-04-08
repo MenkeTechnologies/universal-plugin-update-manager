@@ -86,7 +86,15 @@ async function fetchPdfPage() {
         if (seq !== _pdfQuerySeq) return;
         renderPdfTable();
         if (pdfScanProgressCleanup) _pdfScanDbView = true;
-        rebuildPdfStats();
+        if (typeof requestIdleCallback === 'function') {
+            requestIdleCallback(() => {
+                void rebuildPdfStats();
+            });
+        } else {
+            setTimeout(() => {
+                void rebuildPdfStats();
+            }, 0);
+        }
         // Hydrate the pages cache for visible rows, then kick off background extract.
         loadPdfPagesForVisible();
     } catch (e) {

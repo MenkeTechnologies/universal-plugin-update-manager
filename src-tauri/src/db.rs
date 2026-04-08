@@ -71,6 +71,8 @@ pub struct Database {
     read_idx: AtomicUsize,
     /// `SELECT COUNT(*) FROM midi_library` is O(rows); cache and invalidate on MIDI library writes.
     midi_library_total_cache: Mutex<Option<u64>>,
+    /// Same pattern as [`Self::midi_library_total_rows`] for `pdf_library`.
+    pdf_library_total_cache: Mutex<Option<u64>>,
 }
 
 /// Parameters for paginated audio sample queries.
@@ -859,6 +861,31 @@ impl Database {
         }
     }
 
+    fn pdf_library_total_rows(&self, conn: &Connection) -> Result<u64, String> {
+        if let Ok(g) = self.pdf_library_total_cache.lock() {
+            if let Some(n) = *g {
+                return Ok(n);
+            }
+        }
+        let n: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pdf_library",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
+        if let Ok(mut g) = self.pdf_library_total_cache.lock() {
+            *g = Some(n);
+        }
+        Ok(n)
+    }
+
+    fn invalidate_pdf_library_total_cache(&self) {
+        if let Ok(mut g) = self.pdf_library_total_cache.lock() {
+            *g = None;
+        }
+    }
+
     /// SQL bodies for [`sync_*_after_paths_refresh`] (standalone: wrapped in `BEGIN IMMEDIATE` by
     /// [`exec_sync_paths_refresh`]). For preset/midi/pdf flows already inside a
     /// [`Transaction`], use [`sync_preset_library_after_paths_refresh_tx`] /
@@ -1008,6 +1035,7 @@ DROP TABLE _pl_refresh_paths;"#;
             read: Vec::new(),
             read_idx: AtomicUsize::new(0),
             midi_library_total_cache: Mutex::new(None),
+            pdf_library_total_cache: Mutex::new(None),
         };
         db.migrate()?;
         // At least one dedicated reader so `read_conn` never steals the primary handle (which
@@ -2249,9 +2277,9 @@ DROP TABLE _pl_refresh_paths;"#;
             None => conn
                 .query_row(
                     "SELECT COUNT(*) FROM (
-  SELECT 1 FROM midi_files_fts AS f
-  INNER JOIN midi_library AS lib ON lib.midi_id = f.rowid
-  WHERE f MATCH ?1
+  SELECT 1 FROM midi_files_fts
+  INNER JOIN midi_library AS lib ON lib.midi_id = midi_files_fts.rowid
+  WHERE midi_files_fts MATCH ?1
   LIMIT ?2)",
                     params![fts_match, cap],
                     |row| row.get::<_, i64>(0),
@@ -2260,9 +2288,9 @@ DROP TABLE _pl_refresh_paths;"#;
             Some(f) if f.trim().is_empty() || f == "all" => conn
                 .query_row(
                     "SELECT COUNT(*) FROM (
-  SELECT 1 FROM midi_files_fts AS f
-  INNER JOIN midi_library AS lib ON lib.midi_id = f.rowid
-  WHERE f MATCH ?1
+  SELECT 1 FROM midi_files_fts
+  INNER JOIN midi_library AS lib ON lib.midi_id = midi_files_fts.rowid
+  WHERE midi_files_fts MATCH ?1
   LIMIT ?2)",
                     params![fts_match, cap],
                     |row| row.get::<_, i64>(0),
@@ -2272,10 +2300,10 @@ DROP TABLE _pl_refresh_paths;"#;
                 let in_list = Self::in_list_sql(f);
                 let sql = format!(
                     "SELECT COUNT(*) FROM (
-  SELECT 1 FROM midi_files_fts AS f
-  INNER JOIN midi_files AS m ON m.id = f.rowid
+  SELECT 1 FROM midi_files_fts
+  INNER JOIN midi_files AS m ON m.id = midi_files_fts.rowid
   INNER JOIN midi_library AS lib ON lib.midi_id = m.id
-  WHERE f MATCH ?1 AND m.format IN ({in_list})
+  WHERE midi_files_fts MATCH ?1 AND m.format IN ({in_list})
   LIMIT ?2)"
                 );
                 conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
@@ -2284,10 +2312,10 @@ DROP TABLE _pl_refresh_paths;"#;
             Some(f) => conn
                 .query_row(
                     "SELECT COUNT(*) FROM (
-  SELECT 1 FROM midi_files_fts AS f
-  INNER JOIN midi_files AS m ON m.id = f.rowid
+  SELECT 1 FROM midi_files_fts
+  INNER JOIN midi_files AS m ON m.id = midi_files_fts.rowid
   INNER JOIN midi_library AS lib ON lib.midi_id = m.id
-  WHERE f MATCH ?1 AND m.format = ?2
+  WHERE midi_files_fts MATCH ?1 AND m.format = ?2
   LIMIT ?3)",
                     params![fts_match, f, cap],
                     |row| row.get::<_, i64>(0),
@@ -2310,7 +2338,8 @@ DROP TABLE _pl_refresh_paths;"#;
             .query_row(
                 "SELECT COUNT(*) FROM (
   SELECT 1 FROM pdfs_fts
-  WHERE pdfs_fts MATCH ?1 AND rowid IN (SELECT pdf_id FROM pdf_library)
+  INNER JOIN pdf_library AS lib ON lib.pdf_id = pdfs_fts.rowid
+  WHERE pdfs_fts MATCH ?1
   LIMIT ?2)",
                 params![fts_match, cap],
                 |row| row.get::<_, i64>(0),
@@ -5122,10 +5151,10 @@ DROP TABLE _pl_refresh_paths;"#;
         let sql = if use_fts_rank_page {
             let mut w = String::from(
                 "SELECT m.name, m.path, m.directory, m.format, m.size, m.size_formatted, m.modified
-                 FROM midi_files_fts AS f
-                 INNER JOIN midi_files m ON m.id = f.rowid
+                 FROM midi_files_fts
+                 INNER JOIN midi_files m ON m.id = midi_files_fts.rowid
                  INNER JOIN midi_library lib ON lib.midi_id = m.id
-                 WHERE f MATCH ?1",
+                 WHERE midi_files_fts MATCH ?1",
             );
             let mut next_ph = 2usize;
             if let Some(f) = format_filter {
@@ -5144,7 +5173,7 @@ DROP TABLE _pl_refresh_paths;"#;
             }
             let li = next_ph;
             let oi = next_ph + 1;
-            w.push_str(&format!(" ORDER BY bm25(f) LIMIT ?{li} OFFSET ?{oi}"));
+            w.push_str(&format!(" ORDER BY bm25(midi_files_fts) LIMIT ?{li} OFFSET ?{oi}"));
             w
         } else {
             format!(
@@ -5356,6 +5385,7 @@ DROP TABLE _pl_refresh_paths;"#;
         conn.execute("DELETE FROM pdfs_fts WHERE scan_id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Self::sync_pdf_library_after_paths_refresh(&conn)?;
+        self.invalidate_pdf_library_total_cache();
         Ok(())
     }
 
@@ -5438,6 +5468,9 @@ DROP TABLE _pl_refresh_paths;"#;
             ).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())?;
+        if inserted > 0 {
+            self.invalidate_pdf_library_total_cache();
+        }
         Ok(inserted)
     }
 
@@ -5671,7 +5704,9 @@ DROP TABLE _pl_refresh_paths;"#;
             }
             Self::sync_pdf_library_after_paths_refresh_tx(&tx)?;
         }
-        tx.commit().map_err(|e| e.to_string())
+        tx.commit().map_err(|e| e.to_string())?;
+        self.invalidate_pdf_library_total_cache();
+        Ok(())
     }
 
     pub fn get_pdf_scans(&self) -> Result<Vec<serde_json::Value>, String> {
@@ -5777,6 +5812,7 @@ DROP TABLE _pl_refresh_paths;"#;
         Self::sync_pdf_library_after_paths_refresh(&conn)?;
         conn.execute("DELETE FROM pdf_scans WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
+        self.invalidate_pdf_library_total_cache();
         Ok(())
     }
 
@@ -5790,7 +5826,9 @@ DROP TABLE _pl_refresh_paths;"#;
              DELETE FROM pdf_scans;
              COMMIT;",
         )
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+        self.invalidate_pdf_library_total_cache();
+        Ok(())
     }
 
     // ── PDF metadata (page count) ──
@@ -5905,13 +5943,7 @@ DROP TABLE _pl_refresh_paths;"#;
         limit: u64,
     ) -> Result<PdfQueryResult, String> {
         let conn = self.read_conn();
-        let total_unfiltered: u64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library)",
-                [],
-                |row| row.get::<_, i64>(0).map(|v| v as u64),
-            )
-            .unwrap_or(0);
+        let total_unfiltered: u64 = self.pdf_library_total_rows(&conn)?;
         if total_unfiltered == 0 {
             return Ok(PdfQueryResult {
                 pdfs: vec![],
@@ -5976,15 +6008,33 @@ DROP TABLE _pl_refresh_paths;"#;
             (n, false)
         };
 
-        let sql = format!(
-            "SELECT name, path, directory, size, size_formatted, modified FROM pdfs WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}",
-            bind_idx + 1
-        );
+        // FTS substring search: ORDER BY column sorts the entire match set before LIMIT (stalls).
+        // Use bm25 + LIMIT like MIDI; frontend may re-rank with `searchScore`.
+        let use_fts_bm25 = fts_match.is_some();
+        let sql = if use_fts_bm25 {
+            String::from(
+                "SELECT p.name, p.path, p.directory, p.size, p.size_formatted, p.modified
+                 FROM pdfs_fts
+                 INNER JOIN pdfs p ON p.id = pdfs_fts.rowid
+                 INNER JOIN pdf_library lib ON lib.pdf_id = p.id
+                 WHERE pdfs_fts MATCH ?1
+                 ORDER BY bm25(pdfs_fts) LIMIT ?2 OFFSET ?3",
+            )
+        } else {
+            format!(
+                "SELECT name, path, directory, size, size_formatted, modified FROM pdfs WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}",
+                bind_idx + 1
+            )
+        };
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let mut bi = 1;
-        if let Some(ref m) = fts_match {
+        if use_fts_bm25 {
+            let m = fts_match.as_ref().expect("fts");
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            bi += 1;
+            stmt.raw_bind_parameter(bi + 1, limit as i64)
+                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi + 2, offset as i64)
+                .map_err(|e| e.to_string())?;
         } else if let Some(ref r) = regex_pat {
             stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
@@ -5993,10 +6043,12 @@ DROP TABLE _pl_refresh_paths;"#;
                 .map_err(|e| e.to_string())?;
             bi += 1;
         }
-        stmt.raw_bind_parameter(bi, limit as i64)
-            .map_err(|e| e.to_string())?;
-        stmt.raw_bind_parameter(bi + 1, offset as i64)
-            .map_err(|e| e.to_string())?;
+        if !use_fts_bm25 {
+            stmt.raw_bind_parameter(bi, limit as i64)
+                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi + 1, offset as i64)
+                .map_err(|e| e.to_string())?;
+        }
 
         let mut pdfs = Vec::new();
         let mut rows = stmt.raw_query();
@@ -6583,13 +6635,7 @@ DROP TABLE _pl_refresh_paths;"#;
         search_regex: bool,
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
-        let total_unfiltered: u64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library)",
-                [],
-                |r| r.get::<_, i64>(0).map(|v| v as u64),
-            )
-            .unwrap_or(0);
+        let total_unfiltered: u64 = self.pdf_library_total_rows(&conn)?;
         let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
         if fts_match.is_some() {
             let m = fts_match.as_ref().expect("fts");
@@ -7695,6 +7741,7 @@ mod tests {
             read: Vec::new(),
             read_idx: AtomicUsize::new(0),
             midi_library_total_cache: Mutex::new(None),
+            pdf_library_total_cache: Mutex::new(None),
         };
         db.migrate().unwrap();
         let read = Connection::open(uri.as_str()).unwrap();
@@ -8968,8 +9015,9 @@ mod tests {
         assert_eq!(filtered.total_unfiltered, 3);
         assert_eq!(filtered.total_count, 2);
         assert_eq!(filtered.pdfs.len(), 2);
-        assert_eq!(filtered.pdfs[0].name, "alpha");
-        assert_eq!(filtered.pdfs[1].name, "alpha_notes");
+        let mut got: Vec<&str> = filtered.pdfs.iter().map(|p| p.name.as_str()).collect();
+        got.sort();
+        assert_eq!(got, vec!["alpha", "alpha_notes"]);
 
         let by_size = db.query_pdfs(None, "size", false, false, 0, 10).unwrap();
         assert_eq!(by_size.pdfs[0].name, "zebra");
