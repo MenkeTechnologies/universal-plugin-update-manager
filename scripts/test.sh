@@ -6,6 +6,14 @@ cyber_banner
 cyber_status "OPERATION" "TEST // full test suite"
 echo
 
+cyber_section "I18N KEY ORDER"
+if ! pnpm run i18n:sort:check 2>&1; then
+  cyber_fail "i18n catalogs not sorted — run: pnpm run i18n:sort"
+  exit 1
+fi
+cyber_ok "i18n key order nominal"
+echo
+
 cyber_section "JS SUBSYSTEM"
 START=$(date +%s)
 JS_OUT=$(node scripts/run-js-tests.mjs 2>&1)

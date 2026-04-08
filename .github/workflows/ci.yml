@@ -57,6 +57,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Check i18n JSON key order
+        run: pnpm run i18n:sort:check
+
       - name: Run JS tests
         run: node scripts/run-js-tests.mjs
 
@@ -140,6 +143,9 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Check i18n JSON key order
+        run: pnpm run i18n:sort:check
 
       - name: Build Tauri (CI, unsigned bundles)
         run: pnpm run tauri:build:ci
