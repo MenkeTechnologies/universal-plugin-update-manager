@@ -60,8 +60,11 @@ pub fn global() -> &'static Database {
 pub type AnalysisBatchRow = (String, Option<f64>, Option<String>, Option<f64>);
 
 /// SQLite with WAL: multiple connections can serve read-heavy queries concurrently.
-/// `write` holds the primary handle (migrations run here when the read pool is still empty).
-/// `read` adds extra file handles; [`Database::read_conn`] round-robins across `write` + `read`.
+/// `write` is the **only** handle used for schema migrations and code paths that need the writer
+/// mutex; **never** mix it into the read round-robin — doing so serialized every `db_query_*` IPC
+/// with every other read/write on that mutex (spinners across tabs when one query held the slot).
+/// `read` is a pool of read-only file handles; [`Database::read_conn`] round-robins **only** here
+/// (always at least one after [`Database::open`]).
 pub struct Database {
     write: Mutex<Connection>,
     read: Vec<Mutex<Connection>>,
@@ -704,10 +707,64 @@ pub struct UnifiedScanRunRow {
 const SCHEMA_VERSION: i64 = 4;
 
 /// Cap on extra connections when [`sqliteReadPoolExtra`] pref is `"auto"`.
-const SQLITE_READ_POOL_AUTO_CAP: usize = 16;
+/// Keep modest: explicit `0`–`32` extra still opens `1 + extra` readers — RSS scales with
+/// [`read_pool_cache_kib`] / [`read_pool_mmap_bytes`] (budget-split, not fixed per handle).
+const SQLITE_READ_POOL_AUTO_CAP: usize = 8;
 
-/// Max explicit extra connections from preferences (0 = primary only for reads in round-robin).
+/// Max explicit extra connections from preferences (`0` = one reader + writer; see README).
 const SQLITE_READ_POOL_EXTRA_MAX: usize = 32;
+
+/// Primary SQLite handle (migrations, `write_conn`): large page cache + mmap.
+const SQLITE_CACHE_KIB_PRIMARY: i32 = -262_144; // 256 MiB (negative `cache_size` = KiB)
+const SQLITE_MMAP_BYTES_PRIMARY: i64 = 536_870_912; // 512 MiB
+
+/// ~512 MiB total page-cache budget split across **all** read-pool connections (e.g. `extra = 32`
+/// → 33 readers × ~15.5 MiB each). Caps each reader at 32 MiB when the pool is small.
+fn read_pool_cache_kib(num_read_connections: usize) -> i32 {
+    const TOTAL_KIB_BUDGET: i64 = 512 * 1024; // 512 MiB in KiB units for SQLite negative cache_size
+    let n = num_read_connections.max(1) as i64;
+    let per_kib = (TOTAL_KIB_BUDGET / n).min(32 * 1024).max(256);
+    -(per_kib as i32)
+}
+
+/// ~512 MiB total mmap cap split across read-pool connections; each reader at most 64 MiB.
+fn read_pool_mmap_bytes(num_read_connections: usize) -> i64 {
+    const BUDGET: i64 = 512 * 1024 * 1024;
+    let n = num_read_connections.max(1) as i64;
+    (BUDGET / n).min(64 * 1024 * 1024).max(256 * 1024)
+}
+
+fn init_sqlite_connection_pragmas(
+    conn: &Connection,
+    cache_kib: i32,
+    mmap_cap: i64,
+) -> Result<(), String> {
+    conn.execute_batch(&format!(
+        "PRAGMA journal_mode=WAL;
+         PRAGMA synchronous=NORMAL;
+         PRAGMA cache_size={cache_kib};
+         PRAGMA mmap_size={mmap_cap};
+         PRAGMA foreign_keys=ON;
+         PRAGMA temp_store=MEMORY;
+         PRAGMA wal_autocheckpoint=1000;",
+    ))
+    .map_err(|e| format!("Failed to set pragmas: {e}"))?;
+    Ok(())
+}
+
+fn open_db_connection_with_pragmas(
+    db_path: &std::path::Path,
+    cache_kib: i32,
+    mmap_cap: i64,
+) -> Result<Connection, String> {
+    let conn =
+        Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
+    conn.busy_timeout(std::time::Duration::from_secs(30))
+        .map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
+    init_sqlite_connection_pragmas(&conn, cache_kib, mmap_cap)?;
+    install_regexp_function(&conn)?;
+    Ok(conn)
+}
 
 fn sqlite_read_pool_auto() -> usize {
     num_cpus::get().min(SQLITE_READ_POOL_AUTO_CAP).max(2)
@@ -742,49 +799,37 @@ fn parse_sqlite_read_pool_extra_pref() -> usize {
 }
 
 impl Database {
-    /// Extra SQLite file handles beyond the primary (total = 1 + this) for parallel read load.
+    /// User pref: *additional* read pool slots beyond the mandatory first reader (`1 + this`, min 1).
     fn read_pool_extra() -> usize {
         parse_sqlite_read_pool_extra_pref()
     }
 
-    /// Extra read-only connections only (excludes the primary handle).
+    /// Count of read-pool connections (each participates in [`read_conn`] round-robin only).
     pub fn sqlite_read_pool_extra_slots(&self) -> usize {
         self.read.len()
     }
 
-    /// Primary + pool (all handles participating in [`read_conn`] round-robin).
+    /// Primary writer + read pool (`1 + read.len()` open file handles).
     pub fn sqlite_read_pool_total_handles(&self) -> usize {
         1 + self.read.len()
     }
 
-    fn open_file_connection(db_path: &std::path::Path) -> Result<Connection, String> {
-        let conn =
-            Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
-        conn.busy_timeout(std::time::Duration::from_secs(30))
-            .map_err(|e| format!("Failed to set busy_timeout: {e}"))?;
-        conn.execute_batch(
-            "PRAGMA journal_mode=WAL;
-             PRAGMA synchronous=NORMAL;
-             PRAGMA cache_size=-262144;
-             PRAGMA mmap_size=536870912;
-             PRAGMA foreign_keys=ON;
-             PRAGMA temp_store=MEMORY;
-             PRAGMA wal_autocheckpoint=1000;",
-        )
-        .map_err(|e| format!("Failed to set pragmas: {e}"))?;
-        install_regexp_function(&conn)?;
-        Ok(conn)
+    /// Exclusive writer — migrations, cache writes, and anything that should not compete with
+    /// [`Self::read_conn`] for the same `Mutex`.
+    #[inline]
+    fn write_conn(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.write.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Round-robin across primary + pool so concurrent IPC (startup tab queries, stats) parallelizes.
+    /// Round-robin read pool only (never the primary `write` handle — see [`Database`] docs).
     #[inline]
     fn read_conn(&self) -> std::sync::MutexGuard<'_, Connection> {
-        let total = 1 + self.read.len();
-        let i = self.read_idx.fetch_add(1, Ordering::Relaxed) % total;
-        if i == 0 {
-            return self.write.lock().unwrap_or_else(|e| e.into_inner());
+        let n = self.read.len();
+        if n == 0 {
+            panic!("Database read pool is empty — Database::open() must add at least one reader");
         }
-        self.read[i - 1].lock().unwrap_or_else(|e| e.into_inner())
+        let i = self.read_idx.fetch_add(1, Ordering::Relaxed) % n;
+        self.read[i].lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// SQL bodies for [`sync_*_after_paths_refresh`] (standalone: wrapped in `BEGIN IMMEDIATE` by
@@ -926,16 +971,29 @@ DROP TABLE _pl_refresh_paths;"#;
         let _ = std::fs::create_dir_all(db_path.parent().unwrap());
         // Parallel `cargo test` processes can open the same path; busy_timeout avoids
         // immediate `database is locked` during migrations.
-        let write = Self::open_file_connection(&db_path)?;
+        let write = open_db_connection_with_pragmas(
+            &db_path,
+            SQLITE_CACHE_KIB_PRIMARY,
+            SQLITE_MMAP_BYTES_PRIMARY,
+        )?;
         let mut db = Self {
             write: Mutex::new(write),
             read: Vec::new(),
             read_idx: AtomicUsize::new(0),
         };
         db.migrate()?;
-        for _ in 0..Self::read_pool_extra() {
-            db.read
-                .push(Mutex::new(Self::open_file_connection(&db_path)?));
+        // At least one dedicated reader so `read_conn` never steals the primary handle (which
+        // must remain available for migrations / writes without blocking every paginated query).
+        // Pref `sqliteReadPoolExtra` is "extra" slots: total readers = 1 + extra (min 1).
+        let n_read = (1 + Self::read_pool_extra()).max(1);
+        let read_cache_kib = read_pool_cache_kib(n_read);
+        let read_mmap = read_pool_mmap_bytes(n_read);
+        for _ in 0..n_read {
+            db.read.push(Mutex::new(open_db_connection_with_pragmas(
+                &db_path,
+                read_cache_kib,
+                read_mmap,
+            )?));
         }
         Ok(db)
     }
@@ -950,8 +1008,8 @@ DROP TABLE _pl_refresh_paths;"#;
     }
 
     /// Expensive path: prune old scans (DELETE + full `*_library` rebuild) and optional `VACUUM`.
-    /// Run **well after** the window and `setup()` have finished so pooled `read_conn()` handles are
-    /// not held across first-frame IPC (single-handle / unlucky round-robin still blocks peers).
+    /// Run **well after** the window and `setup()` have finished so pooled `read_conn()` scopes are
+    /// not held across first-frame IPC (long prune batches still contend on SQLite + pool slots).
     pub fn housekeep_heavy(&self) {
         self.prune_old_scans(3);
         self.vacuum_if_needed();
@@ -1234,7 +1292,7 @@ DROP TABLE _pl_refresh_paths;"#;
 
     /// Run schema migrations.
     fn migrate(&self) -> Result<(), String> {
-        let conn = self.read_conn();
+        let conn = self.write_conn();
 
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS schema_version (
@@ -6676,7 +6734,7 @@ DROP TABLE _pl_refresh_paths;"#;
         if obj.is_empty() {
             return Ok(());
         }
-        let conn = self.read_conn();
+        let conn = self.write_conn();
         let col = match field {
             "bpm" => "bpm",
             "key" => "key_name",
@@ -6723,7 +6781,7 @@ DROP TABLE _pl_refresh_paths;"#;
     fn write_kv_cache(&self, name: &str, data: &serde_json::Value) -> Result<(), String> {
         let obj = data.as_object().ok_or("expected object")?;
         let (table, key_col, val_col) = self.cache_table_for(name);
-        let conn = self.read_conn();
+        let conn = self.write_conn();
         let sql = format!("INSERT OR REPLACE INTO {table} ({key_col}, {val_col}) VALUES (?1, ?2)");
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
@@ -7522,6 +7580,24 @@ mod tests {
     static MIGRATE_JSON_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
+    fn read_pool_cache_splits_budget_when_extra_is_32_readers() {
+        let one = read_pool_cache_kib(1);
+        let thirty_three = read_pool_cache_kib(33);
+        assert_eq!(one, -32_768, "single reader capped at 32 MiB");
+        assert!(
+            thirty_three.abs() < one.abs(),
+            "33 readers must use smaller per-connection cache than a lone reader"
+        );
+        assert_eq!(thirty_three, -i32::try_from((512_i64 * 1024) / 33).unwrap());
+    }
+
+    #[test]
+    fn read_pool_mmap_splits_budget() {
+        let m = read_pool_mmap_bytes(33);
+        assert_eq!(m, 536_870_912_i64 / 33);
+    }
+
+    #[test]
     fn test_audio_query_params_json_empty_object_uses_defaults() {
         let v = serde_json::json!({});
         let p: AudioQueryParams = serde_json::from_value(v).expect("deserialize");
@@ -7577,16 +7653,27 @@ mod tests {
     }
 
     fn test_db() -> Database {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
+        // Shared-cache in-memory DB so writer + read pool see the same tables (matches on-disk open).
+        let uri = format!(
+            "file:memdb_{}?mode=memory&cache=shared",
+            rand::random::<u128>()
+        );
+        let write = Connection::open(uri.as_str()).unwrap();
+        write
+            .execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
             .unwrap();
-        install_regexp_function(&conn).unwrap();
-        let db = Database {
-            write: Mutex::new(conn),
+        install_regexp_function(&write).unwrap();
+        let mut db = Database {
+            write: Mutex::new(write),
             read: Vec::new(),
             read_idx: AtomicUsize::new(0),
         };
         db.migrate().unwrap();
+        let read = Connection::open(uri.as_str()).unwrap();
+        read.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
+            .unwrap();
+        install_regexp_function(&read).unwrap();
+        db.read.push(Mutex::new(read));
         db
     }
 
