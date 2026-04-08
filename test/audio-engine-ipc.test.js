@@ -616,6 +616,172 @@ if (!bin) {
       assert.match(String(j.error || ''), /segment too short for spectrogram/i);
     });
 
+    it('spectrogram_preview clamps height_px below minimum (4 → 16)', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'spectrogram_preview', path: tmpWav, width_px: 32, height_px: 4, fft_order: 8 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.height_px, 16);
+      assert.equal(j.rows.length, 16);
+    });
+
+    it('spectrogram_preview clamps fft_order in request and shrinks FFT to fit segment', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'spectrogram_preview', path: tmpWav, width_px: 16, height_px: 16, fft_order: 20 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      // clampInt(..., 8, 15) caps fft_order; then fft_size is reduced to ≤ numSamples (8192 mono samples here).
+      assert.equal(j.fft_size, 8192);
+    });
+
+    it('playback_set_speed clamps below minimum to 0.25', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_speed', speed: 0.01 })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.speed, 0.25);
+    });
+
+    it('playback_set_speed clamps above maximum to 2', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_speed', speed: 9 })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.speed, 2);
+    });
+
+    it('playback_set_reverse true echoes reverse', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_set_reverse', reverse: true })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.reverse, true);
+    });
+
+    it('set_output_tone fails when no output stream', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'set_output_tone', tone: true })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /no output stream/i);
+    });
+
+    it('stop_output_stream returns was_running false when idle', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'stop_output_stream' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.was_running, false);
+    });
+
+    it('stop_input_stream returns was_running false when idle', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'stop_input_stream' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+      assert.equal(j.was_running, false);
+    });
+
+    it('set_audio_device_type rejects empty type', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'set_audio_device_type', type: '' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /type required/i);
+    });
+
+    it('get_output_device_info rejects unknown device_id', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'get_output_device_info', device_id: '__ipc_test_no_such_output__' })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown device_id/i);
+    });
+
+    it('get_input_device_info rejects unknown device_id', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'get_input_device_info', device_id: '__ipc_test_no_such_input__' })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown device_id/i);
+    });
+
+    it('set_output_device rejects unknown device_id', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'set_output_device', device_id: '__ipc_test_unknown_output__' })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown device_id/i);
+    });
+
+    it('set_input_device rejects unknown device_id', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'set_input_device', device_id: '__ipc_test_unknown_input__' })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /unknown device_id/i);
+    });
+
+    it('plugin_rescan returns ok (cache wipe, no scan worker until plugin_chain)', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'plugin_rescan' })], {
+        timeoutMs: 90_000,
+      });
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, true);
+    });
+
+    it('playback_load then playback_status in one session reports loaded', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'playback_load', path: tmpWav }), jl({ cmd: 'playback_status' })],
+        { timeoutMs: 90_000 },
+      );
+      assert.equal(outLines.length, 2);
+      const load = JSON.parse(outLines[0]);
+      const st = JSON.parse(outLines[1]);
+      assert.equal(load.ok, true);
+      assert.equal(typeof load.duration_sec, 'number');
+      assert.equal(st.ok, true);
+      assert.equal(st.loaded, true);
+      assert.ok(Math.abs(st.duration_sec - load.duration_sec) < 1e-3);
+    });
+
+    it('waveform_preview duration_sec zero yields empty segment', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'waveform_preview', path: tmpWav, start_sec: 0, duration_sec: 0 })],
+        { timeoutMs: 90_000 },
+      );
+      const j = JSON.parse(outLines[0]);
+      assert.equal(j.ok, false);
+      assert.match(String(j.error || ''), /empty segment/i);
+    });
+
     it('mixed ping + preview validation in one session', async () => {
       const lines = [
         jl({ cmd: 'ping' }),
