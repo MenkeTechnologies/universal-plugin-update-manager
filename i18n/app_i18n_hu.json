@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "BPM/Key/LUFS automatikus elemzése indításkor",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "A szkennelés után automatikusan ellenőrizze a KVR frissítéseit",
   "ui.tt.automatically_scan_on_app_launch": "Automatikus keresés az alkalmazás indításakor",
-  "ui.tt.background_bpm_key_analysis_progress": "Háttér BPM/Key elemzés folyamata",
+  "ui.tt.background_bpm_key_analysis_progress": "Háttér BPM/hangnem/LUFS elemzés előrehaladása",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Kötegméret a vizsgálati eredmények UI-ra való streameléséhez",
   "ui.tt.bookmark_current_directory": "Az aktuális könyvtár megjelölése",
   "ui.tt.border_color_border": "Szegély színe (--border)",

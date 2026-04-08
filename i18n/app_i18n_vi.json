@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Tự động phân tích BPM/Key/LUFS khi khởi động",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Tự động kiểm tra KVR để cập nhật sau khi quét",
   "ui.tt.automatically_scan_on_app_launch": "Tự động quét khi khởi chạy ứng dụng",
-  "ui.tt.background_bpm_key_analysis_progress": "Quá trình phân tích khóa/BPM nền",
+  "ui.tt.background_bpm_key_analysis_progress": "Tiến độ phân tích BPM/tông/LUFS nền",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Kích thước hàng loạt để truyền phát kết quả quét tới giao diện người dùng",
   "ui.tt.bookmark_current_directory": "Đánh dấu thư mục hiện tại",
   "ui.tt.border_color_border": "Màu đường viền (--border)",

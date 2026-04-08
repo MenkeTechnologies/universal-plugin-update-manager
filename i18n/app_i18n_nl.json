@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Analyseer automatisch BPM/Key/LUFS bij het opstarten",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Controleer KVR automatisch op updates na het scannen",
   "ui.tt.automatically_scan_on_app_launch": "Automatisch scannen bij het starten van de app",
-  "ui.tt.background_bpm_key_analysis_progress": "Achtergrond BPM/Key analyse voortgang",
+  "ui.tt.background_bpm_key_analysis_progress": "Voortgang van BPM-/toonsoort-/LUFS-analyse op de achtergrond",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Batchgrootte voor het streamen van scanresultaten naar de gebruikersinterface",
   "ui.tt.bookmark_current_directory": "Maak een bladwijzer van de huidige map",
   "ui.tt.border_color_border": "Randkleur (--rand)",

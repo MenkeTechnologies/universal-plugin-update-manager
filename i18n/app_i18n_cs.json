@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Automaticky analyzovat BPM/Key/LUFS při spuštění",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Po skenování automaticky zkontrolovat aktualizace KVR",
   "ui.tt.automatically_scan_on_app_launch": "Automaticky skenovat při spuštění aplikace",
-  "ui.tt.background_bpm_key_analysis_progress": "Průběh analýzy BPM/klíče na pozadí",
+  "ui.tt.background_bpm_key_analysis_progress": "Průběh analýzy BPM/tóniny/LUFS na pozadí",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Velikost dávky pro streamování výsledků skenování do uživatelského rozhraní",
   "ui.tt.bookmark_current_directory": "Přidat aktuální adresář do záložek",
   "ui.tt.border_color_border": "Barva okraje (--border)",

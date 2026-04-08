@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "启动时自动分析 BPM/调性/LUFS",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "扫描后自动检查 KVR 是否有更新",
   "ui.tt.automatically_scan_on_app_launch": "应用程序启动时自动扫描",
-  "ui.tt.background_bpm_key_analysis_progress": "后台BPM/关键分析进度",
+  "ui.tt.background_bpm_key_analysis_progress": "后台 BPM/调性/LUFS 分析进度",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "将扫描结果流式传输到 UI 的批量大小",
   "ui.tt.bookmark_current_directory": "为当前目录添加书签",
   "ui.tt.border_color_border": "边框颜色（--border）",

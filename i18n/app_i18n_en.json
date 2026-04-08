@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Automatically analyze BPM/Key/LUFS on startup",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Automatically check KVR for updates after scanning",
   "ui.tt.automatically_scan_on_app_launch": "Automatically scan on app launch",
-  "ui.tt.background_bpm_key_analysis_progress": "Background BPM/Key analysis progress",
+  "ui.tt.background_bpm_key_analysis_progress": "Background BPM/Key/LUFS analysis progress",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Batch size for streaming scan results to UI",
   "ui.tt.bookmark_current_directory": "Bookmark current directory",
   "ui.tt.border_color_border": "Border color (--border)",

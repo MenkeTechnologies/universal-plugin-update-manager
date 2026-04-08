@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Αυτόματη ανάλυση BPM/Key/LUFS κατά την εκκίνηση",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Ελέγξτε αυτόματα το KVR για ενημερώσεις μετά τη σάρωση",
   "ui.tt.automatically_scan_on_app_launch": "Αυτόματη σάρωση κατά την εκκίνηση της εφαρμογής",
-  "ui.tt.background_bpm_key_analysis_progress": "Πρόοδος ανάλυσης BPM/Κλειδιού φόντου",
+  "ui.tt.background_bpm_key_analysis_progress": "Πρόοδος ανάλυσης BPM/Κλειδιού/LUFS παρασκηνίου",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Μέγεθος παρτίδας για ροή αποτελεσμάτων σάρωσης στη διεπαφή χρήστη",
   "ui.tt.bookmark_current_directory": "Προσθέστε σελιδοδείκτη στον τρέχοντα κατάλογο",
   "ui.tt.border_color_border": "Χρώμα περιγράμματος (--περιθώριο)",

@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Автоматический анализ BPM/Key/LUFS при запуске",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Автоматически проверять наличие обновлений КВР после сканирования",
   "ui.tt.automatically_scan_on_app_launch": "Автоматическое сканирование при запуске приложения",
-  "ui.tt.background_bpm_key_analysis_progress": "Прогресс базового анализа BPM/ключей",
+  "ui.tt.background_bpm_key_analysis_progress": "Прогресс фонового анализа BPM/тональности/LUFS",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Размер пакета для потоковой передачи результатов сканирования в пользовательский интерфейс",
   "ui.tt.bookmark_current_directory": "Добавить в закладки текущий каталог",
   "ui.tt.border_color_border": "Цвет границы (--border)",

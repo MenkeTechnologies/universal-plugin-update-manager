@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "स्टार्टअप पर BPM/की/LUFS स्वचालित रूप से विश्लेषित करें",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "स्कैनिंग के बाद अपडेट के लिए स्वचालित रूप से केवीआर की जांच करें",
   "ui.tt.automatically_scan_on_app_launch": "ऐप लॉन्च पर स्वचालित रूप से स्कैन करें",
-  "ui.tt.background_bpm_key_analysis_progress": "पृष्ठभूमि बीपीएम/कुंजी विश्लेषण प्रगति",
+  "ui.tt.background_bpm_key_analysis_progress": "पृष्ठभूमि BPM/कुंजी/LUFS विश्लेषण प्रगति",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "स्कैन परिणामों को यूआई में स्ट्रीम करने के लिए बैच आकार",
   "ui.tt.bookmark_current_directory": "वर्तमान निर्देशिका को बुकमार्क करें",
   "ui.tt.border_color_border": "बॉर्डर का रंग (--बॉर्डर)",

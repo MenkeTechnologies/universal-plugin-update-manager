@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "起動時に BPM/キー/LUFS を自動解析します",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "スキャン後に KVR のアップデートを自動的にチェックします",
   "ui.tt.automatically_scan_on_app_launch": "アプリ起動時に自動的にスキャン",
-  "ui.tt.background_bpm_key_analysis_progress": "バックグラウンドBPM/キー分析の進行状況",
+  "ui.tt.background_bpm_key_analysis_progress": "バックグラウンドでの BPM/キー/LUFS 分析の進行",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "スキャン結果を UI にストリーミングするためのバッチ サイズ",
   "ui.tt.bookmark_current_directory": "現在のディレクトリをブックマークする",
   "ui.tt.border_color_border": "枠線の色 (--border)",

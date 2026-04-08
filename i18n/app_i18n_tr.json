@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Başlangıçta BPM/Key/LUFS otomatik analiz et",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Taramadan sonra güncellemeler için KVR'yi otomatik olarak kontrol edin",
   "ui.tt.automatically_scan_on_app_launch": "Uygulama başlatıldığında otomatik olarak tara",
-  "ui.tt.background_bpm_key_analysis_progress": "Arka plan BPM/Anahtar analizi ilerlemesi",
+  "ui.tt.background_bpm_key_analysis_progress": "Arka plan BPM/ton/LUFS analizi ilerlemesi",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Tarama sonuçlarını kullanıcı arayüzüne aktarmak için toplu boyut",
   "ui.tt.bookmark_current_directory": "Geçerli dizine yer işareti koy",
   "ui.tt.border_color_border": "Kenarlık rengi (--kenarlık)",

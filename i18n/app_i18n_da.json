@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Analyser BPM/Key/LUFS automatisk ved opstart",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Kontroller automatisk KVR for opdateringer efter scanning",
   "ui.tt.automatically_scan_on_app_launch": "Scan automatisk ved app-start",
-  "ui.tt.background_bpm_key_analysis_progress": "Baggrund BPM/Nøgleanalyse fremskridt",
+  "ui.tt.background_bpm_key_analysis_progress": "Baggrund: fremskridt for BPM-/toneart-/LUFS-analyse",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Batchstørrelse til streaming af scanningsresultater til brugergrænsefladen",
   "ui.tt.bookmark_current_directory": "Bogmærk den aktuelle mappe",
   "ui.tt.border_color_border": "Kantfarve (--kant)",

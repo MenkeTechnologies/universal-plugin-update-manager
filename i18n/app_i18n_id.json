@@ -1762,7 +1762,7 @@
   "ui.tt.automatically_analyze_bpm_key_lufs_on_startup": "Analisis BPM/Key/LUFS pada startup secara otomatis",
   "ui.tt.automatically_check_kvr_for_updates_after_scanning": "Secara otomatis memeriksa pembaruan KVR setelah pemindaian",
   "ui.tt.automatically_scan_on_app_launch": "Pindai secara otomatis saat peluncuran aplikasi",
-  "ui.tt.background_bpm_key_analysis_progress": "Latar belakang kemajuan analisis BPM/Kunci",
+  "ui.tt.background_bpm_key_analysis_progress": "Kemajuan analisis BPM/nada/LUFS latar belakang",
   "ui.tt.batch_size_for_streaming_scan_results_to_ui": "Ukuran batch untuk streaming hasil pemindaian ke UI",
   "ui.tt.bookmark_current_directory": "Tandai direktori saat ini",
   "ui.tt.border_color_border": "Warna batas (--batas)",
