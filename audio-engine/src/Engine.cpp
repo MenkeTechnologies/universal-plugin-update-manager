@@ -39,6 +39,18 @@ static constexpr float kTestToneGain = 0.05f;
 static constexpr float kInputPeakDecay = 0.95f;
 static constexpr uint32_t kMaxBufferFrames = 8192;
 
+/** `setenv` is POSIX; MSVC exposes `_putenv_s` instead. */
+static void setProcessEnv(const char* name, const char* value)
+{
+#if defined(_WIN32)
+    if (_putenv_s(name, value) != 0)
+        appLogLine(juce::String("setProcessEnv failed: ") + name);
+#else
+    if (::setenv(name, value, 1) != 0)
+        appLogLine(juce::String("setProcessEnv failed: ") + name);
+#endif
+}
+
 static juce::var errObj(const juce::String& msg)
 {
     appLogLine("error: " + msg);
@@ -1577,7 +1589,7 @@ struct Engine::Impl
             if (sec >= 5 && sec <= 3600)
             {
                 const juce::String val(sec);
-                setenv("AUDIO_HAXOR_PLUGIN_SCAN_TIMEOUT_SEC", val.toRawUTF8(), 1);
+                setProcessEnv("AUDIO_HAXOR_PLUGIN_SCAN_TIMEOUT_SEC", val.toRawUTF8());
                 appLogLine("plugin_rescan: timeout set to " + val + "s");
             }
         }
