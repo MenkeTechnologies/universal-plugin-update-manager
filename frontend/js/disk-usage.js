@@ -19,6 +19,11 @@ function renderDiskUsageBar(containerId, data, totalBytes) {
         'FL Studio': 'var(--orange)', 'REAPER': 'var(--yellow)',
         'Cubase': 'var(--accent)', 'Pro Tools': 'var(--magenta)',
         'Other': 'var(--text-muted)',
+        // Preset formats (tab disk bar — same component as DAW/plugins/samples)
+        'FXP': 'var(--cyan)', 'FXB': 'var(--accent)',
+        'VSTPRESET': 'var(--green)', 'AUPRESET': 'var(--yellow)',
+        'ADG': 'var(--orange)', 'ADV': 'var(--magenta)',
+        'NKI': 'var(--cyan)', 'H2P': 'var(--accent)', 'SYX': 'var(--green)',
     };
     const defaultColor = 'var(--text-dim)';
 
@@ -68,6 +73,18 @@ function updateDawDiskUsage() {
     const total = Object.values(bytes).reduce((a, b) => a + b, 0);
     const data = Object.entries(bytes).map(([label, b]) => ({label, bytes: b, sizeStr: formatAudioSize(b)}));
     renderDiskUsageBar('dawDiskUsage', data, total);
+}
+
+/** Presets tab: stacked bar under stats — `bytesByType` from `db_preset_filter_stats` (or count-weighted fallback). */
+function updatePresetDiskUsage(bytesByType) {
+    const raw = bytesByType && typeof bytesByType === 'object' ? bytesByType : {};
+    const total = Object.values(raw).reduce((a, b) => a + Number(b || 0), 0);
+    const data = Object.entries(raw).map(([label, b]) => ({
+        label,
+        bytes: Number(b) || 0,
+        sizeStr: formatAudioSize(Number(b) || 0),
+    }));
+    renderDiskUsageBar('presetDiskUsage', data, total);
 }
 
 // Build disk usage data from plugin types + populate the plugin stats row

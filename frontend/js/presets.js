@@ -219,6 +219,7 @@ async function rebuildPresetStats(force) {
     const regexOn = typeof getSearchMode === 'function' && getSearchMode('regexPresets') === 'regex';
     const key = search.trim() + '|' + (formatFilter || '') + '|' + (regexOn ? 'r' : 'f');
     let count = 0, bytes = 0, unfiltered = 0, byType = {};
+    let bytesByType = {};
     {
         const cacheHit = !force && key === _lastPresetAggKey && _presetAggCache;
         try {
@@ -235,6 +236,7 @@ async function rebuildPresetStats(force) {
             bytes = agg.totalBytes || 0;
             unfiltered = agg.totalUnfiltered || 0;
             byType = agg.byType || {};
+            bytesByType = agg.bytesByType && typeof agg.bytesByType === 'object' ? agg.bytesByType : {};
             _presetTotalCount = count;
             _presetTotalCountCapped = agg.countCapped === true;
             _presetTotalUnfiltered = unfiltered;
@@ -247,6 +249,7 @@ async function rebuildPresetStats(force) {
             byType = _presetStatsFormatCounts;
             count = Object.values(byType).reduce((a, b) => a + b, 0);
             unfiltered = count;
+            bytesByType = {};
         }
     }
     const isFiltered = unfiltered > 0 && count > 0 && count < unfiltered;
@@ -266,6 +269,11 @@ async function rebuildPresetStats(force) {
     const entries = Object.entries(byType).sort((a, b) => b[1] - a[1]);
     renderPresetFormatBreakdown(entries);
     updatePresetExportButton();
+    let barWeights = bytesByType;
+    if (Object.keys(barWeights).length === 0 && Object.keys(byType).length > 0) {
+        barWeights = Object.fromEntries(Object.entries(byType).map(([k, v]) => [k, v]));
+    }
+    if (typeof updatePresetDiskUsage === 'function') updatePresetDiskUsage(barWeights);
 }
 
 function resetPresetStats() {
@@ -273,6 +281,7 @@ function resetPresetStats() {
     document.getElementById('presetTotalSize').textContent = '0 B';
     clearPresetFormatBreakdownPairs();
     resetPresetStatsAccumulators();
+    if (typeof updatePresetDiskUsage === 'function') updatePresetDiskUsage({});
 }
 
 function sortPreset(key) {
