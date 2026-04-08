@@ -484,6 +484,57 @@ function formatCacheSize(bytes) {
     return (n / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
 }
 
+/** Last successful `db_cache_stats` rows — repainted synchronously on Settings open so the table is not blank while SQLite runs COUNT/dbstat work. */
+let _lastDbCacheStatsRows = null;
+
+function invalidateDbCacheStatsSnapshot() {
+    _lastDbCacheStatsRows = null;
+}
+
+/** Builds the Database Caches table markup from `db_cache_stats` rows (current locale). */
+function buildCacheStatsTableHtml(rows) {
+    const _cf = catalogFmt;
+    return `<table style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;">
+      <thead><tr style="color:var(--cyan);font-size:10px;text-transform:uppercase;letter-spacing:1px;">
+        <th style="text-align:left;padding:4px 8px;">${_cf('ui.settings.cache_table_cache')}</th>
+        <th style="text-align:right;padding:4px 8px;">${_cf('ui.settings.cache_table_items')}</th>
+        <th style="text-align:right;padding:4px 8px;">${_cf('ui.settings.cache_table_size')}</th>
+        <th style="text-align:center;padding:4px 8px;width:60px;"></th>
+      </tr></thead>
+      <tbody>${rows.map(s => {
+        let countStr = '';
+        if (s.count > 0) {
+            if (s.total > 0 && s.key !== 'database' && !s.key.includes('_scans')) {
+                countStr = s.count.toLocaleString() + ` / ${s.total.toLocaleString()}`;
+            } else if (s.key.includes('_scans')) {
+                countStr = `${s.count.toLocaleString()} (${_cf('ui.settings.cache_scans_suffix', {n: s.total.toLocaleString()})})`;
+            } else {
+                countStr = s.count.toLocaleString();
+            }
+        } else {
+            countStr = s.key === 'database' ? '' : '0';
+        }
+        const sizeStr = formatCacheSize(s.sizeBytes ?? s.size_bytes);
+        const canClear = s.key !== 'database' && !s.key.includes('_scans');
+        const canBuild = s.count === 0 && (s.key === 'xref' || s.key === 'fingerprint');
+        let action = '';
+        if (canBuild) {
+            action = `<button class="btn btn-secondary" data-action="buildCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">${_cf('ui.settings.cache_build')}</button>`;
+        } else if (canClear && s.count > 0) {
+            action = `<button class="btn btn-secondary" data-action="clearCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">${_cf('ui.settings.cache_clear')}</button>`;
+        }
+        const rowLabel = cacheStatRowLabel(s.key, s.label, _cf);
+        const safeLabel = typeof escapeHtml === 'function' ? escapeHtml(rowLabel) : rowLabel;
+        return `<tr style="border-bottom:1px solid rgba(26,26,62,0.2);">
+          <td style="padding:4px 8px;color:var(--text);">${safeLabel}</td>
+          <td style="padding:4px 8px;text-align:right;color:var(--text-muted);">${countStr}</td>
+          <td style="padding:4px 8px;text-align:right;color:${(Number(s.sizeBytes ?? s.size_bytes) || 0) > 10 * 1024 * 1024 ? 'var(--yellow)' : 'var(--text-muted)'};">${sizeStr}</td>
+          <td style="padding:4px 8px;text-align:center;">${action}</td>
+        </tr>`;
+    }).join('')}</tbody>
+    </table>`;
+}
+
 /** Maps `db_cache_stats` row `key` → `appFmt` catalog key (Database Caches table). */
 const CACHE_STAT_I18N_KEYS = {
     bpm: 'ui.settings.cache_row_bpm',
@@ -509,55 +560,18 @@ function cacheStatRowLabel(statKey, fallbackLabel, _cf) {
     return fallbackLabel;
 }
 
-/** Fetches Settings → Database Caches table from `db_cache_stats`. Keeps prior markup until data returns (no loading placeholder). */
+/** Fetches Settings → Database Caches table from `db_cache_stats`. Replays last snapshot synchronously when available (stale-while-revalidate). */
 async function renderCacheStats() {
     const grid = document.getElementById('cacheStatsGrid');
     if (!grid) return;
-    const _cf = catalogFmt;
+    if (Array.isArray(_lastDbCacheStatsRows) && _lastDbCacheStatsRows.length > 0) {
+        grid.innerHTML = buildCacheStatsTableHtml(_lastDbCacheStatsRows);
+    }
     try {
         const stats = await window.vstUpdater.dbCacheStats();
         const rows = Array.isArray(stats) ? stats : [];
-        grid.innerHTML = `<table style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;">
-      <thead><tr style="color:var(--cyan);font-size:10px;text-transform:uppercase;letter-spacing:1px;">
-        <th style="text-align:left;padding:4px 8px;">${_cf('ui.settings.cache_table_cache')}</th>
-        <th style="text-align:right;padding:4px 8px;">${_cf('ui.settings.cache_table_items')}</th>
-        <th style="text-align:right;padding:4px 8px;">${_cf('ui.settings.cache_table_size')}</th>
-        <th style="text-align:center;padding:4px 8px;width:60px;"></th>
-      </tr></thead>
-      <tbody>${rows.map(s => {
-            let countStr = '';
-            if (s.count > 0) {
-                if (s.total > 0 && s.key !== 'database' && !s.key.includes('_scans')) {
-                    countStr = s.count.toLocaleString() + ` / ${s.total.toLocaleString()}`;
-                } else if (s.key.includes('_scans')) {
-                    countStr = `${s.count.toLocaleString()} (${_cf('ui.settings.cache_scans_suffix', {n: s.total.toLocaleString()})})`;
-                } else {
-                    countStr = s.count.toLocaleString();
-                }
-            } else {
-                countStr = s.key === 'database' ? '' : '0';
-            }
-            const sizeStr = formatCacheSize(s.sizeBytes ?? s.size_bytes);
-            const canClear = s.key !== 'database' && !s.key.includes('_scans');
-            // On-demand caches: expose a BUILD action when the cache is empty so users
-            // don't have to hunt through the UI for the individual trigger.
-            const canBuild = s.count === 0 && (s.key === 'xref' || s.key === 'fingerprint');
-            let action = '';
-            if (canBuild) {
-                action = `<button class="btn btn-secondary" data-action="buildCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">${_cf('ui.settings.cache_build')}</button>`;
-            } else if (canClear && s.count > 0) {
-                action = `<button class="btn btn-secondary" data-action="clearCacheTable" data-cache="${s.key}" style="font-size:9px;padding:2px 6px;">${_cf('ui.settings.cache_clear')}</button>`;
-            }
-            const rowLabel = cacheStatRowLabel(s.key, s.label, _cf);
-            const safeLabel = typeof escapeHtml === 'function' ? escapeHtml(rowLabel) : rowLabel;
-            return `<tr style="border-bottom:1px solid rgba(26,26,62,0.2);">
-          <td style="padding:4px 8px;color:var(--text);">${safeLabel}</td>
-          <td style="padding:4px 8px;text-align:right;color:var(--text-muted);">${countStr}</td>
-          <td style="padding:4px 8px;text-align:right;color:${(Number(s.sizeBytes ?? s.size_bytes) || 0) > 10 * 1024 * 1024 ? 'var(--yellow)' : 'var(--text-muted)'};">${sizeStr}</td>
-          <td style="padding:4px 8px;text-align:center;">${action}</td>
-        </tr>`;
-        }).join('')}</tbody>
-    </table>`;
+        _lastDbCacheStatsRows = rows;
+        grid.innerHTML = buildCacheStatsTableHtml(rows);
     } catch (e) {
         const msg = catalogFmt('ui.settings.cache_load_failed', {err: e.message || String(e)});
         grid.innerHTML = `<span style="color:var(--red);font-size:11px;">${typeof escapeHtml === 'function' ? escapeHtml(msg) : msg}</span>`;
@@ -723,6 +737,7 @@ async function settingClearAllDatabases() {
     if (typeof showToast === 'function') {
         showToast(catalogFmt('toast.all_scan_databases_cleared'));
     }
+    if (typeof invalidateDbCacheStatsSnapshot === 'function') invalidateDbCacheStatsSnapshot();
     if (typeof renderCacheStats === 'function') renderCacheStats();
 }
 
@@ -1292,6 +1307,7 @@ function updateSettingsAboutVersionLine() {
 }
 
 window.updateSettingsAboutVersionLine = updateSettingsAboutVersionLine;
+window.invalidateDbCacheStatsSnapshot = invalidateDbCacheStatsSnapshot;
 
 function refreshSettingsUI() {
     // Theme

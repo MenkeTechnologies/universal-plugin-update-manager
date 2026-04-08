@@ -643,6 +643,7 @@ document.addEventListener('click', (e) => {
                         _spectrogramCache = {};
                     }
                     showToast(toastFmt('toast.all_caches_cleared'));
+                    if (typeof invalidateDbCacheStatsSnapshot === 'function') invalidateDbCacheStatsSnapshot();
                     if (typeof renderCacheStats === 'function') renderCacheStats();
                 }).catch(e => showToast(toastFmt('toast.failed', {err: e}), 4000, 'error'));
                 break;
@@ -658,6 +659,7 @@ document.addEventListener('click', (e) => {
                     if (c === 'waveform' && typeof _waveformCache !== 'undefined') _waveformCache = {};
                     if (c === 'spectrogram' && typeof _spectrogramCache !== 'undefined') _spectrogramCache = {};
                     showToast(toastFmt('toast.cache_type_cleared', {cache: c.toUpperCase()}));
+                    if (typeof invalidateDbCacheStatsSnapshot === 'function') invalidateDbCacheStatsSnapshot();
                     if (typeof renderCacheStats === 'function') renderCacheStats();
                 }).catch(e => showToast(toastFmt('toast.failed', {err: e}), 4000, 'error'));
             }
