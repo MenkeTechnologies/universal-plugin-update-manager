@@ -484,7 +484,7 @@ function formatCacheSize(bytes) {
     return (n / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
 }
 
-/** Last successful `db_cache_stats` rows — repainted synchronously on Settings open so the table is not blank while SQLite runs COUNT/dbstat work. */
+/** Last successful `db_cache_stats` rows — repainted synchronously when available (app startup + Settings tab open) so the table is not blank while SQLite runs COUNT/dbstat work. */
 let _lastDbCacheStatsRows = null;
 
 function invalidateDbCacheStatsSnapshot() {
@@ -560,7 +560,7 @@ function cacheStatRowLabel(statKey, fallbackLabel, _cf) {
     return fallbackLabel;
 }
 
-/** Fetches Settings → Database Caches table from `db_cache_stats`. Replays last snapshot synchronously when available (stale-while-revalidate). */
+/** Fetches Settings → Database Caches table from `db_cache_stats`. Replays last snapshot synchronously when available (stale-while-revalidate). Invoked on app load (`app.js`) and when opening Settings. */
 async function renderCacheStats() {
     const grid = document.getElementById('cacheStatsGrid');
     if (!grid) return;

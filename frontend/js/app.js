@@ -104,6 +104,8 @@ async function handleFileWatcherChange(event) {
     if (_stopAll && !(_scanAllBtn && _scanAllBtn.disabled)) _stopAll.style.display = 'none';
     if (_resumeAll) _resumeAll.style.display = 'none';
     restoreSettings();
+    // Preload Settings → Database Caches (`db_cache_stats`) so counts warm before first Settings visit.
+    if (typeof renderCacheStats === 'function') void renderCacheStats();
     // Restore audio player state — must run post-prefs-load (the IIFEs run too early).
     if (typeof restorePlayerDock === 'function') restorePlayerDock();
     if (typeof restorePlayerDimensions === 'function') restorePlayerDimensions();
