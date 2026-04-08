@@ -20,10 +20,14 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      # Virtual workspace root: `Cargo.toml` at repo root; `cargo` writes `target/` here (not
+      # `src-tauri/target`). `workspaces: src-tauri` made rust-cache treat `src-tauri/target` as
+      # the cache dir, misaligning the real build output and breaking Windows test binaries (e.g.
+      # STATUS_ENTRYPOINT_NOT_FOUND). Default is `. -> target` (see Swatinem/rust-cache README).
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: .
 
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
@@ -102,7 +106,7 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: .
 
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
