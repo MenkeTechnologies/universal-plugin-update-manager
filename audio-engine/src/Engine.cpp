@@ -707,6 +707,8 @@ public:
     /** Forward playback only: wraps `readerSource` for tape-style speed (pitch follows rate). */
     std::unique_ptr<juce::ResamplingAudioSource> speedResampler;
     std::atomic<float>* playbackSpeed = nullptr;
+    /** When non-null, reverse path wraps when `load()` is true (same flag as forward `playback_set_loop`). */
+    std::atomic<bool>* playbackLoop = nullptr;
     juce::AudioBuffer<float> reverseStereo;
     bool reverseMode = false;
     int reverseFrame = 0;
@@ -787,6 +789,8 @@ public:
 
     bool isLooping() const override
     {
+        if (reverseMode && playbackLoop != nullptr)
+            return playbackLoop->load();
         if (readerSource != nullptr)
             return readerSource->isLooping();
         return false;
@@ -811,8 +815,13 @@ public:
             {
                 if (reverseFrame >= frames)
                 {
-                    bufferToFill.buffer->clear(bufferToFill.startSample, n - i);
-                    break;
+                    if (playbackLoop != nullptr && playbackLoop->load())
+                        reverseFrame = 0;
+                    else
+                    {
+                        bufferToFill.buffer->clear(bufferToFill.startSample + i, n - i);
+                        break;
+                    }
                 }
                 const int fi = frames - 1 - reverseFrame;
                 float l = reverseStereo.getSample(0, fi);
@@ -1151,8 +1160,8 @@ struct Engine::Impl
     uint32_t sessionSrcRate = 44100;
     std::atomic<uint32_t> deviceRate{0};
     bool reverseWanted = false;
-    /** Forward path: `AudioFormatReaderSource::setLooping`. Stored for new streams and live updates. */
-    bool playbackLoopWanted = false;
+    /** Forward: `AudioFormatReaderSource::setLooping`. Reverse: `DspStereoFileSource` wraps RAM buffer. */
+    std::atomic<bool> playbackLoopWanted{false};
     bool paused = false;
 
     juce::VST3PluginFormat vst3;
@@ -2050,10 +2059,11 @@ struct Engine::Impl
                 fileSource->playbackSpeed = &playbackSpeed;
             }
 
+            fileSource->playbackLoop = &playbackLoopWanted;
             transport.setSource(fileSource.get(), 0, nullptr, (double) sessionSrcRate);
             fileSource->insertChain = insertRunner.get();
             if (!reverseWanted)
-                fileSource->setLooping(playbackLoopWanted);
+                fileSource->setLooping(playbackLoopWanted.load());
             sourcePlayer.setSource(&transport);
             outputManager.addAudioCallback(&sourcePlayer);
             transport.start();
@@ -2653,7 +2663,7 @@ juce::var Engine::dispatch(const juce::var& req)
     if (cmd == "playback_set_loop")
     {
         const bool loop = req["loop"].isVoid() ? false : (bool) req["loop"];
-        impl->playbackLoopWanted = loop;
+        impl->playbackLoopWanted.store(loop);
         if (impl->playbackMode && impl->fileSource != nullptr && !impl->reverseWanted)
             impl->fileSource->setLooping(loop);
         juce::var out = okObj();

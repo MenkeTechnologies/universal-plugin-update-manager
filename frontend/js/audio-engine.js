@@ -2053,7 +2053,7 @@ function syncEnginePlaybackSpeedFromPrefs() {
     void inv({cmd: 'playback_set_speed', speed: s});
 }
 
-/** Full-file loop → `playback_set_loop` on the JUCE reader path (forward playback only; engine reverse decode has no reader loop). */
+/** Full-file loop → `playback_set_loop` (forward: `AudioFormatReaderSource`; reverse: RAM buffer wraps). */
 function syncEnginePlaybackLoop(loop) {
     const inv = getAeAudioEngineInvoke();
     if (!inv) return;
