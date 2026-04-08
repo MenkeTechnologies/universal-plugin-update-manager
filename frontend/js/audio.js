@@ -3474,6 +3474,9 @@ let _bgAnalysisAbort = false;
 let _bgQueue = []; // kept for compat but no longer primary source
 let _bgDone = 0;
 let _bgPaused = false;
+/** Throttle Settings → Database Caches refresh during bg batches (`db_cache_stats` is heavy). */
+let _lastBgCacheStatsRefreshMs = 0;
+const CACHE_STATS_BG_REFRESH_MS = 6000;
 
 // Pause bg analysis when user interacts (resume after 3s idle)
 let _bgIdleTimer = null;
@@ -3500,6 +3503,20 @@ function _setBgAnalysisBadgeRunning(badge) {
 function _setBgAnalysisBadgeProgress(badge, n) {
     if (!badge) return;
     badge.textContent = catalogFmt('ui.stats.bpm_bg_progress', {n});
+}
+
+/** Keep Settings cache stats table in sync while BPM/Key/LUFS batches run (not only on tab open). */
+function _refreshCacheStatsIfSettingsTab(force) {
+    try {
+        if (typeof prefs === 'undefined' || prefs.getItem('activeTab') !== 'settings') return;
+        if (typeof renderCacheStats !== 'function') return;
+        const now = Date.now();
+        if (!force && now - _lastBgCacheStatsRefreshMs < CACHE_STATS_BG_REFRESH_MS) return;
+        _lastBgCacheStatsRefreshMs = now;
+        void renderCacheStats();
+    } catch {
+        /* ignore */
+    }
 }
 
 async function startBackgroundAnalysis() {
@@ -3583,9 +3600,11 @@ async function startBackgroundAnalysis() {
         }
 
         _setBgAnalysisBadgeProgress(badge, _bgDone);
+        _refreshCacheStatsIfSettingsTab(false);
         await new Promise(r => setTimeout(r, 100));
     }
 
+    _refreshCacheStatsIfSettingsTab(true);
     _bgAnalysisRunning = false;
     if (badge) badge.innerHTML = '';
 }
