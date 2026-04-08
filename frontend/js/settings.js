@@ -1048,7 +1048,7 @@ function settingToggleIncludeBackups() {
 
 function settingTogglePruneOldScans() {
     const po = prefs.getItem('pruneOldScans');
-    const current = po !== 'off' && po !== 'false';
+    const current = po === 'on' || po === 'true';
     const next = !current;
     prefs.setItem('pruneOldScans', next ? 'on' : 'off');
     showToast(toastFmt('toast.prune_old_scans', {state: next ? 'on' : 'off'}));
@@ -1503,8 +1503,9 @@ function refreshSettingsUI() {
         }
     }
 
-    // Prune old scans (default on)
-    const pruneOn = prefs.getItem('pruneOldScans') !== 'off' && prefs.getItem('pruneOldScans') !== 'false';
+    // Prune old scans (default off — explicit "on"/"true" enables)
+    const pruneRaw = getSettingValue('pruneOldScans', 'off');
+    const pruneOn = pruneRaw === 'on' || pruneRaw === 'true';
     const pruneBtn = document.getElementById('settingPruneOldScans');
     const pruneLabel = document.getElementById('settingPruneOldScansLabel');
     if (pruneBtn) {

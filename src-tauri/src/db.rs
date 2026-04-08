@@ -1237,8 +1237,8 @@ DROP TABLE _pl_refresh_paths;"#;
     fn prune_old_scans_pref_enabled() -> bool {
         crate::history::get_preference("pruneOldScans")
             .and_then(|v| v.as_str().map(str::to_owned))
-            .map(|s| s != "off")
-            .unwrap_or(true)
+            .map(|s| s == "on" || s == "true")
+            .unwrap_or(false)
     }
 
     /// `[performance]` → `pruneOldScansKeep` (default 3, clamped 1..=100).
