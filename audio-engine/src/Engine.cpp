@@ -875,11 +875,11 @@ static int pluginScanTimeoutMsFromEnv()
 {
     const char* e = std::getenv("AUDIO_HAXOR_PLUGIN_SCAN_TIMEOUT_SEC");
     if (e == nullptr || e[0] == '\0')
-        return 120 * 1000;
+        return 30 * 1000;
     char* end = nullptr;
     const long sec = std::strtol(e, &end, 10);
     if (end == e || sec <= 0)
-        return 120 * 1000;
+        return 30 * 1000;
     return (int) juce::jlimit(5L, 3600L, sec) * 1000;
 }
 
@@ -1112,6 +1112,7 @@ struct Engine::Impl
     juce::Array<juce::PluginDescription> pluginScanCache;
     PluginScanPhase pluginScanPhase = PluginScanPhase::Idle;
     juce::String pluginScanLastError;
+    std::atomic<bool> pluginScanCancel{false};
 
     struct PluginScanProgressState
     {
@@ -1153,6 +1154,7 @@ struct Engine::Impl
     {
         formatManager.registerBasicFormats();
         pluginFormatManager.addDefaultFormats();
+        hydratePluginScanCacheFromDiskIfAvailable();
     }
 
     ~Impl()
@@ -1180,6 +1182,11 @@ struct Engine::Impl
         };
         while (processed < n)
         {
+            if (pluginScanCancel.load(std::memory_order_relaxed))
+            {
+                appLogLine("plugin scan: " + formatLabel + " cancelled at " + juce::String(processed) + "/" + juce::String(n));
+                return;
+            }
             const int fileIdx = n - 1 - processed;
             const juce::String fileId = files[fileIdx];
             juce::String displayName = fileId;
@@ -1317,6 +1324,14 @@ struct Engine::Impl
             appLogLine("plugin scan: VST3 phase unexpected error (continuing, non-std)");
         }
 #if JUCE_MAC
+        if (pluginScanCancel.load(std::memory_order_relaxed))
+        {
+            appLogLine("plugin scan: cancelled before AU phase");
+            std::lock_guard<std::mutex> lock(pluginScanMutex);
+            pluginScanCache = list.getTypes();
+            pluginScanPhase = PluginScanPhase::Idle;
+            return;
+        }
         try
         {
             appLogLine("plugin scan: VST3 phase complete; starting AU");
@@ -1354,24 +1369,10 @@ struct Engine::Impl
         return pluginScanCache.size() > 0;
     }
 
-    /** Resolve a UI path: `.vst3` / `.component` bundle on disk, or `fileOrIdentifier` (e.g. AU string) from scan cache. */
+    /** Resolve a UI path from the scan cache only.  Never call findAllTypesForFile on the
+        message thread — WaveShell and heavy plugins can block indefinitely during introspection. */
     bool resolvePluginDescriptionForInsert(const juce::String& path, juce::PluginDescription& out)
     {
-        const juce::File f(path);
-        if (f.exists())
-        {
-            juce::OwnedArray<juce::PluginDescription> types;
-            vst3.findAllTypesForFile(types, f.getFullPathName());
-#if JUCE_MAC
-            if (types.isEmpty())
-                auFormat.findAllTypesForFile(types, f.getFullPathName());
-#endif
-            if (types.size() > 0)
-            {
-                out = *types[0];
-                return true;
-            }
-        }
         std::lock_guard<std::mutex> scanLock(pluginScanMutex);
         for (const auto& t : pluginScanCache)
         {
@@ -1495,6 +1496,8 @@ struct Engine::Impl
             row->setProperty("name", t.name);
             row->setProperty("format", t.pluginFormatName);
             row->setProperty("path", t.fileOrIdentifier);
+            row->setProperty("category", t.category);
+            row->setProperty("isInstrument", t.isInstrument);
             plugins.add(row);
         }
         juce::var out = okObj();
@@ -1516,61 +1519,153 @@ struct Engine::Impl
         return out;
     }
 
-    juce::var playbackSetInsertsLocked(const juce::var& req)
+    juce::var pluginRescanLocked(const juce::var& req)
     {
-        closeAllInsertEditorsLocked();
-        if (outputRunning)
-            return errObj("stop_output_stream before changing inserts");
-        const juce::var pathsVar = req["paths"];
-        if (!pathsVar.isArray())
-            return errObj("paths must be an array");
-        auto* arr = pathsVar.getArray();
-        if (arr == nullptr)
-            return errObj("paths must be an array");
-        if (arr->isEmpty())
+        if (req.hasProperty("timeout_sec"))
         {
-            insertRunner.reset();
+            const int sec = (int) req["timeout_sec"];
+            if (sec >= 5 && sec <= 3600)
+            {
+                const juce::String val(sec);
+                setenv("AUDIO_HAXOR_PLUGIN_SCAN_TIMEOUT_SEC", val.toRawUTF8(), 1);
+                appLogLine("plugin_rescan: timeout set to " + val + "s");
+            }
+        }
+        {
+            std::lock_guard<std::mutex> scanLock(pluginScanMutex);
+            if (pluginScanPhase == PluginScanPhase::Running)
+            {
+                pluginScanCancel.store(true, std::memory_order_relaxed);
+            }
+        }
+
+        if (pluginScanThread.joinable())
+            pluginScanThread.join();
+        pluginScanCancel.store(false, std::memory_order_relaxed);
+
+        (void) knownPluginListCacheFilePath().deleteFile();
+        (void) pluginScanSkipFilePath().deleteFile();
+        (void) deadMansPedalFilePath().deleteFile();
+
+        {
+            std::lock_guard<std::mutex> scanLock(pluginScanMutex);
+            pluginScanCache.clear();
+            pluginScanPhase = PluginScanPhase::Idle;
+            pluginScanLastError.clear();
+        }
+
+        appLogLine("plugin_rescan: wiped cache, skip-list, dead-man's-pedal; phase reset to Idle");
+        return okObj();
+    }
+
+    juce::var playbackSetInserts(const juce::var& req)
+    {
+        appLogLine("playback_set_inserts: ENTER");
+
+        // ── Phase 1: under lock — validate request, close editors, resolve descriptions ──
+        struct SlotInfo { juce::String path; juce::PluginDescription desc; };
+        std::vector<SlotInfo> slots;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            closeAllInsertEditorsLocked();
+            appLogLine("playback_set_inserts: editors closed");
+            if (outputRunning)
+                return errObj("stop_output_stream before changing inserts");
+            const juce::var pathsVar = req["paths"];
+            if (!pathsVar.isArray())
+                return errObj("paths must be an array");
+            auto* arr = pathsVar.getArray();
+            if (arr == nullptr)
+                return errObj("paths must be an array");
+            if (arr->isEmpty())
+            {
+                insertRunner.reset();
+                juce::var out = okObj();
+                if (auto* o = out.getDynamicObject())
+                {
+                    juce::Array<juce::var> empty;
+                    o->setProperty("insert_paths", juce::var(empty));
+                }
+                return out;
+            }
+            constexpr int kMaxSlots = 32;
+            for (int i = 0; i < arr->size() && i < kMaxSlots; ++i)
+            {
+                const juce::String path = (*arr)[i].toString();
+                if (path.isEmpty())
+                    continue;
+                SlotInfo s;
+                s.path = path;
+                appLogLine("playback_set_inserts: resolving " + path);
+                if (!resolvePluginDescriptionForInsert(path, s.desc))
+                    return errObj("unknown plugin (not on disk and not in scan cache): " + path);
+                appLogLine("playback_set_inserts: resolved " + s.desc.name);
+                slots.push_back(std::move(s));
+            }
+        }
+        // mutex released — message thread free to process AU/system callbacks
+
+        // ── Phase 2: no lock — create plugin instances ──
+        //
+        // JUCE's `createPluginInstanceAsync` posts a message that calls
+        // `AudioComponentInstanceNew` ON the message thread.  We pump messages
+        // from the main thread while a background thread waits on the sync
+        // `createPluginInstance` (which internally posts + waits on the
+        // message-thread callback).  Because impl->mutex is NOT held,
+        // message-delivered callbacks that need the mutex won't deadlock.
+        auto next = std::make_unique<InsertChainRunner>();
+        for (auto& s : slots)
+        {
+            appLogLine("playback_set_inserts: creating instance " + s.desc.name + "...");
+            std::atomic<bool> done{false};
+            std::unique_ptr<juce::AudioPluginInstance> inst;
+            juce::String createErr;
+            auto descCopy = s.desc;
+
+            std::thread worker([&done, &inst, &createErr, &descCopy, this]() {
+                inst = pluginFormatManager.createPluginInstance(descCopy, 44100.0, 512, createErr);
+                done.store(true, std::memory_order_release);
+            });
+
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (!done.load(std::memory_order_acquire))
+            {
+                if (std::chrono::steady_clock::now() > deadline)
+                {
+                    appLogLine("playback_set_inserts: TIMEOUT creating " + s.desc.name);
+                    worker.detach();
+                    return errObj("plugin creation timed out: " + s.desc.name);
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            worker.join();
+
+            if (inst == nullptr)
+            {
+                appLogLine("playback_set_inserts: FAILED " + s.desc.name + ": " + createErr);
+                return errObj("plugin load failed for " + s.desc.name + ": " + createErr);
+            }
+            appLogLine("playback_set_inserts: loaded " + s.desc.name);
+            next->paths.push_back(s.path);
+            next->instances.push_back(std::move(inst));
+        }
+
+        // ── Phase 3: re-lock — install the chain ──
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (outputRunning)
+                return errObj("output stream started while loading plugins — stop it first");
+            insertRunner = std::move(next);
             juce::var out = okObj();
             if (auto* o = out.getDynamicObject())
             {
-                juce::Array<juce::var> empty;
-                o->setProperty("insert_paths", juce::var(empty));
+                juce::Array<juce::var> pathVars;
+                for (const auto& p : insertRunner->paths)
+                    pathVars.add(p);
+                o->setProperty("insert_paths", juce::var(pathVars));
             }
             return out;
         }
-        auto next = std::make_unique<InsertChainRunner>();
-        constexpr int kMaxSlots = 8;
-        for (int i = 0; i < arr->size() && i < kMaxSlots; ++i)
-        {
-            const juce::String path = (*arr)[i].toString();
-            if (path.isEmpty())
-                continue;
-            juce::PluginDescription desc;
-            if (!resolvePluginDescriptionForInsert(path, desc))
-            {
-                next->clear();
-                return errObj("unknown plugin (not on disk and not in scan cache): " + path);
-            }
-            juce::String err;
-            auto inst = pluginFormatManager.createPluginInstance(desc, 44100.0, 512, err);
-            if (inst == nullptr)
-            {
-                next->clear();
-                return errObj("plugin load failed: " + err);
-            }
-            next->paths.push_back(path);
-            next->instances.push_back(std::move(inst));
-        }
-        insertRunner = std::move(next);
-        juce::var out = okObj();
-        if (auto* o = out.getDynamicObject())
-        {
-            juce::Array<juce::var> pathVars;
-            for (const auto& p : insertRunner->paths)
-                pathVars.add(p);
-            o->setProperty("insert_paths", juce::var(pathVars));
-        }
-        return out;
     }
 
     void closeAllInsertEditorsLocked()
@@ -1587,43 +1682,128 @@ struct Engine::Impl
         });
     }
 
-    juce::var openInsertEditorLocked(const juce::var& req)
+    /** DocumentWindow + AU/VST editor must be created/destroyed on the JUCE message thread. */
+    static void* openInsertEditorMessageThreadFn(void* userData)
     {
-        const int slot = (int) req["slot"];
-        if (insertRunner == nullptr || slot < 0 || slot >= (int) insertRunner->instances.size())
-            return errObj("invalid insert slot");
-        juce::AudioPluginInstance* inst = insertRunner->instances[(size_t) slot].get();
-        if (inst == nullptr)
-            return errObj("empty insert slot");
-
-        insertEditorWindows.resize(insertRunner->instances.size());
-        insertEditorWindows[(size_t) slot].reset();
-
-        auto w = std::make_unique<PluginEditorHostWindow>(
-            slot,
-            [this](int s) { requestCloseInsertEditor(s); },
-            *inst);
-        if (!w->hasEditorContent())
+        struct Payload
         {
-            w.reset();
-            return errObj("plugin has no editor");
+            Impl* self = nullptr;
+            int slot = -1;
+            juce::var result;
+        };
+        auto* p = static_cast<Payload*>(userData);
+        try
+        {
+            juce::AudioPluginInstance* inst = nullptr;
+            {
+                std::lock_guard<std::mutex> lock(p->self->mutex);
+                if (p->self->insertRunner == nullptr || p->slot < 0
+                    || p->slot >= (int) p->self->insertRunner->instances.size())
+                {
+                    p->result = errObj("invalid insert slot");
+                    return nullptr;
+                }
+                inst = p->self->insertRunner->instances[(size_t) p->slot].get();
+                if (inst == nullptr)
+                {
+                    p->result = errObj("empty insert slot");
+                    return nullptr;
+                }
+                p->self->insertEditorWindows.resize(p->self->insertRunner->instances.size());
+                p->self->insertEditorWindows[(size_t) p->slot].reset();
+            }
+            auto w = std::make_unique<PluginEditorHostWindow>(
+                p->slot,
+                [self = p->self](int s) { self->requestCloseInsertEditor(s); },
+                *inst);
+            if (!w->hasEditorContent())
+            {
+                p->result = errObj("plugin has no editor");
+                return nullptr;
+            }
+            w->setVisible(true);
+            w->toFront(true);
+            {
+                std::lock_guard<std::mutex> lock(p->self->mutex);
+                if (p->self->insertRunner == nullptr || p->slot < 0
+                    || p->slot >= (int) p->self->insertRunner->instances.size())
+                {
+                    p->result = errObj("insert chain changed while opening editor");
+                    return nullptr;
+                }
+                p->self->insertEditorWindows.resize(p->self->insertRunner->instances.size());
+                p->self->insertEditorWindows[(size_t) p->slot] = std::move(w);
+            }
+            p->result = okObj();
         }
-        insertEditorWindows[(size_t) slot] = std::move(w);
-        insertEditorWindows[(size_t) slot]->setVisible(true);
-        insertEditorWindows[(size_t) slot]->toFront(true);
-        return okObj();
+        catch (...)
+        {
+            p->result = errObj("plugin editor failed");
+        }
+        return nullptr;
     }
 
-    juce::var closeInsertEditorLocked(const juce::var& req)
+    juce::var openInsertEditorOnMessageThread(const juce::var& req)
     {
-        const int slot = (int) req["slot"];
-        if (insertRunner == nullptr || slot < 0)
-            return errObj("invalid insert slot");
-        insertEditorWindows.resize(insertRunner->instances.size());
-        if (slot >= (int) insertEditorWindows.size())
-            return errObj("invalid insert slot");
-        insertEditorWindows[(size_t) slot].reset();
-        return okObj();
+        struct Payload
+        {
+            Impl* self = nullptr;
+            int slot = -1;
+            juce::var result;
+        };
+        Payload p;
+        p.self = this;
+        p.slot = (int) req["slot"];
+        juce::MessageManager::getInstance()->callFunctionOnMessageThread(openInsertEditorMessageThreadFn, &p);
+        return p.result;
+    }
+
+    static void* closeInsertEditorMessageThreadFn(void* userData)
+    {
+        struct Payload
+        {
+            Impl* self = nullptr;
+            int slot = -1;
+            juce::var result;
+        };
+        auto* p = static_cast<Payload*>(userData);
+        try
+        {
+            std::lock_guard<std::mutex> lock(p->self->mutex);
+            if (p->self->insertRunner == nullptr || p->slot < 0)
+            {
+                p->result = errObj("invalid insert slot");
+                return nullptr;
+            }
+            p->self->insertEditorWindows.resize(p->self->insertRunner->instances.size());
+            if (p->slot >= (int) p->self->insertEditorWindows.size())
+            {
+                p->result = errObj("invalid insert slot");
+                return nullptr;
+            }
+            p->self->insertEditorWindows[(size_t) p->slot].reset();
+            p->result = okObj();
+        }
+        catch (...)
+        {
+            p->result = errObj("close editor failed");
+        }
+        return nullptr;
+    }
+
+    juce::var closeInsertEditorOnMessageThread(const juce::var& req)
+    {
+        struct Payload
+        {
+            Impl* self = nullptr;
+            int slot = -1;
+            juce::var result;
+        };
+        Payload p;
+        p.self = this;
+        p.slot = (int) req["slot"];
+        juce::MessageManager::getInstance()->callFunctionOnMessageThread(closeInsertEditorMessageThreadFn, &p);
+        return p.result;
     }
 
     void stopOutputLocked()
@@ -2049,6 +2229,24 @@ juce::var Engine::dispatch(const juce::var& req)
         return fut.get();
     }
 
+    if (cmd == "playback_set_inserts")
+    {
+        appLogLine("cmd " + cmd);
+        return impl->playbackSetInserts(req);
+    }
+
+    if (cmd == "playback_open_insert_editor")
+    {
+        appLogLine("cmd " + cmd);
+        return impl->openInsertEditorOnMessageThread(req);
+    }
+
+    if (cmd == "playback_close_insert_editor")
+    {
+        appLogLine("cmd " + cmd);
+        return impl->closeInsertEditorOnMessageThread(req);
+    }
+
     std::lock_guard<std::mutex> lock(impl->mutex);
     // High-frequency IPC: omit from engine.log (same as ping / playback_status polls).
     if (cmd.isNotEmpty() && cmd != "ping" && cmd != "playback_status" && cmd != "playback_seek")
@@ -2421,17 +2619,11 @@ juce::var Engine::dispatch(const juce::var& req)
         return out;
     }
 
-    if (cmd == "playback_set_inserts")
-        return impl->playbackSetInsertsLocked(req);
-
-    if (cmd == "playback_open_insert_editor")
-        return impl->openInsertEditorLocked(req);
-
-    if (cmd == "playback_close_insert_editor")
-        return impl->closeInsertEditorLocked(req);
-
     if (cmd == "plugin_chain")
         return impl->pluginChainLocked();
+
+    if (cmd == "plugin_rescan")
+        return impl->pluginRescanLocked(req);
 
     return errObj("unknown cmd: " + cmd);
 }

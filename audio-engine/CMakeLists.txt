@@ -1,6 +1,6 @@
 # audio-engine — JUCE-based AudioEngine (stdin/stdout JSON) for device I/O, file playback, VST3 scan.
 cmake_minimum_required(VERSION 3.22)
-project(audio_engine VERSION 2.4.4 LANGUAGES C CXX)
+project(audio_engine VERSION 2.4.8 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -36,6 +36,7 @@ target_compile_definitions(audio_engine PRIVATE
   JUCE_PLUGINHOST_VST3=1
   JUCE_PLUGINHOST_LADSPA=0
   JUCE_PLUGINHOST_LV2=0
+  JUCE_MODAL_LOOPS_PERMITTED=1
 )
 
 if(APPLE)
