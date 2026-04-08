@@ -85,6 +85,23 @@ static void persistKnownPluginListCache(const juce::KnownPluginList& list)
     }
 }
 
+/** Never throws — a disk/XML error must not abort the whole scan (user would have to restart the engine). */
+static void persistKnownPluginListCacheSafe(const juce::KnownPluginList& list)
+{
+    try
+    {
+        persistKnownPluginListCache(list);
+    }
+    catch (const std::exception& e)
+    {
+        appLogLine("plugin scan: known-plugin-list.xml write failed (continuing): " + juce::String(e.what()));
+    }
+    catch (...)
+    {
+        appLogLine("plugin scan: known-plugin-list.xml write failed (continuing, non-std)");
+    }
+}
+
 static juce::StringArray readDeadMansPedalLines(const juce::File& deadMans)
 {
     juce::StringArray lines;
@@ -163,6 +180,36 @@ static void appendPluginScanSkipIfNew(const juce::String& fileId)
         return;
     lines.add(fileId);
     (void) path.replaceWithText(lines.joinIntoString("\n") + "\n", false, false);
+}
+
+static void appendPluginScanSkipAndBlacklistSafe(juce::KnownPluginList& list, const juce::String& fileId)
+{
+    if (fileId.isEmpty())
+        return;
+    try
+    {
+        appendPluginScanSkipIfNew(fileId);
+    }
+    catch (const std::exception& e)
+    {
+        appLogLine("plugin scan: plugin-scan-skip.txt append failed: " + juce::String(e.what()));
+    }
+    catch (...)
+    {
+        appLogLine("plugin scan: plugin-scan-skip.txt append failed (non-std)");
+    }
+    try
+    {
+        list.addToBlacklist(fileId);
+    }
+    catch (const std::exception& e)
+    {
+        appLogLine("plugin scan: addToBlacklist failed: " + juce::String(e.what()));
+    }
+    catch (...)
+    {
+        appLogLine("plugin scan: addToBlacklist failed (non-std)");
+    }
 }
 
 /** Same file order as `juce::PluginDirectoryScanner` (searchPaths + dead-man's-pedal reorder). */
@@ -998,6 +1045,9 @@ struct Engine::Impl
                                       const juce::FileSearchPath& dirs, const juce::File& deadMans,
                                       const juce::String& formatLabel)
     {
+        /* Isolate failures so one bad identifier / disk error does not set plugin_scan phase to failed. */
+        try
+        {
         juce::StringArray files = buildOrderedPluginScanFiles(format, dirs, true, deadMans);
         files = filterOutSkippedPluginIdentifiers(files, pluginScanSkipFilePath());
         juce::PluginDirectoryScanner scanner(list, format, dirs, true, deadMans, false);
@@ -1012,9 +1062,26 @@ struct Engine::Impl
         };
         while (processed < n)
         {
-            const juce::String fileId = files[static_cast<size_t>(n - 1 - processed)];
-            const juce::String displayName = format.getNameOfPluginFromIdentifier(fileId);
-            const bool cacheListingUpToDate = list.isListingUpToDate(fileId, format);
+            const int fileIdx = n - 1 - processed;
+            const juce::String fileId = files[fileIdx];
+            juce::String displayName = fileId;
+            try
+            {
+                displayName = format.getNameOfPluginFromIdentifier(fileId);
+            }
+            catch (...)
+            {
+                displayName = fileId;
+            }
+            bool cacheListingUpToDate = false;
+            try
+            {
+                cacheListingUpToDate = list.isListingUpToDate(fileId, format);
+            }
+            catch (...)
+            {
+                cacheListingUpToDate = false;
+            }
             if (cacheListingUpToDate)
                 pluginScanProgress.skipped.fetch_add(1, std::memory_order_relaxed);
             {
@@ -1025,10 +1092,16 @@ struct Engine::Impl
             const int doneBefore = pluginScanProgress.done.load(std::memory_order_relaxed);
             const int scanSeq = doneBefore + 1;
             const int totalCandidates = pluginScanProgress.total.load(std::memory_order_relaxed);
-            appLogLine("plugin scan: START " + formatLabel + " scan_seq=" + juce::String(scanSeq)
-                       + " total_candidates=" + juce::String(totalCandidates) + " format_pos=" + juce::String(processed + 1)
-                       + "/" + juce::String(n) + " cache_listing_up_to_date=" + juce::String(cacheListingUpToDate ? "yes" : "no")
-                       + " name=\"" + displayName + "\" file=\"" + fileId + "\"");
+            try
+            {
+                appLogLine("plugin scan: START " + formatLabel + " scan_seq=" + juce::String(scanSeq)
+                           + " total_candidates=" + juce::String(totalCandidates) + " format_pos=" + juce::String(processed + 1)
+                           + "/" + juce::String(n) + " cache_listing_up_to_date=" + juce::String(cacheListingUpToDate ? "yes" : "no")
+                           + " name=\"" + displayName + "\" file=\"" + fileId + "\"");
+            }
+            catch (...)
+            {
+            }
             bool more = false;
             try
             {
@@ -1038,34 +1111,41 @@ struct Engine::Impl
             {
                 // `scanNextFile` decrements the scanner index before loading; on throw we must advance
                 // our progress and blacklist/skip or we desync from JUCE and spin on the same slot.
-                appendPluginScanSkipIfNew(fileId);
-                list.addToBlacklist(fileId);
+                appendPluginScanSkipAndBlacklistSafe(list, fileId);
                 appLogLine("plugin scan: FAIL_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
                            + "\" what=\"" + juce::String(e.what()) + "\"");
                 processed++;
                 pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
-                persistKnownPluginListCache(list);
+                persistKnownPluginListCacheSafe(list);
                 yieldIfPlayback();
                 continue;
             }
             catch (...)
             {
-                appendPluginScanSkipIfNew(fileId);
-                list.addToBlacklist(fileId);
+                appendPluginScanSkipAndBlacklistSafe(list, fileId);
                 appLogLine("plugin scan: FAIL_SKIP " + formatLabel + " scan_seq=" + juce::String(scanSeq) + " file=\"" + fileId
                            + "\" (non-std)");
                 processed++;
                 pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
-                persistKnownPluginListCache(list);
+                persistKnownPluginListCacheSafe(list);
                 yieldIfPlayback();
                 continue;
             }
             processed++;
             pluginScanProgress.done.fetch_add(1, std::memory_order_relaxed);
-            persistKnownPluginListCache(list);
+            persistKnownPluginListCacheSafe(list);
             yieldIfPlayback();
             if (!more)
                 break;
+        }
+        }
+        catch (const std::exception& e)
+        {
+            appLogLine("plugin scan: " + formatLabel + " phase error (skipping rest of phase): " + juce::String(e.what()));
+        }
+        catch (...)
+        {
+            appLogLine("plugin scan: " + formatLabel + " phase error (skipping rest of phase, non-std)");
         }
         {
             std::lock_guard<std::mutex> lk(pluginScanProgress.mutex);
@@ -1125,32 +1205,37 @@ struct Engine::Impl
                 const juce::FileSearchPath dirs = vst3.getDefaultLocationsToSearch();
                 scanPluginFormatWithProgress(list, vst3, dirs, deadMans, "VST3");
             }
+        }
+        catch (const std::exception& e)
+        {
+            persistKnownPluginListCacheSafe(list);
+            appLogLine("plugin scan: VST3 phase unexpected error (continuing): " + juce::String(e.what()));
+        }
+        catch (...)
+        {
+            persistKnownPluginListCacheSafe(list);
+            appLogLine("plugin scan: VST3 phase unexpected error (continuing, non-std)");
+        }
 #if JUCE_MAC
+        try
+        {
             appLogLine("plugin scan: VST3 phase complete; starting AU");
             {
                 const juce::FileSearchPath auDirs = auFormat.getDefaultLocationsToSearch();
                 scanPluginFormatWithProgress(list, auFormat, auDirs, deadMans, "AU");
             }
-#endif
         }
         catch (const std::exception& e)
         {
-            persistKnownPluginListCache(list);
-            std::lock_guard<std::mutex> lock(pluginScanMutex);
-            pluginScanPhase = PluginScanPhase::Failed;
-            pluginScanLastError = "scan failed: " + juce::String(e.what());
-            appLogLine("error: " + pluginScanLastError);
-            return;
+            persistKnownPluginListCacheSafe(list);
+            appLogLine("plugin scan: AU phase unexpected error (continuing): " + juce::String(e.what()));
         }
         catch (...)
         {
-            persistKnownPluginListCache(list);
-            std::lock_guard<std::mutex> lock(pluginScanMutex);
-            pluginScanPhase = PluginScanPhase::Failed;
-            pluginScanLastError = "scan failed: unknown exception";
-            appLogLine("error: " + pluginScanLastError);
-            return;
+            persistKnownPluginListCacheSafe(list);
+            appLogLine("plugin scan: AU phase unexpected error (continuing, non-std)");
         }
+#endif
 
         const juce::Array<juce::PluginDescription> types = list.getTypes();
         std::lock_guard<std::mutex> lock(pluginScanMutex);
