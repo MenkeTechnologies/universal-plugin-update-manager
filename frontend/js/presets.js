@@ -171,37 +171,48 @@ function renderPresetFormatBreakdown(entries) {
     clearPresetFormatBreakdownPairs();
     const ps = document.getElementById('presetStats');
     if (!ps) return;
+    const sizeEl = ps.querySelector('.audio-stats-pair[data-stat-key="size"]');
+    if (!sizeEl) return;
     for (const [fmt, c] of entries) {
         const span = document.createElement('span');
         span.className = 'audio-stats-pair format-badge format-default';
         span.dataset.statKey = 'fmt-' + fmt;
-        span.textContent = fmt + ': ' + c.toLocaleString();
-        ps.appendChild(span);
+        const lab = document.createElement('span');
+        lab.textContent = String(fmt) + ':';
+        const val = document.createElement('span');
+        val.className = 'audio-stat-value';
+        val.textContent = c.toLocaleString();
+        span.appendChild(lab);
+        span.appendChild(document.createTextNode(' '));
+        span.appendChild(val);
+        ps.insertBefore(span, sizeEl);
     }
     applyPresetStatsOrderFromPrefs();
 }
 
-/** Re-apply prefs after format rows are recreated (DOMContentLoaded restore runs before breakdown exists). */
+/** Order is always Total → format rows (middle) → Size; only `fmt-*` keys follow saved drag order. */
 function applyPresetStatsOrderFromPrefs() {
     if (typeof prefs === 'undefined') return;
-    const saved = prefs.getObject('presetStatsOrder', null);
-    if (!saved || !Array.isArray(saved)) return;
     const ps = document.getElementById('presetStats');
     if (!ps) return;
-    const getKey = (el) => el.dataset.statKey || '';
-    const children = [...ps.children].filter((c) => c.classList.contains('audio-stats-pair'));
-    const map = {};
-    children.forEach((c) => {
-        const k = getKey(c);
-        if (k) map[k] = c;
-    });
-    for (const key of saved) {
-        if (map[key]) ps.appendChild(map[key]);
+    const total = ps.querySelector('.audio-stats-pair[data-stat-key="total"]');
+    const size = ps.querySelector('.audio-stats-pair[data-stat-key="size"]');
+    if (!total || !size) return;
+    const fmts = [...ps.querySelectorAll('.audio-stats-pair[data-stat-key^="fmt-"]')];
+    const saved = prefs.getObject('presetStatsOrder', null);
+    let orderedFmts = fmts;
+    if (saved && Array.isArray(saved)) {
+        const fmtKeys = saved.filter((k) => k.startsWith('fmt-'));
+        const map = Object.fromEntries(fmts.map((el) => [el.dataset.statKey, el]));
+        orderedFmts = [...fmtKeys.map((k) => map[k]).filter(Boolean)];
+        const rest = fmts.filter((el) => !orderedFmts.includes(el));
+        orderedFmts.push(...rest);
     }
-    children.forEach((c) => {
-        const k = getKey(c);
-        if (k && !saved.includes(k)) ps.appendChild(c);
-    });
+    const frag = document.createDocumentFragment();
+    frag.appendChild(total);
+    orderedFmts.forEach((el) => frag.appendChild(el));
+    frag.appendChild(size);
+    ps.appendChild(frag);
 }
 
 let _lastPresetAggKey = null;
@@ -410,8 +421,6 @@ function _legacyFilterPresets() {
       </td></tr>`);
     }
 
-    // (pagination render-count display removed)
-    document.getElementById('presetFilteredCount').textContent = '';
 }
 
 function renderPresetTable() {
@@ -454,9 +463,6 @@ function renderPresetTable() {
         ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
       </td></tr>`);
     }
-    // (pagination render-count display removed — presetCount already shows "filtered / total")
-    const fc = document.getElementById('presetFilteredCount');
-    if (fc) fc.textContent = '';
 }
 
 function loadMorePresets() {
