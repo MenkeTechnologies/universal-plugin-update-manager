@@ -1356,7 +1356,7 @@ function _playbackRafLoop() {
 }
 
 // Real-time FFT spectrum curve in the player's visualizer section.
-// Matches parametric EQ spectrum: neutral gray fill + light outline (EQ response curve stays cyan).
+// Magenta→cyan gradient + cyan outline (matches parametric EQ spectrum fill).
 let _npFftBuf = null;
 let _npFftGrad = null;
 let _npFftCanvas = null;
@@ -1479,9 +1479,9 @@ function _renderNpFft() {
 
     if (!_npFftGrad) {
         _npFftGrad = ctx.createLinearGradient(0, 0, 0, h);
-        _npFftGrad.addColorStop(0, 'rgba(210, 212, 218, 0.32)');
-        _npFftGrad.addColorStop(0.55, 'rgba(95, 98, 108, 0.16)');
-        _npFftGrad.addColorStop(1, 'rgba(45, 46, 52, 0.05)');
+        _npFftGrad.addColorStop(0, 'rgba(211,0,197,0.35)');
+        _npFftGrad.addColorStop(0.5, 'rgba(5,217,232,0.18)');
+        _npFftGrad.addColorStop(1, 'rgba(5,217,232,0.03)');
     }
 
     const fMin = 20;
@@ -1532,7 +1532,7 @@ function _renderNpFft() {
         ctx.beginPath();
         ctx.moveTo(0, specH);
         for (let p = 0; p < nPts; p += 2) ctx.lineTo(pts[p], pts[p + 1]);
-        ctx.strokeStyle = 'rgba(220, 222, 230, 0.45)';
+        ctx.strokeStyle = 'rgba(5,217,232,0.5)';
         ctx.lineWidth = 1;
         ctx.stroke();
     }
@@ -4902,61 +4902,34 @@ function updateMetaLine() {
     let _dragState = null;
     let _eqDragEngineSyncTs = 0;
 
-    /** Dark panel + log grid + dB lines (Ableton EQ8–style); EQ curve stays cyan. */
+    /** Light log grid + 0 dB line (transparent background; EQ response stroke stays cyan). */
     function drawEqPanelGrid(ctx, w, h, zeroY) {
-        ctx.fillStyle = '#141414';
-        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
         ctx.lineWidth = 1;
-        const majorFreqs = [100, 1000, 10000];
-        const minorFreqs = [50, 200, 500, 2000, 5000, 20000];
-        for (const f of minorFreqs) {
-            if (f < FREQ_MIN || f > FREQ_MAX) continue;
+        for (const f of [100, 1000, 10000]) {
             const x = freqToX(f, w);
-            ctx.strokeStyle = 'rgba(255,255,255,0.04)';
             ctx.beginPath();
             ctx.moveTo(x, 0);
-            ctx.lineTo(x, h - EQ_MARGIN_BOTTOM);
+            ctx.lineTo(x, h);
             ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.font = '9px sans-serif';
+            ctx.fillText(f >= 1000 ? (f / 1000) + 'k' : f, x + 2, h - 3);
         }
-        for (const f of majorFreqs) {
-            const x = freqToX(f, w);
-            ctx.strokeStyle = 'rgba(255,255,255,0.09)';
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, h - EQ_MARGIN_BOTTOM);
-            ctx.stroke();
-        }
-        for (const g of [-12, -6, 6, 12]) {
-            const gy = gainToY(g, h);
-            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-            ctx.beginPath();
-            ctx.moveTo(0, gy);
-            ctx.lineTo(w, gy);
-            ctx.stroke();
-        }
-        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
         ctx.beginPath();
         ctx.moveTo(0, zeroY);
         ctx.lineTo(w, zeroY);
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = '9px "Share Tech Mono", ui-monospace, sans-serif';
-        ctx.textAlign = 'center';
-        for (const f of majorFreqs) {
-            const x = freqToX(f, w);
-            const lab = f >= 1000 ? (f / 1000) + 'k' : String(f);
-            ctx.fillText(lab, x, h - 5);
-        }
-        ctx.textAlign = 'start';
     }
 
-    /** Log-spaced spectrum fill + top outline (neutral gray; interpolated magnitudes). */
+    /** Log-spaced spectrum fill + top outline (magenta→cyan; interpolated magnitudes). */
     function drawEqSpectrumFill(ctx, w, h, dataArr, bufLen, sampleRate, fftSize) {
         const plotH = h - EQ_MARGIN_BOTTOM;
         const grad = ctx.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, 'rgba(210, 212, 218, 0.28)');
-        grad.addColorStop(0.55, 'rgba(95, 98, 108, 0.14)');
-        grad.addColorStop(1, 'rgba(45, 46, 52, 0.06)');
+        grad.addColorStop(0, 'rgba(211,0,197,0.25)');
+        grad.addColorStop(0.5, 'rgba(5,217,232,0.12)');
+        grad.addColorStop(1, 'rgba(5,217,232,0.02)');
         ctx.beginPath();
         ctx.moveTo(0, h);
         let firstY = h;
@@ -4989,7 +4962,7 @@ function updateMetaLine() {
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
         }
-        ctx.strokeStyle = 'rgba(220, 222, 230, 0.42)';
+        ctx.strokeStyle = 'rgba(5,217,232,0.45)';
         ctx.lineWidth = 1;
         ctx.stroke();
     }
@@ -5140,8 +5113,9 @@ function updateMetaLine() {
         const wrap = canvas.parentElement;
         if (!wrap) return;
         const br = wrap.getBoundingClientRect();
-        const w = Math.round(br.width > 1 ? br.width : wrap.clientWidth);
-        const h = Math.round(br.height > 1 ? br.height : wrap.clientHeight);
+        /* Floor dimensions to avoid subpixel oscillation (ResizeObserver ↔ canvas bitmap ↔ layout creep). */
+        const w = Math.max(1, Math.floor(br.width > 1 ? br.width : wrap.clientWidth));
+        const h = Math.max(1, Math.floor(br.height > 1 ? br.height : wrap.clientHeight));
         if (w > 0 && h > 0) {
             const dw = Math.abs(w - canvas.width);
             const dh = Math.abs(h - canvas.height);

@@ -129,6 +129,7 @@ static juce::StringArray mergePluginScanSkipList(const juce::File& skipFile)
         "AudioUnit:Mixers/mixr,aumx,appl",    // AUMixer
         "AudioUnit:Mixers/mixr,mxmx,appl",    // AUMatrixMixer
         "AudioUnit:Mixers/mixr,mcmx,appl",    // AUMultiChannelMixer
+        "AudioUnit:Mixers/mixr,spmx,appl",    // AUSpatialMixer — often blocks JUCE scanNextFile (no throw)
     };
     for (const char* s : kBuiltin)
     {

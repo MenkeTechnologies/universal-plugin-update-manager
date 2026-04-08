@@ -24,7 +24,7 @@ let aePluginChainPollGeneration = 0;
 /** One live toast for plugin scan (`#aePluginScanProgressToast`); updated each poll, not stacked. */
 const AE_PLUGIN_SCAN_PROGRESS_TOAST_ID = 'aePluginScanProgressToast';
 /** After this many seconds on the same `scan_done`/plug-in step, append `ui.ae.plugins_scan_stuck_hint` (JUCE may block in `scanNextFile`). */
-const AE_PLUGIN_SCAN_STUCK_HINT_SEC = 60;
+const AE_PLUGIN_SCAN_STUCK_HINT_SEC = 20;
 /** When `scan_done` / current plug-in / skipped unchanged, we still show elapsed seconds on the toast. */
 let aeScanProgressToastKey = '';
 let aeScanProgressToastKeyAt = 0;
