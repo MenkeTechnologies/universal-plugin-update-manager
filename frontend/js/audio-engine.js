@@ -294,6 +294,48 @@ function aePopulateSampleRateSelect(selectEl, info, preferredHz) {
 
 /**
  * @param {HTMLSelectElement|null} selectEl
+ * @param {object|null} info — `get_output_device_info` / `get_input_device_info` payload
+ * @param {string} [preferredFrames] — saved pref string (numeric or empty for driver default)
+ */
+function aePopulateBufferFramesSelect(selectEl, info, preferredFrames) {
+    if (!selectEl || typeof selectEl.replaceChildren !== 'function' || typeof catalogFmt !== 'function') return;
+    selectEl.replaceChildren();
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = catalogFmt('ui.ae.buffer_frames_driver_default');
+    selectEl.appendChild(defOpt);
+    const raw = info && Array.isArray(info.buffer_sizes) ? info.buffer_sizes : [];
+    const nums = [];
+    for (const x of raw) {
+        const n = typeof x === 'number' ? x : Number.parseInt(String(x), 10);
+        if (Number.isFinite(n) && n > 0) nums.push(Math.min(n >>> 0, AE_MAX_BUFFER_FRAMES));
+    }
+    nums.sort((a, b) => a - b);
+    const seen = new Set();
+    for (const frames of nums) {
+        if (seen.has(frames)) continue;
+        seen.add(frames);
+        const opt = document.createElement('option');
+        opt.value = String(frames);
+        opt.textContent = catalogFmt('ui.ae.buffer_frames_option', {frames: String(frames)});
+        selectEl.appendChild(opt);
+    }
+    const pref = preferredFrames != null ? String(preferredFrames).trim() : '';
+    if (pref !== '' && [...selectEl.options].some((o) => o.value === pref)) {
+        selectEl.value = pref;
+    } else if (pref !== '') {
+        const opt = document.createElement('option');
+        opt.value = pref;
+        opt.textContent = catalogFmt('ui.ae.buffer_frames_saved_option', {frames: pref});
+        selectEl.appendChild(opt);
+        selectEl.value = pref;
+    } else {
+        selectEl.value = '';
+    }
+}
+
+/**
+ * @param {HTMLSelectElement|null} selectEl
  * @param {object} typeRes — `list_audio_device_types` payload (`ok`, `types`, `current`)
  */
 function aePopulateAudioDeviceTypeSelect(selectEl, typeRes) {
@@ -1317,14 +1359,18 @@ function initAudioEngineTab() {
 async function fillAeDeviceCaps(inv, deviceId) {
     const capsEl = document.getElementById('aeDeviceCaps');
     const srSel = document.getElementById('aeSampleRate');
+    const bufOut = document.getElementById('aeBufferFramesOutput');
     if (!capsEl || typeof inv !== 'function') {
         if (capsEl) capsEl.textContent = '—';
         return;
     }
     let prefSr = '';
+    let prefBuf = '';
     if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
         const p = prefs.getItem(AE_PREFS_SAMPLE_RATE_HZ);
         prefSr = p != null ? String(p).trim() : '';
+        const b = prefs.getItem(AE_PREFS_BUFFER_FRAMES_OUTPUT);
+        prefBuf = b != null ? String(b).trim() : '';
     }
     try {
         const payload = {cmd: 'get_output_device_info'};
@@ -1338,10 +1384,16 @@ async function fillAeDeviceCaps(inv, deviceId) {
         if (srSel) {
             aePopulateSampleRateSelect(srSel, info && info.ok === true ? info : null, prefSr);
         }
+        if (bufOut) {
+            aePopulateBufferFramesSelect(bufOut, info && info.ok === true ? info : null, prefBuf);
+        }
     } catch {
         capsEl.textContent = '—';
         if (srSel) {
             aePopulateSampleRateSelect(srSel, null, prefSr);
+        }
+        if (bufOut) {
+            aePopulateBufferFramesSelect(bufOut, null, prefBuf);
         }
     }
 }
@@ -1353,9 +1405,15 @@ async function fillAeDeviceCaps(inv, deviceId) {
  */
 async function fillAeInputDeviceCaps(inv, deviceId) {
     const el = document.getElementById('aeInputDeviceCaps');
+    const bufIn = document.getElementById('aeBufferFramesInput');
     if (!el || typeof inv !== 'function') {
         if (el) el.textContent = '—';
         return;
+    }
+    let prefBuf = '';
+    if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+        const b = prefs.getItem(AE_PREFS_BUFFER_FRAMES_INPUT);
+        prefBuf = b != null ? String(b).trim() : '';
     }
     try {
         const payload = {cmd: 'get_input_device_info'};
@@ -1366,8 +1424,14 @@ async function fillAeInputDeviceCaps(inv, deviceId) {
         const info = await inv(payload);
         const line = buildAeDeviceCapsLine(info);
         el.textContent = line != null ? line : '—';
+        if (bufIn) {
+            aePopulateBufferFramesSelect(bufIn, info && info.ok === true ? info : null, prefBuf);
+        }
     } catch {
         el.textContent = '—';
+        if (bufIn) {
+            aePopulateBufferFramesSelect(bufIn, null, prefBuf);
+        }
     }
 }
 
