@@ -19,27 +19,47 @@ function diskLabelKind(label) {
     return DISK_LABEL_KIND[k] || 'muted';
 }
 
+/** For title="…" — avoid breaking HTML when labels contain quotes. */
+function diskAttrEscape(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
+}
+
 function renderDiskUsageBar(containerId, data, totalBytes) {
     const el = document.getElementById(containerId);
     if (!el) return;
-    if (!data || data.length === 0 || totalBytes === 0) {
+    if (!data || data.length === 0) {
+        el.style.display = 'none';
+        return;
+    }
+
+    // Sort by size descending
+    data.sort((a, b) => b.bytes - a.bytes);
+
+    const weights = data.map((d) => Number(d.bytes) || 0);
+    const sumBytes = weights.reduce((s, w) => s + w, 0);
+    if (sumBytes === 0 && (!totalBytes || totalBytes === 0)) {
         el.style.display = 'none';
         return;
     }
     el.style.display = '';
 
-    // Sort by size descending
-    data.sort((a, b) => b.bytes - a.bytes);
-
-    const sumBytes = data.reduce((s, d) => s + (Number(d.bytes) || 0), 0);
     const denom = sumBytes > 0 ? sumBytes : totalBytes;
+    let pcts = weights.map((w) => (denom > 0 ? (w / denom) * 100 : 0));
+    const sumP = pcts.reduce((a, b) => a + b, 0);
+    if (sumP > 0 && Math.abs(sumP - 100) > 1e-9) {
+        const s = 100 / sumP;
+        pcts = pcts.map((p) => p * s);
+    }
 
-    /** Proportional flex (not width:%) — WKWebView often resolves % on flex items to 0; only min-width painted. */
-    const segments = data.map((d) => {
-        const pct = ((d.bytes / denom) * 100).toFixed(1);
+    /** Table-cell + width:% — % resolves against the bar (table); flex % on WKWebView stayed at min-width. */
+    const segments = data.map((d, i) => {
+        const pctLabel = ((d.bytes / denom) * 100).toFixed(1);
         const kind = diskLabelKind(d.label);
-        const w = Number(d.bytes) || 0;
-        return `<div class="disk-segment" data-kind="${kind}" style="flex:${w} 0 0" title="${d.label}: ${d.sizeStr} (${pct}%)"></div>`;
+        const wPct = pcts[i].toFixed(4);
+        return `<div class="disk-segment" data-kind="${kind}" style="width:${wPct}%" title="${diskAttrEscape(d.label)}: ${diskAttrEscape(d.sizeStr)} (${pctLabel}%)"></div>`;
     }).join('');
 
     const legend = data.filter(d => d.bytes > 0).map(d => {
@@ -52,7 +72,9 @@ function renderDiskUsageBar(containerId, data, totalBytes) {
     }).join('');
 
     el.innerHTML = `
-    <div class="disk-bar">${segments}</div>
+    <div class="disk-bar-wrap">
+      <div class="disk-bar">${segments}</div>
+    </div>
     <div class="disk-legend">${legend}</div>
   `;
     if (typeof el.querySelector === 'function') {

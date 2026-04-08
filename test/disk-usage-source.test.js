@@ -76,14 +76,25 @@ describe('frontend/js/disk-usage.js (vm-loaded)', () => {
     D = loadDiskUsageSandbox();
   });
 
-  it('renderDiskUsageBar hides container when totalBytes is 0', () => {
+  it('renderDiskUsageBar hides when sum of segment bytes is 0 and totalBytes is 0', () => {
+    D.renderDiskUsageBar(
+      'testDisk',
+      [{ label: 'WAV', bytes: 0, sizeStr: '0 B' }],
+      0
+    );
+    const el = D._containers.testDisk;
+    assert.strictEqual(el.style.display, 'none');
+  });
+
+  it('renderDiskUsageBar shows when segment bytes sum > 0 even if totalBytes is 0', () => {
     D.renderDiskUsageBar(
       'testDisk',
       [{ label: 'WAV', bytes: 100, sizeStr: '100 B' }],
       0
     );
     const el = D._containers.testDisk;
-    assert.strictEqual(el.style.display, 'none');
+    assert.strictEqual(el.style.display, '');
+    assert.ok(el.innerHTML.includes('width:100.0000%'));
   });
 
   it('renderDiskUsageBar builds segments and legend with percentages', () => {
@@ -100,8 +111,8 @@ describe('frontend/js/disk-usage.js (vm-loaded)', () => {
     assert.ok(el.innerHTML.includes('disk-legend'));
     assert.match(
       el.innerHTML,
-      /class="disk-segment"[^>]*style="flex:\d+ 0 0" title="/,
-      'segment must close style="…" before title= (WKWebView drops bars if the attribute is split across lines)'
+      /class="disk-segment"[^>]*style="width:\d+\.\d+%" title="/,
+      'segment uses table-cell width:% (one line); WKWebView failed flex-based sizing'
     );
   });
 

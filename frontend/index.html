@@ -2988,7 +2988,7 @@
             text-shadow: 0 0 8px var(--cyan-glow);
         }
 
-        /* Disk usage bar — width:100% on bar + flex-grow segments (not % width); WKWebView left % flex children at min-width. */
+        /* Disk usage bar — table + table-cell + inline width:% (flex % on WKWebView failed; flex-grow inline was fragile). */
         .disk-usage {
             width: 100%;
             box-sizing: border-box;
@@ -2997,22 +2997,29 @@
             border-bottom: 1px solid var(--border);
         }
 
-        .disk-bar {
-            display: flex;
+        .disk-bar-wrap {
             width: 100%;
-            min-width: 0;
-            box-sizing: border-box;
-            height: 8px;
             border-radius: 2px;
             overflow: hidden;
             background: var(--border);
+            box-sizing: border-box;
         }
 
-        /* Proportional flex-grow (set inline) — no % width; avoids WebKit flex % resolution bugs. */
+        .disk-bar {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            height: 8px;
+            border-collapse: collapse;
+            box-sizing: border-box;
+        }
+
         .disk-segment {
-            height: 100%;
-            min-width: 0;
-            flex-shrink: 0;
+            display: table-cell;
+            height: 8px;
+            padding: 0;
+            vertical-align: top;
+            box-sizing: border-box;
         }
 
         .disk-legend {
@@ -10599,44 +10606,44 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=35136"></script>
-<script src="js/utils.js?v=35136"></script>
-<script src="js/ipc.js?v=35136"></script>
-<script src="js/drag-reorder.js?v=35136"></script>
-<script src="js/modal-drag.js?v=35136"></script>
-<script src="js/columns.js?v=35136"></script>
-<script src="js/notes.js?v=35136"></script>
-<script src="js/favorites.js?v=35136"></script>
-<script src="js/export.js?v=35136"></script>
-<script src="js/plugins.js?v=35136"></script>
-<script src="js/settings.js?v=35136"></script>
-<script src="js/history.js?v=35136"></script>
-<script src="js/kvr.js?v=35136"></script>
-<script src="js/audio.js?v=35136"></script>
-<script src="js/daw.js?v=35136"></script>
-<script src="js/disk-usage.js?v=35137"></script>
-<script src="js/presets.js?v=35136"></script>
-<script src="js/batch-select.js?v=35136"></script>
-<script src="js/native-file-drag.js?v=35136"></script>
-<script src="js/sort-persist.js?v=35136"></script>
-<script src="js/multi-filter.js?v=35136"></script>
-<script src="js/file-browser.js?v=35136"></script>
-<script src="js/duplicates.js?v=35136"></script>
-<script src="js/command-palette.js?v=35136"></script>
-<script src="js/xref.js?v=35136"></script>
-<script src="js/dep-graph.js?v=35136"></script>
-<script src="js/smart-playlists.js?v=35136"></script>
-<script src="js/heatmap-dashboard.js?v=35136"></script>
-<script src="js/midi.js?v=35136"></script>
-<script src="js/pdf.js?v=35136"></script>
-<script src="js/settings-search.js?v=35136"></script>
-<script src="js/visualizer.js?v=35136"></script>
-<script src="js/walker-status.js?v=35136"></script>
-<script src="js/audio-engine.js?v=35136"></script>
-<script src="js/context-menu.js?v=35136"></script>
-<script src="js/shortcuts.js?v=35136"></script>
-<script src="js/help-overlay.js?v=35136"></script>
-<script src="js/keyboard-nav.js?v=35136"></script>
-<script src="js/app.js?v=35136"></script>
+<script src="js/i18n-ui.js?v=39886"></script>
+<script src="js/utils.js?v=39886"></script>
+<script src="js/ipc.js?v=39886"></script>
+<script src="js/drag-reorder.js?v=39886"></script>
+<script src="js/modal-drag.js?v=39886"></script>
+<script src="js/columns.js?v=39886"></script>
+<script src="js/notes.js?v=39886"></script>
+<script src="js/favorites.js?v=39886"></script>
+<script src="js/export.js?v=39886"></script>
+<script src="js/plugins.js?v=39886"></script>
+<script src="js/settings.js?v=39886"></script>
+<script src="js/history.js?v=39886"></script>
+<script src="js/kvr.js?v=39886"></script>
+<script src="js/audio.js?v=39886"></script>
+<script src="js/daw.js?v=39886"></script>
+<script src="js/disk-usage.js?v=39886"></script>
+<script src="js/presets.js?v=39886"></script>
+<script src="js/batch-select.js?v=39886"></script>
+<script src="js/native-file-drag.js?v=39886"></script>
+<script src="js/sort-persist.js?v=39886"></script>
+<script src="js/multi-filter.js?v=39886"></script>
+<script src="js/file-browser.js?v=39886"></script>
+<script src="js/duplicates.js?v=39886"></script>
+<script src="js/command-palette.js?v=39886"></script>
+<script src="js/xref.js?v=39886"></script>
+<script src="js/dep-graph.js?v=39886"></script>
+<script src="js/smart-playlists.js?v=39886"></script>
+<script src="js/heatmap-dashboard.js?v=39886"></script>
+<script src="js/midi.js?v=39886"></script>
+<script src="js/pdf.js?v=39886"></script>
+<script src="js/settings-search.js?v=39886"></script>
+<script src="js/visualizer.js?v=39886"></script>
+<script src="js/walker-status.js?v=39886"></script>
+<script src="js/audio-engine.js?v=39886"></script>
+<script src="js/context-menu.js?v=39886"></script>
+<script src="js/shortcuts.js?v=39886"></script>
+<script src="js/help-overlay.js?v=39886"></script>
+<script src="js/keyboard-nav.js?v=39886"></script>
+<script src="js/app.js?v=39886"></script>
 </body>
 </html>

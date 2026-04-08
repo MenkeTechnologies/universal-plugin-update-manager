@@ -1,3 +1,4 @@
+#include <atomic>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -65,10 +66,6 @@ static void runStdinJsonLoop(audio_haxor::Engine& engine)
         }
     }
     audio_haxor::appLogLine("stdin closed, exiting");
-    juce::MessageManager::callAsync([&engine]() {
-        engine.shutdownEditors();
-        juce::MessageManager::getInstance()->stopDispatchLoop();
-    });
 }
 
 int main(int argc, char* argv[])
@@ -90,11 +87,18 @@ int main(int argc, char* argv[])
     audio_haxor::Engine engine;
     audio_haxor::appLogLine("Engine constructed");
 
-    std::thread stdinThread([&engine]() { runStdinJsonLoop(engine); });
+    std::atomic<bool> stdinDone{false};
+    std::thread stdinThread([&engine, &stdinDone]() {
+        runStdinJsonLoop(engine);
+        stdinDone.store(true, std::memory_order_release);
+    });
 
-    audio_haxor::appLogLine("entering runDispatchLoop (message thread)");
-    juce::MessageManager::getInstance()->runDispatchLoop();
-    audio_haxor::appLogLine("runDispatchLoop returned");
+    audio_haxor::appLogLine("entering message pump loop (message thread)");
+    while (!stdinDone.load(std::memory_order_acquire))
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(50);
+    audio_haxor::appLogLine("message pump loop exited");
+
+    engine.shutdownEditors();
     stdinThread.join();
     return 0;
 }

@@ -7,13 +7,16 @@ const AE_PREFS_SAMPLE_RATE_HZ = 'audioEngineSampleRateHz';
 const AE_PREFS_TONE = 'audioEngineTestTone';
 const AE_PREFS_BUFFER_FRAMES_OUTPUT = 'audioEngineBufferFramesOutput';
 const AE_PREFS_BUFFER_FRAMES_INPUT = 'audioEngineBufferFramesInput';
-/** JSON array of up to four host paths for `playback_set_inserts` (UI mirror). */
+/** JSON array of insert host paths for `playback_set_inserts` (UI mirror). */
 const AE_PREFS_INSERT_PATHS_JSON = 'audioEngineInsertPathsJson';
 /** @deprecated Legacy single pref; migrated once to output/input */
 const AE_LEGACY_BUFFER_FRAMES = 'audioEngineBufferFrames';
 
-const AE_INSERT_SLOT_IDS = ['aeInsertSlot0', 'aeInsertSlot1', 'aeInsertSlot2', 'aeInsertSlot3'];
-const AE_INSERT_EDITOR_IDS = ['aeInsertEditor0', 'aeInsertEditor1', 'aeInsertEditor2', 'aeInsertEditor3'];
+/** Live plugin list from the last `plugin_chain` response (populated by `aePopulateInsertSlotSelects`). */
+let aePluginCatalog = [];
+
+/** Active picker instances (one per insert row in the UI). */
+let aeInsertPickers = [];
 
 /** After first successful `list_audio_device_types`, restore saved driver from prefs once per page load (and again after AudioEngine restart). */
 let aeInitialDeviceTypeRestored = false;
@@ -23,8 +26,6 @@ let aePluginChainPollGeneration = 0;
 
 /** One live toast for plugin scan (`#aePluginScanProgressToast`); updated each poll, not stacked. */
 const AE_PLUGIN_SCAN_PROGRESS_TOAST_ID = 'aePluginScanProgressToast';
-/** After this many seconds on the same `scan_done`/plug-in step, append `ui.ae.plugins_scan_stuck_hint` (JUCE may block in `scanNextFile`). */
-const AE_PLUGIN_SCAN_STUCK_HINT_SEC = 20;
 /** When `scan_done` / current plug-in / skipped unchanged, we still show elapsed seconds on the toast. */
 let aeScanProgressToastKey = '';
 let aeScanProgressToastKeyAt = 0;
@@ -476,31 +477,310 @@ function bindAePlaybackControls() {
     }
 }
 
-/**
- * @param {object|null} chain — `plugin_chain` payload
- */
-function aePopulateInsertSlotSelects(chain) {
-    const plugins = chain && Array.isArray(chain.plugins) ? chain.plugins : [];
-    const emptyLabel =
-        typeof catalogFmt === 'function' ? catalogFmt('ui.ae.insert_slot_empty_opt') : '—';
-    for (const id of AE_INSERT_SLOT_IDS) {
-        const sel = document.getElementById(id);
-        if (!sel || typeof sel.replaceChildren !== 'function') continue;
-        sel.replaceChildren();
-        const opt0 = document.createElement('option');
-        opt0.value = '';
-        opt0.textContent = emptyLabel;
-        sel.appendChild(opt0);
-        for (const p of plugins) {
-            const path = p && p.path != null ? String(p.path) : '';
-            if (!path) continue;
-            const name = p && p.name != null ? String(p.name) : path.split('/').pop();
-            const opt = document.createElement('option');
-            opt.value = path;
-            opt.textContent = name;
-            sel.appendChild(opt);
+// ── Fuzzy matching (fzf-style subsequence with scoring) ──
+
+function aeFuzzyMatch(query, text) {
+    const q = query.toLowerCase();
+    const t = text.toLowerCase();
+    if (!q) return {score: 0, indices: []};
+    let qi = 0;
+    const indices = [];
+    for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+        if (t[ti] === q[qi]) {
+            indices.push(ti);
+            qi++;
         }
     }
+    if (qi < q.length) return null;
+    let score = 0;
+    let prev = -2;
+    for (const idx of indices) {
+        if (idx === prev + 1) score += 3;
+        if (idx === 0 || ' /\\._-:'.includes(t[idx - 1])) score += 2;
+        prev = idx;
+    }
+    score -= indices.length > 0 ? indices[0] : 0;
+    return {score, indices};
+}
+
+function aeHighlightMatch(text, indices) {
+    if (!indices || !indices.length) return document.createTextNode(text);
+    const frag = document.createDocumentFragment();
+    const idxSet = new Set(indices);
+    let run = '';
+    let inMatch = false;
+    for (let i = 0; i < text.length; i++) {
+        const m = idxSet.has(i);
+        if (m !== inMatch) {
+            if (run) {
+                if (inMatch) {
+                    const sp = document.createElement('span');
+                    sp.className = 'ae-match';
+                    sp.textContent = run;
+                    frag.appendChild(sp);
+                } else {
+                    frag.appendChild(document.createTextNode(run));
+                }
+            }
+            run = '';
+            inMatch = m;
+        }
+        run += text[i];
+    }
+    if (run) {
+        if (inMatch) {
+            const sp = document.createElement('span');
+            sp.className = 'ae-match';
+            sp.textContent = run;
+            frag.appendChild(sp);
+        } else {
+            frag.appendChild(document.createTextNode(run));
+        }
+    }
+    return frag;
+}
+
+// ── Plugin picker widget ──
+
+function aeCreatePluginPicker() {
+    const state = {selectedPath: '', selectedName: '', selectedFormat: ''};
+    const wrap = document.createElement('div');
+    wrap.className = 'ae-picker';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'ae-picker-input';
+    input.placeholder = 'Search plugins\u2026';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    const clear = document.createElement('span');
+    clear.className = 'ae-picker-clear';
+    clear.textContent = '\u00d7';
+    clear.title = 'Clear';
+    const dropdown = document.createElement('div');
+    dropdown.className = 'ae-picker-dropdown';
+    wrap.appendChild(input);
+    wrap.appendChild(clear);
+    wrap.appendChild(dropdown);
+
+    let activeIdx = -1;
+
+    function renderDropdown(query) {
+        dropdown.innerHTML = '';
+        activeIdx = -1;
+        const q = (query || '').trim();
+        let items = aePluginCatalog.map((p) => {
+            const m = q ? aeFuzzyMatch(q, p.name) : {score: 0, indices: []};
+            if (!m && q) {
+                const mPath = aeFuzzyMatch(q, p.path);
+                if (mPath) return {...p, score: mPath.score - 5, indices: []};
+            }
+            return m ? {...p, score: m.score, indices: m.indices} : null;
+        }).filter(Boolean);
+        if (q) items.sort((a, b) => b.score - a.score);
+        if (!items.length) {
+            const d = document.createElement('div');
+            d.className = 'ae-picker-no-match';
+            d.textContent = q ? 'No matches' : 'No plugins loaded';
+            dropdown.appendChild(d);
+            return;
+        }
+        for (const it of items) {
+            const row = document.createElement('div');
+            row.className = 'ae-picker-option';
+            row.dataset.path = it.path;
+            row.dataset.name = it.name;
+            row.dataset.format = it.format;
+            const badge = document.createElement('span');
+            badge.className = 'ae-badge ' + (it.format === 'VST3' ? 'ae-badge-vst3' : 'ae-badge-au');
+            badge.textContent = it.format || '?';
+            row.appendChild(badge);
+            const nameSpan = document.createElement('span');
+            nameSpan.appendChild(aeHighlightMatch(it.name, it.indices));
+            row.appendChild(nameSpan);
+            row.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                selectItem(it.path, it.name, it.format);
+            });
+            dropdown.appendChild(row);
+        }
+    }
+
+    function selectItem(path, name, format) {
+        state.selectedPath = path;
+        state.selectedName = name;
+        state.selectedFormat = format;
+        input.value = name;
+        wrap.classList.toggle('has-value', !!path);
+        closeDropdown();
+    }
+
+    function openDropdown() {
+        wrap.classList.add('open');
+        renderDropdown(input.value === state.selectedName ? '' : input.value);
+    }
+
+    function closeDropdown() {
+        wrap.classList.remove('open');
+        activeIdx = -1;
+    }
+
+    function scrollActiveIntoView() {
+        const opts = dropdown.querySelectorAll('.ae-picker-option');
+        if (activeIdx >= 0 && activeIdx < opts.length) {
+            opts[activeIdx].scrollIntoView({block: 'nearest'});
+        }
+    }
+
+    input.addEventListener('focus', () => {
+        input.select();
+        openDropdown();
+    });
+
+    input.addEventListener('input', () => {
+        if (!wrap.classList.contains('open')) wrap.classList.add('open');
+        renderDropdown(input.value);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const opts = dropdown.querySelectorAll('.ae-picker-option');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!wrap.classList.contains('open')) { openDropdown(); return; }
+            activeIdx = Math.min(activeIdx + 1, opts.length - 1);
+            opts.forEach((o, i) => o.classList.toggle('active', i === activeIdx));
+            scrollActiveIntoView();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIdx = Math.max(activeIdx - 1, 0);
+            opts.forEach((o, i) => o.classList.toggle('active', i === activeIdx));
+            scrollActiveIntoView();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (activeIdx >= 0 && activeIdx < opts.length) {
+                const o = opts[activeIdx];
+                selectItem(o.dataset.path, o.dataset.name, o.dataset.format);
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            if (state.selectedPath) input.value = state.selectedName;
+            closeDropdown();
+            input.blur();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (state.selectedPath) input.value = state.selectedName;
+            else input.value = '';
+            closeDropdown();
+        }, 150);
+    });
+
+    clear.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        state.selectedPath = '';
+        state.selectedName = '';
+        state.selectedFormat = '';
+        input.value = '';
+        wrap.classList.remove('has-value');
+        input.focus();
+    });
+
+    return {
+        el: wrap,
+        getValue() { return state.selectedPath; },
+        setValue(path) {
+            const p = aePluginCatalog.find((x) => x.path === path);
+            if (p) selectItem(p.path, p.name, p.format);
+            else { state.selectedPath = path; state.selectedName = path; state.selectedFormat = ''; input.value = path; wrap.classList.toggle('has-value', !!path); }
+        },
+        refresh() {
+            if (state.selectedPath) {
+                const p = aePluginCatalog.find((x) => x.path === state.selectedPath);
+                if (p) { state.selectedName = p.name; state.selectedFormat = p.format; input.value = p.name; }
+            }
+        },
+    };
+}
+
+// ── Dynamic insert chain rows ──
+
+function aeRebuildInsertChainUI(paths) {
+    const container = document.getElementById('aeInsertChainContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    aeInsertPickers = [];
+    if (!Array.isArray(paths)) paths = [];
+    const count = Math.max(paths.length, 1);
+    for (let i = 0; i < count; i++) {
+        aeAddInsertRow(container, paths[i] || '');
+    }
+}
+
+function aeAddInsertRow(container, initialPath) {
+    if (!container) container = document.getElementById('aeInsertChainContainer');
+    if (!container) return;
+    const idx = aeInsertPickers.length;
+    const row = document.createElement('div');
+    row.className = 'ae-insert-row';
+
+    const num = document.createElement('span');
+    num.className = 'ae-slot-num';
+    num.textContent = String(idx + 1);
+    row.appendChild(num);
+
+    const picker = aeCreatePluginPicker();
+    row.appendChild(picker.el);
+
+    const edBtn = document.createElement('button');
+    edBtn.className = 'ae-insert-editor-btn';
+    edBtn.textContent = 'Editor';
+    edBtn.type = 'button';
+    edBtn.addEventListener('click', () => {
+        const slotIdx = aeInsertPickers.indexOf(picker);
+        if (slotIdx >= 0) void aeOpenInsertEditor(slotIdx);
+    });
+    row.appendChild(edBtn);
+
+    const rmBtn = document.createElement('button');
+    rmBtn.className = 'ae-insert-remove-btn';
+    rmBtn.textContent = '\u00d7';
+    rmBtn.type = 'button';
+    rmBtn.addEventListener('click', () => {
+        const slotIdx = aeInsertPickers.indexOf(picker);
+        if (slotIdx >= 0) aeRemoveInsertRow(slotIdx);
+    });
+    row.appendChild(rmBtn);
+
+    container.appendChild(row);
+    aeInsertPickers.push(picker);
+    if (initialPath) picker.setValue(initialPath);
+}
+
+function aeRemoveInsertRow(idx) {
+    const container = document.getElementById('aeInsertChainContainer');
+    if (!container) return;
+    if (idx < 0 || idx >= aeInsertPickers.length) return;
+    if (aeInsertPickers.length <= 1) {
+        aeInsertPickers[0].setValue('');
+        return;
+    }
+    container.children[idx].remove();
+    aeInsertPickers.splice(idx, 1);
+    for (let i = 0; i < container.children.length; i++) {
+        const num = container.children[i].querySelector('.ae-slot-num');
+        if (num) num.textContent = String(i + 1);
+    }
+}
+
+function aePopulateInsertSlotSelects(chain) {
+    const plugins = chain && Array.isArray(chain.plugins) ? chain.plugins : [];
+    aePluginCatalog = plugins.map((p) => ({
+        path: p && p.path != null ? String(p.path) : '',
+        name: p && p.name != null ? String(p.name) : String(p && p.path || '').split('/').pop(),
+        format: p && p.format != null ? String(p.format) : '',
+    })).filter((p) => p.path);
+
     const fromServer = chain && Array.isArray(chain.insert_paths) ? chain.insert_paths.map((x) => String(x)) : [];
     let pick = [];
     if (fromServer.length > 0) {
@@ -514,13 +794,7 @@ function aePopulateInsertSlotSelects(chain) {
         }
     }
     if (!Array.isArray(pick)) pick = [];
-    for (let i = 0; i < AE_INSERT_SLOT_IDS.length; i++) {
-        const sel = document.getElementById(AE_INSERT_SLOT_IDS[i]);
-        if (!sel) continue;
-        const v = pick[i] != null ? String(pick[i]).trim() : '';
-        if (v && [...sel.options].some((o) => o.value === v)) sel.value = v;
-        else sel.value = '';
-    }
+    aeRebuildInsertChainUI(pick);
 }
 
 /**
@@ -573,15 +847,11 @@ async function fetchPluginChainUntilSettled(inv, initialChain, expectedGen) {
             }
             const sec = Math.floor((now - aeScanProgressToastKeyAt) / 1000);
             const suffix = sec >= 1 ? ` · ${sec}s` : '';
-            const stuckHint =
-                sec >= AE_PLUGIN_SCAN_STUCK_HINT_SEC && typeof catalogFmt === 'function'
-                    ? catalogFmt('ui.ae.plugins_scan_stuck_hint')
-                    : '';
             fillAePluginSection(chain, {elapsedSec: sec});
             const line = formatAePluginScanProgressLine(chain);
             if (line && typeof toastFmt === 'function') {
                 ensureAePluginScanProgressToast(
-                    toastFmt('toast.ae_plugin_scan_progress', {line: line + suffix + stuckHint}),
+                    toastFmt('toast.ae_plugin_scan_progress', {line: line + suffix}),
                 );
             }
         }
@@ -589,9 +859,7 @@ async function fetchPluginChainUntilSettled(inv, initialChain, expectedGen) {
 
     dismissAePluginScanProgressToast();
 
-    if (chain && chain.phase === 'scanning' && attempts >= maxAttempts) {
-        toast('toast.ae_plugin_scan_timeout', {}, 6500, 'warning');
-    } else if (sawScanning && chain && chain.phase === 'juce') {
+    if (sawScanning && chain && chain.phase === 'juce') {
         const n = chain.plugin_count != null ? Number(chain.plugin_count) : 0;
         toast(
             'toast.ae_plugin_scan_done',
@@ -669,9 +937,6 @@ function fillAePluginSection(chain, scanUiExtra) {
             if (Number.isFinite(es) && es >= 1) {
                 line += ` · ${es}s`;
             }
-            if (Number.isFinite(es) && es >= AE_PLUGIN_SCAN_STUCK_HINT_SEC && typeof catalogFmt === 'function') {
-                line += catalogFmt('ui.ae.plugins_scan_stuck_hint');
-            }
             prog.textContent = line;
         }
     } else {
@@ -717,78 +982,61 @@ function fillAePluginSection(chain, scanUiExtra) {
 }
 
 /**
- * Map UI insert slot index (0–3) to serial chain index for `playback_open_insert_editor`.
- * @returns {number} chain index, or -1 if this UI slot has no plug-in selected
+ * Map UI slot index to the chain index (only counting non-empty slots before it).
+ * @returns {number} chain index, or -1 if slot is empty
  */
 function aeChainIndexForInsertUiSlot(uiSlotIndex) {
-    if (uiSlotIndex < 0 || uiSlotIndex >= AE_INSERT_SLOT_IDS.length) return -1;
+    if (uiSlotIndex < 0 || uiSlotIndex >= aeInsertPickers.length) return -1;
     let idx = 0;
     for (let i = 0; i < uiSlotIndex; i++) {
-        const sel = document.getElementById(AE_INSERT_SLOT_IDS[i]);
-        const v = sel && sel.value != null ? String(sel.value).trim() : '';
-        if (v) idx++;
+        if (aeInsertPickers[i].getValue()) idx++;
     }
-    const sel = document.getElementById(AE_INSERT_SLOT_IDS[uiSlotIndex]);
-    const v = sel && sel.value != null ? String(sel.value).trim() : '';
-    if (!v) return -1;
+    if (!aeInsertPickers[uiSlotIndex].getValue()) return -1;
     return idx;
 }
 
-/**
- * @param {number} uiSlotIndex 0–3 matching `AE_INSERT_SLOT_IDS`
- */
-async function openAeInsertEditorForUiSlot(uiSlotIndex) {
+async function aeOpenInsertEditor(uiSlotIndex) {
     const inv = getAeAudioEngineInvoke();
-    if (!inv) {
-        aeNotifyNoAudioEngineIpc();
-        return;
-    }
-    const chainIdx = aeChainIndexForInsertUiSlot(uiSlotIndex);
-    if (chainIdx < 0) {
-        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+    if (!inv) { aeNotifyNoAudioEngineIpc(); return; }
+    if (!aeInsertPickers[uiSlotIndex] || !aeInsertPickers[uiSlotIndex].getValue()) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function')
             showToast(toastFmt('toast.ae_insert_editor_no_plugin'), 4000, 'warning');
-        }
         return;
     }
     try {
+        await applyAePlaybackInserts();
+        const chainIdx = aeChainIndexForInsertUiSlot(uiSlotIndex);
+        if (chainIdx < 0) return;
         const r = await inv({cmd: 'playback_open_insert_editor', slot: chainIdx});
         throwIfAeNotOk(r, 'playback_open_insert_editor failed');
     } catch (e) {
         const err = e && e.message ? String(e.message) : String(e);
-        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function')
             showToast(toastFmt('toast.ae_insert_editor_failed', {err}), 5000, 'error');
-        }
     }
 }
 
 async function applyAePlaybackInserts() {
     const inv = getAeAudioEngineInvoke();
-    if (!inv) {
-        aeNotifyNoAudioEngineIpc();
-        return;
-    }
+    if (!inv) { aeNotifyNoAudioEngineIpc(); return; }
     const paths = [];
-    for (const id of AE_INSERT_SLOT_IDS) {
-        const sel = document.getElementById(id);
-        const v = sel && sel.value != null ? String(sel.value).trim() : '';
+    for (const pk of aeInsertPickers) {
+        const v = pk.getValue();
         if (v) paths.push(v);
     }
     try {
         const r = await inv({cmd: 'playback_set_inserts', paths});
         throwIfAeNotOk(r, 'playback_set_inserts failed');
-        if (typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
+        if (typeof prefs !== 'undefined' && typeof prefs.setItem === 'function')
             prefs.setItem(AE_PREFS_INSERT_PATHS_JSON, JSON.stringify(paths));
-        }
-        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function')
             showToast(toastFmt('toast.ae_inserts_applied'), 3000, 'success');
-        }
         const chain = await fetchPluginChainUntilSettled(inv, undefined, aePluginChainPollGeneration);
         fillAePluginSection(chain);
     } catch (e) {
         const err = e && e.message ? String(e.message) : String(e);
-        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function')
             showToast(toastFmt('toast.ae_inserts_failed', {err}), 5000, 'error');
-        }
     }
 }
 
@@ -822,6 +1070,27 @@ async function restartAeAudioEngine() {
             showToast(toastFmt('toast.ae_audioengine_restart_failed', {err}), 5000, 'error');
         }
         void refreshAudioEnginePanel();
+    }
+}
+
+async function aeWipeAndRescan() {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) { aeNotifyNoAudioEngineIpc(); return; }
+    try {
+        if (typeof showToast === 'function')
+            showToast('Wiping plugin cache and starting fresh scan\u2026', 3000, 'info');
+        const timeoutEl = document.getElementById('aeScanTimeout');
+        const timeoutSec = timeoutEl ? Math.max(5, Math.min(3600, parseInt(timeoutEl.value, 10) || 30)) : 30;
+        const r = await inv({cmd: 'plugin_rescan', timeout_sec: timeoutSec});
+        throwIfAeNotOk(r, 'plugin_rescan failed');
+        const chain = await fetchPluginChainUntilSettled(inv, undefined, ++aePluginChainPollGeneration);
+        fillAePluginSection(chain);
+        if (typeof showToast === 'function')
+            showToast('Plugin rescan complete', 3000, 'success');
+    } catch (e) {
+        const err = e && e.message ? String(e.message) : String(e);
+        if (typeof showToast === 'function')
+            showToast('Rescan failed: ' + err, 5000, 'error');
     }
 }
 
@@ -866,14 +1135,30 @@ function initAudioEngineTab() {
             void applyAePlaybackInserts();
         });
     }
-    for (let i = 0; i < AE_INSERT_EDITOR_IDS.length; i++) {
-        const edBtn = document.getElementById(AE_INSERT_EDITOR_IDS[i]);
-        if (edBtn && typeof edBtn.addEventListener === 'function') {
-            const slot = i;
-            edBtn.addEventListener('click', () => {
-                void openAeInsertEditorForUiSlot(slot);
-            });
+    const addSlotBtn = document.getElementById('aeAddInsertSlot');
+    if (addSlotBtn && typeof addSlotBtn.addEventListener === 'function') {
+        addSlotBtn.addEventListener('click', () => {
+            aeAddInsertRow(null, '');
+        });
+    }
+    const wipeRescanBtn = document.getElementById('aeWipeRescan');
+    if (wipeRescanBtn && typeof wipeRescanBtn.addEventListener === 'function') {
+        wipeRescanBtn.addEventListener('click', () => {
+            void aeWipeAndRescan();
+        });
+    }
+    const scanTimeoutInput = document.getElementById('aeScanTimeout');
+    if (scanTimeoutInput) {
+        if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+            const saved = prefs.getItem('pluginScanTimeoutSec');
+            if (saved != null && String(saved) !== '') scanTimeoutInput.value = String(saved);
         }
+        scanTimeoutInput.addEventListener('change', () => {
+            const v = Math.max(5, Math.min(3600, parseInt(scanTimeoutInput.value, 10) || 30));
+            scanTimeoutInput.value = String(v);
+            if (typeof prefs !== 'undefined' && typeof prefs.setItem === 'function')
+                prefs.setItem('pluginScanTimeoutSec', String(v));
+        });
     }
     const stopBtn = document.getElementById('aeStopStream');
     if (stopBtn && typeof stopBtn.addEventListener === 'function') {
@@ -1426,6 +1711,7 @@ async function applyAudioEngineDevice() {
     const bufOut = document.getElementById('aeBufferFramesOutput');
     const inv = getAeAudioEngineInvoke();
     if (!inv || !selectEl) {
+        if (typeof showToast === 'function') showToast('DEBUG: device inv=' + !!inv + ' selectEl=' + !!selectEl, 3000, 'error');
         if (!inv) aeNotifyNoAudioEngineIpc();
         return;
     }

@@ -190,6 +190,9 @@ fn spawn_engine_child(path: &Path) -> Result<EngineChild, String> {
     let data_dir = crate::history::get_data_dir();
     let engine_log = data_dir.join("engine.log");
     let app_log = data_dir.join("app.log");
+    let scan_timeout_sec = crate::history::get_preference("pluginScanTimeoutSec")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(30);
     let mut child = Command::new(path)
         .env("AUDIO_HAXOR_ENGINE_LOG", engine_log.as_os_str())
         .env("AUDIO_HAXOR_APP_LOG", app_log.as_os_str())
@@ -197,6 +200,7 @@ fn spawn_engine_child(path: &Path) -> Result<EngineChild, String> {
             "AUDIO_HAXOR_PARENT_PID",
             format!("{}", std::process::id()),
         )
+        .env("AUDIO_HAXOR_PLUGIN_SCAN_TIMEOUT_SEC", scan_timeout_sec.to_string())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
