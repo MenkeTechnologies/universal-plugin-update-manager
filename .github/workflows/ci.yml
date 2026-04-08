@@ -65,6 +65,19 @@ jobs:
         if: matrix.os != 'ubuntu-latest'
         run: node scripts/run-audio-engine-tests.mjs
 
+      # Swatinem/rust-cache can restore an old `target/debug` that still had JUCE/MSVC outputs
+      # from before audio-engine moved to `audio-engine-artifacts/` — stray DLLs next to Cargo's
+      # outputs break `cargo test --lib` with STATUS_ENTRYPOINT_NOT_FOUND on Windows.
+      - name: Clean legacy JUCE/MSVC junk from target/debug (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $td = Join-Path $env:GITHUB_WORKSPACE 'target/debug'
+          if (-not (Test-Path $td)) { exit 0 }
+          Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $td 'audio-engine.exe')
+          Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $td 'audio-engine.pdb')
+          Get-ChildItem -Path $td -File -Filter *.dll | Remove-Item -Force -ErrorAction SilentlyContinue
+
       - name: Run Rust tests (library)
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
