@@ -412,7 +412,7 @@ between plugins. You can stop it anytime with the Stop button.
 
 **Rust cache (CI):** [Swatinem/rust-cache](https://github.com/Swatinem/rust-cache) must use `workspaces: .` (repo root). The virtual `[workspace]` writes **`target/`** at the repository root (`cargo metadata` → `target_directory`); `workspaces: src-tauri` would cache **`src-tauri/target`**, which this layout does not use and can misalign CI artifacts (e.g. Windows test runs).
 
-**Concurrency (CI):** On **pull requests**, superseded workflow runs are cancelled so the matrix does not stack one full run per commit. On **push** (including `main`), runs **queue** instead: rapid pushes no longer cancel an in-flight matrix before Rust tests and Tauri build finish, so CI can still go green.
+**Concurrency (CI):** On **pull requests**, superseded runs are cancelled (one group per PR). On **push**, the concurrency group includes the commit SHA so each push is independent — rapid `main` commits do not cancel each other’s runs (they may run in parallel).
 
 ```
 Cargo.toml (repo root) -- Cargo workspace: member `src-tauri` (`audio-haxor` app). **AudioEngine** (`audio-engine` binary) is a **C++/JUCE** CMake target (not a Cargo crate); `audio-engine/README.md` + `scripts/build-audio-engine.mjs` build it into `audio-engine-artifacts/<debug|release>/audio-engine` (kept out of Cargo `target/`). Shared `target/` at repo root is Rust-only. Locale JSON must use the **same `{placeholder}` names** as English for `appFmt`; `scripts/sync_i18n_placeholders_from_en.py` copies English strings for any key that drifts (run after bulk locale edits if `cargo test` seed tests fail).
