@@ -54,13 +54,15 @@ echo
 
 cyber_section "RUST SUBSYSTEM"
 START=$(date +%s)
-RUST_OUT=$(cargo test --manifest-path src-tauri/Cargo.toml --lib 2>&1)
+RUST_OUT=$(cargo test --manifest-path src-tauri/Cargo.toml 2>&1)
 RUST_EXIT=$?
 END=$(date +%s)
-RUST_RESULT=$(echo "$RUST_OUT" | grep 'test result' | tail -1)
-RUST_PASS=$(echo "$RUST_RESULT" | grep -o '[0-9]* passed' | grep -o '[0-9]*' || echo "0")
-RUST_FAIL=$(echo "$RUST_RESULT" | grep -o '[0-9]* failed' | grep -o '[0-9]*' || echo "0")
-echo -e "  ${W}$RUST_RESULT${N}  ${D}// $((END - START))s${N}"
+RUST_PASS=$(echo "$RUST_OUT" | awk '/^test result:/{for(i=1;i<=NF;i++) if($(i+1) ~ /^passed/) p+=$i} END{print p+0}')
+RUST_FAIL=$(echo "$RUST_OUT" | awk '/^test result:/{for(i=1;i<=NF;i++) if($(i+1) ~ /^failed/) f+=$i} END{print f+0}')
+RUST_SUITES=$(echo "$RUST_OUT" | grep '^test result:' | wc -l | tr -d ' ')
+RUST_LAST=$(echo "$RUST_OUT" | grep '^test result:' | tail -1)
+echo -e "  ${W}${RUST_PASS} passed, ${RUST_FAIL} failed${N} ${D}(${RUST_SUITES} suites)${N}"
+echo -e "  ${D}${RUST_LAST}${N}  ${D}// $((END - START))s${N}"
 if [ "$RUST_FAIL" = "0" ] && [ "$RUST_EXIT" = "0" ]; then
   cyber_ok "Rust nominal"
 else
@@ -70,7 +72,7 @@ echo
 
 TOTAL=$((JS_PASS + RUST_PASS + AE_PASS))
 cyber_line
-if [ "$JS_FAIL" = "0" ] && [ "$RUST_FAIL" = "0" ] && { [ "$AE_FAIL" = "0" ] && [ "$AE_EXIT" = "0" ]; }; then
+if [ "$JS_FAIL" = "0" ] && [ "$JS_EXIT" = "0" ] && [ "$RUST_FAIL" = "0" ] && [ "$RUST_EXIT" = "0" ] && { [ "$AE_FAIL" = "0" ] && [ "$AE_EXIT" = "0" ]; }; then
   cyber_tagline "${TOTAL} TESTS PASSED. ALL SYSTEMS GO."
 else
   echo

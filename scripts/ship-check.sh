@@ -43,14 +43,16 @@ echo
 
 # ── RUST SUBSYSTEM ──
 cyber_section "RUST SUBSYSTEM"
-RUST_OUT=$(cargo test --manifest-path src-tauri/Cargo.toml --lib 2>&1 | grep 'test result' | tail -1)
-RUST_PASS=$(echo "$RUST_OUT" | grep -o '[0-9]* passed' | grep -o '[0-9]*' || echo "0")
-RUST_FAIL=$(echo "$RUST_OUT" | grep -o '[0-9]* failed' | grep -o '[0-9]*' || echo "0")
-echo -e "  ${W}$RUST_OUT${N}"
-if [ "$RUST_FAIL" = "0" ]; then
+RUST_FULL=$(cargo test --manifest-path src-tauri/Cargo.toml 2>&1)
+RUST_EXIT=$?
+RUST_PASS=$(echo "$RUST_FULL" | awk '/^test result:/{for(i=1;i<=NF;i++) if($(i+1) ~ /^passed/) p+=$i} END{print p+0}')
+RUST_FAIL=$(echo "$RUST_FULL" | awk '/^test result:/{for(i=1;i<=NF;i++) if($(i+1) ~ /^failed/) f+=$i} END{print f+0}')
+RUST_SUITES=$(echo "$RUST_FULL" | grep '^test result:' | wc -l | tr -d ' ')
+echo -e "  ${W}${RUST_PASS} passed, ${RUST_FAIL} failed${N} ${D}(${RUST_SUITES} cargo test suites)${N}"
+if [ "$RUST_FAIL" = "0" ] && [ "$RUST_EXIT" = "0" ]; then
   echo -e "  ${G}[PASS]${N} ${D}// all systems nominal${N}"
 else
-  echo -e "  ${R}[FAIL]${N} ${D}// $RUST_FAIL test(s) compromised${N}"
+  echo -e "  ${R}[FAIL]${N} ${D}// $RUST_FAIL failed${N} ${D}(exit ${RUST_EXIT})${N}"
 fi
 echo
 
