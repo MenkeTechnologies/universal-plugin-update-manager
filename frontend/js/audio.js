@@ -1285,12 +1285,14 @@ let _enginePlaybackFftRafId = null;
 
 function shouldRunEngineSpectrumRaf() {
     if (typeof window === 'undefined') return false;
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return false;
     if (typeof engineSpectrumLive === 'function' && engineSpectrumLive()) return true;
     return false;
 }
 
 function _enginePlaybackFftLoop() {
     _enginePlaybackFftRafId = null;
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return;
     if (typeof _renderNpFft === 'function') _renderNpFft();
     if (typeof window.scheduleParametricEqFrame === 'function') window.scheduleParametricEqFrame();
     if (!shouldRunEngineSpectrumRaf()) return;
@@ -1348,6 +1350,13 @@ if (typeof window !== 'undefined') {
 }
 
 function _playbackRafLoop() {
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) {
+        if (_playbackRafId) {
+            cancelAnimationFrame(_playbackRafId);
+            _playbackRafId = null;
+        }
+        return;
+    }
     updatePlaybackTime();
     _renderNpFft();
     if (isAudioPlaying()) {
@@ -5231,6 +5240,7 @@ function updateMetaLine() {
 
     function parametricEqTick() {
         _paramEqRafId = null;
+        if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return;
         const canvases = [];
         const eqSec = document.getElementById('npEqSection');
         if (npCanvas && eqSec && eqSec.classList.contains('visible')) canvases.push(npCanvas);
@@ -5253,8 +5263,16 @@ function updateMetaLine() {
     }
 
     function scheduleParametricEqFrame() {
+        if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return;
         if (_paramEqRafId != null) return;
         _paramEqRafId = requestAnimationFrame(parametricEqTick);
+    }
+
+    function cancelParametricEqRaf() {
+        if (_paramEqRafId != null) {
+            cancelAnimationFrame(_paramEqRafId);
+            _paramEqRafId = null;
+        }
     }
 
     function primeCanvasSize(canvas) {
@@ -5446,6 +5464,7 @@ function updateMetaLine() {
 
     if (typeof window !== 'undefined') {
         window.scheduleParametricEqFrame = scheduleParametricEqFrame;
+        window.cancelParametricEqRaf = cancelParametricEqRaf;
     }
 })();
 
@@ -5501,4 +5520,27 @@ window.preloadAudioDecodeWorker = preloadAudioDecodeWorker;
     }
     if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
     document.addEventListener('pointerdown', onPointerDown, true);
+})();
+
+/** `ui-idle.js` — sync playhead / spectrum / parametric EQ rAF when hybrid idle toggles (minimize, other Space, unfocused, hidden tab). */
+(function wireUiIdleHeavyCpuEvents() {
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    document.addEventListener('ui-idle-heavy-cpu', (e) => {
+        const idle = e.detail && e.detail.idle;
+        if (idle) {
+            if (_playbackRafId) {
+                cancelAnimationFrame(_playbackRafId);
+                _playbackRafId = null;
+            }
+            stopEnginePlaybackFftRaf();
+            if (typeof window.cancelParametricEqRaf === 'function') window.cancelParametricEqRaf();
+            return;
+        }
+        if (typeof updatePlaybackTime === 'function') updatePlaybackTime();
+        if (typeof isAudioPlaying === 'function' && isAudioPlaying() && !_playbackRafId) {
+            _playbackRafId = requestAnimationFrame(_playbackRafLoop);
+        }
+        if (typeof ensureEnginePlaybackFftRaf === 'function') ensureEnginePlaybackFftRaf();
+        if (typeof window.scheduleParametricEqFrame === 'function') window.scheduleParametricEqFrame();
+    });
 })();

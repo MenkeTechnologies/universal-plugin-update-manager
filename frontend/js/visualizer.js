@@ -293,6 +293,10 @@ function _vizLoop(timestamp) {
         _vizRAF = null;
         return;
     }
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) {
+        _vizRAF = null;
+        return;
+    }
 
     _vizRAF = requestAnimationFrame(_vizLoop);
 
@@ -1112,3 +1116,15 @@ document.addEventListener('click', (e) => {
 
 // Resize canvases when window resizes (debounced — canvas reset is expensive)
 window.addEventListener('resize', typeof debounce === 'function' ? debounce(_resizeCanvases, 150) : _resizeCanvases);
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('ui-idle-heavy-cpu', (e) => {
+        const idle = e.detail && e.detail.idle;
+        if (idle) {
+            if (typeof stopVisualizer === 'function') stopVisualizer();
+        } else {
+            const t = document.getElementById('tabVisualizer');
+            if (t && t.classList.contains('active') && typeof startVisualizer === 'function') startVisualizer();
+        }
+    });
+}
