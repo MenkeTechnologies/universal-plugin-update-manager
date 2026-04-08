@@ -783,6 +783,9 @@ document.addEventListener('click', (e) => {
             case 'settingToggleIncludeBackups':
                 settingToggleIncludeBackups();
                 break;
+            case 'settingTogglePruneOldScans':
+                settingTogglePruneOldScans();
+                break;
             case 'saveBlacklist': {
                 const el = document.getElementById('settingBlacklist');
                 if (el) {
@@ -987,6 +990,7 @@ document.addEventListener('input', (e) => {
     else if (action === 'settingFlushInterval') settingUpdateFlushInterval(e.target.value);
     else if (action === 'settingThreadMultiplier') settingUpdateThreadMultiplier(e.target.value);
     else if (action === 'settingSqliteReadPoolExtra') settingUpdateSqliteReadPoolExtra(e.target.value);
+    else if (action === 'settingPruneOldScansKeep') settingUpdatePruneOldScansKeep(e.target.value);
     else if (action === 'settingChannelBuffer') settingUpdateChannelBuffer(e.target.value);
     else if (action === 'settingBatchSize') settingUpdateBatchSize(e.target.value);
     else if (action === 'settingFdLimit') settingUpdateFdLimit(e.target.value);

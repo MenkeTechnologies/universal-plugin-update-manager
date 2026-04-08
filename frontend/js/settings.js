@@ -1030,6 +1030,23 @@ function settingToggleIncludeBackups() {
     refreshSettingsUI();
 }
 
+function settingTogglePruneOldScans() {
+    const po = prefs.getItem('pruneOldScans');
+    const current = po !== 'off' && po !== 'false';
+    const next = !current;
+    prefs.setItem('pruneOldScans', next ? 'on' : 'off');
+    showToast(toastFmt('toast.prune_old_scans', {state: next ? 'on' : 'off'}));
+    refreshSettingsUI();
+}
+
+function settingUpdatePruneOldScansKeep(val) {
+    const n = Math.min(100, Math.max(1, parseInt(String(val), 10) || 3));
+    prefs.setItem('pruneOldScansKeep', String(n));
+    const valEl = document.getElementById('settingPruneOldScansKeepValue');
+    if (valEl) valEl.textContent = String(n);
+    showToast(toastFmt('toast.prune_old_scans_keep_set', {val: n}));
+}
+
 function settingUpdatePageSize(val) {
     document.getElementById('settingPageSizeValue').textContent = val;
     prefs.setItem('pageSize', val);
@@ -1430,6 +1447,26 @@ function refreshSettingsUI() {
                 ? (typeof catalogFmt === 'function' ? catalogFmt('ui.perf.sqlite_read_pool_auto_label') : 'Auto')
                 : String(sqlitePoolSlider);
         }
+    }
+
+    // Prune old scans (default on)
+    const pruneOn = prefs.getItem('pruneOldScans') !== 'off' && prefs.getItem('pruneOldScans') !== 'false';
+    const pruneBtn = document.getElementById('settingPruneOldScans');
+    const pruneLabel = document.getElementById('settingPruneOldScansLabel');
+    if (pruneBtn) {
+        pruneBtn.classList.toggle('active', pruneOn);
+        if (pruneLabel) pruneLabel.textContent = _uiToggle(pruneOn);
+    }
+    const pruneKeepRaw = getSettingValue('pruneOldScansKeep', '3');
+    let pruneKeepNum = parseInt(String(pruneKeepRaw), 10);
+    if (Number.isNaN(pruneKeepNum)) pruneKeepNum = 3;
+    pruneKeepNum = Math.min(100, Math.max(1, pruneKeepNum));
+    const pruneKeepEl = document.getElementById('settingPruneOldScansKeep');
+    const pruneKeepValEl = document.getElementById('settingPruneOldScansKeepValue');
+    if (pruneKeepEl) {
+        pruneKeepEl.value = String(pruneKeepNum);
+        pruneKeepEl.disabled = !pruneOn;
+        if (pruneKeepValEl) pruneKeepValEl.textContent = String(pruneKeepNum);
     }
 
     // Channel buffer

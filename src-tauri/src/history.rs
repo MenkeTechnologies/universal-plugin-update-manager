@@ -544,6 +544,8 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
             ("channelBuffer", "channelBuffer"),
             ("batchSize", "batchSize"),
             ("sqliteReadPoolExtra", "sqliteReadPoolExtra"),
+            ("pruneOldScans", "pruneOldScans"),
+            ("pruneOldScansKeep", "pruneOldScansKeep"),
         ],
     ),
     ("logging", &[("logVerbosity", "verbosity")]),

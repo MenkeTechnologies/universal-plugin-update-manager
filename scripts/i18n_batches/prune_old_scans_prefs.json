@@ -1,0 +1,10 @@
+{
+  "toast.prune_old_scans": "Prune old scan snapshots: {state}",
+  "toast.prune_old_scans_keep_set": "Scan history to keep: {val} per type (next launch)",
+  "ui.sd.prune_old_scans": "On startup (after a delay), remove older completed scan runs except the last N per scanner type. Turn off to keep all history (larger DB). Next launch applies.",
+  "ui.sd.prune_old_scans_keep": "Number of most recent completed scans retained per type (plugins, samples, DAW, presets, MIDI, PDF) when pruning is on.",
+  "ui.st.prune_old_scans": "Prune old scan snapshots",
+  "ui.st.prune_old_scans_keep": "Scan history to keep",
+  "ui.tt.prune_old_scans": "Toggle pruning of old completed scan snapshots on startup",
+  "ui.tt.prune_old_scans_keep": "How many completed scans to keep per type when pruning is enabled"
+}

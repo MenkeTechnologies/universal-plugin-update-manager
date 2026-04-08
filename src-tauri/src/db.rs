@@ -1225,8 +1225,29 @@ DROP TABLE _pl_refresh_paths;"#;
     /// Run **well after** the window and `setup()` have finished so pooled `read_conn()` scopes are
     /// not held across first-frame IPC (long prune batches still contend on SQLite + pool slots).
     pub fn housekeep_heavy(&self) {
-        self.prune_old_scans(3);
+        if Self::prune_old_scans_pref_enabled() {
+            self.prune_old_scans(Self::prune_old_scans_keep_pref());
+        }
         self.vacuum_if_needed();
+    }
+
+    fn prune_old_scans_pref_enabled() -> bool {
+        crate::history::get_preference("pruneOldScans")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .map(|s| s != "off")
+            .unwrap_or(true)
+    }
+
+    /// `[performance]` → `pruneOldScansKeep` (default 3, clamped 1..=100).
+    fn prune_old_scans_keep_pref() -> usize {
+        const DEFAULT: usize = 3;
+        const MIN: usize = 1;
+        const MAX: usize = 100;
+        let raw = crate::history::get_preference("pruneOldScansKeep")
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_else(|| DEFAULT.to_string());
+        let n = raw.parse::<usize>().unwrap_or(DEFAULT);
+        n.clamp(MIN, MAX)
     }
 
     /// Full sequence (manual / tests). Startup uses [`Self::housekeep_light`] + delayed [`Self::housekeep_heavy`].
