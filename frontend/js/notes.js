@@ -428,9 +428,16 @@ function exportNotes() {
         defaultName: exportFileName('notes', count),
         exportFn: async (fmt, filePath) => {
             if (fmt === 'pdf') {
-                const headers = ['Path', 'Note', 'Tags', 'Updated'];
+                const headers = [
+                    catalogFmt('ui.export.col_path'),
+                    catalogFmt('ui.export.col_note'),
+                    catalogFmt('ui.export.col_tags'),
+                    catalogFmt('ui.export.col_updated'),
+                ];
                 const rows = entries.map(([path, n]) => [path, n.note || '', (n.tags || []).join(', '), n.updatedAt || '']);
-                if (tags.length > 0) rows.push(['[Standalone Tags]', tags.join(', '), '', '']);
+                if (tags.length > 0) {
+                    rows.push([catalogFmt('ui.export.row_standalone_tags'), tags.join(', '), '', '']);
+                }
                 await window.vstUpdater.exportPdf(catalogFmt('ui.dialog.notes_and_tags'), headers, rows, filePath);
             } else if (fmt === 'csv' || fmt === 'tsv') {
                 const sep = fmt === 'tsv' ? '\t' : ',';
@@ -438,7 +445,15 @@ function exportNotes() {
                     const s = String(v || '');
                     return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
                 };
-                const lines = ['Path' + sep + 'Note' + sep + 'Tags' + sep + 'Updated'];
+                const lines = [
+                    catalogFmt('ui.export.col_path') +
+                        sep +
+                        catalogFmt('ui.export.col_note') +
+                        sep +
+                        catalogFmt('ui.export.col_tags') +
+                        sep +
+                        catalogFmt('ui.export.col_updated'),
+                ];
                 for (const [path, n] of entries) lines.push([path, n.note || '', (n.tags || []).join(', '), n.updatedAt || ''].map(esc).join(sep));
                 await window.__TAURI__.core.invoke('write_text_file', {filePath, contents: lines.join('\n')});
             } else if (fmt === 'toml') {

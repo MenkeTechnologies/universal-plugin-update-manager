@@ -1213,7 +1213,12 @@ function exportRecentlyPlayed() {
         defaultName: exportFileName('play-history', recentlyPlayed.length),
         exportFn: async (fmt, filePath) => {
             if (fmt === 'pdf') {
-                const headers = ['Name', 'Format', 'Size', 'Path'];
+                const headers = [
+                    catalogFmt('ui.export.col_name'),
+                    catalogFmt('ui.export.col_format'),
+                    catalogFmt('ui.export.col_size'),
+                    catalogFmt('ui.export.col_path'),
+                ];
                 const rows = recentlyPlayed.map(r => [r.name, r.format, r.size || '', r.path]);
                 await window.vstUpdater.exportPdf(catalogFmt('ui.dialog.play_history'), headers, rows, filePath);
             } else if (fmt === 'csv' || fmt === 'tsv') {
@@ -1222,7 +1227,15 @@ function exportRecentlyPlayed() {
                     const s = String(v || '');
                     return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
                 };
-                const lines = ['Name' + sep + 'Format' + sep + 'Size' + sep + 'Path'];
+                const lines = [
+                    catalogFmt('ui.export.col_name') +
+                        sep +
+                        catalogFmt('ui.export.col_format') +
+                        sep +
+                        catalogFmt('ui.export.col_size') +
+                        sep +
+                        catalogFmt('ui.export.col_path'),
+                ];
                 for (const r of recentlyPlayed) lines.push([r.name, r.format, r.size || '', r.path].map(esc).join(sep));
                 await window.__TAURI__.core.invoke('write_text_file', {filePath, contents: lines.join('\n')});
             } else if (fmt === 'toml') {

@@ -64,7 +64,12 @@ function exportFavorites() {
         defaultName: exportFileName('favorites', favs.length),
         exportFn: async (fmt, filePath) => {
             if (fmt === 'pdf') {
-                const headers = ['Name', 'Type', 'Format', 'Path'];
+                const headers = [
+                    catalogFmt('ui.export.col_name'),
+                    catalogFmt('ui.export.col_type'),
+                    catalogFmt('ui.export.col_format'),
+                    catalogFmt('ui.export.col_path'),
+                ];
                 const rows = favs.map(f => [f.name, f.type, f.format || f.daw || '', f.path]);
                 await window.vstUpdater.exportPdf(catalogFmt('ui.dialog.favorites'), headers, rows, filePath);
             } else if (fmt === 'csv' || fmt === 'tsv') {
@@ -73,7 +78,15 @@ function exportFavorites() {
                     const s = String(v || '');
                     return s.includes(sep) || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s;
                 };
-                const lines = ['Name' + sep + 'Type' + sep + 'Format' + sep + 'Path'];
+                const lines = [
+                    catalogFmt('ui.export.col_name') +
+                        sep +
+                        catalogFmt('ui.export.col_type') +
+                        sep +
+                        catalogFmt('ui.export.col_format') +
+                        sep +
+                        catalogFmt('ui.export.col_path'),
+                ];
                 for (const f of favs) lines.push([f.name, f.type, f.format || f.daw || '', f.path].map(esc).join(sep));
                 await window.__TAURI__.core.invoke('write_text_file', {filePath, contents: lines.join('\n')});
             } else if (fmt === 'toml') {

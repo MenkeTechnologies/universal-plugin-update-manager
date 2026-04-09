@@ -596,7 +596,7 @@ async function exportSettingsPdf() {
 
     if (savePath.endsWith('.pdf')) {
         // PDF export via Rust
-        const headers = ['Setting / Shortcut', 'Value'];
+        const headers = [catalogFmt('ui.export.col_setting_shortcut'), catalogFmt('ui.export.col_value')];
         const rows = [];
         rows.push(['── KEYBOARD SHORTCUTS ──', '']);
         for (const [id, sc] of Object.entries(shortcuts)) {
@@ -608,7 +608,7 @@ async function exportSettingsPdf() {
             rows.push([k, String(v)]);
         }
         try {
-            await window.vstUpdater.exportPdf('AUDIO_HAXOR Settings & Keybindings', headers, rows, savePath);
+            await window.vstUpdater.exportPdf(catalogFmt('ui.export.pdf_title_settings'), headers, rows, savePath);
             showToast(toastFmt('toast.settings_pdf_exported'));
         } catch (e) {
             showToast(toastFmt('toast.pdf_export_failed', {err: e.message || e}), 4000, 'error');
@@ -651,13 +651,13 @@ async function exportLogPdf() {
         if (!savePath) return;
 
         if (savePath.endsWith('.pdf')) {
-            const headers = ['Timestamp', 'Message'];
+            const headers = [catalogFmt('ui.export.col_timestamp'), catalogFmt('ui.export.col_message')];
             const rows = log.split('\n').filter(Boolean).map(line => {
                 const match = line.match(/^\[(.+?)\] (.+)$/);
                 return match ? [match[1], match[2]] : ['', line];
             });
             try {
-                await window.vstUpdater.exportPdf('AUDIO_HAXOR Error Log', headers, rows, savePath);
+                await window.vstUpdater.exportPdf(catalogFmt('ui.export.pdf_title_error_log'), headers, rows, savePath);
                 showToast(toastFmt('toast.log_pdf_exported'));
             } catch (e) {
                 showToast(toastFmt('toast.pdf_export_failed', {err: e.message || e}), 4000, 'error');
