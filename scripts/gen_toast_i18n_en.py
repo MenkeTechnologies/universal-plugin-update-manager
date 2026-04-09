@@ -136,7 +136,6 @@ TOAST_EN: dict[str, str] = {
     "toast.failed_save_audio_history": "Failed to save audio history — {err}",
     "toast.audio_scan_failed": "Audio scan failed — {err}",
     "toast.audio_query_failed": "Audio query failed: {err}",
-    "toast.format_not_playable": "{ext} format is not playable in browser",
     "toast.playback_failed": "Playback failed ({ext}) — {err}",
     "toast.analysis_batch_failed": "Analysis batch failed: {err}",
     "toast.analysis_read_failed": "Analysis read failed: {err}",

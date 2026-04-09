@@ -508,6 +508,14 @@ if (typeof window !== 'undefined') {
     window.resumeEnginePlaybackAfterApply = resumeEnginePlaybackAfterApply;
 }
 
+/** Neither WebView `<audio>` nor JUCE `registerBasicFormats` can decode — preview shows meta line only. */
+const ENGINE_UNPLAYABLE_EXT = new Set(['sf2', 'sfz', 'rex', 'rx2', 'wma', 'ape', 'opus', 'mid', 'midi']);
+function isEngineUnplayablePath(filePath) {
+    if (!filePath) return false;
+    const x = filePath.split('.').pop().toLowerCase();
+    return ENGINE_UNPLAYABLE_EXT.has(x);
+}
+
 function isAudioPlaying() {
     if (_enginePlaybackActive) {
         return window._enginePlaybackPaused !== true;
@@ -2552,11 +2560,75 @@ function buildAudioRow(s) {
       <button class="btn-small btn-loop${isPlaying && audioLooping ? ' active' : ''}" data-action="toggleRowLoop" data-path="${hp}" title="${loopBtnT}">&#8634;</button>
       <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${hp}" title="${revealBtnT}">&#128193;</button>
     </td>
-  </tr>`;
+    </tr>`;
+}
+
+async function showEngineUnplayablePreview(filePath) {
+    if (_enginePlaybackActive && typeof window !== 'undefined' && typeof window.enginePlaybackStop === 'function') {
+        await window.enginePlaybackStop();
+        setEnginePlaybackActive(false);
+    }
+    stopReverseBufferPlayback();
+    restoreWebViewAudioAfterEngine();
+    audioReverseMode = false;
+    syncReversePlaybackButtons(false);
+    _decodedBuf = null;
+    _reversedBuf = null;
+    _decodedBufPath = null;
+    _pausedOffsetInRev = 0;
+    if (typeof audioPlayer !== 'undefined' && audioPlayer) {
+        audioPlayer.pause();
+        audioPlayer.src = '';
+    }
+    if (typeof window !== 'undefined') {
+        window._enginePlaybackResumePath = '';
+    }
+    audioPlayerPath = filePath;
+    audioPlayer.loop = false;
+    const np = document.getElementById('audioNowPlaying');
+    if (!np) return;
+    np.classList.add('active');
+    np.classList.remove('np-playing');
+    if (prefs.getItem('playerExpanded') === 'on') {
+        np.classList.add('expanded');
+        renderRecentlyPlayed();
+    }
+    const sample = findByPath(allAudioSamples, filePath);
+    const displayName = sample ? `${sample.name}.${sample.format.toLowerCase()}` : filePath.split('/').pop();
+    const npName = document.getElementById('npName');
+    if (npName) npName.textContent = displayName;
+    const npTime = document.getElementById('npTime');
+    if (npTime) npTime.textContent = catalogFmt('ui.audio.player_time_zero');
+    const npProgress = document.getElementById('npProgress');
+    if (npProgress) npProgress.style.width = '0%';
+    const npCursor = document.getElementById('npCursor');
+    if (npCursor) npCursor.style.display = 'none';
+    cancelIdleSchedule(_npWaveformIdleId);
+    _npWaveformIdleId = null;
+    _npWaveformDrawSeq++;
+    const canvas = document.getElementById('npWaveformCanvas');
+    if (canvas) {
+        try {
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        } catch (_) {
+        }
+    }
+    updateMetaLine();
+    updatePlayBtnStates();
+    updateNowPlayingBtn();
+    updateFavBtn();
+    updateNoteBtn();
 }
 
 // ── Audio Preview / Playback ──
 async function previewAudio(filePath) {
+    const ext = filePath.split('.').pop().toLowerCase();
+    if (isEngineUnplayablePath(filePath)) {
+        await showEngineUnplayablePreview(filePath);
+        return;
+    }
+
     if (audioPlayerPath === filePath && isAudioPlaying()) {
         if (_enginePlaybackActive && typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
             applyEnginePlaybackPausedFromTransport(true);
@@ -2589,14 +2661,6 @@ async function previewAudio(filePath) {
         updateNowPlayingBtn();
         if (typeof window.syncAeTransportFromPlayback === 'function') window.syncAeTransportFromPlayback();
         scheduleNowPlayingWaveform(filePath);
-        return;
-    }
-
-    // Non-playable formats — skip silently
-    const ext = filePath.split('.').pop().toLowerCase();
-    const UNPLAYABLE = ['sf2', 'sfz', 'rex', 'rx2', 'wma', 'ape', 'opus', 'mid', 'midi'];
-    if (UNPLAYABLE.includes(ext)) {
-        showToast(toastFmt('toast.format_not_playable', {ext: ext.toUpperCase()}), 3000);
         return;
     }
 
@@ -2710,6 +2774,9 @@ function toggleAudioPlayback() {
         if (typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 0 && recentlyPlayed[0]?.path) {
             previewAudio(recentlyPlayed[0].path);
         }
+        return;
+    }
+    if (isEngineUnplayablePath(audioPlayerPath)) {
         return;
     }
     if (_enginePlaybackActive && typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
@@ -2979,6 +3046,10 @@ function seekPlaybackToPercent(pct) {
     });
     if (!audioPlayerPath) {
         logWaveformSeek('abort', { reason: 'no_audioPlayerPath' });
+        return;
+    }
+    if (isEngineUnplayablePath(audioPlayerPath)) {
+        logWaveformSeek('abort', { reason: 'engine_unplayable_format' });
         return;
     }
     if (_enginePlaybackActive && hasInvoke) {
@@ -4677,6 +4748,11 @@ function updateMetaLine() {
     const el = document.getElementById('npMetaLine');
     if (!el || !audioPlayerPath) {
         if (el) el.textContent = '';
+        return;
+    }
+    if (isEngineUnplayablePath(audioPlayerPath)) {
+        const x = audioPlayerPath.split('.').pop().toLowerCase();
+        el.textContent = _audioFmt('ui.audio.not_playable_in_audio_engine', {ext: x.toUpperCase()});
         return;
     }
     const sample = findByPath(allAudioSamples, audioPlayerPath);
