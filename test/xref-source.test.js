@@ -1,6 +1,7 @@
 /**
  * Loads real utils.js + xref.js; validates xref format gate used before Rust extraction.
  */
+const vm = require('vm');
 const { describe, it, before } = require('node:test');
 const assert = require('node:assert/strict');
 const { loadFrontendScripts, defaultDocument } = require('./frontend-vm-harness.js');
@@ -48,6 +49,45 @@ describe('frontend/js/xref.js (vm-loaded)', () => {
   it('isXrefSupported is case-sensitive (matches Set keys from project format field)', () => {
     assert.strictEqual(X.isXrefSupported('als'), false);
     assert.strictEqual(X.isXrefSupported('ALS'), true);
+  });
+});
+
+describe('frontend/js/xref.js findProjectsUsingPlugin (vm-loaded)', () => {
+  let X;
+
+  before(() => {
+    X = loadFrontendScripts(['utils.js', 'xref.js'], {
+      window: { vstUpdater: {} },
+    });
+  });
+
+  it('matches xref rows without normalizedName via xrefPluginRefKey / normalizePluginName', () => {
+    vm.runInContext(
+      `
+      for (const k of Object.keys(_xrefCache)) delete _xrefCache[k];
+      _xrefCache['/p/a.als'] = [{ name: 'Serum (x64)', manufacturer: 'X', pluginType: 'VST3' }];
+      `,
+      X
+    );
+    X.allDawProjects = [];
+    const hits = X.findProjectsUsingPlugin('Serum');
+    assert.strictEqual(hits.length, 1);
+    assert.strictEqual(hits[0].name, 'a.als');
+    assert.strictEqual(hits[0].directory, '/p');
+  });
+
+  it('prefers allDawProjects row when the path is loaded', () => {
+    vm.runInContext(
+      `
+      for (const k of Object.keys(_xrefCache)) delete _xrefCache[k];
+      _xrefCache['/p/a.als'] = [{ name: 'Serum', normalizedName: 'serum', manufacturer: 'X', pluginType: 'VST3' }];
+      `,
+      X
+    );
+    X.allDawProjects = [{ path: '/p/a.als', name: 'Named', daw: 'Live', format: 'ALS' }];
+    const hits = X.findProjectsUsingPlugin('Serum');
+    assert.strictEqual(hits.length, 1);
+    assert.strictEqual(hits[0].name, 'Named');
   });
 });
 
