@@ -110,14 +110,20 @@ jobs:
           $deps = Join-Path $td 'deps'
           if (-not (Test-Path $deps)) { throw "missing $deps after cargo test --no-run" }
           $ran = 0
-          Get-ChildItem -Path $deps -Filter '*.exe' -ErrorAction SilentlyContinue | ForEach-Object {
-            $name = $_.Name
-            if ($name -inotmatch '-[a-f0-9]{16}\.exe$') { return }
-            $ran++
-            & $_.FullName --quiet
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          # `-Filter '*.exe'` can miss `.EXE` on some Windows setups; `$LASTEXITCODE -ne 0` is true when
+          # `$LASTEXITCODE` is $null (PowerShell quirk) — treat only non-null non-zero as failure.
+          Get-ChildItem -Path $deps -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -ieq '.exe' } |
+            ForEach-Object {
+              $name = $_.Name
+              if ($name -inotmatch '-[a-fA-F0-9]{16}\.exe$') { return }
+              if ($name -like 'build_script_build-*') { return }
+              $ran++
+              & $_.FullName --quiet
+              if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
           if ($ran -lt 1) { throw "no Rust test harness exe matched in $deps" }
+          exit 0
 
   build:
     needs: test
