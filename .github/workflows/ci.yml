@@ -87,12 +87,26 @@ jobs:
 
       # Second `cargo test` after stripping DLLs re-runs build.rs / Tauri externalBin and copies
       # JUCE/VC DLLs back beside test exes → STATUS_ENTRYPOINT_NOT_FOUND. Build once, strip, then
-      # run each `target/debug/deps/*-<rustc-hash>.exe` harness directly (no second Cargo invoke).
+      # run each harness from `cargo test --no-run` output (no second Cargo invoke). Do not glob
+      # `deps/*.exe` by hash length — rustc naming changes left only a subset matched and skipped
+      # unittests + most integration crates; `Start-Process -PassThru` gives a reliable exit code.
       - name: Run Rust tests (library + integration, Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          cargo test --manifest-path src-tauri/Cargo.toml --no-run
+          $chunks = @(cargo test --manifest-path src-tauri/Cargo.toml --no-run 2>&1)
+          $chunks | ForEach-Object { $_ }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exeRelPaths = [System.Collections.Generic.List[string]]::new()
+          foreach ($line in $chunks) {
+            $s = $line.ToString()
+            if ($s -match 'Executable\s+(.+)\s+\((target[\\/]debug[\\/]deps[\\/][^\)]+\.exe)\)') {
+              $exeRelPaths.Add($matches[2])
+            }
+          }
+          if ($exeRelPaths.Count -lt 1) {
+            throw "no test exe paths parsed from cargo test --no-run (expected target\debug\deps\*.exe on Windows)"
+          }
           # JUCE/VC DLLs can land under target/debug/** (not only deps/). The loader resolves
           # *.dll beside the test exe first → STATUS_ENTRYPOINT_NOT_FOUND. Strip recursively.
           function Remove-JuceSidecars([string]$rootDir) {
@@ -107,23 +121,13 @@ jobs:
           }
           $td = Join-Path $env:GITHUB_WORKSPACE 'target/debug'
           Remove-JuceSidecars $td
-          $deps = Join-Path $td 'deps'
-          if (-not (Test-Path $deps)) { throw "missing $deps after cargo test --no-run" }
-          $ran = 0
-          # `-Filter '*.exe'` can miss `.EXE` on some Windows setups; `$LASTEXITCODE -ne 0` is true when
-          # `$LASTEXITCODE` is $null (PowerShell quirk) — treat only non-null non-zero as failure.
-          Get-ChildItem -Path $deps -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Extension -ieq '.exe' } |
-            ForEach-Object {
-              $name = $_.Name
-              if ($name -inotmatch '-[a-fA-F0-9]{16}\.exe$') { return }
-              if ($name -like 'build_script_build-*') { return }
-              $ran++
-              & $_.FullName --quiet
-              if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            }
-          if ($ran -lt 1) { throw "no Rust test harness exe matched in $deps" }
-          exit 0
+          foreach ($rel in $exeRelPaths) {
+            $full = Join-Path $env:GITHUB_WORKSPACE ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
+            if (-not (Test-Path -LiteralPath $full)) { throw "missing test exe: $full" }
+            $p = Start-Process -FilePath $full -ArgumentList @('--quiet') -Wait -NoNewWindow -PassThru
+            if ($null -ne $p.ExitCode -and $p.ExitCode -ne 0) { exit $p.ExitCode }
+          }
+          [Environment]::Exit(0)
 
   build:
     needs: test
