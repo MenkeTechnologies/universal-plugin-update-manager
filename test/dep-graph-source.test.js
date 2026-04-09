@@ -66,6 +66,53 @@ function xrefProjectFromPath(path) {
   return sandbox;
 }
 
+/** `normalizePluginName` only — no `xrefPluginRefKey` / `xrefProjectFromPath` (exercises `_depPluginKey` / `_depProjectMetaForPath` fallbacks). */
+function loadDepGraphSandboxFallbackOnly() {
+  const escEl = { textContent: '', innerHTML: '' };
+  const sandbox = {
+    console,
+    performance: { now: () => 0 },
+    requestAnimationFrame: () => 0,
+    KVR_MANUFACTURER_MAP: {},
+    prefs: {
+      getObject: () => null,
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+    },
+    document: {
+      createElement: (tag) => (tag === 'div' ? createTextDiv() : { ...escEl }),
+      getElementById: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener: () => {},
+      body: { insertAdjacentHTML: () => {} },
+    },
+    setTimeout: (fn) => {
+      if (typeof fn === 'function') fn();
+      return 0;
+    },
+    clearTimeout: () => {},
+  };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  const root = path.join(__dirname, '..', 'frontend', 'js');
+  vm.runInContext(fs.readFileSync(path.join(root, 'utils.js'), 'utf8'), sandbox);
+  vm.runInContext(
+    `function normalizePluginName(name) {
+  let s = name.trim();
+  const bracketRe = /\\s*[\\(\\[](x64|x86_64|x86|arm64|aarch64|64-?bit|32-?bit|intel|apple silicon|universal|stereo|mono|vst3?|au|aax)[\\)\\]]$/i;
+  let prev;
+  do { prev = s; s = s.replace(bracketRe, ''); } while (s !== prev);
+  s = s.replace(/\\s+(x64|x86_64|x86|64bit|32bit)$/i, '');
+  return s.replace(/\\s+/g, ' ').trim().toLowerCase();
+}`,
+    sandbox
+  );
+  vm.runInContext(fs.readFileSync(path.join(root, 'dep-graph.js'), 'utf8'), sandbox);
+  return sandbox;
+}
+
 describe('frontend/js/dep-graph.js buildDepGraphData (vm-loaded)', () => {
   let G;
 
@@ -589,5 +636,58 @@ describe('frontend/js/dep-graph.js buildDepGraphData (vm-loaded)', () => {
     });
     assert.ok(html.includes('xref-type-clap'));
     assert.ok(html.includes('ClapPlug'));
+  });
+
+  it('prefers project.daw over project.format when both are set', () => {
+    G.allDawProjects = [
+      { path: '/p/mix.als', name: 'Mix', daw: 'Ableton Live 12', format: 'ALS' },
+    ];
+    G._xrefCache = {
+      '/p/mix.als': [{ name: 'Z', normalizedName: 'z', manufacturer: 'M', pluginType: 'VST3' }],
+    };
+    G.allPlugins = [];
+    const d = G.buildDepGraphData();
+    const row = d.projectsByCount.find((p) => p.path === '/p/mix.als');
+    assert.ok(row);
+    assert.strictEqual(row.daw, 'Ableton Live 12');
+  });
+
+  it('_depPluginKey and path fallback work without xrefPluginRefKey / xrefProjectFromPath', () => {
+    const F = loadDepGraphSandboxFallbackOnly();
+    F.allDawProjects = [];
+    F._xrefCache = {
+      '/deep/path/session.als': [{ name: 'Alpha (x64)', manufacturer: 'Co', pluginType: 'VST3' }],
+    };
+    F.allPlugins = [{ name: 'Alpha', path: '/a.vst3', type: 'VST3' }];
+    const d = F.buildDepGraphData();
+    assert.strictEqual(d.pluginsByUsage.length, 1);
+    assert.strictEqual(d.pluginsByUsage[0].key, 'alpha');
+    assert.strictEqual(d.projectsByCount[0].name, 'session.als');
+    assert.strictEqual(d.orphaned.length, 0);
+  });
+});
+
+describe('frontend/js/dep-graph.js closeDepGraph (vm-loaded)', () => {
+  let G;
+
+  before(() => {
+    G = loadDepGraphSandbox();
+  });
+
+  it('removes modal when depGraphModal exists', () => {
+    let removed = false;
+    const modal = {
+      remove() {
+        removed = true;
+      },
+    };
+    G.document.getElementById = (id) => (id === 'depGraphModal' ? modal : null);
+    G.closeDepGraph();
+    assert.strictEqual(removed, true);
+  });
+
+  it('does not throw when modal is absent', () => {
+    G.document.getElementById = () => null;
+    assert.doesNotThrow(() => G.closeDepGraph());
   });
 });
