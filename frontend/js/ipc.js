@@ -993,6 +993,7 @@ document.addEventListener('input', (e) => {
     else if (action === 'setPan') setPan(e.target.value);
     else if (action === 'settingPageSize') settingUpdatePageSize(e.target.value);
     else if (action === 'settingFlushInterval') settingUpdateFlushInterval(e.target.value);
+    else if (action === 'settingTooltipHoverDelay') settingUpdateTooltipHoverDelay(e.target.value);
     else if (action === 'settingThreadMultiplier') settingUpdateThreadMultiplier(e.target.value);
     else if (action === 'settingSqliteReadPoolExtra') settingUpdateSqliteReadPoolExtra(e.target.value);
     else if (action === 'settingPruneOldScansKeep') settingUpdatePruneOldScansKeep(e.target.value);

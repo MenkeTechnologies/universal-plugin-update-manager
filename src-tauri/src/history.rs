@@ -509,6 +509,7 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
             ("theme", "theme"),
             ("colorScheme", "colorScheme"),
             ("crtEffects", "crtEffects"),
+            ("tooltipHoverDelayMs", "tooltipHoverDelayMs"),
         ],
     ),
     (

@@ -8,6 +8,8 @@ y = 0
 theme = "dark"
 colorScheme = "cyberpunk"
 crtEffects = "on"
+# Milliseconds to wait after pointer hover before showing title tooltips (0 = immediate). Implemented in the frontend; native WebKit title delay is not configurable.
+tooltipHoverDelayMs = "600"
 
 [scanning]
 autoScan = "off"

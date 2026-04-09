@@ -1124,6 +1124,15 @@ function settingUpdateFlushInterval(val) {
     prefs.setItem('flushInterval', val);
 }
 
+function settingUpdateTooltipHoverDelay(val) {
+    const n = Math.min(5000, Math.max(0, parseInt(String(val), 10) || 0));
+    const valEl = document.getElementById('settingTooltipHoverDelayValue');
+    const rangeEl = document.getElementById('settingTooltipHoverDelay');
+    if (valEl) valEl.textContent = `${n} ms`;
+    if (rangeEl) rangeEl.value = String(n);
+    prefs.setItem('tooltipHoverDelayMs', String(n));
+}
+
 function settingUpdateThreadMultiplier(val) {
     document.getElementById('settingThreadMultiplierValue').textContent = val + 'x';
     prefs.setItem('threadMultiplier', val);
@@ -1355,6 +1364,13 @@ function refreshSettingsUI() {
     }
     const tagPosEl = document.getElementById('settingTagBarPosition');
     if (tagPosEl) tagPosEl.value = prefs.getItem('tagBarPosition') || 'top';
+
+    const ttDelayRaw = parseInt(String(prefs.getItem('tooltipHoverDelayMs') || '600'), 10);
+    const ttN = Number.isNaN(ttDelayRaw) ? 600 : Math.min(5000, Math.max(0, ttDelayRaw));
+    const ttRangeEl = document.getElementById('settingTooltipHoverDelay');
+    const ttValEl = document.getElementById('settingTooltipHoverDelayValue');
+    if (ttRangeEl) ttRangeEl.value = String(ttN);
+    if (ttValEl) ttValEl.textContent = `${ttN} ms`;
 
     // Color scheme — rebuild labels for locale, then highlight active
     const currentScheme = prefs.getItem('colorScheme') || 'cyberpunk';
@@ -1934,6 +1950,13 @@ function restoreSettings() {
         const lastTab = [...document.querySelectorAll('.tab-content')].pop();
         if (bar && lastTab) lastTab.parentNode.insertBefore(bar, lastTab.nextSibling);
     }
+
+    const ttDelay = parseInt(String(prefs.getItem('tooltipHoverDelayMs') || '600'), 10);
+    const ttN = Number.isNaN(ttDelay) ? 600 : Math.min(5000, Math.max(0, ttDelay));
+    const ttEl = document.getElementById('settingTooltipHoverDelay');
+    const ttValEl = document.getElementById('settingTooltipHoverDelayValue');
+    if (ttEl) ttEl.value = String(ttN);
+    if (ttValEl) ttValEl.textContent = `${ttN} ms`;
 }
 
 // restoreSettings is called from loadLastScan after prefs.load()
