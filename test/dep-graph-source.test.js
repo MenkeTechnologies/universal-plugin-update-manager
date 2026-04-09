@@ -404,7 +404,7 @@ describe('frontend/js/dep-graph.js buildDepGraphData (vm-loaded)', () => {
     assert.ok(html.includes('3/3'));
   });
 
-  it('buildAnalyticsHtml uses singular "plugin" on the minimal-project line when count is 1', () => {
+  it('buildAnalyticsHtml uses singular "plugin" on project extremes when count is 1', () => {
     const html = G.buildAnalyticsHtml({
       pluginsByUsage: [
         { key: 'x', name: 'X', type: 'VST3', manufacturer: 'M', count: 1, projects: new Set(['/a']) },
@@ -413,8 +413,8 @@ describe('frontend/js/dep-graph.js buildDepGraphData (vm-loaded)', () => {
       orphaned: [],
       totalProjects: 1,
     });
-    // "Most complex" always prints the word "plugins" in `dep-graph.js`; "Most minimal" pluralizes correctly.
-    assert.ok(html.includes('Most minimal:') && html.includes('Only (1 plugin)'));
+    assert.strictEqual((html.match(/\(1 plugin\)/g) || []).length, 2);
+    assert.ok(html.includes('Most complex:') && html.includes('Most minimal:'));
   });
 
   it('buildAnalyticsHtml escapes HTML in manufacturer names (Top Manufacturers)', () => {

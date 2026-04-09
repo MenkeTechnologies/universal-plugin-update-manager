@@ -171,7 +171,7 @@ function buildAnalyticsHtml(data) {
       ${heaviestProject ? `<div class="dep-analytics-section">
         <h3 class="dep-analytics-title">Project Extremes</h3>
         <div style="font-size:11px;color:var(--text-muted);line-height:1.8;">
-          <div><span style="color:var(--cyan);">Most complex:</span> ${escapeHtml(heaviestProject.name)} (${heaviestProject.count} plugins)</div>
+          <div><span style="color:var(--cyan);">Most complex:</span> ${escapeHtml(heaviestProject.name)} (${heaviestProject.count} plugin${heaviestProject.count !== 1 ? 's' : ''})</div>
           <div><span style="color:var(--green);">Most minimal:</span> ${escapeHtml(lightestProject.name)} (${lightestProject.count} plugin${lightestProject.count !== 1 ? 's' : ''})</div>
         </div>
       </div>` : ''}
@@ -236,7 +236,8 @@ function showDepGraph() {
             const proj = data.projectsByCount.find(pr => pr.path === path);
             return proj ? escapeHtml(proj.name) : escapeHtml(path.split('/').pop());
         }).join(', ');
-        return `<div class="dep-plugin-row" title="Used in: ${escapeHtml(projectList)}">
+        // projectList segments are already escapeHtml'd; do not escape again (would double-encode &amp; etc.).
+        return `<div class="dep-plugin-row" title="Used in: ${projectList}">
       <div class="dep-plugin-info">
         <span class="xref-item-type ${typeCls}">${escapeHtml(p.type || 'Unknown')}</span>
         <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
