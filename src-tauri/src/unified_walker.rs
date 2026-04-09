@@ -285,14 +285,13 @@ fn get_directory_size_depth(path: &Path, depth: u32) -> u64 {
     let mut total = 0u64;
     if let Ok(entries) = fs::read_dir(path) {
         for entry in entries.flatten() {
-            if let Ok(ft) = entry.file_type() {
-                if ft.is_dir() {
-                    total += get_directory_size_depth(&entry.path(), depth + 1);
-                } else if ft.is_file() {
-                    if let Ok(meta) = entry.metadata() {
-                        total += meta.len();
-                    }
-                }
+            let p = entry.path();
+            // Match `daw_scanner` / `scanner`: `file_type().is_file()` skips symlink
+            // children; `path.is_dir()` + `metadata` follows symlinks for size.
+            if p.is_dir() {
+                total += get_directory_size_depth(&p, depth + 1);
+            } else if let Ok(meta) = fs::metadata(&p) {
+                total += meta.len();
             }
         }
     }
