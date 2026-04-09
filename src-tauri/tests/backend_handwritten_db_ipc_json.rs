@@ -349,6 +349,7 @@ fn filter_stats_result_shape() {
         o.get("sizeBuckets"),
         Some(&serde_json::json!([1, 2, 0, 0, 0, 0]))
     );
+    assert_eq!(o.get("topFolders"), Some(&serde_json::json!([])));
 }
 
 // ── `FileWatcherState` (initial, no Tauri app) ──────────────────────────────────

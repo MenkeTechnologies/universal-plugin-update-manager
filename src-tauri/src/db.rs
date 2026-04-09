@@ -719,7 +719,8 @@ pub struct FilterStatsResult {
     #[serde(default, rename = "keyAnalyzedCount")]
     pub key_analyzed_count: u64,
     /// Audio-only: top directory groups (first 3 path segments), sorted by count.
-    #[serde(default, skip_serializing_if = "Vec::is_empty", rename = "topFolders")]
+    /// Always serialized (even `[]`) so the frontend can tell DB aggregates from a missing field.
+    #[serde(default, rename = "topFolders")]
     pub top_folders: Vec<TopFolderRow>,
 }
 

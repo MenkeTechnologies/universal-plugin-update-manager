@@ -253,10 +253,11 @@ function buildSizeCard(samples, agg) {
 
 function buildFolderCard(samples, agg) {
     const libCount = agg?.audio?.count;
-    const fromDb = Array.isArray(agg?.audio?.topFolders) && agg.audio.topFolders.length > 0;
+    /** `topFolders` is always `[]` or rows from SQLite (never omitted) so we do not fall back to paginated `samples` when the DB list is empty. */
+    const useDbFolders = agg?.audio != null && Array.isArray(agg.audio.topFolders);
     let sorted;
     let pageTotal;
-    if (fromDb) {
+    if (useDbFolders) {
         sorted = agg.audio.topFolders.map((r) => [r.path, Number(r.count) || 0]);
         pageTotal = (typeof libCount === 'number' && !Number.isNaN(libCount) && libCount > 0)
             ? libCount
@@ -265,7 +266,7 @@ function buildFolderCard(samples, agg) {
         const dirs = {};
         for (const s of samples) {
             const dir = s.directory || s.path?.replace(/\/[^/]+$/, '') || _hmFmt('ui.hm.unknown');
-            const parts = dir.split('/').filter(Boolean);
+            const parts = dir.split(/[/\\]/).filter(Boolean);
             const key = '/' + parts.slice(0, Math.min(parts.length, 3)).join('/');
             dirs[key] = (dirs[key] || 0) + 1;
         }
@@ -320,6 +321,14 @@ function buildKeyCard(agg) {
 
 function buildTimelineCard(samples) {
     if (samples.length === 0) return '';
+    let hasMod = false;
+    for (const s of samples) {
+        if (s.modified && String(s.modified).length >= 7) {
+            hasMod = true;
+            break;
+        }
+    }
+    if (!hasMod) return '';
     return `<div class="hm-card hm-card-wide" data-hm-card="timeline"><h3 class="hm-card-title">${escapeHtml(_hmFmt('ui.hm.card_timeline'))}</h3><canvas id="hmTimelineCanvas" width="800" height="100" style="width:100%;height:100px;" title="${escapeHtml(_hmFmt('ui.hm.card_timeline_canvas_title'))}"></canvas></div>`;
 }
 

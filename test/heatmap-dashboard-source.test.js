@@ -104,10 +104,14 @@ describe('frontend/js/heatmap-dashboard.js card builders (vm-loaded)', () => {
     assert.strictEqual(H.buildTimelineCard([]), '');
   });
 
-  it('buildTimelineCard includes canvas when samples exist', () => {
-    const html = H.buildTimelineCard([{ path: '/a.wav' }]);
+  it('buildTimelineCard includes canvas when samples have modified dates', () => {
+    const html = H.buildTimelineCard([{path: '/a.wav', modified: '2024-06-01T12:00:00Z'}]);
     assert.ok(html.includes('hmTimelineCanvas'));
     assert.ok(html.includes('data-hm-card="timeline"'));
+  });
+
+  it('buildTimelineCard returns empty when samples lack modified metadata', () => {
+    assert.strictEqual(H.buildTimelineCard([{path: '/a.wav'}]), '');
   });
 
   it('buildPluginTypeCard returns empty string for no plugins and no DB aggregate', () => {
@@ -145,6 +149,17 @@ describe('frontend/js/heatmap-dashboard.js card builders (vm-loaded)', () => {
     assert.ok(html.includes('Samples'));
     assert.ok(html.includes('42'));
     assert.ok(!html.includes('ui.hm.empty_no_data'));
+  });
+
+  it('buildFolderCard uses DB path when topFolders is empty array (not client fallback)', () => {
+    const html = H.buildFolderCard([{path: '/wrong/fallback.wav'}], {
+      audio: {
+        count: 99,
+        topFolders: [],
+      },
+    });
+    assert.ok(!html.includes('fallback'));
+    assert.ok(html.includes('ui.hm.empty_no_data'));
   });
 
   it('buildBpmCard uses bpmAnalyzedCount from aggregate when present', () => {
