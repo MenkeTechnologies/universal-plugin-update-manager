@@ -142,9 +142,29 @@ jobs:
             foreach ($rel in $exeRelPaths) {
               $full = Join-Path $env:GITHUB_WORKSPACE ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
               if (-not (Test-Path -LiteralPath $full)) { throw "missing test exe: $full" }
-              # First harness only: no --quiet so failures show STATUS_ENTRYPOINT_NOT_FOUND vs panics (--quiet hid all stderr on failure).
-              if ($i -eq 0) { & $full } else { & $full --quiet }
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              $outLog = Join-Path $env:RUNNER_TEMP ("rust-harness-{0}.stdout.log" -f $i)
+              $errLog = Join-Path $env:RUNNER_TEMP ("rust-harness-{0}.stderr.log" -f $i)
+              Remove-Item -Force -LiteralPath $outLog,$errLog -ErrorAction SilentlyContinue
+              # Start-Process + redirect: plain & $exe in GHA sometimes yielded exit 1 with no captured libtest output.
+              $sp = @{
+                FilePath               = $full
+                Wait                   = $true
+                PassThru               = $true
+                NoNewWindow            = $true
+                RedirectStandardOutput = $outLog
+                RedirectStandardError  = $errLog
+              }
+              # First harness only: no --quiet so failures show STATUS_ENTRYPOINT_NOT_FOUND vs panics.
+              if ($i -ne 0) { $sp['ArgumentList'] = @('--quiet') }
+              Write-Host "Running harness $i : $rel (exit will follow)"
+              $p = Start-Process @sp
+              Write-Host "Harness $i exit code: $($p.ExitCode)"
+              $showLogs = ($p.ExitCode -ne 0) -or ($i -eq 0)
+              if ($showLogs) {
+                if (Test-Path -LiteralPath $outLog) { Get-Content -LiteralPath $outLog | ForEach-Object { Write-Host $_ } }
+                if (Test-Path -LiteralPath $errLog) { Get-Content -LiteralPath $errLog | ForEach-Object { Write-Host $_ } }
+              }
+              if ($p.ExitCode -ne 0) { exit $p.ExitCode }
               $i++
             }
           } finally {
