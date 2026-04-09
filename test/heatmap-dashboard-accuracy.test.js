@@ -176,6 +176,103 @@ describe('heatmap-dashboard.js accuracy', () => {
     const rows = extractBarRows(html, 'dawFormats');
     const sumCounts = rows.reduce((s, r) => s + r.count, 0);
     assert.strictEqual(sumCounts, projects.length);
+    const sumPct = rows.reduce((s, r) => s + r.pct, 0);
+    assert.ok(Math.abs(sumPct - 100) < 0.15);
+  });
+
+  it('buildFormatCard prefers audioStatCounts when no aggregate byType', () => {
+    const S = loadHm({ audioStatCounts: { WAV: 4, FLAC: 1 } });
+    const html = S.buildFormatCard([], {});
+    const rows = extractBarRows(html, 'format');
+    assert.strictEqual(rows.reduce((s, r) => s + r.count, 0), 5);
+    const sumPct = rows.reduce((s, r) => s + r.pct, 0);
+    assert.ok(Math.abs(sumPct - 100) < 0.15);
+  });
+
+  it('buildPluginTypeCard aggregate byType: counts sum to total', () => {
+    const html = H.buildPluginTypeCard([], {
+      plugins: { byType: { VST3: 7, AU: 3, CLAP: 2 } },
+    });
+    const rows = extractBarRows(html, 'pluginTypes');
+    assert.strictEqual(rows.reduce((s, r) => s + r.count, 0), 12);
+    const sumPct = rows.reduce((s, r) => s + r.pct, 0);
+    assert.ok(Math.abs(sumPct - 100) < 0.15);
+  });
+
+  it('buildDawFormatCard aggregate daw.byType: counts sum to total', () => {
+    const html = H.buildDawFormatCard([], {
+      daw: { byType: { ALS: 4, RPP: 1 } },
+    });
+    const rows = extractBarRows(html, 'dawFormats');
+    assert.strictEqual(rows.reduce((s, r) => s + r.count, 0), 5);
+    const sumPct = rows.reduce((s, r) => s + r.pct, 0);
+    assert.ok(Math.abs(sumPct - 100) < 0.15);
+  });
+
+  it('buildFolderCard sample path: folder bucket counts sum to sample count', () => {
+    const samples = [
+      { path: '/Lib/One/a.wav' },
+      { path: '/Lib/One/b.wav' },
+      { path: '/Other/p/x.wav' },
+    ];
+    const html = H.buildFolderCard(samples, {});
+    const rows = extractBarRows(html, 'folders');
+    const sumCounts = rows.reduce((s, r) => s + r.count, 0);
+    assert.strictEqual(sumCounts, samples.length);
+    const sumPct = rows.reduce((s, r) => s + r.pct, 0);
+    assert.ok(Math.abs(sumPct - 100) < 0.15);
+  });
+
+  it('buildFolderCard DB topFolders: percentages use library count as denominator', () => {
+    const lib = 10_000;
+    const html = H.buildFolderCard([], {
+      audio: {
+        count: lib,
+        topFolders: [
+          { path: '/a/b', count: 2500 },
+          { path: '/c/d', count: 1500 },
+        ],
+      },
+    });
+    const rows = extractBarRows(html, 'folders');
+    assert.strictEqual(rows[0].pct, parseFloat(((2500 / lib) * 100).toFixed(1)));
+    assert.strictEqual(rows[1].pct, parseFloat(((1500 / lib) * 100).toFixed(1)));
+  });
+
+  it('BPM histogram binning (same rules as renderBpmHistogram in-memory path)', () => {
+    const minBpm = 50;
+    const maxBpm = 220;
+    const binWidth = 5;
+    const numBins = Math.ceil((maxBpm - minBpm) / binWidth);
+    assert.strictEqual(numBins, 34);
+    const bpms = [60, 60, 130, 49, 221];
+    const bins = new Array(numBins).fill(0);
+    for (const bpm of bpms) {
+      if (!bpm || bpm <= 0) continue;
+      const idx = Math.floor((bpm - minBpm) / binWidth);
+      if (idx >= 0 && idx < numBins) bins[idx]++;
+    }
+    /* 49 -> idx -1 excluded; 221 -> idx 34 excluded */
+    assert.strictEqual(bins.reduce((a, b) => a + b, 0), 3);
+    assert.strictEqual(bins[2], 2);
+    assert.strictEqual(bins[16], 1);
+  });
+
+  it('renderKeyWheel keyCounts: sorted counts sum matches keyAnalyzedCount when provided', () => {
+    const keyCounts = { 'C Major': 10, 'A Minor': 5 };
+    const analyzed = 15;
+    const sorted = Object.entries(keyCounts)
+      .map(([k, c]) => [k, Number(c) || 0])
+      .sort((x, y) => y[1] - x[1]);
+    const keyTotal =
+      typeof analyzed === 'number' && analyzed > 0
+        ? analyzed
+        : sorted.reduce((s, [, c]) => s + c, 0);
+    assert.strictEqual(sorted.reduce((s, [, c]) => s + c, 0), keyTotal);
+    assert.strictEqual(
+      ((sorted[0][1] / Math.max(keyTotal, 1)) * 100).toFixed(0),
+      '67'
+    );
   });
 
   it('timeline month grouping (same logic as renderTimelineChart) sums to samples with YYYY-MM', () => {
