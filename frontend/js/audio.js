@@ -748,8 +748,8 @@ function startReverseBufferFromOffset(offsetInRev) {
             startReverseBufferFromOffset(0);
             return;
         }
-        if (filteredAudioSamples.length > 1 && prefs.getItem('autoplayNext') !== 'off') {
-            nextTrack();
+        if (typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 1 && prefs.getItem('autoplayNext') !== 'off') {
+            nextTrack({ autoplay: true });
         } else {
             updatePlayBtnStates();
             updateNowPlayingBtn();
@@ -1290,8 +1290,8 @@ async function importRecentlyPlayed() {
 
 audioPlayer.addEventListener('ended', () => {
     if (!audioLooping) {
-        if (filteredAudioSamples.length > 1 && prefs.getItem('autoplayNext') !== 'off') {
-            nextTrack();
+        if (typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 1 && prefs.getItem('autoplayNext') !== 'off') {
+            nextTrack({ autoplay: true });
         } else {
             updatePlayBtnStates();
             updateNowPlayingBtn();
@@ -1311,8 +1311,8 @@ function handleEnginePlaybackEofFromPoll() {
     if (!_enginePlaybackActive) return;
     if (audioLooping) return;
     _enginePlaybackEofHandled = true;
-    if (filteredAudioSamples.length > 1 && prefs.getItem('autoplayNext') !== 'off') {
-        nextTrack();
+    if (typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 1 && prefs.getItem('autoplayNext') !== 'off') {
+        nextTrack({ autoplay: true });
     } else {
         updatePlayBtnStates();
         updateNowPlayingBtn();
@@ -3854,6 +3854,37 @@ function openAudioFolder(filePath) {
     window.vstUpdater.openAudioFolder(filePath).then(() => showToast(toastFmt('toast.revealed_in_finder'))).catch(e => showToast(toastFmt('toast.failed', {err: e}), 4000, 'error'));
 }
 
+/** Same items/order as `#npHistoryList` (Recently Played, drag order) or search results when the player search box has text. */
+function getPlayerHistoryListItems() {
+    const searchInput = document.getElementById('npSearchInput');
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    if (!query) {
+        return typeof recentlyPlayed !== 'undefined' && Array.isArray(recentlyPlayed) ? recentlyPlayed : [];
+    }
+    const seen = new Set();
+    const scored = [];
+    for (const r of recentlyPlayed) {
+        const score = searchScore(query, [r.name, r.path], 'fuzzy');
+        if (score > 0 && !seen.has(r.path)) {
+            seen.add(r.path);
+            scored.push({item: r, score: score + 1000});
+        }
+    }
+    if (typeof allAudioSamples !== 'undefined') {
+        const N = Math.min(allAudioSamples.length, 10000);
+        for (let i = 0; i < N; i++) {
+            const s = allAudioSamples[i];
+            const score = searchScore(query, [s.name, s.path], 'fuzzy');
+            if (score > 0 && !seen.has(s.path)) {
+                seen.add(s.path);
+                scored.push({item: {path: s.path, name: s.name, format: s.format, size: s.sizeFormatted}, score});
+            }
+        }
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 100).map(s => s.item);
+}
+
 // ── Recently Played / Expanded Player ──
 function addToRecentlyPlayed(filePath, sample) {
     // Remove duplicate if already in list
@@ -3876,37 +3907,7 @@ function renderRecentlyPlayed() {
     if (!list) return;
     const searchInput = document.getElementById('npSearchInput');
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-
-    let items;
-    if (query) {
-        // Search all audio samples + recently played, deduplicated, scored by fzf
-        const seen = new Set();
-        const scored = [];
-        for (const r of recentlyPlayed) {
-            const score = searchScore(query, [r.name, r.path], 'fuzzy');
-            if (score > 0 && !seen.has(r.path)) {
-                seen.add(r.path);
-                scored.push({item: r, score: score + 1000});
-            }
-        }
-        if (typeof allAudioSamples !== 'undefined') {
-            // Cap iteration — this runs on every keystroke; must not scan millions.
-            // User searching among millions should use the main samples-tab search.
-            const N = Math.min(allAudioSamples.length, 10000);
-            for (let i = 0; i < N; i++) {
-                const s = allAudioSamples[i];
-                const score = searchScore(query, [s.name, s.path], 'fuzzy');
-                if (score > 0 && !seen.has(s.path)) {
-                    seen.add(s.path);
-                    scored.push({item: {path: s.path, name: s.name, format: s.format, size: s.sizeFormatted}, score});
-                }
-            }
-        }
-        scored.sort((a, b) => b.score - a.score);
-        items = scored.slice(0, 100).map(s => s.item);
-    } else {
-        items = recentlyPlayed;
-    }
+    const items = getPlayerHistoryListItems();
 
     if (items.length === 0 && query) {
         list.innerHTML = `<div style="text-align:center;color:var(--text-dim);font-size:11px;padding:12px;">${typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.search_no_matches')) : _audioFmt('ui.audio.search_no_matches')}</div>`;
@@ -4108,15 +4109,20 @@ document.getElementById('npHistoryList')?.addEventListener('click', (e) => {
 // ── Previous / Next / Shuffle ──
 function prevTrack() {
     const hadExpanded = expandedMetaPath !== null;
+    const items = getPlayerHistoryListItems();
     let prevPath = null;
     if (audioShuffling) {
-        if (filteredAudioSamples.length === 0) return;
-        prevPath = filteredAudioSamples[Math.floor(Math.random() * filteredAudioSamples.length)].path;
+        if (items.length === 0) return;
+        prevPath = items[Math.floor(Math.random() * items.length)].path;
     } else {
-        if (filteredAudioSamples.length === 0) return;
-        const idx = filteredAudioSamples.findIndex(s => s.path === audioPlayerPath);
-        const prevIdx = idx <= 0 ? filteredAudioSamples.length - 1 : idx - 1;
-        prevPath = filteredAudioSamples[prevIdx].path;
+        if (items.length === 0) return;
+        const idx = items.findIndex(s => s.path === audioPlayerPath);
+        if (idx < 0) {
+            prevPath = items[items.length - 1].path;
+        } else {
+            const prevIdx = idx <= 0 ? items.length - 1 : idx - 1;
+            prevPath = items[prevIdx].path;
+        }
     }
     void (async () => {
         await previewAudio(prevPath);
@@ -4124,19 +4130,27 @@ function prevTrack() {
     })();
 }
 
-function nextTrack() {
+/** @param { { autoplay?: boolean } } [opts] — When `autoplay`, advance using full Recently Played order (ignores the player search box). */
+function nextTrack(opts) {
     const hadExpanded = expandedMetaPath !== null;
+    const autoplay = opts && opts.autoplay === true;
+    const items =
+        autoplay && typeof recentlyPlayed !== 'undefined' && Array.isArray(recentlyPlayed) && recentlyPlayed.length > 0
+            ? recentlyPlayed
+            : getPlayerHistoryListItems();
     let nextPath = null;
     if (audioShuffling) {
-        // Random from filtered samples
-        if (filteredAudioSamples.length === 0) return;
-        nextPath = filteredAudioSamples[Math.floor(Math.random() * filteredAudioSamples.length)].path;
+        if (items.length === 0) return;
+        nextPath = items[Math.floor(Math.random() * items.length)].path;
     } else {
-        // Next in filtered list after current
-        if (filteredAudioSamples.length === 0) return;
-        const idx = filteredAudioSamples.findIndex(s => s.path === audioPlayerPath);
-        const nextIdx = (idx + 1) % filteredAudioSamples.length;
-        nextPath = filteredAudioSamples[nextIdx].path;
+        if (items.length === 0) return;
+        const idx = items.findIndex(s => s.path === audioPlayerPath);
+        if (idx < 0) {
+            nextPath = items[0].path;
+        } else {
+            const nextIdx = (idx + 1) % items.length;
+            nextPath = items[nextIdx].path;
+        }
     }
     void (async () => {
         await previewAudio(nextPath);
