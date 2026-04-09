@@ -91,6 +91,8 @@ jobs:
       - name: Run Rust tests (library + integration, Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
+        env:
+          RUST_BACKTRACE: 1
         run: |
           $logFile = Join-Path $env:RUNNER_TEMP 'cargo-test-no-run.txt'
           & cargo test --manifest-path src-tauri/Cargo.toml --no-run --color never *> $logFile
@@ -128,13 +130,22 @@ jobs:
           $td = Join-Path $env:GITHUB_WORKSPACE 'target/debug'
           Remove-WindowsTestSidecars $td
 
+          $depsDll = Join-Path $td 'deps'
+          if (Test-Path -LiteralPath $depsDll) {
+            $names = @(Get-ChildItem -LiteralPath $depsDll -Filter *.dll -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object -Unique)
+            Write-Host "target/debug/deps *.dll after sidecar strip ($($names.Count)):" ($names -join ', ')
+          }
+
           Push-Location $env:GITHUB_WORKSPACE
           try {
+            $i = 0
             foreach ($rel in $exeRelPaths) {
               $full = Join-Path $env:GITHUB_WORKSPACE ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
               if (-not (Test-Path -LiteralPath $full)) { throw "missing test exe: $full" }
-              & $full --quiet
+              # First harness only: no --quiet so failures show STATUS_ENTRYPOINT_NOT_FOUND vs panics (--quiet hid all stderr on failure).
+              if ($i -eq 0) { & $full } else { & $full --quiet }
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              $i++
             }
           } finally {
             Pop-Location
