@@ -937,6 +937,10 @@ if (!bin) {
         timeoutMs: 90_000,
       });
       const j = JSON.parse(outLines[0]);
+      if (!j.ok && /no output device/i.test(String(j.error || ''))) {
+        t.skip('output device(s) listed but probe could not open (e.g. headless Windows CI)');
+        return;
+      }
       assert.equal(j.ok, true);
       assert.ok(typeof j.device_name === 'string' && j.device_name.length > 0);
       assert.ok(typeof j.sample_rate_hz === 'number');
@@ -955,6 +959,10 @@ if (!bin) {
         timeoutMs: 90_000,
       });
       const j = JSON.parse(outLines[0]);
+      if (!j.ok && /no input device/i.test(String(j.error || ''))) {
+        t.skip('input device(s) listed but probe could not open (e.g. headless Windows CI)');
+        return;
+      }
       assert.equal(j.ok, true);
       assert.ok(typeof j.device_name === 'string' && j.device_name.length > 0);
       assert.ok(typeof j.sample_rate_hz === 'number');
