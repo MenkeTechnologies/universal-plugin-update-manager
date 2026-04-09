@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "İnşa etmek",
   "ui.perf.section_database": "Veritabanı",
   "ui.perf.section_export_formats": "Dışa Aktarma Formatları",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Eklenti Çıkarma",
   "ui.perf.section_plugin_formats": "Eklenti Formatları",
   "ui.perf.section_preset_formats": "Önceden Ayarlanmış Formatlar",

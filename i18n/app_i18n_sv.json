@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Bygga",
   "ui.perf.section_database": "Databas",
   "ui.perf.section_export_formats": "Exportera format",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Plugin-extraktion",
   "ui.perf.section_plugin_formats": "Plugin-format",
   "ui.perf.section_preset_formats": "Förinställda format",

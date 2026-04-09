@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "짓다",
   "ui.perf.section_database": "데이터 베이스",
   "ui.perf.section_export_formats": "내보내기 형식",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "플러그인 추출",
   "ui.perf.section_plugin_formats": "플러그인 형식",
   "ui.perf.section_preset_formats": "사전 설정 형식",

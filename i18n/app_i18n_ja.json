@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "建てる",
   "ui.perf.section_database": "データベース",
   "ui.perf.section_export_formats": "エクスポート形式",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "プラグインの抽出",
   "ui.perf.section_plugin_formats": "プラグインの形式",
   "ui.perf.section_preset_formats": "プリセットフォーマット",

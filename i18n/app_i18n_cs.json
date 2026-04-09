@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Vytvořit",
   "ui.perf.section_database": "Databáze",
   "ui.perf.section_export_formats": "Exportovat formáty",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Extrakce pluginu",
   "ui.perf.section_plugin_formats": "Formáty pluginů",
   "ui.perf.section_preset_formats": "Přednastavené formáty",

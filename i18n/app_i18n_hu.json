@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Épít",
   "ui.perf.section_database": "Adatbázis",
   "ui.perf.section_export_formats": "Formátumok exportálása",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Plugin kivonás",
   "ui.perf.section_plugin_formats": "Plugin formátumok",
   "ui.perf.section_preset_formats": "Előre beállított formátumok",

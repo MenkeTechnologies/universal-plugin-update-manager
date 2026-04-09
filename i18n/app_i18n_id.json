@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Membangun",
   "ui.perf.section_database": "Basis data",
   "ui.perf.section_export_formats": "Ekspor Format",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Ekstraksi Plugin",
   "ui.perf.section_plugin_formats": "Format Pengaya",
   "ui.perf.section_preset_formats": "Format Prasetel",

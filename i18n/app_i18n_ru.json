@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Строить",
   "ui.perf.section_database": "База данных",
   "ui.perf.section_export_formats": "Экспортные форматы",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Извлечение плагинов",
   "ui.perf.section_plugin_formats": "Форматы плагинов",
   "ui.perf.section_preset_formats": "Предустановленные форматы",

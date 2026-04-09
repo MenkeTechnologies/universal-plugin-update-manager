@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Οικοδομώ",
   "ui.perf.section_database": "Βάση δεδομένων",
   "ui.perf.section_export_formats": "Μορφές εξαγωγής",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Εξαγωγή πρόσθετου",
   "ui.perf.section_plugin_formats": "Μορφές πρόσθετων",
   "ui.perf.section_preset_formats": "Προκαθορισμένες μορφές",

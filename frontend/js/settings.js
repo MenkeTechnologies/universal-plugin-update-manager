@@ -1764,6 +1764,8 @@ function refreshSettingsUI() {
                         tag(app.dawFormats),
                     ]),
                     section('ui.perf.section_preset_formats', [tag(app.presetFormats)]),
+                    section('ui.perf.section_midi_formats', [tag(app.midiFormats)]),
+                    section('ui.perf.section_pdf_formats', [tag(app.pdfFormats)]),
                     section('ui.perf.section_plugin_extraction', [
                         f('ui.perf.xref_format_count', {n: String((app.xrefFormats || []).length)}),
                         tag(app.xrefFormats),

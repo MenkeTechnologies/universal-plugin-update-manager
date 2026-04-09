@@ -3702,6 +3702,8 @@ fn build_process_stats(app: AppHandle) -> serde_json::Value {
         "PTF",
         "REASON",
     ];
+    let midi_formats = ["MID", "MIDI"];
+    let pdf_formats = ["PDF"];
 
     serde_json::json!({
         "pid": pid,
@@ -3730,6 +3732,8 @@ fn build_process_stats(app: AppHandle) -> serde_json::Value {
             "dawFormats": daw_formats,
             "presetFormats": preset_formats,
             "xrefFormats": xref_formats,
+            "midiFormats": midi_formats,
+            "pdfFormats": pdf_formats,
             "analysisEngines": ["BPM (autocorrelation)", "Key (Goertzel chromagram)", "LUFS (RMS dBFS)", "Fingerprint (spectral)"],
             "visualizers": ["FFT spectrum", "Waveform", "Spectrogram", "Stereo Lissajous", "Level meters", "Frequency bands"],
             "exportFormats": ["JSON", "TOML", "CSV", "TSV", "PDF"],

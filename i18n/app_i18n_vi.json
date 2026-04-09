@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Xây dựng",
   "ui.perf.section_database": "Cơ sở dữ liệu",
   "ui.perf.section_export_formats": "Định dạng xuất",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Khai thác plugin",
   "ui.perf.section_plugin_formats": "Định dạng plugin",
   "ui.perf.section_preset_formats": "Định dạng cài sẵn",

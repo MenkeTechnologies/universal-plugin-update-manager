@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "निर्माण",
   "ui.perf.section_database": "डेटाबेस",
   "ui.perf.section_export_formats": "निर्यात प्रारूप",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "प्लगइन निष्कर्षण",
   "ui.perf.section_plugin_formats": "प्लगइन प्रारूप",
   "ui.perf.section_preset_formats": "पूर्व निर्धारित प्रारूप",

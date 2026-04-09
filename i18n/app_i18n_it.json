@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Costruire",
   "ui.perf.section_database": "Banca dati",
   "ui.perf.section_export_formats": "Formati di esportazione",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Estrazione dei plugin",
   "ui.perf.section_plugin_formats": "Formati dei plugin",
   "ui.perf.section_preset_formats": "Formati preimpostati",

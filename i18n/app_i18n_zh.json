@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "建造",
   "ui.perf.section_database": "数据库",
   "ui.perf.section_export_formats": "导出格式",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "插件提取",
   "ui.perf.section_plugin_formats": "插件格式",
   "ui.perf.section_preset_formats": "预设格式",

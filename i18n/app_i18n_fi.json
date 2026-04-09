@@ -1415,6 +1415,8 @@
   "ui.perf.section_build": "Rakentaa",
   "ui.perf.section_database": "Tietokanta",
   "ui.perf.section_export_formats": "Vie muodot",
+  "ui.perf.section_midi_formats": "MIDI Formats",
+  "ui.perf.section_pdf_formats": "PDF Documents",
   "ui.perf.section_plugin_extraction": "Plugin Extraction",
   "ui.perf.section_plugin_formats": "Plugin-muodot",
   "ui.perf.section_preset_formats": "Esiasetetut muodot",
