@@ -89,23 +89,24 @@ jobs:
       # JUCE/VC DLLs back beside test exes → STATUS_ENTRYPOINT_NOT_FOUND. Build once, strip, then
       # run each harness from `cargo test --no-run` output (no second Cargo invoke). Do not glob
       # `deps/*.exe` by hash length — rustc naming changes left only a subset matched and skipped
-      # unittests + most integration crates; `Start-Process -PassThru` gives a reliable exit code.
+      # unittests + most integration crates. Invoke each harness with `&` from the workspace so
+      # env/cwd match `cargo test`; `Start-Process` can mis-handle libtest exit codes.
       # `--color never`: default colored output inserts ANSI between `Executable` and the path and
       # breaks the regex that collects `target\debug\deps\*.exe` lines.
       - name: Run Rust tests (library + integration, Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          # stderr via `2>&1` becomes ErrorRecord lines; echoing them can leave `$LASTEXITCODE` wrong.
-          # Capture cargo's exit code immediately after the native command (before any pipeline).
-          $chunks = @(cargo test --manifest-path src-tauri/Cargo.toml --no-run --color never 2>&1)
+          # Redirect all streams to a file: `2>&1` into an array wraps stderr as ErrorRecord lines
+          # (fragile to parse); `*` avoids that. Keep cargo's exit code right after `& cargo`.
+          $logFile = Join-Path $env:RUNNER_TEMP 'cargo-test-no-run.txt'
+          & cargo test --manifest-path src-tauri/Cargo.toml --no-run --color never *> $logFile
           $cargoExit = $LASTEXITCODE
-          $chunks | ForEach-Object { $_ }
+          Get-Content -LiteralPath $logFile | ForEach-Object { $_ }
           if ($cargoExit -ne 0) { exit $cargoExit }
           $exeRelPaths = [System.Collections.Generic.List[string]]::new()
-          foreach ($line in $chunks) {
-            $s = $line.ToString()
-            if ($s -match 'Executable\s+(.+)\s+\((target[\\/]debug[\\/]deps[\\/][^\)]+\.exe)\)') {
+          foreach ($line in (Get-Content -LiteralPath $logFile)) {
+            if ($line -match 'Executable\s+(.+)\s+\((target[\\/]debug[\\/]deps[\\/][^\)]+\.exe)\)') {
               $exeRelPaths.Add($matches[2])
             }
           }
@@ -126,13 +127,18 @@ jobs:
           }
           $td = Join-Path $env:GITHUB_WORKSPACE 'target/debug'
           Remove-JuceSidecars $td
-          foreach ($rel in $exeRelPaths) {
-            $full = Join-Path $env:GITHUB_WORKSPACE ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
-            if (-not (Test-Path -LiteralPath $full)) { throw "missing test exe: $full" }
-            $p = Start-Process -FilePath $full -ArgumentList @('--quiet') -Wait -NoNewWindow -PassThru
-            if ($null -ne $p.ExitCode -and $p.ExitCode -ne 0) { exit $p.ExitCode }
+          Push-Location $env:GITHUB_WORKSPACE
+          try {
+            foreach ($rel in $exeRelPaths) {
+              $full = Join-Path $env:GITHUB_WORKSPACE ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
+              if (-not (Test-Path -LiteralPath $full)) { throw "missing test exe: $full" }
+              & $full --quiet
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          } finally {
+            Pop-Location
           }
-          [Environment]::Exit(0)
+          exit 0
 
   build:
     needs: test
