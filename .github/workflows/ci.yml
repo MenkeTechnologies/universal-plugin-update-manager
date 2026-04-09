@@ -90,11 +90,13 @@ jobs:
       # run each harness from `cargo test --no-run` output (no second Cargo invoke). Do not glob
       # `deps/*.exe` by hash length — rustc naming changes left only a subset matched and skipped
       # unittests + most integration crates; `Start-Process -PassThru` gives a reliable exit code.
+      # `--color never`: default colored output inserts ANSI between `Executable` and the path and
+      # breaks the regex that collects `target\debug\deps\*.exe` lines.
       - name: Run Rust tests (library + integration, Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $chunks = @(cargo test --manifest-path src-tauri/Cargo.toml --no-run 2>&1)
+          $chunks = @(cargo test --manifest-path src-tauri/Cargo.toml --no-run --color never 2>&1)
           $chunks | ForEach-Object { $_ }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $exeRelPaths = [System.Collections.Generic.List[string]]::new()
