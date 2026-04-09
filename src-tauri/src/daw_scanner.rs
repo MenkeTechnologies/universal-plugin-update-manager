@@ -9,6 +9,7 @@ use crate::history::DawProject;
 use crate::scanner_skip_dirs::SCANNER_SKIP_DIRS as SKIP_DIRS;
 use crate::unified_walker::IncrementalDirState;
 use rayon::prelude::*;
+use dashmap::DashSet;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -223,7 +224,7 @@ pub fn walk_for_daw(
     let found = Arc::new(AtomicUsize::new(0));
     let active = active_dirs.unwrap_or_else(|| Arc::new(Mutex::new(Vec::new())));
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<DawProject>>(256);
-    let visited = Arc::new(Mutex::new(HashSet::new()));
+    let visited = Arc::new(DashSet::new());
     let exclude = Arc::new(exclude.unwrap_or_default());
 
     let roots_owned: Vec<PathBuf> = roots.to_vec();
@@ -280,7 +281,7 @@ pub fn walk_for_daw(
 fn walk_dir_parallel(
     dir: &Path,
     depth: u32,
-    visited: &Arc<Mutex<HashSet<PathBuf>>>,
+    visited: &Arc<DashSet<PathBuf>>,
     tx: &std::sync::mpsc::SyncSender<Vec<DawProject>>,
     found: &Arc<AtomicUsize>,
     batch_size: usize,
@@ -295,15 +296,14 @@ fn walk_dir_parallel(
     }
 
     {
-        let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
         let orig = normalize_macos_path(dir.to_path_buf());
         let canon = fs::canonicalize(dir).ok().map(normalize_macos_path);
         // Dedup on canonical path (resolves symlinks), fall back to original
         let key = canon.unwrap_or_else(|| orig.clone());
-        if !vis.insert(key) {
+        if !visited.insert(key) {
             return;
         }
-        vis.insert(orig); // also mark original to prevent re-entry via different route
+        visited.insert(orig); // also mark original to prevent re-entry via different route
     }
 
     if let Some(ref inc) = incremental {

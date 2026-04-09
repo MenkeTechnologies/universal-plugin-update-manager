@@ -25,6 +25,7 @@ use crate::bulk_stat::{read_dir_bulk, BulkEntry};
 use crate::history::{AudioSample, DawProject, PdfFile, PresetFile};
 use crate::scanner_skip_dirs::SCANNER_SKIP_DIRS as SKIP_DIRS;
 use rayon::prelude::*;
+use dashmap::DashSet;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -369,7 +370,7 @@ pub fn walk_unified(
         active_dirs
     };
     let (tx, rx) = std::sync::mpsc::sync_channel::<ClassifiedBatch>(256);
-    let visited = Arc::new(Mutex::new(HashSet::new()));
+    let visited = Arc::new(DashSet::new());
 
     // Union of all roots, deduped by canonicalized path.
     let mut union: Vec<PathBuf> = Vec::new();
@@ -416,7 +417,7 @@ pub fn walk_unified(
         .build()
         .unwrap();
 
-    let tcc_denied: Arc<Mutex<HashSet<PathBuf>>> = Arc::new(Mutex::new(HashSet::new()));
+    let tcc_denied: Arc<DashSet<PathBuf>> = Arc::new(DashSet::new());
     let tcc_summary = tcc_denied.clone();
     std::thread::spawn(move || {
         pool.install(|| {
@@ -454,9 +455,8 @@ pub fn walk_unified(
         }
     }
 
-    let denied = tcc_summary.lock().unwrap();
-    if !denied.is_empty() {
-        let paths: Vec<_> = denied.iter().map(|p| p.display().to_string()).collect();
+    if !tcc_summary.is_empty() {
+        let paths: Vec<_> = tcc_summary.iter().map(|p| p.key().display().to_string()).collect();
         crate::write_app_log(format!(
             "SCAN TCC SUMMARY — {} path(s) denied by macOS TCC: {} \
              (grant access in System Settings → Privacy & Security → Files and Folders)",
@@ -470,7 +470,7 @@ pub fn walk_unified(
 fn walk_dir_parallel(
     dir: &Path,
     depth: u32,
-    visited: &Arc<Mutex<HashSet<PathBuf>>>,
+    visited: &Arc<DashSet<PathBuf>>,
     tx: &std::sync::mpsc::SyncSender<ClassifiedBatch>,
     audio_found: &Arc<AtomicUsize>,
     daw_found: &Arc<AtomicUsize>,
@@ -480,7 +480,7 @@ fn walk_dir_parallel(
     stop: &Arc<AtomicBool>,
     spec: &Arc<UnifiedSpec>,
     active_dirs: &[Arc<Mutex<Vec<String>>>],
-    tcc_denied: &Arc<Mutex<HashSet<PathBuf>>>,
+    tcc_denied: &Arc<DashSet<PathBuf>>,
     incremental: Option<Arc<IncrementalDirState>>,
 ) {
     if depth > 30 || stop.load(Ordering::Relaxed) {
@@ -488,7 +488,7 @@ fn walk_dir_parallel(
     }
 
     // Skip paths under a previously TCC-denied ancestor — no syscalls needed.
-    if tcc_denied.lock().unwrap().iter().any(|d| dir.starts_with(d)) {
+    if tcc_denied.iter().any(|d| dir.starts_with(d.key())) {
         return;
     }
 
@@ -507,8 +507,7 @@ fn walk_dir_parallel(
         }
         let canon = canon_result.ok().map(normalize_macos_path);
         let key = canon.clone().unwrap_or_else(|| orig.clone());
-        let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
-        if !vis.insert(key.clone()) {
+        if !visited.insert(key.clone()) {
             if is_network_path(dir) {
                 crate::write_app_log_verbose(format!(
                     "SCAN DEDUP SKIP — unified | orig={} | canon={} | key={}",
@@ -520,7 +519,7 @@ fn walk_dir_parallel(
             }
             return;
         }
-        vis.insert(orig);
+        visited.insert(orig);
     }
 
     if let Some(ref inc) = incremental {
@@ -568,10 +567,8 @@ fn walk_dir_parallel(
             // the user must grant access in System Settings → Privacy & Security.
             // Log once per denied root, silently skip descendants.
             if first_err.raw_os_error() == Some(1) {
-                let mut denied = tcc_denied.lock().unwrap();
-                if !denied.iter().any(|d| dir.starts_with(d)) {
-                    denied.insert(dir.to_path_buf());
-                    drop(denied);
+                if !tcc_denied.iter().any(|d| dir.starts_with(d.key())) {
+                    tcc_denied.insert(dir.to_path_buf());
                     crate::write_app_log(format!(
                         "SCAN TCC DENIED — unified | {} | {} \
                          (grant Full Disk Access or Files and Folders permission)",

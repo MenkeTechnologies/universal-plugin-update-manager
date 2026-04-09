@@ -2351,20 +2351,12 @@ async fn pdf_metadata_extract_batch(
         let mut extracted = 0usize;
         for chunk in paths.chunks(CHUNK) {
             let pairs = pdf_meta::extract_pages_batch(chunk);
-            // Build batch including None markers for files that failed to parse
-            let extracted_set: std::collections::HashSet<&String> =
-                pairs.iter().map(|(p, _)| p).collect();
+            // Build a HashMap for O(1) lookup instead of O(n) linear scan per element
+            let pairs_map: std::collections::HashMap<&String, u32> =
+                pairs.iter().map(|(p, n)| (p, *n)).collect();
             let mut rows: Vec<(String, Option<u32>)> = Vec::with_capacity(chunk.len());
             for p in chunk {
-                let found = pairs.iter().find(|(pp, _)| pp == p).map(|(_, n)| *n);
-                rows.push((
-                    p.clone(),
-                    if extracted_set.contains(p) {
-                        found
-                    } else {
-                        None
-                    },
-                ));
+                rows.push((p.clone(), pairs_map.get(p).copied()));
             }
             let _ = db::global().save_pdf_metadata(&rows);
             extracted += pairs.len();

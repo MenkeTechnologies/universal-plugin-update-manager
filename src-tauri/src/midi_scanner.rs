@@ -8,6 +8,7 @@ use crate::history::MidiFile;
 use crate::scanner_skip_dirs::SCANNER_SKIP_DIRS as SKIP_DIRS;
 use crate::unified_walker::IncrementalDirState;
 use rayon::prelude::*;
+use dashmap::DashSet;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -62,7 +63,7 @@ pub fn walk_for_midi(
     let found = Arc::new(AtomicUsize::new(0));
     let active = active_dirs.unwrap_or_else(|| Arc::new(Mutex::new(Vec::new())));
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<MidiFile>>(256);
-    let visited = Arc::new(Mutex::new(HashSet::new()));
+    let visited = Arc::new(DashSet::new());
     let exclude = Arc::new(exclude.unwrap_or_default());
 
     let roots_owned: Vec<PathBuf> = roots.to_vec();
@@ -120,7 +121,7 @@ fn walk_dir_parallel(
     dir: &Path,
     depth: u32,
     parent_dev: Option<u64>,
-    visited: &Arc<Mutex<HashSet<PathBuf>>>,
+    visited: &Arc<DashSet<PathBuf>>,
     tx: &std::sync::mpsc::SyncSender<Vec<MidiFile>>,
     found: &Arc<AtomicUsize>,
     batch_size: usize,
@@ -162,14 +163,13 @@ fn walk_dir_parallel(
     let current_dev: Option<u64> = None;
     let _ = parent_dev;
 
-    // Canonicalize OUTSIDE the mutex — it's a syscall (network roundtrip on
+    // Canonicalize outside the lock-free set — it's a syscall (network roundtrip on
     // SMB) and must not block other workers while in flight.
     {
         let orig = normalize_macos_path(dir.to_path_buf());
         let canon = fs::canonicalize(dir).ok().map(normalize_macos_path);
         let key = canon.clone().unwrap_or_else(|| orig.clone());
-        let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
-        if !vis.insert(key.clone()) {
+        if !visited.insert(key.clone()) {
             // Dedup hit — already visited via another path. Log if this is
             // something the user might care about (network mounts, /mnt).
             let s = dir.to_string_lossy();
@@ -186,7 +186,7 @@ fn walk_dir_parallel(
             }
             return;
         }
-        vis.insert(orig);
+        visited.insert(orig);
     }
 
     if let Some(ref inc) = incremental {

@@ -23,6 +23,7 @@ fn normalize_macos_path(p: std::path::PathBuf) -> std::path::PathBuf {
     p
 }
 use rayon::prelude::*;
+use dashmap::DashSet;
 use std::collections::HashSet;
 use std::fs;
 use std::io::Read;
@@ -100,7 +101,7 @@ pub fn walk_for_audio(
     let found = Arc::new(AtomicUsize::new(0));
     let active = active_dirs.unwrap_or_else(|| Arc::new(Mutex::new(Vec::new())));
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<AudioSample>>(256);
-    let visited = Arc::new(Mutex::new(HashSet::new()));
+    let visited = Arc::new(DashSet::new());
     let exclude = Arc::new(exclude.unwrap_or_default());
 
     // Dedicated pool — limit threads to avoid FD exhaustion with parallel scans
@@ -158,7 +159,7 @@ pub fn walk_for_audio(
 fn walk_dir_parallel(
     dir: &Path,
     depth: u32,
-    visited: &Arc<Mutex<HashSet<PathBuf>>>,
+    visited: &Arc<DashSet<PathBuf>>,
     tx: &std::sync::mpsc::SyncSender<Vec<AudioSample>>,
     found: &Arc<AtomicUsize>,
     batch_size: usize,
@@ -172,14 +173,13 @@ fn walk_dir_parallel(
     }
 
     {
-        let mut vis = visited.lock().unwrap_or_else(|e| e.into_inner());
         let orig = normalize_macos_path(dir.to_path_buf());
         let canon = fs::canonicalize(dir).ok().map(normalize_macos_path);
         let key = canon.unwrap_or_else(|| orig.clone());
-        if !vis.insert(key) {
+        if !visited.insert(key) {
             return;
         }
-        vis.insert(orig);
+        visited.insert(orig);
     }
 
     if let Some(ref inc) = incremental {

@@ -29,6 +29,44 @@ static ARCH_SUFFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\s*[\(\[](x64|x86_64|x86|arm64|aarch64|64[- ]?bit|32[- ]?bit|intel|apple silicon|universal|stereo|mono|vst3?|au|aax)[\)\]]$").unwrap()
 });
 
+// ── Ableton .als regexes (compiled once) ──
+
+static ALS_VST2_BLOCK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<VstPluginInfo[^>]*>[\s\S]*?</VstPluginInfo>"#).unwrap());
+static ALS_VST2_NAME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<PlugName\s+Value="([^"]+)""#).unwrap());
+static ALS_VST2_MFG_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<Manufacturer\s+Value="([^"]+)""#).unwrap());
+static ALS_VST3_BLOCK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<Vst3PluginInfo[^>]*>[\s\S]*?</Vst3PluginInfo>"#).unwrap());
+static ALS_VST3_NAME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<Name\s+Value="([^"]+)""#).unwrap());
+static ALS_VST3_MFG_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<DeviceCreator\s+Value="([^"]+)""#).unwrap());
+static ALS_AU_BLOCK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<AuPluginInfo[^>]*>[\s\S]*?</AuPluginInfo>"#).unwrap());
+static ALS_AU_NAME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<Name\s+Value="([^"]+)""#).unwrap());
+static ALS_AU_MFG_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<Manufacturer\s+Value="([^"]+)""#).unwrap());
+
+// ── REAPER .rpp regex (compiled once) ──
+
+static RPP_PLUGIN_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<(?:VST|AU|CLAP)\s+"(VST3?|AU|CLAP):\s*(.+?)\s*(?:\(([^)]+)\))?\s*""#).unwrap()
+});
+
+// ── Studio One / DAWproject XML regexes (compiled once) ──
+
+static XML_PLUG_NAME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"plugName="([^"]+)""#).unwrap());
+static XML_DEVICE_NAME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"deviceName="([^"]+)""#).unwrap());
+static XML_LABEL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"label="([^"]+)""#).unwrap());
+static XML_PLUGIN_NAME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<Plugin\s+name="([^"]+)""#).unwrap());
+
 /// Normalize a plugin name for matching: lowercase, strip arch suffixes,
 /// collapse whitespace, trim.
 pub fn normalize_plugin_name(name: &str) -> String {
@@ -120,18 +158,14 @@ fn parse_ableton(path: &Path) -> Vec<PluginRef> {
     let mut plugins = Vec::new();
 
     // VST2 plugins: <VstPluginInfo> ... <PlugName Value="X"/> ... <Manufacturer Value="Y"/>
-    let vst2_re = Regex::new(r#"<VstPluginInfo[^>]*>[\s\S]*?</VstPluginInfo>"#).unwrap();
-    let vst2_name_re = Regex::new(r#"<PlugName\s+Value="([^"]+)""#).unwrap();
-    let vst2_mfg_re = Regex::new(r#"<Manufacturer\s+Value="([^"]+)""#).unwrap();
-
-    for block in vst2_re.find_iter(&xml) {
+    for block in ALS_VST2_BLOCK_RE.find_iter(&xml) {
         let text = block.as_str();
-        let name = vst2_name_re
+        let name = ALS_VST2_NAME_RE
             .captures(text)
             .and_then(|c| c.get(1))
             .map(|m| m.as_str().to_string())
             .unwrap_or_default();
-        let mfg = vst2_mfg_re
+        let mfg = ALS_VST2_MFG_RE
             .captures(text)
             .and_then(|c| c.get(1))
             .map(|m| m.as_str().to_string())
@@ -148,18 +182,14 @@ fn parse_ableton(path: &Path) -> Vec<PluginRef> {
     }
 
     // VST3 plugins: <Vst3PluginInfo> ... <Name Value="X"/> ... <DeviceCreator Value="Y"/>
-    let vst3_re = Regex::new(r#"<Vst3PluginInfo[^>]*>[\s\S]*?</Vst3PluginInfo>"#).unwrap();
-    let vst3_name_re = Regex::new(r#"<Name\s+Value="([^"]+)""#).unwrap();
-    let vst3_mfg_re = Regex::new(r#"<DeviceCreator\s+Value="([^"]+)""#).unwrap();
-
-    for block in vst3_re.find_iter(&xml) {
+    for block in ALS_VST3_BLOCK_RE.find_iter(&xml) {
         let text = block.as_str();
-        let name = vst3_name_re
+        let name = ALS_VST3_NAME_RE
             .captures(text)
             .and_then(|c| c.get(1))
             .map(|m| m.as_str().to_string())
             .unwrap_or_default();
-        let mfg = vst3_mfg_re
+        let mfg = ALS_VST3_MFG_RE
             .captures(text)
             .and_then(|c| c.get(1))
             .map(|m| m.as_str().to_string())
@@ -176,18 +206,14 @@ fn parse_ableton(path: &Path) -> Vec<PluginRef> {
     }
 
     // AU plugins: <AuPluginInfo> ... <Name Value="X"/> ... <Manufacturer Value="Y"/>
-    let au_re = Regex::new(r#"<AuPluginInfo[^>]*>[\s\S]*?</AuPluginInfo>"#).unwrap();
-    let au_name_re = Regex::new(r#"<Name\s+Value="([^"]+)""#).unwrap();
-    let au_mfg_re = Regex::new(r#"<Manufacturer\s+Value="([^"]+)""#).unwrap();
-
-    for block in au_re.find_iter(&xml) {
+    for block in ALS_AU_BLOCK_RE.find_iter(&xml) {
         let text = block.as_str();
-        let name = au_name_re
+        let name = ALS_AU_NAME_RE
             .captures(text)
             .and_then(|c| c.get(1))
             .map(|m| m.as_str().to_string())
             .unwrap_or_default();
-        let mfg = au_mfg_re
+        let mfg = ALS_AU_MFG_RE
             .captures(text)
             .and_then(|c| c.get(1))
             .map(|m| m.as_str().to_string())
@@ -222,10 +248,7 @@ fn parse_reaper(path: &Path) -> Vec<PluginRef> {
     let mut plugins = Vec::new();
 
     // Match <VST "VST: Name (Mfg)" or <VST "VST3: Name (Mfg)" or <AU "AU: Name (Mfg)"
-    let re = Regex::new(r#"<(?:VST|AU|CLAP)\s+"(VST3?|AU|CLAP):\s*(.+?)\s*(?:\(([^)]+)\))?\s*""#)
-        .unwrap();
-
-    for cap in re.captures_iter(&text) {
+    for cap in RPP_PLUGIN_RE.captures_iter(&text) {
         let ptype = cap.get(1).map(|m| m.as_str()).unwrap_or("VST2");
         let name = cap
             .get(2)
@@ -295,9 +318,9 @@ fn parse_studio_one(path: &Path) -> Vec<PluginRef> {
     extract_plugins_from_xml(
         &all_xml,
         &[
-            (r#"plugName="([^"]+)""#, "", "VST"),
-            (r#"deviceName="([^"]+)""#, "", "VST"),
-            (r#"label="([^"]+)""#, "", "VST"),
+            (&XML_PLUG_NAME_RE, "", "VST"),
+            (&XML_DEVICE_NAME_RE, "", "VST"),
+            (&XML_LABEL_RE, "", "VST"),
         ],
     )
 }
@@ -323,8 +346,8 @@ fn parse_dawproject(path: &Path) -> Vec<PluginRef> {
     extract_plugins_from_xml(
         &xml,
         &[
-            (r#"<Plugin\s+name="([^"]+)""#, "", "VST"),
-            (r#"deviceName="([^"]+)""#, "", "VST"),
+            (&XML_PLUGIN_NAME_RE, "", "VST"),
+            (&XML_DEVICE_NAME_RE, "", "VST"),
         ],
     )
 }
@@ -648,28 +671,26 @@ fn parse_reason(path: &Path) -> Vec<PluginRef> {
 
 // ── Shared extraction helpers ──
 
-/// Extract plugin names from XML using regex patterns.
-fn extract_plugins_from_xml(xml: &str, patterns: &[(&str, &str, &str)]) -> Vec<PluginRef> {
+/// Extract plugin names from XML using pre-compiled regex patterns.
+fn extract_plugins_from_xml(xml: &str, patterns: &[(&Regex, &str, &str)]) -> Vec<PluginRef> {
     let mut plugins = Vec::new();
-    for &(pattern, manufacturer_default, type_default) in patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            for cap in re.captures_iter(xml) {
-                if let Some(name) = cap.get(1) {
-                    let n = name.as_str().trim();
-                    if n.is_empty() || n.len() < 2 {
-                        continue;
-                    }
-                    let normalized = normalize_plugin_name(n);
-                    if normalized.is_empty() {
-                        continue;
-                    }
-                    plugins.push(PluginRef {
-                        name: n.to_string(),
-                        normalized_name: normalized,
-                        manufacturer: manufacturer_default.to_string(),
-                        plugin_type: type_default.to_string(),
-                    });
+    for &(re, manufacturer_default, type_default) in patterns {
+        for cap in re.captures_iter(xml) {
+            if let Some(name) = cap.get(1) {
+                let n = name.as_str().trim();
+                if n.is_empty() || n.len() < 2 {
+                    continue;
                 }
+                let normalized = normalize_plugin_name(n);
+                if normalized.is_empty() {
+                    continue;
+                }
+                plugins.push(PluginRef {
+                    name: n.to_string(),
+                    normalized_name: normalized,
+                    manufacturer: manufacturer_default.to_string(),
+                    plugin_type: type_default.to_string(),
+                });
             }
         }
     }
@@ -1375,7 +1396,8 @@ mod tests {
     fn test_extract_plugins_from_xml_regex_capture() {
         // Avoid attributes like deviceName= — substring `name="` would match inside it first
         let xml = r#"<Plugin name="Serum" />"#;
-        let patterns = &[(r#"name="([^"]+)""#, "Xfer Records", "VST3")];
+        let re = Regex::new(r#"name="([^"]+)""#).unwrap();
+        let patterns: &[(&Regex, &str, &str)] = &[(&re, "Xfer Records", "VST3")];
         let refs = extract_plugins_from_xml(xml, patterns);
         assert_eq!(refs.len(), 1);
         assert_eq!(refs[0].name, "Serum");
@@ -1386,7 +1408,8 @@ mod tests {
     #[test]
     fn test_extract_plugins_from_xml_skips_single_char_name() {
         let xml = r#"<x name="X" />"#;
-        let patterns = &[(r#"name="([^"]+)""#, "Co", "VST3")];
+        let re = Regex::new(r#"name="([^"]+)""#).unwrap();
+        let patterns: &[(&Regex, &str, &str)] = &[(&re, "Co", "VST3")];
         assert!(
             extract_plugins_from_xml(xml, patterns).is_empty(),
             "stem length < 2 must be skipped"
