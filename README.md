@@ -433,7 +433,7 @@ src-tauri/
     daw_scanner.rs     -- DAW project scanner (14+ formats)
     preset_scanner.rs  -- Plugin preset discovery
     similarity.rs      -- Audio similarity search via spectral fingerprinting
-    xref.rs            -- Plugin ↔ DAW cross-reference engine (11 DAW formats)
+    xref.rs            -- Plugin ↔ DAW cross-reference engine (11 DAW formats; unit tests include a per-extension synthetic fixture matrix with exact deduped plugin counts)
     db.rs              -- SQLite database layer (paginated queries, 6M+ sample scale)
     file_watcher.rs    -- Filesystem watcher for auto-scan; debounced `file-watcher-change` with per-category subtree roots
     history.rs         -- Scan history persistence + diff engine

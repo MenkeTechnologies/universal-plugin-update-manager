@@ -1998,6 +1998,156 @@ mod tests {
         assert_eq!(once, twice);
     }
 
+    /// Minimal synthetic fixture per supported extension: exact unique plugin count after
+    /// `extract_plugins` dedup (normalized name + type). Guards drift in format parsers.
+    #[test]
+    fn test_extract_plugins_count_matrix_all_daw_extensions() {
+        let td = std::env::temp_dir();
+
+        // ── Ableton .als (gzip XML, one VST3 block) → 1
+        let als_path = td.join("xref_matrix_count.als");
+        {
+            let xml = r#"<Ableton><Vst3PluginInfo><Name Value="MatrixALS" /><DeviceCreator Value="M" /></Vst3PluginInfo></Ableton>"#;
+            let f = fs::File::create(&als_path).unwrap();
+            let mut enc = GzEncoder::new(f, Compression::default());
+            enc.write_all(xml.as_bytes()).unwrap();
+            enc.finish().unwrap();
+        }
+        assert_eq!(extract_plugins(als_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&als_path);
+
+        // ── REAPER .rpp / .rpp-bak → 1 each
+        let rpp_body = r#"<REAPER_PROJECT
+  <TRACK
+    <FXCHAIN
+      <VST "VST3: MatrixRPP (X)" "{ABCDEF}" 0
+      >
+    >
+  >
+>"#;
+        let rpp_path = td.join("xref_matrix_count.rpp");
+        fs::write(&rpp_path, rpp_body).unwrap();
+        assert_eq!(extract_plugins(rpp_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&rpp_path);
+
+        let rpp_bak_path = td.join("xref_matrix_count.rpp-bak");
+        fs::write(&rpp_bak_path, rpp_body).unwrap();
+        assert_eq!(extract_plugins(rpp_bak_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&rpp_bak_path);
+
+        // ── Bitwig .bwproject → 1 (single embedded DLL path)
+        let bw_path = td.join("xref_matrix_count.bwproject");
+        {
+            let mut data = b"BtWg0003".to_vec();
+            data.extend_from_slice(&[0u8; 64]);
+            data.extend_from_slice(b"C:\\VSTPlugins\\MatrixBW.dll");
+            fs::write(&bw_path, &data).unwrap();
+        }
+        assert_eq!(extract_plugins(bw_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&bw_path);
+
+        // ── Studio One .song (ZIP) → 2 distinct plugName
+        let song_path = td.join("xref_matrix_count.song");
+        {
+            use std::io::Write as _;
+            let file = fs::File::create(&song_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            zip.start_file::<_, ()>("Song/song.xml", Default::default())
+                .unwrap();
+            zip.write_all(
+                b"<Song><Insert plugName=\"MatrixS1A\"/><Insert plugName=\"MatrixS1B\"/></Song>",
+            )
+            .unwrap();
+            zip.finish().unwrap();
+        }
+        assert_eq!(extract_plugins(song_path.to_str().unwrap()).len(), 2);
+        let _ = fs::remove_file(&song_path);
+
+        // ── DAWproject → 2 (`<Plugin name=` in project.xml)
+        let dawproj_path = td.join("xref_matrix_count.dawproject");
+        {
+            use std::io::Write as _;
+            let file = fs::File::create(&dawproj_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            zip.start_file::<_, ()>("project.xml", Default::default())
+                .unwrap();
+            zip.write_all(
+                br#"<Project><Plugin name="MatrixDJP1" deviceName="A"/><Plugin name="MatrixDJP2" deviceName="B"/></Project>"#,
+            )
+            .unwrap();
+            zip.finish().unwrap();
+        }
+        assert_eq!(extract_plugins(dawproj_path.to_str().unwrap()).len(), 2);
+        let _ = fs::remove_file(&dawproj_path);
+
+        // ── FL Studio .flp → 1 (single plugin path in binary; pad to reduce UTF-16 false positives)
+        let flp_path = td.join("xref_matrix_count.flp");
+        {
+            let mut data = vec![0u8; 80];
+            data.extend_from_slice(b"/Library/Audio/Plug-Ins/VST3/MatrixFLP.vst3");
+            data.resize(4000, 0u8);
+            fs::write(&flp_path, &data).unwrap();
+        }
+        assert_eq!(extract_plugins(flp_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&flp_path);
+
+        // ── Logic .logicx (package dir + ProjectData) → 1
+        let logic_path = td.join("xref_matrix_count.logicx");
+        {
+            let _ = fs::remove_dir_all(&logic_path);
+            fs::create_dir_all(&logic_path).unwrap();
+            let mut pd = vec![0u8; 16];
+            pd.extend_from_slice(
+                b"/Library/Audio/Plug-Ins/Components/MatrixLogicAU.component",
+            );
+            fs::write(logic_path.join("ProjectData"), &pd).unwrap();
+        }
+        assert_eq!(extract_plugins(logic_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_dir_all(&logic_path);
+
+        // ── Cubase .cpr / Nuendo .npr → 1 (single Plugin Name marker; same bytes)
+        let mut cpr_data = vec![0u8; 8];
+        cpr_data.extend_from_slice(b"Plugin Name");
+        cpr_data.push(0);
+        cpr_data.extend_from_slice(b"MatrixCPR");
+        let cpr_path = td.join("xref_matrix_count.cpr");
+        fs::write(&cpr_path, &cpr_data).unwrap();
+        assert_eq!(extract_plugins(cpr_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&cpr_path);
+
+        let npr_path = td.join("xref_matrix_count.npr");
+        fs::write(&npr_path, &cpr_data).unwrap();
+        assert_eq!(extract_plugins(npr_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&npr_path);
+
+        // ── Pro Tools .ptx / .ptf → 1 each (same binary: one .aaxplugin path)
+        let mut pt_data = vec![0u8; 16];
+        pt_data.extend_from_slice(
+            b"/Library/Application Support/Avid/Audio/Plug-Ins/MatrixPT.aaxplugin",
+        );
+        let ptx_path = td.join("xref_matrix_count.ptx");
+        fs::write(&ptx_path, &pt_data).unwrap();
+        assert_eq!(extract_plugins(ptx_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&ptx_path);
+
+        let ptf_path = td.join("xref_matrix_count.ptf");
+        fs::write(&ptf_path, &pt_data).unwrap();
+        assert_eq!(extract_plugins(ptf_path.to_str().unwrap()).len(), 1);
+        let _ = fs::remove_file(&ptf_path);
+
+        // ── Reason .reason → 2 (two distinct plugin paths)
+        let reason_path = td.join("xref_matrix_count.reason");
+        {
+            let mut data = vec![0u8; 12];
+            data.extend_from_slice(b"C:\\VST\\MatrixReasonA.dll");
+            data.extend_from_slice(&[0u8; 40]);
+            data.extend_from_slice(b"/Library/Audio/Plug-Ins/VST3/MatrixReasonB.vst3");
+            fs::write(&reason_path, &data).unwrap();
+        }
+        assert_eq!(extract_plugins(reason_path.to_str().unwrap()).len(), 2);
+        let _ = fs::remove_file(&reason_path);
+    }
+
     // ── Real file tests (ignored, run manually) ──
 
     #[test]
