@@ -56,7 +56,6 @@ const PRESET_EXTS: &[&str] = &[
     "clap-preset",
     "tfx",
     "h2p",
-    "tfx",
 ];
 
 /// Plugin extensions.

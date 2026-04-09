@@ -52,6 +52,23 @@ function updateSmartPlaylistRules(id, rules) {
 }
 
 // ── Rule Matching ──
+/** Parses `min-max` BPM bounds; optional leading minus on either side. Returns null if invalid. */
+function parseBpmRange(ruleValue) {
+    const s = String(ruleValue ?? '').trim();
+    if (!s) return null;
+    const m = /^(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)$/.exec(s);
+    if (!m) return null;
+    let min = Number(m[1]);
+    let max = Number(m[2]);
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+    if (min > max) {
+        const t = min;
+        min = max;
+        max = t;
+    }
+    return { min, max };
+}
+
 function matchesSmartRule(sample, rule) {
     switch (rule.type) {
         case 'format': {
@@ -61,8 +78,11 @@ function matchesSmartRule(sample, rule) {
         case 'bpm_range': {
             const bpm = typeof _bpmCache !== 'undefined' ? _bpmCache[sample.path] : null;
             if (!bpm) return false;
-            const [min, max] = (rule.value || '0-999').split('-').map(Number);
-            return bpm >= min && bpm <= max;
+            const raw =
+                rule.value != null && String(rule.value).trim() !== '' ? String(rule.value).trim() : '0-999';
+            const range = parseBpmRange(raw);
+            if (!range) return false;
+            return bpm >= range.min && bpm <= range.max;
         }
         case 'tag': {
             if (typeof getNote !== 'function') return false;

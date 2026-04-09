@@ -4107,12 +4107,17 @@ document.getElementById('npHistoryList')?.addEventListener('click', (e) => {
 
 // ── Previous / Next / Shuffle ──
 function prevTrack() {
-    if (recentlyPlayed.length < 2) return;
     const hadExpanded = expandedMetaPath !== null;
-    // Find current in recently played, go to next older one
-    const idx = recentlyPlayed.findIndex(r => r.path === audioPlayerPath);
-    const nextIdx = idx >= 0 && idx < recentlyPlayed.length - 1 ? idx + 1 : 0;
-    const prevPath = recentlyPlayed[nextIdx].path;
+    let prevPath = null;
+    if (audioShuffling) {
+        if (filteredAudioSamples.length === 0) return;
+        prevPath = filteredAudioSamples[Math.floor(Math.random() * filteredAudioSamples.length)].path;
+    } else {
+        if (filteredAudioSamples.length === 0) return;
+        const idx = filteredAudioSamples.findIndex(s => s.path === audioPlayerPath);
+        const prevIdx = idx <= 0 ? filteredAudioSamples.length - 1 : idx - 1;
+        prevPath = filteredAudioSamples[prevIdx].path;
+    }
     void (async () => {
         await previewAudio(prevPath);
         if (hadExpanded) await expandMetaForPath(prevPath);
@@ -4128,9 +4133,9 @@ function nextTrack() {
         nextPath = filteredAudioSamples[Math.floor(Math.random() * filteredAudioSamples.length)].path;
     } else {
         // Next in filtered list after current
+        if (filteredAudioSamples.length === 0) return;
         const idx = filteredAudioSamples.findIndex(s => s.path === audioPlayerPath);
         const nextIdx = (idx + 1) % filteredAudioSamples.length;
-        if (filteredAudioSamples.length === 0) return;
         nextPath = filteredAudioSamples[nextIdx].path;
     }
     void (async () => {

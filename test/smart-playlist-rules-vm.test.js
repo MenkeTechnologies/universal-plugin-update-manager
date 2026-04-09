@@ -48,6 +48,13 @@ describe('frontend/js/smart-playlists.js matchesSmartRule / evaluateSmartPlaylis
     assert.strictEqual(U.matchesSmartRule(s, { type: 'bpm_range', value: '130-200' }), false);
   });
 
+  it('bpm_range: reversed endpoints and spaces are accepted; malformed range rejects', () => {
+    const s = U.allAudioSamples[0];
+    assert.strictEqual(U.matchesSmartRule(s, { type: 'bpm_range', value: '120-100' }), true);
+    assert.strictEqual(U.matchesSmartRule(s, { type: 'bpm_range', value: '100 - 120' }), true);
+    assert.strictEqual(U.matchesSmartRule(s, { type: 'bpm_range', value: '10-20-30' }), false);
+  });
+
   it('bpm_range: no cache misses', () => {
     const s = { path: '/none.wav', name: 'x', format: 'WAV', sizeBytes: 100 };
     assert.strictEqual(U.matchesSmartRule(s, { type: 'bpm_range', value: '0-999' }), false);
