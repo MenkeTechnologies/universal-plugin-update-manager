@@ -86,7 +86,9 @@ function getAeAudioEngineInvoke() {
 function aeStartProcessStatsPollingOnce() {
     if (aeProcStatsInterval != null) return;
     aeProcStatsInterval = setInterval(() => {
-        if (aeAudioEngineTabIsActive()) void refreshAeProcessStats();
+        if (!aeAudioEngineTabIsActive()) return;
+        if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return;
+        void refreshAeProcessStats();
     }, 3000);
 }
 
@@ -181,6 +183,10 @@ async function tickAeInputPeakPoll() {
         stopAeInputPeakPoll();
         return;
     }
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) {
+        stopAeInputPeakPoll();
+        return;
+    }
     if (typeof document !== 'undefined' && document.hidden) {
         stopAeInputPeakPoll();
         return;
@@ -213,6 +219,7 @@ async function tickAeInputPeakPoll() {
 /** When the tab was already initialized, re-sync input line + peak poll (e.g. user left tab and returned). */
 async function resumeAeInputPeakPollIfNeeded() {
     if (!aeAudioEngineTabIsActive()) return;
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return;
     if (typeof document !== 'undefined' && document.hidden) return;
     syncAePlaybackControlsFromPrefs();
     const inv = getAeAudioEngineInvoke();
@@ -233,6 +240,14 @@ function bindAeInputPeakVisibilityOnce() {
     if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
+            stopAeInputPeakPoll();
+        } else {
+            void resumeAeInputPeakPollIfNeeded();
+        }
+    });
+    document.addEventListener('ui-idle-heavy-cpu', (e) => {
+        const idle = e.detail && e.detail.idle;
+        if (idle) {
             stopAeInputPeakPoll();
         } else {
             void resumeAeInputPeakPollIfNeeded();
@@ -2323,12 +2338,23 @@ let _enginePlaybackPollTimer = null;
 let _enginePlaybackPollSessionActive = false;
 
 /** @type {boolean} */
-let _enginePlaybackVisibilityHooked = false;
+let _enginePlaybackIdleHooked = false;
 
 /**
- * Host EOF watchdog runs only while **`document.hidden`** so foreground playback does not double
- * `playback_status` IPC. When hidden, the WebView **`setInterval`** is paused so only this host path
- * (and not both) hits the engine.
+ * True when the WebView should not run the **`playback_status`** **`setInterval`** — hidden tab,
+ * unfocused window, minimized, etc. (`isUiIdleHeavyCpu` in **`ui-idle.js`**). Host EOF watchdog covers
+ * EOF while idle so the engine is not polled twice.
+ */
+function shouldDeferPlaybackPollToHostWatchdog() {
+    if (typeof window.isUiIdleHeavyCpu === 'function') {
+        return window.isUiIdleHeavyCpu();
+    }
+    return typeof document !== 'undefined' && document.hidden;
+}
+
+/**
+ * Host EOF watchdog runs while **`shouldDeferPlaybackPollToHostWatchdog()`** so foreground-focused
+ * playback does not double `playback_status` IPC with the WebView poll.
  */
 function syncEnginePlaybackEofWatchdog() {
     if (!_enginePlaybackPollSessionActive) {
@@ -2339,7 +2365,7 @@ function syncEnginePlaybackEofWatchdog() {
         if (!u) {
             return;
         }
-        if (typeof document !== 'undefined' && document.hidden) {
+        if (shouldDeferPlaybackPollToHostWatchdog()) {
             if (typeof u.audioEngineEofWatchdogStart === 'function') {
                 void u.audioEngineEofWatchdogStart().catch(() => {});
             }
@@ -2351,14 +2377,11 @@ function syncEnginePlaybackEofWatchdog() {
     }
 }
 
-function onEnginePlaybackDocumentVisibilityChange() {
+function syncEnginePlaybackPollForUiIdle() {
     if (!_enginePlaybackPollSessionActive) {
         return;
     }
-    if (typeof document === 'undefined') {
-        return;
-    }
-    if (document.hidden) {
+    if (shouldDeferPlaybackPollToHostWatchdog()) {
         if (_enginePlaybackPollTimer != null) {
             clearInterval(_enginePlaybackPollTimer);
             _enginePlaybackPollTimer = null;
@@ -2448,12 +2471,13 @@ async function runEnginePlaybackStatusTick() {
 function startEnginePlaybackPoll() {
     stopEnginePlaybackPoll();
     _enginePlaybackPollSessionActive = true;
-    if (typeof document !== 'undefined' && !_enginePlaybackVisibilityHooked) {
-        _enginePlaybackVisibilityHooked = true;
-        document.addEventListener('visibilitychange', onEnginePlaybackDocumentVisibilityChange);
+    if (typeof document !== 'undefined' && !_enginePlaybackIdleHooked) {
+        _enginePlaybackIdleHooked = true;
+        document.addEventListener('visibilitychange', syncEnginePlaybackPollForUiIdle);
+        document.addEventListener('ui-idle-heavy-cpu', syncEnginePlaybackPollForUiIdle);
     }
     void runEnginePlaybackStatusTick();
-    if (typeof document !== 'undefined' && document.hidden) {
+    if (shouldDeferPlaybackPollToHostWatchdog()) {
         syncEnginePlaybackEofWatchdog();
     } else {
         _enginePlaybackPollTimer = setInterval(() => void runEnginePlaybackStatusTick(), ENGINE_PLAYBACK_POLL_MS);

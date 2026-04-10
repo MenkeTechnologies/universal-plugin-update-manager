@@ -1,9 +1,10 @@
 /**
- * Hybrid “heavy UI idle” detection: Page Visibility (`document.hidden`) plus Tauri
- * `WebviewWindow` focus / minimize / visible when available.
+ * Hybrid “heavy UI idle” detection: Page Visibility (`document.hidden`), **`document.hasFocus()`**
+ * (desktop WebViews often keep `document.hidden` false when another app is foreground), **`window`**
+ * **blur/focus**, plus Tauri `WebviewWindow` focus / minimize / visible when available.
  *
- * Paused work is rAF-driven visualization only — background BPM/Key/LUFS analysis (`startBackgroundAnalysis`
- * in `audio.js`) is unrelated and keeps running.
+ * Paused work is rAF-driven visualization and idle-gated **`playback_status`** polling — background
+ * BPM/Key/LUFS analysis (`startBackgroundAnalysis` in `audio.js`) is unrelated and keeps running.
  */
 (function initUiIdleHeavyCpu() {
     let docHidden = typeof document !== 'undefined' && document.hidden;
@@ -12,7 +13,11 @@
     let winVisible = true;
 
     function recompute() {
-        return docHidden || !winFocused || winMinimized || !winVisible;
+        const noDocFocus =
+            typeof document !== 'undefined' &&
+            typeof document.hasFocus === 'function' &&
+            !document.hasFocus();
+        return docHidden || !winFocused || winMinimized || !winVisible || noDocFocus;
     }
 
     let idle = recompute();
@@ -40,6 +45,11 @@
             docHidden = document.hidden;
             setState();
         });
+    }
+
+    if (typeof window !== 'undefined') {
+        window.addEventListener('blur', () => setState());
+        window.addEventListener('focus', () => setState());
     }
 
     function syncFromTauriWindow(win) {

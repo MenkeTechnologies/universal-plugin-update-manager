@@ -82,8 +82,9 @@ static ENGINE_CHILD_PID: AtomicU32 = AtomicU32::new(0);
 /// `audio-engine-playback-eof` on the same EOF edge as the UI poll.
 static EOF_WATCHDOG_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-/// Host EOF thread is only started when **`document.hidden`** (JS pauses the WebView poll). ~1 Hz keeps
-/// background CPU down; foreground is unaffected because this thread is not running when visible.
+/// Host EOF thread is only started when the WebView pauses its poll (**`isUiIdleHeavyCpu`** — hidden,
+/// unfocused, minimized, etc.). ~1 Hz keeps background CPU down; foreground-focused playback does not
+/// run this thread.
 const EOF_WATCHDOG_POLL_MS: u64 = 1000;
 
 #[inline]
