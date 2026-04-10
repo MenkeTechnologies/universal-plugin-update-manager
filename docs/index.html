@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="AUDIO_HAXOR developer documentation hub: Rust app_lib API (rustdoc), tests, tray WebView, playback IPC. Release version in package.json / tauri.conf.json.">
+  <meta name="description" content="AUDIO_HAXOR developer docs: rustdoc app_lib, IPC bridge, i18n, command palette, keyboard shortcuts, tray WebView, playback. Version in package.json / tauri.conf.json.">
   <title>AUDIO_HAXOR — Documentation</title>
   <style>
     :root {
@@ -82,6 +82,37 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
     </div>
 
     <div class="card">
+      <h2>Main window IPC &amp; i18n</h2>
+      <p><code>frontend/js/ipc.js</code> is the Tauri bridge (replaces an Electron-style preload):</p>
+      <ul>
+        <li><strong><code>window.vstUpdater</code>:</strong> wraps <code>invoke</code> for DB queries, prefs, scans, PDF/MIDI helpers, <code>audio_engine_invoke</code> (subprocess audio engine JSON API — UI in <code>frontend/js/audio-engine.js</code> + <code>frontend/js/audio.js</code>), and palette search (<code>db_query_palette_preview</code>).</li>
+        <li><strong>Strings:</strong> startup <code>get_app_strings</code> fills <code>window.__appStr</code>; <code>appFmt</code> / <code>toastFmt</code> for UI and toasts. <code>reloadAppStrings(locale)</code> reloads maps, reapplies i18n, invalidates the command palette static cache, refreshes the native menu (<code>refresh_native_menu</code>), and re-syncs tray now playing.</li>
+        <li><strong><code>menu-action</code> events:</strong> native menu bar and tray dispatch action IDs into the main window. Tray seek uses a single payload form <code>seek:&lt;fraction&gt;</code> (0..1) → <code>seekPlaybackToPercent</code> without a separate IPC command.</li>
+        <li><strong>Host EOF poll:</strong> <code>listen('audio-engine-playback-eof', …)</code> forwards to <code>handleEnginePlaybackEofFromPoll</code> when Rust detects end-of-file while WebView timers may be throttled — same advance behavior as the in-window playback path.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Command palette (Cmd+K)</h2>
+      <p><code>frontend/js/command-palette.js</code> — quick launcher bound by default to <strong>Cmd+K</strong> / <strong>Ctrl+K</strong> via <code>shortcuts.js</code> (<code>commandPalette</code>).</p>
+      <ul>
+        <li><strong>Static rows:</strong> jump to tabs, start/stop scans, exports/imports, transport, EQ/mono, theme/CRT, and many settings toggles. Labels use <code>appFmt</code>; shortcut hints use live <code>getShortcuts</code> + <code>formatKey</code>.</li>
+        <li><strong>Database search:</strong> with query length ≥ 2, calls <code>dbQueryPalettePreview</code> (one pooled Rust task, six capped inventory queries). Results cover plugins, audio samples, DAW projects, presets, PDFs, and MIDI files. Choosing a hit switches to the right tab and seeds that tab’s search field — the palette does not rely on in-memory paginated tables alone.</li>
+        <li><strong>Transport alignment:</strong> palette <strong>Next track</strong> / <strong>Previous track</strong> call <code>nextTrack({ respectAutoplaySource: true })</code> / <code>prevTrack({ respectAutoplaySource: true })</code>, same as the tray, menu bar, and keyboard shortcuts (see below).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Keyboard shortcuts</h2>
+      <p><code>frontend/js/shortcuts.js</code> — persisted overrides and <code>executeShortcut(id)</code> dispatch.</p>
+      <ul>
+        <li><strong>Rebinding:</strong> Settings UI lists every action in <code>SHORTCUT_LABEL_KEYS</code>; custom bindings are persisted (see that module for storage and capture UI).</li>
+        <li><strong>Scope:</strong> tab switching (plugins through audio engine), focus search, help overlay, playback (play/pause, loop, mute, volume, shuffle, A/B loop, player visibility), file ops (reveal, copy path, favorite, notes), selection, export/import current tab, dependency graph, duplicates/similar, theme, prefs, scan/stop variants, PDF metadata, fingerprint cache, BPM/key/LUFS jobs, cache clears, log verbosity, table page size, autoplay source, tag filter bar, and more.</li>
+        <li><strong>Next / Previous track keys</strong> invoke <code>nextTrack</code> / <code>prevTrack</code> with <code>respectAutoplaySource: true</code> so ordering follows <code>autoplayNextSource</code> (player history vs Samples table), not only the floating history list.</li>
+      </ul>
+    </div>
+
+    <div class="card">
       <h2>Tray popover &amp; playback IPC</h2>
       <p>High level (details in source comments):</p>
       <ul>
@@ -90,6 +121,8 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
         <li><strong>Previous / Next:</strong> Snake-case menu IDs <code>prev_track</code> / <code>next_track</code> (tray popover, native menu bar, <code>tray_prev</code> / <code>tray_next</code>) call <code>prevTrack</code> / <code>nextTrack</code> with <code>respectAutoplaySource: true</code> so the list follows <code>autoplayNextSource</code> (player history vs visible Samples table). Floating player buttons use camelCase actions and stay on the history list only.</li>
         <li><strong>Autoplay next (on/off):</strong> Gates end-of-track and <strong>failed-preview</strong> auto-advance (<code>tryPreviewAutoplayNextOnFailureAsync</code> in <code>previewAudio</code>) along the same list as EOF (<code>autoplayNextSource</code>), after an error toast; can chain across multiple bad files. Does not gate manual prev/next from tray/menu/shortcuts.</li>
         <li><strong>Tray mirror:</strong> The popover has no separate queue — it reflects the main window via <code>syncTrayNowPlayingFromPlayback</code> after the current path updates.</li>
+        <li><strong>Tray seek:</strong> Popover scrubber sends <code>menu-action</code> with payload <code>seek:&lt;fraction&gt;</code>; see IPC section above.</li>
+        <li><strong>HUD subtitle:</strong> <code>syncTrayNowPlayingFromPlayback</code> clears a redundant subtitle when <code>#npMetaLine</code> would duplicate the track title (e.g. basename-only path matching the displayed name).</li>
       </ul>
     </div>
 
