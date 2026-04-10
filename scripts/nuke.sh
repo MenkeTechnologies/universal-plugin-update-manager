@@ -25,8 +25,18 @@ cyber_section "REBUILD FROM SCRATCH"
 cyber_line
 echo
 START=$(date +%s)
+# On macOS we tell Tauri to build ONLY the .app (skip its own DMG creation) so the
+# audio-engine helper-app reshape can run BEFORE the DMG is built. The reshape +
+# DMG creation both happen in the postbundle step below using the vendored
+# scripts/bundle_dmg.sh, so the resulting DMG already contains the reshaped .app
+# in a single pass (no double-build, no stale rw.*.dmg mounts piling up in Finder).
+# On other platforms, "all" stays in effect (deb / rpm / nsis / msi as appropriate).
+TAURI_BUNDLE_ARGS=()
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  TAURI_BUNDLE_ARGS=(--bundles app)
+fi
 # Full log on failure (do not pipe to tail — hides beforeBuildCommand / cargo errors).
-if ! pnpm tauri build; then
+if ! pnpm tauri build "${TAURI_BUNDLE_ARGS[@]}"; then
   END=$(date +%s)
   ELAPSED=$((END - START))
   echo

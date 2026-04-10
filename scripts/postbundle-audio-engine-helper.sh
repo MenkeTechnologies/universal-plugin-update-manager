@@ -256,7 +256,7 @@ cp -R "$APP" "$DMG_STAGE/"
 # image whose path matches rw.NNNNN.AUDIO_HAXOR*.dmg, then `hdiutil detach -force`
 # the whole device. The block shape from `hdiutil info` is:
 #     ============
-#     image-path      : /…/rw.55129.AUDIO_HAXOR_1.18.20_aarch64.dmg
+#     image-path      : /…/rw.55129.AUDIO_HAXOR_<version>_aarch64.dmg
 #     image-encrypted : false
 #     ... other key:value lines ...
 #     /dev/disk4              GUID_partition_scheme
@@ -299,7 +299,7 @@ if [ ! -f "$DMG_OUT" ]; then
   echo "postbundle-audio-engine-helper: ERROR: DMG not produced at $DMG_OUT" >&2
   exit 1
 fi
-echo "postbundle-audio-engine-helper: DMG ready: $DMG_OUT ($(du -h "$DMG_OUT" | awk '{print $1}'))"
+echo "postbundle-audio-engine-helper: DMG ready: $DMG_OUT $(du -h "$DMG_OUT" | awk '{print $1}')"
 
 # Re-codesign the regenerated DMG so its signature is consistent with the inner
 # .app (Tauri does this for the original DMG; if we don't repeat it here the
@@ -309,3 +309,4 @@ codesign --force --sign - "$DMG_OUT" 2>&1 | sed 's/^/postbundle-audio-engine-hel
 install_reshaped_app_to_applications
 echo "postbundle-audio-engine-helper: helper .app installed at $HELPER_APP"
 echo "postbundle-audio-engine-helper: DMG left at $DMG_OUT (not copied to /Applications)"
+open "/Applications/AUDIO_HAXOR.app"

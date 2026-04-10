@@ -20,7 +20,15 @@ cyber_section "BUILD"
 cyber_line
 echo
 START=$(date +%s)
-pnpm tauri build 2>&1 | tail -8
+# macOS: skip Tauri's DMG bundling (--bundles app); the postbundle step below
+# creates the DMG itself AFTER the audio-engine helper-app reshape, so we get
+# a single DMG-creation pass with the reshaped .app inside. Other platforms
+# build all native bundle targets.
+TAURI_BUNDLE_ARGS=()
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  TAURI_BUNDLE_ARGS=(--bundles app)
+fi
+pnpm tauri build "${TAURI_BUNDLE_ARGS[@]}" 2>&1 | tail -8
 TAURI_RC=${PIPESTATUS[0]}
 END=$(date +%s)
 ELAPSED=$((END - START))
