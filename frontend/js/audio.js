@@ -2645,6 +2645,7 @@ async function showEngineUnplayablePreview(filePath) {
 async function previewAudio(filePath) {
     const ext = filePath.split('.').pop().toLowerCase();
     if (isEngineUnplayablePath(filePath)) {
+        if (tryPreviewAutoplayNextOnFailure(filePath)) return;
         await showEngineUnplayablePreview(filePath);
         return;
     }
@@ -2673,9 +2674,15 @@ async function previewAudio(filePath) {
                     if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
                 });
             }
+            let advancedAfterPlayFailure = false;
             await audioPlayer.play().catch(e => {
+                if (tryPreviewAutoplayNextOnFailure(filePath)) {
+                    advancedAfterPlayFailure = true;
+                    return;
+                }
                 if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
             });
+            if (advancedAfterPlayFailure) return;
         }
         updatePlayBtnStates();
         updateNowPlayingBtn();
@@ -2781,6 +2788,7 @@ async function previewAudio(filePath) {
     } catch (err) {
         setEnginePlaybackActive(false);
         if (typeof window.stopEnginePlaybackPoll === 'function') window.stopEnginePlaybackPoll();
+        if (tryPreviewAutoplayNextOnFailure(filePath)) return;
         showToast(toastFmt('toast.playback_failed', {
             ext: ext.toUpperCase(),
             err: err.message || err || 'Unknown error'
@@ -3933,6 +3941,48 @@ function canAutoplayAdvanceTrack() {
     return typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 1;
 }
 
+/**
+ * Next path after `currentPath` in the same ordering as {@link nextTrack}.
+ * @param {string} currentPath
+ * @param { { autoplay?: boolean } } [opts]
+ * @returns {string | null}
+ */
+function getAutoplayNextPathAfter(currentPath, opts) {
+    const autoplay = opts && opts.autoplay === true;
+    let items;
+    if (autoplay) {
+        const tableItems = getTablePlaybackListItems();
+        if (tableItems.length >= 2) {
+            items = tableItems;
+        } else if (typeof recentlyPlayed !== 'undefined' && Array.isArray(recentlyPlayed) && recentlyPlayed.length > 0) {
+            items = recentlyPlayed;
+        } else {
+            items = getPlayerHistoryListItems();
+        }
+    } else {
+        items = getPlayerHistoryListItems();
+    }
+    if (items.length === 0) return null;
+    if (audioShuffling) {
+        return items[Math.floor(Math.random() * items.length)].path;
+    }
+    const idx = items.findIndex(s => s.path === currentPath);
+    if (idx < 0) {
+        return items[0].path;
+    }
+    const nextIdx = (idx + 1) % items.length;
+    return items[nextIdx].path;
+}
+
+/** When autoplay-next is on, skip to the following sample after a failed preview (decode/play/unplayable). */
+function tryPreviewAutoplayNextOnFailure(failedPath) {
+    if (!canAutoplayAdvanceTrack()) return false;
+    const nextPath = getAutoplayNextPathAfter(failedPath, { autoplay: true });
+    if (!nextPath || nextPath === failedPath) return false;
+    void previewAudio(nextPath);
+    return true;
+}
+
 /** Same items/order as `#npHistoryList` (Recently Played, drag order) or search results when the player search box has text. */
 function getPlayerHistoryListItems() {
     const searchInput = document.getElementById('npSearchInput');
@@ -4217,33 +4267,8 @@ function prevTrack() {
 function nextTrack(opts) {
     const hadExpanded = expandedMetaPath !== null;
     const autoplay = opts && opts.autoplay === true;
-    let items;
-    if (autoplay) {
-        const tableItems = getTablePlaybackListItems();
-        if (tableItems.length >= 2) {
-            items = tableItems;
-        } else if (typeof recentlyPlayed !== 'undefined' && Array.isArray(recentlyPlayed) && recentlyPlayed.length > 0) {
-            items = recentlyPlayed;
-        } else {
-            items = getPlayerHistoryListItems();
-        }
-    } else {
-        items = getPlayerHistoryListItems();
-    }
-    let nextPath = null;
-    if (audioShuffling) {
-        if (items.length === 0) return;
-        nextPath = items[Math.floor(Math.random() * items.length)].path;
-    } else {
-        if (items.length === 0) return;
-        const idx = items.findIndex(s => s.path === audioPlayerPath);
-        if (idx < 0) {
-            nextPath = items[0].path;
-        } else {
-            const nextIdx = (idx + 1) % items.length;
-            nextPath = items[nextIdx].path;
-        }
-    }
+    const nextPath = getAutoplayNextPathAfter(audioPlayerPath, { autoplay });
+    if (!nextPath) return;
     void (async () => {
         await previewAudio(nextPath);
         if (hadExpanded) await expandMetaForPath(nextPath);

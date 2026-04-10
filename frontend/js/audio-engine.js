@@ -2334,81 +2334,14 @@ const ENGINE_PLAYBACK_POLL_MS = 250;
 /** @type {ReturnType<typeof setInterval> | null} */
 let _enginePlaybackPollTimer = null;
 
-/** True between **`startEnginePlaybackPoll`** and **`stopEnginePlaybackPoll`** (timer may be cleared while hidden). */
+/** True between **`startEnginePlaybackPoll`** and **`stopEnginePlaybackPoll`**. */
 let _enginePlaybackPollSessionActive = false;
-
-/** @type {boolean} */
-let _enginePlaybackIdleHooked = false;
-
-/**
- * True when the WebView should not run the **`playback_status`** **`setInterval`** — hidden tab,
- * unfocused window, minimized, etc. (`isUiIdleHeavyCpu` in **`ui-idle.js`**). Host EOF watchdog covers
- * EOF while idle so the engine is not polled twice.
- */
-function shouldDeferPlaybackPollToHostWatchdog() {
-    if (typeof window.isUiIdleHeavyCpu === 'function') {
-        return window.isUiIdleHeavyCpu();
-    }
-    return typeof document !== 'undefined' && document.hidden;
-}
-
-/**
- * Host EOF watchdog runs while **`shouldDeferPlaybackPollToHostWatchdog()`** so foreground-focused
- * playback does not double `playback_status` IPC with the WebView poll.
- */
-function syncEnginePlaybackEofWatchdog() {
-    if (!_enginePlaybackPollSessionActive) {
-        return;
-    }
-    try {
-        const u = typeof window !== 'undefined' ? window.vstUpdater : undefined;
-        if (!u) {
-            return;
-        }
-        if (shouldDeferPlaybackPollToHostWatchdog()) {
-            if (typeof u.audioEngineEofWatchdogStart === 'function') {
-                void u.audioEngineEofWatchdogStart().catch(() => {});
-            }
-        } else if (typeof u.audioEngineEofWatchdogStop === 'function') {
-            void u.audioEngineEofWatchdogStop();
-        }
-    } catch (_) {
-        /* non-Tauri */
-    }
-}
-
-function syncEnginePlaybackPollForUiIdle() {
-    if (!_enginePlaybackPollSessionActive) {
-        return;
-    }
-    if (shouldDeferPlaybackPollToHostWatchdog()) {
-        if (_enginePlaybackPollTimer != null) {
-            clearInterval(_enginePlaybackPollTimer);
-            _enginePlaybackPollTimer = null;
-        }
-        syncEnginePlaybackEofWatchdog();
-    } else {
-        if (_enginePlaybackPollTimer == null) {
-            _enginePlaybackPollTimer = setInterval(() => void runEnginePlaybackStatusTick(), ENGINE_PLAYBACK_POLL_MS);
-            void runEnginePlaybackStatusTick();
-        }
-        syncEnginePlaybackEofWatchdog();
-    }
-}
 
 function stopEnginePlaybackPoll() {
     _enginePlaybackPollSessionActive = false;
     if (_enginePlaybackPollTimer != null) {
         clearInterval(_enginePlaybackPollTimer);
         _enginePlaybackPollTimer = null;
-    }
-    try {
-        const u = typeof window !== 'undefined' ? window.vstUpdater : undefined;
-        if (u && typeof u.audioEngineEofWatchdogStop === 'function') {
-            void u.audioEngineEofWatchdogStop();
-        }
-    } catch (_) {
-        /* non-Tauri */
     }
 }
 
@@ -2471,18 +2404,8 @@ async function runEnginePlaybackStatusTick() {
 function startEnginePlaybackPoll() {
     stopEnginePlaybackPoll();
     _enginePlaybackPollSessionActive = true;
-    if (typeof document !== 'undefined' && !_enginePlaybackIdleHooked) {
-        _enginePlaybackIdleHooked = true;
-        document.addEventListener('visibilitychange', syncEnginePlaybackPollForUiIdle);
-        document.addEventListener('ui-idle-heavy-cpu', syncEnginePlaybackPollForUiIdle);
-    }
     void runEnginePlaybackStatusTick();
-    if (shouldDeferPlaybackPollToHostWatchdog()) {
-        syncEnginePlaybackEofWatchdog();
-    } else {
-        _enginePlaybackPollTimer = setInterval(() => void runEnginePlaybackStatusTick(), ENGINE_PLAYBACK_POLL_MS);
-        syncEnginePlaybackEofWatchdog();
-    }
+    _enginePlaybackPollTimer = setInterval(() => void runEnginePlaybackStatusTick(), ENGINE_PLAYBACK_POLL_MS);
 }
 
 /**

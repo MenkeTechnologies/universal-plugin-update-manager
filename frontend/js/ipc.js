@@ -79,13 +79,6 @@ async function reloadAppStrings(locale) {
 
 window.reloadAppStrings = reloadAppStrings;
 
-// ── AudioEngine library playback EOF (host thread → event; not throttled like WebView `setInterval`) ──
-listen('audio-engine-playback-eof', () => {
-    if (typeof window.handleEnginePlaybackEofFromPoll === 'function') {
-        window.handleEnginePlaybackEofFromPoll();
-    }
-});
-
 // ── Menu bar event handler ──
 listen('menu-action', (event) => {
     const id = event.payload;
@@ -1326,9 +1319,6 @@ window.vstUpdater = {
     /** AudioEngine (persistent stdin loop): `{ cmd, ... }` → JSON. Includes `engine_state`, `start_output_stream` (`start_playback` for file PCM decode), `playback_load` / `playback_pause` / `playback_seek` / `playback_set_dsp` / `playback_set_speed` / `playback_set_reverse` / `playback_set_loop` / `playback_status` (optional `spectrum` + `spectrum_fft_size` / `spectrum_bins` / `spectrum_sr_hz` when output is running) / `playback_stop`, `playback_set_inserts` (VST3/AU bundle paths or cached `fileOrIdentifier`; stop stream first), `playback_open_insert_editor` / `playback_close_insert_editor` (native plug-in UI; `slot` is chain index), `stop_output_stream`, `start_input_stream` / `stop_input_stream`, `set_output_tone`, `plugin_chain` (scan + inserts; while scanning: `scan_done` / `scan_total` / `scan_skipped` / `scan_cache_loaded` / `scan_current_format` / `scan_current_name`). Stream `output_stream_status` / `input_stream_status` include `current_buffer_frames` (actual buffer length). UI: `audio-engine.js` + `audio.js` (`enginePlaybackStart`, waveform `pointerdown` seek, DSP). */
     audioEngineInvoke: (request) => invoke('audio_engine_invoke', {request}),
     audioEngineRestart: () => invoke('audio_engine_restart'),
-    /** Host-side `playback_status` poll for EOF when **`isUiIdleHeavyCpu`** (hidden tab, unfocused window, etc.); ~1 Hz in Rust — WebView interval is paused while idle so only one path polls. */
-    audioEngineEofWatchdogStart: () => invoke('audio_engine_eof_watchdog_start'),
-    audioEngineEofWatchdogStop: () => invoke('audio_engine_eof_watchdog_stop'),
     batchAnalyze: (paths) => invoke('batch_analyze', {paths}),
     dbQueryPlugins: (params) => invoke('db_query_plugins', params || {}),
     dbQueryDaw: (params) => invoke('db_query_daw', params || {}),
