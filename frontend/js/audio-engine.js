@@ -18,7 +18,7 @@ let aePluginCatalog = [];
 /** Active picker instances (one per insert row in the UI). */
 let aeInsertPickers = [];
 
-/** After first successful `list_audio_device_types`, restore saved driver from prefs once per page load (and again after AudioEngine restart). */
+/** After first successful `list_audio_device_types`, restore saved JUCE driver from prefs when safe (and again after AudioEngine restart). */
 let aeInitialDeviceTypeRestored = false;
 
 /** Incremented at the start of each `refreshAudioEnginePanel` so in-flight plugin-scan polls do not apply stale results. */
@@ -1694,13 +1694,17 @@ async function refreshAudioEnginePanel() {
         let typeRes = await inv({cmd: 'list_audio_device_types'});
         throwIfAeNotOk(typeRes, 'list_audio_device_types failed');
         if (!aeInitialDeviceTypeRestored) {
-            aeInitialDeviceTypeRestored = true;
             const savedType =
                 typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
                     ? prefs.getItem(AE_PREFS_DEVICE_TYPE)
                     : null;
             const cur = typeRes.current != null ? String(typeRes.current) : '';
-            if (savedType != null && String(savedType).trim() !== '' && String(savedType) !== cur) {
+            const shouldRestore =
+                savedType != null && String(savedType).trim() !== '' && String(savedType) !== cur;
+            const streamsActive =
+                (es && es.stream && es.stream.running === true) ||
+                (es && es.input_stream && es.input_stream.running === true);
+            if (shouldRestore && !streamsActive) {
                 try {
                     const sr = await inv({cmd: 'set_audio_device_type', type: String(savedType).trim()});
                     throwIfAeNotOk(sr, 'set_audio_device_type failed');
@@ -1709,6 +1713,10 @@ async function refreshAudioEnginePanel() {
                 } catch {
                     /* keep engine driver */
                 }
+            }
+            /* Defer completion while saved driver still differs but output/input is running — `set_audio_device_type` stops all streams (would cut library playback). Retry on later refresh. */
+            if (!shouldRestore || !streamsActive) {
+                aeInitialDeviceTypeRestored = true;
             }
         }
         if (typeSelectEl) {
