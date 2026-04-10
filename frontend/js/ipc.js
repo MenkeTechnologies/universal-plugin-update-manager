@@ -89,7 +89,8 @@ listen('audio-engine-playback-eof', () => {
 
 // ── Menu bar event handler ──
 listen('menu-action', (event) => {
-    const id = event.payload;
+    const raw = event && event.payload !== undefined ? event.payload : event;
+    const id = typeof raw === 'string' ? raw : raw && typeof raw === 'object' && raw.action != null ? String(raw.action) : String(raw ?? '');
     switch (id) {
         // File
         case 'scan_all':

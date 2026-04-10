@@ -267,7 +267,9 @@ pub struct TrayNowPlayingPayload {
 
 #[tauri::command]
 pub fn tray_popover_action(app: AppHandle<Wry>, action: String) -> Result<(), String> {
-    let _ = app.emit("menu-action", action);
+    // Same delivery path as `on_menu_event` in lib.rs: only the **main** webview runs `ipc.js`
+    // playback handlers — broadcast `emit` does not reliably hit the main window listener.
+    let _ = app.emit_to("main", "menu-action", action);
     Ok(())
 }
 

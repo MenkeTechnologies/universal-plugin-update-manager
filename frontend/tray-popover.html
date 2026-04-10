@@ -22,6 +22,9 @@
       --cp-scan: rgba(0, 0, 0, 0.22);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      color-scheme: dark;
+    }
     html, body {
       width: 100%;
       min-height: 100%;
@@ -31,7 +34,8 @@
       outline: none;
       font-family: "JetBrains Mono", ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
       -webkit-font-smoothing: antialiased;
-      background: transparent;
+      /* WKWebView defaults to white; transparent shows a light rim behind the menu bar. */
+      background: var(--cp-bg0);
     }
     /* Asymmetric panel: large TL radius; HUD slice */
     .shell {
@@ -210,8 +214,9 @@
     }
     .transport button:active { transform: scale(0.96); }
     .transport .play-btn { font-size: 18px; padding: 5px 10px; }
-    .idle .progress-wrap,
-    .idle .transport { opacity: 0.35; pointer-events: none; }
+    .idle .progress-wrap { opacity: 0.35; pointer-events: none; }
+    /* Transport must stay clickable when idle (prev/play/next still reach main via IPC). */
+    .idle .transport { opacity: 0.45; }
     .idle .divider { opacity: 0.4; }
   </style>
 </head>
