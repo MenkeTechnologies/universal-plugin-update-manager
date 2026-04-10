@@ -6321,6 +6321,38 @@
             margin-bottom: 6px;
         }
 
+        .np-history-title-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .np-history-title-bar .np-autoplay-toggle {
+            font-size: 10px;
+        }
+
+        .np-history-title-bar .np-autoplay-toggle .settings-toggle-label {
+            font-size: 9px;
+            min-width: 26px;
+        }
+
+        .np-history-title-bar .np-autoplay-toggle .settings-toggle-track {
+            width: 34px;
+            height: 18px;
+        }
+
+        .np-history-title-bar .np-autoplay-toggle .settings-toggle-thumb {
+            width: 12px;
+            height: 12px;
+            top: 3px;
+            left: 3px;
+        }
+
+        .np-history-title-bar .np-autoplay-toggle.active .settings-toggle-thumb {
+            left: 17px;
+        }
+
         /* Visualizer tab — HUD / cyberdeck panels (chamfered, glow, not flat blocks) */
         .viz-container {
             position: relative;
@@ -8123,7 +8155,14 @@
         </div>
         <div class="np-section" data-np-section="history">
             <div class="np-history" id="npHistory">
-                <div class="np-history-title">Recently Played
+                <div class="np-history-title np-history-title-bar">Recently Played
+                    <button class="settings-toggle np-autoplay-toggle" data-action="settingToggleAutoplayNext"
+                            data-i18n-title="ui.tt.toggle_auto_advance_to_next_track_on_playback_end"
+                            id="npAutoplayNextBtn" type="button"
+                            title="Toggle auto-advance to next track on playback end">
+                        <span class="settings-toggle-label" id="npAutoplayNextLabel">On</span>
+                        <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                    </button>
                     <button class="btn-small btn-secondary" data-action="exportRecentlyPlayed"
                             data-i18n="ui.btn.export"
                             data-i18n-title="ui.tt.export_play_history_as_json"

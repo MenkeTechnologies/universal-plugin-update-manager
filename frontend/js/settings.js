@@ -1466,13 +1466,19 @@ function refreshSettingsUI() {
         showPlayerLabel.textContent = _uiToggle(showPlayer);
     }
 
-    // Autoplay next
+    // Autoplay next (Settings + floating player Recently Played header)
     const autoplay = prefs.getItem('autoplayNext') !== 'off';
     const autoplayBtn = document.getElementById('settingAutoplayNext');
     const autoplayLabel = document.getElementById('settingAutoplayNextLabel');
     if (autoplayBtn) {
         autoplayBtn.classList.toggle('active', autoplay);
         autoplayLabel.textContent = _uiToggle(autoplay);
+    }
+    const npAutoplayBtn = document.getElementById('npAutoplayNextBtn');
+    const npAutoplayLabel = document.getElementById('npAutoplayNextLabel');
+    if (npAutoplayBtn && npAutoplayLabel) {
+        npAutoplayBtn.classList.toggle('active', autoplay);
+        npAutoplayLabel.textContent = _uiToggle(autoplay);
     }
 
     // Include Ableton backups
