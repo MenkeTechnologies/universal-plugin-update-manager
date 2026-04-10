@@ -8,7 +8,7 @@
  * timer and on **`onMoved`** (cheap vs leaving rAF + `playback_status` loops running off-screen).
  *
  * Paused work is rAF-driven visualization and idle-gated **`playback_status`** polling — background
- * BPM/Key/LUFS analysis (`startBackgroundAnalysis` in `audio.js`) is unrelated and keeps running.
+ * BPM/Key/LUFS batch analysis runs only when **`autoAnalysis`** is **`on`** (`audio.js`).
  */
 (function initUiIdleHeavyCpu() {
     let docHidden = typeof document !== 'undefined' && document.hidden;

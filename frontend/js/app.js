@@ -200,7 +200,7 @@ async function handleFileWatcherChange(event) {
                 updateAudioStats();
                 audioCurrentOffset = 0;
                 await fetchAudioPage();
-                if (typeof startBackgroundAnalysis === 'function' && prefs.getItem('autoAnalysis') !== 'off') startBackgroundAnalysis();
+                if (typeof startBackgroundAnalysis === 'function' && prefs.getItem('autoAnalysis') === 'on') startBackgroundAnalysis();
             }
         } catch (err) {
             showToast(toastFmt('toast.failed_load_audio_scan', {err: err.message || err}), 4000, 'error');

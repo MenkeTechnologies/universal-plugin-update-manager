@@ -943,10 +943,11 @@ async function settingClearKvrCache() {
 }
 
 function settingToggleAutoAnalysis() {
-    const current = prefs.getItem('autoAnalysis') !== 'off';
+    const current = prefs.getItem('autoAnalysis') === 'on';
     const next = !current;
     prefs.setItem('autoAnalysis', next ? 'on' : 'off');
     showToast(toastFmt('toast.auto_analysis_launch', {state: next ? 'on' : 'off'}));
+    if (next && typeof startBackgroundAnalysis === 'function') void startBackgroundAnalysis();
     refreshSettingsUI();
 }
 
@@ -1389,7 +1390,7 @@ function refreshSettingsUI() {
     }
 
     // Auto-analysis
-    const autoAnalysis = prefs.getItem('autoAnalysis') !== 'off';
+    const autoAnalysis = prefs.getItem('autoAnalysis') === 'on';
     const autoAnalysisBtn = document.getElementById('settingAutoAnalysis');
     const autoAnalysisLabel = document.getElementById('settingAutoAnalysisLabel');
     if (autoAnalysisBtn) {

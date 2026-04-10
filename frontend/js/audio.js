@@ -2001,7 +2001,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
         allAudioSamples.push(...toAdd);
         if (allAudioSamples.length > 100000) allAudioSamples.length = 100000;
         accumulateAudioStats(toAdd);
-        if (!_bgAnalysisRunning && prefs.getItem('autoAnalysis') !== 'off') startBackgroundAnalysis();
+        if (!_bgAnalysisRunning && prefs.getItem('autoAnalysis') === 'on') startBackgroundAnalysis();
 
         const search = document.getElementById('audioSearchInput').value || '';
         const scanFmtSet = getMultiFilterValues('audioFormatFilter');
@@ -2078,7 +2078,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
         audioCurrentOffset = 0;
         await rebuildAudioStats(true);
         await fetchAudioPage();
-        if (prefs.getItem('autoAnalysis') !== 'off') startBackgroundAnalysis();
+        if (prefs.getItem('autoAnalysis') === 'on') startBackgroundAnalysis();
         if (result.stopped && audioTotalUnfiltered > 0) {
             resumeBtn.style.display = '';
         }
@@ -3686,14 +3686,6 @@ let _bgPaused = false;
 // Pause bg analysis when user interacts (resume after 3s idle)
 let _bgIdleTimer = null;
 
-function clearBgAnalysisInteractionPause() {
-    _bgPaused = false;
-    if (_bgIdleTimer != null) {
-        clearTimeout(_bgIdleTimer);
-        _bgIdleTimer = null;
-    }
-}
-
 document.addEventListener('mousedown', () => {
     _bgPaused = true;
     clearTimeout(_bgIdleTimer);
@@ -3708,26 +3700,6 @@ document.addEventListener('keydown', () => {
         _bgPaused = false;
     }, 3000);
 }, true);
-
-/* When the window is minimized / unfocused / hidden, the user is not interacting — clear the 3s
- * interaction gate so BPM/Key/LUFS batches keep running (otherwise _bgPaused can stay true until
- * the timer fires, or indefinitely if something kept resetting it). */
-if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-    document.addEventListener('ui-idle-heavy-cpu', (e) => {
-        try {
-            if (e.detail && e.detail.idle) clearBgAnalysisInteractionPause();
-        } catch (_) {
-            /* ignore */
-        }
-    });
-    document.addEventListener('visibilitychange', () => {
-        try {
-            if (document.hidden) clearBgAnalysisInteractionPause();
-        } catch (_) {
-            /* ignore */
-        }
-    });
-}
 
 function _setBgAnalysisBadgeRunning(badge) {
     if (!badge) return;
