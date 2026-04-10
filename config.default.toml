@@ -13,7 +13,7 @@ tooltipHoverDelayMs = "600"
 
 [scanning]
 autoScan = "off"
-# Background PDF page-count extraction when enabled (after library load and when UI is not idle-heavy). "off" = only Command Palette / manual extract.
+# Background PDF page-count extraction when enabled (after library load; continues while window is backgrounded). "off" = idle-heavy gate + abort apply; use Command Palette / manual extract.
 pdfMetadataAutoExtract = "on"
 autoUpdate = "off"
 singleClickPlay = "on"

@@ -588,14 +588,21 @@ function patchPdfPagesCell(path, pages) {
     }
 }
 
+function isPdfMetadataAutoExtractOn() {
+    return typeof prefs !== 'undefined' && prefs.getItem('pdfMetadataAutoExtract') !== 'off';
+}
+
 function shouldStartPdfMetadataExtraction(forceNoIdle) {
-    if (!forceNoIdle && typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return false;
+    if (forceNoIdle) return true;
+    // Opt-in background mode: keep indexing when the window is hidden/minimized (isUiIdleHeavyCpu).
+    if (isPdfMetadataAutoExtractOn()) return true;
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return false;
     return true;
 }
 
 /** When Settings → Background PDF metadata (auto) is on, kick the batch extractor (no PDF tab required). */
 function maybeStartPdfBackgroundMetadataExtraction() {
-    if (typeof prefs !== 'undefined' && prefs.getItem('pdfMetadataAutoExtract') === 'off') return;
+    if (!isPdfMetadataAutoExtractOn()) return;
     void startPdfMetadataExtraction();
 }
 
@@ -746,7 +753,7 @@ async function buildPdfPagesCache() {
     document.addEventListener('ui-idle-heavy-cpu', (e) => {
         const idle = e && e.detail && e.detail.idle;
         if (idle) {
-            void abortPdfMetadataExtraction();
+            if (!isPdfMetadataAutoExtractOn()) void abortPdfMetadataExtraction();
         } else if (typeof loadPdfPagesForVisible === 'function') {
             void loadPdfPagesForVisible();
         }
