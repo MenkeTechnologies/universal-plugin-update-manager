@@ -248,16 +248,25 @@ function bindAeInputPeakVisibilityOnce() {
 const AE_MAX_BUFFER_FRAMES = 8192;
 
 /**
+ * @param {string|null|undefined} raw — saved pref or select value
+ * @returns {number|undefined} integer Hz for `sample_rate_hz` IPC, or undefined for driver default
+ */
+function parseAeSampleRateHzFromPrefString(raw) {
+    if (raw == null) return undefined;
+    const s = String(raw).trim();
+    if (s === '') return undefined;
+    const n = Number.parseInt(s, 10);
+    if (!Number.isFinite(n) || n < 1000) return undefined;
+    return n;
+}
+
+/**
  * @param {HTMLSelectElement|null} sel
  * @returns {number|undefined} integer Hz for `sample_rate_hz` IPC, or undefined for driver default
  */
 function parseAeSampleRateHzFromSelect(sel) {
     if (!sel || typeof sel.value !== 'string') return undefined;
-    const s = sel.value.trim();
-    if (s === '') return undefined;
-    const n = Number.parseInt(s, 10);
-    if (!Number.isFinite(n) || n < 1000) return undefined;
-    return n;
+    return parseAeSampleRateHzFromPrefString(sel.value);
 }
 
 /**
@@ -1974,6 +1983,135 @@ async function toggleAeTestTone(enabled) {
     }
 }
 
+/**
+ * Best-effort: open cpal/JUCE output once prefs are loaded so spectrum/visualizer and tone
+ * work without visiting Audio Engine → Apply. Uses saved `audioEngineOutputDeviceId` or `""` (driver default).
+ * Idempotent if `engine_state.stream.running` is already true.
+ */
+async function ensureAeOutputStreamOnStartup() {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) return;
+    try {
+        let es = await inv({cmd: 'engine_state'});
+        throwIfAeNotOk(es, 'engine_state failed');
+        if (es.stream && es.stream.running === true) {
+            fillAeStreamsFromEngineState(es);
+            return;
+        }
+
+        let typeRes = await inv({cmd: 'list_audio_device_types'});
+        throwIfAeNotOk(typeRes, 'list_audio_device_types failed');
+        if (!aeInitialDeviceTypeRestored) {
+            const savedType =
+                typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+                    ? prefs.getItem(AE_PREFS_DEVICE_TYPE)
+                    : null;
+            const cur = typeRes.current != null ? String(typeRes.current) : '';
+            const shouldRestore =
+                savedType != null && String(savedType).trim() !== '' && String(savedType) !== cur;
+            const streamsActive =
+                (es && es.stream && es.stream.running === true) ||
+                (es && es.input_stream && es.input_stream.running === true);
+            if (shouldRestore && !streamsActive) {
+                try {
+                    const sr = await inv({cmd: 'set_audio_device_type', type: String(savedType).trim()});
+                    throwIfAeNotOk(sr, 'set_audio_device_type failed');
+                    typeRes = await inv({cmd: 'list_audio_device_types'});
+                    throwIfAeNotOk(typeRes, 'list_audio_device_types failed');
+                } catch {
+                    /* keep engine driver */
+                }
+            }
+            if (!shouldRestore || !streamsActive) {
+                aeInitialDeviceTypeRestored = true;
+            }
+        }
+
+        let playbackLoaded = false;
+        try {
+            const st = await inv({cmd: 'playback_status'});
+            playbackLoaded = Boolean(st && st.ok && st.loaded === true);
+        } catch {
+            /* ignore */
+        }
+        const resumePath =
+            typeof window !== 'undefined' && typeof window._enginePlaybackResumePath === 'string' && window._enginePlaybackResumePath.length > 0
+                ? window._enginePlaybackResumePath
+                : '';
+        let didReloadLibrary = false;
+        /** @type {object | null} */
+        let loadMeta = null;
+        if (!playbackLoaded && resumePath) {
+            const lr = await inv({cmd: 'playback_load', path: resumePath});
+            throwIfAeNotOk(lr, 'playback_load failed');
+            playbackLoaded = true;
+            didReloadLibrary = true;
+            loadMeta = lr;
+        }
+
+        const deviceId =
+            typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+                ? prefs.getItem(AE_PREFS_DEVICE) || ''
+                : '';
+        const toneOn =
+            typeof prefs !== 'undefined' && typeof prefs.getItem === 'function' && prefs.getItem(AE_PREFS_TONE) === '1';
+        const bfRaw =
+            typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+                ? prefs.getItem(AE_PREFS_BUFFER_FRAMES_OUTPUT)
+                : '';
+        const bufferFrames = parseAeBufferFramesPref(bfRaw != null ? String(bfRaw) : '');
+        const srRaw =
+            typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+                ? prefs.getItem(AE_PREFS_SAMPLE_RATE_HZ)
+                : '';
+        const srHz = parseAeSampleRateHzFromPrefString(srRaw);
+
+        const startPayload = {cmd: 'start_output_stream', device_id: deviceId, tone: toneOn};
+        if (bufferFrames !== undefined) {
+            startPayload.buffer_frames = bufferFrames;
+        }
+        if (srHz !== undefined) {
+            startPayload.sample_rate_hz = srHz;
+        }
+        if (playbackLoaded) {
+            startPayload.start_playback = true;
+        }
+        const start = await inv(startPayload);
+        throwIfAeNotOk(start, 'start_output_stream failed');
+        if (didReloadLibrary && typeof window !== 'undefined' && typeof window.resumeEnginePlaybackAfterApply === 'function') {
+            window.resumeEnginePlaybackAfterApply(loadMeta);
+        }
+        if (playbackLoaded) {
+            if (typeof window.syncEnginePlaybackDspFromPrefs === 'function') {
+                window.syncEnginePlaybackDspFromPrefs();
+            }
+            if (typeof window.syncEnginePlaybackSpeedFromPrefs === 'function') {
+                window.syncEnginePlaybackSpeedFromPrefs();
+            }
+            if (typeof startEnginePlaybackPoll === 'function') {
+                startEnginePlaybackPoll();
+            }
+        }
+        es = await inv({cmd: 'engine_state'});
+        fillAeStreamsFromEngineState(es);
+        if (typeof window !== 'undefined' && typeof window.applyAeEqCanvasHeightFromPrefs === 'function') {
+            window.applyAeEqCanvasHeightFromPrefs();
+        }
+    } catch {
+        try {
+            const inv2 = getAeAudioEngineInvoke();
+            if (inv2) {
+                const es = await inv2({cmd: 'engine_state'});
+                if (es && es.ok === true) {
+                    fillAeStreamsFromEngineState(es);
+                }
+            }
+        } catch {
+            /* ignore */
+        }
+    }
+}
+
 async function applyAudioEngineDevice() {
     const selectEl = document.getElementById('aeOutputDevice');
     const statusEl = document.getElementById('aeEngineStatus');
@@ -2421,6 +2559,7 @@ async function enginePlaybackStop() {
 }
 
 if (typeof window !== 'undefined') {
+    window.ensureAeOutputStreamOnStartup = ensureAeOutputStreamOnStartup;
     window.enginePlaybackStart = enginePlaybackStart;
     window.enginePlaybackStop = enginePlaybackStop;
     window.enginePlaybackRestartStream = enginePlaybackRestartStream;
