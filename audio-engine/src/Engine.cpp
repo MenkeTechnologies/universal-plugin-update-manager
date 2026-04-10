@@ -74,6 +74,43 @@ static juce::String cmdKey(const juce::var& req)
     return {};
 }
 
+/** `KnownPluginList` / older caches sometimes use "AU" or omit format; JUCE expects `AudioUnitPluginFormat::getName()` i.e. "AudioUnit". */
+static void normalizePluginDescriptionForHost(juce::PluginDescription& d)
+{
+    const juce::String& id = d.fileOrIdentifier;
+    if (id.startsWithIgnoreCase("AudioUnit:"))
+    {
+        if (d.pluginFormatName.isEmpty() || d.pluginFormatName.equalsIgnoreCase("AU"))
+            d.pluginFormatName = "AudioUnit";
+    }
+    if (id.endsWithIgnoreCase(".vst3") || id.containsIgnoreCase(".vst3/Contents"))
+    {
+        if (d.pluginFormatName.isEmpty())
+            d.pluginFormatName = "VST3";
+    }
+}
+
+/** JUCE returns "No compatible plug-in format…" when either the format name mismatches or (AU) `AudioComponentFindNext` fails. */
+static juce::String refineIncompatiblePluginFormatError(const juce::PluginDescription& d,
+                                                       const juce::AudioPluginFormatManager& pm)
+{
+    for (int i = 0; i < pm.getNumFormats(); ++i)
+    {
+        auto* f = pm.getFormat(i);
+        if (f->getName() != d.pluginFormatName)
+            continue;
+        if (!f->fileMightContainThisPluginType(d.fileOrIdentifier))
+        {
+            return "plug-in is not registered on this system (stale scan cache or uninstalled): "
+                   + d.name + " format=" + d.pluginFormatName + " id=" + d.fileOrIdentifier
+                   + ". Try Audio Engine: Wipe cache & rescan, or reinstall the plug-in.";
+        }
+        return {};
+    }
+    return "no format matches pluginFormatName=" + d.pluginFormatName + " for " + d.name
+           + " — try Wipe cache & rescan.";
+}
+
 /** JUCE dead-man's-pedal: plugins that crash during scan are deferred to the end on later runs. */
 static juce::File deadMansPedalFilePath()
 {
@@ -1625,6 +1662,7 @@ struct Engine::Impl
             if (t.fileOrIdentifier == path)
             {
                 out = t;
+                normalizePluginDescriptionForHost(out);
                 return true;
             }
         }
@@ -1872,6 +1910,7 @@ struct Engine::Impl
             std::unique_ptr<juce::AudioPluginInstance> inst;
             juce::String createErr;
             auto descCopy = s.desc;
+            normalizePluginDescriptionForHost(descCopy);
 
             std::thread worker([&done, &inst, &createErr, &descCopy, this]() {
                 inst = pluginFormatManager.createPluginInstance(descCopy, 44100.0, 512, createErr);
@@ -1893,8 +1932,15 @@ struct Engine::Impl
 
             if (inst == nullptr)
             {
-                appLogLine("playback_set_inserts: FAILED " + s.desc.name + ": " + createErr);
-                return errObj("plugin load failed for " + s.desc.name + ": " + createErr);
+                juce::String errOut = createErr;
+                if (errOut.containsIgnoreCase("No compatible plug-in format"))
+                {
+                    const juce::String refined = refineIncompatiblePluginFormatError(descCopy, pluginFormatManager);
+                    if (refined.isNotEmpty())
+                        errOut = refined;
+                }
+                appLogLine("playback_set_inserts: FAILED " + s.desc.name + ": " + errOut);
+                return errObj("plugin load failed for " + s.desc.name + ": " + errOut);
             }
             appLogLine("playback_set_inserts: loaded " + s.desc.name);
             next->paths.push_back(s.path);
