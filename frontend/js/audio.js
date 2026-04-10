@@ -1664,39 +1664,34 @@ async function findSimilarSamples(filePath) {
     document.body.insertAdjacentHTML('beforeend', loadHtml);
     initSimilarPanelDrag();
 
-    // Listen for progress events
     let progressCleanup = null;
-    if (window.__TAURI__?.event?.listen) {
-        window.__TAURI__.event.listen('similarity-progress', (event) => {
-            const d = event.payload;
-            const statusText = document.getElementById('similarStatusText');
-            const statusDetail = document.getElementById('similarStatusDetail');
-            if (d.phase === 'computing' && statusText && statusDetail) {
-                const cached = d.cached_count ?? d.cached;
-                const uncached = d.uncached_count ?? d.total;
-                const total =
-                    d.candidate_count ??
-                    (typeof cached === 'number' && typeof uncached === 'number'
-                        ? cached + uncached
-                        : uncached);
-                statusText.textContent = _audioFmt('ui.audio.similar_fp_status', {
-                    total,
-                    uncached
-                });
-                statusDetail.textContent = _audioFmt('ui.audio.similar_fp_detail', {
-                    cached,
-                    uncached
-                });
-            }
-        }).then(fn => {
-            progressCleanup = fn;
-        });
-    }
-
     try {
+        if (window.__TAURI__?.event?.listen) {
+            progressCleanup = await window.__TAURI__.event.listen('similarity-progress', (event) => {
+                const d = event.payload;
+                const statusText = document.getElementById('similarStatusText');
+                const statusDetail = document.getElementById('similarStatusDetail');
+                if (d.phase === 'computing' && statusText && statusDetail) {
+                    const cached = d.cached_count ?? d.cached;
+                    const uncached = d.uncached_count ?? d.total;
+                    const total =
+                        d.candidate_count ??
+                        (typeof cached === 'number' && typeof uncached === 'number'
+                            ? cached + uncached
+                            : uncached);
+                    statusText.textContent = _audioFmt('ui.audio.similar_fp_status', {
+                        total,
+                        uncached
+                    });
+                    statusDetail.textContent = _audioFmt('ui.audio.similar_fp_detail', {
+                        cached,
+                        uncached
+                    });
+                }
+            });
+        }
         const candidates = (typeof allAudioSamples !== 'undefined' ? allAudioSamples : []).map(s => s.path);
         const results = await window.vstUpdater.findSimilarSamples(filePath, candidates, 20);
-        if (progressCleanup) progressCleanup();
 
         const panel = document.getElementById('similarPanel');
         if (!panel) return;
@@ -1730,9 +1725,15 @@ async function findSimilarSamples(filePath) {
             });
         });
     } catch (err) {
-        if (progressCleanup) progressCleanup();
         const body = document.getElementById('simBody');
         if (body) body.innerHTML = `<div style="padding:16px;color:var(--red);font-size:11px;">${escapeHtml(_audioFmt('ui.audio.similar_error_prefix'))} ${escapeHtml(err.message || String(err))}</div>`;
+    } finally {
+        if (typeof progressCleanup === 'function') {
+            try {
+                progressCleanup();
+            } catch (_unused) {
+            }
+        }
     }
 }
 
@@ -2032,7 +2033,7 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
     const scheduleFlush = createScanFlusher(flushPendingSamples, FLUSH_INTERVAL);
 
     if (audioScanProgressCleanup) audioScanProgressCleanup();
-    audioScanProgressCleanup = window.vstUpdater.onAudioScanProgress((data) => {
+    audioScanProgressCleanup = await window.vstUpdater.onAudioScanProgress((data) => {
         if (data.phase === 'status') {
             // status message
         } else if (data.phase === 'scanning') {

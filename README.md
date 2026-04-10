@@ -13,7 +13,7 @@
 ░▓████▒   ▓█   ▓██▒▒██▒ ▒██▒░ ████▓▒░░██▓ ▒██▒
 ```
 
-> **// SYSTEM ONLINE -- AUDIO_HAXOR v1.18.19 // by MenkeTechnologies**
+> **// SYSTEM ONLINE -- AUDIO_HAXOR v1.18.20 // by MenkeTechnologies**
 
 A high-voltage **Tauri v2** desktop app that jacks into your system's audio plugin directories, maps every VST2/VST3/AU/CLAP module it finds, scans audio sample libraries, discovers DAW project files, checks the web for the latest plugin versions, and maintains a full changelog of every scan -- so nothing slips through the cracks. Rust backend with a cyberpunk CRT interface featuring neon glow, scanline overlays, glitch effects, and multiple color schemes.
 
@@ -449,8 +449,8 @@ src-tauri/
 frontend/
   index.html           -- Cyberpunk CRT UI (HTML/CSS); tab strip uses **command-palette** tab icons (left of label, `data-i18n` on inner `<span>` so glyphs are not overwritten); **Presets** uses the musical-score glyph (`&#127924;`) and **MIDI** uses the piano-keyboard glyph (`&#127929;`) so the two tabs are visually distinct; `.audio-toolbar > .btn` min-height aligns scan/update toolbars
   js/
-    app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals from SQLite (`get_active_scan_inventory_counts`: one row per path, library scope — not tied to a single `scan_id`); scans stream-insert per batch; `applyInventoryCountsPartial` throttles DB refresh on progress; `handleFileWatcherChange` runs targeted per-root rescans from `roots_by_category` (sequential `await` per category); **Scan All** `prepareUnifiedScan` then delayed `scanUnified`; **Stop All** uses `stopUnifiedScan` for the four inventory types
-    audio.js           -- Audio sample scanning + inline playback + floating player; with **audio-engine** library playback, the `<audio>` element is muted and disconnected from Web Audio (no duplicate output through the WebView). **`playback_pause`** updates **`window._enginePlaybackPaused`** immediately so play/pause icons match before the **`playback_status`** poll (~100 ms) — fixes context-menu / **`previewAudio`** toggle desync. DevTools **`console.warn('[audio-haxor] drawMetaPanelVisuals:…')`** when expanded-row worker decode falls back to main-thread waveform/spectrogram (includes `path`, `url`, `bars`, `error`)
+    app.js             -- Startup, auto-load last scan, restore preferences; `applyInventoryCounts` keeps header strip + stats-bar totals from SQLite (`get_active_scan_inventory_counts`: one row per path, library scope — not tied to a single `scan_id`); scans stream-insert per batch; `applyInventoryCountsPartial` throttles DB refresh on progress; **`updateHeaderInfo`** uses **`_headerInfoSeq`** so overlapping **`getProcessStats`** ticks do not interleave DOM; `handleFileWatcherChange` runs targeted per-root rescans from `roots_by_category` (sequential `await` per category); **Scan All** `prepareUnifiedScan` then delayed `scanUnified`; **Stop All** uses `stopUnifiedScan` for the four inventory types
+    audio.js           -- Audio sample scanning + inline playback + floating player; with **audio-engine** library playback, the `<audio>` element is muted and disconnected from Web Audio (no duplicate output through the WebView). **`playback_pause`** updates **`window._enginePlaybackPaused`** immediately so play/pause icons match before the **`playback_status`** poll (~100 ms) — fixes context-menu / **`previewAudio`** toggle desync. **`await onAudioScanProgress`** before **`scan_audio_samples`** (same ordering as plugin scan). **Similarity** panel **`await listen('similarity-progress')`** before **`find_similar_samples`**, **`finally`** unlisten. DevTools **`console.warn('[audio-haxor] drawMetaPanelVisuals:…')`** when expanded-row worker decode falls back to main-thread waveform/spectrogram (includes `path`, `url`, `bars`, `error`)
     audio-decode-worker.js -- Web Worker decode; `createDecodeContext()` uses `self.OfflineAudioContext || self.webkitOfflineAudioContext` (WKWebView workers have no bare `OfflineAudioContext`), then `AudioContext` if needed
     batch-select.js    -- Checkbox selection + batch operations
     command-palette.js -- Cmd+K fuzzy search; static rows + session item list + type-label cache; arrow keys update selection class only; 2+ char DB merge uses `db_query_palette_preview` (SQLite); **Build fingerprint cache** loads paths from `db_audio_library_paths` (SQLite `audio_library`), same as Settings → cache fingerprint build; **Start/Stop BPM/Key/LUFS background analysis** matches Settings → Database Caches (`triggerBackgroundBpmKeyLufsAnalysis` / `triggerStopBackgroundBpmKeyLufsAnalysis`)
@@ -464,13 +464,13 @@ frontend/
     favorites.js       -- Favorites management; path keys normalized (`/` vs `\\`); `saveFavorites` calls `window.updateFavBtn` so the floating player star stays in sync when favoriting from rows/context menus
     file-browser.js    -- Filesystem navigation with tags + notes; breadcrumbs/parent/quick-nav/bookmark chip names use `normalizePathSeparators` + `pathFileName` / `parentDirectoryPath` for Windows paths from `fs_list_dir`; chunked row append + path→sample `Map` for duration badges; filter debounce 150ms; lazy row waveforms prefer **`waveform_preview`** via **`_fetchWaveformPeaksFromAudioEngine`**, then **`_decodePeaksViaWorker`**
     help-overlay.js    -- Keyboard shortcuts reference overlay
-    history.js         -- Scan history management + merged timeline
-    ipc.js             -- Tauri v2 IPC bridge + event delegation; `stopAll` stops every scanner plus KVR update check (`stop_updates`); native menu actions use `typeof` guards; Tauri `listen` unlisteners use `.catch` so teardown never rejects
+    history.js         -- Scan history management + merged timeline; **`fetchHistoryListsAndRender`** bumps **`_historyFetchSeq`** and skips apply if a newer refresh started (stale IPC completion)
+    ipc.js             -- Tauri v2 IPC bridge + event delegation; `stopAll` stops every scanner plus KVR update check (`stop_updates`); native menu actions use `typeof` guards; **`onScanProgress` / `onUpdateProgress` / `on*ScanProgress` / `onPdfMetadataProgress`** return **`listen` promises** — callers **`await`** before the matching **`invoke`** so the first progress **`emit` is not dropped**
     keyboard-nav.js    -- Arrow key / j/k table row navigation
     kvr.js             -- KVR Audio resolver + cache management
     multi-filter.js    -- Multi-select checkbox dropdowns
     notes.js           -- Note editor + tag management + tag cloud; path keys normalized like favorites; `setNote` calls `window.updateNoteBtn` so the floating player note button reflects row/modal edits
-    plugins.js         -- Plugin scanning, filtering, sorting, updates; awaits `onScanProgress` (`listen('scan-progress')`) before `invoke('scan_plugins')` so streamed batches are not dropped
+    plugins.js         -- Plugin scanning, filtering, sorting, updates; **`await onScanProgress`** / **`await onUpdateProgress`** before **`scan_plugins`** / **`check_updates`** so streamed batches are not dropped
     presets.js         -- Preset scanning + filtering
     settings.js        -- Color schemes, themes, toggles, preferences
     shortcuts.js       -- Customizable keyboard shortcuts

@@ -593,7 +593,7 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     const scheduleFlush = createScanFlusher(flushPendingProjects, FLUSH_INTERVAL);
 
     if (dawScanProgressCleanup) dawScanProgressCleanup();
-    dawScanProgressCleanup = window.vstUpdater.onDawScanProgress((data) => {
+    dawScanProgressCleanup = await window.vstUpdater.onDawScanProgress((data) => {
         if (data.phase === 'status') {
             // status message
         } else if (data.phase === 'scanning') {

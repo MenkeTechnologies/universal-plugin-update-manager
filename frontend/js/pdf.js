@@ -459,7 +459,7 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
     const scheduleFlush = createScanFlusher(flushPending, FLUSH_INTERVAL);
 
     if (pdfScanProgressCleanup) pdfScanProgressCleanup();
-    pdfScanProgressCleanup = window.vstUpdater.onPdfScanProgress((data) => {
+    pdfScanProgressCleanup = await window.vstUpdater.onPdfScanProgress((data) => {
         if (data.phase === 'status') {
             // status message
         } else if (data.phase === 'scanning') {
@@ -611,7 +611,7 @@ async function startPdfMetadataExtraction() {
             _pdfMetaProgressCleanup();
             _pdfMetaProgressCleanup = null;
         }
-        _pdfMetaProgressCleanup = window.vstUpdater.onPdfMetadataProgress(() => {
+        _pdfMetaProgressCleanup = await window.vstUpdater.onPdfMetadataProgress(() => {
             // After each progress event, re-fetch the visible paths that are still missing
             const missing = filteredPdfs.slice(0, 2000).map(r => r.path).filter(p => _pdfPagesCache[p] === undefined);
             if (missing.length === 0) return;

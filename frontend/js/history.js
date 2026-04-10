@@ -73,31 +73,39 @@ let _historySidebarRenderSeq = 0;
 const HISTORY_SIDEBAR_CHUNK = 100;
 
 async function fetchHistoryListsAndRender() {
-    const [pluginScans, audioScans, dawScans, presetScans, pdfScans, midiScans] = await Promise.all([
-        window.vstUpdater.getScans(),
-        window.vstUpdater.getAudioScans(),
-        window.vstUpdater.getDawScans(),
-        window.vstUpdater.getPresetScans(),
-        window.vstUpdater.getPdfScans(),
-        window.vstUpdater.getMidiScans(),
-    ]);
-    // Merge + sort on the main thread — yield first so tab paint / input / audio aren’t starved when IPC returns.
-    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
-    historyScanList = pluginScans;
-    historyAudioScanList = audioScans;
-    historyDawScanList = dawScans;
-    historyPresetScanList = presetScans;
-    historyPdfScanList = pdfScans;
-    historyMidiScanList = midiScans;
-    historyMergedList = [
-        ...pluginScans.map(s => ({...s, _type: 'plugin'})),
-        ...audioScans.map(s => ({...s, _type: 'audio'})),
-        ...dawScans.map(s => ({...s, _type: 'daw'})),
-        ...presetScans.map(s => ({...s, _type: 'preset'})),
-        ...pdfScans.map(s => ({...s, _type: 'pdf'})),
-        ...midiScans.map(s => ({...s, _type: 'midi'})),
-    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    renderHistoryList();
+    const seq = ++_historyFetchSeq;
+    try {
+        const [pluginScans, audioScans, dawScans, presetScans, pdfScans, midiScans] = await Promise.all([
+            window.vstUpdater.getScans(),
+            window.vstUpdater.getAudioScans(),
+            window.vstUpdater.getDawScans(),
+            window.vstUpdater.getPresetScans(),
+            window.vstUpdater.getPdfScans(),
+            window.vstUpdater.getMidiScans(),
+        ]);
+        if (seq !== _historyFetchSeq) return;
+        // Merge + sort on the main thread — yield first so tab paint / input / audio aren’t starved when IPC returns.
+        if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+        if (seq !== _historyFetchSeq) return;
+        historyScanList = pluginScans;
+        historyAudioScanList = audioScans;
+        historyDawScanList = dawScans;
+        historyPresetScanList = presetScans;
+        historyPdfScanList = pdfScans;
+        historyMidiScanList = midiScans;
+        historyMergedList = [
+            ...pluginScans.map(s => ({...s, _type: 'plugin'})),
+            ...audioScans.map(s => ({...s, _type: 'audio'})),
+            ...dawScans.map(s => ({...s, _type: 'daw'})),
+            ...presetScans.map(s => ({...s, _type: 'preset'})),
+            ...pdfScans.map(s => ({...s, _type: 'pdf'})),
+            ...midiScans.map(s => ({...s, _type: 'midi'})),
+        ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        renderHistoryList();
+    } catch (e) {
+        if (seq !== _historyFetchSeq) return;
+        throw e;
+    }
 }
 
 /**
@@ -108,20 +116,16 @@ async function loadHistory(opts) {
     const preferCache = opts && opts.preferCache === true;
     if (preferCache && historyMergedList.length > 0) {
         renderHistoryList();
-        const seq = ++_historyFetchSeq;
         try {
             await fetchHistoryListsAndRender();
         } catch (e) {
-            if (seq === _historyFetchSeq) {
-                showToast(toastFmt('toast.failed_load_history', {err: e.message || e}), 4000, 'error');
-            }
+            showToast(toastFmt('toast.failed_load_history', {err: e.message || e}), 4000, 'error');
         }
         return;
     }
 
     showGlobalProgress();
     try {
-        _historyFetchSeq += 1;
         await fetchHistoryListsAndRender();
     } catch (e) {
         showToast(toastFmt('toast.failed_load_history', {err: e.message || e}), 4000, 'error');

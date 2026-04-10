@@ -110,7 +110,7 @@ function loadAudioSandbox() {
     stopAudioScan: async () => {},
     scanAudioSamples: async () => ({ samples: [], roots: [] }),
     saveAudioScan: async () => {},
-    onAudioScanProgress: () => () => {},
+    onAudioScanProgress: () => Promise.resolve(() => {}),
     dbQueryAudio: async () => ({ samples: [], totalCount: 0, totalUnfiltered: 0 }),
     dbAudioStats: async () => ({ formatCounts: {}, totalBytes: 0, sampleCount: 0 }),
     findSimilarSamples: async () => [],

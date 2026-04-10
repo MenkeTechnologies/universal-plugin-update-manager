@@ -601,7 +601,7 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
     const scheduleFlush = createScanFlusher(flushPending, FLUSH_INTERVAL);
 
     if (presetScanProgressCleanup) presetScanProgressCleanup();
-    presetScanProgressCleanup = window.vstUpdater.onPresetScanProgress((data) => {
+    presetScanProgressCleanup = await window.vstUpdater.onPresetScanProgress((data) => {
         if (data.phase === 'status') {
             // status message
         } else if (data.phase === 'scanning') {

@@ -1104,17 +1104,14 @@ window.vstUpdater = {
         excludePaths: excludePaths || null
     }),
     stopScan: () => invoke('stop_scan'),
-    /** Returns `Promise<UnlistenFn>` — await before `invoke('scan_plugins')` or early events are dropped. */
+    /**
+     * `onScanProgress`, `onUpdateProgress`, `on*ScanProgress`, `onPdfMetadataProgress` return
+     * `Promise<UnlistenFn>` — await before the matching `invoke` or the first backend `emit` can be dropped.
+     */
     onScanProgress: (callback) => listen('scan-progress', (event) => callback(event.payload)),
     checkUpdates: (plugins) => invoke('check_updates', {plugins}),
     stopUpdates: () => invoke('stop_updates'),
-    onUpdateProgress: (callback) => {
-        const p = listen('update-progress', (event) => callback(event.payload));
-        return () => {
-            p.then((fn) => fn()).catch(() => {
-            });
-        };
-    },
+    onUpdateProgress: (callback) => listen('update-progress', (event) => callback(event.payload)),
     resolveKvr: (directUrl, pluginName) => invoke('resolve_kvr', {directUrl, pluginName}),
     openUpdateUrl: (url) => invoke('open_update_url', {url}),
     openPluginFolder: (path) => invoke('open_plugin_folder', {pluginPath: path}),
@@ -1131,13 +1128,7 @@ window.vstUpdater = {
         excludePaths: excludePaths || null
     }),
     stopAudioScan: () => invoke('stop_audio_scan'),
-    onAudioScanProgress: (callback) => {
-        const p = listen('audio-scan-progress', (event) => callback(event.payload));
-        return () => {
-            p.then((fn) => fn()).catch(() => {
-            });
-        };
-    },
+    onAudioScanProgress: (callback) => listen('audio-scan-progress', (event) => callback(event.payload)),
     openAudioFolder: (path) => invoke('open_audio_folder', {filePath: path}),
     getAudioMetadata: (filePath) => invoke('get_audio_metadata', {filePath}),
     // Audio history
@@ -1159,13 +1150,7 @@ window.vstUpdater = {
         excludePaths: excludePaths || null
     }),
     stopPresetScan: () => invoke('stop_preset_scan'),
-    onPresetScanProgress: (callback) => {
-        const p = listen('preset-scan-progress', (event) => callback(event.payload));
-        return () => {
-            p.then((fn) => fn()).catch(() => {
-            });
-        };
-    },
+    onPresetScanProgress: (callback) => listen('preset-scan-progress', (event) => callback(event.payload)),
     openPresetFolder: (path) => invoke('open_preset_folder', {filePath: path}),
     savePresetScan: (presets, roots) => invoke('preset_history_save', {presets, roots: roots || null}),
     getPresetScans: () => invoke('preset_history_get_scans'),
@@ -1180,13 +1165,7 @@ window.vstUpdater = {
         excludePaths: excludePaths || null
     }),
     stopMidiScan: () => invoke('stop_midi_scan'),
-    onMidiScanProgress: (callback) => {
-        const p = listen('midi-scan-progress', (event) => callback(event.payload));
-        return () => {
-            p.then((fn) => fn()).catch(() => {
-            });
-        };
-    },
+    onMidiScanProgress: (callback) => listen('midi-scan-progress', (event) => callback(event.payload)),
     saveMidiScan: (midiFiles, roots) => invoke('midi_history_save', {midiFiles, roots: roots || null}),
     getMidiScans: () => invoke('midi_history_get_scans'),
     getMidiScanDetail: (id) => invoke('midi_history_get_detail', {id}),
@@ -1225,13 +1204,7 @@ window.vstUpdater = {
     prepareUnifiedScan: () => invoke('prepare_unified_scan'),
     stopUnifiedScan: () => invoke('stop_unified_scan'),
     getUnifiedScanRun: () => invoke('get_unified_scan_run', {}),
-    onPdfScanProgress: (callback) => {
-        const p = listen('pdf-scan-progress', (event) => callback(event.payload));
-        return () => {
-            p.then((fn) => fn()).catch(() => {
-            });
-        };
-    },
+    onPdfScanProgress: (callback) => listen('pdf-scan-progress', (event) => callback(event.payload)),
     openPdfFile: (path) => invoke('open_pdf_file', {filePath: path}),
     openFileDefault: (path) => invoke('open_file_default', {filePath: path}),
     savePdfScan: (pdfs, roots) => invoke('pdf_history_save', {pdfs, roots: roots || null}),
@@ -1249,13 +1222,7 @@ window.vstUpdater = {
     importAudioJson: (filePath) => invoke('import_audio_json', {filePath}),
     importDawJson: (filePath) => invoke('import_daw_json', {filePath}),
     stopDawScan: () => invoke('stop_daw_scan'),
-    onDawScanProgress: (callback) => {
-        const p = listen('daw-scan-progress', (event) => callback(event.payload));
-        return () => {
-            p.then((fn) => fn()).catch(() => {
-            });
-        };
-    },
+    onDawScanProgress: (callback) => listen('daw-scan-progress', (event) => callback(event.payload)),
     openDawFolder: (path) => invoke('open_daw_folder', {filePath: path}),
     openDawProject: (path) => invoke('open_daw_project', {filePath: path}),
     extractProjectPlugins: (path) => invoke('extract_project_plugins', {filePath: path}),
@@ -1314,13 +1281,7 @@ window.vstUpdater = {
     pdfMetadataGet: (paths) => invoke('pdf_metadata_get', {paths}),
     pdfMetadataExtractBatch: (paths) => invoke('pdf_metadata_extract_batch', {paths}),
     pdfMetadataUnindexed: (limit) => invoke('pdf_metadata_unindexed', {limit: limit || 100000}),
-    onPdfMetadataProgress: (callback) => {
-        const p = listen('pdf-metadata-progress', (event) => callback(event.payload));
-        return () => {
-            p.then((fn) => fn()).catch(() => {
-            });
-        };
-    },
+    onPdfMetadataProgress: (callback) => listen('pdf-metadata-progress', (event) => callback(event.payload)),
     readAlsXml: (filePath) => invoke('read_als_xml', {filePath}),
     readProjectFile: (filePath) => invoke('read_project_file', {filePath}),
     // Preferences (file-backed)

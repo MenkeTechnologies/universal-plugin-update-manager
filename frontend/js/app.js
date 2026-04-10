@@ -449,10 +449,15 @@ window.applyInventoryCounts = applyInventoryCounts;
 window.applyInventoryCountsPartial = applyInventoryCountsPartial;
 window.scheduleRefreshInventoryFromDb = scheduleRefreshInventoryFromDb;
 
+/** Monotonic id so overlapping `getProcessStats` / `resolveInventoryCounts` ticks do not interleave DOM updates. */
+let _headerInfoSeq = 0;
+
 async function updateHeaderInfo() {
     if (typeof document !== 'undefined' && document.hidden) return;
+    const seq = ++_headerInfoSeq;
     try {
         const s = await window.vstUpdater.getProcessStats();
+        if (seq !== _headerInfoSeq) return;
         window.__scannerFlags = s.scanner || {};
         const set = (id, val) => {
             const el = document.getElementById(id);
@@ -469,6 +474,7 @@ async function updateHeaderInfo() {
         set('headerPid', s.pid);
         const tc = s.database?.tables || {};
         await resolveInventoryCounts(tc, s.scanner);
+        if (seq !== _headerInfoSeq) return;
 
         // Scan status badge
         const sc = s.scanner || {};
@@ -492,6 +498,7 @@ async function updateHeaderInfo() {
             }
         }
     } catch (err) {
+        if (seq !== _headerInfoSeq) return;
         if (typeof showToast === 'function') showToast(toastFmt('toast.stats_update_failed', {err: err.message || err}), 4000, 'error');
     }
 }

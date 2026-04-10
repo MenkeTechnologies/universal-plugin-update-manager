@@ -288,7 +288,7 @@ async function scanMidi(resume = false, overrideRoots = null) {
     const scheduleMidiFlush = createScanFlusher(flushPendingMidi, FLUSH_INTERVAL);
 
     if (_midiScanProgressCleanup) _midiScanProgressCleanup();
-    _midiScanProgressCleanup = window.vstUpdater.onMidiScanProgress((data) => {
+    _midiScanProgressCleanup = await window.vstUpdater.onMidiScanProgress((data) => {
         if (data.phase === 'scanning') {
             if (data.midiFiles) pendingMidi.push(...data.midiFiles);
             pendingFound = data.found || 0;

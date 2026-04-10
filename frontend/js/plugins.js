@@ -444,7 +444,7 @@ async function checkUpdates() {
 
     const updateEta = createETA();
     if (updateProgressCleanup) updateProgressCleanup();
-    updateProgressCleanup = window.vstUpdater.onUpdateProgress((data) => {
+    updateProgressCleanup = await window.vstUpdater.onUpdateProgress((data) => {
         if (data.phase === 'start') {
             btn.innerHTML = `&#9889; 0 / ${data.total}`;
             statusText.textContent = _ui('ui.js.searching_updates', {n: data.total});
