@@ -3180,8 +3180,22 @@ function syncTrayNowPlayingFromPlayback() {
     /* Menu-bar title is track name only — elapsed/total stay in the popover + tooltip. */
     const title_bar = track.length > 44 ? `${track.slice(0, 41)}…` : track;
     const metaEl = document.getElementById('npMetaLine');
-    const popover_subtitle =
+    let popover_subtitle =
         metaEl && typeof metaEl.textContent === 'string' ? metaEl.textContent.trim() : '';
+    /* Tray HUD: `#npMetaLine` uses path basename when the file is not in the library — same as `#npName`, so the subtitle would repeat the title. */
+    if (popover_subtitle && track) {
+        if (popover_subtitle === track) {
+            popover_subtitle = '';
+        } else if (!popover_subtitle.includes('\u2022')) {
+            const stem = (s) => {
+                const t = s.trim();
+                const i = t.lastIndexOf('.');
+                if (i > 0 && i < t.length - 1) return t.slice(0, i).toLowerCase();
+                return t.toLowerCase();
+            };
+            if (stem(popover_subtitle) === stem(track)) popover_subtitle = '';
+        }
+    }
     const durKey = Number.isFinite(dur) && dur > 0 ? Math.floor(dur) : -1;
     const sigPath = audioPlayerPath || resumePath || '';
     const { appearance: trayAppearancePlaying, sig: trayAppSigPlaying } = trayAppearanceForTraySync();
@@ -4176,13 +4190,15 @@ function canAutoplayAdvanceTrack() {
 /**
  * Next path after `currentPath` in the same ordering as {@link nextTrack}.
  * @param {string} currentPath
- * @param { { autoplay?: boolean } } [opts]
+ * @param { { autoplay?: boolean, respectAutoplaySource?: boolean } } [opts]
  * @returns {string | null}
  */
 function getAutoplayNextPathAfter(currentPath, opts) {
-    const autoplay = opts && opts.autoplay === true;
+    const o = opts || {};
+    /** EOF autoplay (`autoplay`) or tray / menu-bar transport (`respectAutoplaySource`) use `autoplayNextSource`; floating-player buttons omit both. */
+    const useSourceList = o.autoplay === true || o.respectAutoplaySource === true;
     let items;
-    if (autoplay) {
+    if (useSourceList) {
         items = getAutoplayNextSource() === 'player' ? getPlayerHistoryListItems() : getTablePlaybackListItems();
     } else {
         items = getPlayerHistoryListItems();
@@ -4501,9 +4517,18 @@ document.getElementById('npHistoryList')?.addEventListener('click', (e) => {
 });
 
 // ── Previous / Next / Shuffle ──
-function prevTrack() {
+/**
+ * @param { { respectAutoplaySource?: boolean } } [opts] — Tray + menu bar: set true to use **`autoplayNextSource`** (player list vs Samples table). Floating player passes nothing (history list only).
+ */
+function prevTrack(opts) {
     const hadExpanded = expandedMetaPath !== null;
-    const items = getPlayerHistoryListItems();
+    const o = opts || {};
+    const useSourceList = o.respectAutoplaySource === true;
+    const items = useSourceList
+        ? getAutoplayNextSource() === 'player'
+            ? getPlayerHistoryListItems()
+            : getTablePlaybackListItems()
+        : getPlayerHistoryListItems();
     let prevPath = null;
     if (audioShuffling) {
         if (items.length === 0) return;
@@ -4530,14 +4555,16 @@ function prevTrack() {
 }
 
 /**
- * @param { { autoplay?: boolean } } [opts] — When `autoplay`, advance uses **`prefs.autoplayNextSource`**: **player** =
- * sequential order of the floating player list (`getPlayerHistoryListItems`, loops); **samples** = visible Samples
- * table rows (`getTablePlaybackListItems`, loops). Manual next (no `autoplay`) still uses `getPlayerHistoryListItems()`.
+ * @param { { autoplay?: boolean, respectAutoplaySource?: boolean } } [opts] — **`autoplay`**: EOF / failure-chain — uses **`autoplayNextSource`**.
+ * **`respectAutoplaySource`**: tray + menu bar — same. Omit both (floating player): **`getPlayerHistoryListItems`** only.
  */
 function nextTrack(opts) {
     const hadExpanded = expandedMetaPath !== null;
-    const autoplay = opts && opts.autoplay === true;
-    const nextPath = getAutoplayNextPathAfter(audioPlayerPath, { autoplay });
+    const o = opts || {};
+    const nextPath = getAutoplayNextPathAfter(audioPlayerPath, {
+        autoplay: o.autoplay === true,
+        respectAutoplaySource: o.respectAutoplaySource === true,
+    });
     if (!nextPath) return;
     void (async () => {
         await previewAudio(nextPath, { skipRecentReorder: true });

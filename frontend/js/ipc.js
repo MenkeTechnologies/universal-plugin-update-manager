@@ -230,10 +230,12 @@ listen('menu-action', (event) => {
             if (typeof togglePlayerExpanded === 'function') togglePlayerExpanded();
             break;
         case 'next_track':
-            if (typeof nextTrack === 'function') nextTrack();
+        case 'tray_next':
+            if (typeof nextTrack === 'function') nextTrack({ respectAutoplaySource: true });
             break;
         case 'prev_track':
-            if (typeof prevTrack === 'function') prevTrack();
+        case 'tray_prev':
+            if (typeof prevTrack === 'function') prevTrack({ respectAutoplaySource: true });
             break;
         case 'toggle_shuffle':
             if (typeof toggleShuffle === 'function') toggleShuffle();

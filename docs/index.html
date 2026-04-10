@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="AUDIO_HAXOR developer documentation — Rust app_lib API (rustdoc), testing, and project links.">
+  <meta name="description" content="AUDIO_HAXOR developer documentation hub: Rust app_lib API (rustdoc), tests, tray WebView, playback IPC. Release version in package.json / tauri.conf.json.">
   <title>AUDIO_HAXOR — Documentation</title>
   <style>
     :root {
@@ -67,8 +67,8 @@
 <body>
   <div class="wrap">
     <h1>// AUDIO_HAXOR — DOCS</h1>
-    <p class="ver">Tauri v2 · Rust backend <code>app_lib</code> · v1.11.0</p>
-    <p>Static hub for developer documentation. The app UI lives in <code>frontend/index.html</code>; this page is for API reference and contribution notes.</p>
+    <p class="ver">Tauri v2 · Rust backend <code>app_lib</code> · app release version in <code>package.json</code> / <code>src-tauri/tauri.conf.json</code> / <code>src-tauri/Cargo.toml</code></p>
+    <p>Static hub for developer documentation. The main UI is <code>frontend/index.html</code>; the menu-bar tray uses a separate WebView (<code>frontend/tray-popover.html</code> + <code>frontend/js/tray-popover.js</code>).</p>
 
     <div class="card">
       <h2>Rust API (rustdoc)</h2>
@@ -82,18 +82,31 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
     </div>
 
     <div class="card">
+      <h2>Tray popover &amp; playback IPC</h2>
+      <p>High level (details in source comments):</p>
+      <ul>
+        <li><strong>State:</strong> Main window calls <code>update_tray_now_playing</code> (Tauri v2: <code>invoke(..., { payload: { … } })</code>) from <code>syncTrayNowPlayingFromPlayback</code> in <code>frontend/js/audio.js</code>. Payload includes <code>ui_theme</code>, optional <code>appearance</code> (CSS variables from <code>SCHEME_VAR_KEYS</code>), and now-playing fields.</li>
+        <li><strong>Theme &amp; color schemes:</strong> Popover applies <code>data-theme</code> and inline scheme vars so the HUD tracks Settings light/dark and color presets.</li>
+        <li><strong>Previous / Next:</strong> Snake-case menu IDs <code>prev_track</code> / <code>next_track</code> (tray popover, native menu bar, <code>tray_prev</code> / <code>tray_next</code>) call <code>prevTrack</code> / <code>nextTrack</code> with <code>respectAutoplaySource: true</code> so the list follows <code>autoplayNextSource</code> (player history vs visible Samples table). Floating player buttons use camelCase actions and stay on the history list only.</li>
+        <li><strong>Autoplay next (on/off):</strong> Gates end-of-track and <strong>failed-preview</strong> auto-advance (<code>tryPreviewAutoplayNextOnFailureAsync</code> in <code>previewAudio</code>) along the same list as EOF (<code>autoplayNextSource</code>), after an error toast; can chain across multiple bad files. Does not gate manual prev/next from tray/menu/shortcuts.</li>
+        <li><strong>Tray mirror:</strong> The popover has no separate queue — it reflects the main window via <code>syncTrayNowPlayingFromPlayback</code> after the current path updates.</li>
+      </ul>
+    </div>
+
+    <div class="card">
       <h2>Repository</h2>
       <ul>
         <li><a href="https://github.com/MenkeTechnologies/Audio-Haxor">GitHub — Audio-Haxor</a></li>
-        <li>Full prose docs: see <code>README.md</code> at repo root (features, testing, architecture).</li>
+        <li>Full prose docs: <code>README.md</code> at repo root (features, testing, architecture).</li>
       </ul>
     </div>
 
     <div class="card">
       <h2>Tests (quick ref)</h2>
+      <p>Counts change with every commit; run locally for current totals.</p>
       <ul>
-        <li><strong>Rust:</strong> 477 total (<code>cargo test --manifest-path src-tauri/Cargo.toml</code>)</li>
-        <li><strong>JavaScript:</strong> 995 <code>node:test</code> runs — pure helpers &amp; bulk micro-tests; <strong>not</strong> DOM/Tauri/E2E (see README)</li>
+        <li><strong>Rust:</strong> <code>cargo test --manifest-path src-tauri/Cargo.toml</code></li>
+        <li><strong>JavaScript:</strong> <code>pnpm run test:js</code> — pure helpers and micro-tests; not DOM/Tauri/E2E (see README)</li>
         <li><strong>Combined:</strong> <code>pnpm test</code></li>
       </ul>
     </div>

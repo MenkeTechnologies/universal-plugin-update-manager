@@ -428,9 +428,9 @@ function executeShortcut(id) {
     } else if (id === 'playPause') {
         toggleAudioPlayback();
     } else if (id === 'nextTrack') {
-        nextTrack();
+        nextTrack({ respectAutoplaySource: true });
     } else if (id === 'prevTrack') {
-        prevTrack();
+        prevTrack({ respectAutoplaySource: true });
     } else if (id === 'scanAll') {
         if (typeof scanAll === 'function') scanAll();
     } else if (id === 'stopAll') {

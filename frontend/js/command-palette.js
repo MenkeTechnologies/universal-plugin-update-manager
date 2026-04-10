@@ -788,10 +788,22 @@ function buildPaletteStaticItems() {
         });
     }
     if (typeof nextTrack === 'function') {
-        items.push({type: 'action', name: appFmt('menu.next_track'), icon: '&#9193;', ...paletteShortcutTip('nextTrack'), action: () => nextTrack()});
+        items.push({
+            type: 'action',
+            name: appFmt('menu.next_track'),
+            icon: '&#9193;',
+            ...paletteShortcutTip('nextTrack'),
+            action: () => nextTrack({ respectAutoplaySource: true }),
+        });
     }
     if (typeof prevTrack === 'function') {
-        items.push({type: 'action', name: appFmt('menu.prev_track'), icon: '&#9194;', ...paletteShortcutTip('prevTrack'), action: () => prevTrack()});
+        items.push({
+            type: 'action',
+            name: appFmt('menu.prev_track'),
+            icon: '&#9194;',
+            ...paletteShortcutTip('prevTrack'),
+            action: () => prevTrack({ respectAutoplaySource: true }),
+        });
     }
     if (typeof toggleAudioLoop === 'function') {
         items.push({
