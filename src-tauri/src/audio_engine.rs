@@ -13,10 +13,12 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime};
+
+use tauri::{AppHandle, Emitter};
 
 /// Placeholder struct kept for serde stability / future prefs sync.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -72,6 +74,16 @@ static ENGINE_CHILD: Mutex<Option<EngineChild>> = Mutex::new(None);
 /// OS PID of the current AudioEngine (`Child::id`), or `0` if none. Used for kill-on-exit without
 /// waiting on [`ENGINE_CHILD`] (see module comment).
 static ENGINE_CHILD_PID: AtomicU32 = AtomicU32::new(0);
+
+/// Host-side `playback_status` poll for library playback EOF when the WebView defers its **`setInterval`**
+/// poll (**`isUiIdleHeavyCpu`** — hidden, unfocused, minimized; see `syncEnginePlaybackEofWatchdog` in
+/// `audio-engine.js`). Throttled background timers can miss EOF for autoplay-next; this thread emits
+/// `audio-engine-playback-eof` on the same `loaded && eof` rising edge as the UI poll.
+static EOF_WATCHDOG_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Only runs while the WebView poll is deferred — ~1 Hz keeps idle CPU low; foreground-focused playback
+/// does not run this thread.
+const EOF_WATCHDOG_POLL_MS: u64 = 1000;
 
 #[inline]
 fn record_engine_pid(child: &Child) {
@@ -343,6 +355,7 @@ fn ensure_engine_child(path: &Path) -> Result<(), String> {
 /// (which can take many seconds if an IPC thread still holds [`ENGINE_CHILD`]). Reaping runs on
 /// a background thread; the next `spawn_audio_engine_request` will spawn a fresh child if needed.
 pub fn restart_audio_engine_child() -> Result<(), String> {
+    audio_engine_eof_watchdog_stop();
     let pid = ENGINE_CHILD_PID.swap(0, Ordering::SeqCst);
     if pid != 0 {
         kill_pid_raw(pid);
@@ -377,6 +390,7 @@ fn clear_engine_slot_after_os_kill() -> bool {
 
 /// Kill the JUCE AudioEngine when the host app exits. Idempotent (safe if no child was spawned).
 pub fn shutdown_audio_engine_child() -> Result<(), String> {
+    audio_engine_eof_watchdog_stop();
     let pid = ENGINE_CHILD_PID.swap(0, Ordering::SeqCst);
     if pid != 0 {
         kill_pid_raw(pid);
@@ -384,6 +398,44 @@ pub fn shutdown_audio_engine_child() -> Result<(), String> {
     let _ = clear_engine_slot_after_os_kill();
     crate::write_app_log("audio-engine: AudioEngine terminated (app shutdown)".to_string());
     Ok(())
+}
+
+/// Start a background thread that polls `playback_status` every [`EOF_WATCHDOG_POLL_MS`] and emits
+/// `audio-engine-playback-eof` when `loaded && eof` transitions to true (same edge `audio-engine.js`
+/// uses for autoplay next).
+/// Idempotent — if already running, returns immediately.
+pub fn audio_engine_eof_watchdog_start(app: AppHandle) {
+    if EOF_WATCHDOG_ACTIVE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    thread::spawn(move || {
+        let mut prev_eof = false;
+        while EOF_WATCHDOG_ACTIVE.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(EOF_WATCHDOG_POLL_MS));
+            if !EOF_WATCHDOG_ACTIVE.load(Ordering::SeqCst) {
+                break;
+            }
+            let v = match spawn_audio_engine_request(&serde_json::json!({ "cmd": "playback_status" })) {
+                Ok(v) => v,
+                Err(_) => {
+                    prev_eof = false;
+                    continue;
+                }
+            };
+            let loaded = v.get("loaded").and_then(|v| v.as_bool()).unwrap_or(false);
+            let eof = v.get("eof").and_then(|v| v.as_bool()).unwrap_or(false);
+            let at_eof = loaded && eof;
+            if at_eof && !prev_eof {
+                let _ = app.emit("audio-engine-playback-eof", serde_json::Value::Null);
+            }
+            prev_eof = at_eof;
+        }
+    });
+}
+
+/// Stop the host EOF poll (e.g. when library playback polling stops or the engine restarts).
+pub fn audio_engine_eof_watchdog_stop() {
+    EOF_WATCHDOG_ACTIVE.store(false, Ordering::SeqCst);
 }
 
 /// Run one request against the audio-engine subprocess (stdin / stdout JSON lines).

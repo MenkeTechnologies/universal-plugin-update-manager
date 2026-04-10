@@ -1,0 +1,4 @@
+{
+  "toast.playback_failed_autoplay_next": "Playback failed ({ext}) — {err}. Playing next sample.",
+  "toast.preview_not_supported_format": "This format cannot be previewed in the player ({ext})"
+}

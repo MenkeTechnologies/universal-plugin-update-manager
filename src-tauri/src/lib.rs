@@ -2935,6 +2935,18 @@ fn audio_engine_restart() -> Result<(), String> {
 }
 
 #[tauri::command]
+fn audio_engine_eof_watchdog_start(app: AppHandle) -> Result<(), String> {
+    audio_engine::audio_engine_eof_watchdog_start(app);
+    Ok(())
+}
+
+#[tauri::command]
+fn audio_engine_eof_watchdog_stop() -> Result<(), String> {
+    audio_engine::audio_engine_eof_watchdog_stop();
+    Ok(())
+}
+
+#[tauri::command]
 fn append_log(msg: String) {
     write_app_log(msg);
 }
@@ -7290,6 +7302,8 @@ pub fn run() {
             write_cache_file,
             audio_engine_invoke,
             audio_engine_restart,
+            audio_engine_eof_watchdog_start,
+            audio_engine_eof_watchdog_stop,
             get_audio_engine_process_stats,
             append_log,
             read_log,

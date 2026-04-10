@@ -79,6 +79,13 @@ async function reloadAppStrings(locale) {
 
 window.reloadAppStrings = reloadAppStrings;
 
+/** Host `playback_status` poll (Rust) when the WebView timer is deferred — same EOF edge as `runEnginePlaybackStatusTick`. */
+listen('audio-engine-playback-eof', () => {
+    if (typeof window.handleEnginePlaybackEofFromPoll === 'function') {
+        window.handleEnginePlaybackEofFromPoll();
+    }
+});
+
 // ── Menu bar event handler ──
 listen('menu-action', (event) => {
     const id = event.payload;
@@ -1080,6 +1087,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 function showToast(message, duration = 2500, type = '') {
+    if (type === 'error' && window.vstUpdater?.appendLog) {
+        window.vstUpdater.appendLog('TOAST_ERROR: ' + message);
+    }
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) {
+        return;
+    }
     const container = document.getElementById('toastContainer');
     if (!container) return;
     const el = document.createElement('div');
@@ -1089,10 +1102,15 @@ function showToast(message, duration = 2500, type = '') {
     el.style.animation = `toast-in 0.3s ease-out, toast-out 0.3s ease-in ${fadeStart}s forwards`;
     container.appendChild(el);
     setTimeout(() => el.remove(), duration);
-    // Log error toasts to app.log
-    if (type === 'error' && window.vstUpdater?.appendLog) {
-        window.vstUpdater.appendLog('TOAST_ERROR: ' + message);
-    }
+}
+
+/** When the window is backgrounded, minimized, or the page is hidden (see `ui-idle.js`), drop slide-in toasts so nothing stacks off-screen. */
+if (typeof document !== 'undefined') {
+    document.addEventListener('ui-idle-heavy-cpu', (e) => {
+        if (!e.detail || !e.detail.idle) return;
+        const container = document.getElementById('toastContainer');
+        if (container) container.innerHTML = '';
+    });
 }
 
 window.vstUpdater = {
@@ -1319,6 +1337,8 @@ window.vstUpdater = {
     /** AudioEngine (persistent stdin loop): `{ cmd, ... }` → JSON. Includes `engine_state`, `start_output_stream` (`start_playback` for file PCM decode), `playback_load` / `playback_pause` / `playback_seek` / `playback_set_dsp` / `playback_set_speed` / `playback_set_reverse` / `playback_set_loop` / `playback_status` (optional `spectrum` + `spectrum_fft_size` / `spectrum_bins` / `spectrum_sr_hz` when output is running) / `playback_stop`, `playback_set_inserts` (VST3/AU bundle paths or cached `fileOrIdentifier`; stop stream first), `playback_open_insert_editor` / `playback_close_insert_editor` (native plug-in UI; `slot` is chain index), `stop_output_stream`, `start_input_stream` / `stop_input_stream`, `set_output_tone`, `plugin_chain` (scan + inserts; while scanning: `scan_done` / `scan_total` / `scan_skipped` / `scan_cache_loaded` / `scan_current_format` / `scan_current_name`). Stream `output_stream_status` / `input_stream_status` include `current_buffer_frames` (actual buffer length). UI: `audio-engine.js` + `audio.js` (`enginePlaybackStart`, waveform `pointerdown` seek, DSP). */
     audioEngineInvoke: (request) => invoke('audio_engine_invoke', {request}),
     audioEngineRestart: () => invoke('audio_engine_restart'),
+    audioEngineEofWatchdogStart: () => invoke('audio_engine_eof_watchdog_start'),
+    audioEngineEofWatchdogStop: () => invoke('audio_engine_eof_watchdog_stop'),
     batchAnalyze: (paths) => invoke('batch_analyze', {paths}),
     dbQueryPlugins: (params) => invoke('db_query_plugins', params || {}),
     dbQueryDaw: (params) => invoke('db_query_daw', params || {}),

@@ -2645,7 +2645,13 @@ async function showEngineUnplayablePreview(filePath) {
 async function previewAudio(filePath) {
     const ext = filePath.split('.').pop().toLowerCase();
     if (isEngineUnplayablePath(filePath)) {
-        if (tryPreviewAutoplayNextOnFailure(filePath)) return;
+        const extU = (filePath.split('.').pop() || '').toLowerCase();
+        const extDisplay = extU ? extU.toUpperCase() : '?';
+        const unplayableErr =
+            typeof toastFmt === 'function'
+                ? toastFmt('toast.preview_not_supported_format', { ext: extDisplay })
+                : undefined;
+        if (tryPreviewAutoplayNextOnFailure(filePath, unplayableErr)) return;
         await showEngineUnplayablePreview(filePath);
         return;
     }
@@ -2676,7 +2682,7 @@ async function previewAudio(filePath) {
             }
             let advancedAfterPlayFailure = false;
             await audioPlayer.play().catch(e => {
-                if (tryPreviewAutoplayNextOnFailure(filePath)) {
+                if (tryPreviewAutoplayNextOnFailure(filePath, e)) {
                     advancedAfterPlayFailure = true;
                     return;
                 }
@@ -2788,7 +2794,7 @@ async function previewAudio(filePath) {
     } catch (err) {
         setEnginePlaybackActive(false);
         if (typeof window.stopEnginePlaybackPoll === 'function') window.stopEnginePlaybackPoll();
-        if (tryPreviewAutoplayNextOnFailure(filePath)) return;
+        if (tryPreviewAutoplayNextOnFailure(filePath, err)) return;
         showToast(toastFmt('toast.playback_failed', {
             ext: ext.toUpperCase(),
             err: err.message || err || 'Unknown error'
@@ -3974,12 +3980,28 @@ function getAutoplayNextPathAfter(currentPath, opts) {
     return items[nextIdx].path;
 }
 
-/** When autoplay-next is on, skip to the following sample after a failed preview (decode/play/unplayable). */
-function tryPreviewAutoplayNextOnFailure(failedPath) {
+/**
+ * When autoplay-next is on, skip to the following sample after a failed preview (decode/play/unplayable).
+ * Shows an error toast with the failure reason while starting the next sample.
+ * @param {string} failedPath
+ * @param {string | Error | undefined} [errDetail]
+ */
+function tryPreviewAutoplayNextOnFailure(failedPath, errDetail) {
     if (!canAutoplayAdvanceTrack()) return false;
     const nextPath = getAutoplayNextPathAfter(failedPath, { autoplay: true });
     if (!nextPath || nextPath === failedPath) return false;
     void previewAudio(nextPath);
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        const extRaw = (failedPath.split('.').pop() || '').toLowerCase();
+        const ext = extRaw ? extRaw.toUpperCase() : '?';
+        let errMsg;
+        if (errDetail != null && errDetail !== '') {
+            errMsg = typeof errDetail === 'string' ? errDetail : (errDetail.message || String(errDetail));
+        } else {
+            errMsg = typeof catalogFmt === 'function' ? catalogFmt('toast.unknown_error') : 'Unknown error';
+        }
+        showToast(toastFmt('toast.playback_failed_autoplay_next', { ext, err: errMsg }), 4000, 'error');
+    }
     return true;
 }
 
