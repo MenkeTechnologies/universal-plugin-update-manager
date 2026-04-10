@@ -94,14 +94,14 @@ pub fn build_native_menu_bar<R: Runtime>(
         "export_audio",
         t("menu.export_samples", "Export Samples..."),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+E"),
     )?;
     let import_audio = MenuItem::with_id(
         handle,
         "import_audio",
         t("menu.import_samples", "Import Samples..."),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+I"),
     )?;
     let sep3 = PredefinedMenuItem::separator(handle)?;
     let export_daw = MenuItem::with_id(
@@ -109,14 +109,14 @@ pub fn build_native_menu_bar<R: Runtime>(
         "export_daw",
         t("menu.export_daw", "Export DAW Projects..."),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+O"),
     )?;
     let import_daw = MenuItem::with_id(
         handle,
         "import_daw",
         t("menu.import_daw", "Import DAW Projects..."),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+J"),
     )?;
     let sep4 = PredefinedMenuItem::separator(handle)?;
     let export_presets = MenuItem::with_id(
@@ -124,14 +124,14 @@ pub fn build_native_menu_bar<R: Runtime>(
         "export_presets",
         t("menu.export_presets", "Export Presets..."),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+Y"),
     )?;
     let import_presets = MenuItem::with_id(
         handle,
         "import_presets",
         t("menu.import_presets", "Import Presets..."),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+Z"),
     )?;
     let file_menu = Submenu::with_id_and_items(
         handle,
@@ -313,7 +313,7 @@ pub fn build_native_menu_bar<R: Runtime>(
         "tab_audio_engine",
         t("menu.tab_audio_engine", "Audio Engine"),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+F6"),
     )?;
     let view_sep = PredefinedMenuItem::separator(handle)?;
     let toggle_theme = MenuItem::with_id(
@@ -328,7 +328,7 @@ pub fn build_native_menu_bar<R: Runtime>(
         "toggle_crt",
         t("menu.toggle_crt", "Toggle CRT Effects"),
         true,
-        None::<&str>,
+        Some("F1"),
     )?;
     let view_sep2 = PredefinedMenuItem::separator(handle)?;
     let reset_columns = MenuItem::with_id(
@@ -336,14 +336,14 @@ pub fn build_native_menu_bar<R: Runtime>(
         "reset_columns",
         t("menu.reset_columns", "Reset Column Widths"),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+W"),
     )?;
     let reset_tabs = MenuItem::with_id(
         handle,
         "reset_tabs",
         t("menu.reset_tabs", "Reset Tab Order"),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+T"),
     )?;
 
     let view_menu = Submenu::with_id_and_items(
@@ -427,7 +427,7 @@ pub fn build_native_menu_bar<R: Runtime>(
         "toggle_mute",
         t("menu.toggle_mute", "Mute / Unmute"),
         true,
-        None::<&str>,
+        Some("M"),
     )?;
     let playback_sep = PredefinedMenuItem::separator(handle)?;
 
@@ -463,21 +463,21 @@ pub fn build_native_menu_bar<R: Runtime>(
         "clear_all_databases",
         t("menu.clear_all_databases", "Clear All Databases"),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+Alt+D"),
     )?;
     let clear_kvr = MenuItem::with_id(
         handle,
         "clear_kvr",
         t("menu.clear_kvr", "Clear KVR Cache..."),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+Alt+K"),
     )?;
     let clear_favorites = MenuItem::with_id(
         handle,
         "clear_favorites",
         t("menu.clear_favorites", "Clear Favorites..."),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+Alt+F"),
     )?;
 
     let reset_all = MenuItem::with_id(
@@ -514,7 +514,7 @@ pub fn build_native_menu_bar<R: Runtime>(
         "help_overlay",
         t("menu.help_overlay", "Keyboard Shortcuts"),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+/"),
     )?;
 
     let data_menu = Submenu::with_id_and_items(
@@ -566,14 +566,14 @@ pub fn build_native_menu_bar<R: Runtime>(
         "github",
         t("menu.github", "GitHub Repository"),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+G"),
     )?;
     let docs = MenuItem::with_id(
         handle,
         "docs",
         t("menu.docs", "Documentation"),
         true,
-        None::<&str>,
+        Some("CmdOrCtrl+Shift+Alt+P"),
     )?;
 
     let help_menu = Submenu::with_id_and_items(
