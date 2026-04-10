@@ -835,15 +835,28 @@ function buildPaletteDynamicItems() {
     if (typeof settingToggleAutoplayNext === 'function' && typeof prefs !== 'undefined') {
         const apOn = prefs.getItem('autoplayNext') !== 'off';
         const detail = apOn ? catalogFmt('ui.js.toggle_on') : catalogFmt('ui.js.toggle_off');
-        const name = catalogFmt('menu.palette_autoplay_next');
         const toggleLabel = catalogFmt('menu.toggle_autoplay_next');
+        const legacy = catalogFmt('menu.palette_autoplay_next');
+        const samplesName = catalogFmt('menu.palette_autoplay_next_samples');
+        const playerName = catalogFmt('menu.palette_autoplay_next_player');
+        const sharedFields = [samplesName, playerName, detail, toggleLabel, legacy];
+        const icon = '&#9197;';
+        const action = () => settingToggleAutoplayNext();
         items.push({
             type: 'action',
-            name,
+            name: samplesName,
             detail,
-            fields: [name, detail, toggleLabel],
-            icon: '&#9197;',
-            action: () => settingToggleAutoplayNext()
+            fields: sharedFields,
+            icon,
+            action
+        });
+        items.push({
+            type: 'action',
+            name: playerName,
+            detail,
+            fields: sharedFields,
+            icon,
+            action
         });
     }
     if (typeof getFavDirs === 'function') {

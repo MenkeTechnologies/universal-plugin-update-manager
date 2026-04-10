@@ -233,6 +233,8 @@
   "menu.open_prefs_file": "Open Prefs File",
   "menu.open_with_default_app": "Open with Default App",
   "menu.palette_autoplay_next": "Autoplay next (advance on track end)",
+  "menu.palette_autoplay_next_player": "Autoplay next — floating player (recently played when fewer than 2 sample rows visible)",
+  "menu.palette_autoplay_next_samples": "Autoplay next — sample rows (visible Samples table order when 2+ rows)",
   "menu.paste_and_search": "Paste & Search",
   "menu.pause": "Pause",
   "menu.play": "Play",
