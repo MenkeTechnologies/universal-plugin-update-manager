@@ -3949,11 +3949,24 @@ function getTablePlaybackListItems() {
     return items;
 }
 
-/** Whether autoplay-after-EOF may run (Settings + enough items in table or recently played). */
+/**
+ * Which list EOF autoplay advances through (`prefs.autoplayNextSource`).
+ * @returns {'player' | 'samples'}
+ */
+function getAutoplayNextSource() {
+    if (typeof prefs === 'undefined') return 'samples';
+    return prefs.getItem('autoplayNextSource') === 'player' ? 'player' : 'samples';
+}
+
+window.getAutoplayNextSource = getAutoplayNextSource;
+
+/** Whether autoplay-after-EOF may run (Settings on + non-empty chosen list). */
 function canAutoplayAdvanceTrack() {
     if (typeof prefs === 'undefined' || prefs.getItem('autoplayNext') === 'off') return false;
-    if (getTablePlaybackListItems().length >= 2) return true;
-    return typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 1;
+    if (getAutoplayNextSource() === 'player') {
+        return getPlayerHistoryListItems().length >= 1;
+    }
+    return getTablePlaybackListItems().length >= 1;
 }
 
 /**
@@ -3966,14 +3979,7 @@ function getAutoplayNextPathAfter(currentPath, opts) {
     const autoplay = opts && opts.autoplay === true;
     let items;
     if (autoplay) {
-        const tableItems = getTablePlaybackListItems();
-        if (tableItems.length >= 2) {
-            items = tableItems;
-        } else if (typeof recentlyPlayed !== 'undefined' && Array.isArray(recentlyPlayed) && recentlyPlayed.length > 0) {
-            items = recentlyPlayed;
-        } else {
-            items = getPlayerHistoryListItems();
-        }
+        items = getAutoplayNextSource() === 'player' ? getPlayerHistoryListItems() : getTablePlaybackListItems();
     } else {
         items = getPlayerHistoryListItems();
     }
@@ -4296,9 +4302,9 @@ function prevTrack() {
 }
 
 /**
- * @param { { autoplay?: boolean } } [opts] — When `autoplay`, advance using the **Samples table** row order when at least
- * two rows are visible (current sort/filter/page); otherwise Recently Played. Manual next (no `autoplay`) still uses
- * `getPlayerHistoryListItems()` (history list + player search).
+ * @param { { autoplay?: boolean } } [opts] — When `autoplay`, advance uses **`prefs.autoplayNextSource`**: **player** =
+ * sequential order of the floating player list (`getPlayerHistoryListItems`, loops); **samples** = visible Samples
+ * table rows (`getTablePlaybackListItems`, loops). Manual next (no `autoplay`) still uses `getPlayerHistoryListItems()`.
  */
 function nextTrack(opts) {
     const hadExpanded = expandedMetaPath !== null;

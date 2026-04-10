@@ -1031,6 +1031,18 @@ function settingToggleAutoplayNext() {
     refreshSettingsUI();
 }
 
+/** `autoplayNextSource`: `player` or `samples`. */
+function settingSetAutoplayNextSource(val) {
+    const v = val === 'player' ? 'player' : 'samples';
+    prefs.setItem('autoplayNextSource', v);
+    const srcLabel =
+        typeof appFmt === 'function'
+            ? appFmt(v === 'player' ? 'ui.autoplay_next_source.player' : 'ui.autoplay_next_source.samples')
+            : v;
+    showToast(toastFmt('toast.autoplay_next_source', {source: srcLabel}));
+    refreshSettingsUI();
+}
+
 function settingToggleShowPlayerOnStartup() {
     const current = prefs.getItem('showPlayerOnStartup') === 'on';
     const next = !current;
@@ -1480,6 +1492,16 @@ function refreshSettingsUI() {
         npAutoplayBtn.classList.toggle('active', autoplay);
         npAutoplayLabel.textContent = _uiToggle(autoplay);
     }
+    const apSrc =
+        typeof getAutoplayNextSource === 'function'
+            ? getAutoplayNextSource()
+            : prefs.getItem('autoplayNextSource') === 'player'
+                ? 'player'
+                : 'samples';
+    const settingApSrc = document.getElementById('settingAutoplayNextSource');
+    if (settingApSrc) settingApSrc.value = apSrc;
+    const npApSrc = document.getElementById('npAutoplayNextSource');
+    if (npApSrc) npApSrc.value = apSrc;
 
     // Include Ableton backups
     const includeBackups = prefs.getItem('includeAbletonBackups') === 'on';

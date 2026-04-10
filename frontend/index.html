@@ -6353,6 +6353,16 @@
             left: 17px;
         }
 
+        .np-history-title-bar .np-autoplay-source-select {
+            font-size: 9px;
+            max-width: 148px;
+            padding: 2px 4px;
+            background: var(--bg-input);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+        }
+
         /* Visualizer tab — HUD / cyberdeck panels (chamfered, glow, not flat blocks) */
         .viz-container {
             position: relative;
@@ -8183,6 +8193,11 @@
                         <span class="settings-toggle-label" id="npAutoplayNextLabel">On</span>
                         <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
                     </button>
+                    <select id="npAutoplayNextSource" class="np-autoplay-source-select" data-action="settingAutoplayNextSource"
+                            data-i18n-title="ui.tt.autoplay_next_source" title="Autoplay next queue">
+                        <option value="samples" data-i18n="ui.opt.autoplay_next_source_samples">Samples</option>
+                        <option value="player" data-i18n="ui.opt.autoplay_next_source_player">Player</option>
+                    </select>
                     <button class="btn-small btn-secondary" data-action="exportRecentlyPlayed"
                             data-i18n="ui.btn.export"
                             data-i18n-title="ui.tt.export_play_history_as_json"
@@ -10427,6 +10442,21 @@
                             <span class="settings-toggle-label" id="settingAutoplayNextLabel">On</span>
                             <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
                         </button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title" data-i18n="ui.st.autoplay_next_source">Autoplay next queue</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.autoplay_next_source">When autoplay next is on, advance through the floating player list (loops) or visible Samples rows (loops)</span>
+                    </div>
+                    <div class="settings-control">
+                        <select class="settings-select" data-action="settingAutoplayNextSource" data-i18n-title="ui.tt.autoplay_next_source"
+                                id="settingAutoplayNextSource"
+                                title="Which list EOF autoplay cycles through">
+                            <option value="samples" data-i18n="ui.opt.autoplay_next_source_samples">Samples table (visible rows)</option>
+                            <option value="player" data-i18n="ui.opt.autoplay_next_source_player">Player list (recently played)</option>
+                        </select>
                     </div>
                 </div>
                 <div class="settings-row">

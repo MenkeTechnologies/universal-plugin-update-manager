@@ -834,29 +834,64 @@ function buildPaletteDynamicItems() {
     }
     if (typeof settingToggleAutoplayNext === 'function' && typeof prefs !== 'undefined') {
         const apOn = prefs.getItem('autoplayNext') !== 'off';
-        const detail = apOn ? catalogFmt('ui.js.toggle_on') : catalogFmt('ui.js.toggle_off');
-        const toggleLabel = catalogFmt('menu.toggle_autoplay_next');
-        const legacy = catalogFmt('menu.palette_autoplay_next');
-        const samplesName = catalogFmt('menu.palette_autoplay_next_samples');
-        const playerName = catalogFmt('menu.palette_autoplay_next_player');
-        const sharedFields = [samplesName, playerName, detail, toggleLabel, legacy];
-        const icon = '&#9197;';
-        const action = () => settingToggleAutoplayNext();
+        const src =
+            typeof getAutoplayNextSource === 'function'
+                ? getAutoplayNextSource()
+                : prefs.getItem('autoplayNextSource') === 'player'
+                    ? 'player'
+                    : 'samples';
+        const onOff = apOn ? catalogFmt('ui.js.toggle_on') : catalogFmt('ui.js.toggle_off');
+        const srcLabel =
+            src === 'player' ? catalogFmt('ui.autoplay_next_source_abbr.player') : catalogFmt('ui.autoplay_next_source_abbr.samples');
+        const detail = `${onOff} · ${srcLabel}`;
         items.push({
             type: 'action',
-            name: samplesName,
+            name: catalogFmt('menu.toggle_autoplay_next'),
             detail,
-            fields: sharedFields,
-            icon,
-            action
+            fields: [
+                catalogFmt('menu.toggle_autoplay_next'),
+                detail,
+                catalogFmt('menu.palette_autoplay_next'),
+                catalogFmt('menu.palette_autoplay_source_player'),
+                catalogFmt('menu.palette_autoplay_source_samples'),
+            ],
+            icon: '&#9197;',
+            action: () => settingToggleAutoplayNext()
+        });
+    }
+    if (typeof settingSetAutoplayNextSource === 'function' && typeof prefs !== 'undefined') {
+        const src =
+            typeof getAutoplayNextSource === 'function'
+                ? getAutoplayNextSource()
+                : prefs.getItem('autoplayNextSource') === 'player'
+                    ? 'player'
+                    : 'samples';
+        const active = catalogFmt('ui.palette.autoplay_source_active');
+        items.push({
+            type: 'action',
+            name: catalogFmt('menu.palette_autoplay_source_player'),
+            detail: src === 'player' ? active : '',
+            fields: [
+                catalogFmt('menu.palette_autoplay_source_player'),
+                catalogFmt('menu.palette_autoplay_source_samples'),
+                catalogFmt('menu.palette_autoplay_next_samples'),
+                catalogFmt('menu.palette_autoplay_next_player'),
+            ],
+            icon: '&#9835;',
+            action: () => settingSetAutoplayNextSource('player')
         });
         items.push({
             type: 'action',
-            name: playerName,
-            detail,
-            fields: sharedFields,
-            icon,
-            action
+            name: catalogFmt('menu.palette_autoplay_source_samples'),
+            detail: src === 'samples' ? active : '',
+            fields: [
+                catalogFmt('menu.palette_autoplay_source_samples'),
+                catalogFmt('menu.palette_autoplay_source_player'),
+                catalogFmt('menu.palette_autoplay_next_samples'),
+                catalogFmt('menu.palette_autoplay_next_player'),
+            ],
+            icon: '&#127925;',
+            action: () => settingSetAutoplayNextSource('samples')
         });
     }
     if (typeof getFavDirs === 'function') {

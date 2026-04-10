@@ -50,6 +50,8 @@ verbosity = "normal"
 
 [player]
 dock = "dock-br"
+# Frontend prefs key `autoplayNextSource`: "samples" (visible table rows) or "player" (recently played list). EOF autoplay cycles that list only.
+autoplayNextSource = "samples"
 
 [tabs]
 order = '["plugins","samples","daw","presets","favorites","history","settings"]'

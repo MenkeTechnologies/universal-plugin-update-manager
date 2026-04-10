@@ -1063,6 +1063,8 @@ document.addEventListener('change', (e) => {
     } else if (action === 'settingLogVerbosity') {
         settingSaveSelect('logVerbosity', e.target.value);
         if (typeof showToast === 'function') showToast(toastFmt('toast.log_verbosity_saved'));
+    } else if (action === 'settingAutoplayNextSource') {
+        if (typeof settingSetAutoplayNextSource === 'function') settingSetAutoplayNextSource(e.target.value);
     }
 });
 
