@@ -6,6 +6,8 @@
 
 let _vizMode = 'all';
 let _vizRAF = null;
+/** Throttle / idle wake — avoids 60Hz `requestAnimationFrame` when Visualizer tab is open but idle or between throttled frames. */
+let _vizBackoffTimer = null;
 let _vizSpectrogramData = [];
 let _vizSpectrogramIdx = 0; // ring buffer write index
 let _vizLastFrame = 0;
@@ -271,39 +273,55 @@ function _resizeCanvases() {
 }
 
 // ── Start/Stop ──
-function startVisualizer() {
-    _resizeCanvases();
-    if (_vizRAF) return;
-    const empty = document.getElementById('vizEmpty');
-    if (empty) empty.style.display = 'none';
-    _vizLoop();
-}
-
-function stopVisualizer() {
-    if (_vizRAF) {
+function _vizCancelScheduled() {
+    if (_vizBackoffTimer != null) {
+        clearTimeout(_vizBackoffTimer);
+        _vizBackoffTimer = null;
+    }
+    if (_vizRAF != null) {
         cancelAnimationFrame(_vizRAF);
         _vizRAF = null;
     }
 }
 
+/** @param {number} delayMs 0 = next frame via rAF; >0 = setTimeout (throttle or idle poll). */
+function _vizScheduleNext(delayMs) {
+    _vizCancelScheduled();
+    if (delayMs > 0) {
+        _vizBackoffTimer = setTimeout(() => {
+            _vizBackoffTimer = null;
+            _vizRAF = requestAnimationFrame(_vizLoop);
+        }, delayMs);
+    } else {
+        _vizRAF = requestAnimationFrame(_vizLoop);
+    }
+}
+
+function startVisualizer() {
+    _resizeCanvases();
+    if (_vizRAF != null || _vizBackoffTimer != null) return;
+    const empty = document.getElementById('vizEmpty');
+    if (empty) empty.style.display = 'none';
+    _vizScheduleNext(0);
+}
+
+function stopVisualizer() {
+    _vizCancelScheduled();
+    _vizLastFrame = 0;
+}
+
 // ── Main render loop ──
 function _vizLoop(timestamp) {
+    _vizRAF = null;
     const tab = document.getElementById('tabVisualizer');
     if (!tab || !tab.classList.contains('active')) {
-        _vizRAF = null;
         return;
     }
     if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) {
-        _vizRAF = null;
         return;
     }
 
-    _vizRAF = requestAnimationFrame(_vizLoop);
-
-    // Throttle: 20fps in grid, 30fps in single
-    const interval = _vizMode === 'all' ? (1000 / _VIZ_FPS_ALL) : (1000 / _VIZ_FPS_SINGLE);
-    if (timestamp - _vizLastFrame < interval) return;
-    _vizLastFrame = timestamp;
+    const ts = timestamp !== undefined ? timestamp : performance.now();
 
     const vizAnalyser = _vizResolveAnalyser();
     const isPlaying = typeof isAudioPlaying === 'function' ? isAudioPlaying() : typeof audioPlayer !== 'undefined' && audioPlayer && !audioPlayer.paused;
@@ -314,7 +332,18 @@ function _vizLoop(timestamp) {
     const empty = document.getElementById('vizEmpty');
     if (empty) empty.style.display = vizAnalyser && vizActive ? 'none' : '';
 
-    if (!vizAnalyser || !vizActive) return;
+    if (!vizAnalyser || !vizActive) {
+        _vizScheduleNext(400);
+        return;
+    }
+
+    // Throttle: 20fps in grid, 30fps in single (sub-interval wait uses setTimeout — not 60Hz rAF polls)
+    const interval = _vizMode === 'all' ? (1000 / _VIZ_FPS_ALL) : (1000 / _VIZ_FPS_SINGLE);
+    if (_vizLastFrame !== 0 && ts - _vizLastFrame < interval) {
+        _vizScheduleNext(Math.max(1, Math.ceil(interval - (ts - _vizLastFrame))));
+        return;
+    }
+    _vizLastFrame = ts;
 
     // Ensure pre-allocated buffers match analyser
     if (!_vizFreqData || _vizFreqData.length !== vizAnalyser.frequencyBinCount) {
@@ -339,6 +368,7 @@ function _vizLoop(timestamp) {
     } else {
         _drawTile(_vizMode, vizAnalyser);
     }
+    _vizScheduleNext(0);
 }
 
 function _drawTile(mode, analyser) {
@@ -527,12 +557,9 @@ function _drawSpectrogram(ctx, w, h, analyser) {
             const r = Math.floor(mag * 211 + (1 - mag) * 5);
             const g = Math.floor(mag * mag * 55);
             const b = Math.floor(mag * 197 + (1 - mag) * 24);
-            const t = bin / bufLen;
-            const gcol = ctx.createLinearGradient(x, y - binH, x + cw, y);
-            gcol.addColorStop(0, `rgba(${r},${g},${b},${mag * 0.55 + 0.08})`);
-            gcol.addColorStop(0.5, `rgba(${Math.min(255, r + 40)},${g},${b},${mag * 0.75 + 0.1})`);
-            gcol.addColorStop(1, `rgba(${r},${g},${b},${mag * 0.35})`);
-            ctx.fillStyle = gcol;
+            /* Solid fill — per-cell `createLinearGradient` was thousands of GPU objects per frame (long-run WebView/GPU pressure). */
+            const a = mag * 0.62 + 0.1;
+            ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
             ctx.fillRect(x, y - binH, cw, binH);
         }
     }
