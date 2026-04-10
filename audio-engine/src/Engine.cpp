@@ -796,6 +796,15 @@ private:
     std::function<void(int)> closeFn;
 };
 
+/** Audio Units often need `setVisible` deferred (`embedViewController` / NSView async). VST3 `IPlugView::attached`
+ *  is usually evaluated when the parent window already has a valid peer on the message thread — deferring the
+ *  first `setVisible` to `callAsync` can leave a permanent white client for some VST3 plug-ins. */
+static bool shouldDeferInsertEditorShow(const juce::AudioPluginInstance& inst)
+{
+    const juce::String fmt = inst.getPluginDescription().pluginFormatName;
+    return fmt.isNotEmpty() && fmt.equalsIgnoreCase("AudioUnit");
+}
+
 class ToneAudioSource final : public juce::AudioSource
 {
 public:
@@ -1985,14 +1994,34 @@ struct Engine::Impl
                 p->self->insertEditorWindows[(size_t) p->slot] = std::move(w);
             }
             p->result = okObj();
-            /* Defer show to the next message-loop tick: AU kAudioUnitProperty_RequestViewController often
-             * posts embedViewController asynchronously during/after createEditor; showing in the same stack
-             * can leave an empty NSView until the callback runs. Subprocess must also activate NSApp or Cocoa
-             * UIs may not attach (blank white client). */
+            PluginEditorHostWindow* winPtr = p->self->insertEditorWindows[(size_t) p->slot].get();
+            const bool deferShow = shouldDeferInsertEditorShow(*inst);
+            appLogLine(juce::String("playback_open_insert_editor: format=")
+                       + inst->getPluginDescription().pluginFormatName
+                       + (deferShow ? " show=deferred (AudioUnit)" : " show=sync (e.g. VST3)"));
+            /* Always activate the audio-engine subprocess synchronously on the message thread before any
+             * deferred AU show — if `makeForegroundProcess` only runs inside `callAsync`, a busy host message
+             * loop (`tauri dev` + Vite) can delay that tick and AU Cocoa views may never attach. */
+            juce::Process::makeForegroundProcess();
+            auto showInsertEditorWindow = [](PluginEditorHostWindow* win) {
+                if (win == nullptr)
+                    return;
+                win->setVisible(true);
+                win->toFront(true);
+                win->schedulePostShowLayout();
+            };
+            if (!deferShow)
             {
+                showInsertEditorWindow(winPtr);
+            }
+            else
+            {
+                /* Defer show to the next message-loop tick: AU kAudioUnitProperty_RequestViewController often
+                 * posts embedViewController asynchronously during/after createEditor; showing in the same stack
+                 * can leave an empty NSView until the callback runs. Foreground activation already ran above. */
                 Impl* self = p->self;
                 const int slot = p->slot;
-                juce::MessageManager::callAsync([self, slot]() {
+                juce::MessageManager::callAsync([self, slot, showInsertEditorWindow]() {
                     if (self == nullptr)
                         return;
                     PluginEditorHostWindow* win = nullptr;
@@ -2003,12 +2032,7 @@ struct Engine::Impl
                             return;
                         win = self->insertEditorWindows[(size_t) slot].get();
                     }
-                    if (win == nullptr)
-                        return;
-                    juce::Process::makeForegroundProcess();
-                    win->setVisible(true);
-                    win->toFront(true);
-                    win->schedulePostShowLayout();
+                    showInsertEditorWindow(win);
                 });
             }
         }
