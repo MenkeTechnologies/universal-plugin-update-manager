@@ -311,6 +311,4 @@ pid="$(pgrep audio-haxor | awk '{print $1}')"
 if [[ -n "$pid" ]]; then
     kill $pid
 fi
-echo "postbundle-audio-engine-helper: helper .app installed at $HELPER_APP"
-echo "postbundle-audio-engine-helper: DMG left at $DMG_OUT not copied to /Applications"
-open "/Applications/AUDIO_HAXOR.app"
+open -a "/Applications/AUDIO_HAXOR.app"

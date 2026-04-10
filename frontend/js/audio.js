@@ -3683,22 +3683,34 @@ let _bgAnalysisAbort = false;
 let _bgQueue = []; // kept for compat but no longer primary source
 let _bgDone = 0;
 let _bgPaused = false;
-// Pause bg analysis when user interacts (resume after 3s idle)
+// Pause bg analysis when user interacts (resume after prefs `analysisPause` seconds — same as Settings slider)
 let _bgIdleTimer = null;
+
+function getBgAnalysisPauseMs() {
+    try {
+        if (typeof prefs === 'undefined' || typeof prefs.getItem !== 'function') return 3000;
+        const raw = prefs.getItem('analysisPause');
+        const n = parseInt(raw, 10);
+        if (!Number.isFinite(n)) return 3000;
+        return Math.max(1000, Math.min(10000, n * 1000));
+    } catch {
+        return 3000;
+    }
+}
 
 document.addEventListener('mousedown', () => {
     _bgPaused = true;
     clearTimeout(_bgIdleTimer);
     _bgIdleTimer = setTimeout(() => {
         _bgPaused = false;
-    }, 3000);
+    }, getBgAnalysisPauseMs());
 }, true);
 document.addEventListener('keydown', () => {
     _bgPaused = true;
     clearTimeout(_bgIdleTimer);
     _bgIdleTimer = setTimeout(() => {
         _bgPaused = false;
-    }, 3000);
+    }, getBgAnalysisPauseMs());
 }, true);
 
 function _setBgAnalysisBadgeRunning(badge) {
