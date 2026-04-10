@@ -588,15 +588,15 @@ function patchPdfPagesCell(path, pages) {
     }
 }
 
-function isPdfTabActive() {
-    const tab = document.querySelector('.tab-content.active');
-    return !!(tab && tab.id === 'tabPdf');
-}
-
 function shouldStartPdfMetadataExtraction(forceNoIdle) {
-    if (!isPdfTabActive()) return false;
     if (!forceNoIdle && typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return false;
     return true;
+}
+
+/** When Settings → Background PDF metadata (auto) is on, kick the batch extractor (no PDF tab required). */
+function maybeStartPdfBackgroundMetadataExtraction() {
+    if (typeof prefs !== 'undefined' && prefs.getItem('pdfMetadataAutoExtract') === 'off') return;
+    void startPdfMetadataExtraction();
 }
 
 function clearPdfMetaProgressDebounceState() {
@@ -663,23 +663,23 @@ async function stopPdfMetadataExtractionUser() {
     }
 }
 
-// Load cached page counts from DB for currently-visible rows, then trigger a
-// background extraction pass for any paths still uncached.
+// Load cached page counts from DB for currently-visible rows (when the PDF table exists), then
+// optionally start the background extractor — gated only by Settings → pdfMetadataAutoExtract.
 async function loadPdfPagesForVisible() {
     const rows = filteredPdfs.slice(0, 2000);
     const paths = rows.map(r => r.path);
-    if (paths.length === 0) return;
-    try {
-        const map = await window.vstUpdater.pdfMetadataGet(paths);
-        for (const [path, pages] of Object.entries(map || {})) {
-            _pdfPagesCache[path] = pages; // null if extraction previously failed
-            patchPdfPagesCell(path, pages);
+    const canPatchUi = typeof document !== 'undefined' && document.getElementById('pdfTableBody');
+    if (paths.length > 0 && canPatchUi) {
+        try {
+            const map = await window.vstUpdater.pdfMetadataGet(paths);
+            for (const [path, pages] of Object.entries(map || {})) {
+                _pdfPagesCache[path] = pages; // null if extraction previously failed
+                patchPdfPagesCell(path, pages);
+            }
+        } catch { /* ignore — rows stay at "—" */
         }
-    } catch { /* ignore — rows stay at "—" */
     }
-    // Fire-and-forget: optional background extractor (Settings → PDF → Background PDF metadata).
-    if (typeof prefs !== 'undefined' && prefs.getItem('pdfMetadataAutoExtract') === 'off') return;
-    startPdfMetadataExtraction();
+    maybeStartPdfBackgroundMetadataExtraction();
 }
 
 async function startPdfMetadataExtraction(opts) {
@@ -747,11 +747,8 @@ async function buildPdfPagesCache() {
         const idle = e && e.detail && e.detail.idle;
         if (idle) {
             void abortPdfMetadataExtraction();
-        } else {
-            const tab = document.querySelector('.tab-content.active');
-            if (tab && tab.id === 'tabPdf' && typeof loadPdfPagesForVisible === 'function') {
-                void loadPdfPagesForVisible();
-            }
+        } else if (typeof loadPdfPagesForVisible === 'function') {
+            void loadPdfPagesForVisible();
         }
     });
 })();

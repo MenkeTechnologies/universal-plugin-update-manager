@@ -1211,7 +1211,6 @@ function switchTab(tab) {
                 if (expectedTab === 'tags') renderTagsManager();
                 if (expectedTab === 'files') initFileBrowser();
                 if (expectedTab === 'midi' && typeof loadMidiFiles === 'function' && typeof _midiLoaded !== 'undefined' && !_midiLoaded) loadMidiFiles();
-                if (expectedTab !== 'pdf' && typeof abortPdfMetadataExtraction === 'function') void abortPdfMetadataExtraction();
                 if (expectedTab === 'pdf' && typeof loadPdfPagesForVisible === 'function') void loadPdfPagesForVisible();
                 if (expectedTab === 'settings') {
                     refreshSettingsUI();

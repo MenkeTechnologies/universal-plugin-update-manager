@@ -957,10 +957,7 @@ function settingTogglePdfMetadataAutoExtract() {
     prefs.setItem('pdfMetadataAutoExtract', next ? 'on' : 'off');
     showToast(toastFmt('toast.pdf_metadata_auto_extract', {state: next ? 'on' : 'off'}));
     if (!next && typeof abortPdfMetadataExtraction === 'function') void abortPdfMetadataExtraction();
-    if (next && typeof loadPdfPagesForVisible === 'function') {
-        const tab = document.querySelector('.tab-content.active');
-        if (tab && tab.id === 'tabPdf') void loadPdfPagesForVisible();
-    }
+    if (next && typeof loadPdfPagesForVisible === 'function') void loadPdfPagesForVisible();
     refreshSettingsUI();
 }
 
