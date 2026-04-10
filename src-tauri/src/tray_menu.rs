@@ -6,15 +6,16 @@ use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    App, AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Rect, Size, State,
-    Wry,
+    App, AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, Position, Rect,
+    Size, State, Wry,
 };
 
 /// Max characters for the first row of the tray dropdown (macOS truncates visually; keep readable).
 const TRAY_MENU_NOW_PLAYING_MAX: usize = 96;
 
 const TRAY_POPOVER_W: u32 = 300;
-const TRAY_POPOVER_H: u32 = 168;
+/// Default height until JS measures `#shell` (`tray_popover_resize`); must fit title+meta+transport.
+const TRAY_POPOVER_H: u32 = 280;
 
 /// Prefer the bundle window icon; otherwise embed `32x32.png` so dev/release always have pixels.
 fn tray_menu_bar_icon(app: &App) -> tauri::Result<Image<'static>> {
@@ -145,9 +146,20 @@ fn build_tray_popup_menu(
         .map_err(|e| e.to_string())
 }
 
-fn popover_xy_below_tray(rect: &Rect) -> (i32, i32) {
-    let pop_w = f64::from(TRAY_POPOVER_W);
-    let gap = 4.0;
+/// `scale_factor` maps logical popover width to **physical** pixels when `rect` uses physical coordinates
+/// (common on macOS tray events).
+fn popover_xy_below_tray(rect: &Rect, scale_factor: f64) -> (i32, i32) {
+    let physical_coords = matches!(rect.position, Position::Physical(..));
+    let pop_w_half = if physical_coords {
+        f64::from(TRAY_POPOVER_W) * scale_factor / 2.0
+    } else {
+        f64::from(TRAY_POPOVER_W) / 2.0
+    };
+    let gap = if physical_coords {
+        4.0_f64 * scale_factor
+    } else {
+        4.0_f64
+    };
     let (px, py) = match rect.position {
         Position::Physical(p) => (p.x as f64, p.y as f64),
         Position::Logical(p) => (p.x, p.y),
@@ -156,7 +168,7 @@ fn popover_xy_below_tray(rect: &Rect) -> (i32, i32) {
         Size::Physical(s) => (s.width as f64, s.height as f64),
         Size::Logical(s) => (s.width, s.height),
     };
-    let x = px + w / 2.0 - pop_w / 2.0;
+    let x = px + w / 2.0 - pop_w_half;
     let y = py + h + gap;
     (x.floor() as i32, y.floor() as i32)
 }
@@ -179,11 +191,12 @@ fn toggle_tray_popover(app: &AppHandle<Wry>, rect: &Rect) -> Result<(), String> 
     if let Some(ref emit) = last {
         let _ = app.emit("tray-popover-state", emit);
     }
-    let (mut x, y) = popover_xy_below_tray(rect);
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let (mut x, y) = popover_xy_below_tray(rect, scale);
     x = x.max(8);
-    let _ = win.set_size(tauri::Size::Physical(PhysicalSize::new(
-        TRAY_POPOVER_W,
-        TRAY_POPOVER_H,
+    let _ = win.set_size(tauri::Size::Logical(LogicalSize::new(
+        f64::from(TRAY_POPOVER_W),
+        f64::from(TRAY_POPOVER_H),
     )));
     let _ = win.set_position(tauri::Position::Physical(PhysicalPosition::new(x, y)));
     let _ = win.show();
@@ -248,6 +261,20 @@ pub struct TrayNowPlayingPayload {
 #[tauri::command]
 pub fn tray_popover_action(app: AppHandle<Wry>, action: String) -> Result<(), String> {
     let _ = app.emit("menu-action", action);
+    Ok(())
+}
+
+/// Fit the `tray-popover` WebView to content (title lines, meta, fonts). Called from `tray-popover.js`.
+/// Width/height are **CSS / logical** pixels (same units as `getBoundingClientRect`); `PhysicalSize` would
+/// undersize on HiDPI and clip the HUD.
+#[tauri::command]
+pub fn tray_popover_resize(app: AppHandle<Wry>, width: f64, height: f64) -> Result<(), String> {
+    let Some(win) = app.get_webview_window("tray-popover") else {
+        return Ok(());
+    };
+    let w = width.clamp(260.0, 560.0);
+    let h = height.clamp(180.0, 720.0);
+    let _ = win.set_size(tauri::Size::Logical(LogicalSize::new(w, h)));
     Ok(())
 }
 

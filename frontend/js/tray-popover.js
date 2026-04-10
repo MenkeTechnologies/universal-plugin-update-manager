@@ -1,5 +1,6 @@
 /**
  * Menu-bar tray popover (WebView window `tray-popover`): Apple-style layout without artwork.
+ * Window size is synced to `#shell` via `tray_popover_resize` (logical/CSS px — matches HiDPI layout).
  */
 (function () {
     const tauri = typeof window !== 'undefined' ? window.__TAURI__ : null;
@@ -29,6 +30,25 @@
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
+    function syncWindowSize() {
+        if (!invoke) return;
+        const root = document.getElementById('shell');
+        if (!root) return;
+        const br = root.getBoundingClientRect();
+        const pad = 6;
+        const h = Math.ceil(Math.max(root.scrollHeight, br.height) + pad);
+        const w = Math.ceil(Math.max(root.scrollWidth, br.width) + pad);
+        void invoke('tray_popover_resize', { width: w, height: h }).catch(() => {});
+    }
+
+    function scheduleResize() {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                syncWindowSize();
+            });
+        });
+    }
+
     function applyState(p) {
         if (!p || typeof p !== 'object') return;
         const idle = p.idle === true;
@@ -54,6 +74,7 @@
         const playing = p.playing === true;
         if (btnPlay) btnPlay.textContent = playing ? '⏸' : '▶';
         if (btnPlay) btnPlay.setAttribute('title', playing ? 'Pause' : 'Play');
+        scheduleResize();
     }
 
     function send(action) {
@@ -70,6 +91,20 @@
             const p = e && e.payload !== undefined ? e.payload : e;
             applyState(p);
         }).catch(() => {});
+    }
+
+    function initSizeAfterFonts() {
+        const run = () => scheduleResize();
+        if (typeof document !== 'undefined' && document.fonts && typeof document.fonts.ready !== 'undefined') {
+            void document.fonts.ready.then(run).catch(run);
+        } else {
+            run();
+        }
+    }
+    if (document.readyState === 'complete') {
+        initSizeAfterFonts();
+    } else {
+        window.addEventListener('load', () => initSizeAfterFonts(), { once: true });
     }
 
     document.addEventListener('keydown', (e) => {
