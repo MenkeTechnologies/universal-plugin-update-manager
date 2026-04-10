@@ -121,7 +121,7 @@ The **`types`** field is a **JSON array of strings** (one name per driver). Olde
 
 The AudioEngine speaks **one JSON object per line** on stdin and prints **one JSON line** per response on stdout (see `src/Main.cpp`).
 
-**Bundled macOS app:** The AudioEngine lives under **`Contents/MacOS/`**. Tauri’s [external-binary](https://v2.tauri.app/develop/sidecar/) naming is **`audio-engine-<rustc-host-tuple>`** in `src-tauri/binaries/` at build time; your shipped `.app` may expose that suffixed name, a plain **`audio-engine`**, or both — **`ls "/Applications/AUDIO_HAXOR.app/Contents/MacOS"`** shows what you actually have.
+**Bundled macOS app:** The AudioEngine lives under **`Contents/MacOS/`**. Tauri’s [external-binary](https://v2.tauri.app/develop/sidecar/) naming is **`audio-engine-<rustc-host-tuple>`** in `src-tauri/binaries/` at build time; the shipped `.app` often has **only** that suffixed file (not a plain **`audio-engine`**). The host resolves **`audio-engine`** via walking up to `audio-engine-artifacts/` (dev builds), then **`Contents/MacOS/audio-engine`**, then **`Contents/MacOS/audio-engine-<AUDIO_HAXOR_TARGET_TRIPLE>`** (compile-time triple from `src-tauri/build.rs`). **`ls "/Applications/AUDIO_HAXOR.app/Contents/MacOS"`** shows what you actually have.
 
 ```bash
 # If you have the plain name:

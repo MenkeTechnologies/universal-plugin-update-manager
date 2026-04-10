@@ -144,6 +144,11 @@ fn binary_name() -> &'static str {
 ///
 /// Override for debugging: set `AUDIO_HAXOR_AUDIO_ENGINE` to an absolute path to the AudioEngine binary.
 /// Release installs use the sibling next to the main executable when no workspace `target/` is found.
+///
+/// Tauri [`bundle.externalBin`](https://v2.tauri.app/develop/sidecar/) places **`audio-engine-<host-triple>`**
+/// next to the main executable (see `scripts/prepare-audio-engine-audioengine.mjs`). We spawn via
+/// [`std::process::Command`], not Tauri’s sidecar API, so we must resolve that suffixed name when
+/// plain `audio-engine` is absent (typical in a shipped `.app` under `/Applications`).
 pub fn resolve_audio_engine_binary() -> Result<PathBuf, String> {
     if let Ok(p) = std::env::var("AUDIO_HAXOR_AUDIO_ENGINE") {
         let p = PathBuf::from(p.trim());
@@ -166,10 +171,21 @@ pub fn resolve_audio_engine_binary() -> Result<PathBuf, String> {
         return Ok(sibling);
     }
 
+    if let Some(triple) = option_env!("AUDIO_HAXOR_TARGET_TRIPLE") {
+        let suffixed = if cfg!(target_os = "windows") {
+            dir.join(format!("audio-engine-{triple}.exe"))
+        } else {
+            dir.join(format!("audio-engine-{triple}"))
+        };
+        if suffixed.is_file() {
+            return Ok(suffixed);
+        }
+    }
+
     Err(format!(
-        "audio engine binary not found (expected {} or workspace target/**/{})",
+        "audio engine binary not found (tried workspace walk, `{}`, and `audio-engine-{}` next to host)",
         sibling.display(),
-        binary_name()
+        option_env!("AUDIO_HAXOR_TARGET_TRIPLE").unwrap_or("?")
     ))
 }
 
