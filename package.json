@@ -8,6 +8,7 @@
     "dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:ci": "tauri build --ci --no-sign",
+    "build": "tauri build && bash scripts/postbundle-audio-engine-helper.sh",
     "ship-check": "bash scripts/ship-check.sh",
     "test": "bash scripts/test.sh",
     "test:js": "node scripts/run-js-tests.mjs",

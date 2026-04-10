@@ -10,5 +10,22 @@
     <true/>
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
+    <!--
+        Plugin-host entitlements. Tauri ad-hoc signs both `audio-haxor` and the
+        `audio-engine` sidecar with hardened runtime (flags=0x10002 adhoc,runtime).
+        Without these, library validation blocks `dlopen()` of any 3rd-party VST3/AU
+        (JUCE returns "Unable to load VST-3 plug-in file") and JIT plugins like
+        Serum 2 cannot allocate executable memory. In `pnpm dev` the engine runs
+        from `audio-engine-artifacts/debug/audio-engine` which is never codesigned,
+        so the restrictions don't apply — release builds need them explicit.
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.disable-executable-page-protection</key>
+    <true/>
 </dict>
 </plist>

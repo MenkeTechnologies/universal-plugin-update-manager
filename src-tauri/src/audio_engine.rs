@@ -163,6 +163,36 @@ pub fn resolve_audio_engine_binary() -> Result<PathBuf, String> {
         .ok_or_else(|| "current_exe has no parent directory".to_string())?;
     let sibling = dir.join(binary_name());
 
+    // macOS release-bundle layout: nested helper .app at
+    // `<bundle>/Contents/MacOS/AudioHaxorEngineHelper.app/Contents/MacOS/audio-engine`
+    // (sibling of the main `audio-haxor` binary). The audio-engine sidecar is wrapped in
+    // its own minimal .app so [NSBundle mainBundle] resolves to the helper bundle (its
+    // own bundle ID + Info.plist) instead of the parent AUDIO_HAXOR.app — required for
+    // `audiocomponentd` to authorize the host process for out-of-process AU plugin loading
+    // and XPC view-controller delivery (otherwise plugin editor windows render as a
+    // permanent 1×1 stub from `_RemoteAUv2ViewFactory`).
+    //
+    // The helper .app lives in Contents/MacOS/, NOT Contents/Frameworks/. We tried
+    // Frameworks/ first; LaunchServices treats `.app` bundles inside Contents/Frameworks/
+    // as embedded frameworks rather than registrable apps and audiocomponentd still
+    // refuses XPC view delivery. Real DAWs (Bitwig's `Bitwig Plug-in Host ARM64-NEON.app`,
+    // Reaper's helpers, etc.) put their helpers in Contents/MacOS/ and that's what works.
+    // See `scripts/postbundle-audio-engine-helper.sh` for the bundling pipeline.
+    //
+    // This check runs first so any release `.app` always uses the helper even if a stale
+    // sibling `audio-engine` binary is also present from a previous build.
+    #[cfg(target_os = "macos")]
+    {
+        let helper = dir
+            .join("AudioHaxorEngineHelper.app")
+            .join("Contents")
+            .join("MacOS")
+            .join(binary_name());
+        if helper.is_file() {
+            return Ok(helper);
+        }
+    }
+
     if let Some(p) = find_audio_engine_under_target_ancestors(&exe) {
         return Ok(p);
     }
@@ -183,7 +213,7 @@ pub fn resolve_audio_engine_binary() -> Result<PathBuf, String> {
     }
 
     Err(format!(
-        "audio engine binary not found (tried workspace walk, `{}`, and `audio-engine-{}` next to host)",
+        "audio engine binary not found (tried helper .app in Contents/Frameworks/, workspace walk, `{}`, and `audio-engine-{}` next to host)",
         sibling.display(),
         option_env!("AUDIO_HAXOR_TARGET_TRIPLE").unwrap_or("?")
     ))

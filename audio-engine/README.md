@@ -104,6 +104,63 @@ AUDIO_ENGINE_BUILD_TYPE=release node scripts/build-audio-engine.mjs
 
 Artifacts land at **`audio-engine-artifacts/debug/audio-engine`** or **`audio-engine-artifacts/release/audio-engine`** (intentionally **not** under Cargo `target/` — MSVC sidecars next to `audio-engine.exe` broke `cargo test` on Windows). **Release** bundles use `scripts/prepare-audio-engine-audioengine.mjs` → `src-tauri/binaries/audio-engine-<triple>` for Tauri `externalBin`.
 
+### Helper `.app` architecture (macOS)
+
+The `audio-engine` sidecar is **not** shipped as a bare Mach-O sibling of the main `audio-haxor` binary in `Contents/MacOS/`. It is reshaped into a nested **helper `.app`** at:
+
+```
+AUDIO_HAXOR.app/
+  Contents/
+    MacOS/
+      audio-haxor                                # Tauri main binary
+      AudioHaxorEngineHelper.app/                # nested helper bundle (sibling of audio-haxor)
+        Contents/
+          Info.plist                             # bundle id: com.menketechnologies.audio-haxor.audio-engine-helper
+          MacOS/
+            audio-engine                         # JUCE host binary, hardened runtime + plugin entitlements
+          _CodeSignature/
+            CodeResources
+```
+
+**Why `Contents/MacOS/` and not `Contents/Frameworks/`?** Apple's HIG suggests `Contents/Frameworks/` for embedded helper bundles, but we tried that first and it didn't work — `audiocomponentd` still refused XPC view-controller delivery for out-of-process AU plugins, leaving editor windows blank. LaunchServices treats `.app` bundles inside `Contents/Frameworks/` as embedded frameworks rather than registrable apps. Bitwig Studio's `Bitwig Studio.app/Contents/MacOS/` contains four nested helper `.app`s — `Bitwig Audio Engine ARM64-NEON.app`, `Bitwig Audio Engine X64-AVX2.app`, **`Bitwig Plug-in Host ARM64-NEON.app`**, **`Bitwig Plug-in Host X64-SSE41.app`** — and Bitwig's AU plugin editors work. Their pattern is the existence proof: nested helper `.app` next to the main binary in `Contents/MacOS/` is what `audiocomponentd` accepts.
+
+**Why a nested `.app` instead of the bare sidecar Tauri's `externalBin` produces?** macOS routes most third-party AUv2 plugins through `audiocomponentd` via `kAudioComponentInstantiation_LoadOutOfProcess`, even when the host calls the legacy `AudioComponentInstanceNew`. The plugin's UI is then delivered as a `_RemoteAUv2ViewFactory` proxy NSView (from `AudioToolboxCore.framework`) whose actual view is shipped over an XPC connection. For `audiocomponentd` to authorize the host process and complete the audit-token handshake, the host must look like a real Cocoa application from LaunchServices' perspective — its own bundle, its own `Info.plist`, its own bundle identifier, its own NSApp activation context.
+
+A bare Mach-O sibling of `audio-haxor` inside `Contents/MacOS/` does **not** qualify: `[NSBundle mainBundle]` for that process resolves up the directory tree and returns the parent `AUDIO_HAXOR.app`, so `audiocomponentd` considers it part of the main app and the XPC view delivery either stalls or returns the **1×1 placeholder NSView** indefinitely → permanently blank plugin editor windows. Wrapping the binary in a nested `.app` makes `[NSBundle mainBundle]` stop at `AudioHaxorEngineHelper.app` (its own bundle id, distinct from the parent's `com.menketechnologies.audio-haxor`), and `audiocomponentd` accepts the helper as a real host. This is the standard pattern Bitwig, Reaper, Chromium and Electron all use for their helper processes.
+
+The helper `Info.plist` sets `LSUIElement=true`, which makes the helper an "agent" process — no Dock icon, no menu bar at startup. When a plugin editor window is opened, the helper transitions to a regular foreground app at runtime via `audio_haxor::activateAsForegroundApp()` (which does both `setActivationPolicy:Regular` and `activateIgnoringOtherApps:YES` — JUCE's `juce::Process::makeForegroundProcess()` only does the first half, which is necessary but not sufficient for `audiocomponentd` to deliver XPC view callbacks).
+
+The helper's `Main.cpp` also calls `[NSApp finishLaunching]` at startup (via `audio_haxor::finishCocoaAppLaunching()`) — `juce::ScopedJuceInitialiser_GUI` calls `[NSApplication sharedApplication]` but never `finishLaunching`, leaving NSApp in a half-initialised state where the process is not registered with LaunchServices as a real Cocoa app. Without `finishLaunching`, `audiocomponentd` treats us as a "background utility" and refuses XPC view delivery even with the nested bundle in place.
+
+**Bundling pipeline.** Tauri's `externalBin` ships the audio-engine binary at `Contents/MacOS/audio-engine` as usual; immediately afterwards `scripts/postbundle-audio-engine-helper.sh` runs and:
+
+1. Moves `Contents/MacOS/audio-engine` → `Contents/MacOS/AudioHaxorEngineHelper.app/Contents/MacOS/audio-engine`.
+2. Drops `audio-engine/helper-app/Info.plist` into `Contents/MacOS/AudioHaxorEngineHelper.app/Contents/Info.plist`.
+3. Strips quarantine xattrs (`xattr -cr`) so they don't invalidate `codesign`.
+4. **Codesigns innermost first**: signs the helper binary with `--options runtime` + `src-tauri/Entitlements.plist` (hardened runtime + the plugin-host entitlements: `disable-library-validation`, `allow-jit`, `allow-unsigned-executable-memory`, `disable-executable-page-protection`).
+5. Seals the helper `.app` (`codesign --force --sign - "$HELPER_APP"`).
+6. Re-seals the outer `.app` (`codesign --force --sign - "$APP"` — **without** `--deep`, so the inner helper signature we just made is not overwritten).
+7. Verifies both signatures with `codesign --verify --verbose=2`.
+
+Order matters: the outer `.app`'s `_CodeSignature/CodeResources` includes a hash of the inner helper `.app`'s signature, so the inner one must be fully signed first. Re-signing the outer with `--deep` would recursively replace inner signatures and break this.
+
+**Build entry points that run the postbundle reshape automatically:**
+- `pnpm nuke` — full clean rebuild (`scripts/nuke.sh`)
+- `pnpm rebuild` — incremental rebuild (`scripts/rebuild.sh`)
+- `pnpm build` — wraps `tauri build` + postbundle in one command
+
+**Plain `pnpm tauri build` / `pnpm tauri:build` does NOT** run the postbundle reshape and produces a bundle whose AU plugin editors will be blank. Either use one of the entry points above, or invoke `bash scripts/postbundle-audio-engine-helper.sh` manually after `tauri build`.
+
+**Rust resolver.** `src-tauri/src/audio_engine.rs::resolve_audio_engine_binary()` checks the helper path (`Contents/Frameworks/AudioHaxorEngineHelper.app/Contents/MacOS/audio-engine`) **before** the legacy sibling/triple-suffix paths, so a bundled `.app` always uses the helper. Dev builds (`pnpm tauri dev`) keep using the workspace artifact at `audio-engine-artifacts/<profile>/audio-engine` via the parent-walk fallback — no helper involved.
+
+### JUCE source patches (macOS)
+
+`audio-engine/CMakeLists.txt` applies one **idempotent in-place patch** to the `FetchContent`-downloaded JUCE 8 source after **`FetchContent_MakeAvailable(JUCE)`**. The patch is gated on `if(APPLE)`, uses a sentinel string for re-run safety, and re-applies automatically whenever `build/_deps/juce-src/` is wiped (e.g. by `pnpm nuke`).
+
+**`modules/juce_audio_processors/format_types/juce_AudioUnitPluginFormat.mm`** — `AudioUnitPluginWindowCocoa::createView` is patched to **prefer the legacy `kAudioUnitProperty_CocoaUI` path over `kAudioUnitProperty_RequestViewController`**. Stock JUCE 8 unconditionally prefers `RequestViewController` and `return true`s without ever attaching the legacy `NSView*` it just obtained from `uiViewForAudioUnit:withSize:`, leaving the wrapper waiting for an async XPC view-controller delivery (`waitingForViewCallback = true`). For our spawned `audio-engine` subprocess that XPC delivery never arrives, so the editor renders **permanently blank** (white client area, JUCE-drawn title bar). Many AUv2 plugins (UAD Ampeg B15N, Sonimus SatsonCM, etc.) implement BOTH properties, so they all hit this. Symptom in `engine.log`: editor child reports `size=1x1 grandchildren=0` after `createEditorIfNeeded`. The patch adds `pluginView == nil &&` to the gating condition so JUCE only takes the async path when CocoaUI returned nothing (e.g. true AUv3 / RequestViewController-only plugins).
+
+If JUCE upstream changes the `createView` signature, the CMake patch fails fast with `FATAL_ERROR` so the regression is caught at configure time instead of producing silently-broken AU editors at runtime.
+
 ### Linux (typical)
 
 ```bash

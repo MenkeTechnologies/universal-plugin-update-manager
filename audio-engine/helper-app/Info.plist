@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Embedded helper .app for the JUCE-based AudioEngine sidecar.
+
+        The audio-engine sidecar lives at:
+            AUDIO_HAXOR.app/Contents/Frameworks/AudioHaxorEngineHelper.app/Contents/MacOS/audio-engine
+
+        Why a nested .app instead of bare Contents/MacOS/audio-engine?
+        macOS routes most third-party AUv2 plugins through audiocomponentd via
+        kAudioComponentInstantiation_LoadOutOfProcess. The plugin's UI is delivered
+        as a `_RemoteAUv2ViewFactory` proxy view (from AudioToolboxCore.framework)
+        whose actual NSView is shipped over an XPC connection. For audiocomponentd
+        to authorize the host process and complete the audit-token handshake, the
+        host must look like a real Cocoa application — its own bundle, its own
+        Info.plist, its own bundle identifier, its own NSApp activation context.
+
+        A bare Mach-O sibling of the main `audio-haxor` binary inside Contents/MacOS/
+        does NOT qualify: [NSBundle mainBundle] for that process resolves up the
+        directory tree and returns the parent AUDIO_HAXOR.app, so audiocomponentd
+        considers it part of the main app and the XPC view delivery either stalls
+        or returns the 1×1 placeholder NSView indefinitely (permanently blank
+        plugin editor windows).
+
+        Wrapping in a nested .app fixes this: [NSBundle mainBundle] from the helper
+        binary now stops at this Info.plist, the helper has its own bundle ID, and
+        audiocomponentd treats it as a distinct host that can receive XPC plugin
+        view deliveries.
+
+        LSUIElement=true makes this an "agent" app — no Dock icon, no menu bar at
+        startup. The helper transitions to a regular foreground app at runtime via
+        juce::Process::makeForegroundProcess() (NSApplicationActivationPolicyRegular)
+        when an AU plugin editor window opens.
+
+        See scripts/postbundle-audio-engine-helper.sh for the bundling pipeline and
+        audio-engine/README.md "Helper .app architecture" for the full rationale.
+    -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>audio-engine</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.menketechnologies.audio-haxor.audio-engine-helper</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>AudioHaxorEngineHelper</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>

@@ -39,6 +39,21 @@ ELAPSED=$((END - START))
 echo
 cyber_line
 
+# macOS only: reshape the bundled audio-engine sidecar into a nested helper .app under
+# Contents/Frameworks/. Required for AU plugin editor windows — see the script and
+# audio-engine/README.md "Helper .app architecture" for the full rationale.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  echo
+  cyber_section "AUDIO ENGINE HELPER .APP RESHAPE"
+  if ! bash scripts/postbundle-audio-engine-helper.sh; then
+    cyber_fail "audio-engine helper .app reshape failed"
+    cyber_tagline "LAUNCH ABORTED"
+    exit 1
+  fi
+  cyber_ok "helper .app installed + signed"
+  echo
+fi
+
 # Cargo workspace: bundle may be under repo `target/` or legacy `src-tauri/target/`.
 BUNDLE_MAC=""
 for d in target/release/bundle/macos/AUDIO_HAXOR.app src-tauri/target/release/bundle/macos/AUDIO_HAXOR.app; do

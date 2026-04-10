@@ -1,4 +1,7 @@
 #include "AppLog.hpp"
+#if defined(__APPLE__)
+ #include "CocoaHelpers.hpp"
+#endif
 #include "Engine.hpp"
 #include "VisualPreview.hpp"
 
@@ -790,6 +793,26 @@ public:
         }
         setResizable(true, true);
         setAlwaysOnTop(true);
+    }
+
+    /** JUCE's `~AudioUnitPluginWindowCocoa` can throw in some situations (the AU's view-controller callback
+     *  block is invoked from a destructor cleanup path and propagates an Obj-C/std exception). An exception
+     *  out of a destructor calls `std::terminate` and kills the engine. Catch + log so the rest of the
+     *  shutdown still runs and the engine survives. */
+    ~PluginEditorHostWindow() override
+    {
+        try
+        {
+            clearContentComponent();
+        }
+        catch (const std::exception& e)
+        {
+            appLogLine(juce::String("editor_host: dtor caught std::exception: ") + e.what());
+        }
+        catch (...)
+        {
+            appLogLine("editor_host: dtor caught unknown exception (suppressed)");
+        }
     }
 
     /** VST3 defers view attach until visibility + valid peer; AU sometimes needs a second layout tick. */
@@ -2045,10 +2068,16 @@ struct Engine::Impl
             appLogLine(juce::String("playback_open_insert_editor: format=")
                        + inst->getPluginDescription().pluginFormatName
                        + (deferShow ? " show=deferred (AudioUnit)" : " show=sync (e.g. VST3)"));
-            /* Always activate the audio-engine subprocess synchronously on the message thread before any
-             * deferred AU show — if `makeForegroundProcess` only runs inside `callAsync`, a busy host message
-             * loop (`tauri dev` + Vite) can delay that tick and AU Cocoa views may never attach. */
-            juce::Process::makeForegroundProcess();
+            /* Activate the helper subprocess as a real foreground Cocoa app on the message thread BEFORE
+             * the editor's CocoaUI factory initiates its `_RemoteAUv2ViewFactory` XPC connection. JUCE's
+             * `juce::Process::makeForegroundProcess()` only sets the activation policy to `Regular`, but
+             * does NOT make the process the *active* (key) app — and `audiocomponentd` does not deliver
+             * AU view-controller XPC callbacks to non-active hosts. `activateAsForegroundApp` does both
+             * `setActivationPolicy:Regular` and `activateIgnoringOtherApps:YES`. Combined with the helper
+             * `.app` bundle identity (`com.menketechnologies.audio-haxor.audio-engine-helper`) and the
+             * `[NSApp finishLaunching]` call in `Main.cpp`, this is the trio that actually unblocks
+             * out-of-process AU view delivery. See `audio-engine/README.md` "Helper .app architecture". */
+            audio_haxor::activateAsForegroundApp();
             auto showInsertEditorWindow = [](PluginEditorHostWindow* win) {
                 if (win == nullptr)
                     return;

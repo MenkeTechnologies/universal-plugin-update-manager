@@ -10,6 +10,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "AppLog.hpp"
+#include "CocoaHelpers.hpp"
 #include "CrashHandler.hpp"
 #include "Engine.hpp"
 #include "ParentWatchdog.hpp"
@@ -83,6 +84,21 @@ int main(int argc, char* argv[])
     audio_haxor::startParentWatchdogFromEnv();
     audio_haxor::installEngineCrashHandlers();
     juce::ScopedJuceInitialiser_GUI juceInit;
+#if defined(__APPLE__)
+    /* JUCE only does `[NSApplication sharedApplication]`; it never calls `finishLaunching`.
+     * Without `finishLaunching`, NSApp is half-initialised — no `NSApplicationDidFinishLaunching`
+     * notification, no CFRunLoop observers installed, and the process is not registered with
+     * LaunchServices as a real Cocoa app. `audiocomponentd` then refuses to deliver XPC
+     * view-controller callbacks for out-of-process AU plugins (`_RemoteAUv2ViewFactory`
+     * returns a 1×1 placeholder NSView that never populates → blank editor windows).
+     * Calling `finishLaunching` here is the canonical fix and is idempotent (AppKit guards
+     * against multiple calls). Only safe in the helper-bundle layout where the process has
+     * its own bundle identity (`com.menketechnologies.audio-haxor.audio-engine-helper`);
+     * doing this from a bare sidecar that inherits the parent's bundle id would cause
+     * LaunchServices conflicts and stall plugin instantiation. See
+     * `audio-engine/README.md` "Helper .app architecture" for details. */
+    audio_haxor::finishCocoaAppLaunching();
+#endif
     audio_haxor::appLogLine(juce::String("started v") + AUDIO_ENGINE_VERSION_STRING);
     audio_haxor::Engine engine;
     audio_haxor::appLogLine("Engine constructed");
