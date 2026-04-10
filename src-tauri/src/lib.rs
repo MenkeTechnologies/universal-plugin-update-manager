@@ -7014,12 +7014,8 @@ fn refresh_native_menu(app: AppHandle) -> Result<(), String> {
     let strings = db::global().get_app_strings(&ui_locale).unwrap_or_default();
     let menu = native_menu::build_native_menu_bar(&app, &strings).map_err(|e| e.to_string())?;
     app.set_menu(menu).map_err(|e| e.to_string())?;
-    let state = app.state::<tray_menu::TrayState>();
-    if let Ok(guard) = state.0.lock() {
-        if let Some(ref tray) = *guard {
-            tray_menu::refresh_tray_popup_menu(&app, tray, &strings)?;
-        }
-    }
+    let tray_state = app.state::<tray_menu::TrayState>();
+    tray_menu::refresh_tray_popup_menu(&app, &tray_state, &strings)?;
     Ok(())
 }
 
@@ -7286,7 +7282,7 @@ pub fn run() {
             unified_scanning: AtomicBool::new(false),
         })
         .manage(file_watcher::FileWatcherState::new())
-        .manage(tray_menu::TrayState(std::sync::Mutex::new(None)))
+        .manage(tray_menu::TrayState::default())
         .invoke_handler(tauri::generate_handler![
             get_version,
             get_walker_status,
@@ -7505,10 +7501,12 @@ pub fn run() {
             {
                 let state = app.state::<tray_menu::TrayState>();
                 let mut guard = state
-                    .0
+                    .inner
                     .lock()
                     .map_err(|_| "tray state mutex poisoned".to_string())?;
-                *guard = Some(tray);
+                guard.tray = Some(tray);
+                guard.menu_strings = strings;
+                guard.now_playing_menu_line = None;
             }
 
             Ok(())
