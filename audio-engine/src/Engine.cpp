@@ -736,23 +736,21 @@ public:
         juce::AudioProcessorEditor* ed = inst.createEditorIfNeeded();
         if (ed != nullptr)
         {
-            const int w = juce::jmax(200, ed->getWidth());
-            const int h = juce::jmax(150, ed->getHeight());
+            /* Generous defaults — many AUs (e.g. UAD) report 100×100 until the Cocoa view loads; too small a
+             * host frame can leave an embedded NSView with no drawable area. */
+            const int w = juce::jmax(480, ed->getWidth());
+            const int h = juce::jmax(360, ed->getHeight());
             ed->setSize(w, h);
-            /* resizeToFitContent=true lets childBoundsChanged() resize the outer window when VST3/AU report
-             * transient 0x0 or changing sizes — that can leave the client area effectively blank. Host owns size. */
-            setContentOwned(ed, false);
+            /* Let AU/VST resize the outer window when the native view reports its size (async for AU).
+             * Do NOT call AudioProcessorEditor::setScaleFactor(hostDpi) here — that applies an AffineTransform
+             * to the whole editor and breaks NSView/IPlugView embedding on Retina (blank white client area). */
+            setContentOwned(ed, true);
             setContentComponentSize(w, h);
-            applyEditorHostScale();
+            /* Prevent spurious 0×0 child reports from collapsing the outer window to an unusable strip. */
+            setResizeLimits(280, 220, 10000, 10000);
         }
         setResizable(true, true);
         setAlwaysOnTop(true);
-    }
-
-    void resized() override
-    {
-        DocumentWindow::resized();
-        applyEditorHostScale();
     }
 
     /** VST3 defers view attach until visibility + valid peer; AU sometimes needs a second layout tick. */
@@ -768,14 +766,13 @@ public:
                 c->resized();
                 c->repaint();
             }
-            if (safe != nullptr)
-                safe->applyEditorHostScale();
         };
         juce::MessageManager::callAsync(bump);
         juce::Timer::callAfterDelay(16, bump);
         juce::Timer::callAfterDelay(50, bump);
         juce::Timer::callAfterDelay(150, bump);
         juce::Timer::callAfterDelay(300, bump);
+        juce::Timer::callAfterDelay(600, bump);
     }
 
     bool hasEditorContent() const { return getContentComponent() != nullptr; }
@@ -793,13 +790,6 @@ public:
     }
 
 private:
-    void applyEditorHostScale()
-    {
-        if (auto* c = getContentComponent())
-            if (auto* ed = dynamic_cast<juce::AudioProcessorEditor*>(c))
-                ed->setScaleFactor((float) getDesktopScaleFactor());
-    }
-
     int slot = -1;
     std::function<void(int)> closeFn;
 };
