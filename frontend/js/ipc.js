@@ -765,6 +765,9 @@ document.addEventListener('click', (e) => {
             case 'settingToggleAutoAnalysis':
                 settingToggleAutoAnalysis();
                 break;
+            case 'settingTogglePdfMetadataAutoExtract':
+                settingTogglePdfMetadataAutoExtract();
+                break;
             case 'settingToggleAutoScan':
                 settingToggleAutoScan();
                 break;

@@ -9824,6 +9824,21 @@
                         <span class="settings-saved-msg" id="savedMsgPdfScanDirs"></span>
                     </div>
                 </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title" data-i18n="ui.st.pdf_metadata_background_auto">Background PDF metadata (auto)</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.when_on_resolve_pdf_page_counts_in_the_background_wh">When on, resolve PDF page counts in the background while the PDF tab is open (including on launch if that tab is restored). When off, use Command Palette → Extract PDF metadata for a full pass; the table still shows values already in the database.</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingTogglePdfMetadataAutoExtract" data-i18n-title="ui.tt.pdf_metadata_background_auto"
+                                id="settingPdfMetadataAutoExtract"
+                                title="Background PDF metadata extraction while the PDF tab is active">
+                            <span class="settings-toggle-label" id="settingPdfMetadataAutoExtractLabel">On</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="settings-section" data-section="performance">
@@ -10858,9 +10873,9 @@
 </div>
 
 <script src="js/i18n-ui.js?v=8451"></script>
-<script src="js/utils.js?v=8454"></script>
+<script src="js/utils.js?v=8455"></script>
 <script src="js/ui-idle.js?v=8451"></script>
-<script src="js/ipc.js?v=8454"></script>
+<script src="js/ipc.js?v=8455"></script>
 <script src="js/tooltip-hover.js?v=8451"></script>
 <script src="js/drag-reorder.js?v=8451"></script>
 <script src="js/modal-drag.js?v=8451"></script>
@@ -10869,7 +10884,7 @@
 <script src="js/favorites.js?v=8451"></script>
 <script src="js/export.js?v=8451"></script>
 <script src="js/plugins.js?v=8451"></script>
-<script src="js/settings.js?v=8451"></script>
+<script src="js/settings.js?v=8455"></script>
 <script src="js/history.js?v=8451"></script>
 <script src="js/kvr.js?v=8451"></script>
 <script src="js/audio.js?v=8451"></script>
@@ -10882,13 +10897,13 @@
 <script src="js/multi-filter.js?v=8451"></script>
 <script src="js/file-browser.js?v=8451"></script>
 <script src="js/duplicates.js?v=8451"></script>
-<script src="js/command-palette.js?v=8454"></script>
+<script src="js/command-palette.js?v=8455"></script>
 <script src="js/xref.js?v=8451"></script>
 <script src="js/dep-graph.js?v=8451"></script>
 <script src="js/smart-playlists.js?v=8451"></script>
 <script src="js/heatmap-dashboard.js?v=8451"></script>
 <script src="js/midi.js?v=8451"></script>
-<script src="js/pdf.js?v=8454"></script>
+<script src="js/pdf.js?v=8455"></script>
 <script src="js/settings-search.js?v=8451"></script>
 <script src="js/visualizer.js?v=8451"></script>
 <script src="js/walker-status.js?v=8451"></script>
@@ -10897,6 +10912,6 @@
 <script src="js/shortcuts.js?v=8451"></script>
 <script src="js/help-overlay.js?v=8451"></script>
 <script src="js/keyboard-nav.js?v=8451"></script>
-<script src="js/app.js?v=8454"></script>
+<script src="js/app.js?v=8455"></script>
 </body>
 </html>

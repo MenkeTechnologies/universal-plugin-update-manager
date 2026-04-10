@@ -677,7 +677,8 @@ async function loadPdfPagesForVisible() {
         }
     } catch { /* ignore — rows stay at "—" */
     }
-    // Fire-and-forget: kick the background extractor for paths still missing.
+    // Fire-and-forget: optional background extractor (Settings → PDF → Background PDF metadata).
+    if (typeof prefs !== 'undefined' && prefs.getItem('pdfMetadataAutoExtract') === 'off') return;
     startPdfMetadataExtraction();
 }
 

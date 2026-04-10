@@ -13,6 +13,8 @@ tooltipHoverDelayMs = "600"
 
 [scanning]
 autoScan = "off"
+# Background PDF page-count extraction while the PDF tab is active (including on launch if that tab is restored). "off" = only Command Palette / manual extract.
+pdfMetadataAutoExtract = "on"
 autoUpdate = "off"
 singleClickPlay = "on"
 autoPlaySampleOnSelect = "on"

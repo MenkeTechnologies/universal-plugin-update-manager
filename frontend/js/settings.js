@@ -951,6 +951,19 @@ function settingToggleAutoAnalysis() {
     refreshSettingsUI();
 }
 
+function settingTogglePdfMetadataAutoExtract() {
+    const current = prefs.getItem('pdfMetadataAutoExtract') !== 'off';
+    const next = !current;
+    prefs.setItem('pdfMetadataAutoExtract', next ? 'on' : 'off');
+    showToast(toastFmt('toast.pdf_metadata_auto_extract', {state: next ? 'on' : 'off'}));
+    if (!next && typeof abortPdfMetadataExtraction === 'function') void abortPdfMetadataExtraction();
+    if (next && typeof loadPdfPagesForVisible === 'function') {
+        const tab = document.querySelector('.tab-content.active');
+        if (tab && tab.id === 'tabPdf') void loadPdfPagesForVisible();
+    }
+    refreshSettingsUI();
+}
+
 function settingToggleAutoScan() {
     const current = prefs.getItem('autoScan') === 'on';
     const next = !current;
@@ -1408,6 +1421,17 @@ function refreshSettingsUI() {
     if (autoAnalysisBtn) {
         autoAnalysisBtn.classList.toggle('active', autoAnalysis);
         autoAnalysisLabel.textContent = _uiToggle(autoAnalysis);
+    }
+
+    // Background PDF metadata (page counts) while PDF tab is active
+    const pdfMetaAuto = prefs.getItem('pdfMetadataAutoExtract') !== 'off';
+    const pdfMetaAutoBtn = document.getElementById('settingPdfMetadataAutoExtract');
+    const pdfMetaAutoLabel = document.getElementById('settingPdfMetadataAutoExtractLabel');
+    if (pdfMetaAutoBtn) {
+        pdfMetaAutoBtn.classList.toggle('active', pdfMetaAuto);
+    }
+    if (pdfMetaAutoLabel) {
+        pdfMetaAutoLabel.textContent = _uiToggle(pdfMetaAuto);
     }
 
     // Folder watch
