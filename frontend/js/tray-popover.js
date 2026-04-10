@@ -13,7 +13,7 @@
     /* Do not hide on blur: focus moves to the tray before the tray Click event, which would fight Rust toggle. */
 
     const shell = document.getElementById('shell');
-    const elTitle = document.getElementById('title');
+    const elTitle = document.getElementById('trayPopoverTitle');
     const elSub = document.getElementById('subtitle');
     const elIdle = document.getElementById('idleHint');
     const elFill = document.getElementById('fill');
@@ -55,8 +55,26 @@
         });
     }
 
-    function applyState(p) {
-        if (!p || typeof p !== 'object') return;
+    function normalizePayload(raw) {
+        if (!raw || typeof raw !== 'object') return null;
+        const p = { ...raw };
+        let elapsed = p.elapsed_sec;
+        if (typeof elapsed === 'string') elapsed = parseFloat(elapsed);
+        if (typeof elapsed !== 'number' || !Number.isFinite(elapsed)) elapsed = 0;
+        let total = p.total_sec;
+        if (typeof total === 'string') total = parseFloat(total);
+        if (typeof total === 'number' && Number.isFinite(total) && total > 0) {
+            p.total_sec = total;
+        } else {
+            p.total_sec = null;
+        }
+        p.elapsed_sec = elapsed;
+        return p;
+    }
+
+    function applyState(raw) {
+        const p = normalizePayload(raw);
+        if (!p) return;
         const idle = p.idle === true;
         if (shell) shell.classList.toggle('idle', idle);
         if (elTitle) elTitle.textContent = typeof p.title === 'string' ? p.title : '';
@@ -98,11 +116,33 @@
     if (btnPlay) btnPlay.addEventListener('click', () => send('play_pause'));
     if (btnNext) btnNext.addEventListener('click', () => send('next_track'));
 
-    if (listen) {
-        void listen('tray-popover-state', (e) => {
+    function bindTrayPopoverListener() {
+        const handler = (e) => {
             const p = e && e.payload !== undefined ? e.payload : e;
             applyState(p);
-        }).catch(() => {});
+        };
+        const attach = (fn) => {
+            try {
+                const r = fn('tray-popover-state', handler);
+                if (r && typeof r.then === 'function') void r.catch(() => {});
+            } catch (_) {
+                /* ignore */
+            }
+        };
+        if (TW && typeof TW.listen === 'function') {
+            attach(TW.listen.bind(TW));
+            return;
+        }
+        if (listen) attach(listen);
+    }
+    bindTrayPopoverListener();
+
+    if (invoke) {
+        void invoke('tray_popover_get_state')
+            .then((emit) => {
+                if (emit) applyState(emit);
+            })
+            .catch(() => {});
     }
 
     function initSizeAfterFonts() {

@@ -188,9 +188,16 @@ fn toggle_tray_popover(app: &AppHandle<Wry>, rect: &Rect) -> Result<(), String> 
         let _ = win.hide();
         return Ok(());
     }
-    if let Some(ref emit) = last {
-        let _ = app.emit("tray-popover-state", emit);
-    }
+    let emit = last.unwrap_or(TrayPopoverEmit {
+        idle: true,
+        title: String::new(),
+        subtitle: String::new(),
+        elapsed_sec: 0.0,
+        total_sec: None,
+        playing: false,
+        idle_hint: None,
+    });
+    let _ = app.emit_to("tray-popover", "tray-popover-state", &emit);
     let scale = win.scale_factor().unwrap_or(1.0);
     let (mut x, y) = popover_xy_below_tray(rect, scale);
     x = x.max(8);
@@ -346,6 +353,15 @@ pub fn update_tray_now_playing(
             let _ = tray.set_title(payload.title_bar.as_deref());
         }
     }
-    let _ = app.emit("tray-popover-state", &emit);
+    let _ = app.emit_to("tray-popover", "tray-popover-state", &emit);
     Ok(())
+}
+
+#[tauri::command]
+pub fn tray_popover_get_state(tray_state: State<'_, TrayState>) -> Result<Option<TrayPopoverEmit>, String> {
+    let guard = tray_state
+        .inner
+        .lock()
+        .map_err(|_| "tray state mutex poisoned".to_string())?;
+    Ok(guard.last_popover_emit.clone())
 }

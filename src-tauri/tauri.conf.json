@@ -27,7 +27,7 @@
         "height": 280,
         "decorations": false,
         "transparent": true,
-        "shadow": true,
+        "shadow": false,
         "visible": false,
         "resizable": false,
         "skipTaskbar": true,

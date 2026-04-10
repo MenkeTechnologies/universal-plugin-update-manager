@@ -3026,6 +3026,32 @@ function enginePlaybackDurationSec() {
 /** Dedupes `invoke('update_tray_now_playing')` — includes duration so tray updates when total length loads. */
 let _traySyncSig = '';
 
+/** Tray popover + menu line: `#npName`, else library sample basename, else path basename. */
+function trayNowPlayingDisplayName() {
+    const np = document.getElementById('npName');
+    let track = np && typeof np.textContent === 'string' ? np.textContent.trim() : '';
+    if (track) return track;
+    const resumePath =
+        typeof window !== 'undefined' &&
+        typeof window._enginePlaybackResumePath === 'string' &&
+        window._enginePlaybackResumePath.length > 0
+            ? window._enginePlaybackResumePath
+            : '';
+    const pathForMeta = audioPlayerPath || resumePath || null;
+    if (pathForMeta && typeof findByPath === 'function' && typeof allAudioSamples !== 'undefined') {
+        const s = findByPath(allAudioSamples, pathForMeta);
+        if (s && typeof s.name === 'string' && s.name.trim() !== '') {
+            const ext = s.format ? String(s.format).toLowerCase() : '';
+            return ext ? `${s.name}.${ext}` : s.name;
+        }
+    }
+    if (pathForMeta) {
+        const base = pathForMeta.split('/').pop();
+        if (base) return base;
+    }
+    return '';
+}
+
 function syncTrayNowPlayingFromPlayback() {
     const inv =
         typeof window !== 'undefined' &&
@@ -3083,15 +3109,7 @@ function syncTrayNowPlayingFromPlayback() {
             if (s && typeof s.duration === 'number' && s.duration > 0) dur = s.duration;
         }
     }
-    const np = document.getElementById('npName');
-    let track = np && typeof np.textContent === 'string' ? np.textContent.trim() : '';
-    if (!track && audioPlayerPath) {
-        const base = audioPlayerPath.split('/').pop();
-        track = base || '';
-    } else if (!track && resumePath) {
-        const base = resumePath.split('/').pop();
-        track = base || '';
-    }
+    let track = trayNowPlayingDisplayName();
     const playing = typeof isAudioPlaying === 'function' && isAudioPlaying();
     const ft = typeof formatTime === 'function' ? formatTime : (x) => String(x);
     const totalStr = Number.isFinite(dur) && dur > 0 ? ft(dur) : '—';
