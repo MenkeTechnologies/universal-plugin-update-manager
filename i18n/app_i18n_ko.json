@@ -695,6 +695,8 @@
   "ui.ae.insert_editor_slot_4": "Editor (4)",
   "ui.ae.insert_editor_tt": "Open the native plug-in window for this insert slot. Apply inserts first.",
   "ui.ae.insert_editors_row_tt": "Native plug-in editor windows (JUCE host).",
+  "ui.ae.insert_hide_audio_units": "Audio Units 숨기기",
+  "ui.ae.insert_hide_audio_units_tt": "이 빌드에서는 audiocomponentd가 임시 서명된 호스트에 대한 프로세스 외부 AU 뷰 전달을 거부하기 때문에 AU 플러그인 편집기 창이 비어 있습니다. 프로젝트가 실제 Developer ID로 서명될 때까지 인서트 선택기에서 AU를 숨깁니다(기본값). 편집기를 열지 않고 AU 오디오 처리만 필요한 경우 끄십시오.",
   "ui.ae.insert_show_instruments": "Show instruments",
   "ui.ae.insert_show_instruments_tt": "When off, the insert picker lists only plug-ins JUCE marks as effects (not synths or samplers). Turn on to include instruments.",
   "ui.ae.insert_slot_empty_opt": "— none —",

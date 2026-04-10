@@ -888,10 +888,37 @@ function aeInsertPickerShowInstrumentsEnabled() {
         && prefs.getItem('aeInsertPickerShowInstruments') === 'on';
 }
 
+/* AU plugins are loaded out-of-process by `audiocomponentd` via `_RemoteAUv2ViewFactory`,
+ * which only delivers its populated NSView over an XPC connection that requires the host to
+ * be signed with a real Apple Developer ID. Our ad-hoc signed helper bundle gets `not set`
+ * as `TeamIdentifier`, so the XPC view-controller delivery never completes and AU editor
+ * windows render as a permanent 1×1 placeholder (blank/white). Until the project ships with
+ * a real Developer ID signing identity, AU plugin editors are unusable — so the picker
+ * defaults to hiding them. The user can flip this off if they want to see/select AUs anyway
+ * (e.g. for an instance whose audio works fine without ever opening its UI).
+ * See `audio-engine/README.md` "Helper .app architecture" for the full story. */
+function aeInsertPickerHideAudioUnitsEnabled() {
+    if (typeof prefs === 'undefined' || typeof prefs.getItem !== 'function') return true;
+    const v = prefs.getItem('aeInsertPickerHideAudioUnits');
+    // Default is ON (hide) when the pref has never been set.
+    return v == null || v === '' || v === 'on';
+}
+
+/** Compose the active filter set against an entry list — single source of truth so the
+ *  catalog rebuild and the live refresh path stay in sync as filters are added. */
+function aeApplyInsertPickerFilters(entries) {
+    let out = entries;
+    if (!aeInsertPickerShowInstrumentsEnabled())
+        out = out.filter((p) => !p.isInstrument);
+    if (aeInsertPickerHideAudioUnitsEnabled())
+        out = out.filter((p) => p.format !== 'AudioUnit');
+    return out;
+}
+
 /** Rebuild `aePluginCatalog` from `aeLastPluginChain` without rebuilding rows (picker filter toggle). */
 function aeRefreshInsertPickerCatalogOnly() {
     const full = aePluginEntriesFromChain(aeLastPluginChain);
-    aePluginCatalog = aeInsertPickerShowInstrumentsEnabled() ? full : full.filter((p) => !p.isInstrument);
+    aePluginCatalog = aeApplyInsertPickerFilters(full);
     for (const picker of aeInsertPickers) {
         if (picker && typeof picker.refresh === 'function') picker.refresh();
     }
@@ -903,10 +930,16 @@ function syncAeInsertPickerShowInstrumentsCheckbox() {
     cb.checked = aeInsertPickerShowInstrumentsEnabled();
 }
 
+function syncAeInsertPickerHideAudioUnitsCheckbox() {
+    const cb = document.getElementById('aeInsertPickerHideAudioUnits');
+    if (!cb || typeof cb !== 'object') return;
+    cb.checked = aeInsertPickerHideAudioUnitsEnabled();
+}
+
 function aePopulateInsertSlotSelects(chain) {
     aeLastPluginChain = chain || null;
     const full = aePluginEntriesFromChain(chain);
-    aePluginCatalog = aeInsertPickerShowInstrumentsEnabled() ? full : full.filter((p) => !p.isInstrument);
+    aePluginCatalog = aeApplyInsertPickerFilters(full);
 
     const fromServer = chain && Array.isArray(chain.insert_paths) ? chain.insert_paths.map((x) => String(x)) : [];
     let pick = [];
@@ -1332,6 +1365,15 @@ function initAudioEngineTab() {
         && typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
         insertShowInstrumentsCb.addEventListener('change', () => {
             prefs.setItem('aeInsertPickerShowInstruments', insertShowInstrumentsCb.checked ? 'on' : 'off');
+            aeRefreshInsertPickerCatalogOnly();
+        });
+    }
+    syncAeInsertPickerHideAudioUnitsCheckbox();
+    const insertHideAudioUnitsCb = document.getElementById('aeInsertPickerHideAudioUnits');
+    if (insertHideAudioUnitsCb && typeof insertHideAudioUnitsCb.addEventListener === 'function'
+        && typeof prefs !== 'undefined' && typeof prefs.setItem === 'function') {
+        insertHideAudioUnitsCb.addEventListener('change', () => {
+            prefs.setItem('aeInsertPickerHideAudioUnits', insertHideAudioUnitsCb.checked ? 'on' : 'off');
             aeRefreshInsertPickerCatalogOnly();
         });
     }

@@ -695,6 +695,8 @@
   "ui.ae.insert_editor_slot_4": "Editor (4)",
   "ui.ae.insert_editor_tt": "Open the native plug-in window for this insert slot. Apply inserts first.",
   "ui.ae.insert_editors_row_tt": "Native plug-in editor windows (JUCE host).",
+  "ui.ae.insert_hide_audio_units": "隐藏 Audio Units",
+  "ui.ae.insert_hide_audio_units_tt": "由于 audiocomponentd 拒绝向临时签名的主机交付进程外 AU 视图,因此在此构建中 AU 插件编辑器窗口为空白。在项目使用真实的 Developer ID 签名之前,从插入选择器中隐藏 AU(默认)。如果只需要 AU 音频处理而不打开编辑器,请关闭此选项。",
   "ui.ae.insert_show_instruments": "Show instruments",
   "ui.ae.insert_show_instruments_tt": "When off, the insert picker lists only plug-ins JUCE marks as effects (not synths or samplers). Turn on to include instruments.",
   "ui.ae.insert_slot_empty_opt": "— none —",

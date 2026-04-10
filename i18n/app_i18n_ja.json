@@ -695,6 +695,8 @@
   "ui.ae.insert_editor_slot_4": "Editor (4)",
   "ui.ae.insert_editor_tt": "Open the native plug-in window for this insert slot. Apply inserts first.",
   "ui.ae.insert_editors_row_tt": "Native plug-in editor windows (JUCE host).",
+  "ui.ae.insert_hide_audio_units": "Audio Units を非表示",
+  "ui.ae.insert_hide_audio_units_tt": "このビルドでは、audiocomponentd がアドホック署名されたホストへのアウトオブプロセス AU ビュー配信を拒否するため、AU プラグインのエディタウィンドウは空白になります。プロジェクトが実際の Developer ID で署名されるまで、AU をインサートピッカーから非表示にします（デフォルト）。エディタを開かずに AU オーディオ処理のみが必要な場合はオフにします。",
   "ui.ae.insert_show_instruments": "Show instruments",
   "ui.ae.insert_show_instruments_tt": "When off, the insert picker lists only plug-ins JUCE marks as effects (not synths or samplers). Turn on to include instruments.",
   "ui.ae.insert_slot_empty_opt": "— none —",
