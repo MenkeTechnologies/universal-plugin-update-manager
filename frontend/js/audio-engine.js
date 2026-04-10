@@ -2319,15 +2319,19 @@ const ENGINE_PLAYBACK_POLL_MS = 250;
 /** @type {ReturnType<typeof setInterval> | null} */
 let _enginePlaybackPollTimer = null;
 
+/** True between **`startEnginePlaybackPoll`** and **`stopEnginePlaybackPoll`** (timer may be cleared while hidden). */
+let _enginePlaybackPollSessionActive = false;
+
 /** @type {boolean} */
 let _enginePlaybackVisibilityHooked = false;
 
 /**
  * Host EOF watchdog runs only while **`document.hidden`** so foreground playback does not double
- * `playback_status` IPC with the WebView poll (keeps idle CPU low for typical library playback).
+ * `playback_status` IPC. When hidden, the WebView **`setInterval`** is paused so only this host path
+ * (and not both) hits the engine.
  */
 function syncEnginePlaybackEofWatchdog() {
-    if (_enginePlaybackPollTimer == null) {
+    if (!_enginePlaybackPollSessionActive) {
         return;
     }
     try {
@@ -2347,7 +2351,30 @@ function syncEnginePlaybackEofWatchdog() {
     }
 }
 
+function onEnginePlaybackDocumentVisibilityChange() {
+    if (!_enginePlaybackPollSessionActive) {
+        return;
+    }
+    if (typeof document === 'undefined') {
+        return;
+    }
+    if (document.hidden) {
+        if (_enginePlaybackPollTimer != null) {
+            clearInterval(_enginePlaybackPollTimer);
+            _enginePlaybackPollTimer = null;
+        }
+        syncEnginePlaybackEofWatchdog();
+    } else {
+        if (_enginePlaybackPollTimer == null) {
+            _enginePlaybackPollTimer = setInterval(() => void runEnginePlaybackStatusTick(), ENGINE_PLAYBACK_POLL_MS);
+            void runEnginePlaybackStatusTick();
+        }
+        syncEnginePlaybackEofWatchdog();
+    }
+}
+
 function stopEnginePlaybackPoll() {
+    _enginePlaybackPollSessionActive = false;
     if (_enginePlaybackPollTimer != null) {
         clearInterval(_enginePlaybackPollTimer);
         _enginePlaybackPollTimer = null;
@@ -2386,50 +2413,52 @@ function applyPlaybackStatusSpectrum(st) {
     }
 }
 
-function startEnginePlaybackPoll() {
-    stopEnginePlaybackPoll();
-    if (typeof document !== 'undefined' && !_enginePlaybackVisibilityHooked) {
-        _enginePlaybackVisibilityHooked = true;
-        document.addEventListener('visibilitychange', () => {
-            if (_enginePlaybackPollTimer != null) {
-                syncEnginePlaybackEofWatchdog();
-            }
-        });
-    }
-    const tick = async () => {
-        const inv = getAeAudioEngineInvoke();
-        if (!inv) return;
-        try {
-            const st = await inv({cmd: 'playback_status'});
-            if (st && st.ok === true) {
-                applyPlaybackStatusSpectrum(st);
-                if (st.loaded === true) {
-                    window._enginePlaybackPosSec = typeof st.position_sec === 'number' ? st.position_sec : 0;
-                    window._enginePlaybackDurSec = typeof st.duration_sec === 'number' ? st.duration_sec : 0;
-                    window._enginePlaybackPaused = st.paused === true;
-                    window._enginePlaybackPeak = typeof st.peak === 'number' ? st.peak : 0;
-                    if (typeof updatePlaybackTime === 'function') updatePlaybackTime();
-                    if (st.eof !== true && typeof window.resetEnginePlaybackEofFlag === 'function') {
-                        window.resetEnginePlaybackEofFlag();
-                    }
-                    if (
-                        st.eof === true &&
-                        typeof window.handleEnginePlaybackEofFromPoll === 'function'
-                    ) {
-                        window.handleEnginePlaybackEofFromPoll();
-                    }
+async function runEnginePlaybackStatusTick() {
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) return;
+    try {
+        const st = await inv({cmd: 'playback_status'});
+        if (st && st.ok === true) {
+            applyPlaybackStatusSpectrum(st);
+            if (st.loaded === true) {
+                window._enginePlaybackPosSec = typeof st.position_sec === 'number' ? st.position_sec : 0;
+                window._enginePlaybackDurSec = typeof st.duration_sec === 'number' ? st.duration_sec : 0;
+                window._enginePlaybackPaused = st.paused === true;
+                window._enginePlaybackPeak = typeof st.peak === 'number' ? st.peak : 0;
+                if (typeof updatePlaybackTime === 'function') updatePlaybackTime();
+                if (st.eof !== true && typeof window.resetEnginePlaybackEofFlag === 'function') {
+                    window.resetEnginePlaybackEofFlag();
+                }
+                if (
+                    st.eof === true &&
+                    typeof window.handleEnginePlaybackEofFromPoll === 'function'
+                ) {
+                    window.handleEnginePlaybackEofFromPoll();
                 }
             }
-            if (typeof window.ensureEnginePlaybackFftRaf === 'function') {
-                window.ensureEnginePlaybackFftRaf();
-            }
-        } catch {
-            /* ignore */
         }
-    };
-    void tick();
-    _enginePlaybackPollTimer = setInterval(() => void tick(), ENGINE_PLAYBACK_POLL_MS);
-    syncEnginePlaybackEofWatchdog();
+        if (typeof window.ensureEnginePlaybackFftRaf === 'function') {
+            window.ensureEnginePlaybackFftRaf();
+        }
+    } catch {
+        /* ignore */
+    }
+}
+
+function startEnginePlaybackPoll() {
+    stopEnginePlaybackPoll();
+    _enginePlaybackPollSessionActive = true;
+    if (typeof document !== 'undefined' && !_enginePlaybackVisibilityHooked) {
+        _enginePlaybackVisibilityHooked = true;
+        document.addEventListener('visibilitychange', onEnginePlaybackDocumentVisibilityChange);
+    }
+    void runEnginePlaybackStatusTick();
+    if (typeof document !== 'undefined' && document.hidden) {
+        syncEnginePlaybackEofWatchdog();
+    } else {
+        _enginePlaybackPollTimer = setInterval(() => void runEnginePlaybackStatusTick(), ENGINE_PLAYBACK_POLL_MS);
+        syncEnginePlaybackEofWatchdog();
+    }
 }
 
 /**
