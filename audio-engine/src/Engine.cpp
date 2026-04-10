@@ -88,15 +88,43 @@ static juce::File knownPluginListCacheFilePath()
     return audio_haxor::appDataDirectoryForAudioEngine().getChildFile("known-plugin-list.xml");
 }
 
-/** Called after each scan step so a hang or crash mid-scan still leaves a useful cache on disk. */
+/** Write-then-replace so `known-plugin-list.xml` is never a half-written XML fragment (crash/kill mid-write). */
 static void persistKnownPluginListCache(const juce::KnownPluginList& list)
 {
     const juce::File cacheFile = knownPluginListCacheFilePath();
     if (auto xml = list.createXml())
     {
         (void) cacheFile.getParentDirectory().createDirectory();
-        xml->writeTo(cacheFile, {});
+        const juce::File tmp = cacheFile.getSiblingFile(cacheFile.getFileName() + ".tmp");
+        (void) tmp.deleteFile();
+        if (!xml->writeTo(tmp, {}))
+        {
+            appLogLine("plugin scan: known-plugin-list.xml tmp write failed");
+            return;
+        }
+        if (!tmp.replaceFileIn(cacheFile))
+        {
+            appLogLine("plugin scan: known-plugin-list.xml atomic replace failed");
+            (void) tmp.deleteFile();
+        }
     }
+}
+
+/** If the cache file exists but cannot be parsed, move it aside before a rescan overwrites it (recovery / forensics). */
+static void quarantineUnreadableKnownPluginListCacheIfPresent()
+{
+    const juce::File cacheFile = knownPluginListCacheFilePath();
+    if (!cacheFile.existsAsFile())
+        return;
+    const juce::int64 sz = cacheFile.getSize();
+    const juce::String ts = juce::String(juce::Time::currentTimeMillis());
+    const juce::File quarantine = cacheFile.getSiblingFile("known-plugin-list.invalid." + ts + ".xml");
+    if (cacheFile.moveFileTo(quarantine))
+        appLogLine("plugin scan: known-plugin-list.xml unreadable or invalid; moved " + juce::String(sz)
+                   + " bytes to " + quarantine.getFileName());
+    else
+        appLogLine("plugin scan: known-plugin-list.xml unreadable or invalid (" + juce::String(sz)
+                   + " bytes); quarantine move failed");
 }
 
 /** Never throws — a disk/XML error must not abort the whole scan (user would have to restart the engine). */
@@ -1465,7 +1493,10 @@ struct Engine::Impl
         {
             const juce::File cacheFile = knownPluginListCacheFilePath();
             if (cacheFile.existsAsFile())
+            {
                 appLogLine("plugin scan: known-plugin-list.xml missing or invalid; scanning from empty list");
+                quarantineUnreadableKnownPluginListCacheIfPresent();
+            }
             pluginScanProgress.cacheLoaded.store(false, std::memory_order_relaxed);
         }
 
@@ -1597,7 +1628,7 @@ struct Engine::Impl
         fmts.add("AU");
 #endif
 
-        std::lock_guard<std::mutex> scanLock(pluginScanMutex);
+        std::unique_lock<std::mutex> scanLock(pluginScanMutex);
         if (pluginScanPhase == PluginScanPhase::Failed)
         {
             const juce::String err = pluginScanLastError;
@@ -1626,7 +1657,12 @@ struct Engine::Impl
             {
                 pluginScanPhase = PluginScanPhase::Running;
                 if (pluginScanThread.joinable())
+                {
+                    /* Worker finishes by taking this mutex; join while holding it deadlocks. */
+                    scanLock.unlock();
                     pluginScanThread.join();
+                    scanLock.lock();
+                }
                 pluginScanThread = std::thread([this]() { runPluginScanWorker(); });
                 juce::var out = okObj();
                 if (auto* o = out.getDynamicObject())
