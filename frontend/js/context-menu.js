@@ -1161,6 +1161,8 @@ document.addEventListener('contextmenu', (e) => {
         // ── Floating player ──
         const player = e.target.closest('#audioNowPlaying');
         if (player && player.classList.contains('active')) {
+            // Smart playlist rows (`smart-playlists.js` listener runs first) — do not replace that menu.
+            if (e.target.closest('.sp-item')) return;
             const isPlaying = audioPlayerPath && (typeof isAudioPlaying === 'function' ? isAudioPlaying() : !audioPlayer.paused);
             const isExpanded = player.classList.contains('expanded');
             const items = [];

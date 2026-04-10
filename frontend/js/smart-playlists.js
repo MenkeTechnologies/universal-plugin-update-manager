@@ -160,8 +160,11 @@ function renderSmartPlaylists() {
       <span class="sp-icon">&#127926;</span>
       <span class="sp-name">${escapeHtml(pl.name)}</span>
       <span class="sp-count">${count}</span>
+      <button type="button" class="sp-item-del btn-small btn-stop" data-sp-id="${escapeHtml(pl.id)}" data-i18n-title="menu.delete" title="Delete">&#10005;</button>
     </div>`;
     }).join('');
+
+    if (typeof applyUiI18n === 'function') applyUiI18n();
 
     // Drag reorder smart playlists
     if (typeof initDragReorder === 'function') {
@@ -370,6 +373,15 @@ document.addEventListener('click', (e) => {
 
 // ── Click handlers ──
 document.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('.sp-item-del');
+    if (delBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = delBtn.dataset.spId;
+        const pl = _smartPlaylists.find(p => p.id === id);
+        if (pl && confirm(appFmt('confirm.delete_smart_playlist', {name: pl.name}))) deleteSmartPlaylist(id);
+        return;
+    }
     const spItem = e.target.closest('.sp-item');
     if (spItem) {
         loadSmartPlaylistIntoPlayer(spItem.dataset.spId);
