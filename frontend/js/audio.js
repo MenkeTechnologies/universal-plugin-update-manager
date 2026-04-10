@@ -445,6 +445,10 @@ function setEnginePlaybackActive(value) {
     }
 }
 
+if (typeof window !== 'undefined') {
+    window.setEnginePlaybackActive = setEnginePlaybackActive;
+}
+
 /**
  * Waveform click-to-seek diagnostics. In DevTools, filter by `[audio-haxor] waveform-seek`.
  * Set `window.__AUDIO_HAXOR_WAVEFORM_SEEK_LOG = false` to silence (default is on).
@@ -2719,18 +2723,28 @@ async function previewAudio(filePath, opts) {
         if (canEngine) {
             /* Mute / disconnect `<audio>` before AudioEngine audio starts so WebView path cannot overlap. */
             silenceWebViewAudioForEngine();
-            await window.enginePlaybackStart(filePath);
-            setEnginePlaybackActive(true);
-            if (typeof window !== 'undefined') {
-                window._enginePlaybackResumePath = filePath;
-            }
             stopReverseBufferPlayback();
             _decodedBuf = null;
             _reversedBuf = null;
             _decodedBufPath = null;
             _pausedOffsetInRev = 0;
+            /* `enginePlaybackStart` runs `playback_status` immediately — path + engine flag must be set first or tray / time stay idle / HTML5. */
             audioPlayerPath = filePath;
             audioPlayer.loop = false;
+            if (typeof window !== 'undefined') {
+                window._enginePlaybackResumePath = filePath;
+            }
+            try {
+                await window.enginePlaybackStart(filePath);
+            } catch (e) {
+                setEnginePlaybackActive(false);
+                if (typeof window.stopEnginePlaybackPoll === 'function') window.stopEnginePlaybackPoll();
+                audioPlayerPath = null;
+                if (typeof window !== 'undefined') {
+                    window._enginePlaybackResumePath = '';
+                }
+                throw e;
+            }
             if (prefs.getItem('audioReverse') === 'on' && typeof window.engineApplyReversePrefPlayback === 'function') {
                 await window.engineApplyReversePrefPlayback();
                 audioReverseMode = true;

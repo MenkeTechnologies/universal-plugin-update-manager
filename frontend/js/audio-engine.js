@@ -2620,6 +2620,10 @@ async function enginePlaybackStart(filePath) {
     if (typeof window !== 'undefined') {
         window._aeOutputStreamRunning = true;
     }
+    /* Before first `playback_status` poll — matches `audio.js` `_enginePlaybackActive` so tray / `isAudioPlaying` see engine transport. */
+    if (typeof window.setEnginePlaybackActive === 'function') {
+        window.setEnginePlaybackActive(true);
+    }
     syncEnginePlaybackDspFromPrefs();
     syncEnginePlaybackSpeedFromPrefs();
     startEnginePlaybackPoll();
