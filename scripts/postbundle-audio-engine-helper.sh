@@ -25,8 +25,6 @@
 # fully signed before the outer .app re-signs. Re-signing the outer must NOT use --deep
 # (which would recursively re-sign and overwrite the inner signatures we just made).
 
-set -eu
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -314,5 +312,5 @@ if [[ -n "$pid" ]]; then
     kill $pid
 fi
 echo "postbundle-audio-engine-helper: helper .app installed at $HELPER_APP"
-echo "postbundle-audio-engine-helper: DMG left at $DMG_OUT (not copied to /Applications)"
+echo "postbundle-audio-engine-helper: DMG left at $DMG_OUT not copied to /Applications"
 open "/Applications/AUDIO_HAXOR.app"

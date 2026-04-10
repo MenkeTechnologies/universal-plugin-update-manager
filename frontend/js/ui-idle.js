@@ -3,6 +3,10 @@
  * (desktop WebViews often keep `document.hidden` false when another app is foreground), **`window`**
  * **blur/focus**, plus Tauri `WebviewWindow` focus / minimize / visible when available.
  *
+ * **macOS Spaces:** switching to another Space does not reliably fire `visibilitychange`, `blur`, or
+ * even `onFocusChanged` for the WebView, so we **poll** `isFocused` / `isVisible` / `isMinimized` on a
+ * timer and on **`onMoved`** (cheap vs leaving rAF + `playback_status` loops running off-screen).
+ *
  * Paused work is rAF-driven visualization and idle-gated **`playback_status`** polling — background
  * BPM/Key/LUFS analysis (`startBackgroundAnalysis` in `audio.js`) is unrelated and keeps running.
  */
@@ -98,6 +102,15 @@
                     void syncFromTauriWindow(win).then(() => setState()).catch(() => setState());
                 });
             }
+            if (typeof win.onMoved === 'function') {
+                await win.onMoved(() => {
+                    void syncFromTauriWindow(win).then(() => setState()).catch(() => setState());
+                });
+            }
+            /* Spaces / occlusion: events are unreliable; re-sync native window state periodically. */
+            setInterval(() => {
+                void syncFromTauriWindow(win).then(() => setState()).catch(() => setState());
+            }, 1200);
         } catch (_) {
             /* non-Tauri or older API */
         }
