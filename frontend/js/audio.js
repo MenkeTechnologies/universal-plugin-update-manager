@@ -3035,7 +3035,18 @@ function syncTrayNowPlayingFromPlayback() {
             ? window.__TAURI__.core.invoke
             : null;
     if (!inv) return;
-    const idle = !audioPlayerPath;
+    /* `!audioPlayerPath` alone misses AudioEngine sessions where `resumeEnginePlaybackAfterApply` did not
+     * restore `audioPlayerPath` while transport is still active. Match engine / reverse transport. */
+    const resumePath =
+        typeof window !== 'undefined' &&
+        typeof window._enginePlaybackResumePath === 'string' &&
+        window._enginePlaybackResumePath.length > 0
+            ? window._enginePlaybackResumePath
+            : '';
+    const idle =
+        !audioPlayerPath &&
+        !_enginePlaybackActive &&
+        !(audioReverseMode && _reversedBuf && _bufPlaying);
     const tooltipBase = typeof appFmt === 'function' ? appFmt('tray.tooltip') : 'AUDIO_HAXOR';
     if (idle) {
         if (_traySyncSig === 'idle') return;
@@ -3056,8 +3067,9 @@ function syncTrayNowPlayingFromPlayback() {
     } else {
         cur = audioPlayer.currentTime;
         dur = audioPlayer.duration;
-        if ((!Number.isFinite(dur) || dur <= 0) && audioPlayerPath && typeof findByPath === 'function' && typeof allAudioSamples !== 'undefined') {
-            const s = findByPath(allAudioSamples, audioPlayerPath);
+        const pathForMeta = audioPlayerPath || resumePath || null;
+        if ((!Number.isFinite(dur) || dur <= 0) && pathForMeta && typeof findByPath === 'function' && typeof allAudioSamples !== 'undefined') {
+            const s = findByPath(allAudioSamples, pathForMeta);
             if (s && typeof s.duration === 'number' && s.duration > 0) dur = s.duration;
         }
     }
@@ -3065,6 +3077,9 @@ function syncTrayNowPlayingFromPlayback() {
     let track = np && typeof np.textContent === 'string' ? np.textContent.trim() : '';
     if (!track && audioPlayerPath) {
         const base = audioPlayerPath.split('/').pop();
+        track = base || '';
+    } else if (!track && resumePath) {
+        const base = resumePath.split('/').pop();
         track = base || '';
     }
     const playing = typeof isAudioPlaying === 'function' && isAudioPlaying();
@@ -3083,7 +3098,8 @@ function syncTrayNowPlayingFromPlayback() {
     const shortT = track.length > 44 ? `${track.slice(0, 41)}…` : track;
     const title_bar = `${shortT} — ${ft(cur)} / ${totalStr}`;
     const durKey = Number.isFinite(dur) && dur > 0 ? Math.floor(dur) : -1;
-    const sig = `${audioPlayerPath}|${Math.floor(cur)}|${durKey}|${playing ? 1 : 0}`;
+    const sigPath = audioPlayerPath || resumePath || '';
+    const sig = `${sigPath}|${Math.floor(cur)}|${durKey}|${playing ? 1 : 0}`;
     if (sig === _traySyncSig) return;
     _traySyncSig = sig;
     void inv('update_tray_now_playing', {title_bar, tooltip, idle: false}).catch(() => {});
