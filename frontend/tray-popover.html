@@ -4,46 +4,54 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --cp-bg0: #14161c;
-      --cp-bg1: #1e222d;
-      --cp-cyan: #00e5ff;
-      --cp-cyan-dim: rgba(0, 229, 255, 0.55);
+      /* Desaturated navy HUD (CRT reference) */
+      --cp-bg0: #0a0e14;
+      --cp-bg1: #121820;
+      --cp-cyan: #5ce1ff;
+      --cp-cyan-hot: #88eeff;
+      --cp-cyan-dim: rgba(92, 225, 255, 0.5);
       --cp-magenta: #ff2aa3;
       --cp-magenta-dim: rgba(255, 42, 163, 0.45);
-      --cp-text: #e8f4ff;
-      --cp-muted: rgba(232, 244, 255, 0.45);
-      --cp-edge: rgba(255, 255, 255, 0.14);
+      --cp-text: #d8f8ff;
+      --cp-muted: rgba(200, 235, 255, 0.42);
+      --cp-scan: rgba(0, 0, 0, 0.22);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-family: "JetBrains Mono", ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
       -webkit-font-smoothing: antialiased;
       background: transparent;
     }
-    /* Asymmetric panel: large TL radius like a HUD slice; sharp TR per reference */
+    /* Asymmetric panel: large TL radius; HUD slice */
     .shell {
       position: relative;
       width: 300px;
       min-height: 168px;
       margin: 0 auto;
       padding: 12px 14px 10px;
-      border-radius: 22px 5px 12px 12px;
-      background: linear-gradient(165deg, var(--cp-bg1) 0%, var(--cp-bg0) 100%);
-      border: 1px solid var(--cp-cyan-dim);
+      border-radius: 24px 4px 12px 12px;
+      background: linear-gradient(168deg, #161c26 0%, var(--cp-bg1) 42%, var(--cp-bg0) 100%);
+      border: 1px solid rgba(92, 225, 255, 0.22);
+      /* Top + left cyan glow (reference image) */
       box-shadow:
-        inset 0 1px 0 var(--cp-edge),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-        0 0 0 1px rgba(0, 0, 0, 0.5),
-        0 0 24px rgba(0, 229, 255, 0.12),
-        0 0 48px rgba(255, 42, 163, 0.06);
-      backdrop-filter: blur(20px) saturate(140%);
-      -webkit-backdrop-filter: blur(20px) saturate(140%);
+        inset 1px 0 0 rgba(136, 238, 255, 0.35),
+        inset 0 1px 0 rgba(136, 238, 255, 0.45),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(0, 0, 0, 0.65),
+        0 0 20px rgba(92, 225, 255, 0.14),
+        0 0 42px rgba(255, 42, 163, 0.05);
+      backdrop-filter: blur(18px) saturate(130%);
+      -webkit-backdrop-filter: blur(18px) saturate(130%);
     }
+    /* CRT horizontal scanlines (stronger than before) */
     .shell::before {
       content: '';
       position: absolute;
@@ -53,11 +61,21 @@
       background: repeating-linear-gradient(
         180deg,
         transparent,
-        transparent 3px,
-        rgba(0, 229, 255, 0.04) 3px,
-        rgba(0, 229, 255, 0.04) 4px
+        transparent 1px,
+        var(--cp-scan) 1px,
+        var(--cp-scan) 2px
       );
-      opacity: 0.9;
+      mix-blend-mode: multiply;
+      opacity: 0.85;
+    }
+    /* Subtle cyan wash + vignette */
+    .shell .crt-wash {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: radial-gradient(ellipse 120% 80% at 50% 0%, rgba(92, 225, 255, 0.06) 0%, transparent 55%);
+      opacity: 1;
     }
     .shell::after {
       content: '';
@@ -66,21 +84,22 @@
       left: 0;
       right: 0;
       height: 1px;
-      background: linear-gradient(90deg, var(--cp-cyan), transparent 55%, var(--cp-magenta));
-      opacity: 0.55;
+      background: linear-gradient(90deg, var(--cp-cyan-hot), rgba(92, 225, 255, 0.2) 45%, var(--cp-magenta));
+      opacity: 0.65;
       pointer-events: none;
-      border-radius: 22px 5px 0 0;
+      box-shadow: 0 0 10px rgba(92, 225, 255, 0.35);
+      border-radius: 24px 4px 0 0;
     }
     .title {
       position: relative;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 700;
-      line-height: 1.25;
-      letter-spacing: 0.04em;
+      line-height: 1.3;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--cp-text);
-      text-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
-      max-height: 2.5em;
+      text-shadow: 0 0 14px rgba(92, 225, 255, 0.35);
+      max-height: 2.6em;
       overflow: hidden;
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -89,9 +108,9 @@
     .subtitle {
       position: relative;
       margin-top: 5px;
-      font-size: 11px;
-      line-height: 1.35;
-      letter-spacing: 0.06em;
+      font-size: 10px;
+      line-height: 1.4;
+      letter-spacing: 0.08em;
       color: var(--cp-cyan-dim);
       max-height: 2.8em;
       overflow: hidden;
@@ -104,32 +123,33 @@
       position: relative;
       height: 1px;
       margin: 10px 0 8px;
-      background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.35) 20%, rgba(255, 42, 163, 0.35) 80%, transparent);
-      box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+      background: linear-gradient(90deg, transparent, rgba(92, 225, 255, 0.5) 20%, rgba(255, 42, 163, 0.35) 80%, transparent);
+      box-shadow: 0 0 10px rgba(92, 225, 255, 0.35);
     }
     .idle-hint {
       position: relative;
-      font-size: 11px;
-      letter-spacing: 0.12em;
+      font-size: 10px;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--cp-muted);
       margin: 4px 0 0;
     }
     .progress-wrap { position: relative; margin-top: 2px; }
+    /* Thin track above readout (reference) */
     .track-bg {
-      height: 5px;
-      border-radius: 2px;
-      background: rgba(0, 0, 0, 0.45);
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+      height: 3px;
+      border-radius: 1px;
+      background: rgba(0, 0, 0, 0.55);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.75);
       overflow: hidden;
-      border: 1px solid rgba(0, 229, 255, 0.15);
+      border: 1px solid rgba(92, 225, 255, 0.22);
     }
     .track-fill {
       height: 100%;
       width: 0%;
-      border-radius: 1px;
+      border-radius: 0;
       background: linear-gradient(90deg, var(--cp-cyan), var(--cp-magenta));
-      box-shadow: 0 0 10px rgba(0, 229, 255, 0.45);
+      box-shadow: 0 0 12px rgba(92, 225, 255, 0.55);
       transition: width 0.12s linear;
     }
     .times {
@@ -137,19 +157,22 @@
       justify-content: space-between;
       align-items: baseline;
       margin-top: 6px;
-      font-family: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
-      font-size: 11px;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 0.06em;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums slashed-zero;
+      /* JetBrains Mono: slashed 0 via OpenType where supported */
+      font-feature-settings: "zero" 1;
+      letter-spacing: 0.04em;
     }
     #elapsed {
-      color: var(--cp-cyan);
-      text-shadow: 0 0 8px rgba(0, 229, 255, 0.35);
+      color: var(--cp-cyan-hot);
+      text-shadow: 0 0 12px rgba(92, 225, 255, 0.55), 0 0 24px rgba(92, 225, 255, 0.2);
     }
     #total {
-      color: var(--cp-text);
+      color: rgba(230, 252, 255, 0.92);
       font-weight: 600;
-      text-shadow: 0 0 6px rgba(255, 42, 163, 0.25);
+      text-shadow: 0 0 8px rgba(255, 42, 163, 0.35);
     }
     .transport {
       position: relative;
@@ -162,25 +185,28 @@
     }
     .transport button {
       appearance: none;
-      border: 1px solid rgba(0, 229, 255, 0.25);
-      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(92, 225, 255, 0.22);
+      background: rgba(0, 0, 0, 0.35);
       cursor: pointer;
       padding: 5px 8px;
       border-radius: 4px;
-      color: var(--cp-cyan);
+      color: var(--cp-cyan-hot);
       line-height: 1;
-      font-size: 16px;
-      text-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
-      box-shadow: 0 0 12px rgba(0, 229, 255, 0.08);
+      font-size: 15px;
+      font-family: "JetBrains Mono", monospace;
+      text-shadow: 0 0 10px rgba(92, 225, 255, 0.5);
+      box-shadow:
+        inset 0 0 0 1px rgba(92, 225, 255, 0.08),
+        0 0 14px rgba(92, 225, 255, 0.12);
       transition: border-color 0.15s, box-shadow 0.15s, color 0.15s;
     }
     .transport button:hover {
-      border-color: var(--cp-cyan);
-      box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
+      border-color: var(--cp-cyan-hot);
+      box-shadow: 0 0 18px rgba(92, 225, 255, 0.35);
       color: #fff;
     }
     .transport button:active { transform: scale(0.96); }
-    .transport .play-btn { font-size: 19px; padding: 5px 10px; }
+    .transport .play-btn { font-size: 18px; padding: 5px 10px; }
     .idle .progress-wrap,
     .idle .transport { opacity: 0.35; pointer-events: none; }
     .idle .divider { opacity: 0.4; }
@@ -188,6 +214,7 @@
 </head>
 <body>
   <div class="shell" id="shell">
+    <div class="crt-wash" aria-hidden="true"></div>
     <div class="title" id="title"></div>
     <div class="subtitle" id="subtitle"></div>
     <div class="idle-hint" id="idleHint" hidden></div>
