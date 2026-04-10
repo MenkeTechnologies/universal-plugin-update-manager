@@ -271,12 +271,12 @@ function buildPaletteStaticItems() {
         }
     });
     items.push({
-        type: 'action', name: appFmt('menu.extract_pdf_page_counts'), icon: '&#128196;', action: () => {
+        type: 'action', name: appFmt('menu.extract_pdf_metadata'), icon: '&#128196;', action: () => {
             if (typeof buildPdfPagesCache === 'function') buildPdfPagesCache();
         }
     });
     items.push({
-        type: 'action', name: appFmt('menu.stop_pdf_page_counts'), icon: '&#9632;', action: () => {
+        type: 'action', name: appFmt('menu.stop_pdf_metadata'), icon: '&#9632;', action: () => {
             if (typeof stopPdfMetadataExtractionUser === 'function') void stopPdfMetadataExtractionUser();
         }
     });

@@ -659,7 +659,7 @@ async function stopPdfMetadataExtractionUser() {
     _pdfMetaUserCancelled = true;
     await abortPdfMetadataExtraction();
     if (typeof showToast === 'function') {
-        showToast(toastFmt('toast.pdf_page_extract_stopped'), 2500);
+        showToast(toastFmt('toast.pdf_metadata_extract_stopped'), 2500);
     }
 }
 
@@ -709,7 +709,7 @@ async function startPdfMetadataExtraction(opts) {
         await window.vstUpdater.pdfMetadataExtractBatch(uncached);
     } catch (e) {
         if (typeof showToast === 'function') {
-            showToast(toastFmt('toast.pdf_page_extract_failed', {err: e && e.message ? e.message : e}), 4000, 'error');
+            showToast(toastFmt('toast.pdf_metadata_extract_failed', {err: e && e.message ? e.message : e}), 4000, 'error');
         }
     } finally {
         clearPdfMetaProgressDebounceState();
@@ -735,9 +735,9 @@ async function buildPdfPagesCache() {
     while (_pdfMetaRunning && Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 50));
     }
-    if (typeof showToast === 'function') showToast(toastFmt('toast.pdf_extracting_page_counts'), 3000);
+    if (typeof showToast === 'function') showToast(toastFmt('toast.pdf_extracting_metadata'), 3000);
     await startPdfMetadataExtraction({ forceNoIdle: true });
-    if (typeof showToast === 'function') showToast(toastFmt('toast.pdf_page_extract_complete'), 2500);
+    if (typeof showToast === 'function') showToast(toastFmt('toast.pdf_metadata_extract_complete'), 2500);
 }
 
 (function initPdfMetadataExtractionLifecycle() {
