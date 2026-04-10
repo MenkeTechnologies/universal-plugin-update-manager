@@ -445,6 +445,9 @@ document.addEventListener('click', (e) => {
             case 'stopPdfScan':
                 stopPdfScan();
                 break;
+            case 'stopPdfMetadataExtraction':
+                if (typeof stopPdfMetadataExtractionUser === 'function') void stopPdfMetadataExtractionUser();
+                break;
             case 'openPdfFile':
                 openPdfFile(el.dataset.path);
                 break;

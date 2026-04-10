@@ -694,6 +694,9 @@ async function scanAll(resume = false) {
 
 async function stopAll() {
     await Promise.all([
+        typeof abortPdfMetadataExtraction === 'function'
+            ? abortPdfMetadataExtraction().catch(() => {})
+            : Promise.resolve(),
         window.vstUpdater.stopScan().catch(e => {
             if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
         }),

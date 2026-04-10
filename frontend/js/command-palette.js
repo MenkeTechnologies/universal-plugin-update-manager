@@ -276,6 +276,11 @@ function buildPaletteStaticItems() {
         }
     });
     items.push({
+        type: 'action', name: appFmt('menu.stop_pdf_page_counts'), icon: '&#9632;', action: () => {
+            if (typeof stopPdfMetadataExtractionUser === 'function') void stopPdfMetadataExtractionUser();
+        }
+    });
+    items.push({
         type: 'action', name: appFmt('menu.build_fingerprint_cache'), icon: '&#127925;', action: () => {
             void (async () => {
                 const paths = await fetchAudioLibraryPathsForFingerprint();

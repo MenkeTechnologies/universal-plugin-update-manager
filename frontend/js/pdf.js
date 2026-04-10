@@ -50,6 +50,8 @@ let _pdfMetaProgressCleanup = null;
 let _pdfMetaProgDebounceTimer = null;
 let _pdfMetaProgGetInFlight = false;
 let _pdfMetaProgGetPending = false;
+/** True when the user explicitly stops page-count extraction (toolbar / palette); skips refresh restart in `finally`. */
+let _pdfMetaUserCancelled = false;
 
 let _lastPdfSearch = '';
 let _lastPdfMode = 'fuzzy';
@@ -646,6 +648,21 @@ async function abortPdfMetadataExtraction() {
     }
 }
 
+function syncPdfMetaExtractStopButton() {
+    const el = document.getElementById('btnStopPdfMeta');
+    if (!el) return;
+    el.style.display = _pdfMetaRunning ? '' : 'none';
+}
+
+async function stopPdfMetadataExtractionUser() {
+    if (!_pdfMetaRunning) return;
+    _pdfMetaUserCancelled = true;
+    await abortPdfMetadataExtraction();
+    if (typeof showToast === 'function') {
+        showToast(toastFmt('toast.pdf_page_extract_stopped'), 2500);
+    }
+}
+
 // Load cached page counts from DB for currently-visible rows, then trigger a
 // background extraction pass for any paths still uncached.
 async function loadPdfPagesForVisible() {
@@ -668,10 +685,16 @@ async function startPdfMetadataExtraction(opts) {
     const forceNoIdle = opts && opts.forceNoIdle === true;
     if (_pdfMetaRunning) return;
     if (!shouldStartPdfMetadataExtraction(forceNoIdle)) return;
+    _pdfMetaUserCancelled = false;
     _pdfMetaRunning = true;
+    syncPdfMetaExtractStopButton();
     let hadUncachedWork = false;
     try {
         const uncached = await window.vstUpdater.pdfMetadataUnindexed(100000);
+        if (_pdfMetaUserCancelled) {
+            _pdfMetaUserCancelled = false;
+            return;
+        }
         if (!Array.isArray(uncached) || uncached.length === 0) return;
         hadUncachedWork = true;
         // Listen to progress events to patch cells as they resolve
@@ -694,9 +717,12 @@ async function startPdfMetadataExtraction(opts) {
             _pdfMetaProgressCleanup();
             _pdfMetaProgressCleanup = null;
         }
+        const skipRefreshAfterUserStop = _pdfMetaUserCancelled;
+        _pdfMetaUserCancelled = false;
         _pdfMetaRunning = false;
-        // Final reload for any rows we missed via progress events (only after a real batch or listener was set up)
-        if (hadUncachedWork) loadPdfPagesForVisible();
+        syncPdfMetaExtractStopButton();
+        // Final reload for any rows we missed via progress events (not after explicit user stop — avoids immediate restart)
+        if (hadUncachedWork && !skipRefreshAfterUserStop) loadPdfPagesForVisible();
     }
 }
 
