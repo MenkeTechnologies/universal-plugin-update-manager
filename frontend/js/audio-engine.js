@@ -2030,6 +2030,14 @@ function stopEnginePlaybackPoll() {
         clearInterval(_enginePlaybackPollTimer);
         _enginePlaybackPollTimer = null;
     }
+    try {
+        const u = typeof window !== 'undefined' ? window.vstUpdater : undefined;
+        if (u && typeof u.audioEngineEofWatchdogStop === 'function') {
+            void u.audioEngineEofWatchdogStop();
+        }
+    } catch (_) {
+        /* non-Tauri */
+    }
 }
 
 function applyPlaybackStatusSpectrum(st) {
@@ -2058,6 +2066,14 @@ function applyPlaybackStatusSpectrum(st) {
 
 function startEnginePlaybackPoll() {
     stopEnginePlaybackPoll();
+    try {
+        const u = typeof window !== 'undefined' ? window.vstUpdater : undefined;
+        if (u && typeof u.audioEngineEofWatchdogStart === 'function') {
+            void u.audioEngineEofWatchdogStart().catch(() => {});
+        }
+    } catch (_) {
+        /* non-Tauri */
+    }
     const tick = async () => {
         const inv = getAeAudioEngineInvoke();
         if (!inv) return;
