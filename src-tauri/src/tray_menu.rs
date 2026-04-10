@@ -1,9 +1,19 @@
 //! System tray / menu bar icon: playback controls and dynamic title + tooltip (now playing).
 use std::collections::HashMap;
 use std::sync::Mutex;
+use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{App, AppHandle, Emitter, Manager, State, Wry};
+
+/// Prefer the bundle window icon; otherwise embed `32x32.png` so dev/release always have pixels.
+fn tray_menu_bar_icon(app: &App) -> tauri::Result<Image<'static>> {
+    if let Some(icon) = app.default_window_icon() {
+        return Ok(icon.clone().to_owned());
+    }
+    const TRAY_PNG: &[u8] = include_bytes!("../icons/32x32.png");
+    Image::from_bytes(TRAY_PNG)
+}
 
 fn t(strings: &HashMap<String, String>, key: &str, fallback: &str) -> String {
     strings
@@ -49,12 +59,16 @@ fn build_tray_popup_menu(
 pub fn create_tray(app: &App, strings: &HashMap<String, String>) -> Result<TrayIcon<Wry>, String> {
     let handle = app.handle().clone();
     let tray_menu = build_tray_popup_menu(&handle, strings)?;
+    let icon = tray_menu_bar_icon(app).map_err(|e| e.to_string())?;
     let mut builder = TrayIconBuilder::new()
         .menu(&tray_menu)
+        .icon(icon)
         .tooltip(t(strings, "tray.tooltip", "AUDIO_HAXOR"))
         .show_menu_on_left_click(true);
-    if let Some(icon) = app.default_window_icon().cloned() {
-        builder = builder.icon(icon).icon_as_template(true);
+    #[cfg(target_os = "macos")]
+    {
+        // Menu bar PNGs from the app bundle are full-color; `template=true` often draws them invisible.
+        builder = builder.icon_as_template(false);
     }
     builder
         .on_menu_event(move |app_handle, event| {
