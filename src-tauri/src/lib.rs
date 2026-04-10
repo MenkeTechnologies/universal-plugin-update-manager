@@ -7511,6 +7511,10 @@ pub fn run() {
                 guard.menu_strings = strings;
                 guard.now_playing_menu_line = None;
             }
+            /* Host-side poll thread — keeps tray title + popover elapsed live for audio-engine
+             * playback even while the main window is unfocused (JS rAF + `setInterval` both stall
+             * behind `isUiIdleHeavyCpu`, leaving the tray frozen). JS still pushes the track name. */
+            tray_menu::start_tray_host_poll(app.handle().clone());
 
             Ok(())
         })

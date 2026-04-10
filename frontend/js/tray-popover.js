@@ -17,6 +17,8 @@
     const elSub = document.getElementById('subtitle');
     const elIdle = document.getElementById('idleHint');
     const elFill = document.getElementById('fill');
+    const elThumb = document.getElementById('trackThumb');
+    const elTrackBar = document.getElementById('trackBar');
     const elElapsed = document.getElementById('elapsed');
     const elTotal = document.getElementById('total');
     const btnPrev = document.getElementById('btnPrev');
@@ -30,20 +32,14 @@
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
-    /** Small pad: outer glow is toned down in CSS so we do not need huge margins (avoids “box in a box”). */
-    const SHADOW_PAD_X = 12;
-    const SHADOW_PAD_Y = 14;
-    const LAYOUT_PAD = 4;
-
+    /** Size the window to the exact `.shell` rect — no outer glow / shadow to pad for. */
     function syncWindowSize() {
         if (!invoke) return;
         const root = document.getElementById('shell');
         if (!root) return;
         const br = root.getBoundingClientRect();
-        const innerH = Math.max(root.scrollHeight, root.offsetHeight, br.height);
-        const innerW = Math.max(root.scrollWidth, root.offsetWidth, br.width);
-        const h = Math.ceil(innerH + LAYOUT_PAD + SHADOW_PAD_Y);
-        const w = Math.ceil(innerW + LAYOUT_PAD + SHADOW_PAD_X);
+        const h = Math.ceil(Math.max(root.scrollHeight, root.offsetHeight, br.height));
+        const w = Math.ceil(Math.max(root.scrollWidth, root.offsetWidth, br.width));
         void invoke('tray_popover_resize', { width: w, height: h }).catch(() => {});
     }
 
@@ -72,6 +68,53 @@
         return p;
     }
 
+    /**
+     * Local playback model — between host pushes (every ~500 ms), a **`requestAnimationFrame`** loop
+     * interpolates elapsed time against `performance.now()` so the slider animates smoothly at 60 fps
+     * instead of stepping in 500 ms increments. The model is paused while the user drags the thumb and
+     * resumes from the new base after `pointerup`.
+     */
+    let _baseElapsed = 0;
+    let _baseTime = performance.now();
+    let _currentTotal = null;
+    let _currentPlaying = false;
+    let _currentIdle = true;
+    let _dragging = false;
+    let _dragFrac = 0;
+    let _rafId = null;
+
+    function renderProgress(elapsed, total) {
+        const tot = typeof total === 'number' && Number.isFinite(total) && total > 0 ? total : null;
+        let pct = 0;
+        if (tot != null) pct = Math.min(100, Math.max(0, (elapsed / tot) * 100));
+        if (elFill) elFill.style.width = `${pct}%`;
+        if (elThumb) elThumb.style.left = `${pct}%`;
+        if (elElapsed) elElapsed.textContent = fmt(Math.max(0, tot != null ? Math.min(elapsed, tot) : elapsed));
+    }
+
+    function animationTick() {
+        _rafId = null;
+        if (_currentIdle) return;
+        if (_dragging) {
+            /* Drag preview: render whatever the pointer is pointing at, elapsed text follows. */
+            renderProgress(_dragFrac * (_currentTotal || 0), _currentTotal);
+            _rafId = requestAnimationFrame(animationTick);
+            return;
+        }
+        const now = performance.now();
+        const elapsed = _currentPlaying
+            ? _baseElapsed + (now - _baseTime) / 1000
+            : _baseElapsed;
+        renderProgress(elapsed, _currentTotal);
+        _rafId = requestAnimationFrame(animationTick);
+    }
+
+    function ensureAnimating() {
+        if (_rafId == null && !_currentIdle) {
+            _rafId = requestAnimationFrame(animationTick);
+        }
+    }
+
     function applyState(raw) {
         const p = normalizePayload(raw);
         if (!p) return;
@@ -90,12 +133,24 @@
         }
         const elapsed = typeof p.elapsed_sec === 'number' && Number.isFinite(p.elapsed_sec) ? p.elapsed_sec : 0;
         const total = typeof p.total_sec === 'number' && Number.isFinite(p.total_sec) && p.total_sec > 0 ? p.total_sec : null;
-        let pct = 0;
-        if (total != null && total > 0) pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
-        if (elFill) elFill.style.width = `${pct}%`;
-        if (elElapsed) elElapsed.textContent = fmt(elapsed);
-        if (elTotal) elTotal.textContent = total != null ? fmt(total) : '—';
         const playing = p.playing === true;
+        /* Re-base the animation model from the host-reported values. `performance.now()` is the
+         * zero-point for interpolation until the next push. */
+        _baseElapsed = elapsed;
+        _baseTime = performance.now();
+        _currentTotal = total;
+        _currentPlaying = playing;
+        _currentIdle = idle;
+        if (elTotal) elTotal.textContent = total != null ? fmt(total) : '—';
+        if (!_dragging) renderProgress(elapsed, total);
+        if (idle) {
+            if (_rafId != null) {
+                cancelAnimationFrame(_rafId);
+                _rafId = null;
+            }
+        } else {
+            ensureAnimating();
+        }
         if (btnPlay) btnPlay.textContent = playing ? '⏸' : '▶';
         if (btnPlay) btnPlay.setAttribute('title', playing ? 'Pause' : 'Play');
         scheduleResize();
@@ -105,6 +160,64 @@
         setTimeout(() => {
             syncWindowSize();
         }, 80);
+    }
+
+    /* Drag-to-seek on the scrubber. Uses pointer capture so the drag still tracks even when the
+     * cursor leaves the track bar, and blocks updates from host pushes (`applyState` honors
+     * `_dragging`) so the thumb does not jitter while the user is scrubbing. */
+    function pointerFraction(e) {
+        if (!elTrackBar) return 0;
+        const rect = elTrackBar.getBoundingClientRect();
+        if (rect.width <= 0) return 0;
+        const x = e.clientX - rect.left;
+        return Math.max(0, Math.min(1, x / rect.width));
+    }
+
+    function sendSeek(frac) {
+        if (!invoke) return;
+        void invoke('tray_popover_action', {
+            action: `seek:${frac.toFixed(4)}`,
+        }).catch(() => {});
+    }
+
+    if (elTrackBar) {
+        elTrackBar.addEventListener('pointerdown', (e) => {
+            if (_currentIdle) return;
+            if (e.button !== 0 && e.pointerType === 'mouse') return;
+            e.preventDefault();
+            _dragging = true;
+            _dragFrac = pointerFraction(e);
+            try {
+                elTrackBar.setPointerCapture(e.pointerId);
+            } catch (_) {
+                /* ignore */
+            }
+            ensureAnimating();
+        });
+        elTrackBar.addEventListener('pointermove', (e) => {
+            if (!_dragging) return;
+            _dragFrac = pointerFraction(e);
+        });
+        const endDrag = (e) => {
+            if (!_dragging) return;
+            _dragging = false;
+            try {
+                elTrackBar.releasePointerCapture(e.pointerId);
+            } catch (_) {
+                /* ignore */
+            }
+            sendSeek(_dragFrac);
+            /* Optimistically re-base to the dragged position so the thumb does not snap back before
+             * the next host push arrives (engine seek + playback_status poll can be > 250 ms). */
+            if (_currentTotal != null) {
+                _baseElapsed = _dragFrac * _currentTotal;
+                _baseTime = performance.now();
+                renderProgress(_baseElapsed, _currentTotal);
+            }
+            ensureAnimating();
+        };
+        elTrackBar.addEventListener('pointerup', endDrag);
+        elTrackBar.addEventListener('pointercancel', endDrag);
     }
 
     function send(action) {

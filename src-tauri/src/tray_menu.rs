@@ -1,7 +1,10 @@
 //! System tray / menu bar icon: playback controls, dynamic title + tooltip, popup menu,
 //! and (non-Linux) a **WebView popover** styled like macOS Now Playing (no artwork).
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
@@ -347,13 +350,11 @@ pub fn update_tray_now_playing(
     drop(guard);
     let _ = tray.set_menu(Some(menu));
     let _ = tray.set_tooltip(Some(payload.tooltip.as_str()));
+    /* Menu-bar status item shows icon only — the track name still appears as the first row of the
+     * dropdown menu + in the popover HUD + the hover tooltip, but nothing is drawn next to the icon. */
     #[cfg(target_os = "macos")]
     {
-        if payload.idle {
-            let _ = tray.set_title(None::<&str>);
-        } else {
-            let _ = tray.set_title(payload.title_bar.as_deref());
-        }
+        let _ = tray.set_title(None::<&str>);
     }
     let _ = app.emit_to("tray-popover", "tray-popover-state", &emit);
     Ok(())
@@ -366,4 +367,147 @@ pub fn tray_popover_get_state(tray_state: State<'_, TrayState>) -> Result<Option
         .lock()
         .map_err(|_| "tray state mutex poisoned".to_string())?;
     Ok(guard.last_popover_emit.clone())
+}
+
+static TRAY_POLL_ACTIVE: AtomicBool = AtomicBool::new(false);
+/// Host-side poll interval — 500 ms matches the popover UI's expected cadence and is cheap since the
+/// audio-engine stdin/stdout JSON request is just a few bytes.
+const TRAY_POLL_MS: u64 = 500;
+
+fn fmt_tray_time(sec: f64) -> String {
+    let s = sec.max(0.0);
+    let m = (s / 60.0) as u64;
+    let r = (s as u64) % 60;
+    format!("{}:{:02}", m, r)
+}
+
+fn truncate_tray_title(s: &str) -> String {
+    const MAX: usize = 44;
+    let t = s.trim();
+    if t.chars().count() <= MAX {
+        return t.to_string();
+    }
+    let mut out: String = t.chars().take(MAX.saturating_sub(1)).collect();
+    out.push('…');
+    out
+}
+
+/// Background thread that polls `audio-engine` `playback_status` and pushes fresh elapsed / total /
+/// paused state to the **tray icon** and the **tray-popover** WebView, regardless of JS timer
+/// throttling. The JS side (`update_tray_now_playing` in `audio.js`) still owns the **title** and
+/// **subtitle** — those come from DOM state that Rust cannot see — but this thread keeps the
+/// **elapsed / total / playing** fields live when the main window is unfocused (on macOS the rAF
+/// loop and `setInterval` both pause behind `isUiIdleHeavyCpu`, leaving the tray frozen).
+///
+/// The thread is **idempotent** (guarded by `TRAY_POLL_ACTIVE`) and runs for the lifetime of the
+/// app. On each tick:
+///  1. Poll `playback_status` from audio-engine.
+///  2. If `loaded != true`, skip (HTML5 / reverse playback does not reach the engine poll; the JS
+///     `timeupdate` + keepalive paths handle those).
+///  3. Merge fresh position / duration / paused into the last JS-reported `TrayPopoverEmit`.
+///  4. Update `tray.set_title` (macOS) + `tray.set_tooltip` and emit `tray-popover-state`.
+pub fn start_tray_host_poll(app: AppHandle<Wry>) {
+    if TRAY_POLL_ACTIVE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    thread::spawn(move || {
+        while TRAY_POLL_ACTIVE.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(TRAY_POLL_MS));
+            if !TRAY_POLL_ACTIVE.load(Ordering::SeqCst) {
+                break;
+            }
+            /* Short-circuit BEFORE touching the audio-engine — no point spawning the child process
+             * or locking its stdin mutex until JS has reported a non-idle track. */
+            let Some(tray_state) = app.try_state::<TrayState>() else {
+                continue;
+            };
+            {
+                let guard = match tray_state.inner.lock() {
+                    Ok(g) => g,
+                    Err(_) => continue,
+                };
+                match guard.last_popover_emit.as_ref() {
+                    Some(e) if !e.idle => {}
+                    _ => continue,
+                }
+            }
+            let v = match crate::audio_engine::spawn_audio_engine_request(
+                &serde_json::json!({ "cmd": "playback_status" }),
+            ) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let loaded = v.get("loaded").and_then(|x| x.as_bool()).unwrap_or(false);
+            if !loaded {
+                continue;
+            }
+            let pos = v
+                .get("position_sec")
+                .and_then(|x| x.as_f64())
+                .unwrap_or(0.0);
+            let dur = v
+                .get("duration_sec")
+                .and_then(|x| x.as_f64())
+                .unwrap_or(0.0);
+            let paused = v.get("paused").and_then(|x| x.as_bool()).unwrap_or(false);
+            let (tray, new_emit, title_bar, tooltip) = {
+                let mut guard = match tray_state.inner.lock() {
+                    Ok(g) => g,
+                    Err(_) => continue,
+                };
+                let Some(tray) = guard.tray.clone() else {
+                    continue;
+                };
+                let Some(last) = guard.last_popover_emit.clone() else {
+                    continue;
+                };
+                /* Do not overwrite an explicit idle state — JS has torn down playback; the thread
+                 * must not resurrect a fake "still playing" state from a stale position read. */
+                if last.idle {
+                    continue;
+                }
+                /* If the engine reports a fresh duration, prefer it; otherwise hold the last value so
+                 * the popover does not flash "—" mid-track. */
+                let total_sec = if dur > 0.0 { Some(dur) } else { last.total_sec };
+                let new_emit = TrayPopoverEmit {
+                    idle: false,
+                    title: last.title.clone(),
+                    subtitle: last.subtitle.clone(),
+                    elapsed_sec: pos,
+                    total_sec,
+                    playing: !paused,
+                    idle_hint: None,
+                };
+                guard.last_popover_emit = Some(new_emit.clone());
+
+                let total_str = match total_sec {
+                    Some(t) if t > 0.0 => fmt_tray_time(t),
+                    _ => "—".to_string(),
+                };
+                let elapsed_str = fmt_tray_time(pos);
+                /* Menu-bar title is track name only — elapsed/total stay in the popover + tooltip. */
+                let title_bar = truncate_tray_title(&new_emit.title);
+                let status = if new_emit.playing {
+                    "Playing"
+                } else {
+                    "Paused"
+                };
+                let tooltip = if new_emit.title.is_empty() {
+                    format!("{} / {} • {}", elapsed_str, total_str, status)
+                } else {
+                    format!(
+                        "{} — {} / {} • {}",
+                        new_emit.title, elapsed_str, total_str, status
+                    )
+                };
+                (tray, new_emit, title_bar, tooltip)
+            };
+
+            /* Status-item icon only — title stays unset (see `update_tray_now_playing`). */
+            let _ = title_bar;
+            let _ = tray.set_tooltip(Some(tooltip.as_str()));
+            let _ = app.emit_to("tray-popover", "tray-popover-state", &new_emit);
+        }
+        TRAY_POLL_ACTIVE.store(false, Ordering::SeqCst);
+    });
 }

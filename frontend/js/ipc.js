@@ -91,6 +91,14 @@ listen('audio-engine-playback-eof', () => {
 listen('menu-action', (event) => {
     const raw = event && event.payload !== undefined ? event.payload : event;
     const id = typeof raw === 'string' ? raw : raw && typeof raw === 'object' && raw.action != null ? String(raw.action) : String(raw ?? '');
+    /* Tray popover slider seek — encoded as `seek:<fraction>` (0..1) to avoid a second IPC command. */
+    if (typeof id === 'string' && id.startsWith('seek:')) {
+        const frac = parseFloat(id.slice(5));
+        if (Number.isFinite(frac) && typeof seekPlaybackToPercent === 'function') {
+            seekPlaybackToPercent(frac);
+        }
+        return;
+    }
     switch (id) {
         // File
         case 'scan_all':

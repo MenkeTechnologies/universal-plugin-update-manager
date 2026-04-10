@@ -1637,6 +1637,16 @@ audioPlayer.addEventListener('pause', () => {
     updatePlaybackTime(); // final position
 });
 audioPlayer.addEventListener('seeked', updatePlaybackTime);
+/**
+ * HTMLMediaElement `timeupdate` fires ~4×/sec even when the window is unfocused, minimized, or on
+ * another Space — where the `_playbackRafLoop` idle gate (`isUiIdleHeavyCpu`) has already exited.
+ * This is the only HTML5 hook that reliably keeps the menu-bar title and tray popover alive while
+ * the user is looking at the menu bar instead of the main window.
+ */
+audioPlayer.addEventListener('timeupdate', () => {
+    if (audioReverseMode && _bufPlaying) return;
+    if (typeof syncTrayNowPlayingFromPlayback === 'function') syncTrayNowPlayingFromPlayback();
+});
 
 // formatAudioSize and formatTime moved to utils.js
 
@@ -3077,16 +3087,21 @@ function syncTrayNowPlayingFromPlayback() {
     if (idle) {
         if (_traySyncSig === 'idle') return;
         _traySyncSig = 'idle';
+        /* Tauri v2 requires struct command args to be wrapped in the Rust parameter name (`payload`),
+         * not passed flat. Passing flat fails with "missing required key payload" and the tray stays
+         * frozen at its last known state — this was the silent root cause of the broken tray updates. */
         void inv('update_tray_now_playing', {
-            title_bar: null,
-            tooltip: tooltipBase,
-            idle: true,
-            popover_title: '',
-            popover_subtitle: '',
-            elapsed_sec: 0,
-            total_sec: null,
-            popover_playing: false,
-            popover_idle_label: typeof appFmt === 'function' ? appFmt('tray.popover_idle') : 'Nothing playing',
+            payload: {
+                title_bar: null,
+                tooltip: tooltipBase,
+                idle: true,
+                popover_title: '',
+                popover_subtitle: '',
+                elapsed_sec: 0,
+                total_sec: null,
+                popover_playing: false,
+                popover_idle_label: typeof appFmt === 'function' ? appFmt('tray.popover_idle') : 'Nothing playing',
+            },
         }).catch(() => {});
         return;
     }
@@ -3123,8 +3138,8 @@ function syncTrayNowPlayingFromPlayback() {
           : 'Paused';
     /* Single line: macOS status-item tooltips often drop or truncate after \n */
     const tooltip = `${track} — ${timeLine} • ${status}`;
-    const shortT = track.length > 44 ? `${track.slice(0, 41)}…` : track;
-    const title_bar = `${shortT} — ${ft(cur)} / ${totalStr}`;
+    /* Menu-bar title is track name only — elapsed/total stay in the popover + tooltip. */
+    const title_bar = track.length > 44 ? `${track.slice(0, 41)}…` : track;
     const metaEl = document.getElementById('npMetaLine');
     const popover_subtitle =
         metaEl && typeof metaEl.textContent === 'string' ? metaEl.textContent.trim() : '';
@@ -3135,14 +3150,16 @@ function syncTrayNowPlayingFromPlayback() {
     if (sig === _traySyncSig) return;
     _traySyncSig = sig;
     void inv('update_tray_now_playing', {
-        title_bar,
-        tooltip,
-        idle: false,
-        popover_title: track,
-        popover_subtitle,
-        elapsed_sec: cur,
-        total_sec: Number.isFinite(dur) && dur > 0 ? dur : null,
-        popover_playing: playing,
+        payload: {
+            title_bar,
+            tooltip,
+            idle: false,
+            popover_title: track,
+            popover_subtitle,
+            elapsed_sec: cur,
+            total_sec: Number.isFinite(dur) && dur > 0 ? dur : null,
+            popover_playing: playing,
+        },
     }).catch(() => {});
 }
 
@@ -4460,7 +4477,12 @@ function prevTrack() {
     }
     void (async () => {
         await previewAudio(prevPath, { skipRecentReorder: true });
-        if (hadExpanded) await expandMetaForPath(prevPath);
+        /* `previewAudio` may chain through `tryPreviewAutoplayNextOnFailureAsync` if `prevPath`
+         * is unplayable — in that case the chain has already set `audioPlayerPath` (and
+         * `expandedMetaPath`) to whatever it skipped to, so expanding the intended hop would
+         * overwrite the correct expansion with the failed row. Only expand when the chain
+         * actually landed on `prevPath`. */
+        if (hadExpanded && audioPlayerPath === prevPath) await expandMetaForPath(prevPath);
     })();
 }
 
@@ -4476,7 +4498,12 @@ function nextTrack(opts) {
     if (!nextPath) return;
     void (async () => {
         await previewAudio(nextPath, { skipRecentReorder: true });
-        if (hadExpanded) await expandMetaForPath(nextPath);
+        /* `previewAudio` may chain through `tryPreviewAutoplayNextOnFailureAsync` if `nextPath`
+         * is unplayable — in that case the chain has already set `audioPlayerPath` (and
+         * `expandedMetaPath`) to whatever it skipped to, so expanding the intended hop would
+         * overwrite the correct expansion with the failed row. Only expand when the chain
+         * actually landed on `nextPath`. */
+        if (hadExpanded && audioPlayerPath === nextPath) await expandMetaForPath(nextPath);
     })();
 }
 

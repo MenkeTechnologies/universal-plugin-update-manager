@@ -1,12 +1,16 @@
 [package]
 name = "audio-haxor"
-version = "1.18.26"
+version = "1.18.27"
 description = "Desktop app to scan and manage VST/VST3/AU audio plugins, samples, and DAW projects"
 authors = ["MenkeTechnologies <MenkeTechnologies@gmail.com>"]
 edition = "2024"
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "protocol-asset", "image-png"] }
+# `macos-private-api` is required for `tauri.conf.json > app.macOSPrivateApi` to actually take
+# effect — without it, `transparent: true` on macOS is a silent no-op and the WKWebView keeps its
+# default opaque white background (CSS `background: transparent` has nothing behind it to show
+# through, so the tray popover shows a white rectangle behind the rounded panel).
+tauri = { version = "2", features = ["tray-icon", "protocol-asset", "image-png", "macos-private-api"] }
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
