@@ -3,10 +3,41 @@
  * Window size is synced to `#shell` via `tray_popover_resize` (logical/CSS px — matches HiDPI layout).
  */
 (function () {
+    const TRAY_LOG_VERBOSE =
+        typeof window !== 'undefined' && window.__TRAY_POPOVER_DEBUG === true;
+
+    function trayDbg(...args) {
+        if (TRAY_LOG_VERBOSE) console.info('[tray-popover]', ...args);
+    }
+
     const tauri = typeof window !== 'undefined' ? window.__TAURI__ : null;
     const listen = tauri && tauri.event && typeof tauri.event.listen === 'function' ? tauri.event.listen : null;
     const invoke =
         tauri && tauri.core && typeof tauri.core.invoke === 'function' ? tauri.core.invoke : null;
+
+    /** Tray window does not load `ipc.js` — mirror minimal `appFmt` + SQLite strings for tooltips. */
+    window.__appStr = window.__appStr || {};
+    if (typeof window.appFmt !== 'function') {
+        window.appFmt = function (key, vars) {
+            const map = window.__appStr;
+            let s = map && map[key];
+            if (s == null || s === '') return key;
+            if (vars && typeof vars === 'object') {
+                s = s.replace(/\{(\w+)\}/g, (_, name) =>
+                    vars[name] != null && vars[name] !== '' ? String(vars[name]) : ''
+                );
+            }
+            return s;
+        };
+    }
+    const _trayI18nReady = invoke
+        ? invoke('get_app_strings', {locale: null})
+              .then((m) => {
+                  window.__appStr = m || {};
+              })
+              .catch(() => {})
+        : Promise.resolve();
+
     /* `getCurrentWebviewWindow()` must run after the webview exists — call in init, not at parse time. */
     function getTrayWebviewWindow() {
         return tauri && tauri.webviewWindow && typeof tauri.webviewWindow.getCurrentWebviewWindow === 'function'
@@ -25,17 +56,69 @@
     function extractAppearance(obj) {
         if (!obj || typeof obj !== 'object') return null;
         const a = obj.appearance;
-        return a && typeof a === 'object' ? a : null;
+        return a && typeof a === 'object' && !Array.isArray(a) ? a : null;
+    }
+
+    /**
+     * `emit_to` delivers the tray struct as **`event.payload`** (Tauri `Event<T>`). Some bridges also pass
+     * JSON strings. Rarely, a mistaken double-wrap `{ payload: { payload: state } }` appears — unwrap
+     * up to a few levels. This is **not** the same as `invoke('cmd', { payload: … })` — events never use
+     * that outer key; only the Event wrapper’s `.payload` holds the HUD state.
+     */
+    function trayListenUnwrap(arg) {
+        if (arg == null) return null;
+        let cur = arg;
+        if (typeof cur === 'string') {
+            try {
+                cur = JSON.parse(cur);
+            } catch {
+                return null;
+            }
+        }
+        let depth = 0;
+        while (
+            depth < 5 &&
+            cur &&
+            typeof cur === 'object' &&
+            !Array.isArray(cur) &&
+            Object.prototype.hasOwnProperty.call(cur, 'payload') &&
+            cur.payload != null
+        ) {
+            const next = cur.payload;
+            if (typeof next === 'string') {
+                try {
+                    cur = JSON.parse(next);
+                } catch {
+                    break;
+                }
+            } else {
+                cur = next;
+            }
+            depth++;
+        }
+        return cur && typeof cur === 'object' ? cur : null;
     }
 
     /** Main-window scheme vars (`--cyan`, …) → popover `document.documentElement` (feeds `--cp-*` aliases in CSS). */
-    function applyTrayAppearanceFromPayload(map) {
+    function applyTrayAppearanceFromPayload(map, source) {
         if (!map || typeof map !== 'object') return;
         const root = document.documentElement.style;
+        let applied = 0;
+        const keys = [];
         for (const [k, v] of Object.entries(map)) {
             if (typeof k === 'string' && k.startsWith('--') && typeof v === 'string' && v.length > 0) {
                 root.setProperty(k, v);
+                applied++;
+                keys.push(k);
             }
+        }
+        if (applied > 0) {
+            console.info('[tray-popover] colorscheme applied', {
+                source: source || 'payload',
+                css_var_count: applied,
+                keys_sample: keys.slice(0, 8),
+                cyan: map['--cyan'],
+            });
         }
     }
 
@@ -75,11 +158,16 @@
         }
         _trayPopoverApplyLog = { idle, playing, ui };
         const title = typeof p.title === 'string' ? p.title : '';
+        const sub = typeof p.subtitle === 'string' ? p.subtitle : '';
+        const appMap = extractAppearance(p);
+        const appKeys = appMap ? Object.keys(appMap).filter((k) => k.startsWith('--')) : [];
         console.info('[tray-popover] applyState', {
             idle,
             playing,
             ui_theme: ui,
             titleLen: title.length,
+            subtitleLen: sub.length,
+            appearance_in_payload: appKeys.length,
         });
     }
 
@@ -110,12 +198,21 @@
     }
 
     function normalizePayload(raw) {
-        if (!raw || typeof raw !== 'object') return null;
-        const p = { ...raw };
-        let elapsed = p.elapsed_sec;
+        if (raw == null) return null;
+        let o = raw;
+        if (typeof o === 'string') {
+            try {
+                o = JSON.parse(o);
+            } catch {
+                return null;
+            }
+        }
+        if (!o || typeof o !== 'object') return null;
+        const p = { ...o };
+        let elapsed = p.elapsed_sec ?? p.elapsedSec;
         if (typeof elapsed === 'string') elapsed = parseFloat(elapsed);
         if (typeof elapsed !== 'number' || !Number.isFinite(elapsed)) elapsed = 0;
-        let total = p.total_sec;
+        let total = p.total_sec ?? p.totalSec;
         if (typeof total === 'string') total = parseFloat(total);
         if (typeof total === 'number' && Number.isFinite(total) && total > 0) {
             p.total_sec = total;
@@ -123,6 +220,8 @@
             p.total_sec = null;
         }
         p.elapsed_sec = elapsed;
+        if (p.idle_hint == null && p.idleHint != null) p.idle_hint = p.idleHint;
+        if (p.ui_theme == null && p.uiTheme != null) p.ui_theme = p.uiTheme;
         return p;
     }
 
@@ -175,22 +274,31 @@
 
     function applyState(raw) {
         const p = normalizePayload(raw);
-        if (!p) return;
+        if (!p) {
+            console.warn('[tray-popover] applyState skipped — not a tray state object', {
+                type: raw === null ? 'null' : typeof raw,
+                sample: typeof raw === 'string' ? raw.slice(0, 200) : raw,
+            });
+            return;
+        }
         const themed = extractUiTheme(p);
         if (themed) applyTrayDocumentTheme(themed);
-        applyTrayAppearanceFromPayload(extractAppearance(p));
+        applyTrayAppearanceFromPayload(extractAppearance(p), 'tray-popover-state');
         const idle = p.idle === true;
         if (shell) shell.classList.toggle('idle', idle);
         if (elTitle) elTitle.textContent = typeof p.title === 'string' ? p.title : '';
         if (elSub) elSub.textContent = typeof p.subtitle === 'string' ? p.subtitle : '';
         if (elIdle) {
             elIdle.hidden = !idle;
-            elIdle.textContent =
-                idle && typeof p.idle_hint === 'string' && p.idle_hint.trim() !== ''
-                    ? p.idle_hint
-                    : idle
-                      ? 'Nothing playing'
-                      : '';
+            let idleLabel = '';
+            if (idle) {
+                if (typeof p.idle_hint === 'string' && p.idle_hint.trim() !== '') {
+                    idleLabel = p.idle_hint;
+                } else {
+                    idleLabel = window.appFmt('tray.popover_idle');
+                }
+            }
+            elIdle.textContent = idleLabel;
         }
         const elapsed = typeof p.elapsed_sec === 'number' && Number.isFinite(p.elapsed_sec) ? p.elapsed_sec : 0;
         const total = typeof p.total_sec === 'number' && Number.isFinite(p.total_sec) && p.total_sec > 0 ? p.total_sec : null;
@@ -213,7 +321,10 @@
             ensureAnimating();
         }
         if (btnPlay) btnPlay.textContent = playing ? '⏸' : '▶';
-        if (btnPlay) btnPlay.setAttribute('title', playing ? 'Pause' : 'Play');
+        if (btnPlay) {
+            const playT = playing ? window.appFmt('menu.pause') : window.appFmt('menu.play');
+            btnPlay.setAttribute('title', playT);
+        }
         logTrayPopoverApplyState(p, idle, playing, themed);
         scheduleResize();
         setTimeout(() => {
@@ -293,14 +404,42 @@
 
     /** `WebviewWindow.listen` / `event.listen` return Promises — await so emits are not dropped on first open. */
     async function initTrayIpc() {
+        await _trayI18nReady;
+        if (btnPrev) btnPrev.setAttribute('title', window.appFmt('tray.previous_track'));
+        if (btnNext) btnNext.setAttribute('title', window.appFmt('tray.next_track'));
+
+        const tw0 = getTrayWebviewWindow();
+        console.info('[tray-popover] boot', {
+            href: typeof location !== 'undefined' ? location.href : '',
+            has_global_listen: !!listen,
+            has_invoke: !!invoke,
+            webview_label: tw0 && typeof tw0.label === 'string' ? tw0.label : undefined,
+            webview_has_listen: !!(tw0 && typeof tw0.listen === 'function'),
+        });
         const onState = (e) => {
-            const raw = e && e.payload !== undefined ? e.payload : e;
+            const raw = trayListenUnwrap(e);
+            const top = e && typeof e === 'object' && !Array.isArray(e) ? e : null;
+            console.info('[tray-popover] tray-popover-state ← host', {
+                event_is_wrapper: !!(top && 'payload' in top && top.payload != null),
+                event_name: top && typeof top.event === 'string' ? top.event : undefined,
+                state_keys: raw && typeof raw === 'object' ? Object.keys(raw) : [],
+                appearance_keys:
+                    raw && raw.appearance && typeof raw.appearance === 'object'
+                        ? Object.keys(raw.appearance).filter((k) => k.startsWith('--')).length
+                        : 0,
+            });
             applyState(raw);
         };
         const onTheme = (e) => {
-            const raw = e && e.payload !== undefined ? e.payload : e;
-            console.info('[tray-popover] event tray-popover-ui-theme', raw);
-            const th = extractUiTheme(raw) || (raw && typeof raw === 'object' && typeof raw.theme === 'string' ? raw.theme : null);
+            const raw = trayListenUnwrap(e);
+            const th =
+                extractUiTheme(raw) ||
+                (raw && typeof raw === 'object' && typeof raw.theme === 'string' ? raw.theme : null);
+            console.info('[tray-popover] tray-popover-ui-theme ← host', {
+                event_is_wrapper: !!(e && typeof e === 'object' && 'payload' in e),
+                raw,
+                ui_theme: th || '(none)',
+            });
             if (th) applyTrayDocumentTheme(th);
         };
         const scoped = { target: 'tray-popover' };
@@ -336,12 +475,13 @@
                     invoke('tray_popover_get_ui_theme').catch(() => 'dark'),
                     invoke('tray_popover_get_state').catch(() => null),
                 ]);
+                const bootState = emit ? trayListenUnwrap(emit) : null;
                 console.info('[tray-popover] bootstrap invoke', {
                     tray_popover_get_ui_theme: theme,
-                    tray_popover_get_state: emit ? 'some' : 'null',
+                    tray_popover_get_state: bootState ? Object.keys(bootState) : null,
                 });
                 applyTrayDocumentTheme(typeof theme === 'string' ? theme : 'dark');
-                if (emit) applyState(emit);
+                if (bootState) applyState(bootState);
             } catch (err) {
                 console.warn('[tray-popover] bootstrap invoke failed', err);
             }

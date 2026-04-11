@@ -276,8 +276,11 @@ function loadMorePdfs() {
     fetchPdfPage();
 }
 
-function sortPdf(key) {
-    if (pdfSortKey === key) {
+function sortPdf(key, forceAsc) {
+    if (typeof forceAsc === 'boolean') {
+        pdfSortKey = key;
+        pdfSortAsc = forceAsc;
+    } else if (pdfSortKey === key) {
         pdfSortAsc = !pdfSortAsc;
     } else {
         pdfSortKey = key;

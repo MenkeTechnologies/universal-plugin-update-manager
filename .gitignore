@@ -24,6 +24,9 @@ src-tauri/rust_out
 # Generated docs
 docs/api/
 
+# i18n catalog audit HTML (`pnpm i18n:audit`)
+reports/
+
 # AI coding tools
 .claude/
 CLAUDE.md

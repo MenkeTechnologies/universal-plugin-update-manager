@@ -1672,17 +1672,17 @@ async function findSimilarSamples(filePath) {
     <div class="sim-resize sim-resize-ne" data-sim-resize="ne"></div>
     <div class="sim-resize sim-resize-nw" data-sim-resize="nw"></div>
     <div class="sim-toolbar" id="simToolbar">
-      <span class="sim-toolbar-title" title="Find Similar Samples">&#128270; Similar to "${escapeHtml(name)}"</span>
+      <span class="sim-toolbar-title" title="${escapeHtml(_audioFmt('menu.find_similar_samples'))}">&#128270; ${escapeHtml(_audioFmt('ui.audio.similar_toolbar_title', {name}))}</span>
       <div class="sim-toolbar-actions">
-        <button class="sim-toolbar-btn" data-action="minimizeSimilar" title="Minimize">&#9866;</button>
-        <button class="sim-toolbar-btn btn-close" data-action="closeSimilar" title="Close">&#10005;</button>
+        <button class="sim-toolbar-btn" data-action="minimizeSimilar" title="${escapeHtml(_audioFmt('ui.tt.minimize'))}">&#9866;</button>
+        <button class="sim-toolbar-btn btn-close" data-action="closeSimilar" title="${escapeHtml(_audioFmt('menu.close'))}">&#10005;</button>
       </div>
     </div>
     <div class="sim-body" id="simBody">
       <div style="text-align:center;padding:24px;">
         <div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>
-        <div id="similarStatusText" style="color:var(--text-muted);font-size:11px;">Analyzing fingerprints...</div>
-        <div id="similarStatusDetail" style="color:var(--text-dim);font-size:9px;margin-top:4px;">Checking cache...</div>
+        <div id="similarStatusText" style="color:var(--text-muted);font-size:11px;">${escapeHtml(_audioFmt('ui.audio.similar_loading_analyzing'))}</div>
+        <div id="similarStatusDetail" style="color:var(--text-dim);font-size:9px;margin-top:4px;">${escapeHtml(_audioFmt('ui.audio.similar_loading_cache_check'))}</div>
       </div>
     </div>
   </div>`;
@@ -2473,8 +2473,11 @@ async function fetchAudioPage() {
     }
 }
 
-function sortAudio(key) {
-    if (audioSortKey === key) {
+function sortAudio(key, forceAsc) {
+    if (typeof forceAsc === 'boolean') {
+        audioSortKey = key;
+        audioSortAsc = forceAsc;
+    } else if (audioSortKey === key) {
         audioSortAsc = !audioSortAsc;
     } else {
         audioSortKey = key;
@@ -3036,14 +3039,18 @@ function enginePlaybackDurationSec() {
 /** Dedupes `invoke('update_tray_now_playing')` — includes duration so tray updates when total length loads. */
 let _traySyncSig = '';
 
-/** DevTools: log only when `idle` vs playing, `ui_theme`, or scheme snapshot changes. */
-let _trayMainIpcLog = { idle: null, ui_theme: null, app_sig: null };
-
-function logTrayMainNowPlayingInvoke(idle, uiTheme, appSig) {
-    const sig = appSig == null ? '' : String(appSig);
-    if (_trayMainIpcLog.idle === idle && _trayMainIpcLog.ui_theme === uiTheme && _trayMainIpcLog.app_sig === sig) return;
-    _trayMainIpcLog = { idle, ui_theme: uiTheme, app_sig: sig };
-    console.info('[tray-main] update_tray_now_playing', { idle, ui_theme: uiTheme });
+/** DevTools: compact summary of `appearance` sent with `update_tray_now_playing` (CSS custom properties). */
+function trayAppearanceForLog(appearance) {
+    if (!appearance || typeof appearance !== 'object') {
+        return { appearance_var_count: 0 };
+    }
+    const keys = Object.keys(appearance).filter((k) => typeof k === 'string' && k.startsWith('--'));
+    const cyan = appearance['--cyan'];
+    return {
+        appearance_var_count: keys.length,
+        appearance_keys_sample: keys.slice(0, 10),
+        '--cyan': typeof cyan === 'string' ? cyan : undefined,
+    };
 }
 
 /** Scheme vars for tray popover HUD — matches `SCHEME_VAR_KEYS` from `settings.js`. */
@@ -3060,6 +3067,65 @@ function trayAppearanceForTraySync() {
         if (v) appearance[k] = v;
     }
     return { appearance: Object.keys(appearance).length ? appearance : null, sig: parts.join('|') };
+}
+
+/**
+ * Library row for meta / tray — SQLite UI keeps only a page in `filteredAudioSamples`; `allAudioSamples` is often empty.
+ * Fall back to play history (format/size/dir) so `#npMetaLine` and the tray match what the user hears.
+ */
+function resolveAudioSampleForMeta(path) {
+    if (!path || typeof findByPath !== 'function') return null;
+    if (typeof allAudioSamples !== 'undefined') {
+        const a = findByPath(allAudioSamples, path);
+        if (a) return a;
+    }
+    if (typeof filteredAudioSamples !== 'undefined') {
+        const f = findByPath(filteredAudioSamples, path);
+        if (f) return f;
+    }
+    if (typeof recentlyPlayed !== 'undefined' && Array.isArray(recentlyPlayed)) {
+        const r = recentlyPlayed.find((x) => x && x.path === path);
+        if (r) {
+            const norm = path.replace(/\\/g, '/');
+            const slash = norm.lastIndexOf('/');
+            const directory = slash > 0 ? norm.slice(0, slash) : '';
+            return {
+                path,
+                name: r.name,
+                format: r.format,
+                sizeFormatted: r.size || '',
+                directory,
+            };
+        }
+    }
+    return null;
+}
+
+/** Same string as `#npMetaLine` / `updateMetaLine` — shared so tray sync does not read stale DOM or miss `resumePath`. */
+function npMetaLineTextForPath(path) {
+    if (!path) return '';
+    if (isEngineUnplayablePath(path)) {
+        const x = path.split('.').pop().toLowerCase();
+        return _audioFmt('ui.audio.not_playable_in_audio_engine', {ext: x.toUpperCase()});
+    }
+    const sample = resolveAudioSampleForMeta(path);
+    if (!sample) {
+        const base = path.replace(/\\/g, '/').split('/').pop();
+        return base || '';
+    }
+    const parts = [sample.format, sample.sizeFormatted];
+    const bpmShow = sample.bpm || (typeof _bpmCache !== 'undefined' ? _bpmCache[path] : undefined);
+    const keyShow = sample.key || (typeof _keyCache !== 'undefined' ? _keyCache[path] : undefined);
+    const lufsShow =
+        sample.lufs != null
+            ? sample.lufs
+            : typeof _lufsCache !== 'undefined' && _lufsCache[path] != null ? _lufsCache[path]
+              : null;
+    if (bpmShow) parts.push(bpmShow + ' BPM');
+    if (keyShow) parts.push(keyShow);
+    if (lufsShow != null) parts.push(lufsShow + ' LUFS');
+    if (sample.directory) parts.push(sample.directory);
+    return parts.join(' \u2022 ');
 }
 
 /** Tray popover + menu line: `#npName`, else library sample basename, else path basename. */
@@ -3095,6 +3161,16 @@ function traySyncUiTheme() {
         : 'dark';
 }
 
+/** Prefs `audioSpeed` for tray HUD — same clamp as `setPlaybackSpeed` (0.25..2). */
+function trayPlaybackSpeedForSync() {
+    let v = 1;
+    if (typeof prefs !== 'undefined' && prefs.getItem) {
+        const raw = parseFloat(prefs.getItem('audioSpeed') || '1');
+        if (Number.isFinite(raw)) v = raw;
+    }
+    return Math.max(0.25, Math.min(2, v));
+}
+
 function syncTrayNowPlayingFromPlayback() {
     const inv =
         typeof window !== 'undefined' &&
@@ -3116,14 +3192,19 @@ function syncTrayNowPlayingFromPlayback() {
         !audioPlayerPath &&
         !_enginePlaybackActive &&
         !(audioReverseMode && _reversedBuf && _bufPlaying);
-    const tooltipBase = typeof appFmt === 'function' ? appFmt('tray.tooltip') : 'AUDIO_HAXOR';
+    const tooltipBase = catalogFmt('tray.tooltip');
     const uiTheme = traySyncUiTheme();
     const { appearance: trayAppearance, sig: trayAppSig } = trayAppearanceForTraySync();
+    const traySp = trayPlaybackSpeedForSync();
     if (idle) {
-        const idleSig = `idle|${uiTheme}|${trayAppSig}`;
+        const idleSig = `idle|${uiTheme}|${trayAppSig}|sp:${traySp}`;
         if (_traySyncSig === idleSig) return;
         _traySyncSig = idleSig;
-        logTrayMainNowPlayingInvoke(true, uiTheme, trayAppSig);
+        console.info('[tray-main] update_tray_now_playing → Rust', {
+            idle: true,
+            ui_theme: uiTheme,
+            colorscheme: trayAppearanceForLog(trayAppearance),
+        });
         /* Tauri v2 requires struct command args to be wrapped in the Rust parameter name (`payload`),
          * not passed flat. Passing flat fails with "missing required key payload" and the tray stays
          * frozen at its last known state — this was the silent root cause of the broken tray updates. */
@@ -3137,7 +3218,8 @@ function syncTrayNowPlayingFromPlayback() {
                 elapsed_sec: 0,
                 total_sec: null,
                 popover_playing: false,
-                popover_idle_label: typeof appFmt === 'function' ? appFmt('tray.popover_idle') : 'Nothing playing',
+                popover_idle_label: catalogFmt('tray.popover_idle'),
+                playback_speed: traySp,
                 ui_theme: uiTheme,
                 appearance: trayAppearance,
             },
@@ -3168,21 +3250,14 @@ function syncTrayNowPlayingFromPlayback() {
     const ft = typeof formatTime === 'function' ? formatTime : (x) => String(x);
     const totalStr = Number.isFinite(dur) && dur > 0 ? ft(dur) : '—';
     const timeLine = `${ft(cur)} / ${totalStr}`;
-    const status = playing
-        ? typeof appFmt === 'function'
-            ? appFmt('tray.status_playing')
-            : 'Playing'
-        : typeof appFmt === 'function'
-          ? appFmt('tray.status_paused')
-          : 'Paused';
+    const status = playing ? catalogFmt('tray.status_playing') : catalogFmt('tray.status_paused');
     /* Single line: macOS status-item tooltips often drop or truncate after \n */
     const tooltip = `${track} — ${timeLine} • ${status}`;
     /* Menu-bar title is track name only — elapsed/total stay in the popover + tooltip. */
     const title_bar = track.length > 44 ? `${track.slice(0, 41)}…` : track;
-    const metaEl = document.getElementById('npMetaLine');
-    let popover_subtitle =
-        metaEl && typeof metaEl.textContent === 'string' ? metaEl.textContent.trim() : '';
-    /* Tray HUD: `#npMetaLine` uses path basename when the file is not in the library — same as `#npName`, so the subtitle would repeat the title. */
+    const pathForTrayMeta = audioPlayerPath || resumePath || null;
+    let popover_subtitle = pathForTrayMeta ? npMetaLineTextForPath(pathForTrayMeta).trim() : '';
+    /* Tray HUD: avoid repeating the title when meta is only the basename (non-library file). */
     if (popover_subtitle && track) {
         if (popover_subtitle === track) {
             popover_subtitle = '';
@@ -3200,10 +3275,21 @@ function syncTrayNowPlayingFromPlayback() {
     const sigPath = audioPlayerPath || resumePath || '';
     const { appearance: trayAppearancePlaying, sig: trayAppSigPlaying } = trayAppearanceForTraySync();
     /* Include title + subtitle: first ticks often have empty `#npName` / meta; dedupe must not block later updates. */
-    const sig = `${sigPath}|${track}|${popover_subtitle}|${Math.floor(cur)}|${durKey}|${playing ? 1 : 0}|${uiTheme}|${trayAppSigPlaying}`;
+    const sig = `${sigPath}|${track}|${popover_subtitle}|${Math.floor(cur)}|${durKey}|${playing ? 1 : 0}|${uiTheme}|${trayAppSigPlaying}|sp:${trayPlaybackSpeedForSync()}`;
     if (sig === _traySyncSig) return;
     _traySyncSig = sig;
-    logTrayMainNowPlayingInvoke(false, uiTheme, trayAppSigPlaying);
+    console.info('[tray-main] update_tray_now_playing → Rust', {
+        idle: false,
+        ui_theme: uiTheme,
+        colorscheme: trayAppearanceForLog(trayAppearancePlaying),
+        path: sigPath,
+        popover_title: track,
+        popover_subtitle: popover_subtitle,
+        subtitle_len: popover_subtitle.length,
+        playing,
+        elapsed_sec: cur,
+        total_sec: Number.isFinite(dur) && dur > 0 ? dur : null,
+    });
     void inv('update_tray_now_playing', {
         payload: {
             title_bar,
@@ -3214,6 +3300,7 @@ function syncTrayNowPlayingFromPlayback() {
             elapsed_sec: cur,
             total_sec: Number.isFinite(dur) && dur > 0 ? dur : null,
             popover_playing: playing,
+            playback_speed: trayPlaybackSpeedForSync(),
             ui_theme: uiTheme,
             appearance: trayAppearancePlaying,
         },
@@ -3504,6 +3591,7 @@ function setPlaybackSpeed(value) {
     } else {
         audioPlayer.playbackRate = clamped;
     }
+    if (typeof syncTrayNowPlayingFromPlayback === 'function') syncTrayNowPlayingFromPlayback();
 }
 
 // ── Metadata Panel ──
@@ -3543,42 +3631,75 @@ async function expandMetaForPath(filePath) {
         if (expandedMetaPath !== filePath) return; // user closed it
 
         let items = '';
-        items += metaItem('File Name', meta.fileName, true);
-        items += metaItem('Format', meta.format);
-        items += metaItem('Size', formatAudioSize(meta.sizeBytes));
-        items += metaItem('Full Path', meta.fullPath, true);
+        items += metaItem(_audioFmt('ui.audio.meta_label_file_name'), meta.fileName, true);
+        items += metaItem(_audioFmt('ui.audio.meta_label_format'), meta.format);
+        items += metaItem(_audioFmt('ui.audio.meta_label_size'), formatAudioSize(meta.sizeBytes));
+        items += metaItem(_audioFmt('ui.audio.meta_label_full_path'), meta.fullPath, true);
 
-        if (meta.sampleRate) items += metaItem('Sample Rate', meta.sampleRate.toLocaleString() + ' Hz');
-        if (meta.bitsPerSample) items += metaItem('Bit Depth', meta.bitsPerSample + '-bit');
-        if (meta.channels) items += metaItem('Channels', meta.channels === 1 ? 'Mono' : meta.channels === 2 ? 'Stereo' : meta.channels + ' ch');
-        if (meta.duration) items += metaItem('Duration', formatTime(meta.duration));
-        if (meta.byteRate) items += metaItem('Byte Rate', formatAudioSize(meta.byteRate) + '/s');
+        if (meta.sampleRate) {
+            items += metaItem(
+                _audioFmt('ui.audio.meta_label_sample_rate'),
+                _audioFmt('ui.audio.meta_sample_rate_hz', {rate: meta.sampleRate.toLocaleString()})
+            );
+        }
+        if (meta.bitsPerSample) {
+            items += metaItem(
+                _audioFmt('ui.audio.meta_label_bit_depth'),
+                _audioFmt('ui.audio.meta_bit_depth_bits', {n: meta.bitsPerSample})
+            );
+        }
+        if (meta.channels) {
+            const chVal = meta.channels === 1
+                ? _audioFmt('ui.tt.mono')
+                : meta.channels === 2
+                    ? _audioFmt('ui.btn.stereo')
+                    : _audioFmt('ui.audio.meta_channels_multichannel', {n: meta.channels});
+            items += metaItem(_audioFmt('ui.audio.meta_label_channels'), chVal);
+        }
+        if (meta.duration) items += metaItem(_audioFmt('ui.audio.meta_label_duration'), formatTime(meta.duration));
+        if (meta.byteRate) {
+            items += metaItem(
+                _audioFmt('ui.audio.meta_label_byte_rate'),
+                _audioFmt('ui.audio.meta_byte_rate_per_sec', {size: formatAudioSize(meta.byteRate)})
+            );
+        }
 
+        const ttBpm = escapeHtml(_audioFmt('ui.audio.meta_tt_bpm'));
+        const ttKey = escapeHtml(_audioFmt('ui.audio.meta_tt_key'));
+        const ttLufs = escapeHtml(_audioFmt('ui.audio.meta_tt_lufs'));
+        const lblBpm = escapeHtml(_audioFmt('ui.audio.meta_label_bpm'));
+        const lblKey = escapeHtml(_audioFmt('ui.audio.meta_label_key'));
+        const lblLufs = escapeHtml(_audioFmt('ui.audio.meta_label_lufs'));
         // BPM and Key placeholders — filled async
-        items += `<div class="meta-item" id="metaBpmItem" title="Estimated tempo via onset-strength autocorrelation"><span class="meta-label">BPM</span><span class="meta-value" id="metaBpmValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
-        items += `<div class="meta-item" id="metaKeyItem" title="Musical key detected via chromagram analysis"><span class="meta-label">KEY</span><span class="meta-value" id="metaKeyValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
-        items += `<div class="meta-item" id="metaLufsItem" title="Integrated loudness (ITU-R BS.1770 K-weighted)"><span class="meta-label">LUFS</span><span class="meta-value" id="metaLufsValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
+        items += `<div class="meta-item" id="metaBpmItem" title="${ttBpm}"><span class="meta-label">${lblBpm}</span><span class="meta-value" id="metaBpmValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
+        items += `<div class="meta-item" id="metaKeyItem" title="${ttKey}"><span class="meta-label">${lblKey}</span><span class="meta-value" id="metaKeyValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
+        items += `<div class="meta-item" id="metaLufsItem" title="${ttLufs}"><span class="meta-label">${lblLufs}</span><span class="meta-value" id="metaLufsValue" style="display:flex;align-items:center;gap:6px;"><span class="spinner" style="width:10px;height:10px;"></span></span></div>`;
 
         const fmtDate = (v) => {
-            if (!v) return '—';
+            if (!v) return _audioFmt('ui.audio.meta_na');
             const d = new Date(v);
-            return isNaN(d) ? '—' : d.toLocaleString();
+            return isNaN(d) ? _audioFmt('ui.audio.meta_na') : d.toLocaleString();
         };
-        items += metaItem('Created', fmtDate(meta.created));
-        items += metaItem('Modified', fmtDate(meta.modified));
-        items += metaItem('Accessed', fmtDate(meta.accessed));
-        items += metaItem('Permissions', meta.permissions);
+        items += metaItem(_audioFmt('ui.audio.meta_label_created'), fmtDate(meta.created));
+        items += metaItem(_audioFmt('ui.audio.meta_label_modified'), fmtDate(meta.modified));
+        items += metaItem(_audioFmt('ui.audio.meta_label_accessed'), fmtDate(meta.accessed));
+        items += metaItem(_audioFmt('ui.audio.meta_label_permissions'), meta.permissions);
 
+        const wfSeekT = escapeHtml(_audioFmt('ui.audio.meta_waveform_seek_title'));
+        const wfCanT = escapeHtml(_audioFmt('ui.audio.meta_waveform_canvas_tt'));
+        const sgBoxT = escapeHtml(_audioFmt('ui.audio.meta_spectrogram_box_tt'));
+        const sgCanT = escapeHtml(_audioFmt('ui.audio.meta_spectrogram_canvas_tt'));
+        const sgBadge = escapeHtml(_audioFmt('ui.audio.meta_spectrogram_badge'));
         // Waveform preview with seek support
-        const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" title="Click to seek playback position">
-      <canvas id="metaWaveformCanvas" title="Waveform — click to seek"></canvas>
+        const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" title="${wfSeekT}">
+      <canvas id="metaWaveformCanvas" title="${wfCanT}"></canvas>
       <div class="waveform-progress-fill"></div>
       <div class="waveform-cursor" style="left:0;"></div>
       <div class="waveform-time-label">${meta.duration ? formatTime(meta.duration) : ''}</div>
     </div>
-    <div class="meta-waveform" style="height:80px;cursor:default;" title="Spectrogram — frequency content over time (FFT)">
-      <canvas id="metaSpectrogramCanvas" width="800" height="80" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="Spectrogram — low frequencies at bottom, high at top"></canvas>
-      <span style="position:absolute;top:2px;left:4px;font-size:8px;color:var(--text-dim);pointer-events:none;">SPECTROGRAM</span>
+    <div class="meta-waveform" style="height:80px;cursor:default;" title="${sgBoxT}">
+      <canvas id="metaSpectrogramCanvas" width="800" height="80" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="${sgCanT}"></canvas>
+      <span style="position:absolute;top:2px;left:4px;font-size:8px;color:var(--text-dim);pointer-events:none;">${sgBadge}</span>
     </div>`;
 
         const _closeT = typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.meta_close_title')) : _audioFmt('ui.audio.meta_close_title');
@@ -3628,12 +3749,13 @@ async function expandMetaForPath(filePath) {
             ]);
             await persistAnalysisRowToDb(filePath);
         } else {
+            const na = _audioFmt('ui.audio.meta_na');
             const bpmEl = document.getElementById('metaBpmValue');
-            if (bpmEl) bpmEl.textContent = '—';
+            if (bpmEl) bpmEl.textContent = na;
             const keyEl = document.getElementById('metaKeyValue');
-            if (keyEl) keyEl.textContent = '—';
+            if (keyEl) keyEl.textContent = na;
             const lufsEl = document.getElementById('metaLufsValue');
-            if (lufsEl) lufsEl.textContent = '—';
+            if (lufsEl) lufsEl.textContent = na;
         }
     } catch (err) {
         {
@@ -3745,7 +3867,9 @@ async function estimateBpmForMeta(filePath) {
 
     // Check in-memory cache
     if (_bpmCache[filePath] !== undefined) {
-        bpmEl.textContent = _bpmCache[filePath] ? _bpmCache[filePath] + ' BPM' : '—';
+        bpmEl.textContent = _bpmCache[filePath]
+            ? _audioFmt('ui.audio.meta_bpm_value', {n: _bpmCache[filePath]})
+            : _audioFmt('ui.audio.meta_na');
         return;
     }
 
@@ -3754,7 +3878,7 @@ async function estimateBpmForMeta(filePath) {
         const analysis = await window.vstUpdater.dbGetAnalysis(filePath);
         if (analysis && analysis.bpm) {
             _bpmCache[filePath] = analysis.bpm;
-            bpmEl.textContent = analysis.bpm + ' BPM';
+            bpmEl.textContent = _audioFmt('ui.audio.meta_bpm_value', {n: analysis.bpm});
             // Also fill key and LUFS from same query
             if (analysis.key) {
                 _keyCache[filePath] = analysis.key;
@@ -3764,7 +3888,7 @@ async function estimateBpmForMeta(filePath) {
             if (analysis.lufs != null) {
                 _lufsCache[filePath] = analysis.lufs;
                 const lufsEl = document.getElementById('metaLufsValue');
-                if (lufsEl) lufsEl.textContent = analysis.lufs + ' LUFS';
+                if (lufsEl) lufsEl.textContent = _audioFmt('ui.audio.meta_lufs_value', {n: analysis.lufs});
             }
             return;
         }
@@ -3780,7 +3904,7 @@ async function estimateBpmForMeta(filePath) {
         const currentBpmEl = document.getElementById('metaBpmValue');
         const metaRow = document.getElementById('audioMetaRow');
         if (currentBpmEl && metaRow && metaRow.getAttribute('data-meta-path') === filePath) {
-            currentBpmEl.textContent = bpm ? bpm + ' BPM' : '—';
+            currentBpmEl.textContent = bpm ? _audioFmt('ui.audio.meta_bpm_value', {n: bpm}) : _audioFmt('ui.audio.meta_na');
         }
         // Update table row cell
         const tableRow = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(filePath)}"]`);
@@ -3790,7 +3914,7 @@ async function estimateBpmForMeta(filePath) {
         }
     } catch {
         _bpmCache[filePath] = null;
-        if (bpmEl) bpmEl.textContent = '—';
+        if (bpmEl) bpmEl.textContent = _audioFmt('ui.audio.meta_na');
     }
 }
 
@@ -3813,7 +3937,7 @@ async function detectKeyForMeta(filePath) {
     if (!keyEl) return;
 
     if (_keyCache[filePath] !== undefined) {
-        keyEl.textContent = _keyCache[filePath] || '—';
+        keyEl.textContent = _keyCache[filePath] || _audioFmt('ui.audio.meta_na');
         return;
     }
 
@@ -3824,7 +3948,7 @@ async function detectKeyForMeta(filePath) {
         const currentKeyEl = document.getElementById('metaKeyValue');
         const metaRow = document.getElementById('audioMetaRow');
         if (currentKeyEl && metaRow && metaRow.getAttribute('data-meta-path') === filePath) {
-            currentKeyEl.textContent = key || '—';
+            currentKeyEl.textContent = key || _audioFmt('ui.audio.meta_na');
         }
         // Update table row cell
         const tableRow2 = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(filePath)}"]`);
@@ -3834,7 +3958,7 @@ async function detectKeyForMeta(filePath) {
         }
     } catch {
         _keyCache[filePath] = null;
-        if (keyEl) keyEl.textContent = '—';
+        if (keyEl) keyEl.textContent = _audioFmt('ui.audio.meta_na');
     }
 }
 
@@ -3843,7 +3967,9 @@ async function measureLufsForMeta(filePath) {
     if (!lufsEl) return;
 
     if (_lufsCache[filePath] !== undefined) {
-        lufsEl.textContent = _lufsCache[filePath] != null ? _lufsCache[filePath] + ' LUFS' : '—';
+        lufsEl.textContent = _lufsCache[filePath] != null
+            ? _audioFmt('ui.audio.meta_lufs_value', {n: _lufsCache[filePath]})
+            : _audioFmt('ui.audio.meta_na');
         return;
     }
 
@@ -3854,7 +3980,7 @@ async function measureLufsForMeta(filePath) {
         const currentEl = document.getElementById('metaLufsValue');
         const metaRow = document.getElementById('audioMetaRow');
         if (currentEl && metaRow && metaRow.getAttribute('data-meta-path') === filePath) {
-            currentEl.textContent = lufs != null ? lufs + ' LUFS' : '—';
+            currentEl.textContent = lufs != null ? _audioFmt('ui.audio.meta_lufs_value', {n: lufs}) : _audioFmt('ui.audio.meta_na');
         }
         const tableRow = document.querySelector(`#audioTableBody tr[data-audio-path="${CSS.escape(filePath)}"]`);
         if (tableRow) {
@@ -3863,7 +3989,7 @@ async function measureLufsForMeta(filePath) {
         }
     } catch {
         _lufsCache[filePath] = null;
-        if (lufsEl) lufsEl.textContent = '—';
+        if (lufsEl) lufsEl.textContent = _audioFmt('ui.audio.meta_na');
     }
 }
 
@@ -4124,8 +4250,10 @@ function triggerStopBackgroundBpmKeyLufsAnalysis() {
 
 function metaItem(label, value, wide) {
     const cls = wide ? 'meta-item meta-item-wide' : 'meta-item';
-    const val = String(value || '—');
-    return `<div class="${cls}" title="${escapeHtml(label)}: ${escapeHtml(val)}"><span class="meta-label">${label}</span><span class="meta-value">${escapeHtml(val)}</span></div>`;
+    const na = _audioFmt('ui.audio.meta_na');
+    const val = (value == null || value === '') ? na : String(value);
+    const escL = escapeHtml(label);
+    return `<div class="${cls}" title="${escL}: ${escapeHtml(val)}"><span class="meta-label">${escL}</span><span class="meta-value">${escapeHtml(val)}</span></div>`;
 }
 
 function openAudioFolder(filePath) {
@@ -5207,25 +5335,8 @@ function updateMetaLine() {
         if (el) el.textContent = '';
         return;
     }
-    if (isEngineUnplayablePath(audioPlayerPath)) {
-        const x = audioPlayerPath.split('.').pop().toLowerCase();
-        el.textContent = _audioFmt('ui.audio.not_playable_in_audio_engine', {ext: x.toUpperCase()});
-        return;
-    }
-    const sample = findByPath(allAudioSamples, audioPlayerPath);
-    if (!sample) {
-        el.textContent = audioPlayerPath.split('/').pop();
-        return;
-    }
-    const parts = [sample.format, sample.sizeFormatted];
-    const bpmShow = sample.bpm || _bpmCache[audioPlayerPath];
-    const keyShow = sample.key || _keyCache[audioPlayerPath];
-    const lufsShow = sample.lufs != null ? sample.lufs : (_lufsCache[audioPlayerPath] != null ? _lufsCache[audioPlayerPath] : null);
-    if (bpmShow) parts.push(bpmShow + ' BPM');
-    if (keyShow) parts.push(keyShow);
-    if (lufsShow != null) parts.push(lufsShow + ' LUFS');
-    if (sample.directory) parts.push(sample.directory);
-    el.textContent = parts.join(' \u2022 ');
+    el.textContent = npMetaLineTextForPath(audioPlayerPath);
+    if (typeof syncTrayNowPlayingFromPlayback === 'function') syncTrayNowPlayingFromPlayback();
 }
 
 // ── Visualizer init (canvas-based FFT replaces random CSS bars) ──

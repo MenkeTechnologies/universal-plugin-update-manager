@@ -2895,12 +2895,8 @@ async fn prefs_set(app: AppHandle, key: String, value: serde_json::Value) {
     if refresh_log {
         refresh_log_verbosity_from_prefs();
     }
-    if let Some(t) = tray_theme {
-        let _ = app.emit_to(
-            "tray-popover",
-            "tray-popover-ui-theme",
-            serde_json::json!({ "ui_theme": t }),
-        );
+    if let Some(ref t) = tray_theme {
+        tray_menu::emit_tray_popover_ui_theme(&app, t);
     }
 }
 

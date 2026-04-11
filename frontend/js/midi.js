@@ -514,8 +514,11 @@ async function fetchMidiFilesForExport() {
     return files;
 }
 
-function sortMidi(key) {
-    if (midiSortKey === key) {
+function sortMidi(key, forceAsc) {
+    if (typeof forceAsc === 'boolean') {
+        midiSortKey = key;
+        midiSortAsc = forceAsc;
+    } else if (midiSortKey === key) {
         midiSortAsc = !midiSortAsc;
     } else {
         midiSortKey = key;
@@ -725,7 +728,11 @@ async function loadMidiMetadata() {
                         c[6].textContent = info.noteCount.toLocaleString();
                         c[7].textContent = info.channelsUsed;
                         c[8].textContent = info.duration ? (typeof formatTime === 'function' ? formatTime(info.duration) : info.duration.toFixed(1) + 's') : '';
-                        if (info.trackNames && info.trackNames.length > 0) row.title = 'Tracks: ' + info.trackNames.join(', ');
+                        if (info.trackNames && info.trackNames.length > 0) {
+                            row.title = typeof appFmt === 'function'
+                                ? appFmt('ui.midi.tracks_tooltip', {names: info.trackNames.join(', ')})
+                                : 'Tracks: ' + info.trackNames.join(', ');
+                        }
                     }
                 }
             }

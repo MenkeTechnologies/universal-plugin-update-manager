@@ -295,8 +295,11 @@ function resetPresetStats() {
     if (typeof updatePresetDiskUsage === 'function') updatePresetDiskUsage({});
 }
 
-function sortPreset(key) {
-    if (presetSortKey === key) {
+function sortPreset(key, forceAsc) {
+    if (typeof forceAsc === 'boolean') {
+        presetSortKey = key;
+        presetSortAsc = forceAsc;
+    } else if (presetSortKey === key) {
         presetSortAsc = !presetSortAsc;
     } else {
         presetSortKey = key;

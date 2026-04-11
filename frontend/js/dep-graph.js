@@ -81,7 +81,10 @@ function buildDepGraphData() {
 function buildAnalyticsHtml(data) {
     const plugins = data.pluginsByUsage;
     const projects = data.projectsByCount;
-    if (plugins.length === 0) return '<div class="dep-empty">No data to analyze. Build the plugin index first.</div>';
+    if (plugins.length === 0) {
+        return `<div class="dep-empty">${escapeHtml(catalogFmt('ui.dep_graph.analytics_empty'))}</div>`;
+    }
+    const unkLabel = () => catalogFmt('ui.hm.unknown');
 
     // 1. Plugin type breakdown (VST2 vs VST3 vs AU vs CLAP)
     const typeCounts = {};
@@ -95,10 +98,11 @@ function buildAnalyticsHtml(data) {
         .map(([type, count]) => {
             const pct = Math.round((count / typeTotal) * 100);
             const typeCls = 'xref-type-' + _depTypeSlug(type);
+            const typeLabel = type === 'Unknown' ? unkLabel() : type;
             return `<div class="dep-plugin-row">
         <div class="dep-plugin-info">
-          <span class="xref-item-type ${typeCls}">${escapeHtml(type)}</span>
-          <span class="dep-plugin-name">${count} references (${pct}%)</span>
+          <span class="xref-item-type ${typeCls}">${escapeHtml(typeLabel)}</span>
+          <span class="dep-plugin-name">${escapeHtml(catalogFmt('ui.dep_graph.references_pct', {count, pct}))}</span>
         </div>
         <div class="dep-bar-wrap">
           <div class="dep-bar dep-bar-cyan" data-bar-pct="${pct}" style="width:0"></div>
@@ -120,9 +124,10 @@ function buildAnalyticsHtml(data) {
         .slice(0, 15)
         .map(([mfg, count]) => {
             const pct = Math.round((count / mfgMax) * 100);
+            const mfgLabel = mfg === 'Unknown' ? unkLabel() : mfg;
             return `<div class="dep-plugin-row">
         <div class="dep-plugin-info">
-          <span class="dep-plugin-name">${escapeHtml(mfg)}</span>
+          <span class="dep-plugin-name">${escapeHtml(mfgLabel)}</span>
         </div>
         <div class="dep-bar-wrap">
           <div class="dep-bar dep-bar-green" data-bar-pct="${pct}" style="width:0"></div>
@@ -149,37 +154,41 @@ function buildAnalyticsHtml(data) {
     // 7. Plugin adoption — how many plugins are used in >50% of projects
     const widelyUsed = plugins.filter(p => p.count > data.totalProjects / 2);
 
+    const extremePlug = (n) => (n === 1
+        ? catalogFmt('ui.dep_graph.extreme_plugin_one', {n})
+        : catalogFmt('ui.dep_graph.extreme_plugin_other', {n}));
+
     return `
     <div class="dep-analytics">
       <div class="dep-analytics-section">
-        <h3 class="dep-analytics-title">Plugin Format Breakdown</h3>
+        <h3 class="dep-analytics-title">${escapeHtml(catalogFmt('ui.dep_graph.section_format_breakdown'))}</h3>
         ${typeRows}
       </div>
       <div class="dep-analytics-section">
-        <h3 class="dep-analytics-title">Top Manufacturers</h3>
+        <h3 class="dep-analytics-title">${escapeHtml(catalogFmt('ui.dep_graph.section_top_manufacturers'))}</h3>
         ${mfgRows}
       </div>
       <div class="dep-analytics-section">
-        <h3 class="dep-analytics-title">Key Insights</h3>
+        <h3 class="dep-analytics-title">${escapeHtml(catalogFmt('ui.dep_graph.section_key_insights'))}</h3>
         <div class="dep-analytics-insights">
-          <div class="dep-insight"><span class="dep-insight-val">${avgPlugins}</span><span class="dep-insight-label">Avg plugins per project</span></div>
-          <div class="dep-insight"><span class="dep-insight-val">${widelyUsed.length}</span><span class="dep-insight-label">Used in >50% of projects</span></div>
-          <div class="dep-insight"><span class="dep-insight-val">${singleUse.length}</span><span class="dep-insight-label">Single-use plugins</span></div>
-          <div class="dep-insight"><span class="dep-insight-val">${data.orphaned.length}</span><span class="dep-insight-label">Unused installed plugins</span></div>
+          <div class="dep-insight"><span class="dep-insight-val">${avgPlugins}</span><span class="dep-insight-label">${escapeHtml(catalogFmt('ui.dep_graph.insight_avg_plugins'))}</span></div>
+          <div class="dep-insight"><span class="dep-insight-val">${widelyUsed.length}</span><span class="dep-insight-label">${escapeHtml(catalogFmt('ui.dep_graph.insight_widely_used'))}</span></div>
+          <div class="dep-insight"><span class="dep-insight-val">${singleUse.length}</span><span class="dep-insight-label">${escapeHtml(catalogFmt('ui.dep_graph.insight_single_use'))}</span></div>
+          <div class="dep-insight"><span class="dep-insight-val">${data.orphaned.length}</span><span class="dep-insight-label">${escapeHtml(catalogFmt('ui.dep_graph.insight_orphaned_installed'))}</span></div>
         </div>
       </div>
       ${heaviestProject ? `<div class="dep-analytics-section">
-        <h3 class="dep-analytics-title">Project Extremes</h3>
+        <h3 class="dep-analytics-title">${escapeHtml(catalogFmt('ui.dep_graph.section_project_extremes'))}</h3>
         <div style="font-size:11px;color:var(--text-muted);line-height:1.8;">
-          <div><span style="color:var(--cyan);">Most complex:</span> ${escapeHtml(heaviestProject.name)} (${heaviestProject.count} plugin${heaviestProject.count !== 1 ? 's' : ''})</div>
-          <div><span style="color:var(--green);">Most minimal:</span> ${escapeHtml(lightestProject.name)} (${lightestProject.count} plugin${lightestProject.count !== 1 ? 's' : ''})</div>
+          <div><span style="color:var(--cyan);">${escapeHtml(catalogFmt('ui.dep_graph.most_complex'))}</span> ${escapeHtml(heaviestProject.name)} (${escapeHtml(extremePlug(heaviestProject.count))})</div>
+          <div><span style="color:var(--green);">${escapeHtml(catalogFmt('ui.dep_graph.most_minimal'))}</span> ${escapeHtml(lightestProject.name)} (${escapeHtml(extremePlug(lightestProject.count))})</div>
         </div>
       </div>` : ''}
       ${widelyUsed.length > 0 ? `<div class="dep-analytics-section">
-        <h3 class="dep-analytics-title">Your Go-To Plugins (>50% of projects)</h3>
+        <h3 class="dep-analytics-title">${escapeHtml(catalogFmt('ui.dep_graph.section_goto_plugins'))}</h3>
         ${widelyUsed.map(p => `<div class="dep-plugin-row">
           <div class="dep-plugin-info">
-            <span class="xref-item-type xref-type-${_depTypeSlug(p.type)}">${escapeHtml(p.type || 'Unknown')}</span>
+            <span class="xref-item-type xref-type-${_depTypeSlug(p.type)}">${escapeHtml(p.type ? p.type : unkLabel())}</span>
             <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
             <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer)}</span>
           </div>
@@ -190,16 +199,16 @@ function buildAnalyticsHtml(data) {
         </div>`).join('')}
       </div>` : ''}
       ${singleUse.length > 0 ? `<div class="dep-analytics-section">
-        <h3 class="dep-analytics-title">Single-Use Plugins (only 1 project)</h3>
+        <h3 class="dep-analytics-title">${escapeHtml(catalogFmt('ui.dep_graph.section_single_use'))}</h3>
         <div style="max-height:200px;overflow-y:auto;">
         ${singleUse.slice(0, 30).map(p => `<div class="dep-plugin-row" style="opacity:0.7;">
           <div class="dep-plugin-info">
-            <span class="xref-item-type xref-type-${_depTypeSlug(p.type)}">${escapeHtml(p.type || 'Unknown')}</span>
+            <span class="xref-item-type xref-type-${_depTypeSlug(p.type)}">${escapeHtml(p.type ? p.type : unkLabel())}</span>
             <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
             <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer)}</span>
           </div>
         </div>`).join('')}
-        ${singleUse.length > 30 ? `<div style="text-align:center;padding:6px;color:var(--text-dim);font-size:10px;">...and ${singleUse.length - 30} more</div>` : ''}
+        ${singleUse.length > 30 ? `<div style="text-align:center;padding:6px;color:var(--text-dim);font-size:10px;">${escapeHtml(catalogFmt('ui.dep_graph.and_n_more', {n: singleUse.length - 30}))}</div>` : ''}
         </div>
       </div>` : ''}
     </div>`;
@@ -212,7 +221,10 @@ function showDepGraph() {
 
     if (data.pluginsByUsage.length === 0 && data.orphaned.length === 0) {
         if (typeof tauriConfirm === 'function') {
-            tauriConfirm('No plugin index data.\n\nYou must run "Plugin Index" first to scan DAW projects for plugin references.\n\nBuild the index now?', 'Plugin Dependency Graph').then(ok => {
+            tauriConfirm(
+                catalogFmt('ui.dep_graph.confirm_build_index_body'),
+                catalogFmt('ui.dep_graph.title')
+            ).then(ok => {
                 if (ok && typeof buildXrefIndex === 'function') {
                     buildXrefIndex().then(() => {
                         filterDawProjects();
@@ -227,19 +239,20 @@ function showDepGraph() {
     }
 
     const maxCount = data.pluginsByUsage.length > 0 ? data.pluginsByUsage[0].count : 1;
+    const unkLabel = () => catalogFmt('ui.hm.unknown');
 
     // Most-used plugins section
     const topPlugins = data.pluginsByUsage.slice(0, 50).map(p => {
         const pct = Math.round((p.count / maxCount) * 100);
         const typeCls = 'xref-type-' + _depTypeSlug(p.type);
-        const projectList = [...p.projects].map(path => {
+        const projectListRaw = [...p.projects].map(path => {
             const proj = data.projectsByCount.find(pr => pr.path === path);
-            return proj ? escapeHtml(proj.name) : escapeHtml(path.split('/').pop());
+            return proj ? proj.name : path.split('/').pop();
         }).join(', ');
-        // projectList segments are already escapeHtml'd; do not escape again (would double-encode &amp; etc.).
-        return `<div class="dep-plugin-row" title="Used in: ${projectList}">
+        const usedInTitle = escapeHtml(catalogFmt('ui.dep_graph.used_in_title', {names: projectListRaw}));
+        return `<div class="dep-plugin-row" title="${usedInTitle}">
       <div class="dep-plugin-info">
-        <span class="xref-item-type ${typeCls}">${escapeHtml(p.type || 'Unknown')}</span>
+        <span class="xref-item-type ${typeCls}">${escapeHtml(p.type ? p.type : unkLabel())}</span>
         <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
         <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer)}</span>
       </div>
@@ -277,16 +290,16 @@ function showDepGraph() {
           <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer || '')}</span>
         </div>`;
         }).join('')
-        : '<div class="dep-empty">All installed plugins are referenced in scanned projects.</div>';
+        : `<div class="dep-empty">${escapeHtml(catalogFmt('ui.dep_graph.empty_all_referenced'))}</div>`;
 
     // Stats summary
     const totalRefs = data.pluginsByUsage.reduce((sum, p) => sum + p.count, 0);
     const uniquePlugins = data.pluginsByUsage.length;
     const statsHtml = `<div class="dep-stats">
-    <div class="dep-stat"><span class="dep-stat-val">${uniquePlugins}</span><span class="dep-stat-label">Unique Plugins</span></div>
-    <div class="dep-stat"><span class="dep-stat-val">${data.totalProjects}</span><span class="dep-stat-label">Projects Indexed</span></div>
-    <div class="dep-stat"><span class="dep-stat-val">${totalRefs}</span><span class="dep-stat-label">Total References</span></div>
-    <div class="dep-stat"><span class="dep-stat-val">${data.orphaned.length}</span><span class="dep-stat-label">Orphaned Plugins</span></div>
+    <div class="dep-stat"><span class="dep-stat-val">${uniquePlugins}</span><span class="dep-stat-label">${escapeHtml(catalogFmt('ui.dep_graph.stat_unique_plugins'))}</span></div>
+    <div class="dep-stat"><span class="dep-stat-val">${data.totalProjects}</span><span class="dep-stat-label">${escapeHtml(catalogFmt('ui.dep_graph.stat_projects_indexed'))}</span></div>
+    <div class="dep-stat"><span class="dep-stat-val">${totalRefs}</span><span class="dep-stat-label">${escapeHtml(catalogFmt('ui.dep_graph.stat_total_refs'))}</span></div>
+    <div class="dep-stat"><span class="dep-stat-val">${data.orphaned.length}</span><span class="dep-stat-label">${escapeHtml(catalogFmt('ui.dep_graph.stat_orphaned'))}</span></div>
   </div>`;
 
     // ── Analytics tab content ──
@@ -295,22 +308,22 @@ function showDepGraph() {
     const html = `<div class="modal-overlay" id="depGraphModal" data-action-modal="closeDepGraph">
     <div class="modal-content modal-wide dep-graph-modal">
       <div class="modal-header">
-        <h2>Plugin Dependency Graph</h2>
-        <button class="modal-close" data-action-modal="closeDepGraph" title="Close">&#10005;</button>
+        <h2>${escapeHtml(catalogFmt('ui.dep_graph.title'))}</h2>
+        <button class="modal-close" data-action-modal="closeDepGraph" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button>
       </div>
       <div class="modal-body">
         ${statsHtml}
         <div style="margin-bottom:10px;">
-          <input type="text" class="np-search-input" id="depSearchInput" placeholder="Search plugins and projects..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Filter dependency graph results" style="width:100%;box-sizing:border-box;">
+          <input type="text" class="np-search-input" id="depSearchInput" placeholder="${escapeHtml(catalogFmt('ui.dep_graph.search_placeholder'))}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="${escapeHtml(catalogFmt('ui.dep_graph.search_title'))}" style="width:100%;box-sizing:border-box;">
         </div>
         <div class="dep-tabs">
-          <button class="dep-tab active" data-dep-tab="usage" title="Plugins ranked by how many projects use them">Most Used</button>
-          <button class="dep-tab" data-dep-tab="projects" title="Projects ranked by plugin count">By Project</button>
-          <button class="dep-tab" data-dep-tab="orphaned" title="Installed plugins not used in any scanned project">Orphaned (${data.orphaned.length})</button>
-          <button class="dep-tab" data-dep-tab="analytics" title="Plugin usage analytics and insights">Analytics</button>
+          <button class="dep-tab active" data-dep-tab="usage" title="${escapeHtml(catalogFmt('ui.dep_graph.tt_tab_most_used'))}">${escapeHtml(catalogFmt('ui.dep_graph.tab_most_used'))}</button>
+          <button class="dep-tab" data-dep-tab="projects" title="${escapeHtml(catalogFmt('ui.dep_graph.tt_tab_by_project'))}">${escapeHtml(catalogFmt('ui.dep_graph.tab_by_project'))}</button>
+          <button class="dep-tab" data-dep-tab="orphaned" title="${escapeHtml(catalogFmt('ui.dep_graph.tt_tab_orphaned'))}">${escapeHtml(catalogFmt('ui.dep_graph.tab_orphaned', {n: data.orphaned.length}))}</button>
+          <button class="dep-tab" data-dep-tab="analytics" title="${escapeHtml(catalogFmt('ui.dep_graph.tt_tab_analytics'))}">${escapeHtml(catalogFmt('ui.dep_graph.tab_analytics'))}</button>
         </div>
-        <div class="dep-panel active" id="depPanelUsage">${topPlugins || '<div class="state-message"><div class="state-icon">&#9889;</div><h2>No plugin references found</h2></div>'}</div>
-        <div class="dep-panel" id="depPanelProjects">${topProjects || '<div class="state-message"><div class="state-icon">&#127911;</div><h2>No projects indexed</h2></div>'}</div>
+        <div class="dep-panel active" id="depPanelUsage">${topPlugins || `<div class="state-message"><div class="state-icon">&#9889;</div><h2>${escapeHtml(catalogFmt('ui.dep_graph.empty_no_refs'))}</h2></div>`}</div>
+        <div class="dep-panel" id="depPanelProjects">${topProjects || `<div class="state-message"><div class="state-icon">&#127911;</div><h2>${escapeHtml(catalogFmt('ui.dep_graph.empty_no_projects'))}</h2></div>`}</div>
         <div class="dep-panel" id="depPanelOrphaned">${orphanedHtml}</div>
         <div class="dep-panel" id="depPanelAnalytics">${analyticsHtml}</div>
       </div>
@@ -410,21 +423,25 @@ document.addEventListener('click', (e) => {
             panel._prevHtml = panel.innerHTML;
             let body;
             if (plugins.length === 0) {
-                body = '<div class="state-message"><div class="state-icon">&#9889;</div><h2>No plugins found in this project</h2></div>';
+                body = `<div class="state-message"><div class="state-icon">&#9889;</div><h2>${escapeHtml(catalogFmt('ui.dep_graph.empty_no_plugins_in_project'))}</h2></div>`;
             } else {
                 body = plugins.map(p => {
                     const typeCls = 'xref-type-' + _depTypeSlug(p.pluginType);
+                    const typeLabel = p.pluginType ? p.pluginType : catalogFmt('ui.hm.unknown');
                     return `<div class="dep-plugin-row">
-            <span class="xref-item-type ${typeCls}">${escapeHtml(p.pluginType || 'Unknown')}</span>
+            <span class="xref-item-type ${typeCls}">${escapeHtml(typeLabel)}</span>
             <span class="dep-plugin-name">${escapeHtml(p.name)}</span>
             <span class="dep-plugin-mfg">${escapeHtml(p.manufacturer)}</span>
           </div>`;
                 }).join('');
             }
+            const plugHdr = plugins.length === 1
+                ? catalogFmt('ui.dep_graph.project_header_plugins_one', {n: plugins.length})
+                : catalogFmt('ui.dep_graph.project_header_plugins_other', {n: plugins.length});
             panel.innerHTML = `<div style="margin-bottom:8px;">
-        <button class="btn btn-secondary" data-dep-back title="Back to project list" style="padding:4px 12px;font-size:11px;">&#8592; Back</button>
+        <button class="btn btn-secondary" data-dep-back title="${escapeHtml(catalogFmt('ui.dep_graph.tt_back'))}" style="padding:4px 12px;font-size:11px;">&#8592; ${escapeHtml(catalogFmt('ui.dep_graph.back'))}</button>
         <span style="margin-left:8px;font-weight:600;color:var(--cyan);">${escapeHtml(name)}</span>
-        <span style="margin-left:8px;color:var(--text-muted);font-size:11px;">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''}</span>
+        <span style="margin-left:8px;color:var(--text-muted);font-size:11px;">${escapeHtml(plugHdr)}</span>
       </div>${body}`;
         }
         return;

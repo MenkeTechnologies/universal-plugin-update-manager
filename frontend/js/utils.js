@@ -747,21 +747,20 @@ function isMidiScanTableEmpty() {
 
 function toggleRegex(btn) {
     btn.classList.toggle('active');
-    const isRegex = btn.classList.contains('active');
-    const input = btn.closest('.search-box').querySelector('input');
-    if (input) {
-        const base = input.placeholder.replace(/^(Fuzzy|Regex) /, '');
-        input.placeholder = (isRegex ? 'Regex ' : 'Fuzzy ') + base;
-        const action = btn.dataset.target;
-        applyFilter(action);
+    const input = btn.closest('.search-box')?.querySelector('input');
+    if (input && typeof window.applyI18nPlaceholders === 'function') {
+        window.applyI18nPlaceholders();
     }
+    const action = btn.dataset.target;
+    if (action) applyFilter(action);
 }
 
 // ── Confirm dialog (Tauri-safe) ──
-async function confirmAction(message, title = 'Confirm') {
+async function confirmAction(message, title) {
+    const t = title || catalogFmt('confirm.dialog_title');
     const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
     if (dialogApi && dialogApi.ask) {
-        return dialogApi.ask(message, {title, kind: 'warning'});
+        return dialogApi.ask(message, {title: t, kind: 'warning'});
     }
     return Promise.resolve(confirm(message));
 }
@@ -1181,6 +1180,10 @@ function switchTab(tab) {
     // Toggle tab buttons + panels in one pass — pure class mutations, no layout reads.
     for (const b of _tabButtonsCache) {
         b.classList.toggle('active', b.dataset.tab === tab);
+    }
+    const activeStripBtn = _tabButtonsCache.find((b) => b.dataset.tab === tab);
+    if (activeStripBtn && typeof activeStripBtn.scrollIntoView === 'function') {
+        activeStripBtn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
     for (const t of _tabPanelIds) {
         _tabPanels[t]?.classList.toggle('active', t === tab);

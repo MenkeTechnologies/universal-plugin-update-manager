@@ -391,8 +391,11 @@ async function fetchDawProjectsForExport() {
     return projects;
 }
 
-function sortDaw(key) {
-    if (dawSortKey === key) {
+function sortDaw(key, forceAsc) {
+    if (typeof forceAsc === 'boolean') {
+        dawSortKey = key;
+        dawSortAsc = forceAsc;
+    } else if (dawSortKey === key) {
         dawSortAsc = !dawSortAsc;
     } else {
         dawSortKey = key;

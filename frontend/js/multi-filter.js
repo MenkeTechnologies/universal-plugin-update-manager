@@ -114,11 +114,14 @@ function updateMultiFilterLabel(wrapper, allLabel) {
     if (wrapper._selected.size === 0) {
         label.textContent = allLabel;
         label.classList.remove('multi-filter-active');
-    } else if (wrapper._selected.size === 1) {
+       } else if (wrapper._selected.size === 1) {
         label.textContent = [...wrapper._selected][0];
         label.classList.add('multi-filter-active');
     } else {
-        label.textContent = wrapper._selected.size + ' selected';
+        const n = wrapper._selected.size;
+        label.textContent = typeof appFmt === 'function'
+            ? appFmt('menu.batch_selected', {n})
+            : n + ' selected';
         label.classList.add('multi-filter-active');
     }
 }

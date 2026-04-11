@@ -303,7 +303,7 @@ function buildPaletteStaticItems() {
     });
     if (typeof settingTogglePdfMetadataAutoExtract === 'function') {
         items.push({
-            type: 'action',
+            type: 'toggle',
             name: appFmt('menu.toggle_pdf_metadata_background'),
             icon: '&#128196;',
             ...paletteShortcutTip('togglePdfMetadataAutoExtract'),
@@ -459,7 +459,7 @@ function buildPaletteStaticItems() {
     });
     if (typeof settingToggleTheme === 'function') {
         items.push({
-            type: 'action',
+            type: 'toggle',
             name: appFmt('menu.toggle_dark_light_theme'),
             icon: '&#127912;',
             ...paletteShortcutTip('toggleTheme'),
@@ -507,72 +507,72 @@ function buildPaletteStaticItems() {
         }
     });
 
-    // Toggles
+    // Toggles (badge: ui.palette.type_toggle)
     if (typeof settingToggleCrt === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_crt'),
         icon: '&#128187;',
         ...paletteShortcutTip('toggleCrt'),
         action: () => settingToggleCrt()
     });
     if (typeof settingToggleNeonGlow === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_neon_glow'),
         icon: '&#10024;',
         ...paletteShortcutTip('toggleNeonGlow'),
         action: () => settingToggleNeonGlow()
     });
     if (typeof toggleTagFilterBarVisibility === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_tag_filter_bar'),
         icon: '&#127991;',
         ...paletteShortcutTip('toggleTagFilterBar'),
         action: () => toggleTagFilterBarVisibility()
     });
     if (typeof settingToggleAutoAnalysis === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_auto_analyze_startup'),
         icon: '&#127925;',
         ...paletteShortcutTip('toggleAutoAnalysis'),
         action: () => settingToggleAutoAnalysis()
     });
     if (typeof settingToggleAutoScan === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_auto_scan_launch'),
         icon: '&#8635;',
         ...paletteShortcutTip('toggleAutoScan'),
         action: () => settingToggleAutoScan()
     });
     if (typeof settingToggleAutoUpdate === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_auto_check_updates'),
         icon: '&#9889;',
         ...paletteShortcutTip('toggleAutoUpdate'),
         action: () => settingToggleAutoUpdate()
     });
     if (typeof settingToggleFolderWatch === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_folder_watch'),
         icon: '&#128065;',
         ...paletteShortcutTip('toggleFolderWatch'),
         action: () => settingToggleFolderWatch()
     });
     if (typeof settingToggleIncrementalDirectoryScan === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_incremental_directory_scan'),
         icon: '&#128193;',
         ...paletteShortcutTip('toggleIncrementalDirectoryScan'),
         action: () => settingToggleIncrementalDirectoryScan()
     });
     if (typeof settingToggleSingleClickPlay === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_single_click_play'),
         icon: '&#9654;',
         ...paletteShortcutTip('toggleSingleClickPlay'),
         action: () => settingToggleSingleClickPlay()
     });
     if (typeof settingToggleAutoPlaySampleOnSelect === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_play_sample_on_keyboard_select'),
         icon: '&#9835;',
         ...paletteShortcutTip('toggleAutoPlaySampleOnSelect'),
@@ -580,28 +580,28 @@ function buildPaletteStaticItems() {
     });
     // Autoplay next: session row in buildPaletteDynamicItems (live On/Off detail; see menu.palette_autoplay_next)
     if (typeof settingToggleShowPlayerOnStartup === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_show_player_startup'),
         icon: '&#9835;',
         ...paletteShortcutTip('toggleShowPlayerStartup'),
         action: () => settingToggleShowPlayerOnStartup()
     });
     if (typeof settingToggleExpandOnClick === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_expand_on_click'),
         icon: '&#8597;',
         ...paletteShortcutTip('toggleExpandOnClick'),
         action: () => settingToggleExpandOnClick()
     });
     if (typeof settingToggleIncludeBackups === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_include_ableton_backups'),
         icon: '&#128190;',
         ...paletteShortcutTip('toggleIncludeBackups'),
         action: () => settingToggleIncludeBackups()
     });
     if (typeof settingTogglePruneOldScans === 'function') items.push({
-        type: 'action',
+        type: 'toggle',
         name: appFmt('menu.toggle_prune_old_scans'),
         icon: '&#128465;',
         ...paletteShortcutTip('togglePruneOldScans'),
@@ -777,6 +777,51 @@ function buildPaletteStaticItems() {
         }
     });
 
+    const _palCopyStats = catalogFmt('menu.copy_stats');
+    items.push({
+        type: 'action',
+        name: _palCopyStats,
+        icon: '&#128203;',
+        ...paletteShortcutTip('copyPath'),
+        fields: [_palCopyStats, 'menu.copy_stats'],
+        action: () => {
+            const statsBar = document.getElementById('statsBar');
+            if (!statsBar) return;
+            const statsText = [...statsBar.querySelectorAll('.stat')].map((s) => s.textContent.trim()).join(' | ');
+            if (!statsText) return;
+            if (typeof copyToClipboard === 'function') copyToClipboard(statsText);
+            else {
+                navigator.clipboard.writeText(statsText).then(() => {
+                    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+                        showToast(toastFmt('toast.copied_clipboard'));
+                    }
+                }).catch(() => {});
+            }
+        },
+    });
+    const _palCopyProc = catalogFmt('menu.copy_process_stats');
+    items.push({
+        type: 'action',
+        name: _palCopyProc,
+        icon: '&#128203;',
+        ...paletteShortcutTip('copyPath'),
+        fields: [_palCopyProc, 'menu.copy_process_stats'],
+        action: () => {
+            const headerInfo = document.getElementById('headerStats');
+            if (!headerInfo) return;
+            const statsText = [...headerInfo.querySelectorAll('.header-info-item')].map((s) => s.textContent.trim()).join(' | ');
+            if (!statsText) return;
+            if (typeof copyToClipboard === 'function') copyToClipboard(statsText);
+            else {
+                navigator.clipboard.writeText(statsText).then(() => {
+                    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+                        showToast(toastFmt('toast.copied_clipboard'));
+                    }
+                }).catch(() => {});
+            }
+        },
+    });
+
     // Player controls
     if (typeof toggleAudioPlayback === 'function') {
         items.push({
@@ -807,7 +852,7 @@ function buildPaletteStaticItems() {
     }
     if (typeof toggleAudioLoop === 'function') {
         items.push({
-            type: 'action',
+            type: 'toggle',
             name: appFmt('menu.toggle_loop'),
             icon: '&#128257;',
             ...paletteShortcutTip('toggleLoop'),
@@ -816,7 +861,7 @@ function buildPaletteStaticItems() {
     }
     if (typeof toggleShuffle === 'function') {
         items.push({
-            type: 'action',
+            type: 'toggle',
             name: appFmt('menu.toggle_shuffle'),
             icon: '&#128256;',
             ...paletteShortcutTip('toggleShuffle'),
@@ -824,14 +869,14 @@ function buildPaletteStaticItems() {
         });
     }
     if (typeof toggleMute === 'function') {
-        items.push({type: 'action', name: appFmt('menu.toggle_mute'), icon: '&#128263;', ...paletteShortcutTip('toggleMute'), action: () => toggleMute()});
+        items.push({type: 'toggle', name: appFmt('menu.toggle_mute'), icon: '&#128263;', ...paletteShortcutTip('toggleMute'), action: () => toggleMute()});
     }
     if (typeof toggleMono === 'function') {
-        items.push({type: 'action', name: appFmt('menu.toggle_mono'), icon: '&#127897;', ...paletteShortcutTip('toggleMono'), action: () => toggleMono()});
+        items.push({type: 'toggle', name: appFmt('menu.toggle_mono'), icon: '&#127897;', ...paletteShortcutTip('toggleMono'), action: () => toggleMono()});
     }
     if (typeof toggleEqSection === 'function') {
         items.push({
-            type: 'action',
+            type: 'toggle',
             name: appFmt('menu.toggle_eq_panel'),
             icon: '&#127900;',
             ...paletteShortcutTip('toggleEq'),
@@ -840,7 +885,7 @@ function buildPaletteStaticItems() {
     }
     if (typeof togglePlayerExpanded === 'function') {
         items.push({
-            type: 'action',
+            type: 'toggle',
             name: appFmt('menu.expand_player'),
             icon: '&#9744;',
             ...paletteShortcutTip('togglePlayerExpand'),
@@ -849,7 +894,7 @@ function buildPaletteStaticItems() {
     }
     if (typeof setAbLoopStart === 'function') {
         items.push({
-            type: 'action', name: appFmt('menu.toggle_ab_loop'), icon: '&#128260;', ...paletteShortcutTip('toggleABLoop'), action: () => {
+            type: 'toggle', name: appFmt('menu.toggle_ab_loop'), icon: '&#128260;', ...paletteShortcutTip('toggleABLoop'), action: () => {
                 if (typeof _abLoop !== 'undefined' && _abLoop) {
                     if (typeof clearAbLoop === 'function') clearAbLoop();
                 } else {
@@ -924,7 +969,7 @@ function buildPaletteDynamicItems() {
             src === 'player' ? catalogFmt('ui.autoplay_next_source_abbr.player') : catalogFmt('ui.autoplay_next_source_abbr.samples');
         const detail = `${onOff} · ${srcLabel}`;
         items.push({
-            type: 'action',
+            type: 'toggle',
             name: catalogFmt('menu.toggle_autoplay_next'),
             detail,
             fields: [
@@ -1015,6 +1060,7 @@ function ensurePaletteTypeLabels() {
         _paletteOpenTypeLabels = {
             tab: catalogFmt('ui.palette.type_tab'),
             action: catalogFmt('ui.palette.type_action'),
+            toggle: catalogFmt('ui.palette.type_toggle'),
             plugin: catalogFmt('ui.palette.type_plugin'),
             sample: catalogFmt('ui.palette.type_sample'),
             daw: catalogFmt('ui.palette.type_daw'),
@@ -1022,6 +1068,7 @@ function ensurePaletteTypeLabels() {
             preset: catalogFmt('ui.palette.type_preset'),
             midi: catalogFmt('ui.palette.type_midi'),
             bookmark: catalogFmt('ui.palette.type_bookmark'),
+            tag: catalogFmt('ui.palette.type_tag'),
         };
     }
     return _paletteOpenTypeLabels;
@@ -1032,7 +1079,9 @@ function ensurePaletteTypeLabels() {
  */
 function filterPaletteItemsScored(query, items) {
     if (!query) {
-        return items.filter(i => i.type === 'tab' || i.type === 'action').map(item => ({item, score: 1}));
+        return items
+            .filter((i) => i.type === 'tab' || i.type === 'action' || i.type === 'toggle')
+            .map((item) => ({item, score: 1}));
     }
     const scored = [];
     for (const item of items) {
@@ -1057,13 +1106,19 @@ function getPaletteSearchItems() {
     return _paletteSessionItems;
 }
 
-function openPalette() {
+async function openPalette() {
     if (_paletteOpen) return;
+    if (window.__appReady && typeof window.__appReady.then === 'function') {
+        try {
+            await window.__appReady;
+        } catch (_) {
+        }
+    }
     _paletteOpen = true;
     _paletteQuery = '';
     _paletteSelected = 0;
 
-    const ph = catalogFmt('ui.palette.placeholder');
+    const ph = typeof catalogFmt === 'function' ? catalogFmt('ui.palette.placeholder') : '';
     const html = `<div class="palette-overlay" id="paletteOverlay">
     <div class="palette-box">
       <input type="text" class="palette-input" id="paletteInput" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -1102,7 +1157,7 @@ function closePalette() {
 
 function toggleCommandPalette() {
     if (_paletteOpen) closePalette();
-    else openPalette();
+    else void openPalette();
 }
 
 function paintPaletteRows(container) {

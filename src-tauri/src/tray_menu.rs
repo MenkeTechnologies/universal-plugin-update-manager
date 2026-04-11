@@ -22,6 +22,53 @@ const TRAY_POPOVER_W: u32 = 280;
 /// Default height until JS measures `#shell` (`tray_popover_resize`); must fit title+meta+transport.
 const TRAY_POPOVER_H: u32 = 220;
 
+/// Set `AUDIO_HAXOR_TRAY_DEBUG=1` in the environment to print every successful `tray-popover-state` /
+/// `tray-popover-ui-theme` emit to stderr (state includes the ~500 ms host poll). Emit **failures** always log.
+fn emit_tray_popover_state(app: &AppHandle<Wry>, emit: &TrayPopoverEmit) {
+    let appearance_n = emit
+        .appearance
+        .as_ref()
+        .map(|m| m.len())
+        .unwrap_or(0);
+    match app.emit_to("tray-popover", "tray-popover-state", emit) {
+        Ok(()) => {
+            if std::env::var_os("AUDIO_HAXOR_TRAY_DEBUG").is_some() {
+                eprintln!(
+                    "[tray-popover-host] emit tray-popover-state ok idle={} ui_theme={} appearance_vars={} title_ch={} subtitle_ch={} playing={} elapsed={:.2} total_sec={:?}",
+                    emit.idle,
+                    emit.ui_theme,
+                    appearance_n,
+                    emit.title.chars().count(),
+                    emit.subtitle.chars().count(),
+                    emit.playing,
+                    emit.elapsed_sec,
+                    emit.total_sec
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("[tray-popover-host] emit tray-popover-state FAILED: {e}");
+        }
+    }
+}
+
+/// Light/dark from prefs (`prefs_set` key `theme`). Same debug env / failure logging as [`emit_tray_popover_state`].
+pub fn emit_tray_popover_ui_theme(app: &AppHandle<Wry>, ui_theme: &str) {
+    let payload = serde_json::json!({ "ui_theme": ui_theme });
+    match app.emit_to("tray-popover", "tray-popover-ui-theme", payload) {
+        Ok(()) => {
+            if std::env::var_os("AUDIO_HAXOR_TRAY_DEBUG").is_some() {
+                eprintln!(
+                    "[tray-popover-host] emit tray-popover-ui-theme ok ui_theme={ui_theme}"
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("[tray-popover-host] emit tray-popover-ui-theme FAILED: {e}");
+        }
+    }
+}
+
 /// Prefer the bundle window icon; otherwise embed `32x32.png` so dev/release always have pixels.
 fn tray_menu_bar_icon(app: &App) -> tauri::Result<Image<'static>> {
     if let Some(icon) = app.default_window_icon() {
@@ -74,6 +121,8 @@ pub struct TrayPopoverEmit {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_sec: Option<f64>,
     pub playing: bool,
+    /// Clamped 0.25..=2.0 — mirrors prefs `audioSpeed` / main `#npSpeed`.
+    pub playback_speed: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub idle_hint: Option<String>,
     /// `"light"` or `"dark"` — tray-popover.html uses this for `html[data-theme]`.
@@ -215,12 +264,13 @@ fn toggle_tray_popover(app: &AppHandle<Wry>, rect: &Rect) -> Result<(), String> 
         elapsed_sec: 0.0,
         total_sec: None,
         playing: false,
+        playback_speed: 1.0,
         idle_hint: None,
         ui_theme: tray_popover_ui_theme_from_prefs(),
         appearance: None,
     });
     emit.ui_theme = tray_popover_ui_theme_from_prefs();
-    let _ = app.emit_to("tray-popover", "tray-popover-state", &emit);
+    emit_tray_popover_state(app, &emit);
     let scale = win.scale_factor().unwrap_or(1.0);
     let (mut x, y) = popover_xy_below_tray(rect, scale);
     x = x.max(8);
@@ -229,8 +279,11 @@ fn toggle_tray_popover(app: &AppHandle<Wry>, rect: &Rect) -> Result<(), String> 
         f64::from(TRAY_POPOVER_H),
     )));
     let _ = win.set_position(tauri::Position::Physical(PhysicalPosition::new(x, y)));
+    // Do not `set_focus`: on macOS that activates the app and often jumps Mission Control to the
+    // Space where the main window lives. Clicks on the HUD still work; keyboard focus stays elsewhere.
     let _ = win.show();
-    let _ = win.set_focus();
+    /* Re-apply after `show`: some platforms drop window level across `hide`/`show` cycles. */
+    let _ = win.set_always_on_top(true);
     Ok(())
 }
 
@@ -286,6 +339,9 @@ pub struct TrayNowPlayingPayload {
     pub popover_playing: Option<bool>,
     #[serde(default)]
     pub popover_idle_label: Option<String>,
+    /// Optional: main prefs `audioSpeed` (0.25..=2). When omitted, last popover value is kept.
+    #[serde(default)]
+    pub playback_speed: Option<f64>,
     /// Optional: main window `data-theme` (`"light"` / `"dark"`). When omitted, Rust reads prefs.
     #[serde(default)]
     pub ui_theme: Option<String>,
@@ -299,6 +355,14 @@ fn tray_emit_ui_theme(payload: &TrayNowPlayingPayload) -> String {
         Some("light") => "light".to_string(),
         Some(_) => "dark".to_string(),
         None => tray_popover_ui_theme_from_prefs(),
+    }
+}
+
+fn tray_playback_speed_merge(payload: &TrayNowPlayingPayload, last: Option<&TrayPopoverEmit>) -> f64 {
+    let fallback = || last.map(|e| e.playback_speed).unwrap_or(1.0);
+    match payload.playback_speed {
+        Some(s) if s.is_finite() => s.clamp(0.25, 2.0),
+        _ => fallback(),
     }
 }
 
@@ -360,6 +424,8 @@ pub fn update_tray_now_playing(
 
     let theme = tray_emit_ui_theme(&payload);
     let appearance = guard.last_tray_appearance.clone();
+    let last_emit = guard.last_popover_emit.as_ref();
+    let playback_speed = tray_playback_speed_merge(&payload, last_emit);
     let emit = if payload.idle {
         TrayPopoverEmit {
             idle: true,
@@ -368,6 +434,7 @@ pub fn update_tray_now_playing(
             elapsed_sec: 0.0,
             total_sec: None,
             playing: false,
+            playback_speed,
             idle_hint: payload
                 .popover_idle_label
                 .clone()
@@ -383,6 +450,7 @@ pub fn update_tray_now_playing(
             elapsed_sec: payload.elapsed_sec.unwrap_or(0.0),
             total_sec: payload.total_sec,
             playing: payload.popover_playing.unwrap_or(false),
+            playback_speed,
             idle_hint: None,
             ui_theme: theme,
             appearance: appearance.clone(),
@@ -404,7 +472,7 @@ pub fn update_tray_now_playing(
     {
         let _ = tray.set_title(None::<&str>);
     }
-    let _ = app.emit_to("tray-popover", "tray-popover-state", &emit);
+    emit_tray_popover_state(&app, &emit);
     Ok(())
 }
 
@@ -529,6 +597,7 @@ pub fn start_tray_host_poll(app: AppHandle<Wry>) {
                     elapsed_sec: pos,
                     total_sec,
                     playing: !paused,
+                    playback_speed: last.playback_speed,
                     idle_hint: None,
                     ui_theme: last.ui_theme.clone(),
                     appearance: last.appearance.clone(),
@@ -561,7 +630,7 @@ pub fn start_tray_host_poll(app: AppHandle<Wry>) {
             /* Status-item icon only — title stays unset (see `update_tray_now_playing`). */
             let _ = title_bar;
             let _ = tray.set_tooltip(Some(tooltip.as_str()));
-            let _ = app.emit_to("tray-popover", "tray-popover-state", &new_emit);
+            emit_tray_popover_state(&app, &new_emit);
         }
         TRAY_POLL_ACTIVE.store(false, Ordering::SeqCst);
     });

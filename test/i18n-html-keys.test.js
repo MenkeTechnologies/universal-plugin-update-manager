@@ -12,7 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function collectDataI18nKeys(html) {
   const keys = new Set();
-  const re = /data-i18n(?:-placeholder|-title)?="([^"]+)"/g;
+  const re = /data-i18n(?:-placeholder-regex|-placeholder|-title)?="([^"]+)"/g;
   let m;
   while ((m = re.exec(html)) !== null) {
     keys.add(m[1]);

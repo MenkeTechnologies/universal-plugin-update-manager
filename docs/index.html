@@ -334,9 +334,93 @@
       align-items: center;
     }
 
-    button {
+    .docs-header-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .hud-scheme-row {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+      max-width: min(36rem, 92vw);
+    }
+
+    .hud-scheme-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-muted);
+      text-align: right;
+    }
+
+    .scheme-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 3px;
+    }
+
+    .scheme-btn {
+      padding: 5px 8px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      cursor: pointer;
+      text-align: left;
+      font-family: 'Share Tech Mono', monospace;
+      transition: all 0.2s;
+    }
+
+    .scheme-btn:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan-dim);
+    }
+
+    .scheme-btn.active {
+      border-color: var(--cyan);
+      border-left: 3px solid var(--cyan);
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
+    .scheme-btn-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 2px;
+    }
+
+    .scheme-btn-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .scheme-btn-preview {
+      display: flex;
+      gap: 4px;
+      margin-top: 5px;
+      flex-wrap: wrap;
+    }
+
+    .scheme-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    button,
+    a.btn {
       font-family: 'Share Tech Mono', monospace;
       -webkit-app-region: no-drag;
+    }
+
+    a.btn {
+      text-decoration: none;
     }
 
     .btn {
@@ -539,10 +623,18 @@
           <h1>// AUDIO_HAXOR — DOCS</h1>
           <p class="docs-sub">Tauri v2 · Rust backend <code>app_lib</code> · app release version in <code>package.json</code> / <code>src-tauri/tauri.conf.json</code> / <code>src-tauri/Cargo.toml</code></p>
         </div>
-        <div class="docs-toolbar">
-          <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
-          <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
-          <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse on cards">Neon</button>
+        <div class="docs-header-actions">
+          <div class="docs-toolbar">
+            <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
+            <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
+            <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse on cards">Neon</button>
+            <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/Audio-Haxor" target="_blank" rel="noopener noreferrer" title="AUDIO_HAXOR on GitHub">GitHub</a>
+            <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/Audio-Haxor/issues" target="_blank" rel="noopener noreferrer" title="GitHub Issues">Issues</a>
+          </div>
+          <div class="hud-scheme-row">
+            <span class="hud-scheme-label">Color scheme</span>
+            <div class="scheme-grid" id="hudSchemeGrid"></div>
+          </div>
         </div>
       </div>
     </header>
@@ -683,114 +775,6 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
     </main>
   </div>
 
-  <script>
-    (function () {
-      var K_THEME = 'audio-haxor-docs-theme';
-      var K_CRT = 'audio-haxor-docs-crt';
-      var K_NEON = 'audio-haxor-docs-neon';
-
-      function readStored(key, fallback) {
-        try {
-          var v = localStorage.getItem(key);
-          return v === null ? fallback : v;
-        } catch (e) {
-          return fallback;
-        }
-      }
-
-      function writeStored(key, value) {
-        try {
-          localStorage.setItem(key, value);
-        } catch (e) { /* ignore */ }
-      }
-
-      function applyTheme(mode) {
-        var html = document.documentElement;
-        if (mode === 'light') html.setAttribute('data-theme', 'light');
-        else html.removeAttribute('data-theme');
-      }
-
-      function applyCrt(on) {
-        var app = document.getElementById('docsApp');
-        var h = document.getElementById('crtH');
-        var v = document.getElementById('crtV');
-        var btn = document.getElementById('btnCrt');
-        if (app) app.classList.toggle('no-crt', !on);
-        if (h) h.hidden = !on;
-        if (v) v.hidden = !on;
-        if (btn) btn.classList.toggle('active', on);
-      }
-
-      function applyNeon(on) {
-        document.body.classList.toggle('no-neon-glow', !on);
-        var btn = document.getElementById('btnNeon');
-        if (btn) btn.classList.toggle('active', on);
-      }
-
-      function initTheme() {
-        var saved = readStored(K_THEME, '');
-        if (saved === 'light' || saved === 'dark') {
-          applyTheme(saved === 'light' ? 'light' : 'dark');
-        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-          applyTheme('light');
-        } else {
-          applyTheme('dark');
-        }
-      }
-
-      function initCrt() {
-        var v = readStored(K_CRT, 'on');
-        applyCrt(v !== 'off');
-      }
-
-      function initNeon() {
-        var v = readStored(K_NEON, 'on');
-        applyNeon(v !== 'off');
-      }
-
-      function syncThemeButton() {
-        var btn = document.getElementById('btnTheme');
-        if (!btn) return;
-        var light = document.documentElement.getAttribute('data-theme') === 'light';
-        btn.textContent = light ? 'Dark mode' : 'Light mode';
-      }
-
-      document.addEventListener('DOMContentLoaded', function () {
-        initTheme();
-        initCrt();
-        initNeon();
-        syncThemeButton();
-
-        var btnTheme = document.getElementById('btnTheme');
-        if (btnTheme) {
-          btnTheme.addEventListener('click', function () {
-            var light = document.documentElement.getAttribute('data-theme') === 'light';
-            var next = light ? 'dark' : 'light';
-            applyTheme(next === 'light' ? 'light' : 'dark');
-            writeStored(K_THEME, next);
-            syncThemeButton();
-          });
-        }
-
-        var btnCrt = document.getElementById('btnCrt');
-        if (btnCrt) {
-          btnCrt.addEventListener('click', function () {
-            var on = document.getElementById('crtH') && !document.getElementById('crtH').hidden;
-            applyCrt(!on);
-            writeStored(K_CRT, !on ? 'on' : 'off');
-          });
-        }
-
-        var btnNeon = document.getElementById('btnNeon');
-        if (btnNeon) {
-          btnNeon.addEventListener('click', function () {
-            var on = !document.body.classList.contains('no-neon-glow');
-            applyNeon(!on);
-            writeStored(K_NEON, !on ? 'on' : 'off');
-          });
-        }
-      });
-    })();
-  </script>
+  <script src="hud-theme.js"></script>
 </body>
 </html>

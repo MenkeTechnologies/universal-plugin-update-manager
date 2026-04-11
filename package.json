@@ -25,7 +25,8 @@
     "db:vacuum": "bash scripts/db-vacuum.sh",
     "db:stats": "bash scripts/db-stats.sh",
     "i18n:sort": "python3 scripts/sort_app_i18n_catalogs.py",
-    "i18n:sort:check": "python3 scripts/sort_app_i18n_catalogs.py --check"
+    "i18n:sort:check": "python3 scripts/sort_app_i18n_catalogs.py --check",
+    "i18n:audit": "python3 scripts/i18n_catalog_audit.py"
   },
   "keywords": [
     "vst",

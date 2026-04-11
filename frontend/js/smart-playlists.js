@@ -156,7 +156,7 @@ function renderSmartPlaylists() {
     container.innerHTML = _smartPlaylists.map(pl => {
         const count = evaluateSmartPlaylist(pl).length;
         const active = _activeSmartPlaylist === pl.id;
-        return `<div class="sp-item${active ? ' active' : ''}" data-sp-id="${escapeHtml(pl.id)}" title="Click to load, right-click for options">
+        return `<div class="sp-item${active ? ' active' : ''}" data-sp-id="${escapeHtml(pl.id)}" title="${escapeHtml(appFmt('ui.tt.sp_playlist_item'))}">
       <span class="sp-icon">&#127926;</span>
       <span class="sp-name">${escapeHtml(pl.name)}</span>
       <span class="sp-count">${count}</span>
@@ -241,9 +241,9 @@ function showSmartPlaylistEditor(existingId) {
         const opts = ruleTypes.map(t => `<option value="${t.value}"${rule.type === t.value ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
         const needsValue = !['favorite', 'recently_played'].includes(rule.type);
         return `<div class="sp-rule-row" data-rule-idx="${idx}">
-      <select class="sp-rule-type" data-ridx="${idx}" title="Rule type">${opts}</select>
-      ${needsValue ? `<input class="sp-rule-value" data-ridx="${idx}" value="${escapeHtml(rule.value || '')}" placeholder="${escapeHtml(appFmt('ui.sp_rule_value_placeholder'))}" title="Rule value">` : '<span style="flex:1"></span>'}
-      <button class="btn-small btn-stop sp-rule-del" data-ridx="${idx}" title="Remove rule" style="padding:2px 6px;font-size:10px;">&#10005;</button>
+      <select class="sp-rule-type" data-ridx="${idx}" title="${escapeHtml(appFmt('ui.tt.sp_rule_type'))}">${opts}</select>
+      ${needsValue ? `<input class="sp-rule-value" data-ridx="${idx}" value="${escapeHtml(rule.value || '')}" placeholder="${escapeHtml(appFmt('ui.sp_rule_value_placeholder'))}" title="${escapeHtml(appFmt('ui.tt.sp_rule_value_field'))}">` : '<span style="flex:1"></span>'}
+      <button class="btn-small btn-stop sp-rule-del" data-ridx="${idx}" title="${escapeHtml(appFmt('ui.tt.sp_remove_rule'))}" style="padding:2px 6px;font-size:10px;">&#10005;</button>
     </div>`;
     }
 
@@ -255,7 +255,7 @@ function showSmartPlaylistEditor(existingId) {
     <div class="modal-content modal-wide smart-playlist-modal">
       <div class="modal-header">
         <h2>${escapeHtml(titleText)}</h2>
-        <button type="button" class="modal-close" data-action-modal="closeSmartPlaylist" title="Close">&#10005;</button>
+        <button type="button" class="modal-close" data-action-modal="closeSmartPlaylist" title="${escapeHtml(appFmt('menu.close'))}">&#10005;</button>
       </div>
       <div class="modal-body" id="smartPlaylistModalBody"></div>
     </div>
@@ -272,21 +272,21 @@ function showSmartPlaylistEditor(existingId) {
         const mm = matchMode;
         bodyEl.innerHTML = `
       <div style="margin-bottom:10px;">
-        <input type="text" class="np-search-input sp-name-input" value="${escapeHtml(name)}" placeholder="${escapeHtml(appFmt('ui.sp_playlist_name_placeholder'))}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Playlist name" style="width:100%;box-sizing:border-box;">
+        <input type="text" class="np-search-input sp-name-input" value="${escapeHtml(name)}" placeholder="${escapeHtml(appFmt('ui.sp_playlist_name_placeholder'))}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="${escapeHtml(appFmt('ui.tt.sp_playlist_name_field'))}" style="width:100%;box-sizing:border-box;">
       </div>
       <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
         <label style="font-size:11px;color:var(--text-muted);">${escapeHtml(appFmt('ui.sp_match_label'))}</label>
-        <select class="sp-match-mode" style="font-size:11px;padding:2px 6px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:3px;" title="Match mode">
+        <select class="sp-match-mode" style="font-size:11px;padding:2px 6px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:3px;" title="${escapeHtml(appFmt('ui.tt.sp_match_mode'))}">
           <option value="all"${mm === 'all' ? ' selected' : ''}>${escapeHtml(appFmt('ui.sp_match_all'))}</option>
           <option value="any"${mm === 'any' ? ' selected' : ''}>${escapeHtml(appFmt('ui.sp_match_any'))}</option>
         </select>
       </div>
       <div class="sp-rules-list">${rules.map((r, i) => buildRuleRow(r, i)).join('')}</div>
       <div style="display:flex;gap:8px;margin-top:10px;">
-        <button type="button" class="btn-small btn-secondary sp-add-rule" style="font-size:10px;padding:4px 10px;" title="Add another rule">${escapeHtml(appFmt('ui.sp_add_rule'))}</button>
+        <button type="button" class="btn-small btn-secondary sp-add-rule" style="font-size:10px;padding:4px 10px;" title="${escapeHtml(appFmt('ui.tt.sp_add_rule'))}">${escapeHtml(appFmt('ui.sp_add_rule'))}</button>
         <span style="flex:1"></span>
-        <button type="button" class="btn-small btn-secondary sp-cancel" style="font-size:10px;padding:4px 12px;" title="Cancel without saving">${escapeHtml(appFmt('ui.sp_cancel'))}</button>
-        <button type="button" class="btn-small btn-play sp-save" style="font-size:10px;padding:4px 12px;" title="${existing ? 'Update playlist rules' : 'Create new smart playlist'}">${existing ? escapeHtml(appFmt('ui.sp_update')) : escapeHtml(appFmt('ui.sp_create'))}</button>
+        <button type="button" class="btn-small btn-secondary sp-cancel" style="font-size:10px;padding:4px 12px;" title="${escapeHtml(appFmt('ui.tt.sp_cancel_modal'))}">${escapeHtml(appFmt('ui.sp_cancel'))}</button>
+        <button type="button" class="btn-small btn-play sp-save" style="font-size:10px;padding:4px 12px;" title="${escapeHtml(appFmt(existing ? 'ui.tt.sp_save_update_rules' : 'ui.tt.sp_save_create_new'))}">${existing ? escapeHtml(appFmt('ui.sp_update')) : escapeHtml(appFmt('ui.sp_create'))}</button>
       </div>
       <div class="sp-preview" style="margin-top:10px;font-size:10px;color:var(--text-dim);border-top:1px solid var(--border);padding-top:8px;"></div>
     `;

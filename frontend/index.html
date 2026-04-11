@@ -2455,6 +2455,7 @@
 
         .tab-nav {
             display: flex;
+            flex-wrap: nowrap;
             gap: 0;
             border-bottom: 1px solid var(--border);
             border-top: 1px solid rgba(5, 217, 232, 0.14);
@@ -2462,6 +2463,12 @@
             padding: 0 24px;
             position: relative;
             box-shadow: inset 0 1px 0 rgba(5, 217, 232, 0.16);
+            /* Long labels (e.g. German) must not clip — scroll inside strip; min-width:0 so column flex allows shrink + overflow. */
+            min-width: 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
         }
 
         .tab-nav::before {
@@ -2517,6 +2524,7 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            flex-shrink: 0;
             transition: color 0.2s, border-color 0.2s, text-shadow 0.2s, transform 0.15s, box-shadow 0.15s;
         }
 
@@ -4034,6 +4042,12 @@
             background: color-mix(in srgb, var(--yellow) 12%, transparent);
             color: var(--yellow);
             border: 1px solid color-mix(in srgb, var(--yellow) 32%, transparent);
+        }
+
+        .palette-type-toggle {
+            background: color-mix(in srgb, var(--orange) 12%, transparent);
+            color: var(--orange);
+            border: 1px solid color-mix(in srgb, var(--orange) 32%, transparent);
         }
 
         .palette-type-plugin {
@@ -8194,7 +8208,7 @@
         </div>
         <div class="np-section" data-np-section="playlists">
             <div class="np-smart-playlists-section">
-                <div class="np-history-title" style="display:flex;align-items:center;gap:6px;">Smart Playlists
+                <div class="np-history-title" style="display:flex;align-items:center;gap:6px;"><span data-i18n="ui.export.title_smart_playlists">Smart Playlists</span>
                     <button class="btn-small btn-secondary" data-action="createSmartPlaylist"
                             data-i18n="ui.btn.new"
                             data-i18n-title="ui.tt.create_a_new_rule_based_smart_playlist"
@@ -8575,7 +8589,7 @@
                 <div class="search-box" style="flex: 1;">
                     <span class="search-icon">&#128269;</span>
                     <input autocapitalize="off" autocomplete="off" autocorrect="off"
-                           data-action="filterPlugins" data-i18n-placeholder="ui.ph.fuzzy_search_plugins" data-i18n-title="ui.tt.search_plugins_cmd_f"
+                           data-action="filterPlugins" data-i18n-placeholder="ui.ph.fuzzy_search_plugins" data-i18n-placeholder-regex="ui.ph.regex_search_plugins" data-i18n-title="ui.tt.search_plugins_cmd_f"
                            id="searchInput" placeholder="Fuzzy search plugins..." spellcheck="false"
                            title="Search plugins (Cmd+F)"
                            type="text">
@@ -8657,7 +8671,7 @@
                 <div class="search-box" style="flex: 1;">
                     <span class="search-icon">&#128269;</span>
                     <input autocapitalize="off" autocomplete="off" autocorrect="off" data-action="filterFavorites"
-                           data-i18n-placeholder="ui.ph.search_favorites" data-i18n-title="ui.tt.search_favorites" id="favSearchInput" placeholder="Fuzzy search favorites..."
+                           data-i18n-placeholder="ui.ph.search_favorites" data-i18n-placeholder-regex="ui.ph.regex_search_favorites" data-i18n-title="ui.tt.search_favorites" id="favSearchInput" placeholder="Fuzzy search favorites..."
                            spellcheck="false" title="Search favorites"
                            type="text">
                     <button class="btn-regex" data-action="toggleRegex" data-i18n-title="ui.tt.toggle_regex_search" data-target="filterFavorites"
@@ -8702,7 +8716,7 @@
                 <div class="search-box" style="flex: 1;">
                     <span class="search-icon">&#128269;</span>
                     <input autocapitalize="off" autocomplete="off" autocorrect="off" data-action="filterTags"
-                           data-i18n-placeholder="ui.ph.search_tags" data-i18n-title="ui.tt.search_tags" id="tagSearchInput" placeholder="Fuzzy search tags..."
+                           data-i18n-placeholder="ui.ph.search_tags" data-i18n-placeholder-regex="ui.ph.regex_search_tags" data-i18n-title="ui.tt.search_tags" id="tagSearchInput" placeholder="Fuzzy search tags..."
                            spellcheck="false" title="Search tags"
                            type="text">
                     <button class="btn-regex" data-action="toggleRegex" data-i18n-title="ui.tt.toggle_regex_search" data-target="filterTags"
@@ -8755,7 +8769,7 @@
                 <div class="search-box" style="flex: 1; max-width: 300px;">
                     <span class="search-icon">&#128269;</span>
                     <input autocapitalize="off" autocomplete="off" autocorrect="off"
-                           data-action="filterFiles" data-i18n-placeholder="ui.ph.filter_files" data-i18n-title="ui.tt.filter_files_in_current_directory"
+                           data-action="filterFiles" data-i18n-placeholder="ui.ph.filter_files" data-i18n-placeholder-regex="ui.ph.regex_filter_files" data-i18n-title="ui.tt.filter_files_in_current_directory"
                            id="fileSearchInput" placeholder="Fuzzy filter files..." spellcheck="false"
                            title="Filter files in current directory"
                            type="text">
@@ -8786,7 +8800,7 @@
                 <div class="search-box" style="flex: 1;">
                     <span class="search-icon">&#128269;</span>
                     <input autocapitalize="off" autocomplete="off" autocorrect="off"
-                           data-action="filterNotes" data-i18n-placeholder="ui.ph.search_notes_and_tags" data-i18n-title="ui.tt.search_notes_and_tags" id="noteSearchInput"
+                           data-action="filterNotes" data-i18n-placeholder="ui.ph.search_notes_and_tags" data-i18n-placeholder-regex="ui.ph.regex_search_notes_and_tags" data-i18n-title="ui.tt.search_notes_and_tags" id="noteSearchInput"
                            placeholder="Fuzzy search notes and tags..." spellcheck="false" title="Search notes and tags"
                            type="text">
                     <button class="btn-regex" data-action="toggleRegex" data-i18n-title="ui.tt.toggle_regex_search" data-target="filterNotes"
@@ -8862,7 +8876,7 @@
                 <div class="search-box" style="flex: 1;">
                     <span class="search-icon">&#128269;</span>
                     <input autocapitalize="off" autocomplete="off" autocorrect="off"
-                           data-action="filterAudioSamples" data-i18n-placeholder="ui.ph.fuzzy_search_samples" data-i18n-title="ui.tt.search_audio_samples_cmd_f"
+                           data-action="filterAudioSamples" data-i18n-placeholder="ui.ph.fuzzy_search_samples" data-i18n-placeholder-regex="ui.ph.regex_search_samples" data-i18n-title="ui.tt.search_audio_samples_cmd_f"
                            id="audioSearchInput" placeholder="Fuzzy search samples..." spellcheck="false"
                            title="Search audio samples (Cmd+F)"
                            type="text">
@@ -8947,7 +8961,7 @@
                 <div class="search-box" style="flex: 1;">
                     <span class="search-icon">&#128269;</span>
                     <input autocapitalize="off" autocomplete="off" autocorrect="off"
-                           data-action="filterDawProjects" data-i18n-placeholder="ui.ph.fuzzy_search_projects" data-i18n-title="ui.tt.search_daw_projects_cmd_f"
+                           data-action="filterDawProjects" data-i18n-placeholder="ui.ph.fuzzy_search_projects" data-i18n-placeholder-regex="ui.ph.regex_search_projects" data-i18n-title="ui.tt.search_daw_projects_cmd_f"
                            id="dawSearchInput" placeholder="Fuzzy search projects..." spellcheck="false"
                            title="Search DAW projects (Cmd+F)"
                            type="text">
@@ -9027,7 +9041,7 @@
                 <div class="search-box" style="flex: 1;">
                     <span class="search-icon">&#128269;</span>
                     <input autocapitalize="off" autocomplete="off" autocorrect="off"
-                           data-action="filterPresets" data-i18n-placeholder="ui.ph.fuzzy_search_presets" data-i18n-title="ui.tt.search_presets_cmd_f"
+                           data-action="filterPresets" data-i18n-placeholder="ui.ph.fuzzy_search_presets" data-i18n-placeholder-regex="ui.ph.regex_search_presets" data-i18n-title="ui.tt.search_presets_cmd_f"
                            id="presetSearchInput" placeholder="Fuzzy search presets..." spellcheck="false"
                            title="Search presets (Cmd+F)"
                            type="text">
@@ -9093,7 +9107,7 @@
             <div class="search-box" style="flex: 1;">
                 <span class="search-icon">&#128269;</span>
                 <input autocapitalize="off" autocomplete="off" autocorrect="off"
-                       data-action="filterMidi" data-i18n-placeholder="ui.ph.fuzzy_search_midi_files" data-i18n-title="ui.tt.search_midi_files_by_name_or_path" id="midiSearchInput"
+                       data-action="filterMidi" data-i18n-placeholder="ui.ph.fuzzy_search_midi_files" data-i18n-placeholder-regex="ui.ph.regex_search_midi_files" data-i18n-title="ui.tt.search_midi_files_by_name_or_path" id="midiSearchInput"
                        placeholder="Fuzzy search MIDI files..." spellcheck="false"
                        title="Search MIDI files by name or path"
                        type="text">
@@ -9139,7 +9153,7 @@
             <div class="search-box" style="flex: 1;">
                 <span class="search-icon">&#128269;</span>
                 <input autocapitalize="off" autocomplete="off" autocorrect="off" data-action="filterPdfs"
-                       data-i18n-placeholder="ui.ph.fuzzy_search_pdfs" data-i18n-title="ui.tt.search_pdfs_by_name_or_path" id="pdfSearchInput" placeholder="Fuzzy search PDFs..."
+                       data-i18n-placeholder="ui.ph.fuzzy_search_pdfs" data-i18n-placeholder-regex="ui.ph.regex_search_pdfs" data-i18n-title="ui.tt.search_pdfs_by_name_or_path" id="pdfSearchInput" placeholder="Fuzzy search PDFs..."
                        spellcheck="false" title="Search PDFs by name or path"
                        type="text">
                 <button class="btn-regex" data-action="toggleRegex" data-i18n-title="ui.tt.toggle_regex_search" data-target="filterPdfs"
@@ -9546,7 +9560,7 @@
                     </button>
                 </div>
                 <div class="settings-search-empty" id="settingsSearchEmpty" style="display:none;">
-                    <span>No settings match your search.</span>
+                    <span data-i18n="ui.settings.search_no_matches">No settings match your search.</span>
                 </div>
             </div>
             <div class="settings-section" data-section="appearance">
@@ -9588,21 +9602,6 @@
                             <option data-i18n="ui.opt.lang_id" value="id">Bahasa Indonesia</option>
                             <option data-i18n="ui.opt.lang_hi" value="hi">हिन्दी</option>
                         </select>
-                    </div>
-                </div>
-                <div class="settings-row">
-                    <div class="settings-label">
-                        <span class="settings-title" data-i18n="ui.st.theme">Theme</span>
-                        <span class="settings-desc"
-                              data-i18n="ui.sd.switch_between_dark_cyberpunk_and_clean_light_mode">Switch between dark cyberpunk and clean light mode</span>
-                    </div>
-                    <div class="settings-control">
-                        <button class="settings-toggle" data-action="settingToggleTheme" data-i18n-title="ui.tt.switch_between_dark_and_light_theme"
-                                id="settingTheme"
-                                title="Switch between dark and light theme">
-                            <span class="settings-toggle-label" id="settingThemeLabel">Dark</span>
-                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-                        </button>
                     </div>
                 </div>
                 <div class="settings-row">
@@ -10203,6 +10202,21 @@
 
             <div class="settings-section" data-section="colorscheme">
                 <h2 class="settings-heading">&#9776; <span data-i18n="ui.sh.9776_color_scheme">Color Scheme</span></h2>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title" data-i18n="ui.st.theme">Theme</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.switch_between_dark_cyberpunk_and_clean_light_mode">Switch between dark cyberpunk and clean light mode</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingToggleTheme" data-i18n-title="ui.tt.switch_between_dark_and_light_theme"
+                                id="settingTheme"
+                                title="Switch between dark and light theme">
+                            <span class="settings-toggle-label" id="settingThemeLabel">Dark</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
                 <div class="scheme-grid" id="schemeGrid"></div>
                 <div class="settings-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
                     <div class="settings-label">
@@ -10895,46 +10909,46 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=17873"></script>
-<script src="js/utils.js?v=17873"></script>
-<script src="js/ui-idle.js?v=17873"></script>
-<script src="js/ipc.js?v=17873"></script>
-<script src="js/tooltip-hover.js?v=17873"></script>
-<script src="js/drag-reorder.js?v=17873"></script>
-<script src="js/modal-drag.js?v=17873"></script>
-<script src="js/columns.js?v=17873"></script>
-<script src="js/notes.js?v=17873"></script>
-<script src="js/favorites.js?v=17873"></script>
-<script src="js/export.js?v=17873"></script>
-<script src="js/plugins.js?v=17873"></script>
-<script src="js/settings.js?v=17873"></script>
-<script src="js/history.js?v=17873"></script>
-<script src="js/kvr.js?v=17873"></script>
-<script src="js/audio.js?v=17873"></script>
-<script src="js/daw.js?v=17873"></script>
-<script src="js/disk-usage.js?v=17873"></script>
-<script src="js/presets.js?v=17873"></script>
-<script src="js/batch-select.js?v=17873"></script>
-<script src="js/native-file-drag.js?v=17873"></script>
-<script src="js/sort-persist.js?v=17873"></script>
-<script src="js/multi-filter.js?v=17873"></script>
-<script src="js/file-browser.js?v=17873"></script>
-<script src="js/duplicates.js?v=17873"></script>
-<script src="js/command-palette.js?v=17873"></script>
-<script src="js/xref.js?v=17873"></script>
-<script src="js/dep-graph.js?v=17873"></script>
-<script src="js/smart-playlists.js?v=17873"></script>
-<script src="js/heatmap-dashboard.js?v=17873"></script>
-<script src="js/midi.js?v=17873"></script>
-<script src="js/pdf.js?v=17873"></script>
-<script src="js/settings-search.js?v=17873"></script>
-<script src="js/visualizer.js?v=17873"></script>
-<script src="js/walker-status.js?v=17873"></script>
-<script src="js/audio-engine.js?v=17873"></script>
-<script src="js/context-menu.js?v=17873"></script>
-<script src="js/shortcuts.js?v=17873"></script>
-<script src="js/help-overlay.js?v=17873"></script>
-<script src="js/keyboard-nav.js?v=17873"></script>
-<script src="js/app.js?v=17873"></script>
+<script src="js/i18n-ui.js?v=28576"></script>
+<script src="js/utils.js?v=28577"></script>
+<script src="js/ui-idle.js?v=28576"></script>
+<script src="js/ipc.js?v=28576"></script>
+<script src="js/tooltip-hover.js?v=28576"></script>
+<script src="js/drag-reorder.js?v=28576"></script>
+<script src="js/modal-drag.js?v=28576"></script>
+<script src="js/columns.js?v=28576"></script>
+<script src="js/notes.js?v=28576"></script>
+<script src="js/favorites.js?v=28576"></script>
+<script src="js/export.js?v=28576"></script>
+<script src="js/plugins.js?v=28576"></script>
+<script src="js/settings.js?v=28576"></script>
+<script src="js/history.js?v=28576"></script>
+<script src="js/kvr.js?v=28576"></script>
+<script src="js/audio.js?v=28576"></script>
+<script src="js/daw.js?v=28576"></script>
+<script src="js/disk-usage.js?v=28576"></script>
+<script src="js/presets.js?v=28576"></script>
+<script src="js/batch-select.js?v=28576"></script>
+<script src="js/native-file-drag.js?v=28576"></script>
+<script src="js/sort-persist.js?v=28576"></script>
+<script src="js/multi-filter.js?v=28576"></script>
+<script src="js/file-browser.js?v=28576"></script>
+<script src="js/duplicates.js?v=28576"></script>
+<script src="js/command-palette.js?v=28577"></script>
+<script src="js/xref.js?v=28576"></script>
+<script src="js/dep-graph.js?v=28576"></script>
+<script src="js/smart-playlists.js?v=28576"></script>
+<script src="js/heatmap-dashboard.js?v=28576"></script>
+<script src="js/midi.js?v=28576"></script>
+<script src="js/pdf.js?v=28576"></script>
+<script src="js/settings-search.js?v=28576"></script>
+<script src="js/visualizer.js?v=28576"></script>
+<script src="js/walker-status.js?v=28576"></script>
+<script src="js/audio-engine.js?v=28576"></script>
+<script src="js/context-menu.js?v=28577"></script>
+<script src="js/shortcuts.js?v=28576"></script>
+<script src="js/help-overlay.js?v=28576"></script>
+<script src="js/keyboard-nav.js?v=28576"></script>
+<script src="js/app.js?v=28576"></script>
 </body>
 </html>

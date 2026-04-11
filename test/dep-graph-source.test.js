@@ -9,6 +9,22 @@ const path = require('path');
 const vm = require('vm');
 const { createTextDiv } = require('./frontend-vm-harness.js');
 
+/** Mirrors `ipc.js` `appFmt` using the English JSON catalog so `catalogFmt` resolves real strings in VM. */
+function enCatalogAppFmt() {
+  const enPath = path.join(__dirname, '..', 'i18n', 'app_i18n_en.json');
+  const enMap = JSON.parse(fs.readFileSync(enPath, 'utf8'));
+  return function appFmt(key, vars) {
+    let s = enMap[key];
+    if (s == null || s === '') return key;
+    if (vars && typeof vars === 'object') {
+      s = s.replace(/\{(\w+)\}/g, (_, name) =>
+        vars[name] != null && vars[name] !== '' ? String(vars[name]) : ''
+      );
+    }
+    return s;
+  };
+}
+
 function loadDepGraphSandbox() {
   const escEl = { textContent: '', innerHTML: '' };
   const sandbox = {
@@ -39,6 +55,7 @@ function loadDepGraphSandbox() {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
+  sandbox.appFmt = enCatalogAppFmt();
   const root = path.join(__dirname, '..', 'frontend', 'js');
   vm.runInContext(fs.readFileSync(path.join(root, 'utils.js'), 'utf8'), sandbox);
   // Mirror xref.js plugin-key helpers so buildDepGraphData matches the live app when normalizedName is absent.
@@ -96,6 +113,7 @@ function loadDepGraphSandboxFallbackOnly() {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
+  sandbox.appFmt = enCatalogAppFmt();
   const root = path.join(__dirname, '..', 'frontend', 'js');
   vm.runInContext(fs.readFileSync(path.join(root, 'utils.js'), 'utf8'), sandbox);
   vm.runInContext(

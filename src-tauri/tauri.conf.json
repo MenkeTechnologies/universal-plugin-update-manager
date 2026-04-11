@@ -31,9 +31,11 @@
         "transparent": true,
         "shadow": false,
         "visible": false,
+        "focus": false,
         "resizable": false,
         "skipTaskbar": true,
-        "alwaysOnTop": false,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
         "url": "tray-popover.html"
       }
     ],

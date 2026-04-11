@@ -50,6 +50,8 @@ window.__appReady = invoke('get_app_strings', {locale: null}).then((m) => {
     window.__appStr = m || {};
     window.__toastStr = window.__appStr;
     if (typeof applyUiI18n === 'function') applyUiI18n();
+    /* Cmd+K static rows cache `appFmt` at first build — refresh after SQLite strings land. */
+    if (typeof window.invalidatePaletteStaticCache === 'function') window.invalidatePaletteStaticCache();
 }).catch(() => {
 });
 window.__toastReady = window.__appReady;
@@ -96,6 +98,14 @@ listen('menu-action', (event) => {
         const frac = parseFloat(id.slice(5));
         if (Number.isFinite(frac) && typeof seekPlaybackToPercent === 'function') {
             seekPlaybackToPercent(frac);
+        }
+        return;
+    }
+    /* Tray popover speed — `speed:<float>` matches `#npSpeed` option values. */
+    if (typeof id === 'string' && id.startsWith('speed:')) {
+        const sp = parseFloat(id.slice(6));
+        if (Number.isFinite(sp) && typeof setPlaybackSpeed === 'function') {
+            setPlaybackSpeed(String(sp));
         }
         return;
     }
@@ -251,7 +261,7 @@ listen('menu-action', (event) => {
             if (typeof showDepGraph === 'function') showDepGraph();
             break;
         case 'cmd_palette':
-            if (typeof openPalette === 'function') openPalette();
+            if (typeof openPalette === 'function') void openPalette();
             break;
         case 'help_overlay':
             if (typeof toggleHelpOverlay === 'function') toggleHelpOverlay();

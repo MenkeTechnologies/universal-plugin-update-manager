@@ -675,13 +675,13 @@ function aeCreatePluginPicker() {
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'ae-picker-input';
-    input.placeholder = 'Search plugins\u2026';
+    input.placeholder = catalogFmt('ui.ae.picker_search_placeholder');
     input.autocomplete = 'off';
     input.spellcheck = false;
     const clear = document.createElement('span');
     clear.className = 'ae-picker-clear';
     clear.textContent = '\u00d7';
-    clear.title = 'Clear';
+    clear.title = catalogFmt('menu.clear');
     const dropdown = document.createElement('div');
     dropdown.className = 'ae-picker-dropdown';
     wrap.appendChild(input);

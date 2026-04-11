@@ -1,0 +1,12 @@
+{
+  "ui.tt.sp_add_rule": "Add another rule",
+  "ui.tt.sp_cancel_modal": "Cancel without saving",
+  "ui.tt.sp_match_mode": "Match mode",
+  "ui.tt.sp_playlist_item": "Click to load; right-click for options",
+  "ui.tt.sp_playlist_name_field": "Playlist name",
+  "ui.tt.sp_remove_rule": "Remove rule",
+  "ui.tt.sp_rule_type": "Rule type",
+  "ui.tt.sp_rule_value_field": "Rule value",
+  "ui.tt.sp_save_create_new": "Create playlist with these rules",
+  "ui.tt.sp_save_update_rules": "Save changes to this playlist"
+}

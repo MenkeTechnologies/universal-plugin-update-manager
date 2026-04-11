@@ -90,9 +90,10 @@ function showXrefModal(projectName, plugins) {
 
     let body;
     if (plugins.length === 0) {
-        body = '<div class="state-message"><div class="state-icon">&#9889;</div><h2>No plugins found in this project</h2></div>';
+        body = `<div class="state-message"><div class="state-icon">&#9889;</div><h2>${escapeHtml(catalogFmt('ui.xref.no_plugins_in_project'))}</h2></div>`;
     } else {
-        body = `<div style="color:var(--text-muted);font-size:11px;margin-bottom:12px;">${plugins.length} plugin${plugins.length !== 1 ? 's' : ''} found</div>
+        const foundLine = catalogFmt(plugins.length === 1 ? 'ui.xref.plugins_found_one' : 'ui.xref.plugins_found_other', {count: plugins.length});
+        body = `<div style="color:var(--text-muted);font-size:11px;margin-bottom:12px;">${escapeHtml(foundLine)}</div>
     <ul class="xref-list">${plugins.map(p => {
             const typeCls = 'xref-type-' + p.pluginType.toLowerCase();
             return `<li class="xref-item" data-xref-plugin="${escapeHtml(p.name)}" style="cursor:pointer;">
@@ -104,7 +105,7 @@ function showXrefModal(projectName, plugins) {
     }
 
     const exportBtn = plugins.length > 0
-        ? `<button class="btn btn-secondary" data-action="exportXrefPlugins" style="margin-left:auto;font-size:11px;" title="Export plugin list">&#8615; Export</button>`
+        ? `<button class="btn btn-secondary" data-action="exportXrefPlugins" style="margin-left:auto;font-size:11px;" title="${escapeHtml(catalogFmt('ui.tt.export_plugin_list_to_json'))}">&#8615; ${escapeHtml(catalogFmt('ui.btn.8615_export'))}</button>`
         : '';
     window._xrefExportPlugins = plugins;
     window._xrefExportProjectName = projectName;
@@ -113,9 +114,9 @@ function showXrefModal(projectName, plugins) {
     const html = `<div class="modal-overlay" id="xrefModal" data-action-modal="closeXref">
     <div class="modal-content modal-wide">
       <div class="modal-header" style="display:flex;align-items:center;gap:8px;">
-        <h2>Plugins in ${escapeHtml(projectName)}</h2>
+        <h2>${escapeHtml(catalogFmt('ui.export.plugins_in_project', {name: projectName}))}</h2>
         ${exportBtn}
-        <button class="modal-close" data-action-modal="closeXref" title="Close">&#10005;</button>
+        <button class="modal-close" data-action-modal="closeXref" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button>
       </div>
       <div class="modal-body">${body}</div>
     </div>
@@ -136,12 +137,12 @@ async function showProjectPlugins(projectPath, projectName) {
     const loadHtml = `<div class="modal-overlay" id="xrefModal" data-action-modal="closeXref">
     <div class="modal-content modal-wide">
       <div class="modal-header">
-        <h2>Plugins in ${escapeHtml(projectName)}</h2>
-        <button class="modal-close" data-action-modal="closeXref" title="Close">&#10005;</button>
+        <h2>${escapeHtml(catalogFmt('ui.export.plugins_in_project', {name: projectName}))}</h2>
+        <button class="modal-close" data-action-modal="closeXref" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button>
       </div>
       <div class="modal-body" style="text-align:center;padding:32px;">
         <div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>
-        <div style="color:var(--text-muted);font-size:12px;">Parsing project file...</div>
+        <div style="color:var(--text-muted);font-size:12px;">${escapeHtml(catalogFmt('ui.xref.parsing_project_file'))}</div>
       </div>
     </div>
   </div>`;
@@ -200,10 +201,14 @@ function showReverseXrefModal(pluginName, projects) {
 
     let body;
     if (projects.length === 0) {
-        body = `<div class="xref-unsupported">No scanned projects use "${escapeHtml(pluginName)}".<br><br>
-      <span style="font-size:11px;color:var(--text-muted);">Tip: Click the &#9889; plugin count badges on DAW project rows to scan them first.</span></div>`;
+        body = `<div class="xref-unsupported">${escapeHtml(catalogFmt('ui.xref.reverse_empty', {plugin: pluginName}))}<br><br>
+      <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(catalogFmt('ui.xref.reverse_empty_tip'))}</span></div>`;
     } else {
-        body = `<div style="color:var(--text-muted);font-size:11px;margin-bottom:12px;">${projects.length} project${projects.length !== 1 ? 's' : ''} use ${escapeHtml(pluginName)}</div>
+        const useLine = catalogFmt(projects.length === 1 ? 'ui.xref.projects_use_plugin_one' : 'ui.xref.projects_use_plugin_other', {
+            count: projects.length,
+            plugin: pluginName,
+        });
+        body = `<div style="color:var(--text-muted);font-size:11px;margin-bottom:12px;">${escapeHtml(useLine)}</div>
     <ul class="xref-list">${projects.map(p => {
             const dawClass = getDawBadgeClass ? getDawBadgeClass(p.daw) : 'format-default';
             return `<li class="xref-item" style="cursor:pointer;" data-xref-project="${escapeHtml(p.path)}">
@@ -217,8 +222,8 @@ function showReverseXrefModal(pluginName, projects) {
     const html = `<div class="modal-overlay" id="xrefModal" data-action-modal="closeXref">
     <div class="modal-content modal-wide">
       <div class="modal-header">
-        <h2>Projects using ${escapeHtml(pluginName)}</h2>
-        <button class="modal-close" data-action-modal="closeXref" title="Close">&#10005;</button>
+        <h2>${escapeHtml(catalogFmt('ui.xref.projects_using_plugin', {name: pluginName}))}</h2>
+        <button class="modal-close" data-action-modal="closeXref" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button>
       </div>
       <div class="modal-body">${body}</div>
     </div>
@@ -361,8 +366,10 @@ function buildXmlTree(node, depth) {
 
     if (hasChildren) {
         const childCount = [...node.children].length;
-        const summary = childCount > 0 ? `<span class="xml-collapsed-summary" style="display:none;color:var(--text-dim);font-size:10px;"> ...${childCount} children</span>` : '';
-        el.innerHTML = `<span class="xml-toggle" title="Click to collapse/expand" style="cursor:pointer;color:var(--cyan);display:inline-block;width:14px;text-align:center;user-select:none;">▼</span><span class="xml-tag" style="color:var(--cyan);">&lt;${escapeHtml(tagName)}</span>${attrsHtml}<span style="color:var(--cyan);">&gt;</span>${summary}`;
+        const summary = childCount > 0
+            ? `<span class="xml-collapsed-summary" style="display:none;color:var(--text-dim);font-size:10px;">${escapeHtml(catalogFmt('ui.xref.xml_collapsed_n_children', {n: childCount}))}</span>`
+            : '';
+        el.innerHTML = `<span class="xml-toggle" title="${escapeHtml(catalogFmt('ui.xref.tt_toggle_node'))}" style="cursor:pointer;color:var(--cyan);display:inline-block;width:14px;text-align:center;user-select:none;">▼</span><span class="xml-tag" style="color:var(--cyan);">&lt;${escapeHtml(tagName)}</span>${attrsHtml}<span style="color:var(--cyan);">&gt;</span>${summary}`;
 
         const childContainer = document.createElement('div');
         childContainer.className = 'xml-children';
@@ -419,8 +426,8 @@ async function showXmlProjectViewer(filePath, projectName) {
     if (existing) existing.remove();
     const loadHtml = `<div class="modal-overlay" id="projectViewerModal" data-action-modal="closeProjectViewer">
     <div class="modal-content" style="max-width:90vw;max-height:90vh;width:900px;">
-      <div class="modal-header"><h2>${escapeHtml(projectName)} — XML</h2><button class="modal-close" data-action-modal="closeProjectViewer" title="Close">&#10005;</button></div>
-      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>Loading...</div></div>
+      <div class="modal-header"><h2>${escapeHtml(catalogFmt('ui.xref.modal_title_xml', {project: projectName}))}</h2><button class="modal-close" data-action-modal="closeProjectViewer" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button></div>
+      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>${escapeHtml(catalogFmt('ui.xref.loading'))}</div></div>
     </div></div>`;
     document.body.insertAdjacentHTML('beforeend', loadHtml);
     try {
@@ -431,20 +438,24 @@ async function showXmlProjectViewer(filePath, projectName) {
         const xml = result.content || '';
         const lineCount = xml.split('\n').length;
         // Reuse the ALS viewer rendering
+        const fmtLabel = result.format || catalogFmt('ui.file_filter.xml');
+        const metaLine = catalogFmt('ui.xref.meta_format_lines', {format: fmtLabel, lines: lineCount.toLocaleString()});
         body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
       <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
-        <span style="font-size:11px;color:var(--text-muted);">${result.format || 'XML'} | ${lineCount.toLocaleString()} lines</span>
-        <input type="text" class="np-search-input" id="projSearchInput" placeholder="Search XML..." style="flex:1;max-width:300px;" autocomplete="off">
-        <button class="btn btn-secondary" id="projCollapseAllBtn" style="padding:4px 10px;font-size:10px;">Collapse All</button>
-        <button class="btn btn-secondary" id="projExpandAllBtn" style="padding:4px 10px;font-size:10px;">Expand All</button>
-        <button class="btn btn-secondary" id="projExportBtn" style="padding:4px 10px;font-size:10px;">&#8615; Export</button>
+        <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(metaLine)}</span>
+        <input type="text" class="np-search-input" id="projSearchInput" placeholder="${escapeHtml(catalogFmt('ui.xref.ph_search_xml'))}" style="flex:1;max-width:300px;" autocomplete="off">
+        <button class="btn btn-secondary" id="projCollapseAllBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.xref.tt_collapse_all_xml_nodes'))}">${escapeHtml(catalogFmt('ui.xref.collapse_all'))}</button>
+        <button class="btn btn-secondary" id="projExpandAllBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.xref.tt_expand_all_xml_nodes'))}">${escapeHtml(catalogFmt('ui.xref.expand_all'))}</button>
+        <button class="btn btn-secondary" id="projExportBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.dialog.export_xml'))}">&#8615; ${escapeHtml(catalogFmt('ui.btn.8615_export'))}</button>
       </div>
       <div id="projXmlTree" style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);background:var(--bg-primary);"></div>
     </div>`;
         // Parse XML and render collapsible tree (cap at 10MB to prevent OOM)
         const treeContainer = document.getElementById('projXmlTree');
         if (xml.length > 10_000_000) {
-            treeContainer.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all;">${escapeHtml(xml.slice(0, 500_000))}\n\n<!-- File too large for tree view (${Math.round(xml.length / 1024 / 1024)}MB). Showing first 500KB as text. --></pre>`;
+            const mb = Math.round(xml.length / 1024 / 1024);
+            const tooLarge = catalogFmt('ui.xref.tree_too_large_plain', {mb});
+            treeContainer.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all;">${escapeHtml(xml.slice(0, 500_000))}\n\n<!-- ${escapeHtml(tooLarge)} --></pre>`;
         } else {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xml, 'text/xml');
@@ -513,7 +524,7 @@ async function showXmlProjectViewer(filePath, projectName) {
         });
     } catch (e) {
         const modal = document.getElementById('projectViewerModal');
-        if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">Error: ' + escapeHtml(String(e)) + '</div>';
+        if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">' + escapeHtml(catalogFmt('ui.ae.status_error', {message: String(e)})) + '</div>';
     }
 }
 
@@ -522,8 +533,8 @@ async function showTextProjectViewer(filePath, projectName) {
     if (existing) existing.remove();
     const loadHtml = `<div class="modal-overlay" id="projectViewerModal" data-action-modal="closeProjectViewer">
     <div class="modal-content" style="max-width:90vw;max-height:90vh;width:900px;">
-      <div class="modal-header"><h2>${escapeHtml(projectName)} — REAPER</h2><button class="modal-close" data-action-modal="closeProjectViewer" title="Close">&#10005;</button></div>
-      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>Loading...</div></div>
+      <div class="modal-header"><h2>${escapeHtml(catalogFmt('ui.xref.modal_title_reaper', {project: projectName}))}</h2><button class="modal-close" data-action-modal="closeProjectViewer" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button></div>
+      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>${escapeHtml(catalogFmt('ui.xref.loading'))}</div></div>
     </div></div>`;
     document.body.insertAdjacentHTML('beforeend', loadHtml);
     try {
@@ -532,17 +543,18 @@ async function showTextProjectViewer(filePath, projectName) {
         if (!modal) return;
         const body = modal.querySelector('.modal-body');
         const text = result.content || '';
+        const reaperMeta = catalogFmt('ui.xref.meta_reaper_lines', {lines: text.split('\n').length.toLocaleString()});
         body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
       <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
-        <span style="font-size:11px;color:var(--text-muted);">REAPER Project | ${text.split('\\n').length.toLocaleString()} lines</span>
-        <input type="text" class="np-search-input" id="projSearchInput" placeholder="Search..." style="flex:1;max-width:300px;" autocomplete="off">
+        <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(reaperMeta)}</span>
+        <input type="text" class="np-search-input" id="projSearchInput" placeholder="${escapeHtml(catalogFmt('ui.xref.ph_search'))}" style="flex:1;max-width:300px;" autocomplete="off">
       </div>
       <pre style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);margin:0;white-space:pre-wrap;tab-size:2;background:var(--bg-primary);" id="projTextContent"></pre>
     </div>`;
         document.getElementById('projTextContent').textContent = text;
     } catch (e) {
         const modal = document.getElementById('projectViewerModal');
-        if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">Error: ' + escapeHtml(String(e)) + '</div>';
+        if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">' + escapeHtml(catalogFmt('ui.ae.status_error', {message: String(e)})) + '</div>';
     }
 }
 
@@ -551,8 +563,8 @@ async function showBinaryProjectViewer(filePath, projectName) {
     if (existing) existing.remove();
     const loadHtml = `<div class="modal-overlay" id="bwViewerModal" data-action-modal="closeBwViewer">
     <div class="modal-content" style="max-width:90vw;max-height:90vh;width:900px;">
-      <div class="modal-header"><h2>${escapeHtml(projectName)}</h2><button class="modal-close" data-action-modal="closeBwViewer" title="Close">&#10005;</button></div>
-      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>Parsing binary data...</div></div>
+      <div class="modal-header"><h2>${escapeHtml(catalogFmt('ui.xref.modal_title_pair', {left: projectName, right: catalogFmt('ui.xref.format_binary')}))}</h2><button class="modal-close" data-action-modal="closeBwViewer" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button></div>
+      <div class="modal-body" style="padding:0;"><div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>${escapeHtml(catalogFmt('ui.xref.parsing_binary_data'))}</div></div>
     </div></div>`;
     document.body.insertAdjacentHTML('beforeend', loadHtml);
     try {
@@ -561,22 +573,28 @@ async function showBinaryProjectViewer(filePath, projectName) {
         if (!modal) return;
         // Update title with format
         const h2 = modal.querySelector('h2');
-        if (h2 && data._format) h2.textContent = `${projectName} — ${data._format}`;
+        if (h2 && data._format) h2.textContent = catalogFmt('ui.xref.modal_title_pair', {left: projectName, right: data._format});
         const body = modal.querySelector('.modal-body');
         const treeData = data.type === 'xml' || data.type === 'text' ? data : data;
+        const binMeta = catalogFmt('ui.xref.meta_binary_summary', {
+            format: treeData._format || catalogFmt('ui.xref.format_binary'),
+            plugins: treeData.plugins ? treeData.plugins.length : 0,
+            presetStates: treeData.pluginStateCount || 0,
+            size: treeData._size || '?',
+        });
         body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
       <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
-        <span style="font-size:11px;color:var(--text-muted);">${treeData._format || 'Binary'} | ${treeData.plugins ? treeData.plugins.length : 0} plugins | ${treeData.pluginStateCount || 0} preset states | ${treeData._size || '?'}</span>
-        <input type="text" class="np-search-input" id="bwSearchInput" placeholder="Search..." style="flex:1;max-width:300px;" autocomplete="off">
-        <button class="btn btn-secondary" id="bwCollapseAllBtn" style="padding:4px 10px;font-size:10px;">Collapse All</button>
-        <button class="btn btn-secondary" id="bwExpandAllBtn" style="padding:4px 10px;font-size:10px;">Expand All</button>
+        <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(binMeta)}</span>
+        <input type="text" class="np-search-input" id="bwSearchInput" placeholder="${escapeHtml(catalogFmt('ui.xref.ph_search'))}" style="flex:1;max-width:300px;" autocomplete="off">
+        <button class="btn btn-secondary" id="bwCollapseAllBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.xref.tt_collapse_all_json_nodes'))}">${escapeHtml(catalogFmt('ui.xref.collapse_all'))}</button>
+        <button class="btn btn-secondary" id="bwExpandAllBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.xref.tt_expand_all_json_nodes'))}">${escapeHtml(catalogFmt('ui.xref.expand_all'))}</button>
       </div>
       <div id="bwJsonTree" style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);background:var(--bg-primary);"></div>
     </div>`;
         document.getElementById('bwJsonTree').appendChild(typeof buildJsonTree === 'function' ? buildJsonTree(treeData, 0) : document.createTextNode(JSON.stringify(treeData, null, 2)));
     } catch (e) {
         const modal = document.getElementById('bwViewerModal');
-        if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">Error: ' + escapeHtml(String(e)) + '</div>';
+        if (modal) modal.querySelector('.modal-body').innerHTML = '<div style="padding:20px;color:var(--red);">' + escapeHtml(catalogFmt('ui.ae.status_error', {message: String(e)})) + '</div>';
     }
 }
 
@@ -588,11 +606,11 @@ async function showAlsViewer(filePath, projectName) {
     const loadHtml = `<div class="modal-overlay" id="alsViewerModal" data-action-modal="closeAlsViewer">
     <div class="modal-content" style="max-width:90vw;max-height:90vh;width:900px;">
       <div class="modal-header">
-        <h2>${escapeHtml(projectName)} — XML</h2>
-        <button class="modal-close" data-action-modal="closeAlsViewer" title="Close">&#10005;</button>
+        <h2>${escapeHtml(catalogFmt('ui.xref.modal_title_xml', {project: projectName}))}</h2>
+        <button class="modal-close" data-action-modal="closeAlsViewer" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button>
       </div>
       <div class="modal-body" style="padding:0;">
-        <div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>Decompressing...</div>
+        <div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>${escapeHtml(catalogFmt('ui.xref.decompressing'))}</div>
       </div>
     </div>
   </div>`;
@@ -605,14 +623,16 @@ async function showAlsViewer(filePath, projectName) {
         const body = modal.querySelector('.modal-body');
 
         const lineCount = xml.split('\n').length;
+        const sizeStr = typeof formatAudioSize === 'function' ? formatAudioSize(xml.length) : Math.round(xml.length / 1024) + ' KB';
+        const alsMeta = catalogFmt('ui.xref.meta_xml_uncompressed', {lines: lineCount.toLocaleString(), size: sizeStr});
 
         body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
       <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
-        <span style="font-size:11px;color:var(--text-muted);">${lineCount.toLocaleString()} lines | ${typeof formatAudioSize === 'function' ? formatAudioSize(xml.length) : Math.round(xml.length / 1024) + ' KB'} uncompressed</span>
-        <input type="text" class="np-search-input" id="alsSearchInput" placeholder="Search XML..." style="flex:1;max-width:300px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Search within XML content">
-        <button class="btn btn-secondary" id="alsCollapseAllBtn" style="padding:4px 10px;font-size:10px;" title="Collapse all XML nodes">Collapse All</button>
-        <button class="btn btn-secondary" id="alsExpandAllBtn" style="padding:4px 10px;font-size:10px;" title="Expand all XML nodes">Expand All</button>
-        <button class="btn btn-secondary" id="alsExportBtn" style="padding:4px 10px;font-size:10px;" title="Save decompressed XML to file">&#8615; Export</button>
+        <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(alsMeta)}</span>
+        <input type="text" class="np-search-input" id="alsSearchInput" placeholder="${escapeHtml(catalogFmt('ui.xref.ph_search_xml'))}" style="flex:1;max-width:300px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="${escapeHtml(catalogFmt('ui.xref.tt_search_xml_content'))}">
+        <button class="btn btn-secondary" id="alsCollapseAllBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.xref.tt_collapse_all_xml_nodes'))}">${escapeHtml(catalogFmt('ui.xref.collapse_all'))}</button>
+        <button class="btn btn-secondary" id="alsExpandAllBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.xref.tt_expand_all_xml_nodes'))}">${escapeHtml(catalogFmt('ui.xref.expand_all'))}</button>
+        <button class="btn btn-secondary" id="alsExportBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.dialog.save_decompressed_xml'))}">&#8615; ${escapeHtml(catalogFmt('ui.btn.8615_export'))}</button>
       </div>
       <div id="alsXmlTree" style="flex:1;overflow:auto;margin:0;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);background:var(--bg-primary);"></div>
     </div>`;
@@ -620,7 +640,9 @@ async function showAlsViewer(filePath, projectName) {
         // Parse XML to DOM and render collapsible tree (cap at 10MB)
         const treeContainer = document.getElementById('alsXmlTree');
         if (xml.length > 10_000_000) {
-            treeContainer.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all;">${escapeHtml(xml.slice(0, 500_000))}\n\n<!-- File too large for tree view (${Math.round(xml.length / 1024 / 1024)}MB). Showing first 500KB. Use Export to save full XML. --></pre>`;
+            const mb = Math.round(xml.length / 1024 / 1024);
+            const tooLarge = catalogFmt('ui.xref.tree_too_large_use_export', {mb});
+            treeContainer.innerHTML = `<pre style="white-space:pre-wrap;word-break:break-all;">${escapeHtml(xml.slice(0, 500_000))}\n\n<!-- ${escapeHtml(tooLarge)} --></pre>`;
         } else {
             const parser = new DOMParser();
             const doc = parser.parseFromString(xml, 'text/xml');
@@ -657,7 +679,6 @@ async function showAlsViewer(filePath, projectName) {
             });
 
             // Search — filter tree nodes
-            const rawLines = xml.split('\n');
             let _alsSearchTimer;
             document.getElementById('alsSearchInput')?.addEventListener('input', (e) => {
                 clearTimeout(_alsSearchTimer);
@@ -682,7 +703,7 @@ async function showAlsViewer(filePath, projectName) {
     } catch (err) {
         const modal = document.getElementById('alsViewerModal');
         if (modal) {
-            modal.querySelector('.modal-body').innerHTML = `<div style="padding:24px;color:var(--red);">Failed to read: ${escapeHtml(err.message || String(err))}</div>`;
+            modal.querySelector('.modal-body').innerHTML = `<div style="padding:24px;color:var(--red);">${escapeHtml(catalogFmt('ui.xref.failed_to_read', {message: err.message || String(err)}))}</div>`;
         }
     }
 }
@@ -722,7 +743,7 @@ function buildJsonTree(data, depth) {
     el.style.paddingLeft = (depth * 16) + 'px';
 
     if (data === null || data === undefined) {
-        el.innerHTML = `<span style="display:inline-block;width:14px;"></span><span class="xml-text" style="color:var(--text-dim);">null</span>`;
+        el.innerHTML = `<span style="display:inline-block;width:14px;"></span><span class="xml-text" style="color:var(--text-dim);">${escapeHtml(catalogFmt('ui.xref.json_null_value'))}</span>`;
         return el;
     }
 
@@ -738,8 +759,9 @@ function buildJsonTree(data, depth) {
 
     if (Array.isArray(data)) {
         const count = data.length;
-        const summary = `<span class="xml-collapsed-summary" style="display:none;color:var(--text-dim);font-size:10px;"> ...${count} items</span>`;
-        el.innerHTML = `<span class="xml-toggle" title="Click to collapse/expand" style="cursor:pointer;color:var(--cyan);display:inline-block;width:14px;text-align:center;user-select:none;">▼</span><span style="color:var(--magenta);">[</span> <span style="color:var(--text-dim);font-size:10px;">${count} items</span>${summary}`;
+        const summary = `<span class="xml-collapsed-summary" style="display:none;color:var(--text-dim);font-size:10px;">${escapeHtml(catalogFmt('ui.xref.json_collapsed_n_items', {n: count}))}</span>`;
+        const inlineItems = escapeHtml(catalogFmt('ui.xref.json_inline_n_items', {n: count}));
+        el.innerHTML = `<span class="xml-toggle" title="${escapeHtml(catalogFmt('ui.xref.tt_toggle_node'))}" style="cursor:pointer;color:var(--cyan);display:inline-block;width:14px;text-align:center;user-select:none;">▼</span><span style="color:var(--magenta);">[</span> <span style="color:var(--text-dim);font-size:10px;">${inlineItems}</span>${summary}`;
         const children = document.createElement('div');
         children.className = 'xml-children';
         for (let i = 0; i < data.length; i++) {
@@ -769,8 +791,9 @@ function buildJsonTree(data, depth) {
 
     if (typeof data === 'object') {
         const keys = Object.keys(data);
-        const summary = `<span class="xml-collapsed-summary" style="display:none;color:var(--text-dim);font-size:10px;"> ...${keys.length} keys</span>`;
-        el.innerHTML = `<span class="xml-toggle" title="Click to collapse/expand" style="cursor:pointer;color:var(--cyan);display:inline-block;width:14px;text-align:center;user-select:none;">▼</span><span style="color:var(--cyan);">{</span> <span style="color:var(--text-dim);font-size:10px;">${keys.length} keys</span>${summary}`;
+        const summary = `<span class="xml-collapsed-summary" style="display:none;color:var(--text-dim);font-size:10px;">${escapeHtml(catalogFmt('ui.xref.json_collapsed_n_keys', {n: keys.length}))}</span>`;
+        const inlineKeys = escapeHtml(catalogFmt('ui.xref.json_inline_n_keys', {n: keys.length}));
+        el.innerHTML = `<span class="xml-toggle" title="${escapeHtml(catalogFmt('ui.xref.tt_toggle_node'))}" style="cursor:pointer;color:var(--cyan);display:inline-block;width:14px;text-align:center;user-select:none;">▼</span><span style="color:var(--cyan);">{</span> <span style="color:var(--text-dim);font-size:10px;">${inlineKeys}</span>${summary}`;
         const children = document.createElement('div');
         children.className = 'xml-children';
         for (const key of keys) {
@@ -809,11 +832,11 @@ async function showBwViewer(filePath, projectName) {
     const loadHtml = `<div class="modal-overlay" id="bwViewerModal" data-action-modal="closeBwViewer">
     <div class="modal-content" style="max-width:90vw;max-height:90vh;width:900px;">
       <div class="modal-header">
-        <h2>${escapeHtml(projectName)} — Bitwig Project</h2>
-        <button class="modal-close" data-action-modal="closeBwViewer" title="Close">&#10005;</button>
+        <h2>${escapeHtml(catalogFmt('ui.xref.modal_title_bitwig', {project: projectName}))}</h2>
+        <button class="modal-close" data-action-modal="closeBwViewer" title="${escapeHtml(catalogFmt('menu.close'))}">&#10005;</button>
       </div>
       <div class="modal-body" style="padding:0;">
-        <div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>Parsing binary data...</div>
+        <div style="text-align:center;padding:32px;"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;"></div>${escapeHtml(catalogFmt('ui.xref.parsing_binary_data'))}</div>
       </div>
     </div>
   </div>`;
@@ -827,13 +850,18 @@ async function showBwViewer(filePath, projectName) {
 
         const jsonStr = JSON.stringify(data, null, 2);
 
+        const bwMeta = catalogFmt('ui.xref.meta_plugin_summary', {
+            plugins: data.plugins ? data.plugins.length : 0,
+            presetStates: data.pluginStateCount || 0,
+            size: data._size || '?',
+        });
         body.innerHTML = `<div style="display:flex;flex-direction:column;height:calc(90vh - 80px);">
       <div style="padding:8px 12px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-shrink:0;">
-        <span style="font-size:11px;color:var(--text-muted);">${data.plugins ? data.plugins.length : 0} plugins | ${data.pluginStateCount || 0} preset states | ${data._size || '?'}</span>
-        <input type="text" class="np-search-input" id="bwSearchInput" placeholder="Search..." style="flex:1;max-width:300px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="Search within project data">
-        <button class="btn btn-secondary" id="bwCollapseAllBtn" style="padding:4px 10px;font-size:10px;" title="Collapse all nodes">Collapse All</button>
-        <button class="btn btn-secondary" id="bwExpandAllBtn" style="padding:4px 10px;font-size:10px;" title="Expand all nodes">Expand All</button>
-        <button class="btn btn-secondary" id="bwExportBtn" style="padding:4px 10px;font-size:10px;" title="Export as JSON">&#8615; Export JSON</button>
+        <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(bwMeta)}</span>
+        <input type="text" class="np-search-input" id="bwSearchInput" placeholder="${escapeHtml(catalogFmt('ui.xref.ph_search'))}" style="flex:1;max-width:300px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title="${escapeHtml(catalogFmt('ui.xref.tt_search_project_data'))}">
+        <button class="btn btn-secondary" id="bwCollapseAllBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.xref.tt_collapse_all_json_nodes'))}">${escapeHtml(catalogFmt('ui.xref.collapse_all'))}</button>
+        <button class="btn btn-secondary" id="bwExpandAllBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.xref.tt_expand_all_json_nodes'))}">${escapeHtml(catalogFmt('ui.xref.expand_all'))}</button>
+        <button class="btn btn-secondary" id="bwExportBtn" style="padding:4px 10px;font-size:10px;" title="${escapeHtml(catalogFmt('ui.dialog.export_bitwig_project_data'))}">&#8615; ${escapeHtml(catalogFmt('ui.btn.export_json'))}</button>
       </div>
       <div id="bwJsonTree" style="flex:1;overflow:auto;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.6;color:var(--text);background:var(--bg-primary);"></div>
     </div>`;
@@ -891,7 +919,7 @@ async function showBwViewer(filePath, projectName) {
     } catch (err) {
         const modal = document.getElementById('bwViewerModal');
         if (modal) {
-            modal.querySelector('.modal-body').innerHTML = `<div style="padding:24px;color:var(--red);">Failed to read: ${escapeHtml(err.message || String(err))}</div>`;
+            modal.querySelector('.modal-body').innerHTML = `<div style="padding:24px;color:var(--red);">${escapeHtml(catalogFmt('ui.xref.failed_to_read', {message: err.message || String(err)}))}</div>`;
         }
     }
 }

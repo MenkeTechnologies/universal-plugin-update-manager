@@ -45,8 +45,10 @@ function showContextMenu(e, items) {
         const cls = item.disabled ? ' ctx-disabled' : '';
         const title = ctxMenuItemTitle(item);
         const titleAttr = title ? ` title="${title}"` : '';
+        const rawLabel = item.label != null ? String(item.label) : '';
+        const safeLabel = typeof escapeHtml === 'function' ? escapeHtml(rawLabel) : rawLabel;
         return `<div class="ctx-menu-item${cls}" data-ctx-idx="${i}"${titleAttr}>
-      <span class="ctx-icon">${item.icon || ''}</span>${item.label}
+      <span class="ctx-icon">${item.icon || ''}</span>${safeLabel}
     </div>`;
     }).join('');
 
@@ -161,7 +163,7 @@ function buildFallbackShellContextMenu(e) {
     if (items.length > 0) items.push('---');
     items.push({
         icon: '&#128179;', label: appFmt('menu.cmd_palette'), ...shortcutTip('commandPalette'), action: () => {
-            if (typeof openPalette === 'function') openPalette();
+            if (typeof openPalette === 'function') void openPalette();
         }
     });
     items.push({
@@ -842,42 +844,30 @@ document.addEventListener('contextmenu', (e) => {
                 {
                     icon: '&#9650;', label: appFmt('menu.sort_ascending'), action: () => {
                         if (action === 'sortAudio') {
-                            audioSortAsc = true;
-                            audioSortKey = key;
-                            sortAudio(key);
+                            sortAudio(key, true);
                         } else if (action === 'sortDaw') {
-                            dawSortAsc = true;
-                            dawSortKey = key;
-                            sortDaw(key);
+                            sortDaw(key, true);
                         } else if (action === 'sortPreset') {
-                            presetSortAsc = true;
-                            presetSortKey = key;
-                            sortPreset(key);
+                            sortPreset(key, true);
                         } else if (action === 'sortPdf') {
-                            pdfSortAsc = true;
-                            pdfSortKey = key;
-                            sortPdf(key);
+                            sortPdf(key, true);
+                        } else if (action === 'sortMidi') {
+                            sortMidi(key, true);
                         }
                     }
                 },
                 {
                     icon: '&#9660;', label: appFmt('menu.sort_descending'), action: () => {
                         if (action === 'sortAudio') {
-                            audioSortAsc = false;
-                            audioSortKey = key;
-                            sortAudio(key);
+                            sortAudio(key, false);
                         } else if (action === 'sortDaw') {
-                            dawSortAsc = false;
-                            dawSortKey = key;
-                            sortDaw(key);
+                            sortDaw(key, false);
                         } else if (action === 'sortPreset') {
-                            presetSortAsc = false;
-                            presetSortKey = key;
-                            sortPreset(key);
+                            sortPreset(key, false);
                         } else if (action === 'sortPdf') {
-                            pdfSortAsc = false;
-                            pdfSortKey = key;
-                            sortPdf(key);
+                            sortPdf(key, false);
+                        } else if (action === 'sortMidi') {
+                            sortMidi(key, false);
                         }
                     }
                 },
@@ -926,12 +916,50 @@ document.addEventListener('contextmenu', (e) => {
             }
         }
 
+        // ── Multi-select format filters (replaces `.filter-select` in the DOM) ──
+        const multiFilter = e.target.closest('.multi-filter');
+        if (multiFilter && multiFilter._select) {
+            const selectEl = multiFilter._select;
+            const items = [
+                {
+                    icon: '&#8635;',
+                    label: catalogFmt('menu.reset_to_all'),
+                    action: () => {
+                        multiFilter._selected.clear();
+                        const dropdown = multiFilter.querySelector('.multi-filter-dropdown');
+                        if (dropdown) {
+                            dropdown.querySelectorAll('input[data-value]').forEach((c) => {
+                                c.checked = c.dataset.value === 'all';
+                            });
+                        }
+                        const allLabel = selectEl.options[0]?.text || '';
+                        if (typeof updateMultiFilterLabel === 'function') {
+                            updateMultiFilterLabel(multiFilter, allLabel);
+                        }
+                        if (typeof syncMultiToSelect === 'function') {
+                            syncMultiToSelect(multiFilter);
+                        }
+                        try {
+                            selectEl.dispatchEvent(new Event('change', {bubbles: true}));
+                        } catch (_) {
+                        }
+                        if (typeof triggerFilter === 'function') {
+                            triggerFilter(multiFilter._action);
+                        }
+                        if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
+                    },
+                },
+            ];
+            showContextMenu(e, items);
+            return;
+        }
+
         // ── Filter dropdowns ──
         const filterSelect = e.target.closest('.filter-select');
         if (filterSelect) {
             const items = [
                 {
-                    icon: '&#8635;', label: appFmt('menu.reset_to_all'), action: () => {
+                    icon: '&#8635;', label: catalogFmt('menu.reset_to_all'), action: () => {
                         filterSelect.value = 'all';
                         filterSelect.dispatchEvent(new Event('change', {bubbles: true}));
                     }
@@ -1057,7 +1085,7 @@ document.addEventListener('contextmenu', (e) => {
             const items = [
                 {
                     icon: '&#128203;',
-                    label: appFmt('menu.copy_stats'), ..._noEcho, ...shortcutTip('copyPath'),
+                    label: catalogFmt('menu.copy_stats'), ..._noEcho, ...shortcutTip('copyPath'),
                     action: () => copyToClipboard(statsText)
                 },
                 '---',
@@ -1076,7 +1104,7 @@ document.addEventListener('contextmenu', (e) => {
                 const items = [
                     {
                         icon: '&#128203;',
-                        label: appFmt('menu.copy_process_stats'), ..._noEcho, ...shortcutTip('copyPath'),
+                        label: catalogFmt('menu.copy_process_stats'), ..._noEcho, ...shortcutTip('copyPath'),
                         action: () => copyToClipboard(statsText)
                     },
                 ];
@@ -1596,8 +1624,12 @@ document.addEventListener('contextmenu', (e) => {
                 pdf: 'menu.scan_pdf',
                 midi: 'menu.scan_midi',
             };
+            const tabNameLabel = tabBtn.querySelector('[data-i18n]')?.textContent?.trim() || '';
+            const switchToTabLabel = tabNameLabel
+                ? appFmt('menu.switch_to_tab_named', {name: tabNameLabel})
+                : appFmt('menu.switch_to_tab');
             const items = [
-                {icon: '&#8635;', label: appFmt('menu.switch_to_tab'), action: () => switchTab(tab)},
+                {icon: '&#8635;', label: switchToTabLabel, action: () => switchTab(tab)},
                 '---',
             ];
             const scanFn = scanMap[tab];
@@ -1775,7 +1807,7 @@ document.addEventListener('contextmenu', (e) => {
             const items = [
                 {
                     icon: '&#128203;',
-                    label: appFmt('menu.copy_stats'), ..._noEcho, ...shortcutTip('copyPath'),
+                    label: catalogFmt('menu.copy_stats'), ..._noEcho, ...shortcutTip('copyPath'),
                     action: () => copyToClipboard(statsText)
                 },
             ];

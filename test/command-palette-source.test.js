@@ -75,16 +75,17 @@ describe('frontend/js/command-palette.js filterPaletteItems (vm-loaded)', () => 
     });
   });
 
-  it('empty query keeps only tab and action rows (drops bookmark/tag/etc.)', () => {
+  it('empty query keeps tab, action, and toggle rows (drops bookmark/tag/etc.)', () => {
     const items = [
       { type: 'bookmark', name: 'Dir', fields: ['Dir', '/tmp'] },
       { type: 'tab', name: 'Plugins' },
       { type: 'action', name: 'Scan' },
+      { type: 'toggle', name: 'CRT effect' },
       { type: 'tag', name: 'drums', fields: ['drums'] },
     ];
     const out = P.filterPaletteItems('', items);
-    assert.strictEqual(out.length, 2);
-    assert.strictEqual(out.map((i) => i.type).sort().join(','), 'action,tab');
+    assert.strictEqual(out.length, 3);
+    assert.strictEqual(out.map((i) => i.type).sort().join(','), 'action,tab,toggle');
   });
 
   it('non-empty query scores items by fuzzy name fields', () => {
