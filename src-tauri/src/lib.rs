@@ -2853,41 +2853,37 @@ async fn open_update_url(url: String) -> Result<(), String> {
 async fn open_plugin_folder(plugin_path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        let raw = plugin_path.trim();
-        let p = std::path::Path::new(raw);
-        let target = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
-        /* `-g` keeps Finder in the **background** so Audio Haxor stays frontmost. If Finder were
-         * to activate, the WebView would lose focus → `ui-idle.js` marks the app idle → the Web
-         * Audio `AudioContext` powering `audioPlayer` gets suspended by WebKit → playback cuts
-         * out mid-track. The user still sees the file revealed in Finder's window; they just have
-         * to click Finder's Dock icon to bring it forward. */
-        if target.is_file() {
-            std::process::Command::new("open")
-                .arg("-R")
-                .arg("-g")
-                .arg(&target)
-                .spawn()
-                .map_err(|e| e.to_string())?;
-        } else if target.is_dir() {
-            std::process::Command::new("open")
-                .arg("-g")
-                .arg(&target)
-                .spawn()
-                .map_err(|e| e.to_string())?;
-        } else if let Some(parent) = p.parent() {
-            if !parent.as_os_str().is_empty() {
-                let pp = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf());
-                std::process::Command::new("open")
-                    .arg("-g")
-                    .arg(&pp)
-                    .spawn()
-                    .map_err(|e| e.to_string())?;
-            } else {
-                return Err("Invalid path".into());
+        /* All filesystem + subprocess work runs on a **detached OS thread**, not on the Tauri
+         * async runtime or a `spawn_blocking` worker. The FIRST Reveal in Finder during a session
+         * pays a multi-second cold-start cost (Finder loads its scripting support, icon/preview
+         * caches, Launch Services, etc.) — and when the user's audio library lives on an SMB
+         * share, `canonicalize()` / `is_file()` are network round-trips that can block for
+         * several seconds on first access. Running any of that inline on the tokio worker
+         * holding this async command starves other IPC (including the audio-engine
+         * `playback_status` poll that shares a stdin/stdout mutex with `playback_set_dsp`),
+         * which manifests as an app-wide lockup + audio dropout on the first Reveal click.
+         * Detaching to a fresh OS thread gets the entire cold-start cost off every path the
+         * audio callback / IPC poll cares about. Finder is also pre-warmed at app startup (see
+         * `setup` in `run()`) so scripting + Launch Services are loaded before audio plays. */
+        let plugin_path_owned = plugin_path.clone();
+        std::thread::spawn(move || {
+            let raw = plugin_path_owned.trim();
+            let p = std::path::Path::new(raw);
+            let target = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+            if target.is_file() {
+                let _ = std::process::Command::new("open")
+                    .arg("-R")
+                    .arg(&target)
+                    .spawn();
+            } else if target.is_dir() {
+                let _ = std::process::Command::new("open").arg(&target).spawn();
+            } else if let Some(parent) = p.parent() {
+                if !parent.as_os_str().is_empty() {
+                    let pp = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf());
+                    let _ = std::process::Command::new("open").arg(&pp).spawn();
+                }
             }
-        } else {
-            return Err("Path not found".into());
-        }
+        });
     }
     #[cfg(target_os = "windows")]
     {
@@ -7584,6 +7580,22 @@ pub fn run() {
              * playback even while the main window is unfocused (JS rAF + `setInterval` both stall
              * behind `isUiIdleHeavyCpu`, leaving the tray frozen). JS still pushes the track name. */
             tray_menu::start_tray_host_poll(app.handle().clone());
+
+            /* Finder pre-warm: the first AppleEvent to Finder in a session loads Finder's scripting
+             * support + Launch Services cache. On a cold machine (and ESPECIALLY when the user's
+             * audio library lives on an SMB share), this cost can run multiple seconds on the first
+             * Reveal in Finder click, spiking CPU and starving the audio-engine subprocess. Fire a
+             * no-op `osascript` → Finder round-trip on a detached thread at startup so the cost is
+             * paid before any audio is playing. The target (`name of application process "Finder"`)
+             * is a purely local query — no filesystem access — and completes in a few ms once
+             * Finder's scripting support is warm. */
+            #[cfg(target_os = "macos")]
+            std::thread::spawn(|| {
+                let _ = std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg("tell application \"Finder\" to get name")
+                    .spawn();
+            });
 
             Ok(())
         })

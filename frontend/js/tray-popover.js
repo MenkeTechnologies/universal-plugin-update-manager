@@ -173,7 +173,11 @@
     /** True briefly after local volume `input` — ignore host volume so poll ticks do not overwrite the slider. */
     let _trayVolUserActive = false;
     let _trayVolUserTimer = null;
-    const TRAY_VOL_USER_SETTLE_MS = 400;
+    /* Must outlive one full Rust `start_tray_host_poll` cycle (500 ms) plus the main window's
+     * debounced `syncTrayNowPlayingFromPlayback` (150 ms) plus IPC round-trip. 400 ms was too
+     * tight — a host poll firing mid-drag at t≈450 ms landed with a stale `volume_pct` just
+     * after the guard expired, snapping the slider back. 1200 ms covers two poll cycles. */
+    const TRAY_VOL_USER_SETTLE_MS = 1200;
 
     /** Same values as main `#npSpeed` — tray window does not load the full index bundle. */
     const TRAY_SPEED_OPTIONS = [
@@ -236,26 +240,18 @@
         if (!invoke) return;
         const root = document.getElementById('shell');
         if (!root) return;
+        /* Measure the `#shell` intrinsic size ONLY. The previous implementation took
+         * `Math.max(shellH, bodyH, htmlH)` which looked safe but is a positive feedback loop:
+         * `body` has `min-height: 100%` in CSS (see `tray-popover.html`), so `bodyH` always
+         * equals the current window height — once the window is large for any reason (initial
+         * `TRAY_POPOVER_H = 480`, a prior expanded state), the `max` picks up the window size
+         * instead of the content and the window can only grow, never shrink. The result was a
+         * huge transparent popover window swallowing clicks far beyond the visible frame. */
         const br = root.getBoundingClientRect();
         const shellH = Math.ceil(Math.max(root.scrollHeight, root.offsetHeight, br.height));
         const shellW = Math.ceil(Math.max(root.scrollWidth, root.offsetWidth, br.width));
-        const body = document.body;
-        const docEl = document.documentElement;
-        let bodyH = 0;
-        let bodyW = 0;
-        if (body) {
-            const bbr = body.getBoundingClientRect();
-            bodyH = Math.ceil(Math.max(body.scrollHeight, body.offsetHeight, bbr.height));
-            bodyW = Math.ceil(Math.max(body.scrollWidth, body.offsetWidth, bbr.width));
-        }
-        let htmlH = 0;
-        let htmlW = 0;
-        if (docEl) {
-            htmlH = Math.ceil(Math.max(docEl.scrollHeight, docEl.offsetHeight, docEl.clientHeight));
-            htmlW = Math.ceil(Math.max(docEl.scrollWidth, docEl.offsetWidth, docEl.clientWidth));
-        }
-        const h = Math.max(shellH, bodyH, htmlH) + TRAY_WIN_PAD_H;
-        const w = Math.max(shellW, bodyW, htmlW) + TRAY_WIN_PAD_W;
+        const h = shellH + TRAY_WIN_PAD_H;
+        const w = shellW + TRAY_WIN_PAD_W;
         void invoke('tray_popover_resize', { width: w, height: h }).catch(() => {});
     }
 
@@ -531,7 +527,20 @@
 
     function revealFromTraySubtitle() {
         if (!_trayRevealPath || _currentIdle || !invoke) return;
-        void invoke('open_audio_folder', { filePath: _trayRevealPath }).catch(() => {});
+        /* Hide the popover BEFORE revealing in Finder. The popover window is created with
+         * `alwaysOnTop: true` + `visibleOnAllWorkspaces: true` + `transparent: true`, so if we
+         * leave it visible while Finder activates, the popover stays layered over Finder and
+         * every click the user makes to interact with Finder lands on the popover's transparent
+         * region instead. That traps the user in what looks like a "focus recursion" — clicks
+         * either re-fire the reveal handler (if they hit the path span) or silently sink into
+         * the popover's hit region. Hiding first gets the overlay out of the way so Finder is
+         * actually interactable. User can reopen the popover from the menubar icon. */
+        const tw = getTrayWebviewWindow();
+        const path = _trayRevealPath;
+        if (tw && typeof tw.hide === 'function') {
+            void tw.hide().catch(() => {});
+        }
+        void invoke('open_audio_folder', { filePath: path }).catch(() => {});
     }
 
     /** Meta + toggle label only — avoids pulling hidden path text into context menu / tooltips. */
@@ -793,11 +802,18 @@
                 ? _baseElapsed + (nowMs - _baseTime) / 1000
                 : _baseElapsed;
         const drift = Math.abs(elapsed - interpolated);
+        /* While the user is actively dragging the volume slider, suppress drift-based re-base
+         * entirely. Engine DSP IPC flooding during drag can stall the `start_tray_host_poll`
+         * `playback_status` response (shared audio-engine stdin/stdout mutex with the per-tick
+         * `playback_set_dsp` commands), so the polled `position_sec` comes back stale by several
+         * hundred ms. Without this guard the stale position breaches the 0.75 s drift threshold
+         * and re-base yanks the progress thumb backward — exactly the symptom the user reports.
+         * Track changes (`total` change), play/pause, and idle toggles still bypass the guard. */
         const discontinuity =
             idle !== _currentIdle ||
             playing !== _currentPlaying ||
             total !== _currentTotal ||
-            drift > 0.75;
+            (!_trayVolUserActive && drift > 0.75);
         if (discontinuity) {
             _baseElapsed = elapsed;
             _baseTime = nowMs;
@@ -934,6 +950,29 @@
     if (btnPrev) btnPrev.addEventListener('click', () => send('prev_track'));
     if (btnPlay) btnPlay.addEventListener('click', () => send('play_pause'));
     if (btnNext) btnNext.addEventListener('click', () => send('next_track'));
+
+    /* Dismiss-on-outside-click: the popover window rect is larger than the visible `.shell`
+     * frame (TRAY_WIN_PAD_W/H padding + first-render auto-height lag before `syncWindowSize`
+     * catches up), so clicks on the transparent padding that looks like "outside the popover"
+     * were being swallowed by the window with no handler and felt like frozen-input. Standard
+     * popover behavior is to dismiss on outside clicks — match that by hiding the webview when
+     * a pointerdown lands outside `#shell` and outside the tray context menu (which is a sibling
+     * of `#shell`, not a descendant). Capture phase so it runs before the shell-internal
+     * handlers and can't be stopped by them. */
+    document.addEventListener(
+        'pointerdown',
+        (e) => {
+            const t = e.target;
+            if (!t || typeof t.closest !== 'function') return;
+            if (t.closest('#shell')) return;
+            if (t.closest('#trayCtxMenu')) return;
+            const tw = getTrayWebviewWindow();
+            if (tw && typeof tw.hide === 'function') {
+                void tw.hide().catch(() => {});
+            }
+        },
+        true
+    );
 
     if (elTrayExtras) {
         elTrayExtras.addEventListener(

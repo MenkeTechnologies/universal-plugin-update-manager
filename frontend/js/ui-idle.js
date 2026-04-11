@@ -18,12 +18,16 @@
     let winMinimized = false;
     let winVisible = true;
 
+    /* IDLE only on actual invisibility — hidden tab, minimized window, or `isVisible:false`.
+     * Merely losing keyboard focus (e.g. the tray popover grabbing focus, the user clicking in
+     * another app while the main window is still on screen) must NOT trigger idle, because the
+     * main window's FFT / playhead / spectrum rAF loops and the engine `playback_status` poll
+     * all stop behind this flag. The user reported that dragging the tray volume slider stopped
+     * updating the main window's playhead + FFT until they clicked the main window to refocus
+     * it — classic symptom of an idle-on-blur heuristic. Being visible-but-unfocused is NOT idle.
+     * `winFocused` is still tracked for diagnostics but is not part of the idle condition. */
     function recompute() {
-        const noDocFocus =
-            typeof document !== 'undefined' &&
-            typeof document.hasFocus === 'function' &&
-            !document.hasFocus();
-        return docHidden || !winFocused || winMinimized || !winVisible || noDocFocus;
+        return docHidden || winMinimized || !winVisible;
     }
 
     let idle = recompute();

@@ -3418,6 +3418,18 @@ function seekPlaybackToPercent(pct) {
         typeof window !== 'undefined' &&
         window.vstUpdater &&
         typeof window.vstUpdater.audioEngineInvoke === 'function';
+    /* Engine-playback sessions don't set `audioPlayerPath` — the path lives in
+     * `window._enginePlaybackResumePath`. Any seek path that checks `audioPlayerPath` first
+     * would bail out before reaching the engine seek branch, which is exactly why seeks from
+     * the tray popover (`seek:<frac>` → `seekPlaybackToPercent`) silently did nothing while the
+     * engine was driving transport. Resolve the effective path from both sources up front. */
+    const resumePath =
+        typeof window !== 'undefined' &&
+        typeof window._enginePlaybackResumePath === 'string' &&
+        window._enginePlaybackResumePath.length > 0
+            ? window._enginePlaybackResumePath
+            : '';
+    const effectivePath = audioPlayerPath || (_enginePlaybackActive ? resumePath : '');
     logWaveformSeek('seekPlaybackToPercent', {
         pct: p,
         audioPlayerPath: audioPlayerPath || null,
@@ -3432,11 +3444,11 @@ function seekPlaybackToPercent(pct) {
                 : audioPlayer?.duration,
         html5muted: typeof audioPlayer !== 'undefined' && audioPlayer ? audioPlayer.muted : null,
     });
-    if (!audioPlayerPath) {
+    if (!effectivePath) {
         logWaveformSeek('abort', { reason: 'no_audioPlayerPath' });
         return;
     }
-    if (isEngineUnplayablePath(audioPlayerPath)) {
+    if (isEngineUnplayablePath(effectivePath)) {
         logWaveformSeek('abort', { reason: 'engine_unplayable_format' });
         return;
     }
@@ -3600,7 +3612,34 @@ function setAudioVolume(value) {
         if (_gainNode) {
             _gainNode.gain.value = 0;
         }
-        window.syncEnginePlaybackDspFromPrefs();
+        /* Coalesce engine DSP IPC to one call per animation frame (≤60 Hz) when the main window
+         * is foreground-visible. Tray volume drag fires `input` events at ~120 Hz on macOS
+         * WebKit; without coalescing, every tick sends a full `playback_set_dsp` round-trip over
+         * the audio-engine's shared stdin/stdout mutex, which `start_tray_host_poll`'s
+         * `playback_status` also uses — a saturated DSP queue stalls the host poll and the
+         * progress thumb snaps backward.
+         *
+         * BUT `requestAnimationFrame` is paused by WebKit when the window is minimized /
+         * unfocused / hidden, so rAF coalescing would silently drop every drag IPC when the user
+         * is driving the tray popover with the main window minimized. Fall back to immediate
+         * dispatch in that case — the user can't see the progress bar anyway, and the IPC flood
+         * is bounded by the ~120 Hz drag rate. */
+        const idle =
+            typeof window !== 'undefined' &&
+            typeof window.isUiIdleHeavyCpu === 'function' &&
+            window.isUiIdleHeavyCpu();
+        if (idle || typeof requestAnimationFrame !== 'function') {
+            window.syncEnginePlaybackDspFromPrefs();
+        } else {
+            if (window._engineDspCoalesceRaf == null) {
+                window._engineDspCoalesceRaf = requestAnimationFrame(() => {
+                    window._engineDspCoalesceRaf = null;
+                    if (typeof window.syncEnginePlaybackDspFromPrefs === 'function') {
+                        window.syncEnginePlaybackDspFromPrefs();
+                    }
+                });
+            }
+        }
         return;
     }
     audioPlayer.volume = Math.max(0, Math.min(1, vol));

@@ -428,6 +428,39 @@ pub fn tray_popover_action(app: AppHandle<Wry>, action: String) -> Result<(), St
                 }
             }
         }
+    } else if let Some(rest) = action.strip_prefix("seek:") {
+        /* Seek directly to the audio-engine from Rust rather than round-tripping through the
+         * main window's `listen('menu-action')` → `seekPlaybackToPercent` path. The main webview
+         * can be suspended by WebKit when it's in another Space, minimized, or occluded, which
+         * means the JS listener doesn't run until the user clicks the main app to bring it
+         * forward — the user observed: "moving the playback slider in tray popover doesn't move
+         * the playhead until you click on main app". Firing `playback_seek` here is
+         * webview-state-independent. We still emit `menu-action` below so the main window's
+         * waveform / now-playing UI picks up the new position on the next poll tick OR as soon
+         * as it resumes. */
+        if let Ok(frac) = rest.parse::<f64>() {
+            if frac.is_finite() {
+                let frac = frac.clamp(0.0, 1.0);
+                let total_sec = app
+                    .try_state::<TrayState>()
+                    .and_then(|s| s.inner.lock().ok().and_then(|g| {
+                        g.last_popover_emit.as_ref().and_then(|e| e.total_sec)
+                    }));
+                if let Some(dur) = total_sec {
+                    if dur > 0.0 {
+                        let position_sec = frac * dur;
+                        std::thread::spawn(move || {
+                            let _ = crate::audio_engine::spawn_audio_engine_request(
+                                &serde_json::json!({
+                                    "cmd": "playback_seek",
+                                    "position_sec": position_sec,
+                                }),
+                            );
+                        });
+                    }
+                }
+            }
+        }
     }
     // Same delivery path as `on_menu_event` in lib.rs: only the **main** webview runs `ipc.js`
     // playback handlers — broadcast `emit` does not reliably hit the main window listener.
@@ -444,8 +477,10 @@ pub fn tray_popover_resize(app: AppHandle<Wry>, width: f64, height: f64) -> Resu
         return Ok(());
     };
     let w = width.clamp(240.0, 620.0);
-    /* Tall cap: meta + wrapped directory path; `tray-popover.js` measures `#shell` scroll height. */
-    let h = height.clamp(280.0, 1200.0);
+    /* Tall cap: meta + wrapped directory path; `tray-popover.js` measures `#shell` scroll height.
+     * Low floor (60 px) so a near-empty idle popover can actually shrink — a higher minimum
+     * leaves transparent padding at the bottom that swallows clicks outside the visible shell. */
+    let h = height.clamp(60.0, 1200.0);
     let _ = win.set_size(tauri::Size::Logical(LogicalSize::new(w, h)));
     Ok(())
 }
@@ -487,6 +522,7 @@ pub fn update_tray_now_playing(
     let theme = tray_emit_ui_theme(&payload);
     let appearance = guard.last_tray_appearance.clone();
     let last_emit = guard.last_popover_emit.as_ref();
+    let prev_reveal_path = last_emit.and_then(|e| e.reveal_path.clone());
     let playback_speed = tray_playback_speed_merge(&payload, last_emit);
     let volume_pct = tray_volume_pct_merge(&payload, last_emit);
     let emit = if payload.idle {
@@ -540,6 +576,35 @@ pub fn update_tray_now_playing(
         let _ = tray.set_title(None::<&str>);
     }
     emit_tray_popover_state(&app, &emit);
+
+    /* SMB directory metadata pre-warmer: when the now-playing `reveal_path` changes, walk the
+     * parent directory on a detached thread so Finder's eventual "Reveal in Finder" click lands
+     * on a warm SMB stat cache instead of paying a multi-second network round-trip for the
+     * listing. For local SSD libraries this is microseconds and a no-op.
+     *
+     * We deliberately do NOT pre-read the audio file content here anymore — the audio-engine
+     * now slurps the full file into a `MemoryBlock` at playback start (see
+     * `Engine.cpp::playbackLoad`), so the file is pinned in process-heap RAM for the lifetime
+     * of the track and is immune to `smbfs` UBC eviction under Finder's memory pressure. A Rust
+     * parallel read-through would just double the initial SMB bandwidth used at track change
+     * with zero benefit. */
+    let new_reveal_path = emit.reveal_path.clone();
+    if new_reveal_path != prev_reveal_path {
+        if let Some(rp) = new_reveal_path {
+            std::thread::spawn(move || {
+                let p = std::path::Path::new(&rp);
+                if let Some(parent) = p.parent() {
+                    if !parent.as_os_str().is_empty() {
+                        if let Ok(entries) = std::fs::read_dir(parent) {
+                            for entry in entries.flatten() {
+                                let _ = entry.metadata();
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
     Ok(())
 }
 

@@ -2362,7 +2362,25 @@ struct Engine::Impl
             }
             else
             {
-                std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(juce::File(sessionPath)));
+                /* Slurp the full file into a `MemoryBlock` and wrap it in a `MemoryInputStream`
+                 * so JUCE's `AudioFormatReader` streams decoded samples from RAM instead of
+                 * demand-reading the original file during playback. Rationale: when the audio
+                 * library lives on an SMB share, the user reports audio dropouts the moment they
+                 * click "Reveal in Finder". Root cause is SMB contention — Finder's thumbnail /
+                 * metadata burst competes with the audio-engine's streaming reads on the same
+                 * SMB connection, AND macOS evicts our file from the unified buffer cache under
+                 * the memory pressure Finder creates (Rust-side page-cache warmers don't help
+                 * for exactly that reason). Process-heap memory is pinned and can't be evicted,
+                 * so once the file is loaded, playback is SMB-free regardless of what Finder
+                 * does on the share. One-time upfront load cost per track; any file
+                 * `juce::AudioFormatManager` can decode (wav/mp3/flac/m4a/…) works unchanged. */
+                juce::File f(sessionPath);
+                juce::MemoryBlock mb;
+                if (!f.loadFileAsData(mb))
+                    return errObj("open file failed");
+                auto memStream = std::make_unique<juce::MemoryInputStream>(mb, true);
+                std::unique_ptr<juce::AudioFormatReader> reader(
+                    formatManager.createReaderFor(std::move(memStream)));
                 if (reader == nullptr)
                     return errObj("open file failed");
                 auto* raw = reader.release();

@@ -59,10 +59,14 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 100%;
-      min-height: 100%;
+      /* DO NOT use `width: 100%` or `min-height: 100%` here. `body`/`html` filling the window
+       * creates a positive feedback loop with `syncWindowSize()` in `tray-popover.js`:
+       * `body.scrollHeight` would equal the current window height, `Math.max(shellH, bodyH)`
+       * would perpetually return the window size, and the window could only grow. `width: auto`
+       * + `display: inline-block` on `body` makes it shrink-wrap to the `#shell` child, so the
+       * window resize IPC is driven by the shell's intrinsic size instead of its own past size. */
+      width: auto;
       height: auto;
-      overflow: visible;
       margin: 0;
       outline: none;
       font-family: 'Share Tech Mono', 'SF Mono', 'Fira Code', monospace;
@@ -70,6 +74,9 @@
       -webkit-font-smoothing: antialiased;
       background: transparent;
       color: var(--cp-text);
+    }
+    body {
+      display: inline-block;
     }
     /* Match `.audio-now-playing` floating player panel */
     .shell {
