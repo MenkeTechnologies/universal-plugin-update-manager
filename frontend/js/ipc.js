@@ -297,11 +297,23 @@ listen('menu-action', (event) => {
             break;
         case 'next_track':
         case 'tray_next':
-            if (typeof nextTrack === 'function') nextTrack({ respectAutoplaySource: true });
+            /* Tray popover has its OWN dedicated `trayTransportSource` pref, independent of
+             * the shared `autoplayNextSource` pref (which governs EOF autoplay). Passed as
+             * `sourceList` explicit override so `nextTrack` / `prevTrack` bypass the shared
+             * lookup entirely. Default is `samples` so tray prev/next walks the visible
+             * Samples table rows. BPM / Key / LUFS analysis is triggered inside `previewAudio`
+             * itself (`ensureAudioAnalysisForPath`), so it runs regardless of which path fired. */
+            if (typeof nextTrack === 'function') {
+                const src = (typeof prefs !== 'undefined' && prefs.getItem && prefs.getItem('trayTransportSource')) === 'player' ? 'player' : 'samples';
+                nextTrack({ sourceList: src });
+            }
             break;
         case 'prev_track':
         case 'tray_prev':
-            if (typeof prevTrack === 'function') prevTrack({ respectAutoplaySource: true });
+            if (typeof prevTrack === 'function') {
+                const src = (typeof prefs !== 'undefined' && prefs.getItem && prefs.getItem('trayTransportSource')) === 'player' ? 'player' : 'samples';
+                prevTrack({ sourceList: src });
+            }
             break;
         case 'toggle_shuffle':
             if (typeof toggleShuffle === 'function') toggleShuffle();
@@ -1149,6 +1161,8 @@ document.addEventListener('change', (e) => {
         if (typeof showToast === 'function') showToast(toastFmt('toast.log_verbosity_saved'));
     } else if (action === 'settingAutoplayNextSource') {
         if (typeof settingSetAutoplayNextSource === 'function') settingSetAutoplayNextSource(e.target.value);
+    } else if (action === 'settingTrayTransportSource') {
+        if (typeof settingSetTrayTransportSource === 'function') settingSetTrayTransportSource(e.target.value);
     }
 });
 
@@ -1157,8 +1171,26 @@ document.addEventListener('keydown', (e) => {
     const isMac = navigator.platform.includes('Mac');
     const mod = isMac ? e.metaKey : e.ctrlKey;
 
-    // Escape — clear search or stop operation
+    // Escape — dismiss tray popover (unconditional), clear search, or stop operation
     if (e.key === 'Escape') {
+        /* Dismiss the tray popover from the main window. Reach the popover webview directly
+         * via Tauri v2's `WebviewWindow.getByLabel` — no new Rust command required, works
+         * immediately without waiting for `pnpm tauri dev` to rebuild src-tauri. The popover's
+         * own keydown listener in `tray-popover.js` only fires when the popover webview has
+         * keyboard focus, which is rare (shown with `focus: false`). Unconditional call so
+         * Escape dismisses whether or not a search input is focused or an operation is active. */
+        try {
+            const TW = window.__TAURI__ && window.__TAURI__.webviewWindow;
+            const getByLabel = TW && (TW.WebviewWindow?.getByLabel || TW.getByLabel);
+            const popover = typeof getByLabel === 'function' ? getByLabel('tray-popover') : null;
+            if (popover && typeof popover.hide === 'function') {
+                void popover.hide().catch(() => {});
+            } else {
+                void invoke('tray_popover_hide').catch(() => {});
+            }
+        } catch (_) {
+            void invoke('tray_popover_hide').catch(() => {});
+        }
         const focused = document.activeElement;
         if (focused?.tagName === 'INPUT' && focused.value) {
             focused.value = '';

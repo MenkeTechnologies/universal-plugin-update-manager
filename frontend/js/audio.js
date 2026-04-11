@@ -2831,6 +2831,13 @@ async function previewAudio(filePath, opts) {
         // Deferred one task — layout for the waveform flex child is often 0×0 until after paint (WKWebView).
         scheduleNowPlayingWaveform(filePath);
         if (typeof window.syncAeTransportFromPlayback === 'function') window.syncAeTransportFromPlayback();
+        /* Fire-and-forget BPM / Key / LUFS analysis for the newly-loaded track. Runs on every
+         * play path (row click, tray prev/next, menu bar, keyboard shortcut, autoplay-next EOF,
+         * history resume) so the analysis pipeline isn't gated behind expanding the row. Results
+         * are cached in memory + persisted to SQLite via `persistAnalysisRowToDb`, so subsequent
+         * expansion / display is an instant read. The `*ForMeta` helpers no-op their DOM updates
+         * when the metadata row isn't open (all DOM gets are null-guarded as of this pass). */
+        void ensureAudioAnalysisForPath(filePath);
     } catch (err) {
         setEnginePlaybackActive(false);
         if (typeof window.stopEnginePlaybackPoll === 'function') window.stopEnginePlaybackPoll();
@@ -3351,8 +3358,27 @@ function updatePlaybackTime() {
     let cur;
     let dur;
     if (_enginePlaybackActive && typeof window !== 'undefined' && typeof window._enginePlaybackPosSec === 'number') {
-        cur = window._enginePlaybackPosSec;
+        /* Interpolate between the 30 Hz engine `playback_status` polls so the playhead /
+         * waveform cursor animates at the full rAF rate (~60 Hz). Without interpolation the
+         * cursor visibly steps in poll-interval chunks because every rAF tick reads the same
+         * stale `_enginePlaybackPosSec` until the next poll writes a new one. `_enginePlaybackPosAnchorMs`
+         * is set in `runEnginePlaybackStatusTick` whenever the position is refreshed.
+         * Stop advancing on pause; honor current `audioSpeed` pref for non-1x playback. */
+        const basePos = window._enginePlaybackPosSec;
+        const anchor = typeof window._enginePlaybackPosAnchorMs === 'number'
+            ? window._enginePlaybackPosAnchorMs
+            : performance.now();
+        const paused = window._enginePlaybackPaused === true;
+        let speed = 1;
+        if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+            const raw = parseFloat(prefs.getItem('audioSpeed') || '1');
+            if (Number.isFinite(raw)) speed = Math.max(0.25, Math.min(2, raw));
+        }
+        const elapsedSinceAnchor = paused ? 0 : (performance.now() - anchor) / 1000;
+        cur = basePos + elapsedSinceAnchor * speed;
         dur = enginePlaybackDurationSec();
+        if (Number.isFinite(dur) && dur > 0 && cur > dur) cur = dur;
+        if (cur < 0) cur = 0;
     } else if (audioReverseMode && _reversedBuf && _bufPlaying) {
         dur = _reversedBuf.duration;
         const elapsed = _playbackCtx.currentTime - _bufSegStartCtx;
@@ -3954,14 +3980,18 @@ function _debounceKeySave() {
 }
 
 async function estimateBpmForMeta(filePath) {
+    /* `bpmEl` may be null when this is called from `previewAudio` rather than
+     * `expandMetaForPath` — the function still needs to compute and cache the result for the
+     * main table row + DB, so the no-DOM case is valid. DOM updates below are all null-guarded. */
     const bpmEl = document.getElementById('metaBpmValue');
-    if (!bpmEl) return;
 
     // Check in-memory cache
     if (_bpmCache[filePath] !== undefined) {
-        bpmEl.textContent = _bpmCache[filePath]
-            ? _audioFmt('ui.audio.meta_bpm_value', {n: _bpmCache[filePath]})
-            : _audioFmt('ui.audio.meta_na');
+        if (bpmEl) {
+            bpmEl.textContent = _bpmCache[filePath]
+                ? _audioFmt('ui.audio.meta_bpm_value', {n: _bpmCache[filePath]})
+                : _audioFmt('ui.audio.meta_na');
+        }
         return;
     }
 
@@ -3970,7 +4000,7 @@ async function estimateBpmForMeta(filePath) {
         const analysis = await window.vstUpdater.dbGetAnalysis(filePath);
         if (analysis && analysis.bpm) {
             _bpmCache[filePath] = analysis.bpm;
-            bpmEl.textContent = _audioFmt('ui.audio.meta_bpm_value', {n: analysis.bpm});
+            if (bpmEl) bpmEl.textContent = _audioFmt('ui.audio.meta_bpm_value', {n: analysis.bpm});
             // Also fill key and LUFS from same query
             if (analysis.key) {
                 _keyCache[filePath] = analysis.key;
@@ -4026,10 +4056,9 @@ let _lufsSaveTimer = null;
 
 async function detectKeyForMeta(filePath) {
     const keyEl = document.getElementById('metaKeyValue');
-    if (!keyEl) return;
 
     if (_keyCache[filePath] !== undefined) {
-        keyEl.textContent = _keyCache[filePath] || _audioFmt('ui.audio.meta_na');
+        if (keyEl) keyEl.textContent = _keyCache[filePath] || _audioFmt('ui.audio.meta_na');
         return;
     }
 
@@ -4056,12 +4085,13 @@ async function detectKeyForMeta(filePath) {
 
 async function measureLufsForMeta(filePath) {
     const lufsEl = document.getElementById('metaLufsValue');
-    if (!lufsEl) return;
 
     if (_lufsCache[filePath] !== undefined) {
-        lufsEl.textContent = _lufsCache[filePath] != null
-            ? _audioFmt('ui.audio.meta_lufs_value', {n: _lufsCache[filePath]})
-            : _audioFmt('ui.audio.meta_na');
+        if (lufsEl) {
+            lufsEl.textContent = _lufsCache[filePath] != null
+                ? _audioFmt('ui.audio.meta_lufs_value', {n: _lufsCache[filePath]})
+                : _audioFmt('ui.audio.meta_na');
+        }
         return;
     }
 
@@ -4085,9 +4115,37 @@ async function measureLufsForMeta(filePath) {
     }
 }
 
+/**
+ * Run BPM / Key / LUFS analysis for a file without requiring the metadata row to be expanded.
+ * Called from `previewAudio` so every play path (row click, tray prev/next, menu bar, keyboard
+ * shortcut, autoplay EOF, history resume) populates the analysis caches + SQLite row.
+ * - Checks the file extension against the supported list (same as `expandMetaForPath`).
+ * - Delegates to the existing `*ForMeta` helpers, which are now no-DOM-safe (guarded gets).
+ * - Fire-and-forget; caller does `void ensureAudioAnalysisForPath(path)`.
+ */
+async function ensureAudioAnalysisForPath(filePath) {
+    if (!filePath || typeof filePath !== 'string') return;
+    const ext = (filePath.split('.').pop() || '').toLowerCase();
+    const supported = ['wav', 'aiff', 'aif', 'mp3', 'flac', 'ogg', 'm4a', 'aac', 'opus'];
+    if (!supported.includes(ext)) return;
+    try {
+        await Promise.all([
+            estimateBpmForMeta(filePath),
+            detectKeyForMeta(filePath),
+            measureLufsForMeta(filePath),
+        ]);
+        await persistAnalysisRowToDb(filePath);
+    } catch (_) {
+        /* ignore — individual helpers handle their own errors and write null to the caches */
+    }
+}
+
 /** Merge in-memory analysis caches with existing DB row and persist (same rules as `batch_analyze`). */
 async function persistAnalysisRowToDb(filePath) {
-    if (expandedMetaPath !== filePath) return;
+    /* Previously gated on `expandedMetaPath === filePath` to avoid racing against a user
+     * expanding a different row. The race doesn't actually corrupt anything (we read + merge
+     * the existing DB row before writing), and removing the gate lets `previewAudio` trigger
+     * analysis persistence on any play regardless of whether a row is expanded. */
     if (!window.vstUpdater || typeof window.vstUpdater.dbUpdateAnalysis !== 'function') return;
     let base = {};
     try {
@@ -4415,10 +4473,16 @@ function canAutoplayAdvanceTrack() {
  */
 function getAutoplayNextPathAfter(currentPath, opts) {
     const o = opts || {};
-    /** EOF autoplay (`autoplay`) or tray / menu-bar transport (`respectAutoplaySource`) use `autoplayNextSource`; floating-player buttons omit both. */
+    /** EOF autoplay (`autoplay`) or tray / menu-bar transport (`respectAutoplaySource`) use `autoplayNextSource`; floating-player buttons omit both.
+     *  `sourceList` explicit override ('player' | 'samples') takes precedence — used by the tray popover's own
+     *  independent `trayTransportSource` pref. */
     const useSourceList = o.autoplay === true || o.respectAutoplaySource === true;
     let items;
-    if (useSourceList) {
+    if (o.sourceList === 'player') {
+        items = getPlayerHistoryListItems();
+    } else if (o.sourceList === 'samples') {
+        items = getTablePlaybackListItems();
+    } else if (useSourceList) {
         items = getAutoplayNextSource() === 'player' ? getPlayerHistoryListItems() : getTablePlaybackListItems();
     } else {
         items = getPlayerHistoryListItems();
@@ -4427,7 +4491,16 @@ function getAutoplayNextPathAfter(currentPath, opts) {
     if (audioShuffling) {
         return items[Math.floor(Math.random() * items.length)].path;
     }
-    const idx = items.findIndex(s => s.path === currentPath);
+    /* Resolve engine-playback resume path if the caller passed a null/empty `currentPath`.
+     * `audioPlayerPath` is null during AudioEngine sessions and callers sometimes pass it
+     * directly — fall back to `window._enginePlaybackResumePath` so `findIndex` can locate
+     * the actual current track instead of returning -1 and wrapping to `items[0]`. */
+    let effectiveCurrent = currentPath;
+    if (!effectiveCurrent && _enginePlaybackActive && typeof window !== 'undefined') {
+        const rp = window._enginePlaybackResumePath;
+        if (typeof rp === 'string' && rp.length > 0) effectiveCurrent = rp;
+    }
+    const idx = items.findIndex(s => s.path === effectiveCurrent);
     if (idx < 0) {
         return items[0].path;
     }
@@ -4743,19 +4816,37 @@ document.getElementById('npHistoryList')?.addEventListener('click', (e) => {
 function prevTrack(opts) {
     const hadExpanded = expandedMetaPath !== null;
     const o = opts || {};
+    /* `sourceList` explicit override ('player' | 'samples') takes precedence over
+     * `respectAutoplaySource` + the shared `autoplayNextSource` pref. Used by the tray popover
+     * so it has its own independent source setting (`trayTransportSource` pref) without
+     * affecting EOF autoplay. */
     const useSourceList = o.respectAutoplaySource === true;
-    const items = useSourceList
-        ? getAutoplayNextSource() === 'player'
-            ? getPlayerHistoryListItems()
-            : getTablePlaybackListItems()
-        : getPlayerHistoryListItems();
+    const resolvedSource =
+        o.sourceList === 'player' || o.sourceList === 'samples'
+            ? o.sourceList
+            : (useSourceList ? getAutoplayNextSource() : 'player');
+    const items = resolvedSource === 'player'
+        ? getPlayerHistoryListItems()
+        : getTablePlaybackListItems();
+    /* Resolve the effective current path — during AudioEngine playback, `audioPlayerPath` is
+     * null and the real path lives in `window._enginePlaybackResumePath`. Using the null
+     * value below made `items.findIndex(...)` return -1, which fell through to "wrap to last
+     * item", so prev/next from the tray popover jumped to arbitrary tracks instead of stepping
+     * relative to what's actually playing. Mirrors the same fix in `seekPlaybackToPercent`. */
+    const resumePath =
+        typeof window !== 'undefined' &&
+        typeof window._enginePlaybackResumePath === 'string' &&
+        window._enginePlaybackResumePath.length > 0
+            ? window._enginePlaybackResumePath
+            : '';
+    const currentPath = audioPlayerPath || (_enginePlaybackActive ? resumePath : '');
     let prevPath = null;
     if (audioShuffling) {
         if (items.length === 0) return;
         prevPath = items[Math.floor(Math.random() * items.length)].path;
     } else {
         if (items.length === 0) return;
-        const idx = items.findIndex(s => s.path === audioPlayerPath);
+        const idx = items.findIndex(s => s.path === currentPath);
         if (idx < 0) {
             prevPath = items[items.length - 1].path;
         } else {
@@ -4769,8 +4860,13 @@ function prevTrack(opts) {
          * is unplayable — in that case the chain has already set `audioPlayerPath` (and
          * `expandedMetaPath`) to whatever it skipped to, so expanding the intended hop would
          * overwrite the correct expansion with the failed row. Only expand when the chain
-         * actually landed on `prevPath`. */
-        if (hadExpanded && audioPlayerPath === prevPath) await expandMetaForPath(prevPath);
+         * actually landed on `prevPath`.
+         * `opts.expand === true` forces expansion even when no row was previously expanded —
+         * used by the tray popover so prev/next there runs the BPM/Key/LUFS analysis pipeline
+         * (via `expandMetaForPath`) the same way a row click does in the main window. */
+        if ((hadExpanded || o.expand === true) && audioPlayerPath === prevPath) {
+            await expandMetaForPath(prevPath);
+        }
     })();
 }
 
@@ -4784,6 +4880,7 @@ function nextTrack(opts) {
     const nextPath = getAutoplayNextPathAfter(audioPlayerPath, {
         autoplay: o.autoplay === true,
         respectAutoplaySource: o.respectAutoplaySource === true,
+        sourceList: o.sourceList,
     });
     if (!nextPath) return;
     void (async () => {
@@ -4792,8 +4889,13 @@ function nextTrack(opts) {
          * is unplayable — in that case the chain has already set `audioPlayerPath` (and
          * `expandedMetaPath`) to whatever it skipped to, so expanding the intended hop would
          * overwrite the correct expansion with the failed row. Only expand when the chain
-         * actually landed on `nextPath`. */
-        if (hadExpanded && audioPlayerPath === nextPath) await expandMetaForPath(nextPath);
+         * actually landed on `nextPath`.
+         * `opts.expand === true` forces expansion even when no row was previously expanded —
+         * tray popover passes it so BPM/Key/LUFS analysis runs via `expandMetaForPath` the
+         * same way a row click in the main window does. */
+        if ((hadExpanded || o.expand === true) && audioPlayerPath === nextPath) {
+            await expandMetaForPath(nextPath);
+        }
     })();
 }
 

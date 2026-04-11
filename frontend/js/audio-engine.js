@@ -2332,8 +2332,13 @@ async function stopAeOutputStream(opts) {
 
 // ── Library playback via AudioEngine (PCM + EQ in engine; WebView stays silent) ──
 
-/** WebView `playback_status` interval — was 100 ms (high CPU with host EOF duplicate); 250 ms is enough for seek bar / levels. */
-const ENGINE_PLAYBACK_POLL_MS = 250;
+/** WebView `playback_status` interval — the poll also carries the spectrum frame data for
+ * the main window's FFT render, so the effective FFT refresh rate is capped at `1000 / this`
+ * (the rAF render loop re-reads the same `_engineSpectrumU8` buffer between polls). 250 ms
+ * (4 Hz) looked visibly choppy for spectrum analysis; 33 ms gives ~30 Hz which is smooth.
+ * The previous CPU concern that drove it up to 250 was actually traced to PDF metadata
+ * generation, not this poll. */
+const ENGINE_PLAYBACK_POLL_MS = 33;
 
 /** @type {ReturnType<typeof setInterval> | null} */
 let _enginePlaybackPollTimer = null;
@@ -2452,6 +2457,11 @@ async function runEnginePlaybackStatusTick() {
                 window._enginePlaybackDurSec = typeof st.duration_sec === 'number' ? st.duration_sec : 0;
                 window._enginePlaybackPaused = st.paused === true;
                 window._enginePlaybackPeak = typeof st.peak === 'number' ? st.peak : 0;
+                /* Anchor the local interpolation model so `updatePlaybackTime()` can compute
+                 * `posSec + (now - anchor) * speed` between polls at rAF rate. Without this the
+                 * playhead visibly steps in 30 ms chunks (poll interval) even though the rAF
+                 * loop runs at 60 Hz — each frame reads the same stale `_enginePlaybackPosSec`. */
+                window._enginePlaybackPosAnchorMs = performance.now();
                 if (typeof updatePlaybackTime === 'function') updatePlaybackTime();
                 if (st.eof !== true && typeof window.resetEnginePlaybackEofFlag === 'function') {
                     window.resetEnginePlaybackEofFlag();

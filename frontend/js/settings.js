@@ -1058,6 +1058,23 @@ function settingSetAutoplayNextSource(val) {
     refreshSettingsUI();
 }
 
+/** `trayTransportSource`: `player` or `samples` — which list the tray popover's prev/next buttons walk.
+ *  Independent of `autoplayNextSource` (which controls EOF autoplay), so the user can have the main
+ *  window auto-advance through the Samples table while using the tray popover to step through the
+ *  recently-played player history, or vice versa. Default `samples`. */
+function settingSetTrayTransportSource(val) {
+    const v = val === 'player' ? 'player' : 'samples';
+    prefs.setItem('trayTransportSource', v);
+    const srcLabel =
+        typeof appFmt === 'function'
+            ? appFmt(v === 'player' ? 'ui.autoplay_next_source.player' : 'ui.autoplay_next_source.samples')
+            : v;
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.tray_transport_source', {source: srcLabel}));
+    }
+    if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
+}
+
 function settingToggleShowPlayerOnStartup() {
     const current = prefs.getItem('showPlayerOnStartup') === 'on';
     const next = !current;
@@ -1520,6 +1537,11 @@ function refreshSettingsUI() {
                 : 'samples';
     const settingApSrc = document.getElementById('settingAutoplayNextSource');
     if (settingApSrc) settingApSrc.value = apSrc;
+
+    /* Tray popover prev/next source — independent of EOF autoplay source above. */
+    const trayTransportSrc = prefs.getItem('trayTransportSource') === 'player' ? 'player' : 'samples';
+    const settingTrayTransportSrc = document.getElementById('settingTrayTransportSource');
+    if (settingTrayTransportSrc) settingTrayTransportSrc.value = trayTransportSrc;
 
     // Include Ableton backups
     const includeBackups = prefs.getItem('includeAbletonBackups') === 'on';

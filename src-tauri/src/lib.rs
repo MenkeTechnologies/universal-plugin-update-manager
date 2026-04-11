@@ -7520,6 +7520,7 @@ pub fn run() {
             tray_menu::tray_popover_get_state,
             tray_menu::tray_popover_get_ui_theme,
             tray_menu::show_main_window,
+            tray_menu::tray_popover_hide,
             start_file_watcher,
             stop_file_watcher,
             get_file_watcher_status,
@@ -7591,9 +7592,16 @@ pub fn run() {
              * Finder's scripting support is warm. */
             #[cfg(target_os = "macos")]
             std::thread::spawn(|| {
+                /* `.stdout(Stdio::null()).stderr(Stdio::null())` suppresses osascript's reply
+                 * (`tell Finder to get name` prints "Finder" to stdout, which otherwise leaks
+                 * to the `pnpm tauri dev` terminal). We don't care about the return value —
+                 * the whole point is to force Finder's AppleEvent scripting support + Launch
+                 * Services to warm up before the user clicks Reveal in Finder. */
                 let _ = std::process::Command::new("osascript")
                     .arg("-e")
                     .arg("tell application \"Finder\" to get name")
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
                     .spawn();
             });
 
@@ -7601,10 +7609,62 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app, event| match event {
+        .run(|app, event| match event {
             tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
                 let _ = audio_engine::shutdown_audio_engine_child();
                 log_shutdown();
+            }
+            /* Click-outside-dismiss for the tray popover, Rust side. Two complementary handlers:
+             *
+             * 1. Popover loses key focus → DEFERRED hide (200 ms). Fires when the user clicks
+             *    into another app or onto a different Space — the main window isn't gaining
+             *    focus in that case (it may be on a different Space entirely), so handler #2
+             *    below can't catch it. Requires `set_focus` on the popover at show time (see
+             *    `toggle_tray_popover`) so the popover is actually key in the first place.
+             *
+             *    The 200 ms defer defuses a tray-icon-toggle race: clicking the tray icon
+             *    while the popover is key makes the popover lose key status (menubar becomes
+             *    the click target) → this blur handler fires → if we hid immediately, the
+             *    subsequent tray-icon toggle would see `is_visible=false` and REOPEN the
+             *    popover instead of leaving it closed. By deferring and re-checking
+             *    `is_focused()` on a background thread, we skip the hide when the tray toggle
+             *    has already handled the close path itself.
+             *
+             * 2. Any OTHER window gains focus → hide. Handles clicking into the main window
+             *    (same Space) where the popover blur may not fire reliably. Non-deferred
+             *    because there's no race with the tray icon toggle here. */
+            tauri::RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::Focused(false),
+                ..
+            } if label == "tray-popover" => {
+                let app_handle = app.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    let Some(popover) = app_handle.get_webview_window("tray-popover") else {
+                        return;
+                    };
+                    /* Skip if the popover regained focus (user clicked back in) OR was already
+                     * hidden by the tray-icon toggle path. */
+                    if !popover.is_visible().unwrap_or(false) {
+                        return;
+                    }
+                    if popover.is_focused().unwrap_or(false) {
+                        return;
+                    }
+                    let _ = popover.hide();
+                });
+            }
+            tauri::RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::Focused(true),
+                ..
+            } if label != "tray-popover" => {
+                if let Some(popover) = app.get_webview_window("tray-popover") {
+                    if popover.is_visible().unwrap_or(false) {
+                        let _ = popover.hide();
+                    }
+                }
             }
             _ => {}
         });

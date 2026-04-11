@@ -287,11 +287,19 @@ fn toggle_tray_popover(app: &AppHandle<Wry>, rect: &Rect) -> Result<(), String> 
         f64::from(TRAY_POPOVER_H),
     )));
     let _ = win.set_position(tauri::Position::Physical(PhysicalPosition::new(x, y)));
-    // Do not `set_focus`: on macOS that activates the app and often jumps Mission Control to the
-    // Space where the main window lives. Clicks on the HUD still work; keyboard focus stays elsewhere.
     let _ = win.show();
     /* Re-apply after `show`: some platforms drop window level across `hide`/`show` cycles. */
     let _ = win.set_always_on_top(true);
+    /* Force the popover to become the key window so keyboard events (Escape) reach its JS
+     * `keydown` listener AND so `WindowEvent::Focused(false)` fires when the user clicks
+     * outside. NSPanel with `visibleOnAllWorkspaces` defaults to non-activating — clicks only
+     * transfer "active" status, not key status — so without this call the popover never gets
+     * keyboard focus and never fires a blur event either. The historical comment said
+     * `set_focus` causes Mission Control to jump Spaces, but that was about focusing the
+     * main window; the popover itself is `visibleOnAllWorkspaces: true` so focusing it stays
+     * on the current Space. If this turns out to Space-jump in practice we can hop to an
+     * Objective-C `makeKeyWindow` via FFI that skips the `NSApp.activate` step. */
+    let _ = win.set_focus();
     Ok(())
 }
 
@@ -631,6 +639,18 @@ pub fn show_main_window(app: AppHandle<Wry>) -> Result<(), String> {
     w.show().map_err(|e| e.to_string())?;
     w.unminimize().map_err(|e| e.to_string())?;
     w.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Hide the tray popover. Invoked from the main window (Escape keybind in `ipc.js`) so the user
+/// can dismiss the popover from any focused window — `tray-popover.js`'s own `document.keydown`
+/// Escape listener only fires when the popover webview itself has keyboard focus, which doesn't
+/// happen if the popover was shown with `focus: false` and the user never clicked into it.
+#[tauri::command]
+pub fn tray_popover_hide(app: AppHandle<Wry>) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("tray-popover") {
+        let _ = win.hide();
+    }
     Ok(())
 }
 

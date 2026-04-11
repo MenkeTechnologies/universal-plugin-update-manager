@@ -10493,6 +10493,21 @@
                 </div>
                 <div class="settings-row">
                     <div class="settings-label">
+                        <span class="settings-title" data-i18n="ui.st.tray_transport_source">Tray popover prev/next queue</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.tray_transport_source">Which list the menubar tray popover's prev/next buttons walk through — independent of the EOF autoplay queue above</span>
+                    </div>
+                    <div class="settings-control">
+                        <select class="settings-select" data-action="settingTrayTransportSource" data-i18n-title="ui.tt.tray_transport_source"
+                                id="settingTrayTransportSource"
+                                title="Which list tray popover prev/next cycles through">
+                            <option value="samples" data-i18n="ui.opt.autoplay_next_source_samples">Samples table (visible rows)</option>
+                            <option value="player" data-i18n="ui.opt.autoplay_next_source_player">Player list (recently played)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
                         <span class="settings-title" data-i18n="ui.st.include_ableton_backup_amp_crash_sets">Include Ableton Backup &amp; Crash Sets</span>
                         <span class="settings-desc"
                               data-i18n="ui.sd.include_als_files_from_ableton_s_backup_and_crash_">Include .als files from Ableton's Backup and Crash directories in DAW scan results</span>
