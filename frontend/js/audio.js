@@ -3128,6 +3128,31 @@ function npMetaLineTextForPath(path) {
     return parts.join(' \u2022 ');
 }
 
+/**
+ * Tray popover subtitle: format / BPM / key / LUFS only — the file path is a separate clickable span in `tray-popover.js`.
+ */
+function npTrayPopoverSubtitleMetaOnly(path) {
+    if (!path) return '';
+    if (isEngineUnplayablePath(path)) {
+        const x = path.split('.').pop().toLowerCase();
+        return _audioFmt('ui.audio.not_playable_in_audio_engine', {ext: x.toUpperCase()});
+    }
+    const sample = resolveAudioSampleForMeta(path);
+    if (!sample) return '';
+    const parts = [sample.format, sample.sizeFormatted];
+    const bpmShow = sample.bpm || (typeof _bpmCache !== 'undefined' ? _bpmCache[path] : undefined);
+    const keyShow = sample.key || (typeof _keyCache !== 'undefined' ? _keyCache[path] : undefined);
+    const lufsShow =
+        sample.lufs != null
+            ? sample.lufs
+            : typeof _lufsCache !== 'undefined' && _lufsCache[path] != null ? _lufsCache[path]
+              : null;
+    if (bpmShow) parts.push(bpmShow + ' BPM');
+    if (keyShow) parts.push(keyShow);
+    if (lufsShow != null) parts.push(lufsShow + ' LUFS');
+    return parts.join(' \u2022 ');
+}
+
 /** Tray popover + menu line: `#npName`, else library sample basename, else path basename. */
 function trayNowPlayingDisplayName() {
     const np = document.getElementById('npName');
@@ -3226,6 +3251,7 @@ function syncTrayNowPlayingFromPlayback() {
                 idle: true,
                 popover_title: '',
                 popover_subtitle: '',
+                popover_reveal_path: null,
                 elapsed_sec: 0,
                 total_sec: null,
                 popover_playing: false,
@@ -3268,7 +3294,7 @@ function syncTrayNowPlayingFromPlayback() {
     /* Menu-bar title is track name only — elapsed/total stay in the popover + tooltip. */
     const title_bar = track.length > 44 ? `${track.slice(0, 41)}…` : track;
     const pathForTrayMeta = audioPlayerPath || resumePath || null;
-    let popover_subtitle = pathForTrayMeta ? npMetaLineTextForPath(pathForTrayMeta).trim() : '';
+    let popover_subtitle = pathForTrayMeta ? npTrayPopoverSubtitleMetaOnly(pathForTrayMeta).trim() : '';
     /* Tray HUD: avoid repeating the title when meta is only the basename (non-library file). */
     if (popover_subtitle && track) {
         if (popover_subtitle === track) {
@@ -3309,6 +3335,7 @@ function syncTrayNowPlayingFromPlayback() {
             idle: false,
             popover_title: track,
             popover_subtitle,
+            popover_reveal_path: pathForTrayMeta || null,
             elapsed_sec: cur,
             total_sec: Number.isFinite(dur) && dur > 0 ? dur : null,
             popover_playing: playing,

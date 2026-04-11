@@ -38,6 +38,22 @@
               .catch(() => {})
         : Promise.resolve();
 
+    /** First resolved translation: `appFmt(k) !== k`, trying `primary` then `alts`. */
+    function appFmtResolved(primary, ...alts) {
+        const pick = (key) => {
+            if (!key) return '';
+            const s = window.appFmt(key);
+            return s && s !== key ? s : '';
+        };
+        let v = pick(primary);
+        if (v) return v;
+        for (let i = 0; i < alts.length; i++) {
+            v = pick(alts[i]);
+            if (v) return v;
+        }
+        return '';
+    }
+
     /* `getCurrentWebviewWindow()` must run after the webview exists — call in init, not at parse time. */
     function getTrayWebviewWindow() {
         return tauri && tauri.webviewWindow && typeof tauri.webviewWindow.getCurrentWebviewWindow === 'function'
@@ -141,6 +157,23 @@
     const elTrayVolLabel = document.getElementById('trayVolLabel');
     const elTraySpeed = document.getElementById('traySpeed');
     const elTraySpeedLabel = document.getElementById('traySpeedLabel');
+    const trayCtx = document.getElementById('trayCtxMenu');
+    const elProgressWrap = document.getElementById('trayProgressWrap');
+    const elTrayExtras = document.getElementById('trayExtras');
+
+    /** Filesystem path for the playing file — from host `reveal_path` (copy / reveal / click subtitle). */
+    let _trayRevealPath = '';
+
+    /** `subtitle` + `reveal_path` — skip rebuilding `#subtitle` on every tray tick (~500 ms) so clicks/toggles work. */
+    let _traySubtitleSig = null;
+
+    /** User-expanded path panel; preserved until track/meta path changes. */
+    let _trayPathUserExpanded = false;
+
+    /** True briefly after local volume `input` — ignore host volume so poll ticks do not overwrite the slider. */
+    let _trayVolUserActive = false;
+    let _trayVolUserTimer = null;
+    const TRAY_VOL_USER_SETTLE_MS = 400;
 
     /** Same values as main `#npSpeed` — tray window does not load the full index bundle. */
     const TRAY_SPEED_OPTIONS = [
@@ -267,14 +300,22 @@
         if (typeof pSpeed === 'string') pSpeed = parseFloat(pSpeed);
         if (typeof pSpeed !== 'number' || !Number.isFinite(pSpeed)) pSpeed = 1;
         p.playback_speed = Math.max(0.25, Math.min(2, pSpeed));
+        let rp = p.reveal_path ?? p.revealPath;
+        if (rp == null || typeof rp !== 'string') {
+            p.reveal_path = '';
+        } else {
+            p.reveal_path = String(rp).trim();
+        }
         return p;
     }
 
     function applyTrayExtrasFromState(volumePct, playbackSpeed) {
         _trayApplyingHostControls = true;
         try {
-            if (elTrayVol) elTrayVol.value = String(volumePct);
-            if (elTrayVolPct) elTrayVolPct.textContent = `${volumePct}%`;
+            if (!_trayVolUserActive) {
+                if (elTrayVol) elTrayVol.value = String(volumePct);
+                if (elTrayVolPct) elTrayVolPct.textContent = `${volumePct}%`;
+            }
             if (elTraySpeed && elTraySpeed.options.length > 0) {
                 const sp = playbackSpeed;
                 let bestIdx = 0;
@@ -308,6 +349,342 @@
     }
     populateTraySpeedSelect();
 
+    function trayPopoverCopyText(text) {
+        const s = text != null ? String(text).trim() : '';
+        if (!s || !navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return;
+        void navigator.clipboard.writeText(s).catch(() => {});
+    }
+
+    function hideTrayCtxMenu() {
+        if (!trayCtx) return;
+        trayCtx.classList.remove('visible');
+        trayCtx.replaceChildren();
+        trayCtx.setAttribute('aria-hidden', 'true');
+        trayCtx._actions = null;
+    }
+
+    function buildTrayCtxItems() {
+        const items = [];
+        items.push({
+            label: window.appFmt('tray.show'),
+            action: () => {
+                if (!invoke) return;
+                void invoke('show_main_window').catch(() => {});
+            },
+        });
+        items.push('---');
+        if (!_currentIdle) {
+            items.push({
+                label: window.appFmt('tray.previous_track'),
+                action: () => send('prev_track'),
+            });
+            items.push({
+                label: window.appFmt('tray.play_pause'),
+                action: () => send('play_pause'),
+            });
+            items.push({
+                label: window.appFmt('tray.next_track'),
+                action: () => send('next_track'),
+            });
+            items.push('---');
+        }
+        items.push({
+            label: window.appFmt('tray.scan_all'),
+            action: () => send('scan_all'),
+        });
+        items.push({
+            label: window.appFmt('tray.stop_all'),
+            action: () => send('stop_all'),
+        });
+        const subLine = trayPopoverSubtitleUiSummary();
+        if (_trayRevealPath) {
+            items.push('---');
+            items.push({
+                label: window.appFmt('menu.reveal_in_finder'),
+                action: () => {
+                    if (!invoke || !_trayRevealPath) return;
+                    void invoke('open_audio_folder', { filePath: _trayRevealPath }).catch(() => {});
+                },
+            });
+            items.push({
+                label: window.appFmt('menu.copy_file_path'),
+                action: () => trayPopoverCopyText(_trayRevealPath),
+            });
+        } else if (subLine) {
+            items.push('---');
+            items.push({
+                label: window.appFmt('menu.copy_file_path'),
+                action: () => trayPopoverCopyText(subLine),
+            });
+        }
+        items.push('---');
+        items.push({
+            label: window.appFmt('menu.close'),
+            action: () => {
+                const tw = getTrayWebviewWindow();
+                if (tw && typeof tw.hide === 'function') void tw.hide().catch(() => {});
+            },
+        });
+        return items;
+    }
+
+    function showTrayCtxMenu(e) {
+        if (!trayCtx) return;
+        hideTrayCtxMenu();
+        const items = buildTrayCtxItems();
+        const actions = [];
+        for (const item of items) {
+            if (item === '---') {
+                const sep = document.createElement('div');
+                sep.className = 'tray-ctx-sep';
+                trayCtx.appendChild(sep);
+                continue;
+            }
+            const div = document.createElement('div');
+            div.className = 'tray-ctx-item';
+            div.textContent = item.label;
+            const idx = actions.length;
+            actions.push(item.action);
+            div.dataset.trayCtxIdx = String(idx);
+            trayCtx.appendChild(div);
+        }
+        trayCtx._actions = actions;
+        trayCtx.classList.add('visible');
+        trayCtx.setAttribute('aria-hidden', 'false');
+        let x = e.clientX;
+        let y = e.clientY;
+        trayCtx.style.left = '0px';
+        trayCtx.style.top = '0px';
+        const rw = trayCtx.offsetWidth;
+        const rh = trayCtx.offsetHeight;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        if (x + rw > vw - 4) x = Math.max(4, vw - rw - 4);
+        if (y + rh > vh - 4) y = Math.max(4, vh - rh - 4);
+        trayCtx.style.left = `${x}px`;
+        trayCtx.style.top = `${y}px`;
+    }
+
+    if (trayCtx) {
+        trayCtx.addEventListener('click', (e) => {
+            const it = e.target && e.target.closest ? e.target.closest('.tray-ctx-item') : null;
+            if (!it || !trayCtx._actions) return;
+            const idx = parseInt(it.dataset.trayCtxIdx, 10);
+            const act = trayCtx._actions[idx];
+            hideTrayCtxMenu();
+            if (typeof act === 'function') act();
+        });
+    }
+
+    document.addEventListener(
+        'click',
+        (e) => {
+            if (!trayCtx || !trayCtx.classList.contains('visible')) return;
+            if (trayCtx.contains(e.target)) return;
+            hideTrayCtxMenu();
+        },
+        true
+    );
+
+    document.addEventListener('contextmenu', (e) => {
+        const t = e.target;
+        if (t && t.closest && t.closest('input, textarea, select, option')) return;
+        e.preventDefault();
+        showTrayCtxMenu(e);
+    });
+
+    function syncTrayPopoverTooltips() {
+        if (elTitle) {
+            const t = elTitle.textContent.trim();
+            elTitle.title = t;
+        }
+        if (elSub) {
+            elSub.removeAttribute('role');
+            const pathSpan = elSub.querySelector('.tray-subtitle-path');
+            const copyT = window.appFmt('menu.copy_file_path');
+            if (pathSpan && _trayRevealPath && !_currentIdle) {
+                pathSpan.title = window.appFmt('menu.reveal_in_finder');
+                elSub.removeAttribute('title');
+            } else {
+                if (pathSpan) {
+                    pathSpan.removeAttribute('title');
+                    pathSpan.removeAttribute('tabIndex');
+                    pathSpan.removeAttribute('role');
+                    pathSpan.classList.remove('tray-subtitle-reveal');
+                }
+                const hasPathPanel = !!elSub.querySelector('.tray-subtitle-path-panel');
+                if (!hasPathPanel) {
+                    const plain = elSub.textContent.trim();
+                    elSub.title = plain ? copyT : '';
+                } else {
+                    elSub.removeAttribute('title');
+                }
+            }
+        }
+        if (elProgressWrap) {
+            elProgressWrap.title = appFmtResolved(
+                'ui.audio.meta_waveform_canvas_tt',
+                'ui.audio.meta_waveform_seek_title'
+            );
+        }
+    }
+
+    function revealFromTraySubtitle() {
+        if (!_trayRevealPath || _currentIdle || !invoke) return;
+        void invoke('open_audio_folder', { filePath: _trayRevealPath }).catch(() => {});
+    }
+
+    /** Meta + toggle label only — avoids pulling hidden path text into context menu / tooltips. */
+    function trayPopoverSubtitleUiSummary() {
+        if (!elSub) return '';
+        const bits = [];
+        const meta = elSub.querySelector('.tray-subtitle-meta');
+        if (meta && meta.textContent.trim()) bits.push(meta.textContent.trim());
+        const lab = elSub.querySelector('.tray-subtitle-path-toggle-label');
+        if (lab && lab.textContent.trim()) bits.push(lab.textContent.trim());
+        return bits.join(' \u2022 ');
+    }
+
+    function trayPathToggleLabels(expanded) {
+        const btn = elSub && elSub.querySelector('.tray-subtitle-path-toggle');
+        if (!btn) return;
+        const lab = btn.querySelector('.tray-subtitle-path-toggle-label');
+        if (!lab) return;
+        const hide = appFmtResolved('tray.path_collapse', 'tray.path_toggle_collapse_tt');
+        const show = appFmtResolved('tray.path_expand', 'tray.path_toggle_expand_tt');
+        lab.textContent = expanded ? hide : show;
+        btn.title = expanded
+            ? appFmtResolved('tray.path_toggle_collapse_tt', 'tray.path_collapse')
+            : appFmtResolved('tray.path_toggle_expand_tt', 'tray.path_expand');
+    }
+
+    function refreshTrayPathToggleI18n() {
+        const btn = elSub && elSub.querySelector('.tray-subtitle-path-toggle');
+        if (!btn) return;
+        trayPathToggleLabels(btn.getAttribute('aria-expanded') === 'true');
+    }
+
+    function applyTrayPathPanelDom(expanded) {
+        if (!elSub) return;
+        const btn = elSub.querySelector('.tray-subtitle-path-toggle');
+        const panel = elSub.querySelector('.tray-subtitle-path-panel');
+        const pathSpan = elSub.querySelector('.tray-subtitle-path');
+        if (!btn || !panel) return;
+        btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        panel.hidden = !expanded;
+        panel.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+        if (pathSpan) pathSpan.tabIndex = expanded ? 0 : -1;
+        trayPathToggleLabels(expanded);
+        syncTrayPopoverTooltips();
+    }
+
+    function setTrayPathPanelExpanded(expanded) {
+        _trayPathUserExpanded = expanded;
+        applyTrayPathPanelDom(expanded);
+        scheduleResize();
+    }
+
+    function makeTrayPathToggleAndPanel(pathDisplay) {
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'tray-subtitle-path-toggle';
+        toggle.setAttribute('aria-expanded', 'false');
+        const panel = document.createElement('div');
+        panel.className = 'tray-subtitle-path-panel';
+        panel.id = 'traySubtitlePathPanel';
+        panel.hidden = true;
+        panel.setAttribute('aria-hidden', 'true');
+        toggle.setAttribute('aria-controls', 'traySubtitlePathPanel');
+
+        const chev = document.createElement('span');
+        chev.className = 'tray-subtitle-path-chevron';
+        chev.setAttribute('aria-hidden', 'true');
+        chev.textContent = '\u25BC';
+        const lab = document.createElement('span');
+        lab.className = 'tray-subtitle-path-toggle-label';
+        toggle.appendChild(chev);
+        toggle.appendChild(lab);
+
+        const pathSpan = document.createElement('span');
+        pathSpan.className = 'tray-subtitle-path tray-subtitle-reveal';
+        pathSpan.textContent = pathDisplay;
+        pathSpan.tabIndex = -1;
+        pathSpan.setAttribute('role', 'button');
+        panel.appendChild(pathSpan);
+        const panAl = appFmtResolved('tray.path_panel_accessible_name', 'tray.path_expand');
+        if (panAl) panel.setAttribute('aria-label', panAl);
+        return { toggle, panel };
+    }
+
+    /** Meta row + collapsible path (`reveal_path`); path hidden by default. */
+    function renderTraySubtitle(metaRaw, revealPathTrimmed) {
+        if (!elSub) return;
+        elSub.replaceChildren();
+        const meta = metaRaw != null ? String(metaRaw).trim() : '';
+        const pathDisp =
+            revealPathTrimmed && typeof revealPathTrimmed === 'string' && revealPathTrimmed.trim() !== ''
+                ? revealPathTrimmed.replace(/\\/g, '/')
+                : '';
+        if (!meta && !pathDisp) {
+            elSub.replaceChildren();
+            return;
+        }
+
+        if (pathDisp) {
+            const { toggle, panel } = makeTrayPathToggleAndPanel(pathDisp);
+            const row = document.createElement('div');
+            row.className = 'tray-subtitle-row';
+            if (meta) {
+                const metaSpan = document.createElement('span');
+                metaSpan.className = 'tray-subtitle-meta';
+                metaSpan.textContent = meta;
+                row.appendChild(metaSpan);
+                row.appendChild(document.createTextNode(' \u2022 '));
+            }
+            row.appendChild(toggle);
+            elSub.appendChild(row);
+            elSub.appendChild(panel);
+        } else {
+            const metaSpan = document.createElement('span');
+            metaSpan.className = 'tray-subtitle-meta';
+            metaSpan.textContent = meta;
+            elSub.appendChild(metaSpan);
+        }
+    }
+
+    if (elSub) {
+        elSub.addEventListener('click', (e) => {
+            const tgl = e.target && e.target.closest ? e.target.closest('.tray-subtitle-path-toggle') : null;
+            if (tgl) {
+                e.preventDefault();
+                e.stopPropagation();
+                const exp = tgl.getAttribute('aria-expanded') === 'true';
+                setTrayPathPanelExpanded(!exp);
+                return;
+            }
+            if (!_trayRevealPath || _currentIdle) return;
+            const hit = e.target && e.target.closest ? e.target.closest('.tray-subtitle-path') : null;
+            if (!hit) return;
+            revealFromTraySubtitle();
+        });
+        elSub.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const t = e.target;
+            const tgl = t && t.closest ? t.closest('.tray-subtitle-path-toggle') : null;
+            if (tgl) {
+                e.preventDefault();
+                const exp = tgl.getAttribute('aria-expanded') === 'true';
+                setTrayPathPanelExpanded(!exp);
+                return;
+            }
+            if (!_trayRevealPath || _currentIdle) return;
+            const onPath = t && t.closest && t.closest('.tray-subtitle-path') === t;
+            if (!onPath) return;
+            e.preventDefault();
+            revealFromTraySubtitle();
+        });
+    }
+
     /**
      * Local playback model — between host pushes (every ~500 ms), a **`requestAnimationFrame`** loop
      * interpolates elapsed time against `performance.now()` so the slider animates smoothly at 60 fps
@@ -320,6 +697,10 @@
     let _currentPlaying = false;
     let _currentIdle = true;
     let _dragging = false;
+    /** Active scrub pointer — window-level `pointermove`/`pointerup` (no `setPointerCapture`; capture broke hit testing vs `#trayVol`). */
+    let _trayScrubPointerId = null;
+    /** True once the pointer moves over vol/times/transport/etc.; `pointerup` must not `sendSeek`. */
+    let _trayScrubCancelled = false;
     let _dragFrac = 0;
     let _rafId = null;
 
@@ -370,7 +751,19 @@
         const idle = p.idle === true;
         if (shell) shell.classList.toggle('idle', idle);
         if (elTitle) elTitle.textContent = typeof p.title === 'string' ? p.title : '';
-        if (elSub) elSub.textContent = typeof p.subtitle === 'string' ? p.subtitle : '';
+        _trayRevealPath =
+            idle || typeof p.reveal_path !== 'string' || !p.reveal_path.trim() ? '' : p.reveal_path.trim();
+        const popSub = typeof p.subtitle === 'string' ? p.subtitle : '';
+        const subtitleSig = `${popSub}\0${_trayRevealPath}`;
+        const subtitleDirty = _traySubtitleSig !== subtitleSig;
+        if (subtitleDirty) {
+            _traySubtitleSig = subtitleSig;
+            _trayPathUserExpanded = false;
+            if (elSub) {
+                renderTraySubtitle(popSub, _trayRevealPath);
+                applyTrayPathPanelDom(_trayPathUserExpanded);
+            }
+        }
         if (elIdle) {
             elIdle.hidden = !idle;
             let idleLabel = '';
@@ -405,11 +798,14 @@
         }
         if (btnPlay) btnPlay.textContent = playing ? '⏸' : '▶';
         if (btnPlay) {
-            const playT = playing ? window.appFmt('menu.pause') : window.appFmt('menu.play');
-            btnPlay.setAttribute('title', playT);
+            const playT = playing
+                ? appFmtResolved('menu.pause')
+                : appFmtResolved('menu.play');
+            if (playT) btnPlay.setAttribute('title', playT);
         }
         applyTrayExtrasFromState(p.volume_pct, p.playback_speed);
         logTrayPopoverApplyState(p, idle, playing, themed);
+        syncTrayPopoverTooltips();
         scheduleResize();
         setTimeout(() => {
             syncWindowSize();
@@ -422,9 +818,9 @@
         }, 260);
     }
 
-    /* Drag-to-seek on the scrubber. Uses pointer capture so the drag still tracks even when the
-     * cursor leaves the track bar, and blocks updates from host pushes (`applyState` honors
-     * `_dragging`) so the thumb does not jitter while the user is scrubbing. */
+    /* Drag-to-seek: window-level pointer listeners (no `setPointerCapture`). Capture retargeting on
+     * macOS WebKit made `clientY`/rect checks unreliable vs the real node under the cursor; volume
+     * drags still updated seek. `elementFromPoint` + `closest` matches the interactive stack. */
     function pointerFraction(e) {
         if (!elTrackBar) return 0;
         const rect = elTrackBar.getBoundingClientRect();
@@ -440,32 +836,39 @@
         }).catch(() => {});
     }
 
-    if (elTrackBar) {
-        elTrackBar.addEventListener('pointerdown', (e) => {
-            if (_currentIdle) return;
-            if (e.button !== 0 && e.pointerType === 'mouse') return;
-            e.preventDefault();
-            _dragging = true;
-            _dragFrac = pointerFraction(e);
-            try {
-                elTrackBar.setPointerCapture(e.pointerId);
-            } catch (_) {
-                /* ignore */
-            }
-            ensureAnimating();
-        });
-        elTrackBar.addEventListener('pointermove', (e) => {
-            if (!_dragging) return;
-            _dragFrac = pointerFraction(e);
-        });
-        const endDrag = (e) => {
-            if (!_dragging) return;
-            _dragging = false;
-            try {
-                elTrackBar.releasePointerCapture(e.pointerId);
-            } catch (_) {
-                /* ignore */
-            }
+    const TRAY_SCRUB_BLOCK_SEEK =
+        '#trayExtras, #trayVol, #traySpeed, .times, .transport, .subtitle, .title, .idle-hint, #subtitle, #trayPopoverTitle, #idleHint';
+
+    function trayScrubPointerBlocksSeek(clientX, clientY) {
+        const n = document.elementFromPoint(clientX, clientY);
+        if (!n) return false;
+        return n.closest(TRAY_SCRUB_BLOCK_SEEK) != null;
+    }
+
+    function removeTrayScrubWindowListeners() {
+        window.removeEventListener('pointermove', trayScrubWindowMove, true);
+        window.removeEventListener('pointerup', trayScrubWindowUp, true);
+        window.removeEventListener('pointercancel', trayScrubWindowUp, true);
+    }
+
+    function trayScrubWindowMove(e) {
+        if (!_dragging || e.pointerId !== _trayScrubPointerId) return;
+        if (_trayScrubCancelled) return;
+        if (trayScrubPointerBlocksSeek(e.clientX, e.clientY)) {
+            _trayScrubCancelled = true;
+            return;
+        }
+        _dragFrac = pointerFraction(e);
+    }
+
+    function trayScrubWindowUp(e) {
+        if (!_dragging || e.pointerId !== _trayScrubPointerId) return;
+        removeTrayScrubWindowListeners();
+        const cancelled = _trayScrubCancelled;
+        _dragging = false;
+        _trayScrubPointerId = null;
+        _trayScrubCancelled = false;
+        if (!cancelled) {
             sendSeek(_dragFrac);
             /* Optimistically re-base to the dragged position so the thumb does not snap back before
              * the next host push arrives (engine seek + playback_status poll can be > 250 ms). */
@@ -474,10 +877,34 @@
                 _baseTime = performance.now();
                 renderProgress(_baseElapsed, _currentTotal);
             }
+        }
+        ensureAnimating();
+    }
+
+    /** Abort an in-flight scrub (second pointer on extras, etc.) — no seek, drop window listeners. */
+    function cancelTrackScrubWithoutSeek() {
+        if (!_dragging) return;
+        removeTrayScrubWindowListeners();
+        _dragging = false;
+        _trayScrubPointerId = null;
+        _trayScrubCancelled = false;
+        ensureAnimating();
+    }
+
+    if (elTrackBar) {
+        elTrackBar.addEventListener('pointerdown', (e) => {
+            if (_currentIdle) return;
+            if (e.button !== 0 && e.pointerType === 'mouse') return;
+            e.preventDefault();
+            _trayScrubCancelled = false;
+            _trayScrubPointerId = e.pointerId;
+            _dragging = true;
+            _dragFrac = pointerFraction(e);
+            window.addEventListener('pointermove', trayScrubWindowMove, true);
+            window.addEventListener('pointerup', trayScrubWindowUp, true);
+            window.addEventListener('pointercancel', trayScrubWindowUp, true);
             ensureAnimating();
-        };
-        elTrackBar.addEventListener('pointerup', endDrag);
-        elTrackBar.addEventListener('pointercancel', endDrag);
+        });
     }
 
     function send(action) {
@@ -489,9 +916,25 @@
     if (btnPlay) btnPlay.addEventListener('click', () => send('play_pause'));
     if (btnNext) btnNext.addEventListener('click', () => send('next_track'));
 
+    if (elTrayExtras) {
+        elTrayExtras.addEventListener(
+            'pointerdown',
+            (e) => {
+                if (e.button !== 0 && e.pointerType === 'mouse') return;
+                cancelTrackScrubWithoutSeek();
+            },
+            true
+        );
+    }
     if (elTrayVol) {
         elTrayVol.addEventListener('input', () => {
             if (_trayApplyingHostControls) return;
+            _trayVolUserActive = true;
+            if (_trayVolUserTimer != null) clearTimeout(_trayVolUserTimer);
+            _trayVolUserTimer = setTimeout(() => {
+                _trayVolUserTimer = null;
+                _trayVolUserActive = false;
+            }, TRAY_VOL_USER_SETTLE_MS);
             const v = parseInt(elTrayVol.value, 10);
             const n = Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 100;
             if (elTrayVolPct) elTrayVolPct.textContent = `${n}%`;
@@ -510,19 +953,30 @@
     /** `WebviewWindow.listen` / `event.listen` return Promises — await so emits are not dropped on first open. */
     async function initTrayIpc() {
         await _trayI18nReady;
-        if (btnPrev) btnPrev.setAttribute('title', window.appFmt('tray.previous_track'));
-        if (btnNext) btnNext.setAttribute('title', window.appFmt('tray.next_track'));
+        const prevT = appFmtResolved('tray.previous_track');
+        const nextT = appFmtResolved('tray.next_track');
+        if (btnPrev && prevT) btnPrev.setAttribute('title', prevT);
+        if (btnNext && nextT) btnNext.setAttribute('title', nextT);
+        const playPauseT = appFmtResolved('tray.play_pause');
+        if (btnPlay && playPauseT) btnPlay.setAttribute('title', playPauseT);
         populateTraySpeedSelect();
         if (elTrayVolLabel) {
-            const vLabel = window.appFmt('ui.ae.playback_volume_label');
-            elTrayVolLabel.textContent = vLabel && vLabel !== 'ui.ae.playback_volume_label' ? vLabel : 'Vol';
+            const vLabel = appFmtResolved('ui.ae.playback_volume_label');
+            elTrayVolLabel.textContent = vLabel || 'Vol';
         }
         if (elTraySpeedLabel) {
-            const sLabel = window.appFmt('ui.np.label_speed');
-            elTraySpeedLabel.textContent = sLabel && sLabel !== 'ui.np.label_speed' ? sLabel : 'Speed';
+            const sLabel = appFmtResolved('ui.np.label_speed');
+            elTraySpeedLabel.textContent = sLabel || 'Speed';
         }
-        if (elTrayVol) elTrayVol.setAttribute('title', window.appFmt('ui.tt.volume_cmd_up_down'));
-        if (elTraySpeed) elTraySpeed.setAttribute('title', window.appFmt('ui.tt.playback_speed'));
+        const volTt = appFmtResolved('ui.tt.volume_cmd_up_down');
+        if (elTrayVol && volTt) elTrayVol.setAttribute('title', volTt);
+        const speedTt = appFmtResolved('ui.tt.playback_speed', 'ui.np.label_speed');
+        if (elTraySpeed && speedTt) {
+            elTraySpeed.setAttribute('title', speedTt);
+            elTraySpeed.setAttribute('aria-label', speedTt);
+        }
+        syncTrayPopoverTooltips();
+        refreshTrayPathToggleI18n();
 
         const tw0 = getTrayWebviewWindow();
         console.info('[tray-popover] boot', {
@@ -587,10 +1041,9 @@
 
         if (invoke) {
             try {
-                const [theme, emit, build] = await Promise.all([
+                const [theme, emit] = await Promise.all([
                     invoke('tray_popover_get_ui_theme').catch(() => 'dark'),
                     invoke('tray_popover_get_state').catch(() => null),
-                    invoke('get_build_info').catch(() => null),
                 ]);
                 const bootState = emit ? trayListenUnwrap(emit) : null;
                 console.info('[tray-popover] bootstrap invoke', {
@@ -599,20 +1052,7 @@
                 });
                 applyTrayDocumentTheme(typeof theme === 'string' ? theme : 'dark');
                 if (bootState) applyState(bootState);
-                const tm = document.getElementById('trayBuildMeta');
-                if (tm && build && typeof build === 'object' && build.version) {
-                    tm.textContent =
-                        typeof formatBuildMetaLine === 'function'
-                            ? formatBuildMetaLine(build)
-                            : 'Version: v' + build.version;
-                }
-                if (build && typeof build === 'object' && build.version) {
-                    document.title =
-                        'AUDIO_HAXOR · ' +
-                        (typeof formatBuildMetaLine === 'function'
-                            ? formatBuildMetaLine(build)
-                            : 'Version: v' + build.version);
-                }
+                document.title = 'AUDIO_HAXOR';
             } catch (err) {
                 console.warn('[tray-popover] bootstrap invoke failed', err);
             }
@@ -644,6 +1084,11 @@
 
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        if (trayCtx && trayCtx.classList.contains('visible')) {
+            hideTrayCtxMenu();
+            e.preventDefault();
+            return;
+        }
         const tw = getTrayWebviewWindow();
         if (tw && typeof tw.hide === 'function') void tw.hide().catch(() => {});
     });

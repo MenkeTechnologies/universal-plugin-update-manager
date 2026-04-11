@@ -118,6 +118,9 @@ pub struct TrayPopoverEmit {
     pub idle: bool,
     pub title: String,
     pub subtitle: String,
+    /// Absolute path of the playing file — tray popover reveal / copy / context menu.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reveal_path: Option<String>,
     pub elapsed_sec: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_sec: Option<f64>,
@@ -264,6 +267,7 @@ fn toggle_tray_popover(app: &AppHandle<Wry>, rect: &Rect) -> Result<(), String> 
         idle: true,
         title: String::new(),
         subtitle: String::new(),
+        reveal_path: None,
         elapsed_sec: 0.0,
         total_sec: None,
         playing: false,
@@ -355,6 +359,17 @@ pub struct TrayNowPlayingPayload {
     /// Optional: `getComputedStyle(document.documentElement)` snapshot for scheme vars (`--cyan`, …).
     #[serde(default)]
     pub appearance: Option<HashMap<String, String>>,
+    /// Optional: filesystem path for the playing item — popover reveal / copy.
+    #[serde(default)]
+    pub popover_reveal_path: Option<String>,
+}
+
+fn normalized_popover_reveal_path(payload: &TrayNowPlayingPayload) -> Option<String> {
+    payload
+        .popover_reveal_path
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 fn tray_emit_ui_theme(payload: &TrayNowPlayingPayload) -> String {
@@ -448,6 +463,7 @@ pub fn update_tray_now_playing(
             idle: true,
             title: String::new(),
             subtitle: String::new(),
+            reveal_path: None,
             elapsed_sec: 0.0,
             total_sec: None,
             playing: false,
@@ -465,6 +481,7 @@ pub fn update_tray_now_playing(
             idle: false,
             title: payload.popover_title.clone().unwrap_or_default(),
             subtitle: payload.popover_subtitle.clone().unwrap_or_default(),
+            reveal_path: normalized_popover_reveal_path(&payload),
             elapsed_sec: payload.elapsed_sec.unwrap_or(0.0),
             total_sec: payload.total_sec,
             playing: payload.popover_playing.unwrap_or(false),
@@ -507,6 +524,18 @@ pub fn tray_popover_get_state(tray_state: State<'_, TrayState>) -> Result<Option
 #[tauri::command]
 pub fn tray_popover_get_ui_theme() -> String {
     tray_popover_ui_theme_from_prefs()
+}
+
+/// Bring the main window forward (tray popover context menu — same intent as the native tray “Show” item).
+#[tauri::command]
+pub fn show_main_window(app: AppHandle<Wry>) -> Result<(), String> {
+    let Some(w) = app.get_webview_window("main") else {
+        return Ok(());
+    };
+    w.show().map_err(|e| e.to_string())?;
+    w.unminimize().map_err(|e| e.to_string())?;
+    w.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 static TRAY_POLL_ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -613,6 +642,7 @@ pub fn start_tray_host_poll(app: AppHandle<Wry>) {
                     idle: false,
                     title: last.title.clone(),
                     subtitle: last.subtitle.clone(),
+                    reveal_path: last.reveal_path.clone(),
                     elapsed_sec: pos,
                     total_sec,
                     playing: !paused,

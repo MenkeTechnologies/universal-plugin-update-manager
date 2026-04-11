@@ -40,6 +40,7 @@ I18N_TEST_GLOB = "i18n*.test.js"
 LOG_TAIL_CHARS = 48_000
 
 HUD_STATIC_CSS_PATH = ROOT / "docs" / "hud-static.css"
+TUTORIAL_CSS_PATH = ROOT / "docs" / "tutorial" / "tutorial.css"
 
 
 def load_package_version(root: Path) -> str:
@@ -80,6 +81,89 @@ def load_hud_static_css() -> str:
     if not HUD_STATIC_CSS_PATH.is_file():
         raise FileNotFoundError(f"Missing shared HUD stylesheet: {HUD_STATIC_CSS_PATH}")
     return HUD_STATIC_CSS_PATH.read_text(encoding="utf-8")
+
+
+def load_tutorial_css() -> str:
+    """Shared tutorial/walkthrough styling. Inlined so the report stays a
+    single self-contained HTML file (can be emailed / uploaded as-is)."""
+    if not TUTORIAL_CSS_PATH.is_file():
+        raise FileNotFoundError(f"Missing tutorial stylesheet: {TUTORIAL_CSS_PATH}")
+    return TUTORIAL_CSS_PATH.read_text(encoding="utf-8")
+
+
+# Hub-style CSS overrides applied after hud-static + tutorial so the
+# report has room for wide tables, and the color scheme grid sits in its
+# own full-width strip below the header (not crammed into the header
+# right-side where flex column + align:flex-end collapses the grid into
+# a single-column stack of giant tiles).
+REPORT_CSS_OVERRIDES = """
+.tutorial-main { max-width: 72rem; }
+.docs-build-line,
+.doc-footer {
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+}
+.doc-footer { margin-top: 1.5rem; text-align: center; }
+
+/* Color scheme strip: full-width horizontal row below the header. */
+.hub-scheme-strip {
+  border-bottom: 1px dashed var(--border);
+  background: color-mix(in srgb, var(--bg-secondary) 85%, transparent);
+  padding: 0.55rem 1.5rem 0.65rem;
+  position: relative;
+  animation: fadeSlideIn 0.5s ease 0.1s both;
+}
+.hub-scheme-strip-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.hub-scheme-strip .hud-scheme-label {
+  flex: 0 0 auto;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-align: left;
+}
+.hub-scheme-strip .scheme-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+@media (max-width: 720px) {
+  .hub-scheme-strip-inner { flex-direction: column; align-items: stretch; }
+  .hub-scheme-strip .scheme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Keep report tables breathing inside tutorial-section */
+.tutorial-section .table-wrap { margin-top: 0.5rem; }
+.tutorial-section table { width: 100%; }
+.tutorial-section .meta {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.tutorial-section .banner {
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.85rem;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  font-size: 12px;
+  color: var(--text);
+}
+.tutorial-section .banner.ok  { border-color: var(--green, #39ff14); background: color-mix(in srgb, var(--green, #39ff14) 10%, transparent); }
+.tutorial-section .banner.bad { border-color: var(--red, #ff073a); background: color-mix(in srgb, var(--red, #ff073a) 12%, transparent); }
+"""
 
 
 def parse_node_spec_summary(text: str) -> tuple[int | None, int | None, int | None, float | None]:
@@ -700,42 +784,54 @@ def write_html(
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&amp;family=Share+Tech+Mono&amp;display=swap"/>
   <title>{rep_title}</title>
   <style>{load_hud_static_css()}</style>
+  <style>{load_tutorial_css()}</style>
+  <style>{REPORT_CSS_OVERRIDES}</style>
 </head>
 <body>
-  <div class="app" id="i18nReportApp">
+  <div class="app tutorial-app" id="i18nReportApp">
     <div class="crt-scanline" id="crtH" aria-hidden="true"></div>
     <div class="crt-scanline-v" id="crtV" aria-hidden="true"></div>
 
-    <header class="docs-header">
-      <div class="docs-header-inner">
-        <div class="docs-title-block">
-          <h1>// app_i18n catalog audit</h1>
-          <p class="docs-sub">{audit_sub} · same HUD tokens as <code>docs/index.html</code> · source of truth <code>i18n/app_i18n_en.json</code></p>
+    <header class="tutorial-header">
+      <div class="tutorial-header-inner">
+        <div>
+          <h1 class="tutorial-brand">// APP_I18N CATALOG AUDIT</h1>
+          <nav class="tutorial-crumbs" aria-label="Breadcrumb">
+            <span class="current">i18n audit</span>
+            <span class="sep">/</span>
+            <span>{audit_sub}</span>
+            <span class="sep">/</span>
+            <code>i18n/app_i18n_en.json</code>
+          </nav>
         </div>
-        <div class="docs-header-actions">
-          <div class="docs-toolbar">
-            <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
-            <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
-            <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse on cards">Neon</button>
-            <a class="btn btn-secondary" href="{GITHUB_REPO_WEB}" target="_blank" rel="noopener noreferrer" title="AUDIO_HAXOR on GitHub">GitHub</a>
-            <a class="btn btn-secondary" href="{GITHUB_ISSUES_WEB}" target="_blank" rel="noopener noreferrer" title="GitHub Issues">Issues</a>
-          </div>
-          <div class="hud-scheme-row">
-            <span class="hud-scheme-label">Color scheme</span>
-            <div class="scheme-grid" id="hudSchemeGrid"></div>
-          </div>
+        <div class="tutorial-toolbar">
+          <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
+          <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
+          <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse">Neon</button>
+          <a class="btn btn-secondary" href="{GITHUB_REPO_WEB}" target="_blank" rel="noopener noreferrer" title="AUDIO_HAXOR on GitHub">GitHub</a>
+          <a class="btn btn-secondary" href="{GITHUB_ISSUES_WEB}" target="_blank" rel="noopener noreferrer" title="GitHub Issues">Issues</a>
         </div>
       </div>
     </header>
 
-    <main class="docs-main">
-      <div class="doc-card">
+    <div class="hub-scheme-strip">
+      <div class="hub-scheme-strip-inner">
+        <span class="hud-scheme-label">// Color scheme</span>
+        <div class="scheme-grid" id="hudSchemeGrid"></div>
+      </div>
+    </div>
+
+    <main class="tutorial-main">
+      <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>I18N CATALOG AUDIT</h2>
+      <p class="tutorial-subtitle">Cross-check of <code>i18n/app_i18n_en.json</code> against every reference in the codebase: missing keys, empty values, translation debt per locale, node test status, and a grouped dump of the full catalog.</p>
+
+      <section class="tutorial-section">
         <h2>Summary</h2>
         <p class="meta">Source of truth: <code>i18n/app_i18n_en.json</code> — <strong>{n_en}</strong> keys; <strong>{n_distinct_refs}</strong> referenced by this scan; <strong>{n_unref}</strong> never referenced by scan; <strong>{len(missing)}</strong> missing; <strong>{len(empty)}</strong> empty (referenced keys with blank English value).</p>
         <div class="banner {status_cls}">{escape(status_txt)}</div>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Supported locales (shipped <code>i18n/app_i18n_*.json</code>)</h2>
         <p class="meta">{len(locale_rows)} file(s). <strong>Keys</strong> = entries in that JSON; <strong>EN keys</strong> = English catalog size ({n_en}); <strong>Missing</strong> = English keys absent from locale file; <strong>Extra</strong> = keys in locale file not in English (should be 0).</p>
         <div class="table-wrap">
@@ -746,9 +842,9 @@ def write_html(
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Translation debt — values still identical to English</h2>
         <p class="meta">Per locale (excluding <code>en</code>): number of keys whose value exactly matches <code>app_i18n_en.json</code>. Lower is better. Percent = keys still English / <strong>{n_en}</strong> English keys. Locales sharing the same count are shown in one row.</p>
         <div class="table-wrap">
@@ -759,13 +855,13 @@ def write_html(
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
 {i18n_tests_section}
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Missing keys (referenced but not in English JSON)</h2>
         <p class="meta">{len(missing)} row(s)</p>
         <div class="table-wrap">
@@ -776,9 +872,9 @@ def write_html(
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Empty values in English JSON (key exists, value blank)</h2>
         <p class="meta">{len(empty)} row(s)</p>
         <div class="table-wrap">
@@ -789,13 +885,13 @@ def write_html(
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Full English catalog ({n_en} keys)</h2>
         <p class="meta"><strong>{n_en}</strong> keys in <code>app_i18n_en.json</code>, grouped by inferred UI surface. <strong>Refs</strong> and <strong>Sample locations</strong> count only hits for that surface; the same key may appear in several tables. <strong>Other UI types</strong> lists remaining surfaces for that key (or —). Keys with no scan hits are under <em>Not referenced by scan</em>. Hover the English value for the full string.</p>
         {catalog_by_type_html}
-      </div>
+      </section>
 
       <p class="doc-footer">Generated by <code>scripts/i18n_catalog_audit.py</code>. Dynamic keys (computed at runtime) are not detected. Rust keys outside <code>native_menu.rs</code> / <code>tray_menu.rs</code> are not scanned.</p>
     </main>

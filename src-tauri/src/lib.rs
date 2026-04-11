@@ -2853,11 +2853,27 @@ async fn open_update_url(url: String) -> Result<(), String> {
 async fn open_plugin_folder(plugin_path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
-            .arg("-R")
-            .arg(&plugin_path)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        let raw = plugin_path.trim();
+        let p = std::path::Path::new(raw);
+        let target = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+        if target.is_file() {
+            std::process::Command::new("open")
+                .arg("-R")
+                .arg(&target)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else if target.is_dir() {
+            opener::open(&target).map_err(|e| e.to_string())?;
+        } else if let Some(parent) = p.parent() {
+            if !parent.as_os_str().is_empty() {
+                let pp = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf());
+                opener::open(&pp).map_err(|e| e.to_string())?;
+            } else {
+                return Err("Invalid path".into());
+            }
+        } else {
+            return Err("Path not found".into());
+        }
     }
     #[cfg(target_os = "windows")]
     {
@@ -7493,6 +7509,7 @@ pub fn run() {
             tray_menu::tray_popover_resize,
             tray_menu::tray_popover_get_state,
             tray_menu::tray_popover_get_ui_theme,
+            tray_menu::show_main_window,
             start_file_watcher,
             stop_file_watcher,
             get_file_watcher_status,

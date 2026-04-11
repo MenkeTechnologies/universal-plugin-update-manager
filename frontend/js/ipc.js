@@ -154,6 +154,10 @@ listen('menu-action', (event) => {
         const v = parseInt(id.slice(7), 10);
         if (Number.isFinite(v) && typeof setAudioVolume === 'function') {
             setAudioVolume(String(Math.max(0, Math.min(100, v))));
+            /* Host poll can emit stale volume before `setAudioVolume`'s debounced tray sync — refresh now. */
+            if (typeof syncTrayNowPlayingFromPlayback === 'function') {
+                syncTrayNowPlayingFromPlayback();
+            }
         }
         return;
     }

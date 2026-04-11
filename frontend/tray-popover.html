@@ -148,6 +148,71 @@
       border-radius: 3px;
     }
     .subtitle:empty { display: none; }
+    .tray-subtitle-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 4px 6px;
+      width: 100%;
+    }
+    .tray-subtitle-path-toggle {
+      appearance: none;
+      font-family: inherit;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      margin: 0;
+      cursor: pointer;
+      color: var(--cp-cyan);
+      background: color-mix(in srgb, var(--cp-bg1) 88%, transparent);
+      border: 1px solid color-mix(in srgb, var(--cp-cyan) 40%, transparent);
+      border-radius: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      line-height: 1.2;
+      box-shadow: 0 0 6px var(--cp-cyan-dim);
+    }
+    .tray-subtitle-path-toggle:hover {
+      background: color-mix(in srgb, var(--cp-cyan) 10%, transparent);
+      box-shadow: 0 0 10px var(--cp-title-glow);
+    }
+    .tray-subtitle-path-chevron {
+      display: inline-block;
+      font-size: 7px;
+      line-height: 1;
+      transition: transform 0.15s ease;
+      transform: rotate(-90deg);
+    }
+    .tray-subtitle-path-toggle[aria-expanded="true"] .tray-subtitle-path-chevron {
+      transform: rotate(0deg);
+    }
+    .tray-subtitle-path-panel {
+      margin-top: 6px;
+      width: 100%;
+      box-sizing: border-box;
+      max-height: min(260px, 38vh);
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .tray-subtitle-path-panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    .tray-subtitle-path-panel::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--cp-cyan) 35%, transparent);
+      border-radius: 3px;
+    }
+    .tray-subtitle-path.tray-subtitle-reveal {
+      cursor: pointer;
+      text-decoration: underline dotted;
+      text-decoration-color: color-mix(in srgb, var(--cp-cyan) 55%, transparent);
+    }
+    .tray-subtitle-path.tray-subtitle-reveal:hover {
+      color: var(--cp-cyan);
+    }
     .divider {
       position: relative;
       height: 1px;
@@ -267,23 +332,9 @@
     .idle .progress-wrap { opacity: 0.35; pointer-events: none; }
     .idle .transport { opacity: 0.45; }
     .idle .divider { opacity: 0.35; margin: 8px 0 6px; }
-    .tray-build {
-      position: relative;
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px solid var(--cp-divider);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 9px;
-      font-weight: 500;
-      letter-spacing: 0.04em;
-      color: var(--cp-text-dim);
-      text-align: center;
-      line-height: 1.35;
-      word-break: break-word;
-    }
-    .tray-build:empty { display: none; }
     .tray-extras {
       position: relative;
+      z-index: 1;
       margin-top: 10px;
       padding-top: 2px;
     }
@@ -339,6 +390,38 @@
       outline: 1px solid var(--cp-cyan-hot);
       outline-offset: 1px;
     }
+    /* Tray-only context menu (separate WebView — not `#ctxMenu` from index) */
+    .tray-ctx-menu {
+      display: none;
+      position: fixed;
+      z-index: 50000;
+      min-width: 188px;
+      background: var(--cp-bg0);
+      border: 1px solid var(--cp-cyan);
+      box-shadow: 0 0 16px var(--cp-title-glow), 0 6px 20px rgba(0, 0, 0, 0.45);
+      padding: 4px 0;
+      font-size: 11px;
+      font-family: 'Share Tech Mono', 'SF Mono', monospace;
+    }
+    .tray-ctx-menu.visible {
+      display: block;
+    }
+    .tray-ctx-item {
+      padding: 7px 14px;
+      cursor: pointer;
+      color: var(--cp-text);
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s;
+    }
+    .tray-ctx-item:hover {
+      background: color-mix(in srgb, var(--cp-cyan) 12%, transparent);
+      color: var(--cp-cyan);
+    }
+    .tray-ctx-sep {
+      height: 1px;
+      background: var(--cp-divider);
+      margin: 4px 8px;
+    }
   </style>
 </head>
 <body>
@@ -348,7 +431,7 @@
     <div class="subtitle" id="subtitle"></div>
     <div class="idle-hint" id="idleHint" hidden></div>
     <div class="divider" aria-hidden="true"></div>
-    <div class="progress-wrap">
+    <div class="progress-wrap" id="trayProgressWrap">
       <div class="track-bar" id="trackBar">
         <div class="track-bg">
           <div class="track-fill" id="fill"></div>
@@ -368,17 +451,16 @@
       </div>
       <div class="tray-row">
         <label class="tray-mini-label" for="traySpeed" id="traySpeedLabel">Speed</label>
-        <select class="tray-speed-select" id="traySpeed" aria-label="Playback speed"></select>
+        <select class="tray-speed-select" id="traySpeed"></select>
       </div>
     </div>
     <div class="transport">
-      <button type="button" id="btnPrev" title="Previous">&#x23ee;</button>
-      <button type="button" class="play-btn" id="btnPlay" title="Play/Pause">&#x23f8;</button>
-      <button type="button" id="btnNext" title="Next">&#x23ed;</button>
+      <button type="button" id="btnPrev">&#x23ee;</button>
+      <button type="button" class="play-btn" id="btnPlay">&#x23f8;</button>
+      <button type="button" id="btnNext">&#x23ed;</button>
     </div>
-    <div class="tray-build" id="trayBuildMeta"></div>
   </div>
-  <script src="js/utils.js"></script>
+  <div class="tray-ctx-menu" id="trayCtxMenu" aria-hidden="true"></div>
   <script src="js/tray-popover.js"></script>
 </body>
 </html>

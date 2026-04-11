@@ -10,377 +10,135 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&amp;family=Share+Tech+Mono&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="hud-static.css">
+  <link rel="stylesheet" href="tutorial/tutorial.css">
   <style>
-    .docs-main { max-width: 56rem; }
-    .doc-lead {
-      margin: 0 0 1.5rem;
+    /* Docs hub: reuse tutorial.css wholesale, override just the widths
+       so the feature map has room for its long bullet lists, and put
+       the color scheme grid in its own strip below the header (a 5-wide
+       horizontal grid rather than collapsing into a 1-column stack). */
+    .tutorial-main { max-width: 64rem; }
+    .docs-build-line {
+      margin: 0.35rem 0 0;
+      font-family: 'Share Tech Mono', ui-monospace, monospace;
+      font-size: 11px;
       color: var(--text-dim);
-      font-size: 13px;
+      letter-spacing: 0.03em;
+      max-width: 42rem;
+      opacity: 0.75;
     }
-    .doc-card > p {
-      margin: 0 0 1rem;
-      color: var(--text-dim);
-      font-size: 13px;
+
+    /* Color scheme strip: full-width horizontal row below the header. */
+    .hub-scheme-strip {
+      border-bottom: 1px dashed var(--border);
+      background: color-mix(in srgb, var(--bg-secondary) 85%, transparent);
+      padding: 0.55rem 1.5rem 0.65rem;
+      position: relative;
+      animation: fadeSlideIn 0.5s ease 0.1s both;
     }
-    .doc-card > p.feat-sub {
-      margin: 1rem 0 0.35rem;
+    .hub-scheme-strip-inner {
+      max-width: 64rem;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .hub-scheme-strip .hud-scheme-label {
+      flex: 0 0 auto;
       font-family: 'Orbitron', sans-serif;
-      color: var(--accent);
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
-    }
-    .doc-card > p + .feat-sub { margin-top: 0.75rem; }
-    pre {
-      font-family: 'Share Tech Mono', ui-monospace, monospace;
-      font-size: 12px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      padding: 0.85rem 1rem;
-      overflow-x: auto;
-      color: var(--text);
-      margin: 0.5rem 0 0;
-      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.25);
-    }
-    [data-theme="light"] pre {
-      box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.04);
-    }
-    ul {
-      margin: 0.5rem 0 0;
-      padding-left: 1.2rem;
-      color: var(--text-dim);
-      font-size: 13px;
-    }
-    li { margin: 0.4rem 0; }
-    li strong {
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    /* Step-by-step tutorial */
-    .tutorial-toc {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-      gap: 0.4rem 1rem;
-      margin: 0.75rem 0 1.25rem;
-      padding: 0.75rem 1rem;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      font-size: 12px;
-    }
-    .tutorial-toc a {
-      color: var(--text-dim);
-      text-decoration: none;
-      font-family: 'Share Tech Mono', ui-monospace, monospace;
-    }
-    .tutorial-toc a:hover { color: var(--accent); }
-    .tutorial-step {
-      margin: 1.25rem 0 1.5rem;
-      padding: 0.85rem 1rem 1rem;
-      border-left: 2px solid var(--accent);
-      background: linear-gradient(
-        to right,
-        color-mix(in srgb, var(--accent) 6%, transparent),
-        transparent 45%
-      );
-    }
-    .tutorial-step h3 {
-      margin: 0 0 0.35rem;
-      font-family: 'Orbitron', sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
       color: var(--accent);
+      text-align: left;
     }
-    .tutorial-step h3 .step-num {
-      display: inline-block;
-      min-width: 2.25rem;
-      margin-right: 0.5rem;
-      padding: 2px 6px;
-      background: var(--accent);
-      color: var(--bg);
-      border-radius: 2px;
-      font-size: 11px;
+    .hub-scheme-strip .scheme-grid {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
     }
-    .tutorial-step p {
-      margin: 0 0 0.55rem;
-      color: var(--text-dim);
-      font-size: 13px;
-      line-height: 1.55;
+    @media (max-width: 720px) {
+      .hub-scheme-strip-inner { flex-direction: column; align-items: stretch; }
+      .hub-scheme-strip .scheme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-    .tutorial-step p:last-child { margin-bottom: 0; }
-    .tutorial-step .tip {
-      margin-top: 0.55rem;
-      padding: 0.4rem 0.65rem;
-      border-left: 2px solid var(--border);
-      font-size: 12px;
-      color: var(--text-dim);
-    }
-    .tutorial-step .tip strong { color: var(--accent); }
-    .tutorial-shot {
-      margin: 0.65rem 0 0.2rem;
-      padding: 0;
-    }
-    .tutorial-shot img {
-      display: block;
-      width: 100%;
-      max-width: 48rem;
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      background: var(--bg-secondary);
-      box-shadow: 0 0 24px rgba(0, 0, 0, 0.45);
-    }
-    [data-theme="light"] .tutorial-shot img {
-      box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
-    }
-    .tutorial-shot figcaption {
-      margin-top: 0.35rem;
-      font-family: 'Share Tech Mono', ui-monospace, monospace;
-      font-size: 11px;
-      color: var(--text-dim);
-      opacity: 0.75;
-    }
-    /* Graceful fallback when user hasn't added screenshots yet:
-       a broken <img> still shows its alt text inside a dashed box. */
-    .tutorial-shot img:where([src=""], :not([src])) { display: none; }
   </style>
 </head>
 <body>
-  <div class="app" id="docsApp">
+  <div class="app tutorial-app" id="docsApp">
     <div class="crt-scanline" id="crtH" aria-hidden="true"></div>
     <div class="crt-scanline-v" id="crtV" aria-hidden="true"></div>
 
-    <header class="docs-header">
-      <div class="docs-header-inner">
-        <div class="docs-title-block">
-          <h1>// AUDIO_HAXOR — DOCS</h1>
-          <p class="docs-sub">Tauri v2 · Rust backend <code>app_lib</code> · release version in <code>package.json</code> / <code>src-tauri/tauri.conf.json</code> / <code>src-tauri/Cargo.toml</code></p>
+    <header class="tutorial-header">
+      <div class="tutorial-header-inner">
+        <div>
+          <h1 class="tutorial-brand">// AUDIO_HAXOR — DEVELOPER HUB</h1>
+          <nav class="tutorial-crumbs" aria-label="Breadcrumb">
+            <span class="current">Docs</span>
+            <span class="sep">/</span>
+            <a href="tutorial/index.html">Walkthrough</a>
+            <span class="sep">/</span>
+            <a href="api/app_lib/index.html">Rustdoc</a>
+            <span class="sep">/</span>
+            <a href="https://github.com/MenkeTechnologies/Audio-Haxor" target="_blank" rel="noopener noreferrer">GitHub</a>
+          </nav>
           <p class="docs-build-line" id="hudBuildMetaLine"></p>
         </div>
-        <div class="docs-header-actions">
-          <div class="docs-toolbar">
-            <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
-            <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
-            <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse on cards">Neon</button>
-            <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/Audio-Haxor" target="_blank" rel="noopener noreferrer" title="AUDIO_HAXOR on GitHub">GitHub</a>
-            <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/Audio-Haxor/issues" target="_blank" rel="noopener noreferrer" title="GitHub Issues">Issues</a>
-          </div>
-          <div class="hud-scheme-row">
-            <span class="hud-scheme-label">Color scheme</span>
-            <div class="scheme-grid" id="hudSchemeGrid"></div>
-          </div>
+        <div class="tutorial-toolbar">
+          <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
+          <button type="button" class="btn btn-secondary active" id="btnCrt" title="CRT scanline overlay">CRT</button>
+          <button type="button" class="btn btn-secondary active" id="btnNeon" title="Neon border pulse">Neon</button>
+          <a class="btn btn-secondary" href="tutorial/index.html">Tutorial</a>
+          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/Audio-Haxor" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="btn btn-secondary" href="https://github.com/MenkeTechnologies/Audio-Haxor/issues" target="_blank" rel="noopener noreferrer">Issues</a>
         </div>
       </div>
     </header>
 
-<main class="docs-main">
-      <p class="doc-lead">Static hub for developer documentation. The main UI is <code>frontend/index.html</code>; the menu-bar tray uses a separate WebView (<code>frontend/tray-popover.html</code> + <code>frontend/js/tray-popover.js</code>).</p>
-
-      <div class="doc-card" id="tutorial">
-        <h2>Step-by-step tutorial — how to use AUDIO_HAXOR</h2>
-        <p>End-user walkthrough from first launch to daily workflows. Verify against the live UI — tab labels are in <code>frontend/index.html</code>, shortcut bindings in <code>frontend/js/shortcuts.js</code>, and scan plumbing in <code>src-tauri/src/unified_walker.rs</code>. Screenshots live in <code>docs/assets/</code> and are named after each tab (<code>plugins.png</code>, <code>samples.png</code>, <code>daw.png</code>, …); drop PNGs at the paths below and they render inline.</p>
-
-        <nav class="tutorial-toc" aria-label="Tutorial steps">
-          <a href="#step-1">01 · First launch</a>
-          <a href="#step-2">02 · Scan roots</a>
-          <a href="#step-3">03 · Scan All</a>
-          <a href="#step-4">04 · Plugins tab</a>
-          <a href="#step-5">05 · Audio samples</a>
-          <a href="#step-6">06 · Analysis (BPM/key/LUFS)</a>
-          <a href="#step-7">07 · DAW projects</a>
-          <a href="#step-8">08 · MIDI / Presets / PDF</a>
-          <a href="#step-9">09 · Command palette</a>
-          <a href="#step-10">10 · Floating player</a>
-          <a href="#step-11">11 · Tray popover</a>
-          <a href="#step-12">12 · Favorites / notes / tags</a>
-          <a href="#step-13">13 · Files browser</a>
-          <a href="#step-14">14 · History &amp; diffs</a>
-          <a href="#step-15">15 · Visualizer</a>
-          <a href="#step-16">16 · Audio Engine tab</a>
-          <a href="#step-17">17 · Theme &amp; color schemes</a>
-          <a href="#step-18">18 · Shortcuts &amp; help overlay</a>
-        </nav>
-
-        <section class="tutorial-step" id="step-1">
-          <h3><span class="step-num">01</span>First launch — orient yourself</h3>
-          <p>After install, open <strong>AUDIO_HAXOR</strong>. The main window shows a header bar (scan buttons, resume-all, process stats) and a row of tabs: <strong>Plugins · Samples · DAW · Presets · MIDI · PDF · Favorites · Notes · Tags · Files · History · Visualizer · Walkers · Audio Engine · Settings</strong>. The welcome panel prompts you to run your first scan.</p>
-          <div class="tip"><strong>Tip:</strong> every tab is bound to a number key — <code>Cmd+1</code>…<code>Cmd+9</code>, <code>Cmd+0</code> for Settings. Hover the tab to see the binding in the tooltip.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-2">
-          <h3><span class="step-num">02</span>Configure your scan roots</h3>
-          <p>Press <code>Cmd+0</code> (or click <strong>Settings</strong>). In the <strong>Scan roots</strong> section, add the folders that contain your plugins, samples, DAW projects, presets, MIDI, and PDFs. Use <strong>Blacklists</strong> to skip noisy subtrees (node_modules, caches, backups). Toggles let you enable auto-scan, folder watch, incremental scan, and prune-old-scans.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/settings.png" alt="Settings tab showing scan roots list and blacklist inputs" loading="lazy">
-            <figcaption>assets/settings.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Tip:</strong> Settings has a fuzzy search bar (<code>settings-search.js</code>) — type <em>“root”</em>, <em>“watch”</em>, or <em>“lufs”</em> to jump straight to a control.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-3">
-          <h3><span class="step-num">03</span>Run your first scan (Scan All)</h3>
-          <p>Back in the main header, click <strong>Scan All</strong>. That dispatches <code>scan_unified</code>, which walks every configured root once and fans progress into the per-type tabs. Watch the header counters and the <strong>Walkers</strong> tab for live per-root status. Hit <strong>Stop</strong> any time; if workers are paused, a <strong>Resume all</strong> button appears in the header.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/walkers.png" alt="Walkers tab showing live per-root progress during a unified scan" loading="lazy">
-            <figcaption>assets/walkers.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Tip:</strong> prefer tab-scoped scans when you just refreshed one library — each tab has its own <em>Scan</em> button that calls <code>scan_plugins</code> / <code>scan_audio_samples</code> / <code>scan_daw_projects</code> / etc.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-4">
-          <h3><span class="step-num">04</span>Explore the Plugins tab</h3>
-          <p>Open <strong>Plugins</strong> (<code>Cmd+1</code>). The SQLite-backed table lists VST / VST3 / AU / CLAP hits with vendor, format, path, and KVR metadata. Click a column to sort (persisted via <code>sort-persist.js</code>), drag headers to reorder (<code>columns.js</code>), and use the filter bar above the table. Right-click a row for context actions: reveal, copy path, open folder, favorite, notes, KVR update check.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/plugins.png" alt="Plugins tab with sorted table and a KVR update badge" loading="lazy">
-            <figcaption>assets/plugins.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Tip:</strong> open <strong>Dependency graph</strong> from the tab header to see which DAW projects reference each plugin (powered by <code>xref.rs</code>).</div>
-        </section>
-
-        <section class="tutorial-step" id="step-5">
-          <h3><span class="step-num">05</span>Preview audio samples</h3>
-          <p>Switch to <strong>Samples</strong> (<code>Cmd+2</code>). Click any row to load it into the floating player; the waveform and spectrogram render from the decode worker (<code>audio-decode-worker.js</code>). Scrub the waveform, toggle loop / A-B loop, and use the <strong>Find similar</strong> row action to pull acoustically-related files through the chromaprint fingerprint cache.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/samples.png" alt="Samples table with waveform and floating player active" loading="lazy">
-            <figcaption>assets/samples.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Tip:</strong> the <strong>Content duplicates</strong> action groups byte- and fingerprint-level copies so you can prune redundant files (<code>duplicates.js</code> + <code>content_hash.rs</code>).</div>
-        </section>
-
-        <section class="tutorial-step" id="step-6">
-          <h3><span class="step-num">06</span>Batch analyze BPM / key / LUFS</h3>
-          <p>In <strong>Samples</strong>, open the analysis menu and run <strong>Batch analyze</strong>. The backend fills in <code>bpm</code>, <code>key</code>, and <code>lufs</code> columns (<code>bpm.rs</code>, <code>key_detect.rs</code>, <code>lufs.rs</code>). Progress streams into the table — sort by any of these columns once values appear. You can also trigger single-file analysis from the context menu.</p>
-          <div class="tip"><strong>Tip:</strong> combine analysis with <strong>Smart playlists</strong> (<code>smart-playlists.js</code>) — e.g. <em>“LUFS &gt; -14 AND BPM BETWEEN 120 AND 128”</em>.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-7">
-          <h3><span class="step-num">07</span>Work with DAW projects</h3>
-          <p><strong>DAW</strong> tab (<code>Cmd+3</code>) lists Ableton (<code>.als</code>), Bitwig (<code>.bwproject</code>), and other supported project files. Select a row and click <strong>Extract plugins</strong> to parse the project and cache its plugin list via <code>extract_project_plugins</code>. Use <strong>Open project</strong> to launch it in its native DAW, or <strong>Reveal</strong> to jump to it in Finder/Explorer.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/daw.png" alt="DAW tab with a project row expanded showing extracted plugins" loading="lazy">
-            <figcaption>assets/daw.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Tip:</strong> cross-reference flows both ways — from a plugin row in the Plugins tab you can jump to every project that uses it.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-8">
-          <h3><span class="step-num">08</span>MIDI, Presets, and PDFs</h3>
-          <p><strong>MIDI</strong> shows note count, tempo, and key per file; <strong>Presets</strong> aggregates your plugin preset files; <strong>PDF</strong> indexes documentation with optional metadata extraction (<strong>PDF metadata</strong> batch in Settings). All three tabs support history, diff, and export/import.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/midi.png" alt="MIDI tab with tempo and key metadata columns" loading="lazy">
-            <figcaption>assets/midi.png</figcaption>
-          </figure>
-          <figure class="tutorial-shot">
-            <img src="assets/presets.png" alt="Presets tab listing plugin preset files with tags and notes" loading="lazy">
-            <figcaption>assets/presets.png</figcaption>
-          </figure>
-          <figure class="tutorial-shot">
-            <img src="assets/pdf.png" alt="PDF tab showing indexed documents with extracted metadata" loading="lazy">
-            <figcaption>assets/pdf.png</figcaption>
-          </figure>
-        </section>
-
-        <section class="tutorial-step" id="step-9">
-          <h3><span class="step-num">09</span>Command palette (<code>Cmd+K</code>)</h3>
-          <p>Press <code>Cmd+K</code> anywhere to open the palette (<code>command-palette.js</code>). Type ≥ 2 characters to fuzzy-search across tabs, scans, transport, and settings toggles. With a query, it also runs <code>db_query_palette_preview</code> and returns matching plugins, samples, projects, presets, MIDI, and PDFs — choose a hit and you land on the right tab with its search field seeded.</p>
-        </section>
-
-        <section class="tutorial-step" id="step-10">
-          <h3><span class="step-num">10</span>Floating player &amp; transport</h3>
-          <p>The floating player (<code>audio.js</code>) shows the current track, waveform, and history list. Controls: play/pause, seek, shuffle, loop modes, A/B loop, 3-band EQ, gain, pan, mono, speed, reverse. Favorite or tag the currently playing track with one click. Use <strong>Next</strong>/<strong>Previous</strong> to walk history, or flip <strong>Autoplay next</strong> in Settings to follow the visible Samples table instead.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/player.png" alt="Expanded floating player with waveform, transport, and recently-played list" loading="lazy">
-            <figcaption>assets/player.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Tip:</strong> collapse the player to a small pill, or hide it entirely — shortcuts for both are in the keymap editor.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-11">
-          <h3><span class="step-num">11</span>Menu-bar tray popover</h3>
-          <p>Click the AUDIO_HAXOR icon in your OS menu bar (macOS) or system tray (Windows/Linux) to open a compact HUD with now-playing info, a scrubber, prev/next/play/pause, and quick actions. Theme and color scheme follow the main window automatically via <code>update_tray_now_playing</code>.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/tray.png" alt="Tray popover showing now-playing title, scrubber, and transport" loading="lazy">
-            <figcaption>assets/tray.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Tip:</strong> the tray scrubber is the fastest way to jump around a long sample without raising the main window.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-12">
-          <h3><span class="step-num">12</span>Favorites, notes, and tags</h3>
-          <p>Any row (plugin, sample, project, preset, MIDI, PDF) can be favorited (<code>Cmd+5</code> tab), annotated in <strong>Notes</strong> (<code>Cmd+6</code>), or tagged from the global <strong>Tags</strong> manager (<code>Cmd+7</code>). The multi-filter tag bar can sit above or below tables — position is a Settings toggle (<code>multi-filter.js</code>).</p>
-          <figure class="tutorial-shot">
-            <img src="assets/favorites.png" alt="Favorites tab listing starred paths across inventory types" loading="lazy">
-            <figcaption>assets/favorites.png</figcaption>
-          </figure>
-          <figure class="tutorial-shot">
-            <img src="assets/notes.png" alt="Notes tab with per-item annotations" loading="lazy">
-            <figcaption>assets/notes.png</figcaption>
-          </figure>
-          <figure class="tutorial-shot">
-            <img src="assets/tags.png" alt="Tag manager with multi-filter bar active over the samples table" loading="lazy">
-            <figcaption>assets/tags.png</figcaption>
-          </figure>
-        </section>
-
-        <section class="tutorial-step" id="step-13">
-          <h3><span class="step-num">13</span>Files browser</h3>
-          <p>The <strong>Files</strong> tab (<code>Cmd+8</code>) is a direct filesystem view — list, rename, delete, reveal, and open-with / default app. It uses <code>fs_list_dir</code>, <code>rename_file</code>, <code>delete_file</code>, and <code>open_with_app</code> / <code>open_file_default</code> under the hood. Native OS drag-and-drop works in and out (<code>native-file-drag.js</code>), so you can drag a row into a DAW or into another app.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/files.png" alt="Files browser tab showing a directory listing with rename and reveal actions" loading="lazy">
-            <figcaption>assets/files.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Tip:</strong> use the Files tab for ad-hoc cleanup that doesn’t belong in a scanned inventory — e.g. reorganizing a download folder before the next sample scan picks it up.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-14">
-          <h3><span class="step-num">14</span>Scan history and diffs</h3>
-          <p>Open <strong>History</strong> (<code>Cmd+9</code>) to see every scan run — unified and per-type. Select two runs and click <strong>Diff</strong> to see added/removed/changed rows between them. Prune old entries from here to keep the DB tidy, or clear a whole inventory’s history at once.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/history.png" alt="History tab comparing two scan runs with added and removed rows highlighted" loading="lazy">
-            <figcaption>assets/history.png</figcaption>
-          </figure>
-        </section>
-
-        <section class="tutorial-step" id="step-15">
-          <h3><span class="step-num">15</span>Real-time visualizer</h3>
-          <p>The <strong>Visualizer</strong> tab renders spectrum and waveform views driven from live playback or the audio engine’s optional spectrum bins (<code>visualizer.js</code>). Start playback from Samples (or any preview), switch to Visualizer, and watch the bins react. The view respects the <strong>UI idle</strong> backoff (<code>ui-idle.js</code>) so it pauses cleanly when the window is hidden.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/visualizers.png" alt="Visualizer tab showing real-time spectrum and waveform display" loading="lazy">
-            <figcaption>assets/visualizers.png</figcaption>
-          </figure>
-        </section>
-
-        <section class="tutorial-step" id="step-16">
-          <h3><span class="step-num">16</span>Audio Engine tab</h3>
-          <p>The <strong>Audio Engine</strong> tab is a developer-oriented surface over the subprocess engine (<code>audio-engine.js</code> ↔ <code>audio_engine_invoke</code>). From here you can load a file, scrub/loop/reverse, apply DSP/EQ/mono, insert a VST3 or AU plugin chain, and open plugin editor windows. Use the <strong>Restart engine</strong> control if the helper misbehaves; <code>audio_engine_restart</code> rebuilds the child process without touching the main window.</p>
-          <figure class="tutorial-shot">
-            <img src="assets/audioengine.png" alt="Audio Engine tab with plugin insert chain and transport controls" loading="lazy">
-            <figcaption>assets/audioengine.png</figcaption>
-          </figure>
-          <div class="tip"><strong>Note:</strong> ad-hoc signed builds on macOS may show blank AU editor windows because <code>audiocomponentd</code> refuses XPC view delivery to unsigned hosts. A Developer ID build resolves this.</div>
-        </section>
-
-        <section class="tutorial-step" id="step-17">
-          <h3><span class="step-num">17</span>Theme, CRT, neon, color schemes</h3>
-          <p>In the header (or Settings), toggle <strong>Theme</strong> (light/dark), <strong>CRT</strong> scanline overlay, and <strong>Neon</strong> border pulse. The <strong>Color scheme</strong> grid picks an accent palette; you can save custom presets too. All of these also apply to the tray popover in real time.</p>
-        </section>
-
-        <section class="tutorial-step" id="step-18">
-          <h3><span class="step-num">18</span>Keyboard shortcuts &amp; help overlay</h3>
-          <p>Press <strong>?</strong> (help overlay, <code>help-overlay.js</code>) at any time for a cheat sheet of every binding. To rebind, open <strong>Settings → Shortcuts</strong>: every action in <code>SHORTCUT_LABEL_KEYS</code> is listed and capturable. Custom bindings persist across launches.</p>
-          <div class="tip"><strong>Done.</strong> Everything else on this page is developer reference — the IPC surface, SQLite layer, scanners, audio-engine subprocess, and Rust module map.</div>
-        </section>
+    <div class="hub-scheme-strip">
+      <div class="hub-scheme-strip-inner">
+        <span class="hud-scheme-label">// Color scheme</span>
+        <div class="scheme-grid" id="hudSchemeGrid"></div>
       </div>
+    </div>
 
-      <div class="doc-card">
+    <main class="tutorial-main">
+      <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>DEVELOPER REFERENCE</h2>
+      <p class="tutorial-subtitle">Tauri v2 · Rust backend <code>app_lib</code> · release version in <code>package.json</code> / <code>src-tauri/tauri.conf.json</code> / <code>src-tauri/Cargo.toml</code>. Main UI is <code>frontend/index.html</code>; the menu-bar tray runs a separate WebView (<code>frontend/tray-popover.html</code> + <code>frontend/js/tray-popover.js</code>).</p>
+
+      <section class="tutorial-section" id="tutorial">
+        <h2>Step-by-step tutorial — how to use AUDIO_HAXOR</h2>
+        <p>The full end-user walkthrough now lives as an 18-step, multi-page tour under <code>docs/tutorial/</code>. Each step is a proper deep-dive: every control, column, filter, row action, keybinding, and IPC command — grounded in the actual source. Cyberpunk styling, CRT scanlines, neon accents, entrance animations.</p>
+        <p><a href="tutorial/index.html" class="btn btn-secondary">Open the tutorial →</a></p>
+        <h3>Chapters</h3>
+        <ul>
+          <li><strong>01 — First launch</strong>: HUD header, process stats, tab bar, boot sequence. <a href="tutorial/01-welcome.html">Read &rarr;</a></li>
+          <li><strong>02 — Scan roots</strong>: per-scanner directory lists, blacklist, performance tunables. <a href="tutorial/02-settings.html">Read &rarr;</a></li>
+          <li><strong>03 — Scan All &amp; Walkers</strong>: unified scan, per-type scans, live walker tiles. <a href="tutorial/03-walkers.html">Read &rarr;</a></li>
+          <li><strong>04 — Plugins</strong>: VST/VST3/AU/CLAP, KVR update flow, dependency graph. <a href="tutorial/04-plugins.html">Read &rarr;</a></li>
+          <li><strong>05 — Samples</strong>: streaming table, waveform + spectrogram preview, fingerprint duplicates. <a href="tutorial/05-samples.html">Read &rarr;</a></li>
+          <li><strong>06 — BPM / key / LUFS analysis</strong>: algorithm notes (onset autocorrelation, Krumhansl-Kessler, BS.1770). <a href="tutorial/06-analysis.html">Read &rarr;</a></li>
+          <li><strong>07 — DAW projects</strong>: thirteen formats, extract plugins, xref cache. <a href="tutorial/07-daw.html">Read &rarr;</a></li>
+          <li><strong>08 — MIDI / Presets / PDFs</strong>: metadata extractors, preset catalog, PDF page counts. <a href="tutorial/08-midi-presets-pdf.html">Read &rarr;</a></li>
+          <li><strong>09 — Command palette</strong>: Cmd+K launcher, DB preview, toggles. <a href="tutorial/09-palette.html">Read &rarr;</a></li>
+          <li><strong>10 — Floating player</strong>: waveform seek, EQ, gain, pan, speed, reverse, A/B loop. <a href="tutorial/10-player.html">Read &rarr;</a></li>
+          <li><strong>11 — Tray popover</strong>: menu-bar HUD, scrubber drag, theme sync. <a href="tutorial/11-tray.html">Read &rarr;</a></li>
+          <li><strong>12 — Favorites / Notes / Tags</strong>: cross-inventory organization, multi-filter, tag cloud. <a href="tutorial/12-favorites-notes-tags.html">Read &rarr;</a></li>
+          <li><strong>13 — Files browser</strong>: navigation, bookmarks, lazy waveforms, native drag-out. <a href="tutorial/13-files.html">Read &rarr;</a></li>
+          <li><strong>14 — Scan history &amp; diffs</strong>: merged sidebar, per-type detail, added/removed diffs. <a href="tutorial/14-history.html">Read &rarr;</a></li>
+          <li><strong>15 — Visualizer</strong>: six tiles, engine spectrum vs Web Audio fallback, idle backoff. <a href="tutorial/15-visualizer.html">Read &rarr;</a></li>
+          <li><strong>16 — Audio Engine tab</strong>: device selection, plugin insert chain, diagnostics. <a href="tutorial/16-audio-engine.html">Read &rarr;</a></li>
+          <li><strong>17 — Theme &amp; color schemes</strong>: Cyberpunk, Midnight, Matrix, Ember, Arctic + custom editor. <a href="tutorial/17-theme.html">Read &rarr;</a></li>
+          <li><strong>18 — Keyboard shortcuts</strong>: full default keymap, rebinding UI, FZF syntax. <a href="tutorial/18-shortcuts.html">Read &rarr;</a></li>
+        </ul>
+      </section>
+
+
+      <section class="tutorial-section">
         <h2>Application feature map</h2>
         <p>Checklist-style index of shipped surfaces (verify in <code>frontend/</code> + <code>src-tauri/</code>). Deeper behavior lives in <code>README.md</code> and rustdoc.</p>
 
-        <p class="feat-sub">Main tabs</p>
+        <h3>Main tabs</h3>
         <ul>
           <li><strong>Plugins</strong> — VST/VST3/AU/CLAP scan, SQLite table, KVR resolve + update check with queued “next update” flow (<code>js/kvr.js</code>), export/import (JSON/CSV/TOML), per-scan history + diff, optional disk-usage strip (<code>js/disk-usage.js</code>), plugin dependency graph (<code>js/dep-graph.js</code>).</li>
           <li><strong>Samples</strong> — audio library scan + history/diff, paginated table with sort/persisted columns (<code>js/sort-persist.js</code>, <code>js/columns.js</code>), inline preview / floating player (<code>js/audio.js</code>), waveform/spectrogram caches + decode worker, BPM/key/LUFS fields and batch analysis, chromaprint fingerprint cache + <strong>find similar</strong> + <strong>content duplicates</strong>, smart playlists (<code>js/smart-playlists.js</code>).</li>
@@ -399,7 +157,7 @@
           <li><strong>Settings</strong> — file-backed prefs + SQLite app strings; UI locale; light/dark + CRT + neon; color schemes / custom presets; scan roots &amp; blacklists; auto-scan, folder watch, incremental scan, prune-old-scans, include-backups; autoplay &amp; playback toggles; auto-update; PDF metadata auto-extract; analysis auto-run; table page size; log verbosity; cache table rebuild/clear (incl. xref/fingerprint); BPM/LUFS jobs; data-dir file list; export settings/log as PDF; shortcut editor (<code>js/settings.js</code>, <code>js/settings-search.js</code>, <code>js/i18n-ui.js</code>).</li>
         </ul>
 
-        <p class="feat-sub">Scanning &amp; database</p>
+        <h3>Scanning &amp; database</h3>
         <ul>
           <li><strong>Unified scan</strong> — <code>scan_unified</code> walks configured roots once and fans progress into the same per-type events as standalone scans (<code>prepare_unified_scan</code>, <code>stop_unified_scan</code>, <code>get_unified_scan_run</code>).</li>
           <li><strong>Standalone scans</strong> — plugins, samples, DAW, presets, MIDI, PDF each support custom roots, exclude paths, stop/resume where applicable, progress listeners, and a header <strong>resume all</strong> when workers are paused.</li>
@@ -407,13 +165,13 @@
           <li><strong>Import/export</strong> — tab-scoped JSON/DSV/CSV/TOML where implemented; plugin xref export; smart-playlist export; favorites/notes; PDFs; MIDI export.</li>
         </ul>
 
-        <p class="feat-sub">Playback &amp; tray (summary)</p>
+        <h3>Playback &amp; tray (summary)</h3>
         <ul>
           <li>Floating player: history list, filter field, shuffle, loop modes, A/B loop, 3-band EQ + gain + pan, mono, volume, playback speed + reverse, favorite/tag current track, export/import/clear <strong>recently played</strong>, expand/collapse, hide/show pill — see <code>js/audio.js</code>.</li>
           <li><strong>Autoplay next source</strong> — Settings chooses whether EOF / failure-chain advance follows player history or visible Samples table; tray/menu/shortcuts/palette use <code>respectAutoplaySource</code>; floating <strong>Next/Previous</strong> buttons use history order only (see tray section below).</li>
         </ul>
 
-        <p class="feat-sub">Tooling &amp; discovery</p>
+        <h3>Tooling &amp; discovery</h3>
         <ul>
           <li><strong>Heatmap dashboard</strong> — sample metadata visualization (<code>js/heatmap-dashboard.js</code>).</li>
           <li><strong>Duplicate finder</strong> — content-level reports (<code>js/duplicates.js</code>).</li>
@@ -421,7 +179,7 @@
           <li><strong>Logging</strong> — in-app log, clear, open log file, optional PDF export.</li>
         </ul>
 
-        <p class="feat-sub">UX &amp; desktop integration</p>
+        <h3>UX &amp; desktop integration</h3>
         <ul>
           <li><strong>Help overlay</strong> — shortcut reference (<code>js/help-overlay.js</code>).</li>
           <li><strong>Context menus</strong> — row actions across tabs (<code>js/context-menu.js</code>).</li>
@@ -431,9 +189,9 @@
           <li><strong>UI idle</strong> — <code>js/ui-idle.js</code> sets <code>html.ui-idle-heavy-cpu</code> when the window is backgrounded/minimized/hidden to pause scanlines and suppress toasts.</li>
           <li><strong>Native menus</strong> — macOS/Windows menu bar mirrors many actions; <strong>GitHub</strong> / <strong>Docs</strong> items open external links.</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Rust API (rustdoc)</h2>
         <p>Generated HTML for the library crate:</p>
         <ul>
@@ -442,9 +200,9 @@
         </ul>
         <pre>pnpm run doc:open    # build + open in browser
 pnpm run doc:sync    # copy tree into docs/api/</pre>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Main window IPC &amp; i18n</h2>
         <p><code>frontend/js/ipc.js</code> is the Tauri bridge (replaces an Electron-style preload):</p>
         <ul>
@@ -453,9 +211,9 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
           <li><strong><code>menu-action</code> events:</strong> native menu bar and tray dispatch action IDs into the main window. Tray seek uses a single payload form <code>seek:&lt;fraction&gt;</code> (0..1) → <code>seekPlaybackToPercent</code> without a separate IPC command.</li>
           <li><strong>Host EOF poll:</strong> <code>listen('audio-engine-playback-eof', …)</code> forwards to <code>handleEnginePlaybackEofFromPoll</code> when Rust detects end-of-file while WebView timers may be throttled — same advance behavior as the in-window playback path.</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Command palette (Cmd+K)</h2>
         <p><code>frontend/js/command-palette.js</code> — quick launcher bound by default to <strong>Cmd+K</strong> / <strong>Ctrl+K</strong> via <code>shortcuts.js</code> (<code>commandPalette</code>).</p>
         <ul>
@@ -463,9 +221,9 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
           <li><strong>Database search:</strong> with query length ≥ 2, calls <code>dbQueryPalettePreview</code> (one pooled Rust task, six capped inventory queries). Results cover plugins, audio samples, DAW projects, presets, PDFs, and MIDI files. Choosing a hit switches to the right tab and seeds that tab’s search field — the palette does not rely on in-memory paginated tables alone.</li>
           <li><strong>Transport alignment:</strong> palette <strong>Next track</strong> / <strong>Previous track</strong> call <code>nextTrack({ respectAutoplaySource: true })</code> / <code>prevTrack({ respectAutoplaySource: true })</code>, same as the tray, menu bar, and keyboard shortcuts (see below).</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Keyboard shortcuts</h2>
         <p><code>frontend/js/shortcuts.js</code> — persisted overrides and <code>executeShortcut(id)</code> dispatch.</p>
         <ul>
@@ -473,9 +231,9 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
           <li><strong>Scope:</strong> tab switching (plugins through audio engine), focus search, help overlay, playback (play/pause, loop, mute, volume, shuffle, A/B loop, player visibility), file ops (reveal, copy path, favorite, notes), selection, export/import current tab, dependency graph, duplicates/similar, theme, prefs, scan/stop variants, PDF metadata, fingerprint cache, BPM/key/LUFS jobs, cache clears, log verbosity, table page size, autoplay source, tag filter bar, and more.</li>
           <li><strong>Next / Previous track keys</strong> invoke <code>nextTrack</code> / <code>prevTrack</code> with <code>respectAutoplaySource: true</code> so ordering follows <code>autoplayNextSource</code> (player history vs Samples table), not only the floating history list.</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Tray popover &amp; playback IPC</h2>
         <p>High level (details in source comments):</p>
         <ul>
@@ -487,9 +245,9 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
           <li><strong>Tray seek:</strong> Popover scrubber sends <code>menu-action</code> with payload <code>seek:&lt;fraction&gt;</code>; see IPC section above.</li>
           <li><strong>HUD subtitle:</strong> <code>syncTrayNowPlayingFromPlayback</code> clears a redundant subtitle when <code>#npMetaLine</code> would duplicate the track title (e.g. basename-only path matching the displayed name).</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Monorepo layout</h2>
         <p>High-level tree (names only — open the repo for full detail).</p>
         <pre>audio-haxor/
@@ -501,9 +259,9 @@ pnpm run doc:sync    # copy tree into docs/api/</pre>
 ├── src-tauri/         # Rust crate (lib + binary), capabilities, bundled resources
 │   └── src/           # lib.rs invoke surface + domain modules (see below)
 └── package.json       # pnpm scripts; version mirrors tauri.conf / Cargo for releases</pre>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Package scripts (pnpm)</h2>
         <p>Entry points from <code>package.json</code> — run from repo root with <code>pnpm …</code>.</p>
         <pre>dev / tauri:dev          → tauri dev
@@ -517,9 +275,9 @@ doc / doc:open / doc:sync → rustdoc; doc:sync copies target/doc → docs/api/
 clean / bust / rebuild / nuke / deploy → maintenance shell scripts
 db:vacuum / db:stats     → SQLite maintenance helpers
 i18n:sort / i18n:sort:check / i18n:audit → catalog sort + HTML audit report</pre>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Shell helpers under <code>scripts/</code></h2>
         <p>Thin wrappers around builds, tests, deploy, and DB housekeeping — read each file for flags and safety rails.</p>
         <ul>
@@ -529,9 +287,9 @@ i18n:sort / i18n:sort:check / i18n:audit → catalog sort + HTML audit report</p
           <li><strong>bundle_dmg.sh / deploy.sh / cyberpunk.sh</strong> — packaging and themed extras.</li>
           <li><strong>db-vacuum.sh / db-stats.sh</strong> — on-disk SQLite maintenance.</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Tauri <code>invoke</code> inventory</h2>
         <p>Authoritative list lives in <code>src-tauri/src/lib.rs</code> inside <code>tauri::generate_handler![…]</code>. Grouped here for orientation (names only).</p>
         <pre>Core / system
@@ -594,9 +352,9 @@ SQLite (queries, stats, maintenance, analysis backfill)
 
 Folder watch
   start_file_watcher, stop_file_watcher, get_file_watcher_status</pre>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Rust modules (<code>src-tauri/src</code>)</h2>
         <p>One file per concern where possible; heavy lifting is split so IPC handlers stay thin.</p>
         <ul>
@@ -615,9 +373,9 @@ Folder watch
           <li><strong>open_with_app.rs</strong> — platform “open with” / reveal patterns.</li>
           <li><strong>app_i18n.rs</strong> — loads catalogs for <code>get_app_strings</code>; <strong>native_menu.rs</strong>, <strong>tray_menu.rs</strong> — menu bar + tray popover wiring.</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>SQLite &amp; performance notes</h2>
         <p>The database layer is documented in-source: WAL mode, a single writer connection for migrations and serialized writes, and a pool of read-only handles rotated for <code>db_query_*</code> so one long query does not block the whole UI.</p>
         <ul>
@@ -625,9 +383,9 @@ Folder watch
           <li><strong>Analysis columns</strong> — BPM, musical key, LUFS, and batch backfill commands keep the library table the source of truth for sort/filter.</li>
           <li><strong>Caches</strong> — <code>db_cache_stats</code> / <code>db_clear_cache_table</code> expose maintenance for derived tables (fingerprints, xref, etc.) without nuking raw library rows.</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Audio engine subprocess</h2>
         <p>The UI talks to a separate audio-engine binary via <code>audio_engine_invoke</code> (see <code>frontend/js/audio-engine.js</code>). Rust forwards JSON messages, restarts the child when needed, and exposes EOF watchdog hooks so backgrounded WebViews still advance transport when macOS throttles timers.</p>
         <ul>
@@ -636,18 +394,18 @@ Folder watch
           <li><strong>Plugin hosting</strong> — VST3/AU insert chain with editor windows where supported.</li>
           <li><strong>Tests</strong> — <code>pnpm run test:audio-engine</code> exercises the JSON surface from Node without the full Tauri shell.</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Frontend <code>js/</code> module index</h2>
         <p>Every module below is plain browser JS loaded by <code>frontend/index.html</code> (order matters for globals — release builds may differ from dev bundling assumptions; cross-file calls are guarded where noted in source).</p>
-        <p class="feat-sub">Shell &amp; IPC</p>
+        <h3>Shell &amp; IPC</h3>
         <ul>
           <li><strong>app.js</strong> — boot, tab wiring, global listeners.</li>
           <li><strong>ipc.js</strong> — <code>window.vstUpdater</code>, string hydration, menu-action routing.</li>
           <li><strong>utils.js</strong> — shared helpers (formatting, DOM, async guards).</li>
         </ul>
-        <p class="feat-sub">Tabs &amp; data</p>
+        <h3>Tabs &amp; data</h3>
         <ul>
           <li><strong>plugins.js</strong>, <strong>daw.js</strong>, <strong>presets.js</strong>, <strong>midi.js</strong>, <strong>pdf.js</strong> — table UX per inventory type.</li>
           <li><strong>history.js</strong>, <strong>walker-status.js</strong> — scan runs and live walker HUD.</li>
@@ -655,14 +413,14 @@ Folder watch
           <li><strong>smart-playlists.js</strong>, <strong>duplicates.js</strong>, <strong>heatmap-dashboard.js</strong> — library intelligence views.</li>
           <li><strong>file-browser.js</strong>, <strong>native-file-drag.js</strong> — Files tab and native drag metadata.</li>
         </ul>
-        <p class="feat-sub">Playback &amp; engine</p>
+        <h3>Playback &amp; engine</h3>
         <ul>
           <li><strong>audio.js</strong> — floating player, history, tray sync, autoplay chains.</li>
           <li><strong>audio-engine.js</strong> — JSON client for the subprocess engine.</li>
           <li><strong>audio-decode-worker.js</strong> — off-main-thread decode for waveforms/spectrograms.</li>
           <li><strong>visualizer.js</strong> — spectrum/waveform presentation.</li>
         </ul>
-        <p class="feat-sub">Settings, i18n, palette</p>
+        <h3>Settings, i18n, palette</h3>
         <ul>
           <li><strong>settings.js</strong>, <strong>settings-search.js</strong> — prefs UI and fuzzy search over settings keys.</li>
           <li><strong>i18n-ui.js</strong> — reapplies translated strings and locale toggles.</li>
@@ -670,7 +428,7 @@ Folder watch
           <li><strong>shortcuts.js</strong> — keymap persistence + <code>executeShortcut</code>.</li>
           <li><strong>kvr.js</strong> — KVR resolve/update UX.</li>
         </ul>
-        <p class="feat-sub">Desktop polish</p>
+        <h3>Desktop polish</h3>
         <ul>
           <li><strong>context-menu.js</strong>, <strong>tooltip-hover.js</strong>, <strong>help-overlay.js</strong>, <strong>modal-drag.js</strong>.</li>
           <li><strong>keyboard-nav.js</strong>, <strong>batch-select.js</strong>, <strong>drag-reorder.js</strong>, <strong>sort-persist.js</strong>, <strong>columns.js</strong>.</li>
@@ -678,26 +436,26 @@ Folder watch
           <li><strong>ui-idle.js</strong> — backs off animations when the window is not visible.</li>
           <li><strong>tray-popover.js</strong> — separate WebView HUD (loaded from <code>tray-popover.html</code>).</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Static docs styling</h2>
         <p>This page shares <code>hud-static.css</code> with the generated i18n audit report so <code>file://</code> and <code>tauri://</code> views stay visually aligned. <code>hud-theme.js</code> wires theme toggle, CRT overlay, neon pulse, and the same color-scheme grid as the app HUD.</p>
         <ul>
           <li><strong>i18n audit</strong> — <code>pnpm run i18n:audit</code> writes <code>reports/i18n_catalog_audit.html</code> by default (override with <code>-o</code>). Open that file after generation; it inlines CSS from <code>hud-static.css</code> for a self-contained artifact.</li>
           <li><strong>Catalog maintenance</strong> — <code>pnpm run i18n:sort</code> normalizes key ordering; <code>i18n:sort:check</code> fails CI-style when catalogs drift.</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Repository</h2>
         <ul>
           <li><a href="https://github.com/MenkeTechnologies/Audio-Haxor">GitHub — Audio-Haxor</a></li>
           <li>Full prose docs: <code>README.md</code> at repo root (features, testing, architecture).</li>
         </ul>
-      </div>
+      </section>
 
-      <div class="doc-card">
+      <section class="tutorial-section">
         <h2>Tests (quick ref)</h2>
         <p>Counts change with every commit; run locally for current totals.</p>
         <ul>
@@ -705,7 +463,7 @@ Folder watch
           <li><strong>JavaScript:</strong> <code>pnpm run test:js</code> — pure helpers and micro-tests; not DOM/Tauri/E2E (see README)</li>
           <li><strong>Combined:</strong> <code>pnpm test</code></li>
         </ul>
-      </div>
+      </section>
     </main>
   </div>
 
