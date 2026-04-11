@@ -241,44 +241,98 @@
     .progress-wrap { position: relative; margin-top: 4px; }
     .track-bar {
       position: relative;
-      padding: 6px 0;
+      padding: 4px 0;
       cursor: pointer;
       touch-action: none;
     }
     .track-bg {
       position: relative;
-      height: 3px;
+      height: 28px;
       border-radius: 0;
       background: var(--cp-track-bg);
       border: 1px solid var(--cp-track-border);
+      overflow: visible;
     }
-    /* `.now-playing-progress` */
-    .track-fill {
+    /* Mini waveform canvas — peaks sent from the main window in `TrayPopoverEmit.waveform_peaks`.
+     * Rendered once per track and cached by path; overlays (fill, cursor, loop) sit on top. */
+    .track-waveform-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
       height: 100%;
+      pointer-events: none;
+      image-rendering: pixelated;
+    }
+    /* `.now-playing-progress` — translucent overlay on top of the waveform. */
+    .track-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
       width: 0%;
       border-radius: 0;
       background: linear-gradient(
         90deg,
-        color-mix(in srgb, var(--cp-cyan) 45%, transparent),
-        color-mix(in srgb, var(--cp-magenta) 35%, transparent)
+        color-mix(in srgb, var(--cp-cyan) 18%, transparent),
+        color-mix(in srgb, var(--cp-magenta) 14%, transparent)
       );
       pointer-events: none;
     }
+    /* Playhead cursor — vertical line spanning the full waveform height. */
     .track-thumb {
       position: absolute;
-      top: 50%;
+      top: 0;
+      bottom: 0;
       left: 0;
-      width: 8px;
-      height: 8px;
-      margin-left: -4px;
-      border-radius: 0;
+      width: 2px;
+      margin-left: -1px;
       background: var(--cp-cyan);
-      border: 1px solid color-mix(in srgb, var(--cp-cyan) 60%, white);
-      box-shadow: 0 0 8px var(--cp-thumb-glow);
+      box-shadow: 0 0 4px var(--cp-thumb-glow);
       pointer-events: none;
-      transform: translateY(-50%);
+      z-index: 4;
     }
     .idle .track-thumb { opacity: 0; }
+    /* Per-sample loop region on the tray progress bar — spans the full 28 px waveform height so
+     * braces are unmistakable. Matches the yellow (#ffe600) used on the main-window meta waveform
+     * braces. Pointer-events none — the trackBar owns scrub/paint/exit gestures. */
+    .track-loop-region {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      background: rgba(255, 230, 0, 0.14);
+      pointer-events: none;
+      display: none;
+      z-index: 2;
+    }
+    .track-loop-brace {
+      box-sizing: border-box;
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      pointer-events: none;
+      display: none;
+      z-index: 5;
+    }
+    .track-loop-brace-start {
+      margin-left: 0;
+      border-left: 2px solid #ffe600;
+      border-top: 2px solid #ffe600;
+      border-bottom: 2px solid #ffe600;
+      border-right: none;
+    }
+    .track-loop-brace-end {
+      margin-left: -8px;
+      border-right: 2px solid #ffe600;
+      border-top: 2px solid #ffe600;
+      border-bottom: 2px solid #ffe600;
+      border-left: none;
+    }
+    .idle .track-loop-region,
+    .idle .track-loop-brace { display: none !important; }
     /* `.now-playing-time` — Orbitron */
     .times {
       display: flex;
@@ -446,7 +500,11 @@
     <div class="progress-wrap" id="trayProgressWrap">
       <div class="track-bar" id="trackBar">
         <div class="track-bg">
+          <canvas class="track-waveform-canvas" id="trayWaveformCanvas"></canvas>
           <div class="track-fill" id="fill"></div>
+          <div class="track-loop-region" id="trayLoopRegion"></div>
+          <div class="track-loop-brace track-loop-brace-start" id="trayLoopBraceStart"></div>
+          <div class="track-loop-brace track-loop-brace-end" id="trayLoopBraceEnd"></div>
           <div class="track-thumb" id="trackThumb"></div>
         </div>
       </div>
@@ -476,6 +534,6 @@
     </div>
   </div>
   <div class="tray-ctx-menu" id="trayCtxMenu" aria-hidden="true"></div>
-  <script src="js/tray-popover.js?v=25371"></script>
+  <script src="js/tray-popover.js?v=38325"></script>
 </body>
 </html>

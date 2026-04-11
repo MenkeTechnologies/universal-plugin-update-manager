@@ -191,6 +191,43 @@ listen('menu-action', (event) => {
         }
         return;
     }
+    /* Tray popover sample loop region — the popover sends fraction pairs (0..1) via
+     * `loop_region_paint:<startFrac>:<endFrac>`, or `loop_region_disable` to clear it.
+     * Main applies the region to `_sampleLoopRegions[audioPlayerPath]`, updates `_abLoop`,
+     * and the braces repaint on the expanded/now-playing waveforms via `applyMetaLoopRegionUI`. */
+    if (typeof id === 'string' && id.startsWith('loop_region_paint:')) {
+        const parts = id.slice('loop_region_paint:'.length).split(':');
+        const sFrac = parseFloat(parts[0]);
+        const eFrac = parseFloat(parts[1]);
+        const path = typeof audioPlayerPath === 'string' ? audioPlayerPath : '';
+        if (Number.isFinite(sFrac) && Number.isFinite(eFrac) && path
+            && typeof getSampleLoopRegion === 'function'
+            && typeof setSampleLoopRegion === 'function') {
+            const region = getSampleLoopRegion(path);
+            const lo = Math.max(0, Math.min(1, Math.min(sFrac, eFrac)));
+            const hi = Math.max(0, Math.min(1, Math.max(sFrac, eFrac)));
+            region.startFrac = lo;
+            region.endFrac = Math.max(hi, lo + 0.005);
+            region.enabled = true;
+            setSampleLoopRegion(path, region);
+            if (typeof applyMetaLoopRegionUI === 'function') applyMetaLoopRegionUI(path);
+            if (typeof refreshNpLoopRegionUI === 'function') refreshNpLoopRegionUI();
+            if (typeof syncAbLoopFromSampleRegion === 'function') syncAbLoopFromSampleRegion(path);
+        }
+        return;
+    }
+    if (id === 'loop_region_disable') {
+        const path = typeof audioPlayerPath === 'string' ? audioPlayerPath : '';
+        if (path && typeof getSampleLoopRegion === 'function' && typeof setSampleLoopRegion === 'function') {
+            const region = getSampleLoopRegion(path);
+            region.enabled = false;
+            setSampleLoopRegion(path, region);
+            if (typeof applyMetaLoopRegionUI === 'function') applyMetaLoopRegionUI(path);
+            if (typeof refreshNpLoopRegionUI === 'function') refreshNpLoopRegionUI();
+            if (typeof syncAbLoopFromSampleRegion === 'function') syncAbLoopFromSampleRegion(path);
+        }
+        return;
+    }
     switch (id) {
         // File
         case 'scan_all':

@@ -147,6 +147,10 @@
     const elFill = document.getElementById('fill');
     const elThumb = document.getElementById('trackThumb');
     const elTrackBar = document.getElementById('trackBar');
+    const elLoopRegion = document.getElementById('trayLoopRegion');
+    const elLoopBraceStart = document.getElementById('trayLoopBraceStart');
+    const elLoopBraceEnd = document.getElementById('trayLoopBraceEnd');
+    const elWaveformCanvas = document.getElementById('trayWaveformCanvas');
     const elElapsed = document.getElementById('elapsed');
     const elTotal = document.getElementById('total');
     const btnShuffle = document.getElementById('btnShuffle');
@@ -720,6 +724,94 @@
      * emits while main is hidden can carry a stale `elapsed_sec` vs local rAF interpolation). */
     let _trayLastApplyProgressKey = null;
 
+    /** Loop region state from the latest emit — fractions are only valid when `_trayLoopTotal > 0`. */
+    let _trayLoopEnabled = false;
+    let _trayLoopStartSec = 0;
+    let _trayLoopEndSec = 0;
+    let _trayLoopTotal = 0;
+
+    /** Cached flat `[max0, min0, max1, min1, …]` peaks for the current track. `null` = no waveform. */
+    let _trayWaveformPeaks = null;
+    /** Signature (length + first/last few samples) — avoids re-rendering when the emit repeats. */
+    let _trayWaveformSig = '';
+
+    function _trayPeaksSig(flat) {
+        if (!Array.isArray(flat) || flat.length === 0) return '';
+        const n = flat.length;
+        const sample = (i) => (typeof flat[i] === 'number' ? flat[i].toFixed(3) : '0');
+        return `${n}|${sample(0)}|${sample(Math.floor(n / 2))}|${sample(n - 1)}`;
+    }
+
+    /* ResizeObserver: the tray popover can resize for title-length changes, so the canvas
+     * backing store needs to follow `clientWidth` / `clientHeight`. Single observer — reusable. */
+    if (elWaveformCanvas && typeof ResizeObserver === 'function') {
+        const ro = new ResizeObserver(() => {
+            // Defer to next frame so the new layout is measurable.
+            requestAnimationFrame(() => renderTrayWaveform());
+        });
+        try { ro.observe(elWaveformCanvas); } catch {}
+    }
+
+    function renderTrayWaveform() {
+        if (!elWaveformCanvas) return;
+        const ctx = elWaveformCanvas.getContext('2d');
+        if (!ctx) return;
+        const cssW = Math.max(1, elWaveformCanvas.clientWidth || elWaveformCanvas.offsetWidth || 0);
+        const cssH = Math.max(1, elWaveformCanvas.clientHeight || elWaveformCanvas.offsetHeight || 0);
+        const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+        const bw = Math.max(1, Math.round(cssW * dpr));
+        const bh = Math.max(1, Math.round(cssH * dpr));
+        if (elWaveformCanvas.width !== bw) elWaveformCanvas.width = bw;
+        if (elWaveformCanvas.height !== bh) elWaveformCanvas.height = bh;
+        ctx.clearRect(0, 0, bw, bh);
+        const peaks = _trayWaveformPeaks;
+        if (!Array.isArray(peaks) || peaks.length < 2) return;
+        const nBars = Math.floor(peaks.length / 2);
+        const mid = bh / 2;
+        const barW = bw / nBars;
+        /* Filled envelope: top trace (max), bottom trace (min) — same gradient as the main meta waveform. */
+        ctx.beginPath();
+        ctx.moveTo(0, mid);
+        for (let i = 0; i < nBars; i++) {
+            const x = (i + 0.5) * barW;
+            const mx = peaks[i * 2];
+            const y = mid - mx * mid * 0.92;
+            ctx.lineTo(x, y);
+        }
+        for (let i = nBars - 1; i >= 0; i--) {
+            const x = (i + 0.5) * barW;
+            const mn = peaks[i * 2 + 1];
+            const y = mid - mn * mid * 0.92;
+            ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, 0, bw, 0);
+        grad.addColorStop(0, 'rgba(5, 217, 232, 0.55)');
+        grad.addColorStop(0.5, 'rgba(108, 108, 232, 0.55)');
+        grad.addColorStop(1, 'rgba(211, 0, 197, 0.55)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+    }
+
+    function renderLoopRegion() {
+        const show = _trayLoopEnabled && _trayLoopTotal > 0 && _trayLoopEndSec > _trayLoopStartSec;
+        /* Stylesheet default is `display: none` — setting `''` removes the inline style and the
+         * element falls back to the hidden default. Use an explicit `block` when showing. */
+        const disp = show ? 'block' : 'none';
+        if (elLoopRegion) elLoopRegion.style.display = disp;
+        if (elLoopBraceStart) elLoopBraceStart.style.display = disp;
+        if (elLoopBraceEnd) elLoopBraceEnd.style.display = disp;
+        if (!show) return;
+        const sPct = Math.max(0, Math.min(100, (_trayLoopStartSec / _trayLoopTotal) * 100));
+        const ePct = Math.max(0, Math.min(100, (_trayLoopEndSec / _trayLoopTotal) * 100));
+        if (elLoopRegion) {
+            elLoopRegion.style.left = `${sPct}%`;
+            elLoopRegion.style.width = `${Math.max(0, ePct - sPct)}%`;
+        }
+        if (elLoopBraceStart) elLoopBraceStart.style.left = `${sPct}%`;
+        if (elLoopBraceEnd) elLoopBraceEnd.style.left = `${ePct}%`;
+    }
+
     function renderProgress(elapsed, total) {
         const tot = typeof total === 'number' && Number.isFinite(total) && total > 0 ? total : null;
         let pct = 0;
@@ -862,6 +954,32 @@
         if (btnShuffle) btnShuffle.classList.toggle('active', shuf);
         if (btnLoop) btnLoop.classList.toggle('active', loopOn);
         if (btnFav) btnFav.classList.toggle('active', favOn);
+        _trayLoopEnabled = p.loop_region_enabled === true;
+        _trayLoopStartSec = typeof p.loop_region_start_sec === 'number' && Number.isFinite(p.loop_region_start_sec) ? p.loop_region_start_sec : 0;
+        _trayLoopEndSec = typeof p.loop_region_end_sec === 'number' && Number.isFinite(p.loop_region_end_sec) ? p.loop_region_end_sec : 0;
+        _trayLoopTotal = total != null ? total : 0;
+        renderLoopRegion();
+        /* Waveform peaks — `Vec::is_empty` skips serialization, so an absent field means
+         * "host didn't send peaks this tick" (keep existing). An empty array means "clear".
+         * A non-empty array replaces the cached waveform. Only re-render on actual change. */
+        if (Array.isArray(p.waveform_peaks)) {
+            const sig = _trayPeaksSig(p.waveform_peaks);
+            if (p.waveform_peaks.length === 0) {
+                if (_trayWaveformPeaks !== null) {
+                    _trayWaveformPeaks = null;
+                    _trayWaveformSig = '';
+                    renderTrayWaveform();
+                }
+            } else if (sig !== _trayWaveformSig) {
+                _trayWaveformPeaks = p.waveform_peaks;
+                _trayWaveformSig = sig;
+                renderTrayWaveform();
+            }
+        } else if (idle && _trayWaveformPeaks !== null) {
+            _trayWaveformPeaks = null;
+            _trayWaveformSig = '';
+            renderTrayWaveform();
+        }
         applyTrayExtrasFromState(p.volume_pct, p.playback_speed);
         logTrayPopoverApplyState(p, idle, playing, themed);
         syncTrayPopoverTooltips();
@@ -972,10 +1090,80 @@
         ensureAnimating();
     }
 
+    /* Shift+drag on the tray trackBar paints a new sample loop region. Emits `loop_region_paint:s:e`
+     * through `tray_popover_action` → `menu-action`; main's `ipc.js` handler writes it back into
+     * `_sampleLoopRegions[audioPlayerPath]` + `_abLoop`, and the host re-emits the tray state with
+     * updated region fields so the braces repaint here. */
+    let _trayLoopPaint = null; // { anchorFrac, pointerId }
+    function trayLoopPaintMove(e) {
+        if (!_trayLoopPaint || e.pointerId !== _trayLoopPaint.pointerId) return;
+        const frac = pointerFraction(e);
+        const a = _trayLoopPaint.anchorFrac;
+        const lo = Math.min(a, frac);
+        const hi = Math.max(a, frac);
+        /* Optimistic local render so the braces follow the drag immediately — host round-trip
+         * would lag a frame behind the pointer. */
+        if (_trayLoopTotal > 0) {
+            _trayLoopEnabled = true;
+            _trayLoopStartSec = lo * _trayLoopTotal;
+            _trayLoopEndSec = Math.max(hi * _trayLoopTotal, _trayLoopStartSec + 0.005);
+            renderLoopRegion();
+        }
+    }
+    function trayLoopPaintUp(e) {
+        if (!_trayLoopPaint || e.pointerId !== _trayLoopPaint.pointerId) return;
+        const frac = pointerFraction(e);
+        const a = _trayLoopPaint.anchorFrac;
+        const lo = Math.min(a, frac);
+        const hi = Math.max(a, frac);
+        window.removeEventListener('pointermove', trayLoopPaintMove, true);
+        window.removeEventListener('pointerup', trayLoopPaintUp, true);
+        window.removeEventListener('pointercancel', trayLoopPaintUp, true);
+        _trayLoopPaint = null;
+        if (invoke) {
+            void invoke('tray_popover_action', {
+                action: `loop_region_paint:${lo.toFixed(4)}:${Math.max(hi, lo + 0.005).toFixed(4)}`,
+            }).catch(() => {});
+        }
+    }
+
     if (elTrackBar) {
         elTrackBar.addEventListener('pointerdown', (e) => {
             if (_currentIdle) return;
             if (e.button !== 0 && e.pointerType === 'mouse') return;
+            /* Shift+click: start loop-region paint instead of seek-scrub. */
+            if (e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                _trayLoopPaint = {
+                    anchorFrac: pointerFraction(e),
+                    pointerId: e.pointerId,
+                };
+                /* Seed a visible zero-width region at the anchor. */
+                if (_trayLoopTotal > 0) {
+                    _trayLoopEnabled = true;
+                    _trayLoopStartSec = _trayLoopPaint.anchorFrac * _trayLoopTotal;
+                    _trayLoopEndSec = _trayLoopStartSec + 0.005;
+                    renderLoopRegion();
+                }
+                window.addEventListener('pointermove', trayLoopPaintMove, true);
+                window.addEventListener('pointerup', trayLoopPaintUp, true);
+                window.addEventListener('pointercancel', trayLoopPaintUp, true);
+                return;
+            }
+            /* Plain click past the loop end brace cancels the loop region — matches the main
+             * window's `maybeExitLoopOnRightClickFrac` behavior. Still falls through to seek. */
+            if (_trayLoopEnabled && _trayLoopTotal > 0 && _trayLoopEndSec > 0) {
+                const frac = pointerFraction(e);
+                const endFrac = _trayLoopEndSec / _trayLoopTotal;
+                if (frac > endFrac + 0.001) {
+                    _trayLoopEnabled = false;
+                    renderLoopRegion();
+                    if (invoke) {
+                        void invoke('tray_popover_action', { action: 'loop_region_disable' }).catch(() => {});
+                    }
+                }
+            }
             e.preventDefault();
             _trayScrubCancelled = false;
             _trayScrubPointerId = e.pointerId;

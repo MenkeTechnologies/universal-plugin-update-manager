@@ -244,6 +244,9 @@ function storeWaveformPeaksInCache(filePath, peaks) {
     _waveformCache[filePath] = peaks;
     _evictCache(_waveformCache);
     _debounceWfSave();
+    if (typeof notifyWaveformCacheUpdatedForTray === 'function') {
+        notifyWaveformCacheUpdatedForTray(filePath);
+    }
 }
 
 async function fetchSpectrogramPreviewFromEngine(absPath, dims) {
@@ -1095,6 +1098,19 @@ function clearAbLoop() {
 }
 
 function updateAbLoopUI() {
+    // Keep the AudioEngine `playback_status` JS poll running whenever a loop is active
+    // (even while the window is idle) so the A-B wrap-back seek in `updatePlaybackTime`
+    // still fires when hidden/minimized. The poll scheduler re-checks `isAbLoopActive()`
+    // inside `shouldDeferPlaybackPollToHostWatchdog`.
+    if (typeof window !== 'undefined' && typeof window.syncEnginePlaybackPollForUiIdle === 'function') {
+        try { window.syncEnginePlaybackPollForUiIdle(); } catch {}
+    }
+    // Push the region fractions into the tray popover emit so the tray progress bar repaints
+    // its brace overlay on every toggle/drag. The sig includes the region so the debounced
+    // `_traySyncSig` gate doesn't swallow the update.
+    if (typeof syncTrayNowPlayingFromPlayback === 'function') {
+        try { syncTrayNowPlayingFromPlayback(); } catch {}
+    }
     const aBtn = document.getElementById('npAbA');
     const bBtn = document.getElementById('npAbB');
     const clearBtn = document.getElementById('npAbClear');
@@ -1377,6 +1393,12 @@ if (typeof window !== 'undefined') {
     window.toggleMetaLoopRegion = toggleMetaLoopRegion;
     window.setSampleLoopRegionStartAtPlayhead = setSampleLoopRegionStartAtPlayhead;
     window.setSampleLoopRegionEndAtPlayhead = setSampleLoopRegionEndAtPlayhead;
+    /* Used by `audio-engine.js` `shouldDeferPlaybackPollToHostWatchdog` to keep the
+     * 33ms `playback_status` poll alive while a loop is active, so `updatePlaybackTime`'s
+     * A-B wrap-back seek still fires when the window is hidden/minimized/unfocused
+     * (otherwise `ui-idle.js` cancels both the rAF loop and the poll — playback runs
+     * past the loop end forever until the app becomes active again). */
+    window.isAbLoopActive = () => _abLoop != null;
 }
 
 function loadRecentlyPlayed() {
@@ -3321,6 +3343,29 @@ function enginePlaybackDurationSec() {
 /** Dedupes `invoke('update_tray_now_playing')` — includes duration so tray updates when total length loads. */
 let _traySyncSig = '';
 
+/** Last path we pushed waveform peaks to the tray for — avoids re-sending ~1.6 KB of peaks on every poll tick. */
+let _traySyncLastWaveformPath = '';
+/** True once peaks for `_traySyncLastWaveformPath` were actually sent (i.e., they were cached at send time). */
+let _traySyncLastWaveformSent = false;
+
+/** Hook called after any `_waveformCache[path] = peaks` write. When `path` matches the currently
+ *  playing track, re-run `syncTrayNowPlayingFromPlayback` so the tray popover receives the freshly
+ *  decoded peaks (track change → empty-peaks placeholder first, async worker finishes → real peaks). */
+function notifyWaveformCacheUpdatedForTray(filePath) {
+    if (!filePath) return;
+    if (filePath !== audioPlayerPath) return;
+    // Invalidate the tray-sync waveform flag so the next sync re-reads `_waveformCache[sigPath]`.
+    if (_traySyncLastWaveformPath === filePath) {
+        _traySyncLastWaveformSent = false;
+    }
+    // Invalidate the debounce sig so syncTrayNowPlayingFromPlayback actually fires this call
+    // (otherwise the unchanged time tuple would make it short-circuit).
+    _traySyncSig = '';
+    if (typeof syncTrayNowPlayingFromPlayback === 'function') {
+        try { syncTrayNowPlayingFromPlayback(); } catch {}
+    }
+}
+
 /** DevTools: compact summary of `appearance` sent with `update_tray_now_playing` (CSS custom properties). */
 function trayAppearanceForLog(appearance) {
     if (!appearance || typeof appearance !== 'object') {
@@ -3598,8 +3643,56 @@ function syncTrayNowPlayingFromPlayback() {
     const sigPath = audioPlayerPath || resumePath || '';
     const trayFavOn = !!(sigPath && typeof isFavorite === 'function' && isFavorite(sigPath));
     const { appearance: trayAppearancePlaying, sig: trayAppSigPlaying } = trayAppearanceForTraySync();
+    /* Per-sample loop region for the currently playing path — draws braces on the tray progress bar. */
+    const trayLoopRegionRaw = sigPath && typeof getSampleLoopRegion === 'function'
+        ? getSampleLoopRegion(sigPath)
+        : { enabled: false, startFrac: 0, endFrac: 1 };
+    const trayLoopRegionEnabled = !!trayLoopRegionRaw.enabled;
+    const trayLoopDurSec = Number.isFinite(dur) && dur > 0 ? dur : 0;
+    const trayLoopStartSec = trayLoopRegionEnabled ? trayLoopRegionRaw.startFrac * trayLoopDurSec : 0;
+    const trayLoopEndSec = trayLoopRegionEnabled ? trayLoopRegionRaw.endFrac * trayLoopDurSec : 0;
+    const trayLoopSigKey = `${trayLoopRegionEnabled ? 1 : 0}:${Math.round(trayLoopStartSec * 1000)}:${Math.round(trayLoopEndSec * 1000)}`;
+    /* Tray waveform peaks — send once per track (or whenever peaks become freshly cached after
+     * the worker decode finishes). Rust caches them in `TrayPopoverEmit.waveform_peaks` so the
+     * tray popover paints the same mini-waveform on open / host poll ticks without re-sending.
+     * Format: flat `[max0, min0, max1, min1, …]` in `[-1, 1]`. */
+    let trayWaveformPeaks = null;
+    if (sigPath) {
+        const cached = _waveformCache && _waveformCache[sigPath];
+        const pathChanged = _traySyncLastWaveformPath !== sigPath;
+        if (Array.isArray(cached) && cached.length > 0 && (pathChanged || !_traySyncLastWaveformSent)) {
+            const n = cached.length;
+            const flat = new Array(n * 2);
+            if (typeof cached[0] === 'object' && cached[0] !== null && 'max' in cached[0]) {
+                for (let i = 0; i < n; i++) {
+                    flat[i * 2] = Number(cached[i].max) || 0;
+                    flat[i * 2 + 1] = Number(cached[i].min) || 0;
+                }
+            } else {
+                /* Legacy single-value format — mirror for the min/max pair so the tray renderer
+                 * draws a symmetric bar without a code fork. */
+                for (let i = 0; i < n; i++) {
+                    const v = Number(cached[i]) || 0;
+                    flat[i * 2] = v;
+                    flat[i * 2 + 1] = -v;
+                }
+            }
+            trayWaveformPeaks = flat;
+            _traySyncLastWaveformPath = sigPath;
+            _traySyncLastWaveformSent = true;
+        } else if (pathChanged && (!Array.isArray(cached) || cached.length === 0)) {
+            /* Path switched but peaks not yet available — send an empty array to clear the tray's
+             * cached waveform so it doesn't keep showing the previous track's bars. */
+            trayWaveformPeaks = [];
+            _traySyncLastWaveformPath = sigPath;
+            _traySyncLastWaveformSent = false;
+        }
+    } else if (_traySyncLastWaveformPath) {
+        _traySyncLastWaveformPath = '';
+        _traySyncLastWaveformSent = false;
+    }
     /* Include title + subtitle: first ticks often have empty `#npName` / meta; dedupe must not block later updates. */
-    const sig = `${sigPath}|${track}|${popover_subtitle}|${Math.floor(cur)}|${durKey}|${playing ? 1 : 0}|${uiTheme}|${trayAppSigPlaying}|sp:${trayPlaybackSpeedForSync()}|vol:${trayVolumeForSync()}|sh:${audioShuffling ? 1 : 0}|lp:${audioLooping ? 1 : 0}|fav:${trayFavOn ? 1 : 0}`;
+    const sig = `${sigPath}|${track}|${popover_subtitle}|${Math.floor(cur)}|${durKey}|${playing ? 1 : 0}|${uiTheme}|${trayAppSigPlaying}|sp:${trayPlaybackSpeedForSync()}|vol:${trayVolumeForSync()}|sh:${audioShuffling ? 1 : 0}|lp:${audioLooping ? 1 : 0}|fav:${trayFavOn ? 1 : 0}|lr:${trayLoopSigKey}`;
     if (sig === _traySyncSig) return;
     _traySyncSig = sig;
     console.info('[tray-main] update_tray_now_playing → Rust', {
@@ -3632,6 +3725,10 @@ function syncTrayNowPlayingFromPlayback() {
             shuffle_on: audioShuffling,
             loop_on: audioLooping,
             favorite_on: trayFavOn,
+            loop_region_enabled: trayLoopRegionEnabled,
+            loop_region_start_sec: trayLoopStartSec,
+            loop_region_end_sec: trayLoopEndSec,
+            waveform_peaks: trayWaveformPeaks,
         },
     }).catch(() => {});
 }
@@ -5431,6 +5528,7 @@ async function drawWaveform(filePath, wfSeq) {
         _waveformCache[filePath] = peaks;
         _evictCache(_waveformCache);
         _debounceWfSave();
+        notifyWaveformCacheUpdatedForTray(filePath);
         renderWaveformData(ctx, canvas, peaks);
     } catch {
         if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
@@ -5591,6 +5689,7 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
             _evictCache(_waveformCache);
             _evictCache(_spectrogramCache);
             _debounceWfSave();
+            notifyWaveformCacheUpdatedForTray(filePath);
             renderWaveformData(wfCtx, wfCanvas, peaks);
             _metaSharedDecoded.path = filePath;
             _metaSharedDecoded.buffer = null;
@@ -5621,6 +5720,7 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
             _waveformCache[filePath] = peaks;
             _evictCache(_waveformCache);
             _debounceWfSave();
+            notifyWaveformCacheUpdatedForTray(filePath);
             renderWaveformData(wfCtx, wfCanvas, peaks);
             _metaSharedDecoded.path = filePath;
             _metaSharedDecoded.buffer = null;
@@ -5716,6 +5816,7 @@ async function drawMetaWaveform(filePath, metaSeq) {
         _waveformCache[filePath] = peaks;
         _evictCache(_waveformCache);
         _debounceWfSave();
+        notifyWaveformCacheUpdatedForTray(filePath);
         renderWaveformData(ctx, canvas, peaks);
     } catch {
         if (_metaPanelStale(metaSeq, filePath)) return;

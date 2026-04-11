@@ -2353,8 +2353,16 @@ let _enginePlaybackIdleHooked = false;
  * True when the WebView should not run the **`playback_status`** **`setInterval`** — hidden tab,
  * unfocused window, minimized, etc. (`isUiIdleHeavyCpu` in **`ui-idle.js`**). Host EOF watchdog covers
  * EOF while idle so the engine is not polled twice.
+ *
+ * **Exception:** while a sample loop region / A-B loop is active we *must* keep the JS poll running
+ * even when idle — the wrap-back `playback_seek` lives inside `updatePlaybackTime()`, which is
+ * called from this very poll (and from the rAF loop, which `ui-idle.js` also cancels). Without
+ * the poll, playback runs past the loop end until the window becomes active again.
  */
 function shouldDeferPlaybackPollToHostWatchdog() {
+    if (typeof window !== 'undefined' && typeof window.isAbLoopActive === 'function') {
+        try { if (window.isAbLoopActive()) return false; } catch {}
+    }
     if (typeof window.isUiIdleHeavyCpu === 'function') {
         return window.isUiIdleHeavyCpu();
     }
@@ -2683,5 +2691,6 @@ if (typeof window !== 'undefined') {
     window.engineApplyReversePrefPlayback = engineApplyReversePrefPlayback;
     window.stopEnginePlaybackPoll = stopEnginePlaybackPoll;
     window.startEnginePlaybackPoll = startEnginePlaybackPoll;
+    window.syncEnginePlaybackPollForUiIdle = syncEnginePlaybackPollForUiIdle;
     window.syncAeTransportFromPlayback = syncAeTransportFromPlayback;
 }

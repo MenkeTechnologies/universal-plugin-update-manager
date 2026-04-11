@@ -199,6 +199,19 @@ pub struct TrayPopoverEmit {
     pub loop_on: bool,
     /// Current track is in favorites (`favCurrentTrack` / `isFavorite`).
     pub favorite_on: bool,
+    /// Per-sample loop region is enabled for the current track (`_abLoop._fromSampleRegion` or manual A-B).
+    pub loop_region_enabled: bool,
+    /// Loop region start (sec) — drawn as a left brace on the tray progress bar.
+    pub loop_region_start_sec: f64,
+    /// Loop region end (sec) — drawn as a right brace on the tray progress bar.
+    pub loop_region_end_sec: f64,
+    /// Flat min/max waveform peaks for the current track: `[max0, min0, max1, min1, …]`, each
+    /// value in `[-1, 1]`. Sent once per track change; the tray popover renders it on
+    /// `#trayWaveformCanvas` and caches locally so 500 ms tray polls don't redraw needlessly.
+    /// Empty while idle. Main side uses `#serde(skip_serializing_if = "Vec::is_empty")` to keep
+    /// the emit compact when peaks aren't available yet.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub waveform_peaks: Vec<f32>,
 }
 
 /// Absolute path for **Reveal in Finder** when the user activates the native tray menu's first row
@@ -374,6 +387,10 @@ fn toggle_tray_popover(app: &AppHandle<Wry>, rect: &Rect) -> Result<(), String> 
         shuffle_on: false,
         loop_on: false,
         favorite_on: false,
+        loop_region_enabled: false,
+        loop_region_start_sec: 0.0,
+        loop_region_end_sec: 0.0,
+        waveform_peaks: Vec::new(),
     });
     emit.ui_theme = tray_popover_ui_theme_from_prefs();
     emit_tray_popover_state(app, &emit);
@@ -474,6 +491,17 @@ pub struct TrayNowPlayingPayload {
     pub loop_on: Option<bool>,
     #[serde(default)]
     pub favorite_on: Option<bool>,
+    #[serde(default)]
+    pub loop_region_enabled: Option<bool>,
+    #[serde(default)]
+    pub loop_region_start_sec: Option<f64>,
+    #[serde(default)]
+    pub loop_region_end_sec: Option<f64>,
+    /// Waveform peaks for the current track — flat `[max0, min0, max1, min1, …]`. `None` means
+    /// "keep whatever peaks the cached `last_popover_emit` already holds"; an empty `Vec` means
+    /// "clear" (track change with no peaks yet); a non-empty `Vec` replaces the cached peaks.
+    #[serde(default)]
+    pub waveform_peaks: Option<Vec<f32>>,
 }
 
 fn normalized_popover_reveal_path(payload: &TrayNowPlayingPayload) -> Option<String> {
@@ -895,6 +923,41 @@ pub fn update_tray_now_playing(
     } else {
         tray_favorite_merge(&payload, last_emit)
     };
+    /* Per-sample loop region — when the JS payload omits the fields, fall back to the last emit
+     * so tray polls (no loop info) don't blank the braces. Idle state always clears. */
+    let loop_region_enabled = if payload.idle {
+        false
+    } else {
+        payload
+            .loop_region_enabled
+            .unwrap_or_else(|| last_emit.map(|e| e.loop_region_enabled).unwrap_or(false))
+    };
+    let loop_region_start_sec = if payload.idle {
+        0.0
+    } else {
+        payload
+            .loop_region_start_sec
+            .unwrap_or_else(|| last_emit.map(|e| e.loop_region_start_sec).unwrap_or(0.0))
+    };
+    let loop_region_end_sec = if payload.idle {
+        0.0
+    } else {
+        payload
+            .loop_region_end_sec
+            .unwrap_or_else(|| last_emit.map(|e| e.loop_region_end_sec).unwrap_or(0.0))
+    };
+    /* Waveform peaks merge: on idle, clear; otherwise prefer the payload when present
+     * (`Some(vec)`), fall back to the last emit's cached peaks when omitted (`None`). */
+    let waveform_peaks: Vec<f32> = if payload.idle {
+        Vec::new()
+    } else {
+        match payload.waveform_peaks.as_ref() {
+            Some(v) => v.clone(),
+            None => last_emit
+                .map(|e| e.waveform_peaks.clone())
+                .unwrap_or_default(),
+        }
+    };
     let emit = if payload.idle {
         TrayPopoverEmit {
             idle: true,
@@ -915,6 +978,10 @@ pub fn update_tray_now_playing(
             shuffle_on,
             loop_on,
             favorite_on,
+            loop_region_enabled: false,
+            loop_region_start_sec: 0.0,
+            loop_region_end_sec: 0.0,
+            waveform_peaks: Vec::new(),
         }
     } else {
         TrayPopoverEmit {
@@ -933,6 +1000,10 @@ pub fn update_tray_now_playing(
             shuffle_on,
             loop_on,
             favorite_on,
+            loop_region_enabled,
+            loop_region_start_sec,
+            loop_region_end_sec,
+            waveform_peaks,
         }
     };
     guard.last_popover_emit = Some(emit.clone());
@@ -1171,6 +1242,10 @@ pub fn start_tray_host_poll(app: AppHandle<Wry>) {
                     shuffle_on: last.shuffle_on,
                     loop_on: last.loop_on,
                     favorite_on: last.favorite_on,
+                    loop_region_enabled: last.loop_region_enabled,
+                    loop_region_start_sec: last.loop_region_start_sec,
+                    loop_region_end_sec: last.loop_region_end_sec,
+                    waveform_peaks: last.waveform_peaks.clone(),
                 };
                 guard.last_popover_emit = Some(new_emit.clone());
 
