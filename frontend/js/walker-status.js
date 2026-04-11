@@ -67,7 +67,7 @@ async function _updateWalkerTiles() {
         const unifiedTile = document.getElementById('walkerTileUnified');
         const fileWalkerActive = status.unifiedScanning || status.audioScanning
             || status.dawScanning || status.presetScanning || status.midiScanning
-            || status.pdfScanning;
+            || status.pdfScanning || status.videoScanning;
         if (unifiedTile) unifiedTile.style.display = '';
         // Fall back through dir lists — whichever walker ran last populates
         // its corresponding list.

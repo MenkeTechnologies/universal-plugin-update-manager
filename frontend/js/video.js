@@ -51,9 +51,11 @@ async function fetchVideoPage() {
     if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
     else await new Promise((r) => requestAnimationFrame(r));
     try {
+        const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('videoFormatFilter') : null;
+        const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
         const result = await window.vstUpdater.dbQueryVideo({
             search: search || null,
-            format_filter: null,
+            format_filter: formatFilter,
             sort_key: videoSortKey,
             sort_asc: videoSortAsc,
             search_regex: _lastVideoMode === 'regex',
@@ -103,7 +105,9 @@ async function rebuildVideoStats(force) {
     if (!statsEl) return;
     const search = document.getElementById('videoSearchInput')?.value || '';
     const regexOn = typeof getSearchMode === 'function' && getSearchMode('regexVideo') === 'regex';
-    const key = search.trim() + '|' + (regexOn ? 'r' : 'f');
+    const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('videoFormatFilter') : null;
+    const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
+    const key = search.trim() + '|' + (regexOn ? 'r' : 'f') + '|' + (formatFilter || '');
     let displayCount = 0;
     let displayBytes = 0;
     let unfiltered = 0;
@@ -114,7 +118,7 @@ async function rebuildVideoStats(force) {
             if (cacheHit) {
                 agg = _videoAggCache;
             } else {
-                agg = await window.vstUpdater.dbVideoFilterStats(search.trim(), null, regexOn);
+                agg = await window.vstUpdater.dbVideoFilterStats(search.trim(), formatFilter, regexOn);
                 if (typeof yieldToBrowser === 'function') await yieldToBrowser();
                 _lastVideoAggKey = key;
                 _videoAggCache = agg;
@@ -147,6 +151,8 @@ async function rebuildVideoStats(force) {
         const headerEl = document.getElementById('videoCountHeader');
         if (headerEl) headerEl.textContent = u.toLocaleString();
     }
+    const exportBtn = document.getElementById('btnExportVideo');
+    if (exportBtn) exportBtn.style.display = (u > 0) ? '' : 'none';
 }
 
 function buildVideoRow(v) {
@@ -348,8 +354,10 @@ async function scanVideos(resume = false, overrideRoots = null) {
     videoScanProgressCleanup = onProg;
 
     try {
-        const roots = overrideRoots;
-        await window.vstUpdater.scanVideoFiles(roots, excludePaths);
+        const roots = (overrideRoots && overrideRoots.length > 0)
+            ? overrideRoots
+            : (typeof prefs !== 'undefined' ? (prefs.getItem('videoScanDirs') || '') : '').split('\n').map(s => s.trim()).filter(Boolean);
+        await window.vstUpdater.scanVideoFiles(roots.length ? roots : undefined, excludePaths);
     } catch (e) {
         if (typeof showToast === 'function') showToast(String(e && e.message ? e.message : e), 5000, 'error');
     } finally {
@@ -387,4 +395,37 @@ function openVideoFile(path) {
         .catch((e) => {
             if (typeof showToast === 'function') showToast(toastFmt('toast.failed', {err: e}), 4000, 'error');
         });
+}
+
+const _VIDEO_EXPORT_MAX = 100000;
+
+async function fetchVideosForExport() {
+    const search = _lastVideoSearch || '';
+    let total = _videoTotalCount || 0;
+    if (total <= 0) {
+        try {
+            const probe = await window.vstUpdater.dbQueryVideo({
+                search: search || null,
+                sort_key: videoSortKey,
+                sort_asc: videoSortAsc,
+                search_regex: _lastVideoMode === 'regex',
+                offset: 0,
+                limit: 1,
+            });
+            total = probe.totalCount || 0;
+        } catch {
+            return [];
+        }
+    }
+    const n = Math.min(total, _VIDEO_EXPORT_MAX);
+    if (n <= 0) return [];
+    const result = await window.vstUpdater.dbQueryVideo({
+        search: search || null,
+        sort_key: videoSortKey,
+        sort_asc: videoSortAsc,
+        search_regex: _lastVideoMode === 'regex',
+        offset: 0,
+        limit: n,
+    });
+    return result.videoFiles || [];
 }

@@ -802,6 +802,104 @@ async function importPdfs() {
     }
 }
 
+// ── Video export / import ──
+
+async function writeVideosExport(videos, fmt, filePath) {
+    if (fmt === 'csv' || fmt === 'tsv') {
+        await window.vstUpdater.exportVideosDsv(videos, filePath);
+    } else if (fmt === 'toml') {
+        await window.vstUpdater.exportToml({videos}, filePath);
+    } else {
+        await window.vstUpdater.exportVideosJson(
+            videos,
+            filePath.endsWith('.json') ? filePath : filePath + '.json',
+        );
+    }
+}
+
+async function exportVideosSubset(itemsRaw) {
+    const items = (itemsRaw || []).filter(Boolean);
+    if (!items.length) { showToast(toastFmt('toast.no_list_export')); return; }
+    const rawLen = items.length;
+    _exportCtx = {
+        titleKey: 'ui.export.title_videos',
+        defaultName: exportFileName('videos-selection'),
+        exportFn: async (fmt, filePath) => {
+            const capped = capExportList(items);
+            await writeVideosExport(capped, fmt, filePath);
+        },
+    };
+    showExportModal('videos', 'ui.export.title_videos', rawLen);
+}
+
+async function exportVideos() {
+    let videos = null;
+    if (typeof videoScanProgressCleanup === 'undefined' || !videoScanProgressCleanup) {
+        videos = typeof allVideos !== 'undefined' && allVideos.length > 0 ? allVideos : null;
+    }
+    const pageHint = typeof filteredVideos !== 'undefined' && filteredVideos ? filteredVideos.length : 0;
+    const countForModal = videos && videos.length > 0
+        ? videos.length
+        : Math.max(Number(typeof _videoTotalCount !== 'undefined' ? _videoTotalCount : 0) || 0, pageHint);
+    if (countForModal === 0) {
+        showToast(toastFmt('toast.no_list_export'));
+        return;
+    }
+    _exportCtx = {
+        titleKey: 'ui.export.title_videos',
+        defaultName: exportFileName('videos'),
+        exportFn: async (fmt, filePath) => {
+            let vids = videos;
+            if (!vids || vids.length === 0) {
+                if (typeof fetchVideosForExport !== 'function') {
+                    throw new Error('fetchVideosForExport unavailable');
+                }
+                vids = await fetchVideosForExport();
+            }
+            if (!vids || vids.length === 0) throw new Error('No videos to export');
+            await writeVideosExport(capExportList(vids), fmt, filePath);
+        },
+    };
+    showExportModal('videos', 'ui.export.title_videos', countForModal);
+}
+
+async function importVideos() {
+    const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+    if (!dialogApi) return;
+    const selected = await dialogApi.open({
+        title: _exportFmt('ui.export.dialog_import_videos'),
+        multiple: false,
+        filters: getAllImportFilters(),
+    });
+    if (!selected) return;
+    const filePath = typeof selected === 'string' ? selected : selected.path;
+    if (!filePath) return;
+    showGlobalProgress();
+    try {
+        let imported;
+        if (filePath.endsWith('.toml')) {
+            const data = await window.vstUpdater.importToml(filePath);
+            imported = data.videos || data;
+        } else {
+            imported = await window.vstUpdater.importVideosJson(filePath);
+        }
+        if (!imported || !Array.isArray(imported) || imported.length === 0) {
+            await showImportError('videos', _exportFmt('ui.export.import_empty_videos'));
+            return;
+        }
+        if (typeof allVideos !== 'undefined') allVideos = imported;
+        if (typeof rebuildVideoStats === 'function') rebuildVideoStats();
+        if (typeof filterVideos === 'function') filterVideos();
+        const btn = document.getElementById('btnExportVideo');
+        if (btn) btn.style.display = '';
+        showToast(toastFmt('toast.imported_n_videos', {n: imported.length}));
+    } catch (err) {
+        await showImportError('videos', err.message || String(err));
+    } finally {
+        hideGlobalProgress();
+    }
+}
+
 async function exportPresets() {
     let presets = null;
     if (typeof presetScanProgressCleanup === 'undefined' || !presetScanProgressCleanup) {

@@ -310,6 +310,28 @@ function buildPaletteStaticItems() {
             action: () => settingTogglePdfMetadataAutoExtract()
         });
     }
+    // ── Video commands ──
+    items.push({
+        type: 'action', name: appFmt('ui.btn.scan_videos'), icon: '&#127909;', ...paletteShortcutTip('scanVideosOnly'), action: () => {
+            showToast(toastFmt('toast.scanning_videos_progress'));
+            typeof scanVideos === 'function' && scanVideos();
+        }
+    });
+    items.push({
+        type: 'action', name: appFmt('menu.stop_video_scan'), icon: '&#9632;', ...paletteShortcutTip('stopVideoScan'), action: () => {
+            if (typeof stopVideoScan === 'function') void stopVideoScan();
+        }
+    });
+    items.push({
+        type: 'action', name: appFmt('menu.export_videos'), icon: '&#8615;', ...paletteShortcutTip('exportTab'), action: () => {
+            if (typeof exportVideos === 'function' && typeof runExport === 'function') runExport(exportVideos); else if (typeof exportVideos === 'function') exportVideos();
+        }
+    });
+    items.push({
+        type: 'action', name: appFmt('menu.import_videos'), icon: '&#8613;', ...paletteShortcutTip('importTab'), action: () => {
+            if (typeof importVideos === 'function') importVideos();
+        }
+    });
     items.push({
         type: 'action', name: appFmt('menu.build_fingerprint_cache'), icon: '&#127925;', ...paletteShortcutTip('buildFingerprintCache'), action: () => {
             if (typeof triggerStartFingerprintCacheBuild === 'function') void triggerStartFingerprintCacheBuild();

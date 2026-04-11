@@ -3128,7 +3128,7 @@ function aeDrawBalanceGraph(ctx, w, h) {
     const R = aeScopeChannelDbStats(srDat);
     const diffDb = L.rmsDb - R.rmsDb;
     const maxDb = 9;
-    const t = Math.max(-1, Math.min(1, diffDb / maxDb));
+    const t = Math.max(-1, Math.min(1, -(diffDb / maxDb)));
     const cy = h * 0.52;
     const x0 = w * 0.1;
     const x1 = w * 0.9;

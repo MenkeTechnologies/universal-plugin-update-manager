@@ -799,6 +799,48 @@ document.addEventListener('contextmenu', (e) => {
             return;
         }
 
+        // ── Video rows ──
+        const videoRow = e.target.closest('#videoTableBody tr[data-video-path]');
+        if (videoRow) {
+            const path = videoRow.dataset.videoPath;
+            const name = videoRow.querySelector('.col-name')?.getAttribute('title')?.trim() ||
+                videoRow.querySelector('.col-name')?.textContent?.trim() || '';
+            const items = [
+                {
+                    icon: '&#128193;',
+                    label: appFmt('menu.reveal_in_finder'), ..._noEcho, ...shortcutTip('revealFile'),
+                    action: () => openVideoFile(path)
+                },
+                {
+                    icon: '&#9889;',
+                    label: appFmt('menu.open_with_default_app'), ..._noEcho,
+                    action: () => window.vstUpdater.openFileDefault(path).catch(err => showToast(toastFmt('toast.failed_open_file', {err: err.message || err}), 4000, 'error'))
+                },
+                {
+                    icon: '&#128194;', label: appFmt('menu.show_file_browser'), ..._noEcho, action: () => {
+                        switchTab('files');
+                        setTimeout(() => loadDirectory(path.replace(/\/[^/]+$/, '')), 200);
+                    }
+                },
+                '---',
+                {icon: '&#128203;', label: appFmt('menu.copy_name'), ..._noEcho, action: () => copyToClipboard(name)},
+                {icon: '&#128203;', label: appFmt('menu.copy_path'), ..._noEcho, ...shortcutTip('copyPath'), action: () => copyToClipboard(path)},
+                '---',
+                ...[(() => {
+                    const f = typeof isFavorite === 'function' && isFavorite(path);
+                    return {
+                        icon: f ? '&#9734;' : '&#9733;',
+                        label: f ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho, ...shortcutTip('toggleFavorite'),
+                        action: () => f ? removeFavorite(path) : addFavorite('video', path, name)
+                    };
+                })()],
+                {icon: '&#128221;', label: appFmt('menu.add_note'), action: () => showNoteEditor(path, name)},
+                ...quickTagItems(path, name),
+            ];
+            showContextMenu(e, items);
+            return;
+        }
+
         // ── Preset rows ──
         const presetRow = e.target.closest('#presetTableBody tr[data-preset-path]');
         if (presetRow) {
@@ -853,6 +895,8 @@ document.addEventListener('contextmenu', (e) => {
                             sortPdf(key, true);
                         } else if (action === 'sortMidi') {
                             sortMidi(key, true);
+                        } else if (action === 'sortVideo') {
+                            sortVideo(key, true);
                         }
                     }
                 },
@@ -868,6 +912,8 @@ document.addEventListener('contextmenu', (e) => {
                             sortPdf(key, false);
                         } else if (action === 'sortMidi') {
                             sortMidi(key, false);
+                        } else if (action === 'sortVideo') {
+                            sortVideo(key, false);
                         }
                     }
                 },
@@ -1063,6 +1109,26 @@ document.addEventListener('contextmenu', (e) => {
                 items.push({
                     icon: '&#8613;', label: appFmt('menu.import_pdfs'), ...shortcutTip('importTab'), action: () => {
                         if (typeof importPdfs === 'function') importPdfs();
+                    }
+                });
+            } else if (tabId === 'tabVideos') {
+                items.push({
+                    icon: '&#127909;', label: appFmt('menu.scan_videos'), action: () => {
+                        if (typeof scanVideos === 'function') scanVideos();
+                    }
+                });
+                items.push('---');
+                items.push({
+                    icon: '&#8615;',
+                    label: appFmt('menu.export_videos'),
+                    ...shortcutTip('exportTab'), action: () => {
+                        if (typeof exportVideos === 'function' && typeof runExport === 'function') runExport(exportVideos); else if (typeof exportVideos === 'function') exportVideos();
+                    },
+                    disabled: Math.max(typeof _videoTotalCount !== 'undefined' ? _videoTotalCount || 0 : 0, typeof allVideos !== 'undefined' ? allVideos.length : 0) === 0
+                });
+                items.push({
+                    icon: '&#8613;', label: appFmt('menu.import_videos'), ...shortcutTip('importTab'), action: () => {
+                        if (typeof importVideos === 'function') importVideos();
                     }
                 });
             }

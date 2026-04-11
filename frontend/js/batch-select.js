@@ -3,7 +3,7 @@
 // Selections are scoped per inventory tab (tabSamples, tabDaw, …) — not one global Set.
 
 /** Tab panel ids that use `.batch-cb` in a table body. */
-const TABS_WITH_BATCH = new Set(['tabSamples', 'tabDaw', 'tabPresets', 'tabMidi', 'tabPdf']);
+const TABS_WITH_BATCH = new Set(['tabSamples', 'tabDaw', 'tabPresets', 'tabMidi', 'tabPdf', 'tabVideos']);
 
 /** @type {Map<string, Set<string>>} */
 const batchByTab = new Map();
@@ -43,6 +43,7 @@ function getPathFromBatchRow(el) {
         el.dataset.presetPath ||
         el.dataset.midiPath ||
         el.dataset.pdfPath ||
+        el.dataset.videoPath ||
         el.dataset.path ||
         null
     );
@@ -125,6 +126,18 @@ function resolveBatchInventoryItems(set, tabId) {
                 tr.querySelector('.col-name')?.textContent?.trim() ||
                 path.split('/').pop();
             return { path, name, format: 'PDF', sizeFormatted: tr.querySelector('.col-size')?.textContent?.trim() || '' };
+        };
+    } else if (tabId === 'tabVideos') {
+        if (typeof filteredVideos !== 'undefined') pools.push(filteredVideos);
+        if (typeof allVideos !== 'undefined') pools.push(allVideos);
+        tbodyId = 'videoTableBody';
+        shallow = (tr, path) => {
+            const name =
+                tr.querySelector('.col-name')?.getAttribute('title')?.trim() ||
+                tr.querySelector('.col-name')?.textContent?.trim() ||
+                path.split('/').pop();
+            const format = tr.querySelector('.col-format')?.textContent?.trim() || '';
+            return { path, name, format, sizeFormatted: tr.querySelector('.col-size')?.textContent?.trim() || '' };
         };
     } else {
         return [];
@@ -255,6 +268,7 @@ function batchFavoriteAll() {
         tabPresets: 'preset',
         tabMidi: 'midi',
         tabPdf: 'pdf',
+        tabVideos: 'video',
     };
     const type = typeMap[tid];
     if (!type) return;
@@ -337,6 +351,8 @@ function batchExportToFile() {
         run(() => exportMidiSubset(items));
     } else if (tid === 'tabPdf' && typeof exportPdfsSubset === 'function') {
         run(() => exportPdfsSubset(items));
+    } else if (tid === 'tabVideos' && typeof exportVideosSubset === 'function') {
+        run(() => exportVideosSubset(items));
     }
 }
 
@@ -355,7 +371,7 @@ function batchRevealAll() {
         if (typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.openPluginFolder === 'function') {
             window.vstUpdater.openPluginFolder(path).catch(e => showToast(toastFmt('toast.failed', {err: e}), 4000, 'error'));
         }
-    } else if (activeTab.id === 'tabMidi' || activeTab.id === 'tabPdf') {
+    } else if (activeTab.id === 'tabMidi' || activeTab.id === 'tabPdf' || activeTab.id === 'tabVideos') {
         if (typeof openAudioFolder === 'function') openAudioFolder(path);
     }
     showToast(toastFmt('toast.revealing_first_batch', {n: set.size}));

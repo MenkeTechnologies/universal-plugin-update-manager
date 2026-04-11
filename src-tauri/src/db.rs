@@ -1225,10 +1225,6 @@ DROP TABLE _pl_refresh_paths;"#;
         Self::exec_sync_paths_refresh(conn, Self::SYNC_VIDEO_LIBRARY_PATHS_SQL)
     }
 
-    fn sync_video_library_after_paths_refresh_tx(tx: &Transaction<'_>) -> Result<(), String> {
-        Self::exec_sync_paths_refresh_tx(tx, Self::SYNC_VIDEO_LIBRARY_PATHS_SQL)
-    }
-
     fn sync_preset_library_after_paths_refresh(conn: &Connection) -> Result<(), String> {
         Self::exec_sync_paths_refresh(conn, Self::SYNC_PRESET_LIBRARY_PATHS_SQL)
     }

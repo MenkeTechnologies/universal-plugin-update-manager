@@ -8861,6 +8861,11 @@
                 <span class="stat-value" id="pdfCountHeader">0</span>
                 <span data-i18n="ui.stats.bar_pdfs">PDFs</span>
             </div>
+            <div class="stat" data-stat-key="videos">
+                <span class="stat-dot" style="background: var(--red); box-shadow: 0 0 6px var(--red);"></span>
+                <span class="stat-value" id="videoCountHeader">0</span>
+                <span data-i18n="ui.stats.bar_videos">Videos</span>
+            </div>
             <div class="stat" id="dashBtnGroup" data-stat-key="dashboard">
                 <button class="btn btn-secondary" data-action="showHeatmapDash" data-i18n-title="ui.tt.audio_heatmap_dashboard_d"
                         style="padding:4px 10px;font-size:10px;" title="Audio heatmap dashboard (D)">
@@ -8906,6 +8911,8 @@
                 data-i18n="ui.btn.127924_midi">MIDI</span></button>
         <button class="tab-btn" data-action="switchTab" data-i18n-title="ui.tt.pdf_documents" data-tab="pdf"
                 title="PDF documents">&#128196; <span data-i18n="ui.btn.128196_pdf">PDF</span></button>
+        <button class="tab-btn" data-action="switchTab" data-i18n-title="ui.tt.video_files" data-tab="videos"
+                title="Video files">&#127909; <span data-i18n="ui.btn.videos">Videos</span></button>
         <button class="tab-btn" data-action="switchTab" data-i18n-title="ui.tt.favorited_items_cmd_5" data-tab="favorites"
                 title="Favorited items (Cmd+5)">&#9733; <span
                 data-i18n="ui.btn.9733_favorites">Favorites</span></button>
@@ -9558,6 +9565,70 @@
         </div>
     </div>
 
+    <div class="tab-content" id="tabVideos">
+        <div class="audio-toolbar">
+            <button class="btn btn-primary" data-action="scanVideos" data-i18n-title="ui.tt.scan_filesystem_for_video_files"
+                    id="btnScanVideos" title="Scan filesystem for video files">&#127909; <span
+                    data-i18n="ui.btn.scan_videos">Scan Videos</span></button>
+            <button class="btn btn-secondary" data-action="resumeVideoScan" data-i18n-title="ui.tt.resume_video_scan" id="btnResumeVideo"
+                    style="display:none;" title="Resume video scan">
+                &#9654; <span data-i18n="ui.btn.9654_resume">Resume</span></button>
+            <button class="btn btn-stop" data-action="stopVideoScan" data-i18n-title="ui.tt.stop_the_current_scan" id="btnStopVideo"
+                    style="display:none;" title="Stop the current scan">&#9632; <span
+                    data-i18n="ui.btn.9632_stop">Stop</span></button>
+            <button class="btn btn-secondary" data-action="exportVideos" data-i18n-title="ui.tt.export_video_list_to_json" id="btnExportVideo"
+                    style="display:none;" title="Export video list to JSON">&#8615; <span
+                    data-i18n="ui.btn.8615_export">Export</span></button>
+            <button class="btn btn-secondary" data-action="importVideos" data-i18n-title="ui.tt.import_video_list_from_json"
+                    title="Import video list from JSON">&#8613; <span data-i18n="ui.btn.8613_import">Import</span>
+            </button>
+            <div class="search-box" style="flex: 1;">
+                <span class="search-icon">&#128269;</span>
+                <input autocapitalize="off" autocomplete="off" autocorrect="off" data-action="filterVideos"
+                       data-i18n-placeholder="ui.ph.fuzzy_search_videos" data-i18n-placeholder-regex="ui.ph.regex_search_videos" data-i18n-title="ui.tt.search_videos_by_name_or_path" id="videoSearchInput" placeholder="Fuzzy search videos..."
+                       spellcheck="false" title="Search videos by name or path"
+                       type="text">
+                <button class="btn-regex" data-action="toggleRegex" data-i18n-title="ui.tt.toggle_regex_search" data-target="filterVideos"
+                        id="regexVideo" title="Toggle regex search">.*
+                </button>
+            </div>
+            <select class="filter-select" data-action="filterVideos" data-i18n-title="ui.tt.filter_by_video_format"
+                    id="videoFormatFilter" title="Filter by video format">
+                <option data-i18n="ui.opt.all_formats" value="all">All Formats</option>
+                <option value="MP4">MP4</option>
+                <option value="M4V">M4V</option>
+                <option value="MOV">MOV</option>
+                <option value="MKV">MKV</option>
+                <option value="WEBM">WEBM</option>
+                <option value="AVI">AVI</option>
+                <option value="MPG">MPG</option>
+                <option value="MPEG">MPEG</option>
+                <option value="WMV">WMV</option>
+                <option value="FLV">FLV</option>
+                <option value="OGV">OGV</option>
+                <option value="3GP">3GP</option>
+                <option value="MTS">MTS</option>
+                <option value="M2TS">M2TS</option>
+            </select>
+        </div>
+        <div class="progress-bar" id="videoProgressBar">
+            <div class="progress-fill" id="videoProgressFill"></div>
+        </div>
+        <div class="audio-stats" id="videoStats" style="display:none;">
+            <span class="audio-stats-pair" data-stat-key="total"><span data-i18n="ui.video.stat_total">Total:</span> <span class="audio-stat-value"
+                                                                          id="videoCount">0</span></span>
+            <span class="audio-stats-pair" data-stat-key="size"><span data-i18n="ui.video.stat_size">Size:</span> <span class="audio-stat-value"
+                                                                        id="videoTotalSize">0 B</span></span>
+        </div>
+        <div class="table-wrap" id="videoTableWrap">
+            <div class="state-message" id="videoEmptyState">
+                <div class="state-icon">&#127909;</div>
+                <h2 data-i18n="ui.h2.video_index">Video Index</h2>
+                <p data-i18n="ui.p.videos_empty">Click &quot;Scan Videos&quot; to find video files on your system.</p>
+            </div>
+        </div>
+    </div>
+
     <div class="tab-content" id="tabVisualizer">
         <div class="viz-container" id="vizContainer">
             <div class="viz-toolbar">
@@ -9973,7 +10044,6 @@
                         <span class="settings-desc" data-i18n="ui.ae.graphs_desc">Real-time scope-derived views of engine output: waveforms (mid, side, L/R overlay, L−R), stereo energy, vectorscope, Lissajous-style L–R line trace, DC offset, magnitude and |L−R| histograms, peak trace, balance, correlation, width, and crest. FFT / spectrogram / band views are on the Visualizer tab.</span>
                     </div>
                 </div>
-            </div>
                     <div class="ae-graph-cell ae-graph-span-full">
                         <span class="ae-graph-label" data-i18n="ui.ae.graph_midside_label">Mid / Side waveform</span>
                         <div class="ae-graph-canvas-wrap">
@@ -10070,6 +10140,7 @@
                             <canvas id="aeGraphLissajous" class="ae-graph-canvas" width="600" height="160" aria-label="Lissajous"></canvas>
                         </div>
                     </div>
+            </div>
             </div>
         </div>
     </div>
@@ -11657,47 +11728,48 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=99679"></script>
-<script src="js/utils.js?v=99679"></script>
-<script src="js/ui-idle.js?v=99679"></script>
-<script src="js/ipc.js?v=99679"></script>
-<script src="js/tooltip-hover.js?v=99679"></script>
-<script src="js/drag-reorder.js?v=99679"></script>
-<script src="js/modal-drag.js?v=99679"></script>
-<script src="js/columns.js?v=99679"></script>
-<script src="js/notes.js?v=99679"></script>
-<script src="js/favorites.js?v=99679"></script>
-<script src="js/export.js?v=99679"></script>
-<script src="js/plugins.js?v=99679"></script>
-<script src="js/settings.js?v=99679"></script>
-<script src="js/history.js?v=99679"></script>
-<script src="js/kvr.js?v=99679"></script>
-<script src="js/graph-freeze.js?v=99679"></script>
-<script src="js/audio.js?v=99679"></script>
-<script src="js/daw.js?v=99679"></script>
-<script src="js/disk-usage.js?v=99679"></script>
-<script src="js/presets.js?v=99679"></script>
-<script src="js/batch-select.js?v=99679"></script>
-<script src="js/native-file-drag.js?v=99679"></script>
-<script src="js/sort-persist.js?v=99679"></script>
-<script src="js/multi-filter.js?v=99679"></script>
-<script src="js/file-browser.js?v=99679"></script>
-<script src="js/duplicates.js?v=99679"></script>
-<script src="js/command-palette.js?v=99679"></script>
-<script src="js/xref.js?v=99679"></script>
-<script src="js/dep-graph.js?v=99679"></script>
-<script src="js/smart-playlists.js?v=99679"></script>
-<script src="js/heatmap-dashboard.js?v=99679"></script>
-<script src="js/midi.js?v=99679"></script>
-<script src="js/pdf.js?v=99679"></script>
-<script src="js/settings-search.js?v=99679"></script>
-<script src="js/visualizer.js?v=99679"></script>
-<script src="js/walker-status.js?v=99679"></script>
-<script src="js/audio-engine.js?v=99679"></script>
-<script src="js/context-menu.js?v=99679"></script>
-<script src="js/shortcuts.js?v=99679"></script>
-<script src="js/help-overlay.js?v=99679"></script>
-<script src="js/keyboard-nav.js?v=99679"></script>
-<script src="js/app.js?v=99679"></script>
+<script src="js/i18n-ui.js?v=15846"></script>
+<script src="js/utils.js?v=15846"></script>
+<script src="js/ui-idle.js?v=15846"></script>
+<script src="js/ipc.js?v=15846"></script>
+<script src="js/tooltip-hover.js?v=15846"></script>
+<script src="js/drag-reorder.js?v=15846"></script>
+<script src="js/modal-drag.js?v=15846"></script>
+<script src="js/columns.js?v=15846"></script>
+<script src="js/notes.js?v=15846"></script>
+<script src="js/favorites.js?v=15846"></script>
+<script src="js/export.js?v=15846"></script>
+<script src="js/plugins.js?v=15846"></script>
+<script src="js/settings.js?v=15846"></script>
+<script src="js/history.js?v=15846"></script>
+<script src="js/kvr.js?v=15846"></script>
+<script src="js/graph-freeze.js?v=15846"></script>
+<script src="js/audio.js?v=15846"></script>
+<script src="js/daw.js?v=15846"></script>
+<script src="js/disk-usage.js?v=15846"></script>
+<script src="js/presets.js?v=15846"></script>
+<script src="js/batch-select.js?v=15846"></script>
+<script src="js/native-file-drag.js?v=15846"></script>
+<script src="js/sort-persist.js?v=15846"></script>
+<script src="js/multi-filter.js?v=15846"></script>
+<script src="js/file-browser.js?v=15846"></script>
+<script src="js/duplicates.js?v=15846"></script>
+<script src="js/command-palette.js?v=15846"></script>
+<script src="js/xref.js?v=15846"></script>
+<script src="js/dep-graph.js?v=15846"></script>
+<script src="js/smart-playlists.js?v=15846"></script>
+<script src="js/heatmap-dashboard.js?v=15846"></script>
+<script src="js/midi.js?v=15846"></script>
+<script src="js/pdf.js?v=15846"></script>
+<script src="js/video.js?v=15846"></script>
+<script src="js/settings-search.js?v=15846"></script>
+<script src="js/visualizer.js?v=15846"></script>
+<script src="js/walker-status.js?v=15846"></script>
+<script src="js/audio-engine.js?v=15846"></script>
+<script src="js/context-menu.js?v=15846"></script>
+<script src="js/shortcuts.js?v=15846"></script>
+<script src="js/help-overlay.js?v=15846"></script>
+<script src="js/keyboard-nav.js?v=15846"></script>
+<script src="js/app.js?v=15846"></script>
 </body>
 </html>

@@ -1053,7 +1053,7 @@ function getFolderWatchScanDirsUnique() {
     if (explicit && explicit.trim()) {
         raw.push(...explicit.split('\n').map(d => d.trim()).filter(Boolean));
     } else {
-        for (const key of ['customDirs', 'audioScanDirs', 'dawScanDirs', 'presetScanDirs', 'midiScanDirs', 'pdfScanDirs']) {
+        for (const key of ['customDirs', 'audioScanDirs', 'dawScanDirs', 'presetScanDirs', 'midiScanDirs', 'pdfScanDirs', 'videoScanDirs']) {
             const val = prefs.getItem(key);
             if (val) raw.push(...val.split('\n').map(d => d.trim()).filter(Boolean));
         }
@@ -1496,6 +1496,13 @@ function savePdfScanDirs() {
     prefs.setItem('pdfScanDirs', val);
     showSavedMsg('savedMsgPdfScanDirs');
     showToast(toastFmt('toast.pdf_scan_dirs_saved'));
+}
+
+function saveVideoScanDirs() {
+    const val = document.getElementById('settingVideoScanDirs').value.trim();
+    prefs.setItem('videoScanDirs', val);
+    showSavedMsg('savedMsgVideoScanDirs');
+    showToast(toastFmt('toast.video_scan_dirs_saved'));
 }
 
 function saveFolderWatchDirs() {
@@ -2006,7 +2013,7 @@ function refreshSettingsUI() {
                     }),
                 ]),
                 section('ui.perf.section_scanner_state', [
-                    `${dot(sc.pluginScanning)} ${f('ui.perf.scan_plugins')}  ${dot(sc.audioScanning)} ${f('ui.perf.scan_samples')}  ${dot(sc.dawScanning)} ${f('ui.perf.scan_daw')}  ${dot(sc.presetScanning)} ${f('ui.perf.scan_presets')}  ${dot(sc.midiScanning)} ${f('ui.perf.scan_midi')}  ${dot(sc.pdfScanning)} ${f('ui.perf.scan_pdf')}  ${dot(sc.updateChecking)} ${f('ui.perf.scan_updates')}`,
+                    `${dot(sc.pluginScanning)} ${f('ui.perf.scan_plugins')}  ${dot(sc.audioScanning)} ${f('ui.perf.scan_samples')}  ${dot(sc.dawScanning)} ${f('ui.perf.scan_daw')}  ${dot(sc.presetScanning)} ${f('ui.perf.scan_presets')}  ${dot(sc.midiScanning)} ${f('ui.perf.scan_midi')}  ${dot(sc.pdfScanning)} ${f('ui.perf.scan_pdf')}  ${dot(sc.videoScanning)} ${f('ui.perf.scan_video')}  ${dot(sc.updateChecking)} ${f('ui.perf.scan_updates')}`,
                 ]),
                 section('ui.perf.section_scan_results', [
                     f('ui.perf.line_scan_results', {
@@ -2148,6 +2155,9 @@ function refreshSettingsUI() {
     const pdfScanDirs = prefs.getItem('pdfScanDirs') || '';
     const pdfScanDirsEl = document.getElementById('settingPdfScanDirs');
     if (pdfScanDirsEl) pdfScanDirsEl.value = pdfScanDirs;
+    const videoScanDirs = prefs.getItem('videoScanDirs') || '';
+    const videoScanDirsEl = document.getElementById('settingVideoScanDirs');
+    if (videoScanDirsEl) videoScanDirsEl.value = videoScanDirs;
 
     const folderWatchDirs = prefs.getItem('folderWatchDirs') || '';
     const folderWatchDirsEl = document.getElementById('settingFolderWatchDirs');

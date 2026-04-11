@@ -59,7 +59,7 @@ pub fn format_size(bytes: u64) -> String {
     format!("{:.1} {}", bytes as f64 / 1024f64.powi(i as i32), units[i])
 }
 
-use history::{AudioSample, DawProject, KvrCacheUpdateEntry, PdfFile, PresetFile};
+use history::{AudioSample, DawProject, KvrCacheUpdateEntry, PdfFile, PresetFile, VideoFile};
 use path_norm::normalize_path_for_db;
 use scanner::PluginInfo;
 use serde::{Deserialize, Serialize};
@@ -5616,6 +5616,54 @@ async fn import_pdfs_json(file_path: String) -> Result<Vec<PdfFile>, String> {
     .await
 }
 
+// ── Video export/import ──
+
+#[tauri::command]
+async fn export_videos_json(videos: Vec<VideoFile>, file_path: String) -> Result<(), String> {
+    blocking_res(move || {
+        let json = serde_json::to_string_pretty(&videos).map_err(|e| e.to_string())?;
+        std::fs::write(&file_path, json).map_err(|e| e.to_string())
+    })
+    .await
+}
+
+#[tauri::command]
+async fn export_videos_dsv(videos: Vec<VideoFile>, file_path: String) -> Result<(), String> {
+    blocking_res(move || {
+        let sep = detect_separator(&file_path);
+        let mut out = format!("Name{s}Path{s}Directory{s}Format{s}Size{s}Modified\n", s = sep);
+        for v in &videos {
+            out.push_str(&format!(
+                "{}{sep}{}{sep}{}{sep}{}{sep}{}{sep}{}\n",
+                dsv_escape(&v.name, sep),
+                dsv_escape(&v.path, sep),
+                dsv_escape(&v.directory, sep),
+                dsv_escape(&v.format, sep),
+                dsv_escape(&v.size_formatted, sep),
+                dsv_escape(&v.modified, sep),
+            ));
+        }
+        std::fs::write(&file_path, out).map_err(|e| e.to_string())
+    })
+    .await
+}
+
+#[tauri::command]
+async fn import_videos_json(file_path: String) -> Result<Vec<VideoFile>, String> {
+    blocking_res(move || {
+        let data = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+        if let Ok(arr) = serde_json::from_str::<Vec<VideoFile>>(&data) {
+            return Ok(arr);
+        }
+        let val: serde_json::Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+        if let Some(arr) = val.get("videos") {
+            return serde_json::from_value(arr.clone()).map_err(|e| e.to_string());
+        }
+        Err("Expected a JSON array of videos or { \"videos\": [...] }".into())
+    })
+    .await
+}
+
 #[tauri::command]
 async fn import_audio_json(file_path: String) -> Result<Vec<AudioSample>, String> {
     blocking_res(move || {
@@ -7915,6 +7963,9 @@ pub fn run() {
             export_pdfs_json,
             export_pdfs_dsv,
             import_pdfs_json,
+            export_videos_json,
+            export_videos_dsv,
+            import_videos_json,
             export_toml,
             import_toml,
             export_pdf,

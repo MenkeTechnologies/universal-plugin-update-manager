@@ -684,6 +684,12 @@ document.addEventListener('click', (e) => {
             case 'importPdfs':
                 if (typeof importPdfs === 'function') importPdfs();
                 break;
+            case 'exportVideos':
+                if (typeof exportVideos === 'function') runExport(exportVideos);
+                break;
+            case 'importVideos':
+                if (typeof importVideos === 'function') importVideos();
+                break;
             case 'filterSettings':
                 if (typeof filterSettings === 'function') filterSettings();
                 break;
@@ -1111,6 +1117,9 @@ document.addEventListener('click', (e) => {
             case 'savePdfScanDirs':
                 savePdfScanDirs();
                 break;
+            case 'saveVideoScanDirs':
+                if (typeof saveVideoScanDirs === 'function') saveVideoScanDirs();
+                break;
             case 'saveFolderWatchDirs':
                 if (typeof saveFolderWatchDirs === 'function') saveFolderWatchDirs();
                 break;
@@ -1246,6 +1255,18 @@ document.addEventListener('dblclick', (e) => {
         window.vstUpdater.openFileDefault(pdfRow.dataset.pdfPath)
             .then(() => showToast(toastFmt('toast.opening_pdf_default_app', {name})))
             .catch(err => showToast(toastFmt('toast.failed_open_pdf', {err: err.message || err}), 4000, 'error'));
+        return;
+    }
+
+    // Videos — open in default app (double-click)
+    const videoRow = e.target.closest('#videoTableBody tr[data-video-path]');
+    if (videoRow && !e.target.closest('.col-actions')) {
+        e.preventDefault();
+        const name = videoRow.querySelector('.col-name')?.textContent?.trim()
+            || videoRow.dataset.videoPath?.split('/').pop() || 'Video';
+        window.vstUpdater.openFileDefault(videoRow.dataset.videoPath)
+            .then(() => showToast(toastFmt('toast.opening_video_default_app', {name})))
+            .catch(err => showToast(toastFmt('toast.failed_open_video', {err: err.message || err}), 4000, 'error'));
         return;
     }
 });
@@ -1540,6 +1561,9 @@ window.vstUpdater = {
     exportPdfsJson: (pdfs, filePath) => invoke('export_pdfs_json', {pdfs, filePath}),
     exportPdfsDsv: (pdfs, filePath) => invoke('export_pdfs_dsv', {pdfs, filePath}),
     importPdfsJson: (filePath) => invoke('import_pdfs_json', {filePath}),
+    exportVideosJson: (videos, filePath) => invoke('export_videos_json', {videos, filePath}),
+    exportVideosDsv: (videos, filePath) => invoke('export_videos_dsv', {videos, filePath}),
+    importVideosJson: (filePath) => invoke('import_videos_json', {filePath}),
     exportPresetsJson: (presets, filePath) => invoke('export_presets_json', {presets, filePath}),
     importPresetsJson: (filePath) => invoke('import_presets_json', {filePath}),
     importAudioJson: (filePath) => invoke('import_audio_json', {filePath}),

@@ -537,6 +537,8 @@ async function updateHeaderInfo() {
         if (sc.dawScanning) active.push(catalogFmt('ui.scan_status.daw'));
         if (sc.presetScanning) active.push(catalogFmt('ui.scan_status.presets'));
         if (sc.midiScanning) active.push(catalogFmt('ui.scan_status.midi'));
+        if (sc.pdfScanning) active.push(catalogFmt('ui.scan_status.pdfs'));
+        if (sc.videoScanning) active.push(catalogFmt('ui.scan_status.videos'));
         const badge = document.getElementById('scanStatusBadge');
         if (badge) {
             if (active.length > 0) {
@@ -571,7 +573,8 @@ async function showPostScanAllToast() {
         document.getElementById('btnResumeDaw')?.style.display === '' ||
         document.getElementById('btnResumePresets')?.style.display === '' ||
         document.getElementById('btnResumeMidi')?.style.display === '' ||
-        document.getElementById('btnResumePdf')?.style.display === '';
+        document.getElementById('btnResumePdf')?.style.display === '' ||
+        document.getElementById('btnResumeVideo')?.style.display === '';
     let c;
     try {
         c = await window.vstUpdater.getActiveScanInventoryCounts();
@@ -686,6 +689,7 @@ async function scanAll(resume = false) {
             scanPresets(resume, presetP),
             typeof scanPdfs === 'function' ? scanPdfs(resume, pdfP) : Promise.resolve(),
             typeof scanMidi === 'function' ? scanMidi(resume) : Promise.resolve(),
+            typeof scanVideos === 'function' ? scanVideos(resume) : Promise.resolve(),
         ]);
 
         // Kick off the backend walker after listeners are up (100ms is imperceptible
@@ -724,7 +728,8 @@ async function scanAll(resume = false) {
         document.getElementById('btnResumeDaw')?.style.display === '' ||
         document.getElementById('btnResumePresets')?.style.display === '' ||
         document.getElementById('btnResumeMidi')?.style.display === '' ||
-        document.getElementById('btnResumePdf')?.style.display === '';
+        document.getElementById('btnResumePdf')?.style.display === '' ||
+        document.getElementById('btnResumeVideo')?.style.display === '';
     resumeBtn.style.display = anyResumeVisible ? '' : 'none';
 }
 

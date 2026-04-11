@@ -64,7 +64,9 @@ const SHORTCUT_LABEL_KEYS = {
     scanDawOnly: 'ui.shortcut.scan_daw_only',
     scanPresetsOnly: 'ui.shortcut.scan_presets_only',
     scanPdfsOnly: 'ui.shortcut.scan_pdfs_only',
+    scanVideosOnly: 'ui.shortcut.scan_videos_only',
     stopPdfScan: 'ui.shortcut.stop_pdf_scan',
+    stopVideoScan: 'ui.shortcut.stop_video_scan',
     extractPdfMetadata: 'ui.shortcut.extract_pdf_metadata',
     stopPdfMetadata: 'ui.shortcut.stop_pdf_metadata',
     stopFingerprintCache: 'ui.shortcut.stop_fingerprint_cache',
@@ -174,7 +176,9 @@ const DEFAULT_SHORTCUT_DEFS = {
     scanDawOnly: {key: '`', mod: true, shift: true},
     scanPresetsOnly: {key: 'r', mod: true, shift: true},
     scanPdfsOnly: {key: 'f', mod: true, shift: true},
+    scanVideosOnly: {key: 'e', mod: true, shift: true},
     stopPdfScan: {key: 'y', mod: true, shift: true},
+    stopVideoScan: {key: 'q', mod: true, shift: true},
     extractPdfMetadata: {key: 'm', mod: true, shift: true},
     // Not Z: matches native menu — macOS reserves Cmd+Shift+Z for Edit → Redo.
     stopPdfMetadata: {key: 'k', mod: true, shift: true},
@@ -574,8 +578,12 @@ function executeShortcut(id) {
         if (typeof scanPresets === 'function') scanPresets();
     } else if (id === 'scanPdfsOnly') {
         if (typeof scanPdfs === 'function') scanPdfs();
+    } else if (id === 'scanVideosOnly') {
+        if (typeof scanVideos === 'function') scanVideos();
     } else if (id === 'stopPdfScan') {
         if (typeof stopPdfScan === 'function') stopPdfScan();
+    } else if (id === 'stopVideoScan') {
+        if (typeof stopVideoScan === 'function') void stopVideoScan();
     } else if (id === 'extractPdfMetadata') {
         if (typeof buildPdfPagesCache === 'function') buildPdfPagesCache();
     } else if (id === 'stopPdfMetadata') {
@@ -716,6 +724,7 @@ function _exportCurrentTab() {
     else if (active === 'tabNotes' && typeof exportNotes === 'function') exportNotes();
     else if (active === 'tabMidi' && typeof exportMidi === 'function') run(exportMidi);
     else if (active === 'tabPdf' && typeof exportPdfs === 'function') run(exportPdfs);
+    else if (active === 'tabVideos' && typeof exportVideos === 'function') run(exportVideos);
 }
 
 function _importCurrentTab() {
@@ -726,6 +735,8 @@ function _importCurrentTab() {
     else if (active === 'tabPresets' && typeof importPresets === 'function') importPresets();
     else if (active === 'tabFavorites' && typeof importFavorites === 'function') importFavorites();
     else if (active === 'tabNotes' && typeof importNotes === 'function') importNotes();
+    else if (active === 'tabPdf' && typeof importPdfs === 'function') importPdfs();
+    else if (active === 'tabVideos' && typeof importVideos === 'function') importVideos();
 }
 
 function _cycleTab(dir) {

@@ -77,6 +77,18 @@ function restoreAllSortStates() {
             pdfSortAsc = true;
         }
     }
+    const video = restoreSortState('video');
+    if (video && typeof videoSortKey !== 'undefined') {
+        videoSortKey = video.key;
+        videoSortAsc = video.asc;
+    }
+    if (!video && typeof videoSortKey !== 'undefined') {
+        const def = prefs.getItem('videoSort');
+        if (def) {
+            videoSortKey = def;
+            videoSortAsc = true;
+        }
+    }
 }
 
 function initSortPersistence() {
