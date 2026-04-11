@@ -422,6 +422,11 @@ let _analyser = null;
 let _monoMode = false;
 let _abLoop = null; // { start, end } in seconds, or null
 
+/** Per-sample loop regions, keyed by absolute host path.
+ *  `{ [path]: { enabled: bool, startFrac: 0-1, endFrac: 0-1 } }`.
+ *  Persisted to `prefs('sampleLoopRegions')`; applied to `_abLoop` when that path plays. */
+let _sampleLoopRegions = {};
+
 // Reverse playback (decoded buffer played backwards through the same EQ chain; HTMLAudioElement has no negative playbackRate)
 let audioReverseMode = false;
 let _decodedBuf = null;
@@ -1124,8 +1129,259 @@ function updateAbLoopUI() {
     markerB.style.left = ((_abLoop.end / dur) * 100) + '%';
 }
 
+// ── Per-sample loop region (expanded-row waveform braces) ──
+/** Load persisted per-sample loop regions from prefs. Called once at startup. */
+function loadSampleLoopRegions() {
+    try {
+        const obj = typeof prefs !== 'undefined' && typeof prefs.getObject === 'function'
+            ? prefs.getObject('sampleLoopRegions', {})
+            : {};
+        _sampleLoopRegions = (obj && typeof obj === 'object') ? obj : {};
+    } catch {
+        _sampleLoopRegions = {};
+    }
+}
+
+function saveSampleLoopRegions() {
+    try {
+        if (typeof prefs !== 'undefined' && typeof prefs.setObject === 'function') {
+            prefs.setObject('sampleLoopRegions', _sampleLoopRegions);
+        }
+    } catch {}
+}
+
+/** Return a normalized region for `path`, falling back to a default inner-half selection. */
+function getSampleLoopRegion(path) {
+    const r = _sampleLoopRegions[path];
+    if (r && typeof r === 'object') {
+        let s = typeof r.startFrac === 'number' ? r.startFrac : 0.25;
+        let e = typeof r.endFrac === 'number' ? r.endFrac : 0.75;
+        s = Math.max(0, Math.min(1, s));
+        e = Math.max(0, Math.min(1, e));
+        if (e < s + 0.01) e = Math.min(1, s + 0.01);
+        return { enabled: !!r.enabled, startFrac: s, endFrac: e };
+    }
+    return { enabled: false, startFrac: 0.25, endFrac: 0.75 };
+}
+
+function setSampleLoopRegion(path, region) {
+    if (!path) return;
+    const s = Math.max(0, Math.min(1, typeof region.startFrac === 'number' ? region.startFrac : 0.25));
+    let e = Math.max(0, Math.min(1, typeof region.endFrac === 'number' ? region.endFrac : 0.75));
+    if (e < s + 0.01) e = Math.min(1, s + 0.01);
+    _sampleLoopRegions[path] = {
+        enabled: !!region.enabled,
+        startFrac: s,
+        endFrac: e,
+    };
+    saveSampleLoopRegions();
+}
+
+/** Paint the loop-region overlay (region band + two brace handles + optional toggle) into one container. */
+function _paintLoopRegionOverlay(box, region) {
+    if (!box) return;
+    const startEl = box.querySelector('.waveform-loop-brace-start');
+    const endEl = box.querySelector('.waveform-loop-brace-end');
+    const regionEl = box.querySelector('.waveform-loop-region');
+    const toggleEl = box.querySelector('.waveform-loop-toggle');
+    const show = region.enabled;
+    const disp = show ? '' : 'none';
+    if (startEl) {
+        startEl.style.display = disp;
+        startEl.style.left = (region.startFrac * 100) + '%';
+    }
+    if (endEl) {
+        endEl.style.display = disp;
+        endEl.style.left = (region.endFrac * 100) + '%';
+    }
+    if (regionEl) {
+        regionEl.style.display = disp;
+        regionEl.style.left = (region.startFrac * 100) + '%';
+        regionEl.style.width = ((region.endFrac - region.startFrac) * 100) + '%';
+    }
+    if (toggleEl) toggleEl.classList.toggle('active', show);
+}
+
+/** Update all on-screen loop overlays (expanded row + now-playing player) to match persisted state for `filePath`. */
+function applyMetaLoopRegionUI(filePath) {
+    if (!filePath) return;
+    const region = getSampleLoopRegion(filePath);
+    const metaBox = document.getElementById('metaWaveformBox');
+    if (metaBox && metaBox.dataset.path === filePath) {
+        _paintLoopRegionOverlay(metaBox, region);
+    }
+    if (filePath === audioPlayerPath) {
+        const npBox = document.getElementById('npWaveform');
+        if (npBox) _paintLoopRegionOverlay(npBox, region);
+    }
+}
+
+/** Refresh the now-playing loop overlay from the current `audioPlayerPath` — used on track change. */
+function refreshNpLoopRegionUI() {
+    const npBox = document.getElementById('npWaveform');
+    if (!npBox) return;
+    if (!audioPlayerPath) {
+        _paintLoopRegionOverlay(npBox, { enabled: false, startFrac: 0, endFrac: 1 });
+        return;
+    }
+    _paintLoopRegionOverlay(npBox, getSampleLoopRegion(audioPlayerPath));
+}
+if (typeof window !== 'undefined') window.refreshNpLoopRegionUI = refreshNpLoopRegionUI;
+
+/** Resolve the duration (sec) that `_abLoop` should be computed against for the active playback path. */
+function _durationSecForActivePlayback() {
+    if (_enginePlaybackActive && typeof enginePlaybackDurationSec === 'function') {
+        const d = enginePlaybackDurationSec();
+        if (Number.isFinite(d) && d > 0) return d;
+    }
+    if (typeof audioPlayer !== 'undefined' && audioPlayer && Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0) {
+        return audioPlayer.duration;
+    }
+    return 0;
+}
+
+/** If `filePath` is the current playback, push its stored region into `_abLoop` (or clear it). */
+function syncAbLoopFromSampleRegion(filePath) {
+    if (!filePath || audioPlayerPath !== filePath) return;
+    const region = getSampleLoopRegion(filePath);
+    const dur = _durationSecForActivePlayback();
+    if (region.enabled && dur > 0) {
+        _abLoop = {
+            start: region.startFrac * dur,
+            end: region.endFrac * dur,
+            _fromSampleRegion: true,
+        };
+    } else if (_abLoop && _abLoop._fromSampleRegion) {
+        _abLoop = null;
+    }
+    if (typeof updateAbLoopUI === 'function') updateAbLoopUI();
+}
+
+/** Toggle the loop region on/off for the currently expanded row. */
+function toggleMetaLoopRegion() {
+    const box = document.getElementById('metaWaveformBox');
+    if (!box) return;
+    const filePath = box.dataset.path || '';
+    if (!filePath) return;
+    const region = getSampleLoopRegion(filePath);
+    region.enabled = !region.enabled;
+    setSampleLoopRegion(filePath, region);
+    applyMetaLoopRegionUI(filePath);
+    syncAbLoopFromSampleRegion(filePath);
+}
+
+/** Resolve the live playback position (sec) for the active path — interpolates between engine polls. */
+function _getCurrentPlaybackTimeSec() {
+    if (_enginePlaybackActive && typeof window !== 'undefined') {
+        const basePos = typeof window._enginePlaybackPosSec === 'number' ? window._enginePlaybackPosSec : 0;
+        const anchor = typeof window._enginePlaybackPosAnchorMs === 'number'
+            ? window._enginePlaybackPosAnchorMs
+            : performance.now();
+        const paused = window._enginePlaybackPaused === true;
+        let speed = 1;
+        if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+            const raw = parseFloat(prefs.getItem('audioSpeed') || '1');
+            if (Number.isFinite(raw)) speed = Math.max(0.25, Math.min(2, raw));
+        }
+        const elapsed = paused ? 0 : (performance.now() - anchor) / 1000;
+        let cur = basePos + elapsed * speed;
+        const dur = typeof enginePlaybackDurationSec === 'function' ? enginePlaybackDurationSec() : 0;
+        if (Number.isFinite(dur) && dur > 0 && cur > dur) cur = dur;
+        return cur < 0 ? 0 : cur;
+    }
+    if (audioReverseMode && _reversedBuf && _bufPlaying && _playbackCtx) {
+        const dur = _reversedBuf.duration || 0;
+        const elapsed = _playbackCtx.currentTime - _bufSegStartCtx;
+        const posInRev = _bufOffsetInRev + elapsed * _bufPlaybackRate;
+        return Math.max(0, dur - posInRev);
+    }
+    if (audioPlayer && Number.isFinite(audioPlayer.currentTime)) return audioPlayer.currentTime;
+    return 0;
+}
+
+/** Resolve the loop-region target path: the expanded row if any, otherwise the currently playing path. */
+function _sampleLoopRegionTargetPath() {
+    const box = document.getElementById('metaWaveformBox');
+    if (box && box.dataset && box.dataset.path) return box.dataset.path;
+    return audioPlayerPath || '';
+}
+
+/** Compute the current playhead as a 0..1 fraction of `filePath`'s duration (requires live playback on that path). */
+function _playbackFracForPath(filePath) {
+    if (!filePath || audioPlayerPath !== filePath) return null;
+    const dur = _durationSecForActivePlayback();
+    if (!Number.isFinite(dur) || dur <= 0) return null;
+    const cur = _getCurrentPlaybackTimeSec();
+    return Math.max(0, Math.min(1, cur / dur));
+}
+
+/** Set the sample loop region start at the live playhead (or 0 when not playing this path). Enables the region. */
+function setSampleLoopRegionStartAtPlayhead() {
+    const filePath = _sampleLoopRegionTargetPath();
+    if (!filePath) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.sample_loop_no_target'), 2500);
+        }
+        return;
+    }
+    const MIN_GAP = 0.005;
+    const region = getSampleLoopRegion(filePath);
+    const frac = _playbackFracForPath(filePath);
+    const newStart = frac != null ? frac : 0;
+    region.startFrac = Math.min(newStart, 1 - MIN_GAP);
+    if (region.endFrac <= region.startFrac + MIN_GAP) {
+        region.endFrac = Math.min(1, region.startFrac + MIN_GAP);
+    }
+    region.enabled = true;
+    setSampleLoopRegion(filePath, region);
+    applyMetaLoopRegionUI(filePath);
+    syncAbLoopFromSampleRegion(filePath);
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        const dur = _durationSecForActivePlayback();
+        const tSec = dur > 0 ? region.startFrac * dur : 0;
+        showToast(toastFmt('toast.sample_loop_start_set', { time: formatTime(tSec) }), 1500);
+    }
+}
+
+/** Set the sample loop region end at the live playhead (or full-duration when not playing this path). Enables the region. */
+function setSampleLoopRegionEndAtPlayhead() {
+    const filePath = _sampleLoopRegionTargetPath();
+    if (!filePath) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.sample_loop_no_target'), 2500);
+        }
+        return;
+    }
+    const MIN_GAP = 0.005;
+    const region = getSampleLoopRegion(filePath);
+    const frac = _playbackFracForPath(filePath);
+    const newEnd = frac != null ? frac : 1;
+    region.endFrac = Math.max(newEnd, MIN_GAP);
+    if (region.endFrac <= region.startFrac + MIN_GAP) {
+        region.startFrac = Math.max(0, region.endFrac - MIN_GAP);
+    }
+    region.enabled = true;
+    setSampleLoopRegion(filePath, region);
+    applyMetaLoopRegionUI(filePath);
+    syncAbLoopFromSampleRegion(filePath);
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        const dur = _durationSecForActivePlayback();
+        const tSec = dur > 0 ? region.endFrac * dur : 0;
+        showToast(toastFmt('toast.sample_loop_end_set', { time: formatTime(tSec) }), 1500);
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.syncAbLoopFromSampleRegion = syncAbLoopFromSampleRegion;
+    window.applyMetaLoopRegionUI = applyMetaLoopRegionUI;
+    window.toggleMetaLoopRegion = toggleMetaLoopRegion;
+    window.setSampleLoopRegionStartAtPlayhead = setSampleLoopRegionStartAtPlayhead;
+    window.setSampleLoopRegionEndAtPlayhead = setSampleLoopRegionEndAtPlayhead;
+}
+
 function loadRecentlyPlayed() {
     recentlyPlayed = prefs.getObject('recentlyPlayed', []);
+    loadSampleLoopRegions();
     // Restore playback settings
     audioLooping = prefs.getItem('audioLoop') === 'on';
     audioPlayer.loop = audioLooping;
@@ -2845,6 +3101,9 @@ async function previewAudio(filePath, opts) {
         updateMetaLine();
         // Deferred one task — layout for the waveform flex child is often 0×0 until after paint (WKWebView).
         scheduleNowPlayingWaveform(filePath);
+        // Apply expanded-row loop braces to live `_abLoop` (engine path does this in `enginePlaybackStart`).
+        syncAbLoopFromSampleRegion(filePath);
+        refreshNpLoopRegionUI();
         if (typeof window.syncAeTransportFromPlayback === 'function') window.syncAeTransportFromPlayback();
         /* Fire-and-forget BPM / Key / LUFS analysis for the newly-loaded track. Runs on every
          * play path (row click, tray prev/next, menu bar, keyboard shortcut, autoplay-next EOF,
@@ -3849,10 +4108,14 @@ async function expandMetaForPath(filePath) {
         const sgBoxT = escapeHtml(_audioFmt('ui.audio.meta_spectrogram_box_tt'));
         const sgCanT = escapeHtml(_audioFmt('ui.audio.meta_spectrogram_canvas_tt'));
         const sgBadge = escapeHtml(_audioFmt('ui.audio.meta_spectrogram_badge'));
-        // Waveform preview with seek support
+        // Waveform preview with seek support + per-sample loop region braces (toggle + drag)
         const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" title="${wfSeekT}">
       <canvas id="metaWaveformCanvas" title="${wfCanT}"></canvas>
       <div class="waveform-progress-fill"></div>
+      <div class="waveform-loop-region" style="display:none;"></div>
+      <div class="waveform-loop-brace waveform-loop-brace-start" data-loop-brace="start" style="display:none;left:25%;" title="Drag to set loop start"></div>
+      <div class="waveform-loop-brace waveform-loop-brace-end" data-loop-brace="end" style="display:none;left:75%;" title="Drag to set loop end"></div>
+      <button type="button" class="waveform-loop-toggle" data-action="toggleMetaLoopRegion" title="Toggle loop region">L</button>
       <div class="waveform-cursor" style="left:0;"></div>
       <div class="waveform-time-label">${meta.duration ? formatTime(meta.duration) : ''}</div>
     </div>
@@ -3863,6 +4126,9 @@ async function expandMetaForPath(filePath) {
 
         const _closeT = typeof escapeHtml === 'function' ? escapeHtml(_audioFmt('ui.audio.meta_close_title')) : _audioFmt('ui.audio.meta_close_title');
         metaRow.innerHTML = `<td colspan="12"><div class="audio-meta-panel"><span class="meta-close-btn" data-action="closeMetaRow" title="${_closeT}">&#10005;</span>${waveformHtml}${items}</div></td>`;
+
+        // Hydrate loop-region braces/toggle from persisted state for this path
+        applyMetaLoopRegionUI(filePath);
 
         // Expanded-row visuals are lowest priority: idle-scheduled so they never preempt playback.
         // Run sequentially so we decode once per visual (not two parallel full-file decodes).
@@ -6526,26 +6792,206 @@ window.preloadAudioDecodeWorker = preloadAudioDecodeWorker;
     }
 })();
 
+/** Resolve the loop-region path for a waveform container (meta uses dataset.path, np follows audioPlayerPath). */
+function _loopRegionPathForBox(box) {
+    if (!box) return '';
+    if (box.id === 'metaWaveformBox') return box.dataset ? box.dataset.path || '' : '';
+    if (box.id === 'npWaveform') return audioPlayerPath || '';
+    return '';
+}
+
 /** Now-playing + expanded-row waveforms: pointerdown seeks (click delegation can miss in some WebViews; canvas is pointer-events:none). */
 (function initWaveformPointerSeek() {
+    function maybeExitLoopOnRightClickFrac(box, e) {
+        const filePath = _loopRegionPathForBox(box);
+        if (!filePath) return;
+        const region = getSampleLoopRegion(filePath);
+        if (!region.enabled) return;
+        const rect = box.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        const frac = (e.clientX - rect.left) / rect.width;
+        if (frac > region.endFrac + 0.001) {
+            region.enabled = false;
+            setSampleLoopRegion(filePath, region);
+            applyMetaLoopRegionUI(filePath);
+            syncAbLoopFromSampleRegion(filePath);
+        }
+    }
     function onPointerDown(e) {
         if (e.button !== 0) return;
         const t = e.target;
         if (!t || (t.closest && t.closest('button, input, select, textarea'))) return;
+        // Loop brace handles consume their own pointerdown (drag); don't treat as seek.
+        if (t.closest && t.closest('.waveform-loop-brace')) return;
+        // Shift+click on a loop-capable waveform starts the region paint (rubber band); skip seek.
+        if (e.shiftKey && t.closest && t.closest('#metaWaveformBox, #npWaveform')) return;
         const meta = typeof t.closest === 'function' ? t.closest('#metaWaveformBox') : null;
         if (meta && typeof seekMetaWaveform === 'function') {
+            // Click to the right of the loop end brace exits the loop region — lets playback continue past `end`.
+            maybeExitLoopOnRightClickFrac(meta, e);
             e.preventDefault();
             seekMetaWaveform(e);
             return;
         }
         const np = typeof t.closest === 'function' ? t.closest('#npWaveform') : null;
         if (np && typeof seekAudio === 'function') {
+            maybeExitLoopOnRightClickFrac(np, e);
             e.preventDefault();
             seekAudio(e);
         }
     }
     if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
     document.addEventListener('pointerdown', onPointerDown, true);
+})();
+
+/** Shift+drag on the expanded-row OR now-playing waveform paints a new loop region (rubber-band). */
+(function initMetaLoopPaintDrag() {
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    let paint = null; // { box, filePath, rect, anchorFrac, pointerId }
+    function onPointerDown(e) {
+        if (e.button !== 0) return;
+        if (!e.shiftKey) return;
+        const t = e.target;
+        if (!t || typeof t.closest !== 'function') return;
+        // Don't start paint when the user shift-clicks a brace or the toggle button.
+        if (t.closest('.waveform-loop-brace')) return;
+        if (t.closest('button, input, select, textarea')) return;
+        const box = t.closest('#metaWaveformBox, #npWaveform');
+        if (!box) return;
+        const filePath = _loopRegionPathForBox(box);
+        if (!filePath) return;
+        const rect = box.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const anchorFrac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        paint = {
+            box,
+            filePath,
+            rect,
+            anchorFrac,
+            pointerId: e.pointerId,
+        };
+        try { box.setPointerCapture(e.pointerId); } catch {}
+        // Seed a zero-width region at the anchor so the highlight band appears on first move.
+        const region = getSampleLoopRegion(paint.filePath);
+        region.enabled = true;
+        region.startFrac = anchorFrac;
+        region.endFrac = Math.min(1, anchorFrac + 0.005);
+        setSampleLoopRegion(paint.filePath, region);
+        applyMetaLoopRegionUI(paint.filePath);
+        document.addEventListener('pointermove', onPointerMove, true);
+        document.addEventListener('pointerup', onPointerUp, true);
+        document.addEventListener('pointercancel', onPointerUp, true);
+    }
+    function onPointerMove(e) {
+        if (!paint) return;
+        const { filePath, rect, anchorFrac } = paint;
+        let frac = (e.clientX - rect.left) / rect.width;
+        if (!Number.isFinite(frac)) return;
+        frac = Math.max(0, Math.min(1, frac));
+        const region = getSampleLoopRegion(filePath);
+        const MIN_GAP = 0.005;
+        if (frac >= anchorFrac) {
+            region.startFrac = anchorFrac;
+            region.endFrac = Math.max(frac, anchorFrac + MIN_GAP);
+        } else {
+            region.startFrac = frac;
+            region.endFrac = Math.max(anchorFrac, frac + MIN_GAP);
+        }
+        region.enabled = true;
+        setSampleLoopRegion(filePath, region);
+        applyMetaLoopRegionUI(filePath);
+        syncAbLoopFromSampleRegion(filePath);
+    }
+    function onPointerUp() {
+        if (paint) {
+            try { paint.box.releasePointerCapture(paint.pointerId); } catch {}
+        }
+        paint = null;
+        document.removeEventListener('pointermove', onPointerMove, true);
+        document.removeEventListener('pointerup', onPointerUp, true);
+        document.removeEventListener('pointercancel', onPointerUp, true);
+    }
+    document.addEventListener('pointerdown', onPointerDown, true);
+})();
+
+/** Drag loop braces on the expanded-row OR now-playing waveform. Updates per-sample region + live `_abLoop` when playing. */
+(function initMetaLoopBraceDrag() {
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    let dragging = null; // { kind, box, filePath, rect, pointerId, handle }
+    function onPointerDown(e) {
+        if (e.button !== 0) return;
+        const t = e.target;
+        if (!t || typeof t.closest !== 'function') return;
+        const handle = t.closest('.waveform-loop-brace');
+        if (!handle) return;
+        const box = handle.closest('#metaWaveformBox, #npWaveform');
+        if (!box) return;
+        const kind = handle.dataset.loopBrace;
+        if (kind !== 'start' && kind !== 'end') return;
+        const filePath = _loopRegionPathForBox(box);
+        if (!filePath) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = box.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        dragging = {
+            kind,
+            box,
+            filePath,
+            rect,
+            pointerId: e.pointerId,
+            handle,
+        };
+        try { handle.setPointerCapture(e.pointerId); } catch {}
+        document.addEventListener('pointermove', onPointerMove, true);
+        document.addEventListener('pointerup', onPointerUp, true);
+        document.addEventListener('pointercancel', onPointerUp, true);
+    }
+    function onPointerMove(e) {
+        if (!dragging) return;
+        const { kind, filePath, rect } = dragging;
+        let frac = (e.clientX - rect.left) / rect.width;
+        if (!Number.isFinite(frac)) return;
+        frac = Math.max(0, Math.min(1, frac));
+        const region = getSampleLoopRegion(filePath);
+        const MIN_GAP = 0.005;
+        if (kind === 'start') {
+            region.startFrac = Math.min(frac, region.endFrac - MIN_GAP);
+        } else {
+            region.endFrac = Math.max(frac, region.startFrac + MIN_GAP);
+        }
+        // Dragging implies the user wants the region visible/active.
+        region.enabled = true;
+        setSampleLoopRegion(filePath, region);
+        applyMetaLoopRegionUI(filePath);
+        syncAbLoopFromSampleRegion(filePath);
+    }
+    function onPointerUp() {
+        if (dragging) {
+            try { dragging.handle.releasePointerCapture(dragging.pointerId); } catch {}
+        }
+        dragging = null;
+        document.removeEventListener('pointermove', onPointerMove, true);
+        document.removeEventListener('pointerup', onPointerUp, true);
+        document.removeEventListener('pointercancel', onPointerUp, true);
+    }
+    document.addEventListener('pointerdown', onPointerDown, true);
+})();
+
+/** Click on the `L` toggle button above the expanded-row waveform → flip loop-region enabled. */
+(function initMetaLoopToggleClick() {
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (!t || typeof t.closest !== 'function') return;
+        const btn = t.closest('.waveform-loop-toggle');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        toggleMetaLoopRegion();
+    }, true);
 })();
 
 /** `ui-idle.js` — sync playhead / spectrum / parametric EQ rAF when hybrid idle toggles (minimize, other Space, unfocused, hidden tab). */

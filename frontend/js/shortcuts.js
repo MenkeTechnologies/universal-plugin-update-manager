@@ -51,6 +51,9 @@ const SHORTCUT_LABEL_KEYS = {
     newSmartPlaylist: 'ui.shortcut.new_smart_playlist',
     deselectAll: 'ui.shortcut.deselect_all',
     toggleABLoop: 'ui.shortcut.ab_loop',
+    toggleSampleLoopRegion: 'ui.shortcut.toggle_sample_loop_region',
+    setSampleLoopRegionStart: 'ui.shortcut.set_sample_loop_region_start',
+    setSampleLoopRegionEnd: 'ui.shortcut.set_sample_loop_region_end',
     heatmapDash: 'ui.shortcut.heatmap_dashboard',
     togglePlayer: 'ui.shortcut.show_hide_player',
     toggleCrt: 'ui.shortcut.toggle_crt',
@@ -125,7 +128,7 @@ const DEFAULT_SHORTCUT_DEFS = {
     scanAll: {key: 's', mod: true, shift: false},
     stopAll: {key: '.', mod: true, shift: false},
     commandPalette: {key: 'k', mod: true, shift: false},
-    toggleLoop: {key: 'l', mod: false},
+    toggleLoop: {key: 'l', mod: false, shift: false},
     toggleMute: {key: 'm', mod: false},
     volumeUp: {key: 'ArrowUp', mod: true, shift: false},
     volumeDown: {key: 'ArrowDown', mod: true, shift: false},
@@ -153,6 +156,9 @@ const DEFAULT_SHORTCUT_DEFS = {
     newSmartPlaylist: {key: 'p', mod: true, shift: false},
     deselectAll: {key: 'Escape', mod: true, shift: false},
     toggleABLoop: {key: 'b', mod: false},
+    toggleSampleLoopRegion: {key: 'L', mod: false, shift: true},
+    setSampleLoopRegionStart: {key: '[', mod: false, shift: false},
+    setSampleLoopRegionEnd: {key: ']', mod: false, shift: false},
     heatmapDash: {key: 'd', mod: false},
     togglePlayer: {key: 'p', mod: false},
     toggleCrt: {key: 'F1', mod: false},
@@ -498,6 +504,28 @@ function executeShortcut(id) {
         } else {
             if (typeof setAbLoopStart === 'function') setAbLoopStart();
         }
+    } else if (id === 'toggleSampleLoopRegion') {
+        // Prefer the expanded metadata row; fall back to the currently playing path
+        // so the shortcut works even without an expanded row.
+        const box = document.getElementById('metaWaveformBox');
+        if (box && box.dataset.path && typeof toggleMetaLoopRegion === 'function') {
+            toggleMetaLoopRegion();
+        } else if (typeof audioPlayerPath === 'string' && audioPlayerPath
+            && typeof getSampleLoopRegion === 'function'
+            && typeof setSampleLoopRegion === 'function'
+            && typeof syncAbLoopFromSampleRegion === 'function') {
+            const region = getSampleLoopRegion(audioPlayerPath);
+            region.enabled = !region.enabled;
+            setSampleLoopRegion(audioPlayerPath, region);
+            syncAbLoopFromSampleRegion(audioPlayerPath);
+            if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+                showToast(toastFmt(region.enabled ? 'toast.sample_loop_region_on' : 'toast.sample_loop_region_off'));
+            }
+        }
+    } else if (id === 'setSampleLoopRegionStart') {
+        if (typeof setSampleLoopRegionStartAtPlayhead === 'function') setSampleLoopRegionStartAtPlayhead();
+    } else if (id === 'setSampleLoopRegionEnd') {
+        if (typeof setSampleLoopRegionEndAtPlayhead === 'function') setSampleLoopRegionEndAtPlayhead();
     } else if (id === 'heatmapDash') {
         if (typeof showHeatmapDashboard === 'function') void showHeatmapDashboard();
     } else if (id === 'togglePlayer') {

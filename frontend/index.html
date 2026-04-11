@@ -7734,6 +7734,80 @@
             pointer-events: none;
         }
 
+        /* Per-sample loop region (braces + highlight band + toggle button) on the expanded-row and now-playing waveforms. */
+        .waveform-loop-region {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            background: rgba(255, 230, 0, 0.10);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .waveform-loop-brace {
+            box-sizing: border-box;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 12px;
+            cursor: ew-resize;
+            background: rgba(255, 230, 0, 0.04);
+            z-index: 3;
+        }
+
+        .waveform-loop-brace-start {
+            margin-left: 0;
+            border-left: 2px solid #ffe600;
+            border-top: 2px solid #ffe600;
+            border-bottom: 2px solid #ffe600;
+            border-right: none;
+        }
+
+        .waveform-loop-brace-end {
+            margin-left: -12px;
+            border-right: 2px solid #ffe600;
+            border-top: 2px solid #ffe600;
+            border-bottom: 2px solid #ffe600;
+            border-left: none;
+        }
+
+        /* On the tiny now-playing waveform (24px tall) slim the brace hit area so it doesn't swallow the whole bar. */
+        .now-playing-waveform .waveform-loop-brace {
+            width: 10px;
+        }
+
+        .now-playing-waveform .waveform-loop-brace-end {
+            margin-left: -10px;
+        }
+
+        .meta-waveform .waveform-loop-toggle {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 9px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            color: var(--text-muted);
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid var(--border);
+            padding: 1px 6px;
+            cursor: pointer;
+            z-index: 4;
+            line-height: 1.2;
+            letter-spacing: 1px;
+        }
+
+        .meta-waveform .waveform-loop-toggle:hover {
+            color: var(--cyan);
+            border-color: var(--cyan);
+        }
+
+        .meta-waveform .waveform-loop-toggle.active {
+            color: #ffe600;
+            border-color: #ffe600;
+            background: rgba(255, 230, 0, 0.12);
+        }
+
         .now-playing-waveform .waveform-cursor {
             position: absolute;
             top: 0;
@@ -8149,6 +8223,9 @@
                 <div class="now-playing-waveform" id="npWaveform">
                     <canvas class="waveform-canvas" id="npWaveformCanvas"></canvas>
                     <div class="now-playing-progress" id="npProgress"></div>
+                    <div class="waveform-loop-region" style="display:none;"></div>
+                    <div class="waveform-loop-brace waveform-loop-brace-start" data-loop-brace="start" style="display:none;left:25%;" title="Drag to set loop start"></div>
+                    <div class="waveform-loop-brace waveform-loop-brace-end" data-loop-brace="end" style="display:none;left:75%;" title="Drag to set loop end"></div>
                     <div class="waveform-cursor" id="npCursor" style="left:0;display:none;"></div>
                 </div>
                 <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
@@ -10948,46 +11025,46 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=88182"></script>
-<script src="js/utils.js?v=88182"></script>
-<script src="js/ui-idle.js?v=88182"></script>
-<script src="js/ipc.js?v=88182"></script>
-<script src="js/tooltip-hover.js?v=88182"></script>
-<script src="js/drag-reorder.js?v=88182"></script>
-<script src="js/modal-drag.js?v=88182"></script>
-<script src="js/columns.js?v=88182"></script>
-<script src="js/notes.js?v=88182"></script>
-<script src="js/favorites.js?v=88182"></script>
-<script src="js/export.js?v=88182"></script>
-<script src="js/plugins.js?v=88182"></script>
-<script src="js/settings.js?v=88182"></script>
-<script src="js/history.js?v=88182"></script>
-<script src="js/kvr.js?v=88182"></script>
-<script src="js/audio.js?v=88182"></script>
-<script src="js/daw.js?v=88182"></script>
-<script src="js/disk-usage.js?v=88182"></script>
-<script src="js/presets.js?v=88182"></script>
-<script src="js/batch-select.js?v=88182"></script>
-<script src="js/native-file-drag.js?v=88182"></script>
-<script src="js/sort-persist.js?v=88182"></script>
-<script src="js/multi-filter.js?v=88182"></script>
-<script src="js/file-browser.js?v=88182"></script>
-<script src="js/duplicates.js?v=88182"></script>
-<script src="js/command-palette.js?v=88182"></script>
-<script src="js/xref.js?v=88182"></script>
-<script src="js/dep-graph.js?v=88182"></script>
-<script src="js/smart-playlists.js?v=88182"></script>
-<script src="js/heatmap-dashboard.js?v=88182"></script>
-<script src="js/midi.js?v=88182"></script>
-<script src="js/pdf.js?v=88182"></script>
-<script src="js/settings-search.js?v=88182"></script>
-<script src="js/visualizer.js?v=88182"></script>
-<script src="js/walker-status.js?v=88182"></script>
-<script src="js/audio-engine.js?v=88182"></script>
-<script src="js/context-menu.js?v=88182"></script>
-<script src="js/shortcuts.js?v=88182"></script>
-<script src="js/help-overlay.js?v=88182"></script>
-<script src="js/keyboard-nav.js?v=88182"></script>
-<script src="js/app.js?v=88182"></script>
+<script src="js/i18n-ui.js?v=25371"></script>
+<script src="js/utils.js?v=25371"></script>
+<script src="js/ui-idle.js?v=25371"></script>
+<script src="js/ipc.js?v=25371"></script>
+<script src="js/tooltip-hover.js?v=25371"></script>
+<script src="js/drag-reorder.js?v=25371"></script>
+<script src="js/modal-drag.js?v=25371"></script>
+<script src="js/columns.js?v=25371"></script>
+<script src="js/notes.js?v=25371"></script>
+<script src="js/favorites.js?v=25371"></script>
+<script src="js/export.js?v=25371"></script>
+<script src="js/plugins.js?v=25371"></script>
+<script src="js/settings.js?v=25371"></script>
+<script src="js/history.js?v=25371"></script>
+<script src="js/kvr.js?v=25371"></script>
+<script src="js/audio.js?v=25371"></script>
+<script src="js/daw.js?v=25371"></script>
+<script src="js/disk-usage.js?v=25371"></script>
+<script src="js/presets.js?v=25371"></script>
+<script src="js/batch-select.js?v=25371"></script>
+<script src="js/native-file-drag.js?v=25371"></script>
+<script src="js/sort-persist.js?v=25371"></script>
+<script src="js/multi-filter.js?v=25371"></script>
+<script src="js/file-browser.js?v=25371"></script>
+<script src="js/duplicates.js?v=25371"></script>
+<script src="js/command-palette.js?v=25371"></script>
+<script src="js/xref.js?v=25371"></script>
+<script src="js/dep-graph.js?v=25371"></script>
+<script src="js/smart-playlists.js?v=25371"></script>
+<script src="js/heatmap-dashboard.js?v=25371"></script>
+<script src="js/midi.js?v=25371"></script>
+<script src="js/pdf.js?v=25371"></script>
+<script src="js/settings-search.js?v=25371"></script>
+<script src="js/visualizer.js?v=25371"></script>
+<script src="js/walker-status.js?v=25371"></script>
+<script src="js/audio-engine.js?v=25371"></script>
+<script src="js/context-menu.js?v=25371"></script>
+<script src="js/shortcuts.js?v=25371"></script>
+<script src="js/help-overlay.js?v=25371"></script>
+<script src="js/keyboard-nav.js?v=25371"></script>
+<script src="js/app.js?v=25371"></script>
 </body>
 </html>

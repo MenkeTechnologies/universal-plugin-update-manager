@@ -2608,6 +2608,14 @@ async function enginePlaybackStart(filePath) {
     window._enginePlaybackPosSec = 0;
     window._enginePlaybackDurSec =
         typeof r.duration_sec === 'number' && !Number.isNaN(r.duration_sec) ? r.duration_sec : 0;
+    /* Apply this sample's persisted loop region (from the expanded-row braces) to `_abLoop`
+     * now that duration is known — the shared `_playbackRafLoop` A-B enforcement handles seeks. */
+    if (typeof window.syncAbLoopFromSampleRegion === 'function') {
+        window.syncAbLoopFromSampleRegion(filePath);
+    }
+    if (typeof window.refreshNpLoopRegionUI === 'function') {
+        window.refreshNpLoopRegionUI();
+    }
     const deviceId =
         typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
             ? prefs.getItem(AE_PREFS_DEVICE) || ''

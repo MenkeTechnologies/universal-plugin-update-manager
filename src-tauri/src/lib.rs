@@ -7596,6 +7596,12 @@ pub fn run() {
                     let _ = tray_menu::show_main_window(handle2.clone());
                     return;
                 }
+                /* Tray / menu-bar icon context menu "Quit": must not rely on the main webview —
+                 * `ipc.js` has no `tray_quit` handler, and a suspended main window would not run it. */
+                if id == "tray_quit" {
+                    handle2.exit(0);
+                    return;
+                }
                 /* First menu row: track title — reveal the playing file in Finder / Explorer / file
                  * manager. Rust path so it works when the main WebView is suspended (same as tray_show). */
                 if id == "tray_now_playing" {
