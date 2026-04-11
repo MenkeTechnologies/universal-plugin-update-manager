@@ -59,6 +59,14 @@ pub fn global() -> &'static Database {
 /// One row for [`Database::batch_update_analysis`]: path, BPM, musical key, LUFS.
 pub type AnalysisBatchRow = (String, Option<f64>, Option<String>, Option<f64>);
 
+/// Row from `pdf_metadata` (pages plus PDF Info dictionary dates when extracted).
+#[derive(Debug, Clone)]
+pub struct PdfMetaDbRow {
+    pub pages: Option<u32>,
+    pub pdf_creation_date: Option<String>,
+    pub pdf_mod_date: Option<String>,
+}
+
 /// SQLite with WAL: multiple connections can serve read-heavy queries concurrently.
 /// `write` is the **only** handle used for schema migrations and code paths that need the writer
 /// mutex; **never** mix it into the read round-robin — doing so serialized every `db_query_*` IPC
@@ -2133,6 +2141,36 @@ DROP TABLE _pl_refresh_paths;"#;
             }
             conn.execute("INSERT INTO schema_version (version) VALUES (18)", [])
                 .map_err(|e| format!("Migration v18 schema_version failed: {e}"))?;
+        }
+
+        if current < 19 {
+            let has_pdf_creation: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('pdf_metadata') WHERE name = 'pdf_creation_date'",
+                    [],
+                    |row| row.get::<_, i64>(0).map(|n| n > 0),
+                )
+                .unwrap_or(false);
+            if !has_pdf_creation {
+                conn.execute(
+                    "ALTER TABLE pdf_metadata ADD COLUMN pdf_creation_date TEXT",
+                    [],
+                )
+                .map_err(|e| format!("Migration v19 (pdf_creation_date) failed: {e}"))?;
+            }
+            let has_pdf_mod: bool = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('pdf_metadata') WHERE name = 'pdf_mod_date'",
+                    [],
+                    |row| row.get::<_, i64>(0).map(|n| n > 0),
+                )
+                .unwrap_or(false);
+            if !has_pdf_mod {
+                conn.execute("ALTER TABLE pdf_metadata ADD COLUMN pdf_mod_date TEXT", [],)
+                    .map_err(|e| format!("Migration v19 (pdf_mod_date) failed: {e}"))?;
+            }
+            conn.execute("INSERT INTO schema_version (version) VALUES (19)", [])
+                .map_err(|e| format!("Migration v19 schema_version failed: {e}"))?;
         }
 
         if conn
@@ -6412,6 +6450,7 @@ DROP TABLE _pl_refresh_paths;"#;
                     size: row.get::<_, i64>(3).unwrap_or(0) as u64,
                     size_formatted: row.get(4)?,
                     modified: row.get(5)?,
+                    ..Default::default()
                 })
             })
             .map_err(|e| e.to_string())?
@@ -6507,9 +6546,12 @@ DROP TABLE _pl_refresh_paths;"#;
             .map_err(|e| e.to_string())
     }
 
-    /// Batch upsert PDF page counts. Entries with None page count are still
-    /// inserted (as a negative marker) so we don't re-attempt broken files.
-    pub fn save_pdf_metadata(&self, batch: &[(String, Option<u32>)]) -> Result<(), String> {
+    /// Batch upsert PDF metadata. Entries with None page count are still
+    /// inserted so we don't re-attempt broken files.
+    pub fn save_pdf_metadata(
+        &self,
+        batch: &[(String, Option<u32>, Option<String>, Option<String>)],
+    ) -> Result<(), String> {
         if batch.is_empty() {
             return Ok(());
         }
@@ -6520,23 +6562,31 @@ DROP TABLE _pl_refresh_paths;"#;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         {
             let mut stmt = tx
-                .prepare_cached("INSERT OR REPLACE INTO pdf_metadata (path, pages, updated_at) VALUES (?1, ?2, ?3)")
+                .prepare_cached(
+                    "INSERT OR REPLACE INTO pdf_metadata (path, pages, pdf_creation_date, pdf_mod_date, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                )
                 .map_err(|e| e.to_string())?;
-            for (path, pages) in batch {
+            for (path, pages, pdf_creation_date, pdf_mod_date) in batch {
                 let path = normalize_path_for_db(path);
                 let pages_i: Option<i64> = pages.map(|n| n as i64);
-                stmt.execute(params![path, pages_i, now])
-                    .map_err(|e| e.to_string())?;
+                stmt.execute(params![
+                    path,
+                    pages_i,
+                    pdf_creation_date.as_ref(),
+                    pdf_mod_date.as_ref(),
+                    now
+                ])
+                .map_err(|e| e.to_string())?;
             }
         }
         tx.commit().map_err(|e| e.to_string())
     }
 
-    /// Get page counts for a set of paths (returns only entries that exist).
+    /// Get stored PDF metadata for a set of paths (returns only rows that exist).
     pub fn get_pdf_metadata(
         &self,
         paths: &[String],
-    ) -> Result<std::collections::HashMap<String, Option<u32>>, String> {
+    ) -> Result<std::collections::HashMap<String, PdfMetaDbRow>, String> {
         if paths.is_empty() {
             return Ok(std::collections::HashMap::new());
         }
@@ -6546,7 +6596,7 @@ DROP TABLE _pl_refresh_paths;"#;
         for chunk in paths.chunks(500) {
             let placeholders: Vec<String> = (1..=chunk.len()).map(|i| format!("?{i}")).collect();
             let sql = format!(
-                "SELECT path, pages FROM pdf_metadata WHERE path IN ({})",
+                "SELECT path, pages, pdf_creation_date, pdf_mod_date FROM pdf_metadata WHERE path IN ({})",
                 placeholders.join(",")
             );
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -6559,9 +6609,15 @@ DROP TABLE _pl_refresh_paths;"#;
             while let Some(row) = rows.next().map_err(|e| e.to_string())? {
                 let path: String = row.get(0).unwrap_or_default();
                 let pages: Option<i64> = row.get(1).ok();
+                let pdf_creation_date: Option<String> = row.get(2).ok();
+                let pdf_mod_date: Option<String> = row.get(3).ok();
                 out.insert(
                     path,
-                    pages.and_then(|n| if n >= 0 { Some(n as u32) } else { None }),
+                    PdfMetaDbRow {
+                        pages: pages.and_then(|n| if n >= 0 { Some(n as u32) } else { None }),
+                        pdf_creation_date,
+                        pdf_mod_date,
+                    },
                 );
             }
         }
@@ -9200,6 +9256,7 @@ mod tests {
                     size: 100,
                     size_formatted: "100 B".into(),
                     modified: "2024-06-01".into(),
+                    ..Default::default()
                 },
                 PdfFile {
                     name: "readme_extra".into(),
@@ -9208,6 +9265,7 @@ mod tests {
                     size: 200,
                     size_formatted: "200 B".into(),
                     modified: "2024-06-02".into(),
+                    ..Default::default()
                 },
             ],
             roots: vec!["/docs".into()],
@@ -9843,6 +9901,7 @@ mod tests {
                 size: 1024,
                 size_formatted: "1.0 KB".into(),
                 modified: "2024-06-01".into(),
+                ..Default::default()
             }],
             roots: vec!["/docs".into()],
         };
@@ -9875,6 +9934,7 @@ mod tests {
                 size: 100,
                 size_formatted: "100 B".into(),
                 modified: "2024-01-03".into(),
+                ..Default::default()
             },
             PdfFile {
                 name: "alpha".into(),
@@ -9883,6 +9943,7 @@ mod tests {
                 size: 50,
                 size_formatted: "50 B".into(),
                 modified: "2024-01-01".into(),
+                ..Default::default()
             },
             PdfFile {
                 name: "alpha_notes".into(),
@@ -9891,6 +9952,7 @@ mod tests {
                 size: 50,
                 size_formatted: "50 B".into(),
                 modified: "2024-01-02".into(),
+                ..Default::default()
             },
         ];
         let total_bytes: u64 = pdfs.iter().map(|p| p.size).sum();
@@ -9938,6 +10000,7 @@ mod tests {
                 size: 10,
                 size_formatted: "10 B".into(),
                 modified: "d".into(),
+                ..Default::default()
             }],
             roots: vec![],
         })
@@ -9954,6 +10017,7 @@ mod tests {
                 size: 20,
                 size_formatted: "20 B".into(),
                 modified: "d".into(),
+                ..Default::default()
             }],
             roots: vec![],
         })
@@ -9991,6 +10055,7 @@ mod tests {
                     size: 100,
                     size_formatted: "100 B".into(),
                     modified: "d".into(),
+                    ..Default::default()
                 },
                 PdfFile {
                     name: "b".into(),
@@ -9999,6 +10064,7 @@ mod tests {
                     size: 200,
                     size_formatted: "200 B".into(),
                     modified: "d".into(),
+                    ..Default::default()
                 },
             ],
             roots: vec![],
@@ -11878,6 +11944,7 @@ mod tests {
             size: 1,
             size_formatted: "1 B".into(),
             modified: "2024-01-01".into(),
+            ..Default::default()
         };
         db.pdf_scan_parent_create("p1", "2024-01-01T00:00:00", &[])
             .unwrap();

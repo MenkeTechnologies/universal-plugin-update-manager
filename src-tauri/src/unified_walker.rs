@@ -890,6 +890,7 @@ fn walk_dir_parallel(
                     size,
                     size_formatted: format_size(size),
                     modified,
+                    ..Default::default()
                 });
                 pdf_found.fetch_add(1, Ordering::Relaxed);
             }

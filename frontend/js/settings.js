@@ -956,6 +956,46 @@ function settingToggleAutoAnalysis() {
     refreshSettingsUI();
 }
 
+function settingToggleAutoContentDupScan() {
+    const current = prefs.getItem('autoContentDupScan') === 'on';
+    const next = !current;
+    prefs.setItem('autoContentDupScan', next ? 'on' : 'off');
+    showToast(toastFmt('toast.auto_content_dup_launch', {state: next ? 'on' : 'off'}));
+    refreshSettingsUI();
+}
+
+function settingToggleAutoFingerprintCache() {
+    const current = prefs.getItem('autoFingerprintCache') === 'on';
+    const next = !current;
+    prefs.setItem('autoFingerprintCache', next ? 'on' : 'off');
+    showToast(toastFmt('toast.auto_fingerprint_cache_launch', {state: next ? 'on' : 'off'}));
+    refreshSettingsUI();
+}
+
+function settingToggleAutoPdfScanOnStartup() {
+    const current = prefs.getItem('autoPdfScanOnStartup') === 'on';
+    const next = !current;
+    prefs.setItem('autoPdfScanOnStartup', next ? 'on' : 'off');
+    showToast(toastFmt('toast.auto_pdf_scan_launch', {state: next ? 'on' : 'off'}));
+    refreshSettingsUI();
+}
+
+function settingToggleAutoPdfMetadataOnStartup() {
+    const current = prefs.getItem('autoPdfMetadataOnStartup') === 'on';
+    const next = !current;
+    prefs.setItem('autoPdfMetadataOnStartup', next ? 'on' : 'off');
+    showToast(toastFmt('toast.auto_pdf_metadata_startup', {state: next ? 'on' : 'off'}));
+    refreshSettingsUI();
+}
+
+function settingToggleAutoCheckUpdatesOnStartup() {
+    const current = prefs.getItem('autoCheckUpdatesOnStartup') === 'on';
+    const next = !current;
+    prefs.setItem('autoCheckUpdatesOnStartup', next ? 'on' : 'off');
+    showToast(toastFmt('toast.auto_kvr_check_startup', {state: next ? 'on' : 'off'}));
+    refreshSettingsUI();
+}
+
 function settingTogglePdfMetadataAutoExtract() {
     const current = prefs.getItem('pdfMetadataAutoExtract') !== 'off';
     const next = !current;
@@ -1226,6 +1266,30 @@ function settingUpdateThreadMultiplier(val) {
     showToast(toastFmt('toast.thread_multiplier_set', {val}));
 }
 
+function settingUpdateBatchAnalysisThreads(val) {
+    const n = Math.min(16, Math.max(1, parseInt(String(val), 10) || 4));
+    const rangeEl = document.getElementById('settingBatchAnalysisThreads');
+    const valEl = document.getElementById('settingBatchAnalysisThreadsValue');
+    if (rangeEl) rangeEl.value = String(n);
+    if (valEl) valEl.textContent = String(n);
+    prefs.setItem('batchAnalysisThreads', String(n));
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.batch_analysis_threads_set', {val: n}));
+    }
+}
+
+function settingUpdateContentDupHashThreads(val) {
+    const n = Math.min(32, Math.max(1, parseInt(String(val), 10) || 8));
+    const rangeEl = document.getElementById('settingContentDupHashThreads');
+    const valEl = document.getElementById('settingContentDupHashThreadsValue');
+    if (rangeEl) rangeEl.value = String(n);
+    if (valEl) valEl.textContent = String(n);
+    prefs.setItem('contentDupHashThreads', String(n));
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.content_dup_hash_threads_set', {val: n}));
+    }
+}
+
 function settingUpdateSqliteReadPoolExtra(val) {
     const n = parseInt(val, 10);
     const raw = (n === 0 || Number.isNaN(n)) ? 'auto' : String(n);
@@ -1348,6 +1412,47 @@ async function browseDir(targetId) {
         textarea.value = lines.join('\n');
     }
     showToast(toastFmt('toast.added_selected', {selected}));
+}
+
+async function browseSnapshotExportDir() {
+    const dialogApi = window.__TAURI_PLUGIN_DIALOG__;
+    if (!dialogApi || !dialogApi.open) {
+        showToast(toastFmt('toast.dialog_api_unavailable'), 3000, 'error');
+        return;
+    }
+    const input = document.getElementById('settingSnapshotExportDir');
+    let cur = input && input.value.trim();
+    if (!cur && typeof window.vstUpdater?.ensureSnapshotExportDir === 'function') {
+        try {
+            cur = await window.vstUpdater.ensureSnapshotExportDir();
+        } catch {
+            cur = '';
+        }
+    }
+    const selected = await dialogApi.open({
+        directory: true,
+        multiple: false,
+        title: catalogFmt('ui.settings.dialog_select_folder'),
+        defaultPath: cur || undefined,
+    });
+    if (!selected) return;
+    if (input) input.value = selected;
+    prefs.setItem('snapshotExportDir', selected);
+    showToast(toastFmt('toast.snapshot_export_dir_saved'));
+}
+
+function saveSnapshotExportDir() {
+    const input = document.getElementById('settingSnapshotExportDir');
+    if (!input) return;
+    prefs.setItem('snapshotExportDir', input.value.trim());
+    showToast(toastFmt('toast.snapshot_export_dir_saved'));
+}
+
+function clearSnapshotExportDir() {
+    const input = document.getElementById('settingSnapshotExportDir');
+    if (input) input.value = '';
+    prefs.removeItem('snapshotExportDir');
+    showToast(toastFmt('toast.snapshot_export_dir_cleared'));
 }
 
 function saveCustomDirs() {
@@ -1492,6 +1597,46 @@ function refreshSettingsUI() {
     if (autoAnalysisBtn) {
         autoAnalysisBtn.classList.toggle('active', autoAnalysis);
         autoAnalysisLabel.textContent = _uiToggle(autoAnalysis);
+    }
+
+    const autoContentDup = prefs.getItem('autoContentDupScan') === 'on';
+    const autoContentDupBtn = document.getElementById('settingAutoContentDupScan');
+    const autoContentDupLabel = document.getElementById('settingAutoContentDupScanLabel');
+    if (autoContentDupBtn) {
+        autoContentDupBtn.classList.toggle('active', autoContentDup);
+        if (autoContentDupLabel) autoContentDupLabel.textContent = _uiToggle(autoContentDup);
+    }
+
+    const autoFp = prefs.getItem('autoFingerprintCache') === 'on';
+    const autoFpBtn = document.getElementById('settingAutoFingerprintCache');
+    const autoFpLabel = document.getElementById('settingAutoFingerprintCacheLabel');
+    if (autoFpBtn) {
+        autoFpBtn.classList.toggle('active', autoFp);
+        if (autoFpLabel) autoFpLabel.textContent = _uiToggle(autoFp);
+    }
+
+    const autoPdfScan = prefs.getItem('autoPdfScanOnStartup') === 'on';
+    const autoPdfScanBtn = document.getElementById('settingAutoPdfScanOnStartup');
+    const autoPdfScanLabel = document.getElementById('settingAutoPdfScanOnStartupLabel');
+    if (autoPdfScanBtn) {
+        autoPdfScanBtn.classList.toggle('active', autoPdfScan);
+        if (autoPdfScanLabel) autoPdfScanLabel.textContent = _uiToggle(autoPdfScan);
+    }
+
+    const autoPdfMetaStartup = prefs.getItem('autoPdfMetadataOnStartup') === 'on';
+    const autoPdfMetaStartupBtn = document.getElementById('settingAutoPdfMetadataOnStartup');
+    const autoPdfMetaStartupLabel = document.getElementById('settingAutoPdfMetadataOnStartupLabel');
+    if (autoPdfMetaStartupBtn) {
+        autoPdfMetaStartupBtn.classList.toggle('active', autoPdfMetaStartup);
+        if (autoPdfMetaStartupLabel) autoPdfMetaStartupLabel.textContent = _uiToggle(autoPdfMetaStartup);
+    }
+
+    const autoKvrStartup = prefs.getItem('autoCheckUpdatesOnStartup') === 'on';
+    const autoKvrStartupBtn = document.getElementById('settingAutoCheckUpdatesOnStartup');
+    const autoKvrStartupLabel = document.getElementById('settingAutoCheckUpdatesOnStartupLabel');
+    if (autoKvrStartupBtn) {
+        autoKvrStartupBtn.classList.toggle('active', autoKvrStartup);
+        if (autoKvrStartupLabel) autoKvrStartupLabel.textContent = _uiToggle(autoKvrStartup);
     }
 
     // Background PDF metadata (page counts) while PDF tab is active
@@ -1642,6 +1787,28 @@ function refreshSettingsUI() {
         threadMultValEl.textContent = threadMult + 'x';
     }
 
+    const batchThrRaw = getSettingValue('batchAnalysisThreads', '4');
+    let batchThrNum = parseInt(String(batchThrRaw), 10);
+    if (Number.isNaN(batchThrNum)) batchThrNum = 4;
+    batchThrNum = Math.min(16, Math.max(1, batchThrNum));
+    const batchThrEl = document.getElementById('settingBatchAnalysisThreads');
+    const batchThrValEl = document.getElementById('settingBatchAnalysisThreadsValue');
+    if (batchThrEl) {
+        batchThrEl.value = String(batchThrNum);
+        if (batchThrValEl) batchThrValEl.textContent = String(batchThrNum);
+    }
+
+    const dupHashRaw = getSettingValue('contentDupHashThreads', '8');
+    let dupHashNum = parseInt(String(dupHashRaw), 10);
+    if (Number.isNaN(dupHashNum)) dupHashNum = 8;
+    dupHashNum = Math.min(32, Math.max(1, dupHashNum));
+    const dupHashEl = document.getElementById('settingContentDupHashThreads');
+    const dupHashValEl = document.getElementById('settingContentDupHashThreadsValue');
+    if (dupHashEl) {
+        dupHashEl.value = String(dupHashNum);
+        if (dupHashValEl) dupHashValEl.textContent = String(dupHashNum);
+    }
+
     // SQLite read pool (0 = auto)
     const sqlitePoolRaw = getSettingValue('sqliteReadPoolExtra', 'auto');
     const sqlitePoolNum = (sqlitePoolRaw === 'auto' || sqlitePoolRaw === '' || sqlitePoolRaw == null)
@@ -1714,6 +1881,9 @@ function refreshSettingsUI() {
         vizFpsEl.value = vizFps;
         vizFpsValEl.textContent = vizFps;
     }
+
+    const snapDirEl = document.getElementById('settingSnapshotExportDir');
+    if (snapDirEl) snapDirEl.value = prefs.getItem('snapshotExportDir') || '';
 
     // Waveform cache max
     const wfMax = getSettingValue('wfCacheMax', '500');

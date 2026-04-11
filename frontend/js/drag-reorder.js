@@ -300,8 +300,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     const aePane = document.querySelector('#tabAudioEngine .settings-container.audio-engine-tab');
-    if (aePane) {
-        initDragReorder(aePane, '.settings-section[data-section]', 'audioEngineSectionOrder', {
+    const aeMainStack = aePane?.querySelector(':scope > .ae-main-stack');
+    if (aeMainStack) {
+        initDragReorder(aeMainStack, '.settings-section[data-section]', 'audioEngineSectionOrder', {
             direction: 'vertical',
             getKey: (el) => el.dataset.section || '',
             restoreMode: 'fragment',

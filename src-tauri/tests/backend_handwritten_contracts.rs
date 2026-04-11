@@ -24,6 +24,7 @@ fn pdf_file(path: &str, size: u64) -> PdfFile {
         size,
         size_formatted: app_lib::format_size(size),
         modified: "2024-01-01T00:00:00Z".into(),
+        ..Default::default()
     }
 }
 

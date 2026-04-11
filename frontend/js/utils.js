@@ -889,6 +889,36 @@ function hideGlobalProgress() {
     document.getElementById('globalProgress')?.classList.remove('active');
 }
 
+/**
+ * Command palette + native Tools menu — status-bar bg jobs plus KVR plugin update check
+ * (`checkUpdates` / `stopUpdates`). KVR URL resolve uses `stopKvrResolve`.
+ */
+function triggerStartAllBackgroundJobs() {
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.start_all_background_jobs'));
+    }
+    if (typeof triggerBackgroundBpmKeyLufsAnalysis === 'function') void triggerBackgroundBpmKeyLufsAnalysis();
+    if (typeof triggerStartBackgroundContentDupScan === 'function') void triggerStartBackgroundContentDupScan();
+    if (typeof scanPdfs === 'function') scanPdfs();
+    if (typeof buildPdfPagesCache === 'function') buildPdfPagesCache();
+    if (typeof triggerStartFingerprintCacheBuild === 'function') void triggerStartFingerprintCacheBuild();
+    if (typeof checkUpdates === 'function') void checkUpdates();
+}
+
+function triggerStopAllBackgroundJobs() {
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.stop_all_background_jobs'));
+    }
+    if (typeof triggerStopBackgroundBpmKeyLufsAnalysis === 'function') triggerStopBackgroundBpmKeyLufsAnalysis();
+    if (typeof triggerStopBackgroundContentDupScan === 'function') triggerStopBackgroundContentDupScan();
+    if (typeof stopPdfScan === 'function') void stopPdfScan();
+    if (typeof stopPdfMetadataExtractionUser === 'function') void stopPdfMetadataExtractionUser();
+    const vu = window.vstUpdater;
+    if (vu && typeof vu.stopFingerprintCache === 'function') void vu.stopFingerprintCache();
+    if (vu && typeof vu.stopUpdates === 'function') void vu.stopUpdates();
+    if (typeof stopKvrResolve === 'function') stopKvrResolve();
+}
+
 // ── Persist filter dropdowns ──
 const _filterIds = ['typeFilter', 'statusFilter', 'favTypeFilter', 'audioFormatFilter', 'dawDawFilter', 'presetFormatFilter'];
 
@@ -1302,6 +1332,13 @@ function switchTab(tab) {
             }
             function runPerTabWork() {
                 if (!tabWorkStillRelevant()) return;
+                /* Real-time graphs: inactive tab panels use `display:none` (see `.tab-content`), but
+                 * canvas rAF loops must stop here too — Audio Engine diagnostics (`aeGraph*`) and the
+                 * Visualizer grid both use `requestAnimationFrame`. Window minimize / hidden WebView is
+                 * handled separately via `ui-idle-heavy-cpu` (`audio-engine.js`, `visualizer.js`, `audio.js`). */
+                if (expectedTab !== 'audioEngine' && typeof window.stopAeTabMeterAndGraph === 'function') {
+                    window.stopAeTabMeterAndGraph();
+                }
                 if (expectedTab !== 'visualizer' && typeof stopVisualizer === 'function') stopVisualizer();
                 if (expectedTab === 'visualizer' && typeof startVisualizer === 'function') startVisualizer();
                 if (expectedTab === 'walkers' && typeof startWalkerPolling === 'function') startWalkerPolling();
@@ -1394,4 +1431,149 @@ async function fetchAudioLibraryPathsForFingerprint() {
     }
     const arr = typeof allAudioSamples !== 'undefined' && Array.isArray(allAudioSamples) ? allAudioSamples : [];
     return arr.map((s) => s && s.path).filter(Boolean);
+}
+
+/** Label keys for `ui.stats.bg_job_badge_fmt` (status-bar background job badges). */
+const BG_JOB_BADGE_KIND_TO_LABEL_KEY = {
+    bpm: 'ui.stats.bg_job_type_bpm',
+    contentDup: 'ui.stats.bg_job_type_content_dup',
+    pdfMeta: 'ui.stats.bg_job_type_pdf_meta',
+    pdfScan: 'ui.stats.bg_job_type_pdf_scan',
+    fingerprint: 'ui.stats.bg_job_type_fingerprint',
+};
+
+/**
+ * @param {'bpm'|'contentDup'|'pdfMeta'|'pdfScan'|'fingerprint'} kind
+ * @param {string} detailCatalogKey
+ * @param {Record<string, unknown>} [vars]
+ */
+function formatBgJobBadgeLine(kind, detailCatalogKey, vars) {
+    const labelKey = BG_JOB_BADGE_KIND_TO_LABEL_KEY[kind];
+    const detail = typeof catalogFmt === 'function' ? catalogFmt(detailCatalogKey, vars) : detailCatalogKey;
+    if (!labelKey) return detail;
+    const job = typeof catalogFmt === 'function' ? catalogFmt(labelKey) : kind;
+    if (typeof catalogFmt === 'function') {
+        return catalogFmt('ui.stats.bg_job_badge_fmt', { job, detail });
+    }
+    return `${job}: ${detail}`;
+}
+
+const STATUS_BG_JOB_BADGE_IDS = ['bgAnalysisBadge', 'bgContentDupBadge', 'bgPdfMetaBadge', 'bgPdfScanBadge', 'bgFingerprintBadge'];
+
+/** Show/hide each `.status-bg-job-row` from job flags + badge text (spinners live in the row). */
+function syncStatusBgJobRows() {
+    for (const id of STATUS_BG_JOB_BADGE_IDS) {
+        const badge = document.getElementById(id);
+        if (!badge) continue;
+        const row = badge.parentElement;
+        if (!row || !row.classList.contains('status-bg-job-row')) continue;
+        let jobFlag = false;
+        if (typeof window !== 'undefined') {
+            if (id === 'bgAnalysisBadge') jobFlag = !!window.__statusBarBpmJob;
+            else if (id === 'bgPdfMetaBadge') jobFlag = !!window.__statusBarPdfMetaJob;
+            else if (id === 'bgContentDupBadge') jobFlag = !!window.__statusBarContentDupJob;
+            else if (id === 'bgPdfScanBadge') jobFlag = !!window.__statusBarPdfScanJob;
+            else if (id === 'bgFingerprintBadge') jobFlag = !!window.__statusBarFingerprintJob;
+        }
+        const hasText = !!(badge.textContent && String(badge.textContent).trim());
+        row.style.display = jobFlag || hasText ? 'flex' : 'none';
+    }
+}
+
+/** True after `syncStatusBgJobRows()` if any `.status-bg-job-row` is shown (inline `display: flex`). */
+function statusBarHasVisibleJobRow() {
+    for (const id of STATUS_BG_JOB_BADGE_IDS) {
+        const badge = document.getElementById(id);
+        const row = badge && badge.parentElement;
+        if (!row || !row.classList.contains('status-bg-job-row')) continue;
+        if (row.style.display === 'flex') return true;
+    }
+    return false;
+}
+
+/** Bottom `#statusBar`: visible only while KVR/update check is running (`.active`) or at least one bg job row is open. */
+function syncAppStatusBarVisibility() {
+    try {
+        syncStatusBgJobRows();
+        const bar = document.getElementById('statusBar');
+        if (!bar) return;
+        const show = bar.classList.contains('active') || statusBarHasVisibleJobRow();
+        bar.classList.toggle('status-bar-visible', show);
+    } catch {
+        /* ignore */
+    }
+}
+
+/** Join a directory path and file name using the path style already present in `dir`. */
+function joinPathDirFile(dir, file) {
+    const d = String(dir || '').replace(/[/\\]+$/, '');
+    if (!d) return String(file || '');
+    const sep = d.indexOf('\\') >= 0 ? '\\' : '/';
+    return d + sep + String(file || '');
+}
+
+/**
+ * Export a canvas as PNG: writes to `snapshotExportDir` (prefs) via Tauri when set, else `<a download>`.
+ * @param {HTMLCanvasElement|null} canvas
+ * @param {string} labelForFilename Human-readable label → slug in filename
+ */
+async function exportCanvasSnapshotPng(canvas, labelForFilename) {
+    if (!canvas) return;
+    const raw = String(labelForFilename || 'snapshot').trim() || 'snapshot';
+    const slug = raw
+        .replace(/\s+/g, '_')
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '') || 'snapshot';
+    const filename = `${slug}_${Date.now()}.png`;
+    let dir =
+        typeof prefs !== 'undefined' && prefs.getItem
+            ? String(prefs.getItem('snapshotExportDir') || '').trim()
+            : '';
+    const dataUrl = canvas.toDataURL('image/png');
+    const tryTauriWrite = async () => {
+        const invoke = window.__TAURI__?.core?.invoke;
+        if (!invoke) return false;
+        if (!dir) {
+            try {
+                dir =
+                    typeof window.vstUpdater?.ensureSnapshotExportDir === 'function'
+                        ? await window.vstUpdater.ensureSnapshotExportDir()
+                        : await invoke('ensure_snapshot_export_dir');
+            } catch {
+                return false;
+            }
+        }
+        if (!dir) return false;
+        const fullPath = joinPathDirFile(dir, filename);
+        const b64 = dataUrl.split(',')[1];
+        if (!b64) return false;
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        await invoke('write_binary_file', {filePath: fullPath, contents: Array.from(bytes)});
+        return true;
+    };
+    try {
+        if (await tryTauriWrite()) {
+            if (typeof showToast === 'function') showToast(toastFmt('toast.snapshot_exported'));
+            return;
+        }
+    } catch (err) {
+        if (typeof showToast === 'function') {
+            showToast(String(err && err.message ? err.message : err), 4000, 'error');
+        }
+    }
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUrl;
+    link.click();
+    if (typeof showToast === 'function') showToast(toastFmt('toast.snapshot_exported'));
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    });
 }

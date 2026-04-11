@@ -552,10 +552,14 @@ function applyEnginePlaybackPausedFromTransport(paused) {
  * Matches `visualizer.js` `_vizEngineSpectrumOk`: library playback through the AudioEngine, or any
  * Audio Engine output with an FFT tap (`_aeOutputStreamRunning`).
  * Transport pause (`playback_pause`) does **not** turn this off — spectrum still updates (or holds
- * last bins) independently of global play/pause; only `fftAnimationPaused` freezes the curves.
+ * last bins) independently of global play/pause; per-graph freeze (`graphFreezeMap` / `isGraphFrozen`) stops updates for that canvas only.
  */
 function engineSpectrumLive() {
-    if (typeof window === 'undefined' || !window._engineSpectrumU8 || window._engineSpectrumU8.length < 1024) {
+    const minBins =
+        typeof window !== 'undefined' && typeof window.ENGINE_PLAYBACK_SPECTRUM_MIN_BINS === 'number'
+            ? window.ENGINE_PLAYBACK_SPECTRUM_MIN_BINS
+            : 64;
+    if (typeof window === 'undefined' || !window._engineSpectrumU8 || window._engineSpectrumU8.length < minBins) {
         return false;
     }
     if (window._enginePlaybackActive === true) {
@@ -565,6 +569,28 @@ function engineSpectrumLive() {
         return true;
     }
     return false;
+}
+
+/** At least one parametric EQ canvas (np / ae) should animate its spectrum overlay — honors per-graph freeze. */
+function parametricEqNeedsLiveSpectrumAnimation() {
+    if (typeof window.isGraphFrozen !== 'function') return true;
+    const eqSec = typeof document !== 'undefined' ? document.getElementById('npEqSection') : null;
+    const npVis = eqSec && eqSec.classList.contains('visible');
+    const aeTab = typeof document !== 'undefined' ? document.getElementById('tabAudioEngine') : null;
+    const aeVis = aeTab && aeTab.classList.contains('active');
+    const eng = engineSpectrumLive();
+    const playing = isAudioPlaying();
+    if (!eng && !playing) return false;
+    if (npVis && !window.isGraphFrozen('np:eq')) return true;
+    if (aeVis && !window.isGraphFrozen('ae:eq')) return true;
+    return false;
+}
+
+function enginePlaybackStatusInvokePayload() {
+    if (typeof window !== 'undefined' && typeof window.buildEnginePlaybackStatusRequest === 'function') {
+        return window.buildEnginePlaybackStatusRequest();
+    }
+    return {cmd: 'playback_status'};
 }
 
 if (typeof window !== 'undefined') {
@@ -1745,7 +1771,11 @@ function _enginePlaybackFftLoop() {
     if (typeof _renderNpFft === 'function') _renderNpFft();
     if (typeof window.scheduleParametricEqFrame === 'function') window.scheduleParametricEqFrame();
     if (!shouldRunEngineSpectrumRaf()) return;
-    if (typeof isFftAnimationPaused === 'function' && isFftAnimationPaused()) return;
+    if (typeof window.isGraphFrozen === 'function') {
+        const npFftLive = !window.isGraphFrozen('np:fft');
+        const eqLive = parametricEqNeedsLiveSpectrumAnimation();
+        if (!npFftLive && !eqLive) return;
+    }
     _enginePlaybackFftRafId = requestAnimationFrame(_enginePlaybackFftLoop);
 }
 
@@ -1767,37 +1797,6 @@ if (typeof window !== 'undefined') {
     window.stopEnginePlaybackFftRaf = stopEnginePlaybackFftRaf;
 }
 
-/** Prefs: `fftAnimationPaused` — `1` freezes spectrum curves (mini FFT, visualizer FFT tile, EQ fill). */
-const FFT_ANIM_PREF_KEY = 'fftAnimationPaused';
-
-function isFftAnimationPaused() {
-    try {
-        return typeof prefs !== 'undefined' && prefs.getItem && prefs.getItem(FFT_ANIM_PREF_KEY) === '1';
-    } catch {
-        return false;
-    }
-}
-
-function setFftAnimationPaused(on) {
-    if (typeof prefs === 'undefined' || !prefs.setItem) return;
-    prefs.setItem(FFT_ANIM_PREF_KEY, on ? '1' : '0');
-    if (on) {
-        if (typeof stopEnginePlaybackFftRaf === 'function') stopEnginePlaybackFftRaf();
-    } else if (typeof ensureEnginePlaybackFftRaf === 'function') {
-        ensureEnginePlaybackFftRaf();
-    }
-}
-
-function toggleFftAnimationPaused() {
-    setFftAnimationPaused(!isFftAnimationPaused());
-}
-
-if (typeof window !== 'undefined') {
-    window.isFftAnimationPaused = isFftAnimationPaused;
-    window.setFftAnimationPaused = setFftAnimationPaused;
-    window.toggleFftAnimationPaused = toggleFftAnimationPaused;
-}
-
 function _playbackRafLoop() {
     if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) {
         if (_playbackRafId) {
@@ -1812,7 +1811,8 @@ function _playbackRafLoop() {
     if (
         !_enginePlaybackActive &&
         typeof window.scheduleParametricEqFrame === 'function' &&
-        (typeof isFftAnimationPaused !== 'function' || !isFftAnimationPaused()) &&
+        typeof parametricEqNeedsLiveSpectrumAnimation === 'function' &&
+        parametricEqNeedsLiveSpectrumAnimation() &&
         typeof isAudioPlaying === 'function' &&
         isAudioPlaying()
     ) {
@@ -1821,6 +1821,27 @@ function _playbackRafLoop() {
     if (isAudioPlaying()) {
         _playbackRafId = requestAnimationFrame(_playbackRafLoop);
     }
+}
+
+/** Right edge of log-frequency axis for mini FFT + parametric EQ (must match `FREQ_MAX` below). */
+const NP_SPECTRUM_DISPLAY_MAX_HZ = 20000;
+
+/**
+ * Fractional index into AudioEngine `playback_status.spectrum` (DC omitted). When the buffer is shorter
+ * than the Nyquist bin count, indices match `appendPlaybackSpectrumJson` max-per-subband buckets.
+ */
+function engineSpectrumBundledBinF(freqHz, sampleRate, fftSize, bufLen) {
+    const fullBins = Math.max(64, (fftSize / 2) | 0);
+    const k = (freqHz * fftSize) / sampleRate;
+    if (bufLen >= fullBins) {
+        return k - 1;
+    }
+    const denom = Math.max(1, fullBins - 1);
+    const kClamped = Math.max(1, Math.min(fullBins, k));
+    return ((kClamped - 1) / denom) * (bufLen - 1);
+}
+if (typeof window !== 'undefined') {
+    window.engineSpectrumBundledBinF = engineSpectrumBundledBinF;
 }
 
 // Real-time FFT spectrum curve in the player's visualizer section.
@@ -1833,13 +1854,14 @@ let _npFftCtx = null;
 let _npFftPts = null;
 
 /**
- * IPC `playback_status` updates `spectrum_sr_hz` / `spectrum_fft_size` frequently; using those
- * values directly would shift the log-frequency x-axis every poll (visible "scaling"). Pin once
- * per engine-playback session for stable bin→pixel mapping (mini FFT + parametric EQ fill).
+ * Bin→Hz mapping for spectrum draws uses `spectrum_sr_hz` + `spectrum_fft_size`. Those change when
+ * the user switches playback-spectrum presets; we keep pins in sync with the latest engine values
+ * so the curve stays aligned with the log axis and EQ band Hz positions. Switching between engine
+ * and web spectrum clears pins (see `syncNpFftSpectrumAxisPins`).
  */
 let _npFftEngineAxisSrHz = null;
 let _npFftEngineAxisFftSize = null;
-/** Pinned once per Web Audio session so fMax / bin→Hz mapping does not jitter frame-to-frame. */
+/** Web Audio analyser/context sr + fftSize; refreshed when either changes (FFT preset / graph rebuild). */
 let _npFftWebAxisSrHz = null;
 let _npFftWebAxisFftSize = null;
 /** `'engine'` | `'web'` — changing source resets both pin sets (see `syncNpFftSpectrumAxisPins`). */
@@ -1860,9 +1882,16 @@ function getPinnedEngineSpectrumAxis() {
     if (typeof window === 'undefined' || !engineSpectrumLive()) {
         return null;
     }
-    if (_npFftEngineAxisSrHz == null) {
-        _npFftEngineAxisSrHz = typeof window._engineSpectrumSrHz === 'number' ? window._engineSpectrumSrHz : 44100;
-        _npFftEngineAxisFftSize = typeof window._engineSpectrumFftSize === 'number' ? window._engineSpectrumFftSize : 2048;
+    const liveSr = typeof window._engineSpectrumSrHz === 'number' ? window._engineSpectrumSrHz : 44100;
+    const liveFft = typeof window._engineSpectrumFftSize === 'number' ? window._engineSpectrumFftSize : 2048;
+    if (
+        _npFftEngineAxisSrHz == null ||
+        _npFftEngineAxisFftSize == null ||
+        _npFftEngineAxisSrHz !== liveSr ||
+        _npFftEngineAxisFftSize !== liveFft
+    ) {
+        _npFftEngineAxisSrHz = liveSr;
+        _npFftEngineAxisFftSize = liveFft;
     }
     return {sr: _npFftEngineAxisSrHz, fft: _npFftEngineAxisFftSize};
 }
@@ -1924,24 +1953,32 @@ function _renderNpFft() {
     const w = canvas.width;
     const h = canvas.height;
     if (w === 0 || h === 0) return;
-    if (isFftAnimationPaused()) return;
+    if (typeof window.isGraphFrozen === 'function' && window.isGraphFrozen('np:fft')) return;
     let sampleRate = 44100;
     let fftSize = 2048;
     let binCount = 1024;
     if (useEngineSpectrum) {
         const axis = getPinnedEngineSpectrumAxis();
         if (!axis) return;
-        if (!_npFftBuf || _npFftBuf.length < 1024) _npFftBuf = new Uint8Array(1024);
-        _npFftBuf.set(window._engineSpectrumU8.subarray(0, 1024));
+        binCount = window._engineSpectrumU8.length;
+        if (!_npFftBuf || _npFftBuf.length < binCount) _npFftBuf = new Uint8Array(binCount);
+        _npFftBuf.set(window._engineSpectrumU8.subarray(0, binCount));
         sampleRate = axis.sr;
         fftSize = axis.fft;
-        binCount = Math.min(1024, window._engineSpectrumU8.length);
     } else {
-        if (!_npFftBuf) _npFftBuf = new Uint8Array(_analyser.frequencyBinCount);
+        const binNeed = _analyser.frequencyBinCount;
+        if (!_npFftBuf || _npFftBuf.length !== binNeed) _npFftBuf = new Uint8Array(binNeed);
         _analyser.getByteFrequencyData(_npFftBuf);
-        if (_npFftWebAxisSrHz == null) {
-            _npFftWebAxisSrHz = _playbackCtx ? _playbackCtx.sampleRate : 44100;
-            _npFftWebAxisFftSize = _analyser.fftSize;
+        const liveSr = _playbackCtx ? _playbackCtx.sampleRate : 44100;
+        const liveFft = _analyser.fftSize;
+        if (
+            _npFftWebAxisSrHz == null ||
+            _npFftWebAxisFftSize == null ||
+            _npFftWebAxisSrHz !== liveSr ||
+            _npFftWebAxisFftSize !== liveFft
+        ) {
+            _npFftWebAxisSrHz = liveSr;
+            _npFftWebAxisFftSize = liveFft;
         }
         sampleRate = _npFftWebAxisSrHz;
         fftSize = _npFftWebAxisFftSize;
@@ -1957,16 +1994,20 @@ function _renderNpFft() {
     }
 
     const fMin = 20;
-    const fMax = sampleRate / 2;
+    const fMax = Math.min(sampleRate / 2, NP_SPECTRUM_DISPLAY_MAX_HZ);
     const logMin = Math.log10(fMin);
     const logMax = Math.log10(fMax);
     const specH = h - 10;
 
+    /** AudioEngine: bundled or 1:1 bins (DC omitted). Web: `binF` matches `getByteFrequencyData` indexing. */
     function magAtFreq(freqHz) {
-        const binF = (freqHz * fftSize) / sampleRate;
+        const binF = useEngineSpectrum
+            ? engineSpectrumBundledBinF(freqHz, sampleRate, fftSize, binCount)
+            : (freqHz * fftSize) / sampleRate - 1;
+        if (binCount < 1) return 0;
+        if (binF <= 0) return _npFftBuf[0] / 255;
+        if (binF >= binCount - 1) return _npFftBuf[binCount - 1] / 255;
         const i0 = Math.floor(binF);
-        if (i0 < 0) return 0;
-        if (i0 >= binCount) return _npFftBuf[binCount - 1] / 255;
         const frac = binF - i0;
         const i1 = Math.min(binCount - 1, i0 + 1);
         const v0 = _npFftBuf[i0];
@@ -2159,6 +2200,181 @@ async function findSimilarSamples(filePath) {
         }
     }
 }
+
+// ── Fingerprint cache build: stats-bar badge (`fingerprint-build-progress`) ──
+let _fingerprintBuildUnlisten = null;
+let _fingerprintBuildLastProgress = null;
+let _fingerprintBuildRunning = false;
+
+function _shouldUpdateFingerprintBuildBadgeUi() {
+    return !(typeof isUiIdleHeavyCpu === 'function' && isUiIdleHeavyCpu());
+}
+
+function clearFingerprintBuildBadge() {
+    _fingerprintBuildLastProgress = null;
+    const badge = document.getElementById('bgFingerprintBadge');
+    if (!badge) return;
+    badge.textContent = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+}
+
+function applyFingerprintBuildBadgePayload(pl) {
+    if (!pl || typeof pl !== 'object') return;
+    const badge = document.getElementById('bgFingerprintBadge');
+    const phase = pl.phase;
+    if (phase === 'done') {
+        clearFingerprintBuildBadge();
+        return;
+    }
+    if (phase === 'start') {
+        _fingerprintBuildLastProgress = pl;
+        if (!badge || !_shouldUpdateFingerprintBuildBadgeUi()) {
+            if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+            return;
+        }
+        const t = pl.total;
+        if (t != null && Number.isFinite(t) && t > 0) {
+            badge.textContent = formatBgJobBadgeLine('fingerprint', 'ui.stats.fingerprint_bg_progress', {done: 0, total: t});
+        } else {
+            badge.textContent = formatBgJobBadgeLine('fingerprint', 'ui.stats.fingerprint_bg_working');
+        }
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+        return;
+    }
+    if (phase === 'progress') {
+        _fingerprintBuildLastProgress = pl;
+        if (!badge || !_shouldUpdateFingerprintBuildBadgeUi()) {
+            if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+            return;
+        }
+        if (pl.done != null && pl.total != null && Number.isFinite(pl.total)) {
+            badge.textContent = formatBgJobBadgeLine('fingerprint', 'ui.stats.fingerprint_bg_progress', {
+                done: pl.done,
+                total: pl.total
+            });
+        }
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    }
+}
+
+async function ensureFingerprintBuildProgressListener() {
+    if (_fingerprintBuildUnlisten || !window.__TAURI__?.event?.listen) return;
+    _fingerprintBuildUnlisten = await window.__TAURI__.event.listen('fingerprint-build-progress', (e) => {
+        applyFingerprintBuildBadgePayload(e.payload);
+    });
+}
+
+/**
+ * Toast after `buildFingerprintCache` / `invokeBuildFingerprintCacheWithBadge` (handles user stop).
+ * @param {'builtOnly'|'withCachedTotals'} [summary]
+ */
+function showFingerprintCacheBuildOutcomeToast(res, summary = 'builtOnly') {
+    if (!res || typeof res !== 'object') return;
+    if (typeof showToast !== 'function' || typeof toastFmt !== 'function') return;
+    const built = (res.built ?? 0).toLocaleString();
+    const cached = (res.cached ?? 0).toLocaleString();
+    if (res.stopped === true) {
+        showToast(
+            toastFmt('toast.fingerprint_build_stopped', {
+                built,
+                cached
+            })
+        );
+        return;
+    }
+    if (summary === 'withCachedTotals') {
+        showToast(
+            toastFmt('toast.fingerprint_build_complete_n_cached', {
+                built,
+                cached
+            })
+        );
+        return;
+    }
+    showToast(toastFmt('toast.fingerprint_build_complete_n', {n: built}));
+}
+
+/** Command palette / native menu: fingerprint cache build for the full audio library. */
+async function triggerStartFingerprintCacheBuild() {
+    const paths = typeof fetchAudioLibraryPathsForFingerprint === 'function'
+        ? await fetchAudioLibraryPathsForFingerprint()
+        : [];
+    if (paths.length === 0) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error');
+        }
+        return;
+    }
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.fingerprint_building_n', {n: paths.length.toLocaleString()}), 4000);
+    }
+    const vu = window.vstUpdater;
+    if (!vu || typeof vu.buildFingerprintCache !== 'function') return;
+    try {
+        const res =
+            typeof invokeBuildFingerprintCacheWithBadge === 'function'
+                ? await invokeBuildFingerprintCacheWithBadge(paths)
+                : await vu.buildFingerprintCache(paths);
+        if (typeof showFingerprintCacheBuildOutcomeToast === 'function') {
+            showFingerprintCacheBuildOutcomeToast(res, 'builtOnly');
+        }
+    } catch (e) {
+        if (window.vstUpdater?.appendLog) {
+            window.vstUpdater.appendLog(`FINGERPRINT CACHE ERROR — UI: ${e.message || e}`);
+        }
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.fingerprint_build_failed', {err: e.message || e}), 4000, 'error');
+        }
+    }
+}
+
+/** Wraps `buildFingerprintCache` with stats-bar progress and cleanup on completion or error. */
+async function invokeBuildFingerprintCacheWithBadge(paths) {
+    if (!window.vstUpdater || typeof window.vstUpdater.buildFingerprintCache !== 'function') {
+        throw new Error('buildFingerprintCache unavailable');
+    }
+    await ensureFingerprintBuildProgressListener();
+    _fingerprintBuildRunning = true;
+    if (typeof window !== 'undefined') window.__statusBarFingerprintJob = true;
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    try {
+        return await window.vstUpdater.buildFingerprintCache(paths);
+    } finally {
+        _fingerprintBuildRunning = false;
+        if (typeof window !== 'undefined') window.__statusBarFingerprintJob = false;
+        clearFingerprintBuildBadge();
+    }
+}
+
+document.addEventListener('ui-idle-heavy-cpu', (ev) => {
+    try {
+        if (!ev.detail || ev.detail.idle !== false) return;
+        if (!_fingerprintBuildRunning) return;
+        const badge = document.getElementById('bgFingerprintBadge');
+        if (!badge) return;
+        const pl = _fingerprintBuildLastProgress;
+        if (pl && pl.phase === 'progress' && pl.done != null && pl.total != null && Number.isFinite(pl.total)) {
+            if (!_shouldUpdateFingerprintBuildBadgeUi()) return;
+            badge.textContent = formatBgJobBadgeLine('fingerprint', 'ui.stats.fingerprint_bg_progress', {
+                done: pl.done,
+                total: pl.total
+            });
+        } else if (pl && pl.phase === 'start') {
+            if (!_shouldUpdateFingerprintBuildBadgeUi()) return;
+            const t = pl.total;
+            if (t != null && Number.isFinite(t) && t > 0) {
+                badge.textContent = formatBgJobBadgeLine('fingerprint', 'ui.stats.fingerprint_bg_progress', {done: 0, total: t});
+            } else {
+                badge.textContent = formatBgJobBadgeLine('fingerprint', 'ui.stats.fingerprint_bg_working');
+            }
+        } else if (_shouldUpdateFingerprintBuildBadgeUi()) {
+            badge.textContent = formatBgJobBadgeLine('fingerprint', 'ui.stats.fingerprint_bg_working');
+        }
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    } catch {
+        /* ignore */
+    }
+});
 
 function closeSimilarPanel() {
     if (_simDragAbort) {
@@ -3280,6 +3496,11 @@ function toggleAudioPlayback() {
         const playing = isAudioPlaying();
         applyEnginePlaybackPausedFromTransport(playing);
         void window.vstUpdater.audioEngineInvoke({cmd: 'playback_pause', paused: playing});
+        /* `previewAudio` schedules the waveform on load / same-track replay; play/pause toggles only
+         * hit this path — resuming must redraw (or fill cache) so the floating player waveform is not blank. */
+        if (!playing && typeof audioPlayerPath === 'string' && audioPlayerPath !== '') {
+            scheduleNowPlayingWaveform(audioPlayerPath);
+        }
         updatePlayBtnStates();
         updateNowPlayingBtn();
         if (typeof window.syncAeTransportFromPlayback === 'function') window.syncAeTransportFromPlayback();
@@ -3983,7 +4204,7 @@ function seekPlaybackToPercent(pct) {
             logWaveformSeek('engine_seek_async_duration', { dur, pct: p });
             void (async () => {
                 try {
-                    const st = await window.vstUpdater.audioEngineInvoke({cmd: 'playback_status'});
+                    const st = await window.vstUpdater.audioEngineInvoke(enginePlaybackStatusInvokePayload());
                     logWaveformSeek('engine_playback_status', { st });
                     if (st && st.ok === true && typeof st.duration_sec === 'number' && st.duration_sec > 0) {
                         window._enginePlaybackDurSec = st.duration_sec;
@@ -4055,7 +4276,7 @@ async function skipPlaybackSeconds(delta) {
     }
     if (_enginePlaybackActive && typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
         try {
-            const st = await window.vstUpdater.audioEngineInvoke({cmd: 'playback_status'});
+            const st = await window.vstUpdater.audioEngineInvoke(enginePlaybackStatusInvokePayload());
             if (!st || st.ok !== true || st.loaded !== true) return;
             const dur = typeof st.duration_sec === 'number' ? st.duration_sec : 0;
             if (dur <= 0) return;
@@ -4811,13 +5032,15 @@ function _shouldUpdateBgAnalysisBadgeUi() {
 function _setBgAnalysisBadgeRunning(badge) {
     if (!badge) return;
     if (!_shouldUpdateBgAnalysisBadgeUi()) return;
-    badge.textContent = catalogFmt('ui.stats.bpm_bg_working');
+    badge.textContent = formatBgJobBadgeLine('bpm', 'ui.stats.bpm_bg_working');
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
 }
 
 function _setBgAnalysisBadgeProgress(badge, n) {
     if (!badge) return;
     if (!_shouldUpdateBgAnalysisBadgeUi()) return;
-    badge.textContent = catalogFmt('ui.stats.bpm_bg_progress', {n});
+    badge.textContent = formatBgJobBadgeLine('bpm', 'ui.stats.bpm_bg_progress', {n});
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
 }
 
 document.addEventListener('ui-idle-heavy-cpu', (ev) => {
@@ -4831,6 +5054,7 @@ document.addEventListener('ui-idle-heavy-cpu', (ev) => {
         } else {
             badge.innerHTML = '';
         }
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
     } catch (_) {
         /* ignore */
     }
@@ -4851,6 +5075,9 @@ async function startBackgroundAnalysis() {
     if (_bgAnalysisRunning) return;
     _bgAnalysisRunning = true;
     _bgAnalysisAbort = false;
+    if (typeof window !== 'undefined') window.__statusBarBpmJob = true;
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    let analyzedThisSession = 0;
 
     const badge = document.getElementById('bgAnalysisBadge');
     const BATCH = 50; // 50 files analyzed in parallel per rayon
@@ -4859,6 +5086,11 @@ async function startBackgroundAnalysis() {
         else _setBgAnalysisBadgeRunning(badge);
     }
 
+    if (window.vstUpdater?.appendLog) {
+        window.vstUpdater.appendLog('BPM/LUFS BG — session start');
+    }
+
+    try {
     while (!_bgAnalysisAbort) {
         while (_bgPaused && !_bgAnalysisAbort) await new Promise(r => setTimeout(r, 200));
         if (_bgAnalysisAbort) break;
@@ -4866,7 +5098,19 @@ async function startBackgroundAnalysis() {
         let paths;
         try {
             paths = await window.vstUpdater.dbUnanalyzedPaths(BATCH);
-        } catch {
+        } catch (e) {
+            if (window.vstUpdater?.appendLog) {
+                window.vstUpdater.appendLog(
+                    `BPM/LUFS BG — ERROR queue: ${e && e.message ? e.message : e}`
+                );
+            }
+            if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+                showToast(
+                    toastFmt('toast.bpm_key_lufs_analysis_queue_failed', {err: e && e.message ? e.message : e}),
+                    5000,
+                    'error'
+                );
+            }
             break;
         }
         if (!paths || paths.length === 0) break;
@@ -4875,10 +5119,15 @@ async function startBackgroundAnalysis() {
         // Returns results directly so we skip N individual dbGetAnalysis roundtrips.
         let analysisResult;
         try {
-            _setBgAnalysisBadgeRunning(badge);
+            // Do not switch to "working" here — it flashes between count and label every batch.
             analysisResult = await window.vstUpdater.batchAnalyze(paths);
-            _bgDone += analysisResult.count || 0;
+            const n = analysisResult.count || 0;
+            _bgDone += n;
+            analyzedThisSession += n;
         } catch (e) {
+            if (window.vstUpdater?.appendLog) {
+                window.vstUpdater.appendLog(`BPM/LUFS BG — ERROR batch: ${e.message || e}`);
+            }
             if (typeof showToast === 'function') showToast(toastFmt('toast.analysis_batch_failed', {err: e.message || e}), 4000, 'error');
             break; // Stop loop on persistent failure
         }
@@ -4943,8 +5192,28 @@ async function startBackgroundAnalysis() {
     }
 
     _refreshCacheStatsIfSettingsTab();
-    _bgAnalysisRunning = false;
     if (badge && _shouldUpdateBgAnalysisBadgeUi()) badge.innerHTML = '';
+    if (
+        !_bgAnalysisAbort &&
+        analyzedThisSession > 0 &&
+        typeof showToast === 'function' &&
+        typeof toastFmt === 'function'
+    ) {
+        showToast(
+            toastFmt('toast.bpm_key_lufs_analysis_complete', {n: analyzedThisSession.toLocaleString()}),
+            4000
+        );
+    }
+    } finally {
+        if (window.vstUpdater?.appendLog) {
+            window.vstUpdater.appendLog(
+                `BPM/LUFS BG — session end | analyzed=${analyzedThisSession} user_stopped=${_bgAnalysisAbort}`
+            );
+        }
+        _bgAnalysisRunning = false;
+        if (typeof window !== 'undefined') window.__statusBarBpmJob = false;
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    }
 }
 
 function stopBackgroundAnalysis() {
@@ -6480,7 +6749,8 @@ function updateMetaLine() {
     const aeCanvas = document.getElementById('aeEqCanvas');
     if (!npCanvas && !aeCanvas) return;
 
-    let _eqSpectrumBuf = null;
+    let _eqSpectrumBufNp = null;
+    let _eqSpectrumBufAe = null;
 
     function eqBandLabel(id) {
         const k = id === 'low' ? 'ui.eq.band_low' : id === 'mid' ? 'ui.eq.band_mid' : 'ui.eq.band_high';
@@ -6505,20 +6775,28 @@ function updateMetaLine() {
         },
     ];
 
-    const FREQ_MIN = 20, FREQ_MAX = 20000;
+    const FREQ_MIN = 20, FREQ_MAX = NP_SPECTRUM_DISPLAY_MAX_HZ;
     const GAIN_MIN = -12, GAIN_MAX = 12;
     /** Log-spaced samples for Ableton-style smooth spectrum (not one vertex per FFT bin). */
     const EQ_SPECTRUM_POINTS = 512;
     const EQ_MARGIN_BOTTOM = 22;
 
-    /** Interpolate FFT bin magnitudes in linear bin index space (0–1). */
-    function sampleSpectrumMag01(freqHz, dataArr, bufLen, sampleRate, fftSize) {
-        const binF = (freqHz * fftSize) / sampleRate;
-        if (binF < 0 || bufLen < 2) return 0;
+    /**
+     * Interpolate spectrum magnitude0–1. `omitDc`: AudioEngine `spectrum[i]` is FFT bin i+1; WebAudio
+     * `getByteFrequencyData` is DC-inclusive (bin Hz i·sr/fftSize).
+     */
+    function sampleSpectrumMag01(freqHz, dataArr, bufLen, sampleRate, fftSize, omitDc) {
+        const binF = omitDc
+            ? engineSpectrumBundledBinF(freqHz, sampleRate, fftSize, bufLen)
+            : (freqHz * fftSize) / sampleRate;
+        if (bufLen < 1) return 0;
+        if (bufLen === 1) return dataArr[0] / 255;
+        if (binF <= 0) return dataArr[0] / 255;
+        if (binF >= bufLen - 1) return dataArr[bufLen - 1] / 255;
         const i0 = Math.floor(binF);
         const i1 = Math.min(bufLen - 1, i0 + 1);
         const frac = binF - i0;
-        const v0 = dataArr[Math.max(0, i0)] / 255;
+        const v0 = dataArr[i0] / 255;
         const v1 = dataArr[i1] / 255;
         return v0 + frac * (v1 - v0);
     }
@@ -6571,10 +6849,7 @@ function updateMetaLine() {
     /** Keep parametric EQ rAF only while spectrum animates, audio plays, or the user drags a band — not 24/7 when the panel is open. */
     function needsParametricEqRafContinuation() {
         if (_dragState) return true;
-        if (typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused()) return false;
-        if (typeof engineSpectrumLive === 'function' && engineSpectrumLive()) return true;
-        if (typeof isAudioPlaying === 'function' && isAudioPlaying()) return true;
-        return false;
+        return typeof parametricEqNeedsLiveSpectrumAnimation === 'function' && parametricEqNeedsLiveSpectrumAnimation();
     }
 
     /** Light log grid + 0 dB line (transparent background; EQ response stroke stays cyan). */
@@ -6599,7 +6874,7 @@ function updateMetaLine() {
     }
 
     /** Log-spaced spectrum fill + top outline (magenta→cyan; interpolated magnitudes). */
-    function drawEqSpectrumFill(ctx, w, h, dataArr, bufLen, sampleRate, fftSize) {
+    function drawEqSpectrumFill(ctx, w, h, dataArr, bufLen, sampleRate, fftSize, omitDc) {
         const plotH = h - EQ_MARGIN_BOTTOM;
         const grad = ctx.createLinearGradient(0, 0, 0, h);
         grad.addColorStop(0, 'rgba(211,0,197,0.25)');
@@ -6612,7 +6887,7 @@ function updateMetaLine() {
             const t = i / (EQ_SPECTRUM_POINTS - 1);
             const freq = FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, t);
             const x = freqToX(freq, w);
-            const mag = sampleSpectrumMag01(freq, dataArr, bufLen, sampleRate, fftSize);
+            const mag = sampleSpectrumMag01(freq, dataArr, bufLen, sampleRate, fftSize, omitDc);
             const y = plotH - mag * plotH;
             if (i === 0) {
                 firstY = y;
@@ -6632,7 +6907,7 @@ function updateMetaLine() {
             const t = i / (EQ_SPECTRUM_POINTS - 1);
             const freq = FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, t);
             const x = freqToX(freq, w);
-            const mag = sampleSpectrumMag01(freq, dataArr, bufLen, sampleRate, fftSize);
+            const mag = sampleSpectrumMag01(freq, dataArr, bufLen, sampleRate, fftSize, omitDc);
             const y = plotH - mag * plotH;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
@@ -6645,6 +6920,9 @@ function updateMetaLine() {
     function drawParametricEqOnCanvas(canvas) {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
+        const eqFreezeId = canvas === aeCanvas ? 'ae:eq' : 'np:eq';
+        const eqSpectrumFrozen = typeof window.isGraphFrozen === 'function' && window.isGraphFrozen(eqFreezeId);
+        let _eqSpectrumBuf = canvas === aeCanvas ? _eqSpectrumBufAe : _eqSpectrumBufNp;
         const useEngineEqSpectrum = engineSpectrumLive();
         syncNpFftSpectrumAxisPins(useEngineEqSpectrum);
         /* Canvas size is synced via ResizeObserver → primeCanvasSize only — not here (per-frame
@@ -6666,34 +6944,43 @@ function updateMetaLine() {
                 if (!dataArr) {
                     /* skip spectrum fill */
                 } else {
-                const bufLen = Math.min(1024, dataArr.length);
-                const paused = typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused();
-                if (!paused) {
+                const bufLen = dataArr.length;
+                if (!eqSpectrumFrozen) {
                     if (!_eqSpectrumBuf || _eqSpectrumBuf.length !== bufLen) _eqSpectrumBuf = new Uint8Array(bufLen);
                     _eqSpectrumBuf.set(dataArr.subarray(0, bufLen));
                 }
+                if (canvas === aeCanvas) _eqSpectrumBufAe = _eqSpectrumBuf;
+                else _eqSpectrumBufNp = _eqSpectrumBuf;
                 if (_eqSpectrumBuf && _eqSpectrumBuf.length === bufLen) {
                     const sampleRate = axis.sr;
                     const fftSize = axis.fft;
-                    drawEqSpectrumFill(ctx, w, h, _eqSpectrumBuf, bufLen, sampleRate, fftSize);
+                    drawEqSpectrumFill(ctx, w, h, _eqSpectrumBuf, bufLen, sampleRate, fftSize, true);
                 }
                 }
             }
         } else if (_analyser && _playbackCtx && typeof isAudioPlaying === 'function' && isAudioPlaying()) {
             const bufLen = _analyser.frequencyBinCount;
-            const paused = typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused();
-            if (!paused) {
+            if (!eqSpectrumFrozen) {
                 if (!_eqSpectrumBuf || _eqSpectrumBuf.length !== bufLen) _eqSpectrumBuf = new Uint8Array(bufLen);
                 _analyser.getByteFrequencyData(_eqSpectrumBuf);
             }
+            if (canvas === aeCanvas) _eqSpectrumBufAe = _eqSpectrumBuf;
+            else _eqSpectrumBufNp = _eqSpectrumBuf;
             if (_eqSpectrumBuf && _eqSpectrumBuf.length === bufLen) {
-                if (_npFftWebAxisSrHz == null) {
-                    _npFftWebAxisSrHz = _playbackCtx.sampleRate;
-                    _npFftWebAxisFftSize = _analyser.fftSize;
+                const liveSr = _playbackCtx.sampleRate;
+                const liveFft = _analyser.fftSize;
+                if (
+                    _npFftWebAxisSrHz == null ||
+                    _npFftWebAxisFftSize == null ||
+                    _npFftWebAxisSrHz !== liveSr ||
+                    _npFftWebAxisFftSize !== liveFft
+                ) {
+                    _npFftWebAxisSrHz = liveSr;
+                    _npFftWebAxisFftSize = liveFft;
                 }
                 const sampleRate = _npFftWebAxisSrHz;
                 const fftSizeForBins = _npFftWebAxisFftSize;
-                drawEqSpectrumFill(ctx, w, h, _eqSpectrumBuf, bufLen, sampleRate, fftSizeForBins);
+                drawEqSpectrumFill(ctx, w, h, _eqSpectrumBuf, bufLen, sampleRate, fftSizeForBins, false);
             }
         }
 
@@ -6788,6 +7075,13 @@ function updateMetaLine() {
             cancelAnimationFrame(_paramEqRafId);
             _paramEqRafId = null;
         }
+    }
+
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        document.addEventListener('graph-freeze-changed', () => {
+            scheduleParametricEqFrame();
+            if (typeof window.ensureEnginePlaybackFftRaf === 'function') window.ensureEnginePlaybackFftRaf();
+        });
     }
 
     function primeCanvasSize(canvas) {

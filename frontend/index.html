@@ -580,12 +580,16 @@
 
         /* Settings page — CSS columns for masonry packing (no dead space between
        sections of different heights).  Animation/box-shadow/transition on
-       .settings-row are neutralised below so WebKit release doesn't flicker. */
+       .settings-row are neutralised below so WebKit release doesn't flicker.
+       Audio Engine uses `.audio-engine-tab` > `.ae-main-stack` multicol only — exclude it from settings multicol (WebKit kept applying column layout even with `columns: initial` on the grid container). */
         .settings-container {
+            padding: 6px 6px 40px;
+        }
+
+        .settings-container:not(.audio-engine-tab) {
             columns: 1;
             column-gap: 3px;
             column-fill: balance;
-            padding: 6px 6px 40px;
         }
 
         /* Search bar spans full width across all columns */
@@ -633,19 +637,19 @@
         }
 
         @media (min-width: 900px) {
-            .settings-container {
+            .settings-container:not(.audio-engine-tab) {
                 columns: 2;
             }
         }
 
         @media (min-width: 1500px) {
-            .settings-container {
+            .settings-container:not(.audio-engine-tab) {
                 columns: 3;
             }
         }
 
         @media (min-width: 2100px) {
-            .settings-container {
+            .settings-container:not(.audio-engine-tab) {
                 columns: 4;
             }
         }
@@ -1211,11 +1215,13 @@
             opacity: 1;
         }
 
-        /* Stats bar */
+        /* Stats bar — wrap so narrow windows / many stats don’t shove badges off-screen */
         .stats-bar {
             display: flex;
-            gap: 24px;
+            flex-wrap: wrap;
+            gap: 8px clamp(12px, 2.2vw, 22px);
             align-items: center;
+            row-gap: 6px;
             text-shadow: 0 0 4px rgba(5, 217, 232, 0.1);
         }
 
@@ -2903,21 +2909,24 @@
             text-align: center;
         }
 
-        /* Status bar */
+        /* Bottom status bar — KVR / long ops on the left, live KVR counters center-right, background job badges far right */
         .status-bar {
             display: none;
+            flex-wrap: wrap;
+            row-gap: 6px;
+            column-gap: 14px;
             padding: 8px 24px;
             background: var(--bg-secondary);
             border-top: 1px solid var(--border);
             font-size: 11px;
             color: var(--text-dim);
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
             letter-spacing: 0.5px;
             -webkit-app-region: no-drag;
         }
 
-        .status-bar.active {
+        .status-bar.status-bar-visible {
             display: flex;
         }
 
@@ -2926,7 +2935,18 @@
             align-items: center;
             gap: 10px;
             min-width: 0;
-            flex: 1;
+            flex: 1 1 160px;
+        }
+
+        /* Only the KVR / check-updates spinner collapses when the bar is not `.active`; job rows keep their own spinners. */
+        .status-bar:not(.active) .status-bar-inner > .status-spinner {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            border-width: 0;
+            margin: 0;
+            animation: none;
+            overflow: hidden;
         }
 
         .status-spinner {
@@ -2938,6 +2958,7 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             flex-shrink: 0;
+            transition: opacity 0.15s ease, width 0.15s ease, height 0.15s ease;
         }
 
         .status-text {
@@ -2949,9 +2970,52 @@
 
         .status-stats {
             flex-shrink: 0;
-            margin-left: 16px;
             display: flex;
+            flex-wrap: wrap;
             gap: 14px;
+            align-items: center;
+        }
+
+        .status-stats:empty {
+            display: none;
+        }
+
+        /* Background job badges — horizontal run (wraps when many jobs); cluster stays right-anchored in the bar */
+        .status-bar-bg-job-cluster {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px 16px;
+            flex: 0 1 auto;
+            min-width: 0;
+            max-width: 100%;
+            margin-left: auto;
+        }
+
+        .status-bg-job-row {
+            display: none;
+            flex: 0 1 auto;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            min-width: 0;
+            max-width: 100%;
+        }
+
+        .status-bg-job-row .stats-bg-job-item {
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: 100%;
+            letter-spacing: 0.04em;
+            text-transform: none;
+            font-size: 10px;
+            line-height: 1.2;
+            color: var(--cyan);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .status-stats .stat-up {
@@ -4997,6 +5061,96 @@
             max-width: 50%;
         }
 
+        /* Duplicates modal: tabs vs actions (avoid bare `cyber-btn` — it has no stylesheet; use .btn + .dup-tab-btn) */
+        #dupModal .dup-modal-header {
+            align-items: center;
+            gap: 12px;
+        }
+
+        #dupModal .dup-header-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        #dupModal .dup-header-main h2 {
+            margin: 0;
+        }
+
+        #dupModal .dup-tab-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: flex-end;
+            flex-shrink: 0;
+        }
+
+        #dupModal .dup-tab-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 2px;
+            cursor: pointer;
+            background: rgba(5, 217, 232, 0.06);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+        }
+
+        #dupModal .dup-tab-btn:hover {
+            border-color: var(--cyan-dim);
+            color: var(--text);
+        }
+
+        #dupModal .dup-tab-btn.dup-tab-active {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            background: rgba(5, 217, 232, 0.1);
+            box-shadow: 0 0 10px var(--cyan-dim);
+        }
+
+        #dupModal .dup-content-hint {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin: 0 0 12px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+            word-wrap: break-word;
+            max-width: 100%;
+        }
+
+        #dupModal .dup-content-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        #dupModal .dup-content-actions .btn {
+            min-height: 36px;
+        }
+
+        #dupModal .modal-close {
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 560px) {
+            #dupModal .dup-header-main {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            #dupModal .dup-tab-strip {
+                justify-content: flex-start;
+            }
+        }
+
         /* Export modal */
         .export-info {
             display: flex;
@@ -6683,8 +6837,7 @@
             }
         }
 
-        /* ── Audio Engine tab — full-width masonry like Settings: `.settings-section` + `break-inside: avoid`,
-           `column-fill: balance` to balance column heights; cap at 3 columns (Settings uses 4 on ultra-wide). ── */
+        /* ── Audio Engine tab — one `.ae-main-stack` multicol: controls + graph tiles masonry (no dead space beside a tall right column). ── */
         #tabAudioEngine .settings-container.audio-engine-tab {
             width: 100%;
             max-width: none;
@@ -6692,20 +6845,49 @@
             box-sizing: border-box;
             flex: 1 1 auto;
             min-width: 0;
-            columns: 1;
-            column-gap: 3px;
-            column-fill: balance;
+            display: block;
             padding: 6px 8px 40px;
         }
 
+        #tabAudioEngine .settings-container.audio-engine-tab > .ae-main-stack {
+            min-width: 0;
+            columns: 1;
+            column-gap: 12px;
+            column-fill: balance;
+        }
+
+        #tabAudioEngine .ae-main-stack > .settings-section {
+            break-inside: avoid;
+        }
+
+        #tabAudioEngine .ae-main-stack > .ae-masonry-span-all {
+            column-span: all;
+        }
+
+        #tabAudioEngine .ae-main-stack > .ae-graph-cell {
+            break-inside: avoid;
+            margin-bottom: 3px;
+            overflow: visible;
+            border: 1px solid var(--cyan);
+            border-radius: 4px;
+            padding: 4px;
+            background: var(--bg-card);
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        #tabAudioEngine .ae-main-stack > .ae-graph-cell.ae-graph-span-full {
+            column-span: all;
+        }
+
         @media (min-width: 900px) {
-            #tabAudioEngine .settings-container.audio-engine-tab {
+            #tabAudioEngine .settings-container.audio-engine-tab > .ae-main-stack {
                 columns: 2;
             }
         }
 
-        @media (min-width: 1500px) {
-            #tabAudioEngine .settings-container.audio-engine-tab {
+        @media (min-width: 1280px) {
+            #tabAudioEngine .settings-container.audio-engine-tab > .ae-main-stack {
                 columns: 3;
             }
         }
@@ -6724,6 +6906,15 @@
             flex: 1 1 100%;
             width: 100%;
             min-width: 0;
+            box-sizing: border-box;
+        }
+
+        /* Multi-column masonry: default `.settings-control { flex-shrink: 0 }` overflows narrow columns.
+           Allow controls to shrink and wrap so device row buttons stay inside the pane. */
+        #tabAudioEngine .settings-container .settings-row .settings-control {
+            flex: 1 1 200px;
+            min-width: 0;
+            max-width: 100%;
             box-sizing: border-box;
         }
 
@@ -7435,6 +7626,30 @@
             background: rgba(5, 217, 232, 0.22);
         }
 
+        #tabAudioEngine .ae-graph-label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        #tabAudioEngine .ae-graph-canvas-wrap {
+            width: 100%;
+            height: 160px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(122, 139, 168, 0.15);
+            background: rgba(6, 8, 22, 0.65);
+        }
+
+        #tabAudioEngine .ae-graph-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
         /* Playing glow: animate a ::before layer only. Animating box-shadow on the panel itself
            replaces the static multi-layer shadow and makes the FFT/EQ stack jump in WKWebView. */
         .audio-now-playing.np-playing:not(.expanded)::before {
@@ -7953,9 +8168,9 @@
         }
 
         .toast.toast-warning {
-            color: var(--yellow);
-            border-color: var(--yellow);
-            box-shadow: 0 0 15px var(--yellow-glow), 0 0 30px rgba(249, 240, 2, 0.08);
+            color: var(--cyan);
+            border-color: var(--cyan);
+            box-shadow: 0 0 15px var(--cyan-glow), 0 0 30px rgba(5, 217, 232, 0.1);
             text-transform: none;
             letter-spacing: 0.5px;
             line-height: 1.35;
@@ -8286,8 +8501,8 @@
                     <canvas class="waveform-canvas" id="npWaveformCanvas"></canvas>
                     <div class="now-playing-progress" id="npProgress"></div>
                     <div class="waveform-loop-region" style="display:none;"></div>
-                    <div class="waveform-loop-brace waveform-loop-brace-start" data-loop-brace="start" style="display:none;left:25%;" title="Drag to set loop start"></div>
-                    <div class="waveform-loop-brace waveform-loop-brace-end" data-loop-brace="end" style="display:none;left:75%;" title="Drag to set loop end"></div>
+                    <div class="waveform-loop-brace waveform-loop-brace-start" data-loop-brace="start" style="display:none;left:25%;" title="Drag to set loop start" data-i18n-title="ui.tt.drag_to_set_loop_start"></div>
+                    <div class="waveform-loop-brace waveform-loop-brace-end" data-loop-brace="end" style="display:none;left:75%;" title="Drag to set loop end" data-i18n-title="ui.tt.drag_to_set_loop_end"></div>
                     <div class="waveform-cursor" id="npCursor" style="left:0;display:none;"></div>
                 </div>
                 <span class="now-playing-time" id="npTime">0:00 / 0:00</span>
@@ -8651,9 +8866,6 @@
                         style="padding:4px 10px;font-size:10px;" title="Audio heatmap dashboard (D)">
                     &#128202; <span data-i18n="ui.btn.128202_dashboard">Dashboard</span></button>
             </div>
-            <div class="stat" data-i18n-title="ui.tt.background_bpm_key_analysis_progress" data-stat-key="bg_analysis" id="bgAnalysisBadge"
-                 style="font-size:10px;color:var(--cyan);"
-                 title="Background BPM/Key/LUFS analysis progress"></div>
         </div>
     </div>
 
@@ -9443,7 +9655,8 @@
 
     <div class="tab-content" id="tabAudioEngine">
         <div class="settings-container audio-engine-tab">
-            <div class="settings-section" data-section="ae-overview">
+            <div class="ae-main-stack">
+            <div class="settings-section ae-layout-col-left" data-section="ae-overview">
                 <h2 class="settings-heading">&#9776; <span data-i18n="ui.ae.heading">Audio Engine</span></h2>
                 <div class="settings-row ae-settings-row-full">
                     <div class="settings-label">
@@ -9493,7 +9706,7 @@
                     </div>
                 </div>
             </div>
-            <div class="settings-section" data-section="ae-devices">
+            <div class="settings-section ae-layout-col-left" data-section="ae-devices">
                 <h2 class="settings-heading">&#9776; <span data-i18n="ui.ae.output_device_label">Output device</span></h2>
                 <div class="settings-row">
                     <div class="settings-label">
@@ -9513,18 +9726,18 @@
                         <select id="aeSampleRate" class="ae-input settings-select" data-i18n-title="ui.ae.sample_rate_tt" style="min-width:160px;max-width:100%;"></select>
                     </div>
                 </div>
-                <div class="settings-row">
+                <div class="settings-row ae-output-device-row">
                     <div class="settings-label">
                         <span class="settings-title" data-i18n="ui.ae.output_device_label">Output device</span>
                         <span class="settings-desc" data-i18n="ui.ae.output_device_tt">System output device for the audio engine</span>
                     </div>
-                    <div class="settings-control" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                        <select id="aeOutputDevice" class="ae-input settings-select" data-i18n-title="ui.ae.output_device_tt" style="min-width:280px;max-width:100%;" title="System output device for the engine"></select>
-                        <button class="btn btn-secondary btn-settings-action" type="button" id="aeRefreshDevices" data-i18n="ui.ae.refresh_devices">Refresh list</button>
-                        <button class="btn btn-primary btn-settings-action" type="button" id="aeApplyDevice" data-i18n="ui.ae.apply_device">Apply</button>
+                    <div class="settings-control ae-output-device-controls" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;min-width:0;">
+                        <select id="aeOutputDevice" class="ae-input settings-select" data-i18n-title="ui.ae.output_device_tt" style="flex:1 1 100%;min-width:0;max-width:100%;box-sizing:border-box;" title="System output device for the engine"></select>
+                        <button class="btn btn-secondary btn-settings-action" type="button" id="aeRefreshDevices" data-i18n="ui.ae.refresh_devices" data-i18n-title="ui.ae.refresh_devices_tt">Refresh list</button>
+                        <button class="btn btn-primary btn-settings-action" type="button" id="aeApplyDevice" data-i18n="ui.ae.apply_device" data-i18n-title="ui.ae.apply_device_tt">Apply</button>
                         <button class="btn btn-stop btn-settings-action" type="button" id="aeStopStream" data-i18n="ui.ae.stop_stream" data-i18n-title="ui.ae.stop_stream_tt">Stop stream</button>
                         <label data-i18n-title="ui.ae.test_tone_tt" style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);cursor:pointer;user-select:none;" title="Low-level sine on F32 default stream; toggle live if supported">
-                            <input type="checkbox" id="aeTestTone" />
+                            <input type="checkbox" id="aeTestTone" data-i18n-title="ui.ae.test_tone_tt" />
                             <span data-i18n="ui.ae.test_tone_label">Test tone (440 Hz)</span>
                         </label>
                     </div>
@@ -9538,8 +9751,52 @@
                         <select id="aeBufferFramesOutput" class="ae-input settings-select" data-i18n-title="ui.ae.buffer_frames_output_tt" style="min-width:140px;max-width:100%;"></select>
                     </div>
                 </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title" data-i18n="ui.ae.playback_spectrum_quality_label">Library playback spectrum</span>
+                        <span class="settings-desc" data-i18n="ui.ae.playback_spectrum_row_tt">FFT window length and how many bands are sent in playback_status. Larger windows cost more CPU; fewer bands reduce IPC payload. Off skips FFT in the engine.</span>
+                    </div>
+                    <div class="settings-control" style="display:flex;flex-direction:column;gap:6px;max-width:100%;">
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                        <label class="ae-spectrum-split" style="display:flex;flex-direction:column;gap:4px;min-width:140px;">
+                            <span style="font-size:11px;color:var(--text-dim);" data-i18n="ui.ae.playback_spectrum_points_label">FFT points</span>
+                            <select id="aePlaybackSpectrumFftOrder" class="ae-input settings-select" data-i18n-title="ui.ae.playback_spectrum_points_tt" aria-label="FFT window size">
+                                <option value="off" data-i18n="ui.ae.playback_spectrum_fft_off">Off (no FFT)</option>
+                                <option value="8" data-i18n="ui.opt.256">256</option>
+                                <option value="9" data-i18n="ui.opt.512">512</option>
+                                <option value="10">1 024</option>
+                                <option value="11">2 048</option>
+                                <option value="12">4 096</option>
+                                <option value="13">8 192</option>
+                                <option value="14">16 384</option>
+                                <option value="15">32 768</option>
+                            </select>
+                        </label>
+                        <label class="ae-spectrum-split" style="display:flex;flex-direction:column;gap:4px;min-width:140px;">
+                            <span style="font-size:11px;color:var(--text-dim);" data-i18n="ui.ae.playback_spectrum_bands_label">Bands</span>
+                            <select id="aePlaybackSpectrumBands" class="ae-input settings-select" data-i18n-title="ui.ae.playback_spectrum_bands_tt" aria-label="Spectrum output band count">
+                                <option value="64" data-i18n="ui.opt.64">64</option>
+                                <option value="128" data-i18n="ui.opt.128">128</option>
+                                <option value="256" data-i18n="ui.opt.256">256</option>
+                                <option value="384" data-i18n="ui.opt.384">384</option>
+                                <option value="512" data-i18n="ui.opt.512">512</option>
+                                <option value="768" data-i18n="ui.opt.768">768</option>
+                                <option value="896" data-i18n="ui.opt.896">896</option>
+                                <option value="1024">1 024</option>
+                                <option value="1536">1 536</option>
+                                <option value="2048">2 048</option>
+                                <option value="4096">4 096</option>
+                                <option value="8192">8 192</option>
+                                <option value="16384">16 384</option>
+                                <option value="max" data-i18n="ui.ae.playback_spectrum_bands_max">Max (Nyquist)</option>
+                            </select>
+                        </label>
+                        </div>
+                        <p id="aePlaybackSpectrumCapHint" class="settings-desc" style="font-size:11px;margin:0;line-height:1.35;color:var(--text-dim);" aria-live="polite"></p>
+                    </div>
+                </div>
                 <details id="aeInputDevicesDetails" class="ae-settings-details">
-                    <summary class="settings-heading" style="cursor:pointer;list-style:none;font-size:12px;margin:0 0 8px 0;" data-i18n="ui.ae.input_devices_heading">Input devices</summary>
+                    <summary class="settings-heading" style="cursor:pointer;list-style:none;font-size:12px;margin:0 0 8px 0;" data-i18n="ui.ae.input_devices_heading" data-i18n-title="ui.ae.input_devices_heading">Input devices</summary>
                     <p style="font-size:12px;color:var(--text-dim);margin:8px 0 6px 0;line-height:1.45;" data-i18n="ui.ae.input_devices_intro">AudioEngine list (capture/debug).</p>
                     <div class="settings-row">
                         <div class="settings-label">
@@ -9584,7 +9841,7 @@
                     </div>
                 </div>
             </div>
-            <div class="settings-section" data-section="ae-playback">
+            <div class="settings-section ae-layout-col-mid" data-section="ae-playback">
                 <h2 class="settings-heading">&#9776; <span data-i18n="ui.ae.playback_dsp_heading">Playback output &amp; EQ</span></h2>
                 <div class="settings-row ae-settings-row-full">
                     <div class="settings-label">
@@ -9610,13 +9867,13 @@
                         <span class="settings-title" data-i18n="ui.ae.playback_volume_label">Volume</span>
                     </div>
                     <div class="settings-control" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;">
-                        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);">
-                            <input type="range" id="aeVolume" min="0" max="100" value="100" style="width:140px;accent-color:var(--cyan);" />
+                        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);" data-i18n-title="ui.ae.playback_volume_tt">
+                            <input type="range" id="aeVolume" min="0" max="100" value="100" data-i18n-title="ui.ae.playback_volume_tt" style="width:140px;accent-color:var(--cyan);" />
                             <span id="aeVolumePct" style="min-width:36px;font-family:var(--font-mono,monospace);font-size:12px;color:var(--cyan);text-shadow:0 0 6px var(--cyan-dim);">100%</span>
                         </label>
-                        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-muted);">
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-muted);" data-i18n-title="ui.tt.playback_speed">
                             <span data-i18n="ui.np.label_speed">Speed</span>
-                            <select id="aePlaybackSpeed" class="ae-input settings-select" style="min-width:88px;padding:6px 8px;font-size:13px;">
+                            <select id="aePlaybackSpeed" class="ae-input settings-select" data-i18n-title="ui.tt.playback_speed" style="min-width:88px;padding:6px 8px;font-size:13px;">
                                 <option data-i18n="ui.opt.0_25x" value="0.25">0.25x</option>
                                 <option data-i18n="ui.opt.0_5x" value="0.5">0.5x</option>
                                 <option data-i18n="ui.opt.0_75x" value="0.75">0.75x</option>
@@ -9643,12 +9900,12 @@
                             <div class="ae-eq-gain-pan-row">
                                 <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
                                     <span style="font-size:9px;color:var(--magenta);text-transform:uppercase;letter-spacing:0.08em;font-family:'Orbitron',sans-serif;" data-i18n="ui.np.label_gain">Gain</span>
-                                    <input class="eq-slider" id="aeGainSlider" type="range" min="0" max="2" step="0.01" value="1" orient="vertical" style="width:28px;height:100px;writing-mode:vertical-lr;direction:rtl;accent-color:var(--magenta);" />
+                                    <input class="eq-slider" id="aeGainSlider" type="range" min="0" max="2" step="0.01" value="1" orient="vertical" data-i18n-title="ui.tt.preamp_gain_0_200" style="width:28px;height:100px;writing-mode:vertical-lr;direction:rtl;accent-color:var(--magenta);" />
                                     <span id="aeGainVal" style="font-size:11px;font-family:var(--font-mono,monospace);color:var(--magenta);">100%</span>
                                 </div>
                                 <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
                                     <span style="font-size:9px;color:var(--cyan);text-transform:uppercase;letter-spacing:0.08em;font-family:'Orbitron',sans-serif;" data-i18n="ui.np.label_pan">Pan</span>
-                                    <input class="eq-slider" id="aePanSlider" type="range" min="-1" max="1" step="0.01" value="0" orient="vertical" style="width:28px;height:100px;writing-mode:vertical-lr;direction:rtl;accent-color:var(--cyan);" />
+                                    <input class="eq-slider" id="aePanSlider" type="range" min="-1" max="1" step="0.01" value="0" orient="vertical" data-i18n-title="ui.tt.stereo_pan_l_c_r" style="width:28px;height:100px;writing-mode:vertical-lr;direction:rtl;accent-color:var(--cyan);" />
                                     <span id="aePanVal" style="font-size:11px;font-family:var(--font-mono,monospace);color:var(--cyan);">C</span>
                                 </div>
                             </div>
@@ -9656,7 +9913,7 @@
                     </div>
                 </div>
             </div>
-            <div class="settings-section" data-section="ae-inserts">
+            <div class="settings-section ae-layout-col-mid" data-section="ae-inserts">
                 <h2 class="settings-heading">&#9776; <span data-i18n="ui.ae.plugins_heading">Insert plugins</span></h2>
                 <div class="settings-row ae-settings-row-full">
                     <div class="settings-label">
@@ -9688,13 +9945,13 @@
                         <span class="settings-desc" data-i18n="ui.ae.insert_slot_tt">Optional VST3 or AU effect (from scan). Order is serial top to bottom.</span>
                     </div>
                     <div class="settings-control" style="display:flex;flex-direction:column;align-items:stretch;gap:10px;width:100%;max-width:100%;">
-                        <label class="ae-insert-picker-filter" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);cursor:pointer;">
-                            <input type="checkbox" id="aeInsertPickerShowInstruments"/>
-                            <span data-i18n="ui.ae.insert_show_instruments" data-i18n-title="ui.ae.insert_show_instruments_tt">Show instruments</span>
+                        <label class="ae-insert-picker-filter" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);cursor:pointer;" data-i18n-title="ui.ae.insert_show_instruments_tt">
+                            <input type="checkbox" id="aeInsertPickerShowInstruments" data-i18n-title="ui.ae.insert_show_instruments_tt"/>
+                            <span data-i18n="ui.ae.insert_show_instruments">Show instruments</span>
                         </label>
-                        <label class="ae-insert-picker-filter" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);cursor:pointer;">
-                            <input type="checkbox" id="aeInsertPickerHideAudioUnits"/>
-                            <span data-i18n="ui.ae.insert_hide_audio_units" data-i18n-title="ui.ae.insert_hide_audio_units_tt">Hide Audio Units</span>
+                        <label class="ae-insert-picker-filter" style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);cursor:pointer;" data-i18n-title="ui.ae.insert_hide_audio_units_tt">
+                            <input type="checkbox" id="aeInsertPickerHideAudioUnits" data-i18n-title="ui.ae.insert_hide_audio_units_tt"/>
+                            <span data-i18n="ui.ae.insert_hide_audio_units">Hide Audio Units</span>
                         </label>
                         <div id="aeInsertChainContainer" class="ae-insert-chain"></div>
                         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
@@ -9708,6 +9965,111 @@
                         <ul id="aePluginSlotList" style="margin:0;padding:0;list-style:none;font-size:12px;color:var(--text-dim);font-family:var(--font-mono,monospace);line-height:1.6;"></ul>
                     </div>
                 </div>
+            </div>
+            <div class="settings-section ae-masonry-span-all" data-section="ae-graphs" id="aeOutputGraphsSection">
+                <h2 class="settings-heading">&#9776; <span data-i18n="ui.ae.graphs_heading">Engine output diagnostics</span></h2>
+                <div class="settings-row ae-settings-row-full">
+                    <div class="settings-label">
+                        <span class="settings-desc" data-i18n="ui.ae.graphs_desc">Real-time scope-derived views of engine output: waveforms (mid, side, L/R overlay, L−R), stereo energy, vectorscope, Lissajous-style L–R line trace, DC offset, magnitude and |L−R| histograms, peak trace, balance, correlation, width, and crest. FFT / spectrogram / band views are on the Visualizer tab.</span>
+                    </div>
+                </div>
+            </div>
+                    <div class="ae-graph-cell ae-graph-span-full">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_midside_label">Mid / Side waveform</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphMidSide" class="ae-graph-canvas" width="600" height="160" aria-label="Mid Side"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_balance_label">L / R balance (RMS)</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphBalance" class="ae-graph-canvas" width="600" height="160" aria-label="Balance"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_correlation_label">Mono compatibility (correlation)</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphCorrelation" class="ae-graph-canvas" width="600" height="160" aria-label="Correlation"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_width_label">Stereo width (side / mid)</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphWidth" class="ae-graph-canvas" width="600" height="160" aria-label="Width"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_crest_label">Crest factor (peak / RMS)</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphCrest" class="ae-graph-canvas" width="600" height="160" aria-label="Crest"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_lminus_r_label">L − R difference</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphLMinusR" class="ae-graph-canvas" width="600" height="160" aria-label="L minus R"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_energy_label">Stereo energy envelope</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphEnergy" class="ae-graph-canvas" width="600" height="160" aria-label="Stereo energy"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell ae-graph-span-full">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_gonio_label">Vectorscope (L vs R)</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphGonio" class="ae-graph-canvas" width="600" height="160" aria-label="Vectorscope"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_dc_offset_label">DC offset (mean)</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphDcOffset" class="ae-graph-canvas" width="600" height="160" aria-label="DC offset"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_peak_sample_label">Peak sample trace max(|L|,|R|)</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphPeakSample" class="ae-graph-canvas" width="600" height="160" aria-label="Peak sample trace"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell ae-graph-span-full">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_hist_mag_label">Stereo magnitude histogram</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphMagHist" class="ae-graph-canvas" width="600" height="160" aria-label="Magnitude histogram"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_mono_wave_label">Mono (M) waveform</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphMonoWave" class="ae-graph-canvas" width="600" height="160" aria-label="Mono waveform"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_side_wave_label">Side (S) waveform</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphSideWave" class="ae-graph-canvas" width="600" height="160" aria-label="Side waveform"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell ae-graph-span-full">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_lr_overlay_label">L &amp; R overlay</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphLrOverlay" class="ae-graph-canvas" width="600" height="160" aria-label="L and R overlay"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_abs_diff_hist_label">|L − R| histogram</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphAbsDiffHist" class="ae-graph-canvas" width="600" height="160" aria-label="L minus R absolute histogram"></canvas>
+                        </div>
+                    </div>
+                    <div class="ae-graph-cell ae-graph-span-full">
+                        <span class="ae-graph-label" data-i18n="ui.ae.graph_lissajous_label">Lissajous (L–R line trace)</span>
+                        <div class="ae-graph-canvas-wrap">
+                            <canvas id="aeGraphLissajous" class="ae-graph-canvas" width="600" height="160" aria-label="Lissajous"></canvas>
+                        </div>
+                    </div>
             </div>
         </div>
     </div>
@@ -10013,21 +10375,6 @@
                         <span class="settings-saved-msg" id="savedMsgPdfScanDirs"></span>
                     </div>
                 </div>
-                <div class="settings-row">
-                    <div class="settings-label">
-                        <span class="settings-title" data-i18n="ui.st.pdf_metadata_background_auto">Background PDF metadata (auto)</span>
-                        <span class="settings-desc"
-                              data-i18n="ui.sd.when_on_resolve_pdf_page_counts_in_the_background_wh">When on, resolve PDF page counts in the background while the PDF tab is open (including on launch if that tab is restored). When off, use Command Palette → Extract PDF metadata for a full pass; the table still shows values already in the database.</span>
-                    </div>
-                    <div class="settings-control">
-                        <button class="settings-toggle" data-action="settingTogglePdfMetadataAutoExtract" data-i18n-title="ui.tt.pdf_metadata_background_auto"
-                                id="settingPdfMetadataAutoExtract"
-                                title="Background PDF metadata extraction when this setting is on">
-                            <span class="settings-toggle-label" id="settingPdfMetadataAutoExtractLabel">On</span>
-                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-                        </button>
-                    </div>
-                </div>
             </div>
 
             <div class="settings-section" data-section="performance">
@@ -10078,6 +10425,40 @@
                                    type="range"
                                    value="4">
                             <span class="settings-range-value" id="settingThreadMultiplierValue">4x</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.batch_analysis_threads">BPM/Key/LUFS batch threads</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.batch_analysis_threads">Rayon workers per background analysis batch (1–16). Lower leaves more CPU for playback. Applies on the next batch.</span>
+                    </div>
+                    <div class="settings-control">
+                        <div class="settings-range-wrap">
+                            <input class="settings-range" data-action="settingBatchAnalysisThreads" data-i18n-title="ui.tt.batch_analysis_threads" id="settingBatchAnalysisThreads" max="16"
+                                   min="1" step="1" title="Threads per BPM/Key/LUFS batch"
+                                   type="range"
+                                   value="4">
+                            <span class="settings-range-value" id="settingBatchAnalysisThreadsValue">4</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.content_dup_hash_threads">Byte-duplicate hash threads</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.content_dup_hash_threads">Rayon workers for SHA-256 duplicate chunks (1–32). Separate from the global scan pool. Applies on the next scan.</span>
+                    </div>
+                    <div class="settings-control">
+                        <div class="settings-range-wrap">
+                            <input class="settings-range" data-action="settingContentDupHashThreads" data-i18n-title="ui.tt.content_dup_hash_threads" id="settingContentDupHashThreads" max="32"
+                                   min="1" step="1" title="Threads for byte-duplicate hashing"
+                                   type="range"
+                                   value="8">
+                            <span class="settings-range-value" id="settingContentDupHashThreadsValue">8</span>
                         </div>
                     </div>
                 </div>
@@ -10775,6 +11156,116 @@
                         </button>
                     </div>
                 </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title" data-i18n="ui.st.auto_kvr_check_on_startup">KVR check on startup</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.auto_kvr_check_on_startup">When on, run one plugin update check after the app loads the plugin database (separate from “after auto-scan”). Default off.</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingToggleAutoCheckUpdatesOnStartup" data-i18n-title="ui.tt.auto_kvr_check_on_startup"
+                                id="settingAutoCheckUpdatesOnStartup"
+                                title="Run KVR plugin update check once when the app finishes startup load">
+                            <span class="settings-toggle-label" id="settingAutoCheckUpdatesOnStartupLabel">Off</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.auto_analyze_on_startup">Background analysis (auto)</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.automatically_run_bpm_key_lufs_analysis_on_startup">When on, run BPM/Key/LUFS batches as the library loads and scans complete. Default off — use Run analysis for manual runs.</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingToggleAutoAnalysis" data-i18n-title="ui.tt.automatically_analyze_bpm_key_lufs_on_startup"
+                                id="settingAutoAnalysis"
+                                title="Enable automatic background BPM/Key/LUFS batch analysis">
+                            <span class="settings-toggle-label" id="settingAutoAnalysisLabel">Off</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.auto_content_dup_on_startup">Byte-duplicate scan (auto)</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.auto_content_dup_on_startup">When on, start the SHA-256 byte-duplicate scan after the app finishes loading library counts (default off).</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingToggleAutoContentDupScan" data-i18n-title="ui.tt.auto_content_dup_on_startup"
+                                id="settingAutoContentDupScan"
+                                title="Run byte-duplicate scan automatically on launch">
+                            <span class="settings-toggle-label" id="settingAutoContentDupScanLabel">Off</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.auto_fingerprint_cache_on_startup">Fingerprint cache (auto)</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.auto_fingerprint_cache_on_startup">When on, start fingerprint cache build for the audio library after load (CPU-heavy; default off).</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingToggleAutoFingerprintCache" data-i18n-title="ui.tt.auto_fingerprint_cache_on_startup"
+                                id="settingAutoFingerprintCache"
+                                title="Build fingerprint cache automatically on launch">
+                            <span class="settings-toggle-label" id="settingAutoFingerprintCacheLabel">Off</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.auto_pdf_scan_on_startup">PDF scan (auto)</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.auto_pdf_scan_on_startup">When on and PDF scan roots are configured, run Scan PDFs once at launch if the indexed PDF count is zero (default off).</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingToggleAutoPdfScanOnStartup" data-i18n-title="ui.tt.auto_pdf_scan_on_startup"
+                                id="settingAutoPdfScanOnStartup"
+                                title="Automatically scan for PDFs on launch when the library is empty">
+                            <span class="settings-toggle-label" id="settingAutoPdfScanOnStartupLabel">Off</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.auto_pdf_metadata_on_startup">PDF metadata (auto on launch)</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.auto_pdf_metadata_on_startup">When on, start a full background PDF page-count pass once after startup (independent of the PDF tab). Default off.</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingToggleAutoPdfMetadataOnStartup" data-i18n-title="ui.tt.auto_pdf_metadata_on_startup"
+                                id="settingAutoPdfMetadataOnStartup"
+                                title="Start PDF metadata extraction automatically once after app launch">
+                            <span class="settings-toggle-label" id="settingAutoPdfMetadataOnStartupLabel">Off</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
+                        <span class="settings-title" data-i18n="ui.st.pdf_metadata_background_auto">Background PDF metadata (auto)</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.when_on_resolve_pdf_page_counts_in_the_background_wh">When on, resolve PDF page counts in the background while the PDF tab is open (including on launch if that tab is restored). When off, use Command Palette → Start PDF metadata for a full pass; the table still shows values already in the database.</span>
+                    </div>
+                    <div class="settings-control">
+                        <button class="settings-toggle" data-action="settingTogglePdfMetadataAutoExtract" data-i18n-title="ui.tt.pdf_metadata_background_auto"
+                                id="settingPdfMetadataAutoExtract"
+                                title="Background PDF metadata extraction when this setting is on">
+                            <span class="settings-toggle-label" id="settingPdfMetadataAutoExtractLabel">On</span>
+                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="settings-section" data-section="visualizer-settings">
@@ -10796,6 +11287,25 @@
                 </div>
                 <div class="settings-row">
                     <div class="settings-label">
+                        <span class="settings-title" data-i18n="ui.st.snapshot_export_dir">Snapshot export folder</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.snapshot_export_dir">PNG snapshots from the Visualizer tab and Audio Engine graphs save here when set. Leave empty to use the default download location.</span>
+                    </div>
+                    <div class="settings-control" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;max-width:100%;">
+                        <input type="text" id="settingSnapshotExportDir" data-i18n-title="ui.tt.snapshot_export_dir"
+                               placeholder="/path/to/snapshots"
+                               style="flex:1 1 240px;min-width:120px;max-width:100%;padding:8px 10px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:13px;box-sizing:border-box;"
+                               title="Folder for PNG snapshot exports"/>
+                        <button class="btn btn-secondary btn-settings-action" type="button" data-action="browseSnapshotExportDir"
+                                data-i18n="ui.btn.browse" data-i18n-title="ui.tt.snapshot_export_dir_browse">Browse</button>
+                        <button class="btn btn-secondary btn-settings-action" type="button" data-action="saveSnapshotExportDir"
+                                data-i18n="ui.btn.save" data-i18n-title="ui.tt.snapshot_export_dir_save">Save</button>
+                        <button class="btn btn-secondary btn-settings-action" type="button" data-action="clearSnapshotExportDir"
+                                data-i18n="ui.btn.clear" data-i18n-title="ui.tt.snapshot_export_dir_clear">Clear</button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label">
                         <span class="settings-title" data-i18n="ui.st.waveform_cache_size">Waveform Cache Size</span>
                         <span class="settings-desc" data-i18n="ui.sd.max_cached_waveforms_in_memory_higher_more_ram">Max cached waveforms in memory (higher = more RAM)</span>
                     </div>
@@ -10807,22 +11317,6 @@
                                    value="500">
                             <span class="settings-range-value" id="settingWfCacheMaxValue">500</span>
                         </div>
-                    </div>
-                </div>
-                <div class="settings-row">
-                    <div class="settings-label">
-                        <span class="settings-title"
-                              data-i18n="ui.st.auto_analyze_on_startup">Background analysis (auto)</span>
-                        <span class="settings-desc"
-                              data-i18n="ui.sd.automatically_run_bpm_key_lufs_analysis_on_startup">When on, run BPM/Key/LUFS batches as the library loads and scans complete. Default off — use Run analysis for manual runs.</span>
-                    </div>
-                    <div class="settings-control">
-                        <button class="settings-toggle" data-action="settingToggleAutoAnalysis" data-i18n-title="ui.tt.automatically_analyze_bpm_key_lufs_on_startup"
-                                id="settingAutoAnalysis"
-                                title="Enable automatic background BPM/Key/LUFS batch analysis">
-                            <span class="settings-toggle-label" id="settingAutoAnalysisLabel">Off</span>
-                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-                        </button>
                     </div>
                 </div>
                 <div class="settings-row">
@@ -11042,6 +11536,25 @@
                         </button>
                     </div>
                 </div>
+                <div class="settings-row settings-cache-bpm-wrap">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.content_dup_scan">Byte duplicate scan</span>
+                        <span class="settings-desc" data-i18n="ui.sd.content_dup_scan">SHA-256 scan for byte-identical files (same controls as the Duplicates modal — runs in the background)</span>
+                    </div>
+                    <div class="settings-cache-bpm-btns">
+                        <button class="btn btn-secondary btn-settings-action" data-action="runContentDupScan"
+                                data-i18n="ui.btn.run_content_dup_scan"
+                                data-i18n-title="ui.tt.run_content_dup_scan" style="font-size:10px;"
+                                title="Start byte-duplicate scan">Run scan
+                        </button>
+                        <button class="btn btn-stop btn-settings-action" data-action="stopContentDupScan"
+                                data-i18n="ui.btn.stop_content_dup_scan"
+                                data-i18n-title="ui.tt.stop_content_dup_scan" style="font-size:10px;"
+                                title="Stop byte-duplicate scan (after the current hash chunk)">Stop scan
+                        </button>
+                    </div>
+                </div>
                 <div style="display:flex;gap:6px;">
                     <button class="btn btn-stop btn-settings-action" data-action="settingClearAnalysisCache"
                             data-i18n="ui.btn.clear_all_caches" data-i18n-title="ui.tt.clear_all_caches_at_once"
@@ -11110,53 +11623,81 @@
 
     <div class="status-bar" id="statusBar">
         <div class="status-bar-inner">
-            <span class="status-spinner"></span>
+            <span class="status-spinner" aria-hidden="true"></span>
             <span class="status-text" id="statusText"></span>
         </div>
         <span class="status-stats" id="statusStats"></span>
+        <div class="status-bar-bg-job-cluster" data-stat-key="bg_jobs">
+            <div class="status-bg-job-row" id="bgAnalysisBadgeRow">
+                <span class="status-spinner status-bg-job-spinner" aria-hidden="true"></span>
+                <span class="stats-bg-job-item stat-bg-job-badge" data-i18n-title="ui.tt.background_bpm_key_analysis_progress" id="bgAnalysisBadge"
+                      title="Background BPM/Key/LUFS analysis progress"></span>
+            </div>
+            <div class="status-bg-job-row" id="bgContentDupBadgeRow">
+                <span class="status-spinner status-bg-job-spinner" aria-hidden="true"></span>
+                <span class="stats-bg-job-item stat-bg-job-badge" data-i18n-title="ui.tt.background_content_dup_scan" id="bgContentDupBadge"
+                      title=""></span>
+            </div>
+            <div class="status-bg-job-row" id="bgPdfMetaBadgeRow">
+                <span class="status-spinner status-bg-job-spinner" aria-hidden="true"></span>
+                <span class="stats-bg-job-item stat-bg-job-badge" data-i18n-title="ui.tt.background_pdf_metadata_badge" id="bgPdfMetaBadge"
+                      title=""></span>
+            </div>
+            <div class="status-bg-job-row" id="bgPdfScanBadgeRow">
+                <span class="status-spinner status-bg-job-spinner" aria-hidden="true"></span>
+                <span class="stats-bg-job-item stat-bg-job-badge" data-i18n-title="ui.tt.background_pdf_scan_badge" id="bgPdfScanBadge"
+                      title=""></span>
+            </div>
+            <div class="status-bg-job-row" id="bgFingerprintBadgeRow">
+                <span class="status-spinner status-bg-job-spinner" aria-hidden="true"></span>
+                <span class="stats-bg-job-item stat-bg-job-badge" data-i18n-title="ui.tt.background_fingerprint_badge" id="bgFingerprintBadge"
+                      title=""></span>
+            </div>
+        </div>
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=36526"></script>
-<script src="js/utils.js?v=36526"></script>
-<script src="js/ui-idle.js?v=36526"></script>
-<script src="js/ipc.js?v=36526"></script>
-<script src="js/tooltip-hover.js?v=36526"></script>
-<script src="js/drag-reorder.js?v=36526"></script>
-<script src="js/modal-drag.js?v=36526"></script>
-<script src="js/columns.js?v=36526"></script>
-<script src="js/notes.js?v=36526"></script>
-<script src="js/favorites.js?v=36526"></script>
-<script src="js/export.js?v=36526"></script>
-<script src="js/plugins.js?v=36526"></script>
-<script src="js/settings.js?v=36526"></script>
-<script src="js/history.js?v=36526"></script>
-<script src="js/kvr.js?v=36526"></script>
-<script src="js/audio.js?v=36526"></script>
-<script src="js/daw.js?v=36526"></script>
-<script src="js/disk-usage.js?v=36526"></script>
-<script src="js/presets.js?v=36526"></script>
-<script src="js/batch-select.js?v=36526"></script>
-<script src="js/native-file-drag.js?v=36526"></script>
-<script src="js/sort-persist.js?v=36526"></script>
-<script src="js/multi-filter.js?v=36526"></script>
-<script src="js/file-browser.js?v=36526"></script>
-<script src="js/duplicates.js?v=36526"></script>
-<script src="js/command-palette.js?v=36526"></script>
-<script src="js/xref.js?v=36526"></script>
-<script src="js/dep-graph.js?v=36526"></script>
-<script src="js/smart-playlists.js?v=36526"></script>
-<script src="js/heatmap-dashboard.js?v=36526"></script>
-<script src="js/midi.js?v=36526"></script>
-<script src="js/pdf.js?v=36526"></script>
-<script src="js/settings-search.js?v=36526"></script>
-<script src="js/visualizer.js?v=36526"></script>
-<script src="js/walker-status.js?v=36526"></script>
-<script src="js/audio-engine.js?v=36526"></script>
-<script src="js/context-menu.js?v=36526"></script>
-<script src="js/shortcuts.js?v=36526"></script>
-<script src="js/help-overlay.js?v=36526"></script>
-<script src="js/keyboard-nav.js?v=36526"></script>
-<script src="js/app.js?v=36526"></script>
+<script src="js/i18n-ui.js?v=99679"></script>
+<script src="js/utils.js?v=99679"></script>
+<script src="js/ui-idle.js?v=99679"></script>
+<script src="js/ipc.js?v=99679"></script>
+<script src="js/tooltip-hover.js?v=99679"></script>
+<script src="js/drag-reorder.js?v=99679"></script>
+<script src="js/modal-drag.js?v=99679"></script>
+<script src="js/columns.js?v=99679"></script>
+<script src="js/notes.js?v=99679"></script>
+<script src="js/favorites.js?v=99679"></script>
+<script src="js/export.js?v=99679"></script>
+<script src="js/plugins.js?v=99679"></script>
+<script src="js/settings.js?v=99679"></script>
+<script src="js/history.js?v=99679"></script>
+<script src="js/kvr.js?v=99679"></script>
+<script src="js/graph-freeze.js?v=99679"></script>
+<script src="js/audio.js?v=99679"></script>
+<script src="js/daw.js?v=99679"></script>
+<script src="js/disk-usage.js?v=99679"></script>
+<script src="js/presets.js?v=99679"></script>
+<script src="js/batch-select.js?v=99679"></script>
+<script src="js/native-file-drag.js?v=99679"></script>
+<script src="js/sort-persist.js?v=99679"></script>
+<script src="js/multi-filter.js?v=99679"></script>
+<script src="js/file-browser.js?v=99679"></script>
+<script src="js/duplicates.js?v=99679"></script>
+<script src="js/command-palette.js?v=99679"></script>
+<script src="js/xref.js?v=99679"></script>
+<script src="js/dep-graph.js?v=99679"></script>
+<script src="js/smart-playlists.js?v=99679"></script>
+<script src="js/heatmap-dashboard.js?v=99679"></script>
+<script src="js/midi.js?v=99679"></script>
+<script src="js/pdf.js?v=99679"></script>
+<script src="js/settings-search.js?v=99679"></script>
+<script src="js/visualizer.js?v=99679"></script>
+<script src="js/walker-status.js?v=99679"></script>
+<script src="js/audio-engine.js?v=99679"></script>
+<script src="js/context-menu.js?v=99679"></script>
+<script src="js/shortcuts.js?v=99679"></script>
+<script src="js/help-overlay.js?v=99679"></script>
+<script src="js/keyboard-nav.js?v=99679"></script>
+<script src="js/app.js?v=99679"></script>
 </body>
 </html>

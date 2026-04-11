@@ -1170,18 +1170,87 @@ document.addEventListener('contextmenu', (e) => {
             return;
         }
 
-        // ── Audio Engine tab — parametric EQ canvas / resize handle (same `fftAnimationPaused` pref as mini FFT)
+        // ── Audio Engine tab — output diagnostic graphs (same baseline as Visualizer tiles: export PNG, copy label, freeze)
+        const aeDiagCell =
+            typeof e.target.closest === 'function' && e.target.closest('#tabAudioEngine')
+                ? e.target.closest('.ae-graph-cell')
+                : null;
+        if (aeDiagCell) {
+            const cEl = aeDiagCell.querySelector('canvas.ae-graph-canvas');
+            const label =
+                aeDiagCell.querySelector('.ae-graph-label')?.textContent?.trim()
+                || cEl?.getAttribute('aria-label')
+                || (cEl?.id ? cEl.id : appFmt('ui.ae.graphs_heading'));
+            const cid = cEl && cEl.id ? cEl.id : '';
+            const gf =
+                typeof window.aeCanvasIdToGraphFreezeId === 'function' ? window.aeCanvasIdToGraphFreezeId(cid) : null;
+            const animOn = !(gf && typeof window.isGraphFrozen === 'function' && window.isGraphFrozen(gf));
+            const items = [
+                {
+                    icon: '&#128247;',
+                    label: appFmt('menu.export_snapshot_png'),
+                    action: () => {
+                        if (!cEl || typeof exportCanvasSnapshotPng !== 'function') return;
+                        void exportCanvasSnapshotPng(cEl, label);
+                    },
+                    disabled: !cEl,
+                },
+                {
+                    icon: '&#128203;',
+                    label: appFmt('menu.copy_tile_name'),
+                    ..._noEcho,
+                    ...shortcutTip('copyPath'),
+                    action: () => typeof copyToClipboard === 'function' && copyToClipboard(label),
+                },
+                '---',
+                {
+                    icon: animOn ? '&#10003;' : '&#9634;',
+                    label: animOn ? appFmt('menu.viz_graph_freeze') : appFmt('menu.viz_graph_unfreeze'),
+                    action: () => {
+                        if (gf && typeof window.toggleGraphFrozen === 'function') window.toggleGraphFrozen(gf);
+                    },
+                    ..._noEcho,
+                },
+            ];
+            showContextMenu(e, items);
+            return;
+        }
+
+        // ── Audio Engine tab — parametric EQ canvas / resize handle (`ae:eq`)
         const onAeEqFft = e.target.closest('#aeEqCanvas, #aeEqCanvasWrap, #aeEqCanvasResizeHandle');
         if (onAeEqFft && e.target.closest('#tabAudioEngine')) {
-            const animOn = !(typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused());
-            const items = [{
-                icon: animOn ? '&#10003;' : '&#9634;',
-                label: appFmt('menu.viz_fft_animate'),
-                action: () => {
-                    if (typeof window.toggleFftAnimationPaused === 'function') window.toggleFftAnimationPaused();
+            const G = typeof window.GRAPH_FREEZE_ID !== 'undefined' ? window.GRAPH_FREEZE_ID : null;
+            const gf = G && G.AE_EQ ? G.AE_EQ : 'ae:eq';
+            const animOn = !(typeof window.isGraphFrozen === 'function' && window.isGraphFrozen(gf));
+            const eqCanvas = document.getElementById('aeEqCanvas');
+            const eqLabel = appFmt('ui.ae.eq_rack_label');
+            const items = [
+                {
+                    icon: '&#128247;',
+                    label: appFmt('menu.export_snapshot_png'),
+                    action: () => {
+                        if (!eqCanvas || typeof exportCanvasSnapshotPng !== 'function') return;
+                        void exportCanvasSnapshotPng(eqCanvas, eqLabel);
+                    },
+                    disabled: !eqCanvas,
                 },
-                ..._noEcho,
-            }];
+                {
+                    icon: '&#128203;',
+                    label: appFmt('menu.copy_tile_name'),
+                    ..._noEcho,
+                    ...shortcutTip('copyPath'),
+                    action: () => typeof copyToClipboard === 'function' && copyToClipboard(eqLabel),
+                },
+                '---',
+                {
+                    icon: animOn ? '&#10003;' : '&#9634;',
+                    label: animOn ? appFmt('menu.viz_graph_freeze') : appFmt('menu.viz_graph_unfreeze'),
+                    action: () => {
+                        if (typeof window.toggleGraphFrozen === 'function') window.toggleGraphFrozen(gf);
+                    },
+                    ..._noEcho,
+                },
+            ];
             showContextMenu(e, items);
             return;
         }
@@ -1194,7 +1263,12 @@ document.addEventListener('contextmenu', (e) => {
             const isPlaying = audioPlayerPath && (typeof isAudioPlaying === 'function' ? isAudioPlaying() : !audioPlayer.paused);
             const isExpanded = player.classList.contains('expanded');
             const items = [];
-            const onMiniFft = typeof e.target.closest === 'function' && e.target.closest('#npFftCanvas');
+            const onMiniFft =
+                typeof e.target.closest === 'function' &&
+                (e.target.closest('#npFftCanvas') || e.target.closest('#npVisualizer'));
+            const onNpEqFft =
+                typeof e.target.closest === 'function' &&
+                e.target.closest('#npEqCanvas, #npEqCanvasWrap, #npEqCanvasResizeHandle');
             if (audioPlayerPath) {
                 items.push({
                     icon: isPlaying ? '&#9646;&#9646;' : '&#9654;',
@@ -1208,12 +1282,28 @@ document.addEventListener('contextmenu', (e) => {
                 });
             }
             if (onMiniFft) {
-                const animOn = !(typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused());
+                const G = typeof window.GRAPH_FREEZE_ID !== 'undefined' ? window.GRAPH_FREEZE_ID : null;
+                const gf = G && G.NP_FFT ? G.NP_FFT : 'np:fft';
+                const animOn = !(typeof window.isGraphFrozen === 'function' && window.isGraphFrozen(gf));
                 items.push({
                     icon: animOn ? '&#10003;' : '&#9634;',
                     label: appFmt('menu.viz_fft_animate'),
                     action: () => {
-                        if (typeof window.toggleFftAnimationPaused === 'function') window.toggleFftAnimationPaused();
+                        if (typeof window.toggleGraphFrozen === 'function') window.toggleGraphFrozen(gf);
+                    },
+                    ..._noEcho,
+                });
+                items.push('---');
+            }
+            if (onNpEqFft) {
+                const G = typeof window.GRAPH_FREEZE_ID !== 'undefined' ? window.GRAPH_FREEZE_ID : null;
+                const gf = G && G.NP_EQ ? G.NP_EQ : 'np:eq';
+                const animOn = !(typeof window.isGraphFrozen === 'function' && window.isGraphFrozen(gf));
+                items.push({
+                    icon: animOn ? '&#10003;' : '&#9634;',
+                    label: appFmt('menu.viz_fft_animate'),
+                    action: () => {
+                        if (typeof window.toggleGraphFrozen === 'function') window.toggleGraphFrozen(gf);
                     },
                     ..._noEcho,
                 });

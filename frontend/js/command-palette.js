@@ -312,22 +312,18 @@ function buildPaletteStaticItems() {
     }
     items.push({
         type: 'action', name: appFmt('menu.build_fingerprint_cache'), icon: '&#127925;', ...paletteShortcutTip('buildFingerprintCache'), action: () => {
-            void (async () => {
-                const paths = await fetchAudioLibraryPathsForFingerprint();
-                if (paths.length === 0) {
-                    showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error');
-                    return;
-                }
-                showToast(toastFmt('toast.fingerprint_building_n', {n: paths.length.toLocaleString()}), 4000);
-                const vu = window.vstUpdater;
-                if (!vu || typeof vu.buildFingerprintCache !== 'function') return;
-                try {
-                    const res = await vu.buildFingerprintCache(paths);
-                    showToast(toastFmt('toast.fingerprint_build_complete_n', {n: res.built.toLocaleString()}));
-                } catch (e) {
-                    showToast(toastFmt('toast.fingerprint_build_failed', {err: e.message || e}), 4000, 'error');
-                }
-            })();
+            if (typeof triggerStartFingerprintCacheBuild === 'function') void triggerStartFingerprintCacheBuild();
+        }
+    });
+    items.push({
+        type: 'action',
+        name: appFmt('menu.stop_fingerprint_cache'),
+        icon: '&#9632;',
+        ...paletteShortcutTip('stopFingerprintCache'),
+        action: () => {
+            const vu = window.vstUpdater;
+            if (!vu || typeof vu.stopFingerprintCache !== 'function') return;
+            void vu.stopFingerprintCache();
         }
     });
     if (typeof triggerBackgroundBpmKeyLufsAnalysis === 'function') {
@@ -348,10 +344,55 @@ function buildPaletteStaticItems() {
             action: () => triggerStopBackgroundBpmKeyLufsAnalysis()
         });
     }
+    if (typeof triggerStartBackgroundContentDupScan === 'function') {
+        items.push({
+            type: 'action',
+            name: appFmt('menu.start_content_dup_scan'),
+            icon: '&#128270;',
+            ...paletteShortcutTip('startContentDupScan'),
+            action: () => triggerStartBackgroundContentDupScan()
+        });
+    }
+    if (typeof triggerStopBackgroundContentDupScan === 'function') {
+        items.push({
+            type: 'action',
+            name: appFmt('menu.stop_content_dup_scan'),
+            icon: '&#9632;',
+            ...paletteShortcutTip('stopContentDupScan'),
+            action: () => triggerStopBackgroundContentDupScan()
+        });
+    }
     items.push({
-        type: 'action', name: appFmt('menu.check_updates'), icon: '&#9889;', ...paletteShortcutTip('checkUpdates'), action: () => {
+        type: 'action',
+        name: appFmt('menu.start_all_background_jobs'),
+        icon: '&#9654;',
+        ...paletteShortcutTip('startAllBackgroundJobs'),
+        action: () => {
+            if (typeof triggerStartAllBackgroundJobs === 'function') triggerStartAllBackgroundJobs();
+        }
+    });
+    items.push({
+        type: 'action',
+        name: appFmt('menu.stop_all_background_jobs'),
+        icon: '&#9632;',
+        ...paletteShortcutTip('stopAllBackgroundJobs'),
+        action: () => {
+            if (typeof triggerStopAllBackgroundJobs === 'function') triggerStopAllBackgroundJobs();
+        }
+    });
+    items.push({
+        type: 'action', name: appFmt('menu.start_kvr_update_check'), icon: '&#9889;', ...paletteShortcutTip('checkUpdates'), action: () => {
             showToast(toastFmt('toast.checking_updates'));
             typeof checkUpdates === 'function' && checkUpdates();
+        }
+    });
+    items.push({
+        type: 'action',
+        name: appFmt('menu.stop_kvr_update_check'),
+        icon: '&#9632;',
+        action: () => {
+            const vu = window.vstUpdater;
+            if (vu && typeof vu.stopUpdates === 'function') void vu.stopUpdates();
         }
     });
     items.push({
@@ -377,7 +418,6 @@ function buildPaletteStaticItems() {
     if (typeof showDepGraph === 'function') {
         items.push({
             type: 'action', name: appFmt('menu.dep_graph'), icon: '&#128200;', ...paletteShortcutTip('depGraph'), action: () => {
-                showToast(toastFmt('toast.opening_dep_graph'));
                 showDepGraph();
             }
         });
@@ -535,6 +575,36 @@ function buildPaletteStaticItems() {
         icon: '&#127925;',
         ...paletteShortcutTip('toggleAutoAnalysis'),
         action: () => settingToggleAutoAnalysis()
+    });
+    if (typeof settingToggleAutoContentDupScan === 'function') items.push({
+        type: 'toggle',
+        name: appFmt('menu.toggle_auto_content_dup_startup'),
+        icon: '&#128270;',
+        action: () => settingToggleAutoContentDupScan()
+    });
+    if (typeof settingToggleAutoFingerprintCache === 'function') items.push({
+        type: 'toggle',
+        name: appFmt('menu.toggle_auto_fingerprint_cache_startup'),
+        icon: '&#127925;',
+        action: () => settingToggleAutoFingerprintCache()
+    });
+    if (typeof settingToggleAutoPdfScanOnStartup === 'function') items.push({
+        type: 'toggle',
+        name: appFmt('menu.toggle_auto_pdf_scan_startup'),
+        icon: '&#128196;',
+        action: () => settingToggleAutoPdfScanOnStartup()
+    });
+    if (typeof settingToggleAutoPdfMetadataOnStartup === 'function') items.push({
+        type: 'toggle',
+        name: appFmt('menu.toggle_auto_pdf_metadata_on_startup'),
+        icon: '&#128196;',
+        action: () => settingToggleAutoPdfMetadataOnStartup()
+    });
+    if (typeof settingToggleAutoCheckUpdatesOnStartup === 'function') items.push({
+        type: 'toggle',
+        name: appFmt('menu.toggle_auto_kvr_check_on_startup'),
+        icon: '&#9889;',
+        action: () => settingToggleAutoCheckUpdatesOnStartup()
     });
     if (typeof settingToggleAutoScan === 'function') items.push({
         type: 'toggle',

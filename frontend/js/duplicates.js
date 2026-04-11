@@ -35,6 +35,112 @@ function formatDupBytes(n) {
     return `${(n / 1024 ** i).toFixed(1)} ${u[i]}`;
 }
 
+// ── Background byte-duplicate (SHA-256) scan: same stop-between-chunks idea as BPM batches ──
+let _contentDupRunning = false;
+let _contentDupUnlisten = null;
+let _contentDupLastProgress = null;
+
+function _shouldUpdateContentDupBadgeUi() {
+    return !(typeof isUiIdleHeavyCpu === 'function' && isUiIdleHeavyCpu());
+}
+
+function setContentDupBadgeWorking() {
+    const badge = document.getElementById('bgContentDupBadge');
+    if (!badge || !_shouldUpdateContentDupBadgeUi()) return;
+    badge.textContent = formatBgJobBadgeLine('contentDup', 'ui.stats.content_dup_bg_working');
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+}
+
+function applyContentDupProgressPayload(pl) {
+    _contentDupLastProgress = pl;
+    const status = document.getElementById('dupContentStatus');
+    if (
+        status &&
+        pl &&
+        pl.done != null &&
+        pl.total != null &&
+        Number.isFinite(pl.total)
+    ) {
+        status.textContent = catalogFmt('ui.dup.content_progress', {
+            done: pl.done,
+            total: pl.total
+        });
+    }
+    const badge = document.getElementById('bgContentDupBadge');
+    if (
+        badge &&
+        pl &&
+        pl.done != null &&
+        pl.total != null &&
+        Number.isFinite(pl.total)
+    ) {
+        if (!_shouldUpdateContentDupBadgeUi()) {
+            if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+            return;
+        }
+        badge.textContent = formatBgJobBadgeLine('contentDup', 'ui.stats.content_dup_bg_progress', {
+            done: pl.done,
+            total: pl.total
+        });
+    }
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+}
+
+function clearContentDupBadge() {
+    _contentDupLastProgress = null;
+    const badge = document.getElementById('bgContentDupBadge');
+    if (!badge) return;
+    badge.textContent = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+}
+
+async function ensureContentDupProgressListener() {
+    if (_contentDupUnlisten || !window.__TAURI__?.event?.listen) return;
+    _contentDupUnlisten = await window.__TAURI__.event.listen('content-dup-progress', (e) => {
+        applyContentDupProgressPayload(e.payload);
+    });
+}
+
+function teardownContentDupProgressListener() {
+    if (typeof _contentDupUnlisten === 'function') {
+        try {
+            _contentDupUnlisten();
+        } catch {
+            /* ignore */
+        }
+    }
+    _contentDupUnlisten = null;
+}
+
+function setContentDupButtonsRunning(running) {
+    const scan = document.getElementById('dupContentScanBtn');
+    const stop = document.getElementById('dupContentStopBtn');
+    if (scan) scan.disabled = running;
+    if (stop) stop.disabled = !running;
+}
+
+document.addEventListener('ui-idle-heavy-cpu', (ev) => {
+    try {
+        if (!ev.detail || ev.detail.idle !== false) return;
+        if (!_contentDupRunning) return;
+        const badge = document.getElementById('bgContentDupBadge');
+        if (!badge) return;
+        const pl = _contentDupLastProgress;
+        if (pl && pl.done != null && pl.total != null && Number.isFinite(pl.total)) {
+            if (!_shouldUpdateContentDupBadgeUi()) return;
+            badge.textContent = formatBgJobBadgeLine('contentDup', 'ui.stats.content_dup_bg_progress', {
+                done: pl.done,
+                total: pl.total
+            });
+        } else {
+            setContentDupBadgeWorking();
+        }
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    } catch {
+        /* ignore */
+    }
+});
+
 function buildNameDuplicateSections() {
     const results = [];
 
@@ -154,28 +260,58 @@ function renderNameDupBody(results) {
 function renderContentDupPlaceholder() {
     const hint = catalogFmt('ui.dup.content_hint');
     const btn = catalogFmt('ui.dup.content_scan_btn');
-    return `<p class="dup-content-hint" style="color:var(--text-muted);font-size:12px;margin-bottom:12px;">${escapeHtml(
-        hint
-    )}</p>
-    <button type="button" class="cyber-btn" data-action="dupContentScan" id="dupContentScanBtn">${escapeHtml(
+    const stopLabel = catalogFmt('ui.dup.content_stop_btn');
+    const stopTt = escapeHtml(catalogFmt('ui.tt.content_dup_stop'));
+    return `<p class="dup-content-hint">${escapeHtml(hint)}</p>
+    <div class="dup-content-actions">
+    <button type="button" class="btn btn-secondary" data-action="dupContentScan" id="dupContentScanBtn">${escapeHtml(
         btn
     )}</button>
+    <button type="button" class="btn btn-stop" data-action="dupContentStop" id="dupContentStopBtn" disabled title="${stopTt}">${escapeHtml(
+        stopLabel
+    )}</button>
+    </div>
     <p id="dupContentStatus" style="margin-top:12px;font-size:12px;color:var(--text-muted);"></p>
     <div id="dupContentResults"></div>`;
 }
 
 function renderContentDupResults(payload) {
-    if (!payload || !payload.groups || payload.groups.length === 0) {
-        const empty = catalogFmt('ui.dup.content_empty');
-        return `<p class="state-message" style="padding:12px 0;">${escapeHtml(empty)}</p>`;
+    if (!payload) {
+        return `<p class="state-message" style="padding:12px 0;">${escapeHtml(catalogFmt('ui.dup.content_err'))}</p>`;
     }
-    let html = '';
+    const cancelledNote =
+        payload.cancelled && payload.groups && payload.groups.length > 0
+            ? `<p class="dup-summary" style="margin-bottom:8px;color:var(--text-muted);">${escapeHtml(
+                  catalogFmt('ui.dup.content_cancelled_note', {
+                      done: payload.files_hashed ?? 0,
+                      total: payload.candidates_total ?? 0
+                  })
+              )}</p>`
+            : '';
+    if (!payload.groups || payload.groups.length === 0) {
+        const emptyKey = payload.cancelled ? 'ui.dup.content_empty_cancelled' : 'ui.dup.content_empty';
+        let extra = '';
+        if (payload.cancelled && (payload.candidates_total > 0 || (payload.files_hashed ?? 0) > 0)) {
+            extra = `<p style="color:var(--text-muted);font-size:12px;margin-top:8px;">${escapeHtml(
+                catalogFmt('ui.dup.content_cancelled_progress', {
+                    done: payload.files_hashed ?? 0,
+                    total: payload.candidates_total ?? 0
+                })
+            )}</p>`;
+        }
+        return `<p class="state-message" style="padding:12px 0;">${escapeHtml(catalogFmt(emptyKey))}</p>${extra}`;
+    }
+    let html = cancelledNote;
     const skippedPart =
         payload.skipped > 0 ? catalogFmt('ui.dup.skipped_suffix', {n: payload.skipped}) : '';
+    const zeroPart =
+        payload.skipped_zero_stored_size > 0
+            ? catalogFmt('ui.dup.skipped_zero_suffix', {n: payload.skipped_zero_stored_size})
+            : '';
     const sum = catalogFmt('ui.dup.content_summary', {
         groups: payload.groups.length,
         files: payload.files_hashed || 0,
-        skipped: skippedPart
+        skipped: skippedPart + zeroPart
     });
     html += `<p class="dup-summary" style="margin-bottom:12px;">${escapeHtml(sum)}</p>`;
     for (const g of payload.groups.slice(0, 100)) {
@@ -204,7 +340,9 @@ function switchDupTab(which) {
     const contentPanel = modal.querySelector('#dupPanelContent');
     const tabs = modal.querySelectorAll('[data-dup-tab]');
     tabs.forEach(t => {
-        t.classList.toggle('dup-tab-active', t.dataset.dupTab === which);
+        const on = t.dataset.dupTab === which;
+        t.classList.toggle('dup-tab-active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     if (namePanel) namePanel.style.display = which === 'name' ? '' : 'none';
     if (contentPanel) contentPanel.style.display = which === 'content' ? '' : 'none';
@@ -220,16 +358,18 @@ function showDuplicateReport() {
     const title = catalogFmt('menu.find_duplicates');
 
     const html = `<div class="modal-overlay" id="dupModal" data-action-modal="closeDup">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>${escapeHtml(title)}</h2>
-        <div class="dup-tab-strip" style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;">
-          <button type="button" class="cyber-btn dup-tab-btn dup-tab-active" data-dup-tab="name">${escapeHtml(
+    <div class="modal-content dup-modal-content">
+      <div class="modal-header dup-modal-header">
+        <div class="dup-header-main">
+          <h2>${escapeHtml(title)}</h2>
+          <div class="dup-tab-strip" role="tablist">
+            <button type="button" class="dup-tab-btn dup-tab-active" data-dup-tab="name" role="tab" aria-selected="true">${escapeHtml(
         tabName
     )}</button>
-          <button type="button" class="cyber-btn dup-tab-btn" data-dup-tab="content">${escapeHtml(
+            <button type="button" class="dup-tab-btn" data-dup-tab="content" role="tab" aria-selected="false">${escapeHtml(
         tabContent
     )}</button>
+          </div>
         </div>
         <button class="modal-close" data-action-modal="closeDup" title="Close">&#10005;</button>
       </div>
@@ -239,59 +379,105 @@ function showDuplicateReport() {
       </div>
     </div></div>`;
     document.body.insertAdjacentHTML('beforeend', html);
+    setContentDupButtonsRunning(_contentDupRunning);
+    if (_contentDupRunning) {
+        if (_contentDupLastProgress) {
+            applyContentDupProgressPayload(_contentDupLastProgress);
+        } else {
+            const st = document.getElementById('dupContentStatus');
+            if (st) st.textContent = catalogFmt('ui.dup.content_loading');
+        }
+    }
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
 }
 
-async function runContentDupScan() {
-    const status = document.getElementById('dupContentStatus');
-    const btn = document.getElementById('dupContentScanBtn');
-    const out = document.getElementById('dupContentResults');
+function triggerStopBackgroundContentDupScan() {
+    if (!_contentDupRunning) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.content_dup_not_running'), 2500);
+        }
+        return;
+    }
+    if (typeof window.vstUpdater?.cancelContentDuplicateScan === 'function') {
+        void window.vstUpdater.cancelContentDuplicateScan().catch(() => {});
+    }
+    if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+        showToast(toastFmt('toast.content_dup_stop_requested'), 3500);
+    }
+}
+
+function triggerStartBackgroundContentDupScan() {
+    void runContentDupScanInternal();
+}
+
+async function runContentDupScanInternal() {
+    if (_contentDupRunning) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.content_dup_already_running'), 3500);
+        }
+        return;
+    }
     if (typeof window.vstUpdater?.findContentDuplicates !== 'function') {
+        const status = document.getElementById('dupContentStatus');
         if (status) status.textContent = catalogFmt('ui.dup.content_err');
         return;
     }
-    if (btn) btn.disabled = true;
+
+    _contentDupRunning = true;
+    if (typeof window !== 'undefined') window.__statusBarContentDupJob = true;
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    setContentDupButtonsRunning(true);
+    const status = document.getElementById('dupContentStatus');
+    const out = document.getElementById('dupContentResults');
     if (status) status.textContent = catalogFmt('ui.dup.content_loading');
+    setContentDupBadgeWorking();
+
     if (typeof showToast === 'function' && typeof toastFmt === 'function') {
-        showToast(toastFmt('toast.content_dup_scanning'), 3500);
+        showToast(toastFmt('toast.content_dup_started'), 3500);
     }
 
-    let unlistenFn;
     try {
-        if (window.__TAURI__?.event?.listen) {
-            unlistenFn = await window.__TAURI__.event.listen('content-dup-progress', (e) => {
-                const pl = e.payload;
-                if (status && pl && pl.done != null && pl.total) {
-                    status.textContent = `${pl.done} / ${pl.total}`;
-                }
-            });
-        }
+        await ensureContentDupProgressListener();
         const res = await window.vstUpdater.findContentDuplicates();
         if (out) out.innerHTML = renderContentDupResults(res);
         if (status) status.textContent = '';
         if (typeof showToast === 'function' && typeof toastFmt === 'function' && res) {
-            showToast(
-                toastFmt('toast.content_dup_done', {
-                    groups: (res.groups || []).length,
-                    files: res.files_hashed || 0
-                }),
-                4000
-            );
+            if (res.cancelled) {
+                showToast(
+                    toastFmt('toast.content_dup_cancelled', {
+                        done: res.files_hashed ?? 0,
+                        total: res.candidates_total ?? 0,
+                        groups: (res.groups || []).length,
+                        files: res.files_hashed || 0
+                    }),
+                    4500
+                );
+            } else {
+                showToast(
+                    toastFmt('toast.content_dup_done', {
+                        groups: (res.groups || []).length,
+                        files: res.files_hashed || 0
+                    }),
+                    4000
+                );
+            }
         }
     } catch (e) {
         const msg = e && e.message ? e.message : String(e);
+        if (window.vstUpdater?.appendLog) {
+            window.vstUpdater.appendLog(`CONTENT DUP SCAN ERROR — UI invoke: ${msg}`);
+        }
         if (status) status.textContent = catalogFmt('ui.dup.content_err');
         if (typeof showToast === 'function' && typeof toastFmt === 'function') {
             showToast(toastFmt('toast.content_dup_failed', {err: msg}), 5000, 'error');
         }
     } finally {
-        if (typeof unlistenFn === 'function') {
-            try {
-                unlistenFn();
-            } catch {
-                /* ignore */
-            }
-        }
-        if (btn) btn.disabled = false;
+        teardownContentDupProgressListener();
+        clearContentDupBadge();
+        _contentDupRunning = false;
+        if (typeof window !== 'undefined') window.__statusBarContentDupJob = false;
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+        setContentDupButtonsRunning(false);
     }
 }
 
@@ -309,6 +495,9 @@ document.addEventListener('click', (e) => {
         switchDupTab(tab.dataset.dupTab);
     }
     if (e.target.closest('[data-action="dupContentScan"]')) {
-        runContentDupScan();
+        triggerStartBackgroundContentDupScan();
+    }
+    if (e.target.closest('[data-action="dupContentStop"]')) {
+        triggerStopBackgroundContentDupScan();
     }
 });

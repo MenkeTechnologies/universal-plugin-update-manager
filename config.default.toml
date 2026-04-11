@@ -40,6 +40,10 @@ pdfSort = "name"
 pageSize = "200"
 flushInterval = "100"
 threadMultiplier = "4"
+# Rayon workers per BPM/Key/LUFS batch IPC (1–16). Lower leaves more CPU for playback/UI.
+batchAnalysisThreads = "4"
+# Rayon workers for byte-duplicate SHA-256 chunks (1–32). Does not change the global scan thread pool.
+contentDupHashThreads = "8"
 channelBuffer = "512"
 batchSize = "100"
 # Extra read-only SQLite file handles for parallel queries (WAL). "auto" = min(CPU cores, 16), min 2. Or 0–32 explicit. Restart to apply.
@@ -56,6 +60,11 @@ verbosity = "normal"
 dock = "dock-br"
 # Frontend prefs key `autoplayNextSource`: "samples" (visible table rows) or "player" (recently played list). EOF autoplay cycles that list only.
 autoplayNextSource = "samples"
+
+[audioEngine]
+# Playback spectrum: JUCE FFT order 8–15 (256…32768 samples) or "off". Bands: 64…Nyquist or "max" — see Audio Engine tab selects (`#aePlaybackSpectrumFftOrder`, `#aePlaybackSpectrumBands`).
+playbackSpectrumFftOrder = "11"
+playbackSpectrumBands = "1024"
 
 [tabs]
 order = '["plugins","samples","daw","presets","favorites","history","settings"]'

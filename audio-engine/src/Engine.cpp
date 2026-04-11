@@ -913,6 +913,8 @@ public:
     std::atomic<uint64_t> phase{0};
     /** Optional: tap mono spectrum (test tone path; inserts apply to file playback only). */
     std::function<void(const float*, int)> spectrumPushBatch;
+    /** Optional: stereo tap after DSP + inserts + mono fold (what reaches the device). */
+    std::function<void(const float*, const float*, int)> scopePushBatch;
 
     void prepareToPlay(int, double sampleRate) override { sr = sampleRate; }
     void releaseResources() override {}
@@ -946,6 +948,22 @@ public:
         phase.store(p);
         if (spectrumPushBatch)
             spectrumPushBatch(toneSpectrumMono.data(), n);
+        if (scopePushBatch)
+        {
+            thread_local std::vector<float> tl, tr;
+            if ((int) tl.size() < n)
+            {
+                tl.resize((size_t) n);
+                tr.resize((size_t) n);
+            }
+            for (int i = 0; i < n; ++i)
+            {
+                const float s = toneSpectrumMono[(size_t) i];
+                tl[(size_t) i] = s;
+                tr[(size_t) i] = s;
+            }
+            scopePushBatch(tl.data(), tr.data(), n);
+        }
     }
 
 private:
@@ -968,6 +986,7 @@ public:
     std::atomic<float>* peak = nullptr;
     /** Filled after DSP + inserts (what reaches the device). */
     std::function<void(const float*, int)> spectrumPushBatch;
+    std::function<void(const float*, const float*, int)> scopePushBatch;
     juce::dsp::IIR::Filter<float> lowL, lowR, midL, midR, hiL, hiR;
     double processRate = 44100.0;
     InsertChainRunner* insertChain = nullptr;
@@ -1063,8 +1082,14 @@ public:
         if (reverseMode && reverseStereo.getNumChannels() >= 2 && reverseStereo.getNumSamples() > 0)
         {
             thread_local std::vector<float> revSpectrumMono;
+            thread_local std::vector<float> revScopeL, revScopeR;
             if (revSpectrumMono.size() < (size_t)n)
                 revSpectrumMono.resize((size_t)n);
+            if (revScopeL.size() < (size_t)n)
+            {
+                revScopeL.resize((size_t)n);
+                revScopeR.resize((size_t)n);
+            }
             const int frames = reverseStereo.getNumSamples();
             int specCount = 0;
             for (int i = 0; i < n; ++i)
@@ -1092,10 +1117,15 @@ public:
                     pk = juce::jmax(pk, std::abs(l), std::abs(r));
                     peak->store(pk);
                 }
-                revSpectrumMono[(size_t)specCount++] = (l + r) * 0.5f;
+                revSpectrumMono[(size_t) specCount] = (l + r) * 0.5f;
+                revScopeL[(size_t) specCount] = l;
+                revScopeR[(size_t) specCount] = r;
+                ++specCount;
             }
             if (spectrumPushBatch && specCount > 0)
                 spectrumPushBatch(revSpectrumMono.data(), specCount);
+            if (scopePushBatch && specCount > 0)
+                scopePushBatch(revScopeL.data(), revScopeR.data(), specCount);
             /* Reverse path is sample-wise; VST block processing skipped. */
             return;
         }
@@ -1159,18 +1189,28 @@ public:
             }
         }
 
-        if (spectrumPushBatch)
+        if (spectrumPushBatch || scopePushBatch)
         {
-            thread_local std::vector<float> fwdSpectrumMono;
+            thread_local std::vector<float> fwdSpectrumMono, fwdScopeL, fwdScopeR;
             if (fwdSpectrumMono.size() < (size_t)n)
                 fwdSpectrumMono.resize((size_t)n);
+            if (fwdScopeL.size() < (size_t)n)
+            {
+                fwdScopeL.resize((size_t)n);
+                fwdScopeR.resize((size_t)n);
+            }
             for (int i = 0; i < n; ++i)
             {
                 const float l = bufferToFill.buffer->getSample(0, bufferToFill.startSample + i);
                 const float r = bufferToFill.buffer->getSample(1, bufferToFill.startSample + i);
-                fwdSpectrumMono[(size_t)i] = (l + r) * 0.5f;
+                fwdSpectrumMono[(size_t) i] = (l + r) * 0.5f;
+                fwdScopeL[(size_t) i] = l;
+                fwdScopeR[(size_t) i] = r;
             }
-            spectrumPushBatch(fwdSpectrumMono.data(), n);
+            if (spectrumPushBatch)
+                spectrumPushBatch(fwdSpectrumMono.data(), n);
+            if (scopePushBatch)
+                scopePushBatch(fwdScopeL.data(), fwdScopeR.data(), n);
         }
     }
 };
@@ -1319,6 +1359,10 @@ struct Engine::Impl
     std::mutex spectrumRingMutex;
     std::deque<float> spectrumRing;
     static constexpr size_t kSpectrumRingMax = 32768;
+    std::mutex scopeRingMutex;
+    std::deque<float> scopeRingL;
+    std::deque<float> scopeRingR;
+    static constexpr size_t kScopeRingMax = 32768;
     std::unique_ptr<juce::dsp::FFT> spectrumFft;
     /** Last `juce::dsp::FFT` order passed to `spectrumFft` — recreate when `spectrum_fft_order` changes. */
     int spectrumFftPreparedOrder = -1;
@@ -1343,12 +1387,85 @@ struct Engine::Impl
         spectrumRing.clear();
     }
 
+    void pushScopeStereoBatch(const float* l, const float* r, int count)
+    {
+        if (count <= 0 || l == nullptr || r == nullptr)
+            return;
+        std::lock_guard<std::mutex> lk(scopeRingMutex);
+        for (int i = 0; i < count; ++i)
+        {
+            scopeRingL.push_back(l[i]);
+            scopeRingR.push_back(r[i]);
+            while (scopeRingL.size() > kScopeRingMax)
+            {
+                scopeRingL.pop_front();
+                scopeRingR.pop_front();
+            }
+        }
+    }
+
+    void clearScopeRing()
+    {
+        std::lock_guard<std::mutex> lk(scopeRingMutex);
+        scopeRingL.clear();
+        scopeRingR.clear();
+    }
+
+    /** Last `nSamp` stereo frames as u8 (128 =0) for oscilloscope / vectorscope in WebView. */
+    void appendPlaybackScopeJson(juce::DynamicObject* o, bool want, int nSamp)
+    {
+        if (o == nullptr)
+            return;
+        if (!want || !outputRunning)
+        {
+            o->setProperty("scope_l", juce::var());
+            o->setProperty("scope_r", juce::var());
+            o->setProperty("scope_len", 0);
+            return;
+        }
+        nSamp = juce::jlimit(64, 2048, nSamp);
+        std::vector<float> snapL, snapR;
+        {
+            std::lock_guard<std::mutex> lk(scopeRingMutex);
+            if (scopeRingL.size() < (size_t) nSamp || scopeRingR.size() < (size_t) nSamp)
+            {
+                o->setProperty("scope_l", juce::var());
+                o->setProperty("scope_r", juce::var());
+                o->setProperty("scope_len", 0);
+                return;
+            }
+            snapL.assign(scopeRingL.end() - (ptrdiff_t) nSamp, scopeRingL.end());
+            snapR.assign(scopeRingR.end() - (ptrdiff_t) nSamp, scopeRingR.end());
+        }
+        juce::Array<juce::var> arrL, arrR;
+        arrL.ensureStorageAllocated(nSamp);
+        arrR.ensureStorageAllocated(nSamp);
+        for (int i = 0; i < nSamp; ++i)
+        {
+            const float lf = juce::jlimit(-1.0f, 1.0f, snapL[(size_t) i]);
+            const float rf = juce::jlimit(-1.0f, 1.0f, snapR[(size_t) i]);
+            arrL.add((int) juce::jlimit(0, 255, (int) std::lround((double) lf * 127.5 + 128.0)));
+            arrR.add((int) juce::jlimit(0, 255, (int) std::lround((double) rf * 127.5 + 128.0)));
+        }
+        o->setProperty("scope_l", juce::var(arrL));
+        o->setProperty("scope_r", juce::var(arrR));
+        o->setProperty("scope_len", nSamp);
+    }
+
     void wireSpectrumCallbacks()
     {
         auto fn = [this](const float* m, int c) { pushSpectrumMonoBatch(m, c); };
         toneSource.spectrumPushBatch = fn;
         if (fileSource != nullptr)
             fileSource->spectrumPushBatch = fn;
+    }
+
+    void wireScopeCallbacks()
+    {
+        auto fn = [this](const float* l, const float* r, int c) { pushScopeStereoBatch(l, r, c); };
+        toneSource.scopePushBatch = fn;
+        if (fileSource != nullptr)
+            fileSource->scopePushBatch = fn;
     }
 
     void clearSpectrumCallbacks()
@@ -1358,15 +1475,23 @@ struct Engine::Impl
             fileSource->spectrumPushBatch = {};
     }
 
+    void clearScopeCallbacks()
+    {
+        toneSource.scopePushBatch = {};
+        if (fileSource != nullptr)
+            fileSource->scopePushBatch = {};
+    }
+
     /** Hann + real FFT → magnitudes (0–255) for WebView. Optional `spectrum: false` skips work (metadata only). */
     void appendPlaybackSpectrumJson(juce::DynamicObject* o, int fftOrder, int fftBinsOut, bool wantComputeSpectrum)
     {
         if (o == nullptr)
             return;
-        fftOrder = juce::jlimit(8, 12, fftOrder);
+        fftOrder = juce::jlimit(8, 15, fftOrder);
         const int fftSize = 1 << fftOrder;
-        const int maxBins = juce::jmax(64, fftSize / 2 - 1);
-        fftBinsOut = juce::jlimit(64, juce::jmin(1024, maxBins), fftBinsOut);
+        /* JUCE `performFrequencyOnlyForwardTransform` magnitudes sit at indices 0…N/2 (DC…Nyquist). */
+        const int maxBins = juce::jmax(64, fftSize / 2);
+        fftBinsOut = juce::jlimit(64, maxBins, fftBinsOut);
         const int srOut = outSampleRate > 0 ? outSampleRate : (int) deviceRate.load();
         if (!wantComputeSpectrum || !outputRunning)
         {
@@ -1401,18 +1526,30 @@ struct Engine::Impl
             spectrumFft = std::make_unique<juce::dsp::FFT>(fftOrder);
             spectrumFftPreparedOrder = fftOrder;
         }
-        if (!spectrumFft)
-            return;
         spectrumFft->performFrequencyOnlyForwardTransform(fftBuf.data(), true);
+        /* When `fftBinsOut` < full Nyquist span, take max magnitude per sub-band so the buffer still
+         * covers 20 Hz–Nyquist (UI log axis). Using only the first N raw FFT bins would squash everything
+         * into the low-frequency edge. */
+        std::vector<float> magScratch((size_t) fftBinsOut);
+        for (int j = 0; j < fftBinsOut; ++j)
+        {
+            const int i0 = 1 + (j * maxBins) / fftBinsOut;
+            int i1 = 1 + ((j + 1) * maxBins) / fftBinsOut;
+            if (i1 <= i0)
+                i1 = i0 + 1;
+            float gmax = 0.f;
+            for (int b = i0; b < i1 && b <= maxBins; ++b)
+                gmax = juce::jmax(gmax, fftBuf[(size_t) b]);
+            magScratch[(size_t) j] = gmax;
+        }
         float mx = 1.0e-9f;
-        for (int i = 1; i <= fftBinsOut; ++i)
-            mx = juce::jmax(mx, fftBuf[(size_t) i]);
+        for (int j = 0; j < fftBinsOut; ++j)
+            mx = juce::jmax(mx, magScratch[(size_t) j]);
         juce::Array<juce::var> arr;
         arr.ensureStorageAllocated(fftBinsOut);
         for (int i = 0; i < fftBinsOut; ++i)
         {
-            const int bi = 1 + i;
-            const float mag = fftBuf[(size_t) bi] / mx;
+            const float mag = magScratch[(size_t) i] / mx;
             arr.add((int) juce::jlimit(0, 255, (int) std::lround(mag * 255.0f)));
         }
         o->setProperty("spectrum", juce::var(arr));
@@ -2249,6 +2386,7 @@ struct Engine::Impl
         const juce::String prevId = outDeviceId;
         outputManager.removeAudioCallback(&sourcePlayer);
         clearSpectrumCallbacks();
+        clearScopeCallbacks();
         sourcePlayer.setSource(nullptr);
         transport.setSource(nullptr);
         transport.stop();
@@ -2256,6 +2394,7 @@ struct Engine::Impl
         fileSource.reset();
         outputManager.closeAudioDevice();
         clearSpectrumRing();
+        clearScopeRing();
         outputRunning = false;
         playbackMode = false;
         toneMode = false;
@@ -2318,7 +2457,9 @@ struct Engine::Impl
             toneSource.toneOn.store(false);
             sourcePlayer.setSource(&toneSource);
             clearSpectrumRing();
+            clearScopeRing();
             wireSpectrumCallbacks();
+            wireScopeCallbacks();
         }
         return okObj();
     }
@@ -2477,7 +2618,9 @@ struct Engine::Impl
 
         outputRunning = true;
         clearSpectrumRing();
+        clearScopeRing();
         wireSpectrumCallbacks();
+        wireScopeCallbacks();
 
         {
             const char* mode = startPlayback ? "playback" : (tone ? "tone" : "silence");
@@ -2582,17 +2725,23 @@ struct Engine::Impl
         int fftOrder = 11;
         if (req.hasProperty("spectrum_fft_order") && !req["spectrum_fft_order"].isVoid())
             fftOrder = (int) req["spectrum_fft_order"];
-        fftOrder = juce::jlimit(8, 12, fftOrder);
+        fftOrder = juce::jlimit(8, 15, fftOrder);
 
         int fftBinsOut = 1024;
         if (req.hasProperty("spectrum_bins") && !req["spectrum_bins"].isVoid())
             fftBinsOut = (int) req["spectrum_bins"];
-        fftBinsOut = juce::jlimit(64, 1024, fftBinsOut);
         {
             const int fs = 1 << fftOrder;
-            const int maxBins = juce::jmax(64, fs / 2 - 1);
-            fftBinsOut = juce::jmin(fftBinsOut, maxBins);
+            const int maxBins = juce::jmax(64, fs / 2);
+            fftBinsOut = juce::jlimit(64, maxBins, fftBinsOut);
         }
+
+        bool wantScope = false;
+        if (req.hasProperty("scope") && !req["scope"].isVoid())
+            wantScope = (bool) req["scope"];
+        int scopeSamples = 1024;
+        if (req.hasProperty("scope_samples") && !req["scope_samples"].isVoid())
+            scopeSamples = (int) req["scope_samples"];
 
         juce::var out = okObj();
         auto* o = out.getDynamicObject();
@@ -2602,6 +2751,7 @@ struct Engine::Impl
         {
             o->setProperty("loaded", false);
             appendPlaybackSpectrumJson(o, fftOrder, fftBinsOut, wantSpectrum);
+            appendPlaybackScopeJson(o, wantScope, scopeSamples);
             return out;
         }
         o->setProperty("loaded", true);
@@ -2617,6 +2767,7 @@ struct Engine::Impl
             o->setProperty("paused", false);
             o->setProperty("eof", false);
             appendPlaybackSpectrumJson(o, fftOrder, fftBinsOut, wantSpectrum);
+            appendPlaybackScopeJson(o, wantScope, scopeSamples);
             return out;
         }
         /* Forward + resampler: timeline from reader samples (transport time drifts vs. ResamplingAudioSource). */
@@ -2633,6 +2784,7 @@ struct Engine::Impl
         o->setProperty("paused", paused);
         o->setProperty("eof", transport.hasStreamFinished());
         appendPlaybackSpectrumJson(o, fftOrder, fftBinsOut, wantSpectrum);
+        appendPlaybackScopeJson(o, wantScope, scopeSamples);
         return out;
     }
 

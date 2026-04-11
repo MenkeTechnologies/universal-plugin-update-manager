@@ -192,6 +192,38 @@ async function fetchPluginsForExport() {
     return plugins;
 }
 
+/**
+ * Full plugin rows for `check_updates` when the UI only has a partial DB-backed list in `allPlugins`.
+ * Same filter/sort/cap semantics as `exportPlugins` / `fetchPluginsForExport`.
+ */
+async function fetchPluginsForUpdateCheck() {
+    if (typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) {
+        return typeof allPlugins !== 'undefined' && allPlugins.length > 0 ? allPlugins.slice() : [];
+    }
+    const total = typeof _pluginTotalCount !== 'undefined' ? _pluginTotalCount : 0;
+    const mem = typeof allPlugins !== 'undefined' ? allPlugins.length : 0;
+    if (mem > 0 && (total === 0 || mem >= total)) {
+        return allPlugins.slice();
+    }
+    return fetchPluginsForExport();
+}
+
+/** Settings → run KVR plugin update check once after startup when the plugin DB has rows. */
+async function maybeAutoCheckUpdatesOnStartup() {
+    if (typeof prefs === 'undefined' || prefs.getItem('autoCheckUpdatesOnStartup') !== 'on') return;
+    if (typeof checkUpdates !== 'function' || typeof fetchPluginsForUpdateCheck !== 'function') return;
+    try {
+        if (typeof loadPluginsFromDb === 'function') {
+            await loadPluginsFromDb();
+        }
+        const pluginsForCheck = await fetchPluginsForUpdateCheck();
+        if (!pluginsForCheck.length) return;
+        void checkUpdates();
+    } catch {
+        /* ignore */
+    }
+}
+
 function getPluginExportableCount() {
     if (typeof scanProgressCleanup !== 'undefined' && scanProgressCleanup) {
         if (typeof _pluginScanDbView !== 'undefined' && _pluginScanDbView) {
@@ -419,7 +451,12 @@ function buildPluginCardHtml(p) {
 let updateProgressCleanup = null;
 
 async function checkUpdates() {
-    showGlobalProgress();
+    const pluginsForCheck = await fetchPluginsForUpdateCheck();
+    if (!pluginsForCheck.length) {
+        showToast(toastFmt('toast.no_plugins_export'), 4000, 'error');
+        return;
+    }
+
     const btn = document.getElementById('btnCheckUpdates');
     const progress = document.getElementById('progressBar');
     const progressFill = progress.querySelector('.progress-fill');
@@ -438,6 +475,7 @@ async function checkUpdates() {
     statusBar.classList.add('active');
     statusText.textContent = _ui('ui.js.init_update_check');
     statusStats.innerHTML = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
 
     // Track which plugins have been updated (by path)
     const updatedByPath = new Map();
@@ -526,12 +564,19 @@ async function checkUpdates() {
     });
 
     try {
-        allPlugins = await window.vstUpdater.checkUpdates(allPlugins);
-        pluginsWithUpdates = allPlugins.filter(p => p.hasUpdate);
+        const updatedFull = await window.vstUpdater.checkUpdates(pluginsForCheck);
+        const byPath = new Map(updatedFull.map((u) => [u.path, u]));
+        if (typeof allPlugins !== 'undefined') {
+            for (const p of allPlugins) {
+                const u = byPath.get(p.path);
+                if (u) Object.assign(p, u);
+            }
+        }
+        pluginsWithUpdates = updatedFull.filter((p) => p.hasUpdate);
 
-        const finalUnknown = allPlugins.filter(p => !p.hasUpdate && p.source === 'not-found').length;
+        const finalUnknown = updatedFull.filter((p) => !p.hasUpdate && p.source === 'not-found').length;
         document.getElementById('upToDateCount').textContent =
-            allPlugins.filter(p => !p.hasUpdate && p.source !== 'not-found').length;
+            updatedFull.filter((p) => !p.hasUpdate && p.source !== 'not-found').length;
         document.getElementById('updateCount').textContent = pluginsWithUpdates.length;
         const ucEl2 = document.getElementById('unknownCount');
         if (ucEl2) ucEl2.textContent = finalUnknown;
@@ -555,6 +600,9 @@ async function checkUpdates() {
     } catch (err) {
         const updateErr = err.message || err || catalogFmt('toast.unknown_error');
         if (updateErr !== 'stopped') {
+            if (window.vstUpdater?.appendLog) {
+                window.vstUpdater.appendLog(`UPDATE CHECK ERROR — UI: ${updateErr}`);
+            }
             showToast(toastFmt('toast.update_check_failed', {updateErr}), 4000, 'error');
         }
     }
@@ -563,9 +611,11 @@ async function checkUpdates() {
         updateProgressCleanup();
         updateProgressCleanup = null;
     }
-    hideGlobalProgress();
     hideStopButton();
     statusBar.classList.remove('active');
+    statusText.textContent = '';
+    statusStats.innerHTML = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
     btn.disabled = false;
     btn.innerHTML = `&#9889; ${_ui('ui.js.check_updates_btn')}`;
     progressFill.style.width = '100%';

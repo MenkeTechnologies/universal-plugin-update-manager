@@ -1327,6 +1327,130 @@ if (!bin) {
       assert.ok('spectrum_sr_hz' in st);
     });
 
+    it('playback_status spectrum false leaves spectrum null but keeps fft metadata', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'playback_status', spectrum: false })],
+        { timeoutMs: 90_000 },
+      );
+      const st = JSON.parse(outLines[0]);
+      assert.equal(st.ok, true);
+      assert.equal(st.spectrum, null);
+      assert.equal(typeof st.spectrum_fft_size, 'number');
+      assert.equal(typeof st.spectrum_bins, 'number');
+      assert.equal(typeof st.spectrum_sr_hz, 'number');
+    });
+
+    it('playback_status without scope request leaves scope empty (output stopped)', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'playback_status' })],
+        { timeoutMs: 90_000 },
+      );
+      const st = JSON.parse(outLines[0]);
+      assert.equal(st.ok, true);
+      assert.equal(st.scope_len ?? 0, 0);
+      assert.ok(st.scope_l == null);
+      assert.ok(st.scope_r == null);
+    });
+
+    it('playback_status scope true clamps scope_samples and returns paired arrays when output running', async () => {
+      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'start_output_stream', tone: true })], {
+        timeoutMs: 90_000,
+      });
+      const start = JSON.parse(outLines[0]);
+      if (!start.ok) {
+        assertOkOrNoAudioDevice(start, 'output');
+        return;
+      }
+      try {
+        await new Promise((r) => setTimeout(r, 80));
+        const { outLines: outSt } = await runEngineExchange(
+          bin,
+          [
+            jl({
+              cmd: 'playback_status',
+              spectrum: false,
+              scope: true,
+              scope_samples: 4096,
+            }),
+          ],
+          { timeoutMs: 90_000 },
+        );
+        const st = JSON.parse(outSt[0]);
+        assert.equal(st.ok, true);
+        const want = 2048;
+        assert.equal(st.scope_len, want);
+        assert.ok(Array.isArray(st.scope_l));
+        assert.ok(Array.isArray(st.scope_r));
+        assert.equal(st.scope_l.length, want);
+        assert.equal(st.scope_r.length, want);
+      } finally {
+        await runEngineExchange(bin, [jl({ cmd: 'stop_output_stream' })], { timeoutMs: 90_000 });
+      }
+    });
+
+    it('playback_status clamps spectrum_fft_order and spectrum_bins in metadata', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [
+          jl({
+            cmd: 'playback_status',
+            spectrum: false,
+            spectrum_fft_order: 9,
+            spectrum_bins: 256,
+          }),
+        ],
+        { timeoutMs: 90_000 },
+      );
+      const st = JSON.parse(outLines[0]);
+      assert.equal(st.ok, true);
+      assert.equal(st.spectrum_fft_size, 512);
+      assert.equal(st.spectrum_bins, 256);
+    });
+
+    it('playback_status raises sub-64 spectrum_bins floor in metadata', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'playback_status', spectrum: false, spectrum_fft_order: 11, spectrum_bins: 40 })],
+        { timeoutMs: 90_000 },
+      );
+      const st = JSON.parse(outLines[0]);
+      assert.equal(st.ok, true);
+      assert.equal(st.spectrum_bins, 64);
+    });
+
+    it('playback_status order 15 yields 32768-point fft metadata and clamps bins to Nyquist', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [
+          jl({
+            cmd: 'playback_status',
+            spectrum: false,
+            spectrum_fft_order: 15,
+            spectrum_bins: 50000,
+          }),
+        ],
+        { timeoutMs: 90_000 },
+      );
+      const st = JSON.parse(outLines[0]);
+      assert.equal(st.ok, true);
+      assert.equal(st.spectrum_fft_size, 32768);
+      assert.equal(st.spectrum_bins, 16384);
+    });
+
+    it('playback_status clamps spectrum_fft_order above 15 to 15', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [jl({ cmd: 'playback_status', spectrum: false, spectrum_fft_order: 22, spectrum_bins: 64 })],
+        { timeoutMs: 90_000 },
+      );
+      const st = JSON.parse(outLines[0]);
+      assert.equal(st.ok, true);
+      assert.equal(st.spectrum_fft_size, 32768);
+      assert.equal(st.spectrum_bins, 64);
+    });
+
     it('plugin_chain returns ok with api_version 2 (may be slow on cold cache)', async () => {
       const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'plugin_chain' })], {
         timeoutMs: 120_000,

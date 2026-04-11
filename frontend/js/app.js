@@ -86,6 +86,7 @@ async function handleFileWatcherChange(event) {
 
 (async function loadLastScan() {
     showGlobalProgress();
+    try {
     await (window.__toastReady || Promise.resolve());
     // Load file-backed preferences before anything else
     await prefs.load();
@@ -249,6 +250,7 @@ async function handleFileWatcherChange(event) {
             try {
                 await fetchPdfPage();
                 if (typeof rebuildPdfStats === 'function') rebuildPdfStats();
+                if (typeof maybeAutoStartPdfScanOnStartup === 'function') maybeAutoStartPdfScanOnStartup();
             } catch (err) {
                 showToast(toastFmt('toast.failed_load_pdf_scan', {err}), 4000, 'error');
             }
@@ -257,14 +259,36 @@ async function handleFileWatcherChange(event) {
 
     await Promise.all(_startupLibTasks);
 
+    if (typeof prefs !== 'undefined' && prefs.getItem('autoContentDupScan') === 'on' && typeof triggerStartBackgroundContentDupScan === 'function') {
+        void triggerStartBackgroundContentDupScan();
+    }
+    if (typeof prefs !== 'undefined' && prefs.getItem('autoFingerprintCache') === 'on' && typeof triggerStartFingerprintCacheBuild === 'function') {
+        void triggerStartFingerprintCacheBuild();
+    }
+    if (typeof prefs !== 'undefined' && prefs.getItem('autoCheckUpdatesOnStartup') === 'on' && typeof maybeAutoCheckUpdatesOnStartup === 'function') {
+        void maybeAutoCheckUpdatesOnStartup();
+    }
+    if (typeof prefs !== 'undefined' && prefs.getItem('autoPdfMetadataOnStartup') === 'on' && typeof maybeAutoStartPdfMetadataOnStartup === 'function') {
+        void maybeAutoStartPdfMetadataOnStartup();
+    }
+
     // Apply default type filter from settings
     const defaultType = prefs.getItem('defaultTypeFilter');
     if (defaultType && defaultType !== 'all') {
         document.getElementById('typeFilter').value = defaultType;
         filterPlugins();
     }
-
-    hideGlobalProgress();
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.failed', {err: msg}), 6000, 'error');
+        } else if (typeof showToast === 'function') {
+            showToast(msg, 6000, 'error');
+        }
+        console.error('loadLastScan:', err);
+    } finally {
+        hideGlobalProgress();
+    }
     renderWelcomeDashboard();
     renderShortcutSettings();
     updateHeaderInfo();
@@ -505,9 +529,7 @@ async function updateHeaderInfo() {
         if (sc.audioScanning) active.push(catalogFmt('ui.scan_status.samples'));
         if (sc.dawScanning) active.push(catalogFmt('ui.scan_status.daw'));
         if (sc.presetScanning) active.push(catalogFmt('ui.scan_status.presets'));
-        if (sc.pdfScanning) active.push(catalogFmt('ui.scan_status.pdfs'));
         if (sc.midiScanning) active.push(catalogFmt('ui.scan_status.midi'));
-        if (sc.updateChecking) active.push(catalogFmt('ui.scan_status.updates'));
         const badge = document.getElementById('scanStatusBadge');
         if (badge) {
             if (active.length > 0) {

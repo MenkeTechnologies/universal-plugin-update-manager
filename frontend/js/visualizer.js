@@ -13,6 +13,8 @@ let _vizSpectrogramIdx = 0; // ring buffer write index
 let _vizLastFrame = 0;
 const _VIZ_FPS_SINGLE = 30;
 const _VIZ_FPS_ALL = 20;
+/** Log-frequency axis right edge; must match `NP_SPECTRUM_DISPLAY_MAX_HZ` in audio.js. */
+const _VIZ_LOG_FMAX_HZ = 20000;
 // Pre-allocated buffers (set once when analyser is available)
 let _vizFreqData = null;
 let _vizTimeData = null;
@@ -28,17 +30,121 @@ let _vizParams = {
 };
 let _vizPeakHold = -96;
 let _vizPeakTimer = null;
-/** Last spectrum snapshot for FFT tile when `prefs.fftAnimationPaused` freezes animation. */
+/** Last spectrum snapshot for FFT tile when `viz:fft` is frozen. */
 let _vizFftFrozenCopy = null;
+/** Separate float buffers so oscilloscope freeze does not starve levels (shared `_vizTimeData` was one coupled snapshot). */
+let _vizLevelsTimeData = null;
+/** Last oscilloscope trace while live — used when `viz:oscilloscope` is frozen. */
+let _vizOscFrozenCopy = null;
+/** Octave bands magnitude copy while `viz:bands` is live. */
+let _vizBandsFrozenCopy = null;
+/** Web Audio L/R time buffers for stereo when not on engine scope / spectrum paths. */
+let _vizStereoWebFrozenL = null;
+let _vizStereoWebFrozenR = null;
+
+const _vizScopeSnapByTileMode = Object.create(null);
+const _vizSpecSnapByTileMode = Object.create(null);
+
+function _vizFreezeIdForTileMode(mode) {
+    const G = typeof window !== 'undefined' ? window.GRAPH_FREEZE_ID : null;
+    if (!G) return null;
+    switch (mode) {
+        case 'fft':
+            return G.VIZ_FFT;
+        case 'oscilloscope':
+            return G.VIZ_OSC;
+        case 'spectrogram':
+            return G.VIZ_SPEC;
+        case 'stereo':
+            return G.VIZ_STEREO;
+        case 'levels':
+            return G.VIZ_LEVELS;
+        case 'bands':
+            return G.VIZ_BANDS;
+        default:
+            return null;
+    }
+}
+
+function _vizTileFrozen(mode) {
+    const id = _vizFreezeIdForTileMode(mode);
+    return !!(id && typeof window.isGraphFrozen === 'function' && window.isGraphFrozen(id));
+}
+
+function _vizUpdateScopeSnap(tileMode, liveL, liveR, liveN) {
+    const n = typeof liveN === 'number' ? liveN : 0;
+    if (n < 16 || !liveL || !liveR) return;
+    let ent = _vizScopeSnapByTileMode[tileMode];
+    if (!ent || ent.n !== n) {
+        ent = {sl: new Uint8Array(liveL), sr: new Uint8Array(liveR), n};
+        _vizScopeSnapByTileMode[tileMode] = ent;
+    } else {
+        ent.sl.set(liveL);
+        ent.sr.set(liveR);
+    }
+}
+
+function _vizEngineScopeBuffersForTile(tileMode) {
+    const frozen = _vizTileFrozen(tileMode);
+    const n = _vizEngineScopeLen();
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const sr = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (!frozen) {
+        _vizUpdateScopeSnap(tileMode, sl, sr, n);
+        return {sl, sr, n};
+    }
+    const ent = _vizScopeSnapByTileMode[tileMode];
+    if (ent && ent.n >= 16 && ent.sl && ent.sr) {
+        return {sl: ent.sl, sr: ent.sr, n: ent.n};
+    }
+    return {sl, sr, n};
+}
+
+function _vizEngineSpectrumBufferForTile(tileMode) {
+    const frozen = _vizTileFrozen(tileMode);
+    const minB = _vizEngineSpectrumMinBins();
+    const u8 =
+        typeof window !== 'undefined' && window._engineSpectrumU8 && window._engineSpectrumU8.length >= minB
+            ? window._engineSpectrumU8
+            : null;
+    if (!frozen) {
+        if (u8 && tileMode) {
+            let s = _vizSpecSnapByTileMode[tileMode];
+            if (!s || s.length !== u8.length) s = new Uint8Array(u8.length);
+            s.set(u8);
+            _vizSpecSnapByTileMode[tileMode] = s;
+        }
+        return u8;
+    }
+    const s = _vizSpecSnapByTileMode[tileMode];
+    return s && s.length >= minB ? s : u8;
+}
+
+function _vizLevelsUsesEngineScopeLive() {
+    const n = _vizEngineScopeLen();
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    return n >= 32 && sl && window._engineScopeR && _vizEngineSpectrumOk();
+}
+
+function _vizEngineSpectrumMinBins() {
+    return typeof window !== 'undefined' && typeof window.ENGINE_PLAYBACK_SPECTRUM_MIN_BINS === 'number'
+        ? window.ENGINE_PLAYBACK_SPECTRUM_MIN_BINS
+        : 64;
+}
 /** Last rising-edge trigger index for oscilloscope when the current buffer has no crossing. */
 let _vizOscLastTrigger = 0;
+
+function _vizEngineScopeLen() {
+    return typeof window !== 'undefined' && typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+}
 
 /** AudioEngine is sending usable spectrum bins (`playback_status.spectrum`). */
 function _vizEngineSpectrumOk() {
     if (typeof window !== 'undefined' && typeof window.engineSpectrumLive === 'function') {
         return window.engineSpectrumLive();
     }
-    if (typeof window === 'undefined' || !window._engineSpectrumU8 || window._engineSpectrumU8.length < 1024) {
+    const minB = _vizEngineSpectrumMinBins();
+    if (typeof window === 'undefined' || !window._engineSpectrumU8 || window._engineSpectrumU8.length < minB) {
         return false;
     }
     /* Library / floating player playback through JUCE (includes transport paused — spectrum still wired). */
@@ -75,11 +181,19 @@ function _vizOutputSampleRateHz() {
  * Time-domain trace is synthetic from spectrum when using the shim; stereo/levels tiles use dedicated engine paths when spectrum is live.
  */
 const _vizEngineShim = {
-    frequencyBinCount: 1024,
-    fftSize: 2048,
+    get frequencyBinCount() {
+        const u8 = typeof window !== 'undefined' ? window._engineSpectrumU8 : null;
+        const minB = _vizEngineSpectrumMinBins();
+        return u8 && u8.length >= minB ? u8.length : 1024;
+    },
+    get fftSize() {
+        const fs = typeof window !== 'undefined' ? window._engineSpectrumFftSize : 0;
+        return typeof fs === 'number' && fs > 0 ? fs : 2048;
+    },
     getByteFrequencyData(arr) {
         const u8 = window._engineSpectrumU8;
-        if (!u8 || u8.length < 1024) {
+        const minB = _vizEngineSpectrumMinBins();
+        if (!u8 || u8.length < minB) {
             arr.fill(0);
             return;
         }
@@ -88,9 +202,23 @@ const _vizEngineShim = {
         if (n < arr.length) arr.fill(0, n);
     },
     getFloatTimeDomainData(arr) {
-        const u8 = window._engineSpectrumU8;
         const len = arr.length;
-        if (!u8 || u8.length < 1024) {
+        const n = _vizEngineScopeLen();
+        const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+        if (n >= 16 && sl && window._engineScopeR) {
+            for (let i = 0; i < len; i++) {
+                const t = (i / Math.max(1, len - 1)) * (n - 1);
+                const i0 = Math.floor(t);
+                const i1 = Math.min(n - 1, i0 + 1);
+                const f = t - i0;
+                const u = sl[i0] * (1 - f) + sl[i1] * f;
+                arr[i] = (u - 128) / 128;
+            }
+            return;
+        }
+        const u8 = window._engineSpectrumU8;
+        const minB = _vizEngineSpectrumMinBins();
+        if (!u8 || u8.length < minB) {
             arr.fill(0);
             return;
         }
@@ -112,7 +240,7 @@ function _vizResolveAnalyser() {
     if (_vizEngineSpectrumOk()) return _vizEngineShim;
     // `engineSpectrumLive()` can be false briefly while bins exist (poll / flag ordering). Prefer the
     // engine-backed shim whenever we have a full frame so FFT/spectrogram/bands match stereo/levels.
-    if (typeof window !== 'undefined' && window._engineSpectrumU8 && window._engineSpectrumU8.length >= 1024) {
+    if (typeof window !== 'undefined' && window._engineSpectrumU8 && window._engineSpectrumU8.length >= _vizEngineSpectrumMinBins()) {
         return _vizEngineShim;
     }
     const web = typeof _analyser !== 'undefined' ? _analyser : null;
@@ -310,11 +438,21 @@ function stopVisualizer() {
     _vizLastFrame = 0;
 }
 
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('graph-freeze-changed', () => {
+        const tab = document.getElementById('tabVisualizer');
+        if (tab && tab.classList.contains('active')) _vizScheduleNext(0);
+    });
+}
+
 // ── Main render loop ──
 function _vizLoop(timestamp) {
     _vizRAF = null;
     const tab = document.getElementById('tabVisualizer');
     if (!tab || !tab.classList.contains('active')) {
+        /* Inactive tab uses `display:none` on `.tab-content`; stop rAF/throttle timers defensively if
+         * this loop wakes without a matching `switchTab` teardown. */
+        stopVisualizer();
         return;
     }
     if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) {
@@ -345,6 +483,33 @@ function _vizLoop(timestamp) {
     }
     _vizLastFrame = ts;
 
+    const modes =
+        _vizMode === 'all'
+            ? ['fft', 'oscilloscope', 'spectrogram', 'stereo', 'levels', 'bands']
+            : [_vizMode];
+
+    const needByte = modes.some(
+        (m) => (m === 'fft' || m === 'spectrogram' || m === 'bands') && !_vizTileFrozen(m)
+    );
+    const needOscFloat = modes.includes('oscilloscope') && !_vizTileFrozen('oscilloscope');
+
+    const nSc = _vizEngineScopeLen();
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const engineScopeStereo = nSc >= 32 && sl && window._engineScopeR && _vizEngineSpectrumOk();
+    const minB = _vizEngineSpectrumMinBins();
+    const specU8Ok =
+        typeof window !== 'undefined' && window._engineSpectrumU8 && window._engineSpectrumU8.length >= minB;
+    const engineSpecStereo = !!specU8Ok && _vizEngineSpectrumOk();
+
+    const stereoNeedsWebFloat =
+        modes.includes('stereo') && !_vizTileFrozen('stereo') && !engineScopeStereo && !engineSpecStereo;
+
+    const levelsNeedsSharedFloat =
+        modes.includes('levels') &&
+        !_vizTileFrozen('levels') &&
+        !_vizLevelsUsesEngineScopeLive() &&
+        !_vizEngineSpectrumBufferForTile('levels');
+
     // Ensure pre-allocated buffers match analyser
     if (!_vizFreqData || _vizFreqData.length !== vizAnalyser.frequencyBinCount) {
         _vizFreqData = new Uint8Array(vizAnalyser.frequencyBinCount);
@@ -356,9 +521,25 @@ function _vizLoop(timestamp) {
     }
 
     if (_vizMode === 'all') {
-        // Read data once, share across all tiles
-        vizAnalyser.getByteFrequencyData(_vizFreqData);
-        vizAnalyser.getFloatTimeDomainData(_vizTimeData);
+        if (needByte) {
+            vizAnalyser.getByteFrequencyData(_vizFreqData);
+        }
+        const fftSz = vizAnalyser.fftSize;
+        if (needOscFloat) {
+            if (!_vizTimeData || _vizTimeData.length !== fftSz) _vizTimeData = new Float32Array(fftSz);
+            vizAnalyser.getFloatTimeDomainData(_vizTimeData);
+            if (!_vizOscFrozenCopy || _vizOscFrozenCopy.length !== fftSz) _vizOscFrozenCopy = new Float32Array(fftSz);
+            _vizOscFrozenCopy.set(_vizTimeData);
+        } else if (modes.includes('oscilloscope') && _vizTileFrozen('oscilloscope') && _vizOscFrozenCopy) {
+            if (_vizOscFrozenCopy.length === fftSz) {
+                if (!_vizTimeData || _vizTimeData.length !== fftSz) _vizTimeData = new Float32Array(fftSz);
+                _vizTimeData.set(_vizOscFrozenCopy);
+            }
+        }
+        if (levelsNeedsSharedFloat) {
+            if (!_vizLevelsTimeData || _vizLevelsTimeData.length !== fftSz) _vizLevelsTimeData = new Float32Array(fftSz);
+            vizAnalyser.getFloatTimeDomainData(_vizLevelsTimeData);
+        }
         _drawTile('fft', vizAnalyser);
         _drawTile('oscilloscope', vizAnalyser);
         _drawTile('spectrogram', vizAnalyser);
@@ -366,6 +547,25 @@ function _vizLoop(timestamp) {
         _drawTile('levels', vizAnalyser);
         _drawTile('bands', vizAnalyser);
     } else {
+        const m = _vizMode;
+        if ((m === 'fft' || m === 'spectrogram' || m === 'bands') && !_vizTileFrozen(m)) {
+            vizAnalyser.getByteFrequencyData(_vizFreqData);
+        }
+        if (m === 'oscilloscope' && !_vizTileFrozen(m)) {
+            const fftSz = vizAnalyser.fftSize;
+            if (!_vizTimeData || _vizTimeData.length !== fftSz) _vizTimeData = new Float32Array(fftSz);
+            vizAnalyser.getFloatTimeDomainData(_vizTimeData);
+        }
+        if (
+            m === 'levels' &&
+            !_vizTileFrozen(m) &&
+            !_vizLevelsUsesEngineScopeLive() &&
+            !_vizEngineSpectrumBufferForTile('levels')
+        ) {
+            const fftSz = vizAnalyser.fftSize;
+            if (!_vizLevelsTimeData || _vizLevelsTimeData.length !== fftSz) _vizLevelsTimeData = new Float32Array(fftSz);
+            vizAnalyser.getFloatTimeDomainData(_vizLevelsTimeData);
+        }
         _drawTile(_vizMode, vizAnalyser);
     }
     _vizScheduleNext(0);
@@ -410,7 +610,7 @@ function _drawFFT(ctx, w, h, analyser) {
     if (!_vizFftFrozenCopy || _vizFftFrozenCopy.length !== bufLen) {
         _vizFftFrozenCopy = new Uint8Array(bufLen);
     }
-    const paused = typeof window !== 'undefined' && typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused();
+       const paused = _vizTileFrozen('fft');
     if (!paused) {
         if (_vizMode !== 'all') {
             if (!_vizFreqData || _vizFreqData.length !== bufLen) _vizFreqData = new Uint8Array(bufLen);
@@ -423,17 +623,23 @@ function _drawFFT(ctx, w, h, analyser) {
 
     if (_vizParams.fftLogScale) {
         // Log-frequency display — cap columns so retina-wide canvases do not do O(width) pow/log per frame
-        const minF = 20, maxF = 20000;
-        const logMin = Math.log10(minF), logMax = Math.log10(maxF);
         const sr = _vizOutputSampleRateHz();
+        const minF = 20, maxF = Math.min(sr / 2, _VIZ_LOG_FMAX_HZ);
+        const logMin = Math.log10(minF), logMax = Math.log10(maxF);
+        const fftSize = analyser.fftSize;
         const maxCols = Math.min(w, 4096);
         const colW = w / maxCols;
+        const eng = _vizEngineSpectrumOk();
+        const binF =
+            typeof window !== 'undefined' && eng && typeof window.engineSpectrumBundledBinF === 'function'
+                ? (f) => window.engineSpectrumBundledBinF(f, sr, fftSize, bufLen)
+                : (f) => (f * fftSize) / sr - (eng ? 1 : 0);
         for (let c = 0; c < maxCols; c++) {
             const t = (c + 0.5) / maxCols;
             const logF = logMin + t * (logMax - logMin);
             const freq = Math.pow(10, logF);
-            const bin = Math.round((freq / (sr / 2)) * bufLen);
-            if (bin >= bufLen) continue;
+            const idx = binF(freq);
+            const bin = Math.round(Math.max(0, Math.min(bufLen - 1, idx)));
             const barH = (data[bin] / 255) * h;
             const x = c * colW;
             const bw = Math.max(1, colW - 0.25);
@@ -449,13 +655,21 @@ function _drawFFT(ctx, w, h, analyser) {
             ctx.fillText(f >= 1000 ? (f / 1000) + 'k' : f + '', x, h - 2);
         });
     } else {
-        const barW = w / bufLen;
+        const sr = _vizOutputSampleRateHz();
+        const fftSize = analyser.fftSize;
+        const nyq = sr * 0.5;
+        const engine = _vizEngineSpectrumOk();
         for (let i = 0; i < bufLen; i++) {
             const barH = (data[i] / 255) * h;
-            const t = i / bufLen;
-            const x = i * barW;
+            const k0 = engine ? i + 1 : i;
+            const k1 = engine ? i + 2 : i + 1;
+            const fL = Math.max(0, (k0 * sr) / fftSize);
+            const fR = Math.min(nyq, (k1 * sr) / fftSize);
+            const x = (fL / nyq) * w;
+            const bw = Math.max(1, ((fR - fL) / nyq) * w - 0.5);
+            const t = i / Math.max(1, bufLen - 1);
             const grad = _vizNeonBarGradient(ctx, x, h - barH, h, t);
-            _vizFillRoundTopBar(ctx, x, h - barH, barW - 0.5, barH, grad);
+            _vizFillRoundTopBar(ctx, x, h - barH, bw, barH, grad);
         }
     }
 }
@@ -463,11 +677,25 @@ function _drawFFT(ctx, w, h, analyser) {
 // ── Oscilloscope (time-domain trace) ──
 function _drawOscilloscope(ctx, w, h, analyser) {
     const bufLen = analyser.fftSize;
+    const frozen = _vizTileFrozen('oscilloscope');
     if (_vizMode !== 'all') {
-        if (!_vizTimeData || _vizTimeData.length !== bufLen) _vizTimeData = new Float32Array(bufLen);
-        analyser.getFloatTimeDomainData(_vizTimeData);
+        if (!frozen) {
+            if (!_vizTimeData || _vizTimeData.length !== bufLen) _vizTimeData = new Float32Array(bufLen);
+            analyser.getFloatTimeDomainData(_vizTimeData);
+            if (!_vizOscFrozenCopy || _vizOscFrozenCopy.length !== bufLen) _vizOscFrozenCopy = new Float32Array(bufLen);
+            _vizOscFrozenCopy.set(_vizTimeData);
+        } else if (_vizOscFrozenCopy && _vizOscFrozenCopy.length === bufLen) {
+            if (!_vizTimeData || _vizTimeData.length !== bufLen) _vizTimeData = new Float32Array(bufLen);
+            _vizTimeData.set(_vizOscFrozenCopy);
+        }
+    } else if (!frozen && (!_vizTimeData || _vizTimeData.length !== bufLen)) {
+        return;
     }
     const data = _vizTimeData;
+    if (!data || data.length !== bufLen) {
+        _vizHudBackdrop(ctx, w, h);
+        return;
+    }
     _vizHudBackdrop(ctx, w, h);
 
     const useTrig = _vizParams.oscilloscopeTriggeredSweep === true;
@@ -524,8 +752,10 @@ function _drawOscilloscope(ctx, w, h, analyser) {
 function _drawSpectrogram(ctx, w, h, analyser) {
     const bufLen = analyser.frequencyBinCount;
     if (_vizMode !== 'all') {
-        if (!_vizFreqData || _vizFreqData.length !== bufLen) _vizFreqData = new Uint8Array(bufLen);
-        analyser.getByteFrequencyData(_vizFreqData);
+        if (!_vizTileFrozen('spectrogram')) {
+            if (!_vizFreqData || _vizFreqData.length !== bufLen) _vizFreqData = new Uint8Array(bufLen);
+            analyser.getByteFrequencyData(_vizFreqData);
+        }
     }
     const data = _vizFreqData;
 
@@ -537,8 +767,11 @@ function _drawSpectrogram(ctx, w, h, analyser) {
         for (let i = 0; i < maxCols; i++) _vizSpectrogramData[i] = new Uint8Array(bufLen);
         _vizSpectrogramIdx = 0;
     }
-    _vizSpectrogramData[_vizSpectrogramIdx].set(data);
-    _vizSpectrogramIdx = (_vizSpectrogramIdx + 1) % maxCols;
+    const graphPaused = _vizTileFrozen('spectrogram');
+    if (!graphPaused) {
+        _vizSpectrogramData[_vizSpectrogramIdx].set(data);
+        _vizSpectrogramIdx = (_vizSpectrogramIdx + 1) % maxCols;
+    }
 
     _vizHudBackdrop(ctx, w, h);
     const colW = w / maxCols;
@@ -571,10 +804,12 @@ let _vizLeftData = null;
 let _vizRightData = null;
 
 function _drawStereo(ctx, w, h, analyser) {
-    const u8 =
-        typeof window !== 'undefined' && window._engineSpectrumU8 && window._engineSpectrumU8.length >= 1024
-            ? window._engineSpectrumU8
-            : null;
+    const {sl, sr, n: nSc} = _vizEngineScopeBuffersForTile('stereo');
+    if (nSc >= 32 && sl && sr && _vizEngineSpectrumOk()) {
+        _drawStereoEngineScope(ctx, w, h, sl, sr, nSc);
+        return;
+    }
+    const u8 = _vizEngineSpectrumBufferForTile('stereo');
     if (u8) {
         _drawStereoEngine(ctx, w, h, u8);
         return;
@@ -595,8 +830,20 @@ function _drawStereo(ctx, w, h, analyser) {
         _vizLeftData = new Float32Array(bufLen);
         _vizRightData = new Float32Array(bufLen);
     }
-    aL.getFloatTimeDomainData(_vizLeftData);
-    aR.getFloatTimeDomainData(_vizRightData);
+    const stFrozen = _vizTileFrozen('stereo');
+    if (!stFrozen) {
+        aL.getFloatTimeDomainData(_vizLeftData);
+        aR.getFloatTimeDomainData(_vizRightData);
+        if (!_vizStereoWebFrozenL || _vizStereoWebFrozenL.length !== bufLen) {
+            _vizStereoWebFrozenL = new Float32Array(bufLen);
+            _vizStereoWebFrozenR = new Float32Array(bufLen);
+        }
+        _vizStereoWebFrozenL.set(_vizLeftData);
+        _vizStereoWebFrozenR.set(_vizRightData);
+    } else if (_vizStereoWebFrozenL && _vizStereoWebFrozenR && _vizStereoWebFrozenL.length === bufLen) {
+        _vizLeftData.set(_vizStereoWebFrozenL);
+        _vizRightData.set(_vizStereoWebFrozenR);
+    }
 
     _vizHudBackdrop(ctx, w, h);
     const cx = w / 2, cy = h / 2;
@@ -733,22 +980,121 @@ function _drawStereoEngine(ctx, w, h, u8) {
     ctx.fillText('ENGINE', cx, 14);
 }
 
+/**
+ * Vectorscope from real engine L/R samples (correlation is meaningful; mono fold → diagonal cloud).
+ */
+function _drawStereoEngineScope(ctx, w, h, sl, sr, nSc) {
+    _vizHudBackdrop(ctx, w, h);
+    const cx = w / 2;
+    const cy = h / 2;
+    const scale = Math.min(cx, cy) * 0.82;
+    const minDim = Math.min(w, h);
+    const baseR = Math.max(5, minDim * 0.014);
+
+    ctx.strokeStyle = 'rgba(122,139,168,0.1)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath();
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, h);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, cy);
+    ctx.lineTo(w, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(5,217,232,0.08)';
+    ctx.beginPath();
+    ctx.moveTo(cx - scale, cy - scale);
+    ctx.lineTo(cx + scale, cy + scale);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + scale, cy - scale);
+    ctx.lineTo(cx - scale, cy + scale);
+    ctx.stroke();
+
+    const prev = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < nSc; i += 2) {
+        const l = (sl[i] - 128) / 128;
+        const r = (sr[i] - 128) / 128;
+        const mid = (l + r) * 0.5;
+        const side = (l - r) * 0.5;
+        const px = cx + side * scale;
+        const py = cy - mid * scale;
+        const a = 0.12 + Math.min(0.55, (Math.abs(l) + Math.abs(r)) * 0.35);
+        const rad = 0.9 + Math.min(2.2, (Math.abs(mid) + Math.abs(side)) * 1.8);
+        const grd = ctx.createRadialGradient(px, py, 0, px, py, rad);
+        grd.addColorStop(0, `rgba(5,217,232,${a})`);
+        grd.addColorStop(0.55, `rgba(211,0,197,${a * 0.45})`);
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(px, py, rad, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalCompositeOperation = prev;
+
+    const nn = Math.ceil(nSc / 2);
+    let corrStr = '—';
+    if (nn > 2) {
+        const meanL = sumL / nn;
+        const meanR = sumR / nn;
+        let vL = 0;
+        let vR = 0;
+        let cLR = 0;
+        for (let i = 0; i < nSc; i += 2) {
+            const l = (sl[i] - 128) / 128;
+            const r = (sr[i] - 128) / 128;
+            const dl = l - meanL;
+            const dr = r - meanR;
+            vL += dl * dl;
+            vR += dr * dr;
+            cLR += dl * dr;
+        }
+        const den = Math.sqrt(vL * vR);
+        if (den > 1e-8) {
+            corrStr = (cLR / den).toFixed(2);
+        }
+    }
+
+    ctx.fillStyle = 'rgba(122,139,168,0.5)';
+    ctx.font = `${Math.max(9, h / 30)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('L', 12, cy + 4);
+    ctx.fillText('R', w - 12, cy + 4);
+    ctx.fillText('ENGINE', cx, 14);
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.fillText(`corr ${corrStr}`, cx, h - 8);
+}
+
 // ── Level Meters ──
 function _drawLevels(ctx, w, h, analyser) {
-    const u8 =
-        typeof window !== 'undefined' && window._engineSpectrumU8 && window._engineSpectrumU8.length >= 1024
-            ? window._engineSpectrumU8
-            : null;
+    const {sl, sr, n: nSc} = _vizEngineScopeBuffersForTile('levels');
+    if (nSc >= 32 && sl && sr && _vizEngineSpectrumOk()) {
+        _drawLevelsEngineScope(ctx, w, h, sl, sr, nSc);
+        return;
+    }
+    const u8 = _vizEngineSpectrumBufferForTile('levels');
     if (u8) {
         _drawLevelsEngine(ctx, w, h, u8);
         return;
     }
     const bufLen = analyser.fftSize;
     if (_vizMode !== 'all') {
-        if (!_vizTimeData || _vizTimeData.length !== bufLen) _vizTimeData = new Float32Array(bufLen);
-        analyser.getFloatTimeDomainData(_vizTimeData);
+        if (!_vizTileFrozen('levels')) {
+            if (!_vizLevelsTimeData || _vizLevelsTimeData.length !== bufLen) _vizLevelsTimeData = new Float32Array(bufLen);
+            analyser.getFloatTimeDomainData(_vizLevelsTimeData);
+        }
+    } else if (!_vizLevelsTimeData || _vizLevelsTimeData.length !== bufLen) {
+        _vizHudBackdrop(ctx, w, h);
+        return;
     }
-    const data = _vizTimeData;
+    const data = _vizLevelsTimeData;
+    if (!data || data.length < 2) {
+        _vizHudBackdrop(ctx, w, h);
+        return;
+    }
 
     let sumSq = 0, peak = 0;
     for (let i = 0; i < bufLen; i++) {
@@ -927,17 +1273,115 @@ function _drawLevelsEngine(ctx, w, h, u8) {
     }
 }
 
+function _drawLevelsEngineScope(ctx, w, h, sl, sr, nSc) {
+    let sumSq = 0;
+    let peak = 0;
+    for (let i = 0; i < nSc; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (sr[i] - 128) / 128;
+        const m = 0.5 * (l + r);
+        sumSq += m * m;
+        peak = Math.max(peak, Math.abs(l), Math.abs(r));
+    }
+    const rms = Math.sqrt(sumSq / nSc);
+    const rmsDb = rms > 0 ? 20 * Math.log10(rms) : -96;
+    const peakDb = peak > 0 ? 20 * Math.log10(peak) : -96;
+
+    if (_vizParams.levelsHold) {
+        if (peakDb > _vizPeakHold) {
+            _vizPeakHold = peakDb;
+            clearTimeout(_vizPeakTimer);
+            _vizPeakTimer = setTimeout(() => {
+                _vizPeakHold = -96;
+            }, 2000);
+        }
+    }
+
+    _vizHudBackdrop(ctx, w, h);
+    const meterW = Math.min(80, w / 4);
+    const meterH = h - 50;
+    const startY = 25;
+    const rr = 5;
+
+    const drawMeter = (x, db, label) => {
+        const pct = Math.max(0, Math.min(1, (db + 60) / 60));
+        const barH = pct * meterH;
+        ctx.fillStyle = 'rgba(6,8,22,0.75)';
+        ctx.beginPath();
+        ctx.moveTo(x + rr, startY);
+        ctx.lineTo(x + meterW - rr, startY);
+        ctx.quadraticCurveTo(x + meterW, startY, x + meterW, startY + rr);
+        ctx.lineTo(x + meterW, startY + meterH - rr);
+        ctx.quadraticCurveTo(x + meterW, startY + meterH, x + meterW - rr, startY + meterH);
+        ctx.lineTo(x + rr, startY + meterH);
+        ctx.quadraticCurveTo(x, startY + meterH, x, startY + meterH - rr);
+        ctx.lineTo(x, startY + rr);
+        ctx.quadraticCurveTo(x, startY, x + rr, startY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(5,217,232,0.22)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        if (barH > 1) {
+            const y1 = startY + meterH - barH;
+            const gbar = ctx.createLinearGradient(0, y1, 0, startY + meterH);
+            gbar.addColorStop(0, 'rgba(57,255,20,0.92)');
+            gbar.addColorStop(0.55, 'rgba(249,240,2,0.88)');
+            gbar.addColorStop(0.82, 'rgba(255,107,53,0.88)');
+            gbar.addColorStop(1, 'rgba(255,7,58,0.95)');
+            _vizFillRoundTopBar(ctx, x + 2, y1, meterW - 4, barH, gbar);
+        }
+        ctx.fillStyle = 'rgba(224,240,255,0.88)';
+        ctx.font = `${Math.max(10, h / 30)}px Orbitron, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x + meterW / 2, startY - 6);
+        ctx.font = `${Math.max(9, h / 35)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.fillText(db.toFixed(1) + ' dB', x + meterW / 2, startY + meterH + 16);
+    };
+
+    drawMeter(w / 2 - meterW - 15, rmsDb, 'RMS');
+    drawMeter(w / 2 + 15, peakDb, 'PEAK');
+
+    if (_vizParams.levelsHold && _vizPeakHold > -96) {
+        const holdPct = Math.max(0, Math.min(1, (_vizPeakHold + 60) / 60));
+        const holdY = startY + meterH - holdPct * meterH;
+        ctx.strokeStyle = 'rgba(255,7,58,0.9)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(w / 2 + 15, holdY);
+        ctx.lineTo(w / 2 + 15 + meterW, holdY);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = 'rgba(122,139,168,0.38)';
+    ctx.font = '8px "Share Tech Mono", ui-monospace, monospace';
+    ctx.textAlign = 'right';
+    for (let db = 0; db >= -60; db -= 6) {
+        const y = startY + meterH * (1 - (db + 60) / 60);
+        ctx.fillText(db + '', w / 2 - meterW - 20, y + 3);
+    }
+}
+
 // ── Octave Bands ──
 function _drawBands(ctx, w, h, analyser) {
     const bufLen = analyser.frequencyBinCount;
-    if (_vizMode !== 'all') {
-        if (!_vizFreqData || _vizFreqData.length !== bufLen) _vizFreqData = new Uint8Array(bufLen);
-        analyser.getByteFrequencyData(_vizFreqData);
+    if (!_vizBandsFrozenCopy || _vizBandsFrozenCopy.length !== bufLen) {
+        _vizBandsFrozenCopy = new Uint8Array(bufLen);
     }
-    const data = _vizFreqData;
+    if (_vizMode !== 'all') {
+        if (!_vizTileFrozen('bands')) {
+            if (!_vizFreqData || _vizFreqData.length !== bufLen) _vizFreqData = new Uint8Array(bufLen);
+            analyser.getByteFrequencyData(_vizFreqData);
+            _vizBandsFrozenCopy.set(_vizFreqData);
+        }
+    } else if (!_vizTileFrozen('bands')) {
+        _vizBandsFrozenCopy.set(_vizFreqData);
+    }
+    const data = _vizBandsFrozenCopy;
 
     const sr = _vizOutputSampleRateHz();
-    const binFreq = sr / analyser.fftSize;
+    const fftSize = analyser.fftSize;
+    const engineBands = _vizEngineSpectrumOk();
     const bands = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
     const labels = ['31', '63', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
 
@@ -947,8 +1391,18 @@ function _drawBands(ctx, w, h, analyser) {
 
     for (let i = 0; i < bands.length; i++) {
         const cf = bands[i];
-        const lo = Math.floor((cf / Math.sqrt(2)) / binFreq);
-        const hi = Math.ceil((cf * Math.sqrt(2)) / binFreq);
+        let lo;
+        let hi;
+        if (engineBands && typeof window !== 'undefined' && typeof window.engineSpectrumBundledBinF === 'function') {
+            const bLo = window.engineSpectrumBundledBinF(cf / Math.sqrt(2), sr, fftSize, bufLen);
+            const bHi = window.engineSpectrumBundledBinF(cf * Math.sqrt(2), sr, fftSize, bufLen);
+            lo = Math.max(0, Math.floor(Math.min(bLo, bHi)));
+            hi = Math.min(bufLen - 1, Math.ceil(Math.max(bLo, bHi)));
+        } else {
+            const adj = engineBands ? 1 : 0;
+            lo = Math.floor(((cf / Math.sqrt(2)) * fftSize) / sr - adj);
+            hi = Math.ceil(((cf * Math.sqrt(2)) * fftSize) / sr - adj);
+        }
         let sum = 0, cnt = 0;
         for (let k = Math.max(0, lo); k <= Math.min(hi, bufLen - 1); k++) {
             sum += data[k];
@@ -983,15 +1437,13 @@ document.addEventListener('contextmenu', (e) => {
     const mode = tile.dataset.vizTile;
     const label = tile.querySelector('.viz-tile-label')?.textContent?.trim() || appFmt('menu.tab_visualizer');
     const canvas = tile.querySelector('canvas');
+    const gf = _vizFreezeIdForTileMode(mode);
+    const graphAnimOn = !(gf && typeof window.isGraphFrozen === 'function' && window.isGraphFrozen(gf));
     const items = [
         {
             icon: '&#128247;', label: appFmt('menu.export_snapshot_png'), action: () => {
-                if (canvas) {
-                    const link = document.createElement('a');
-                    link.download = `${label.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                    if (typeof showToast === 'function') showToast(toastFmt('toast.snapshot_exported'));
+                if (canvas && typeof exportCanvasSnapshotPng === 'function') {
+                    void exportCanvasSnapshotPng(canvas, label);
                 }
             }, disabled: !canvas
         },
@@ -1034,18 +1486,22 @@ document.addEventListener('contextmenu', (e) => {
             action: () => document.querySelector('.viz-mode-btn[data-viz-mode="all"]')?.click()
         },
         '---',
+        {
+            icon: graphAnimOn ? '&#10003;' : '&#9634;',
+            label:
+                mode === 'fft'
+                    ? appFmt('menu.viz_fft_animate')
+                    : graphAnimOn
+                      ? appFmt('menu.viz_graph_freeze')
+                      : appFmt('menu.viz_graph_unfreeze'),
+            action: () => {
+                if (gf && typeof window.toggleGraphFrozen === 'function') window.toggleGraphFrozen(gf);
+            },
+            ..._vizMenuNoEcho,
+        },
     ];
 
     if (mode === 'fft') {
-        const animOn = !(typeof window.isFftAnimationPaused === 'function' && window.isFftAnimationPaused());
-        items.push({
-            icon: animOn ? '&#10003;' : '&#9634;',
-            label: appFmt('menu.viz_fft_animate'),
-            action: () => {
-                if (typeof window.toggleFftAnimationPaused === 'function') window.toggleFftAnimationPaused();
-            },
-            ..._vizMenuNoEcho,
-        });
         items.push({
             icon: _vizParams.fftLogScale ? '&#10003;' : '&#9634;',
             label: appFmt('menu.viz_log_frequency_scale'),

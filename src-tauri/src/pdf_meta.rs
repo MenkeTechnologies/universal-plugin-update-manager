@@ -1,23 +1,58 @@
-//! PDF metadata extraction (page count).
+//! PDF metadata extraction (page count + Info dictionary dates).
 //!
-//! Uses `lopdf` to read the document catalog and return the page count.
-//! Designed for bulk extraction — returns `None` on any parse error so
-//! one bad file doesn't stop a batch job.
+//! Uses `lopdf::Document::load_metadata` so we read page count and `CreationDate` /
+//! `ModDate` without loading the full document. Returns `None` on any parse error
+//! so one bad file doesn't stop a batch job.
 
 use rayon::prelude::*;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+pub struct PdfMetaFields {
+    pub pages: u32,
+    pub pdf_creation_date: Option<String>,
+    pub pdf_mod_date: Option<String>,
+}
+
+fn norm_info_date(s: Option<String>) -> Option<String> {
+    let s = s?.trim().to_owned();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
+}
+
+/// Page count, PDF CreationDate, and ModDate from the Info dictionary.
+/// Returns None if the file can't be parsed.
+pub fn extract_pdf_meta(path: &str) -> Option<PdfMetaFields> {
+    let m = lopdf::Document::load_metadata(path).ok()?;
+    Some(PdfMetaFields {
+        pages: m.page_count,
+        pdf_creation_date: norm_info_date(m.creation_date),
+        pdf_mod_date: norm_info_date(m.modification_date),
+    })
+}
 
 /// Page count for a single PDF. Returns None if the file can't be parsed.
 pub fn extract_page_count(path: &str) -> Option<u32> {
-    let doc = lopdf::Document::load(path).ok()?;
-    Some(doc.get_pages().len() as u32)
+    extract_pdf_meta(path).map(|m| m.pages)
+}
+
+/// Parallel metadata extraction. Maps each successfully parsed path to fields.
+pub fn extract_pdf_meta_batch(paths: &[String]) -> HashMap<String, PdfMetaFields> {
+    paths
+        .par_iter()
+        .filter_map(|p| extract_pdf_meta(p).map(|m| (p.clone(), m)))
+        .collect()
 }
 
 /// Batch page-count extraction with parallel parsing. Returns (path, pages) pairs
 /// only for PDFs that parsed successfully.
 pub fn extract_pages_batch(paths: &[String]) -> Vec<(String, u32)> {
-    paths
-        .par_iter()
-        .filter_map(|p| extract_page_count(p).map(|n| (p.clone(), n)))
+    extract_pdf_meta_batch(paths)
+        .into_iter()
+        .map(|(p, m)| (p, m.pages))
         .collect()
 }
 
@@ -40,13 +75,13 @@ mod tests {
     }
 
     #[test]
-    fn extract_pages_batch_skips_bad_files() {
+    fn extract_pdf_meta_batch_skips_bad_files() {
         let paths = vec![
             "/nonexistent/a.pdf".to_string(),
             "/nonexistent/b.pdf".to_string(),
         ];
-        let result = extract_pages_batch(&paths);
-        assert!(result.is_empty());
+        assert!(extract_pdf_meta_batch(&paths).is_empty());
+        assert!(extract_pages_batch(&paths).is_empty());
     }
 
     /// printpdf emits a valid file; lopdf must agree on page count (regression for bulk PDF indexing).
@@ -138,5 +173,51 @@ mod tests {
         assert_eq!(pairs.len(), 2);
         assert!(pairs.iter().any(|(_, n)| *n == 1));
         assert!(pairs.iter().any(|(_, n)| *n == 2));
+    }
+
+    #[test]
+    fn extract_pdf_meta_reads_info_dates() {
+        use lopdf::content::Content;
+        use lopdf::{dictionary, Document, Object, Stream};
+
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let info_id = doc.add_object(dictionary! {
+            "Creator" => "audio_haxor_test",
+            "CreationDate" => Object::string_literal("D:20260101120000"),
+            "ModDate" => Object::string_literal("D:20260202123045"),
+        });
+        let content = Content { operations: vec![] };
+        let content_id = doc.add_object(Stream::new(
+            dictionary! {},
+            content.encode().expect("encode empty content"),
+        ));
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+        });
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => 1,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+        doc.trailer.set("Info", info_id);
+
+        let tmp = std::env::temp_dir().join(format!("ah_pdf_info_dates_{}.pdf", std::process::id()));
+        doc.save(&tmp).expect("save test pdf");
+
+        let m = extract_pdf_meta(tmp.to_str().unwrap()).expect("meta");
+        let _ = std::fs::remove_file(&tmp);
+        assert_eq!(m.pages, 1);
+        assert_eq!(m.pdf_creation_date.as_deref(), Some("D:20260101120000"));
+        assert_eq!(m.pdf_mod_date.as_deref(), Some("D:20260202123045"));
     }
 }

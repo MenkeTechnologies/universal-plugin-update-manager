@@ -124,14 +124,14 @@ pub fn build_native_menu_bar<R: Runtime>(
         "export_presets",
         t("menu.export_presets", "Export Presets..."),
         true,
-        Some("CmdOrCtrl+Shift+Y"),
+        Some("CmdOrCtrl+Shift+Alt+Y"),
     )?;
     let import_presets = MenuItem::with_id(
         handle,
         "import_presets",
         t("menu.import_presets", "Import Presets..."),
         true,
-        Some("CmdOrCtrl+Shift+Z"),
+        Some("CmdOrCtrl+Shift+Alt+Z"),
     )?;
     let file_menu = Submenu::with_id_and_items(
         handle,
@@ -220,6 +220,20 @@ pub fn build_native_menu_bar<R: Runtime>(
         true,
         Some("CmdOrCtrl+Shift+R"),
     )?;
+    let scan_pdfs = MenuItem::with_id(
+        handle,
+        "scan_pdfs",
+        t("menu.scan_pdf", "Scan PDFs"),
+        true,
+        Some("CmdOrCtrl+Shift+F"),
+    )?;
+    let stop_pdf_scan = MenuItem::with_id(
+        handle,
+        "stop_pdf_scan",
+        t("menu.stop_pdf_scan", "Stop PDF scan"),
+        true,
+        Some("CmdOrCtrl+Shift+Y"),
+    )?;
     let scan_sep = PredefinedMenuItem::separator(handle)?;
     let check_updates = MenuItem::with_id(
         handle,
@@ -239,6 +253,8 @@ pub fn build_native_menu_bar<R: Runtime>(
             &scan_audio,
             &scan_daw,
             &scan_presets,
+            &scan_pdfs,
+            &stop_pdf_scan,
             &scan_sep,
             &check_updates,
         ],
@@ -398,7 +414,7 @@ pub fn build_native_menu_bar<R: Runtime>(
         "expand_player",
         t("menu.expand_player", "Expand / Collapse Player"),
         true,
-        Some("CmdOrCtrl+Shift+M"),
+        Some("CmdOrCtrl+Shift+Alt+E"),
     )?;
 
     let next_track = MenuItem::with_id(
@@ -495,6 +511,90 @@ pub fn build_native_menu_bar<R: Runtime>(
         true,
         Some("CmdOrCtrl+D"),
     )?;
+    let tools_bg_sep = PredefinedMenuItem::separator(handle)?;
+    let bpm_key_lufs_start = MenuItem::with_id(
+        handle,
+        "bpm_key_lufs_start",
+        t(
+            "menu.start_bpm_key_lufs_analysis",
+            "Start BPM/Key/LUFS background analysis",
+        ),
+        true,
+        Some("CmdOrCtrl+Shift+V"),
+    )?;
+    let bpm_key_lufs_stop = MenuItem::with_id(
+        handle,
+        "bpm_key_lufs_stop",
+        t(
+            "menu.stop_bpm_key_lufs_analysis",
+            "Stop BPM/Key/LUFS background analysis",
+        ),
+        true,
+        Some("CmdOrCtrl+Shift+C"),
+    )?;
+    let extract_pdf_metadata = MenuItem::with_id(
+        handle,
+        "extract_pdf_metadata",
+        t("menu.extract_pdf_metadata", "Start PDF metadata"),
+        true,
+        Some("CmdOrCtrl+Shift+M"),
+    )?;
+    // Not Cmd+Shift+Z: that collides with Edit → Redo on macOS, so the key never appears on the item.
+    let stop_pdf_metadata = MenuItem::with_id(
+        handle,
+        "stop_pdf_metadata",
+        t("menu.stop_pdf_metadata", "Stop PDF metadata"),
+        true,
+        Some("CmdOrCtrl+Shift+K"),
+    )?;
+    let build_fingerprint_cache_menu = MenuItem::with_id(
+        handle,
+        "build_fingerprint_cache_menu",
+        t("menu.build_fingerprint_cache", "Start fingerprint cache"),
+        true,
+        Some("CmdOrCtrl+Shift+B"),
+    )?;
+    let stop_fingerprint_cache_menu = MenuItem::with_id(
+        handle,
+        "stop_fingerprint_cache_menu",
+        t("menu.stop_fingerprint_cache", "Stop fingerprint cache"),
+        true,
+        Some("CmdOrCtrl+Shift+F4"),
+    )?;
+    let start_content_dup_scan = MenuItem::with_id(
+        handle,
+        "start_content_dup_scan",
+        t(
+            "menu.start_content_dup_scan",
+            "Start byte-duplicate scan (SHA-256)",
+        ),
+        true,
+        Some("CmdOrCtrl+Shift+Comma"),
+    )?;
+    let stop_content_dup_scan = MenuItem::with_id(
+        handle,
+        "stop_content_dup_scan",
+        t(
+            "menu.stop_content_dup_scan",
+            "Stop byte-duplicate scan",
+        ),
+        true,
+        Some("CmdOrCtrl+Shift+Period"),
+    )?;
+    let start_all_background_jobs = MenuItem::with_id(
+        handle,
+        "start_all_background_jobs",
+        t("menu.start_all_background_jobs", "Start all background jobs"),
+        true,
+        Some("CmdOrCtrl+Shift+F5"),
+    )?;
+    let stop_all_background_jobs = MenuItem::with_id(
+        handle,
+        "stop_all_background_jobs",
+        t("menu.stop_all_background_jobs", "Stop all background jobs"),
+        true,
+        Some("CmdOrCtrl+Shift+F6"),
+    )?;
     let dep_graph = MenuItem::with_id(
         handle,
         "dep_graph",
@@ -514,7 +614,7 @@ pub fn build_native_menu_bar<R: Runtime>(
         "help_overlay",
         t("menu.help_overlay", "Keyboard Shortcuts"),
         true,
-        Option::<&str>::None,
+        Some("CmdOrCtrl+Shift+F3"),
     )?;
 
     let data_menu = Submenu::with_id_and_items(
@@ -539,6 +639,17 @@ pub fn build_native_menu_bar<R: Runtime>(
         true,
         &[
             &find_duplicates,
+            &tools_bg_sep,
+            &bpm_key_lufs_start,
+            &bpm_key_lufs_stop,
+            &extract_pdf_metadata,
+            &stop_pdf_metadata,
+            &build_fingerprint_cache_menu,
+            &stop_fingerprint_cache_menu,
+            &start_content_dup_scan,
+            &stop_content_dup_scan,
+            &start_all_background_jobs,
+            &stop_all_background_jobs,
             &dep_graph,
             &data_sep,
             &cmd_palette,

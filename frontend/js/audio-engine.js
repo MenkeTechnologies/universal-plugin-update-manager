@@ -11,6 +11,195 @@ const AE_PREFS_BUFFER_FRAMES_INPUT = 'audioEngineBufferFramesInput';
 const AE_PREFS_INSERT_PATHS_JSON = 'audioEngineInsertPathsJson';
 /** @deprecated Legacy single pref; migrated once to output/input */
 const AE_LEGACY_BUFFER_FRAMES = 'audioEngineBufferFrames';
+/** @deprecated Migrated once into `AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER` + `AE_PREFS_PLAYBACK_SPECTRUM_BANDS`. */
+const AE_PREFS_PLAYBACK_SPECTRUM_QUALITY = 'audioEnginePlaybackSpectrumQuality';
+/** `playback_status` FFT order8–15 (`off` = skip FFT). */
+const AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER = 'audioEnginePlaybackSpectrumFftOrder';
+/** Output band count: integer string or `max` (engine clamps to Nyquist; sub-Nyquist values are max-binned across the full range). */
+const AE_PREFS_PLAYBACK_SPECTRUM_BANDS = 'audioEnginePlaybackSpectrumBands';
+/** Lower clamp for `playback_status.spectrum` length; upper bound is FFT Nyquist (see `Engine::appendPlaybackSpectrumJson`, min 64). */
+const ENGINE_PLAYBACK_SPECTRUM_MIN_BINS = 64;
+
+/** Legacy single-dropdown presets → [`spectrum_fft_order`, `spectrum_bins`] (read only by `migrateAePlaybackSpectrumSplitPrefs`). */
+const AE_LEGACY_PLAYBACK_SPECTRUM_PRESETS = Object.freeze({
+    'pt32k-max': [15, 16383],
+    'pt32k-8k': [15, 8192],
+    'pt32k-4k': [15, 4096],
+    'pt32k-2k': [15, 2048],
+    'pt32k-1k': [15, 1024],
+    'pt32k-512': [15, 512],
+    'pt32k-256': [15, 256],
+    'pt16k-max': [14, 8191],
+    'pt16k-4k': [14, 4096],
+    'pt16k-2k': [14, 2048],
+    'pt16k-1k': [14, 1024],
+    'pt16k-512': [14, 512],
+    'pt8k-max': [13, 4095],
+    'pt8k-2k': [13, 2048],
+    'pt8k-1k': [13, 1024],
+    'pt8k-512': [13, 512],
+    maximum: [12, 2047],
+    'very-high': [12, 1536],
+    'very-high-1k': [12, 1024],
+    high: [11, 1024],
+    'high-balanced': [11, 896],
+    'medium-high': [11, 768],
+    'high-512': [11, 512],
+    medium: [10, 512],
+    'medium-plus': [10, 384],
+    'medium-256': [10, 256],
+    low: [9, 256],
+    'low-128': [9, 128],
+    minimal: [8, 127],
+    'minimal-64': [8, 64],
+});
+
+/** UI / pref normalization: band counts offered in `#aePlaybackSpectrumBands` (ascending). */
+const AE_PLAYBACK_SPECTRUM_BAND_STEPS = Object.freeze([
+    64, 128, 256, 384, 512, 768, 896, 1024, 1536, 2048, 4096, 8192, 16384,
+]);
+
+function aeMaxSpectrumBinsForFftOrder(ord) {
+    const o = typeof ord === 'string' ? parseInt(ord, 10) : ord;
+    if (!Number.isFinite(o)) {
+        return ENGINE_PLAYBACK_SPECTRUM_MIN_BINS;
+    }
+    const clamped = Math.max(8, Math.min(15, o));
+    const fftSize = 1 << clamped;
+    return Math.max(ENGINE_PLAYBACK_SPECTRUM_MIN_BINS, (fftSize / 2) | 0);
+}
+
+function normalizeAePlaybackSpectrumFftOrderPref(v) {
+    const s = v != null ? String(v).trim() : '';
+    if (s === 'off') {
+        return 'off';
+    }
+    const o = parseInt(s, 10);
+    if (Number.isFinite(o) && o >= 8 && o <= 15) {
+        return String(o);
+    }
+    return '11';
+}
+
+function aeParseSpectrumBinsPref(s, maxBins) {
+    const t = s != null ? String(s).trim().toLowerCase() : '';
+    if (t === 'max') {
+        return maxBins;
+    }
+    if (t === '') {
+        return Math.min(1024, maxBins);
+    }
+    const n = parseInt(t, 10);
+    if (!Number.isFinite(n)) {
+        return Math.min(1024, maxBins);
+    }
+    return Math.max(ENGINE_PLAYBACK_SPECTRUM_MIN_BINS, Math.min(maxBins, n));
+}
+
+/** Picks a valid `#aePlaybackSpectrumBands` value at or below `maxBins`. */
+function aeNormalizeBandsSelectValue(s, maxBins) {
+    const t = s != null ? String(s).trim().toLowerCase() : '';
+    if (t === 'max') {
+        return 'max';
+    }
+    const n = aeParseSpectrumBinsPref(s, maxBins);
+    if (n >= maxBins) {
+        return 'max';
+    }
+    for (let i = AE_PLAYBACK_SPECTRUM_BAND_STEPS.length - 1; i >= 0; i--) {
+        const step = AE_PLAYBACK_SPECTRUM_BAND_STEPS[i];
+        if (step <= maxBins && step <= n) {
+            return String(step);
+        }
+    }
+    return String(ENGINE_PLAYBACK_SPECTRUM_MIN_BINS);
+}
+
+/** English when SQLite `app_i18n` has not been re-seeded yet (`catalogFmt` returns the key). */
+const AE_PLAYBACK_SPECTRUM_CAP_HINT_OFF_EN = 'FFT off — playback_status omits spectrum.';
+const AE_PLAYBACK_SPECTRUM_CAP_HINT_EN = 'At most {max} bands for this FFT size (Nyquist = half the window in points).';
+
+function aePlaybackSpectrumCapHintText(off, maxB) {
+    const keyOff = 'ui.ae.playback_spectrum_cap_hint_off';
+    const keyOn = 'ui.ae.playback_spectrum_cap_hint';
+    if (off) {
+        let s = typeof catalogFmt === 'function' ? catalogFmt(keyOff) : keyOff;
+        if (s === keyOff) {
+            s = AE_PLAYBACK_SPECTRUM_CAP_HINT_OFF_EN;
+        }
+        return s;
+    }
+    let s = typeof catalogFmt === 'function' ? catalogFmt(keyOn, {max: String(maxB)}) : keyOn;
+    if (s === keyOn) {
+        s = AE_PLAYBACK_SPECTRUM_CAP_HINT_EN.replace(/\{max\}/g, String(maxB));
+    }
+    return s;
+}
+
+function aeUpdatePlaybackSpectrumBandsUiState(fftEl, bandsEl) {
+    if (!fftEl || !bandsEl) {
+        return;
+    }
+    const hintEl = document.getElementById('aePlaybackSpectrumCapHint');
+    const off = fftEl.value === 'off';
+    bandsEl.disabled = off;
+    if (off) {
+        if (hintEl) {
+            hintEl.textContent = aePlaybackSpectrumCapHintText(true, 0);
+        }
+        return;
+    }
+    const maxB = aeMaxSpectrumBinsForFftOrder(fftEl.value);
+    if (hintEl) {
+        hintEl.textContent = aePlaybackSpectrumCapHintText(false, maxB);
+    }
+    for (let i = 0; i < bandsEl.options.length; i++) {
+        const opt = bandsEl.options[i];
+        const v = opt.value;
+        if (v === 'max') {
+            opt.disabled = false;
+            continue;
+        }
+        const n = parseInt(v, 10);
+        opt.disabled = Number.isFinite(n) && n > maxB;
+    }
+    const sel = bandsEl.selectedOptions[0];
+    if (sel && sel.disabled) {
+        bandsEl.value = aeNormalizeBandsSelectValue(bandsEl.value, maxB);
+    }
+}
+
+function migrateAePlaybackSpectrumSplitPrefs() {
+    if (typeof prefs === 'undefined' || typeof prefs.getItem !== 'function' || typeof prefs.setItem !== 'function') {
+        return;
+    }
+    const newFft = prefs.getItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER);
+    if (newFft != null && String(newFft) !== '') {
+        return;
+    }
+    const leg = prefs.getItem(AE_PREFS_PLAYBACK_SPECTRUM_QUALITY);
+    if (leg != null && String(leg) !== '') {
+        const q = String(leg);
+        if (q === 'off') {
+            prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER, 'off');
+            prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_BANDS, '1024');
+        } else if (AE_LEGACY_PLAYBACK_SPECTRUM_PRESETS[q]) {
+            const pair = AE_LEGACY_PLAYBACK_SPECTRUM_PRESETS[q];
+            const ord = pair[0];
+            const bins = pair[1];
+            prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER, String(ord));
+            const maxB = aeMaxSpectrumBinsForFftOrder(ord);
+            prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_BANDS, bins >= maxB ? 'max' : String(bins));
+        } else {
+            prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER, '11');
+            prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_BANDS, '1024');
+        }
+        prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_QUALITY, '');
+        return;
+    }
+    prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER, '11');
+    prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_BANDS, '1024');
+}
 
 /** Live plugin list from the last `plugin_chain` response (populated by `aePopulateInsertSlotSelects`). */
 let aePluginCatalog = [];
@@ -60,6 +249,30 @@ function ensureAePluginScanProgressToast(message) {
         container.appendChild(el);
     }
     el.textContent = message;
+}
+
+/**
+ * JSON body for `playback_status` — merges user quality pref with optional future overrides.
+ * @returns {{ cmd: 'playback_status', spectrum?: boolean, spectrum_fft_order?: number, spectrum_bins?: number }}
+ */
+function buildEnginePlaybackStatusRequest() {
+    const out = {cmd: 'playback_status', scope: true, scope_samples: 1024};
+    if (typeof prefs === 'undefined' || typeof prefs.getItem !== 'function') {
+        return out;
+    }
+    migrateAePlaybackSpectrumSplitPrefs();
+    const ord = normalizeAePlaybackSpectrumFftOrderPref(prefs.getItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER));
+    if (ord === 'off') {
+        out.spectrum = false;
+        return out;
+    }
+    const o = parseInt(ord, 10);
+    const maxB = aeMaxSpectrumBinsForFftOrder(o);
+    const bins = aeParseSpectrumBinsPref(prefs.getItem(AE_PREFS_PLAYBACK_SPECTRUM_BANDS), maxB);
+    out.spectrum = true;
+    out.spectrum_fft_order = o;
+    out.spectrum_bins = bins;
+    return out;
 }
 
 function migrateAeBufferPrefs() {
@@ -145,6 +358,17 @@ let aeInputPeakPollTimer = null;
 let aeInputPeakPollInFlight = false;
 let aeInputPeakVisibilityBound = false;
 const AE_INPUT_PEAK_POLL_MS = 100;
+
+/** `playback_status` poll when the Audio Engine tab is open and the output stream runs without library `startEnginePlaybackPoll` (same cadence as `ENGINE_PLAYBACK_POLL_MS`). */
+const AE_TAB_METER_POLL_MS = 33;
+/** @type {ReturnType<typeof setInterval> | null} */
+let aeTabMeterPollTimer = null;
+let aeTabMeterPollInFlight = false;
+let aeOutputGraphIdleBound = false;
+/** @type {ResizeObserver | null} */
+let aeGraphResizeObs = null;
+/** @type {number} */
+let aeGraphRafId = 0;
 
 function aeAudioEngineTabIsActive() {
     const root = document.getElementById('tabAudioEngine');
@@ -1365,10 +1589,13 @@ function initAudioEngineTab() {
         syncAeInsertPickerShowInstrumentsCheckbox();
         void resumeAeInputPeakPollIfNeeded();
         void refreshAeProcessStats();
+        layoutAeOutputGraphCanvases();
+        syncAeOutputGraphsAfterStreamStateChange();
         return;
     }
     root.dataset.aeInit = '1';
     bindAeInputPeakVisibilityOnce();
+    bindAeOutputGraphIdleOnce();
     bindAePlaybackControls();
     syncAePlaybackControlsFromPrefs();
 
@@ -1460,6 +1687,16 @@ function initAudioEngineTab() {
         const savedIn = prefs.getItem(AE_PREFS_BUFFER_FRAMES_INPUT);
         bufInCap.value = savedIn != null && String(savedIn) !== '' ? String(savedIn) : '';
     }
+    const specFft = document.getElementById('aePlaybackSpectrumFftOrder');
+    const specBands = document.getElementById('aePlaybackSpectrumBands');
+    if (specFft && specBands && typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+        migrateAePlaybackSpectrumSplitPrefs();
+        specFft.value = normalizeAePlaybackSpectrumFftOrderPref(prefs.getItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER));
+        const maxB = aeMaxSpectrumBinsForFftOrder(specFft.value);
+        const bandRaw = prefs.getItem(AE_PREFS_PLAYBACK_SPECTRUM_BANDS);
+        specBands.value = aeNormalizeBandsSelectValue(bandRaw, maxB);
+        aeUpdatePlaybackSpectrumBandsUiState(specFft, specBands);
+    }
     if (toneCb && typeof toneCb.addEventListener === 'function') {
         toneCb.addEventListener('change', () => {
             if (toneCb.disabled) return;
@@ -1482,6 +1719,28 @@ function initAudioEngineTab() {
         };
         bufInCap.addEventListener('change', saveIn);
         bufInCap.addEventListener('blur', saveIn);
+    }
+    if (
+        specFft &&
+        specBands &&
+        typeof specFft.addEventListener === 'function' &&
+        typeof specBands.addEventListener === 'function' &&
+        typeof prefs !== 'undefined' &&
+        typeof prefs.setItem === 'function'
+    ) {
+        const saveSpectrumPrefs = () => {
+            const fo = normalizeAePlaybackSpectrumFftOrderPref(specFft.value != null ? String(specFft.value) : '11');
+            specFft.value = fo;
+            prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER, fo);
+            aeUpdatePlaybackSpectrumBandsUiState(specFft, specBands);
+            const maxB = aeMaxSpectrumBinsForFftOrder(fo);
+            let bv = specBands.value != null ? String(specBands.value) : '1024';
+            bv = aeNormalizeBandsSelectValue(bv === 'max' ? 'max' : bv, maxB);
+            specBands.value = bv;
+            prefs.setItem(AE_PREFS_PLAYBACK_SPECTRUM_BANDS, bv);
+        };
+        specFft.addEventListener('change', saveSpectrumPrefs);
+        specBands.addEventListener('change', saveSpectrumPrefs);
     }
 
     const typeSel = document.getElementById('aeAudioDeviceType');
@@ -1694,6 +1953,7 @@ function fillAeStreamsFromEngineState(es) {
         }
     }
     syncAeInputPeakPollFromEngineState(es);
+    syncAeOutputGraphsAfterStreamStateChange();
 }
 
 /**
@@ -2063,7 +2323,7 @@ async function ensureAeOutputStreamOnStartup() {
 
         let playbackLoaded = false;
         try {
-            const st = await inv({cmd: 'playback_status'});
+            const st = await inv(buildEnginePlaybackStatusRequest());
             playbackLoaded = Boolean(st && st.ok && st.loaded === true);
         } catch {
             /* ignore */
@@ -2180,7 +2440,7 @@ async function applyAudioEngineDevice() {
          * After Stop stream, `playback_stop` clears the session — reload from `window._enginePlaybackResumePath` if set. */
         let playbackLoaded = false;
         try {
-            const st = await inv({cmd: 'playback_status'});
+            const st = await inv(buildEnginePlaybackStatusRequest());
             playbackLoaded = Boolean(st && st.ok && st.loaded === true);
         } catch {
             /* ignore */
@@ -2428,8 +2688,7 @@ function syncEnginePlaybackPollForUiIdle() {
     }
 }
 
-function stopEnginePlaybackPoll() {
-    _enginePlaybackPollSessionActive = false;
+function _haltLibraryPlaybackPollIntervalAndWatchdog() {
     if (_enginePlaybackPollTimer != null) {
         clearInterval(_enginePlaybackPollTimer);
         _enginePlaybackPollTimer = null;
@@ -2444,9 +2703,53 @@ function stopEnginePlaybackPoll() {
     }
 }
 
+function stopEnginePlaybackPoll() {
+    _enginePlaybackPollSessionActive = false;
+    _haltLibraryPlaybackPollIntervalAndWatchdog();
+    startAeTabMeterPollIfNeeded();
+    scheduleAeGraphRafLoop();
+}
+
+function applyPlaybackStatusScope(st) {
+    if (!st || st.ok !== true) return;
+    const n = typeof st.scope_len === 'number' ? st.scope_len : 0;
+    if (
+        n >= 16 &&
+        Array.isArray(st.scope_l) &&
+        Array.isArray(st.scope_r) &&
+        st.scope_l.length === n &&
+        st.scope_r.length === n
+    ) {
+        if (!window._engineScopeL || window._engineScopeL.length !== n) {
+            window._engineScopeL = new Uint8Array(n);
+            window._engineScopeR = new Uint8Array(n);
+        }
+        const L = window._engineScopeL;
+        const R = window._engineScopeR;
+        for (let i = 0; i < n; i++) {
+            const a = st.scope_l[i];
+            const b = st.scope_r[i];
+            L[i] = typeof a === 'number' ? Math.max(0, Math.min(255, Math.round(a))) : 128;
+            R[i] = typeof b === 'number' ? Math.max(0, Math.min(255, Math.round(b))) : 128;
+        }
+        window._engineScopeLen = n;
+    } else if (st.loaded !== true) {
+        window._engineScopeL = null;
+        window._engineScopeR = null;
+        window._engineScopeLen = 0;
+    }
+}
+
 function applyPlaybackStatusSpectrum(st) {
     if (!st || st.ok !== true) return;
-    if (Array.isArray(st.spectrum) && st.spectrum.length >= 1024) {
+    if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+        migrateAePlaybackSpectrumSplitPrefs();
+        if (normalizeAePlaybackSpectrumFftOrderPref(prefs.getItem(AE_PREFS_PLAYBACK_SPECTRUM_FFT_ORDER)) === 'off') {
+            window._engineSpectrumU8 = null;
+            return;
+        }
+    }
+    if (Array.isArray(st.spectrum) && st.spectrum.length >= ENGINE_PLAYBACK_SPECTRUM_MIN_BINS) {
         const n = st.spectrum.length;
         if (!window._engineSpectrumU8 || window._engineSpectrumU8.length !== n) {
             window._engineSpectrumU8 = new Uint8Array(n);
@@ -2468,18 +2771,1304 @@ function applyPlaybackStatusSpectrum(st) {
     }
 }
 
+function stopAeTabMeterPoll() {
+    if (aeTabMeterPollTimer != null) {
+        clearInterval(aeTabMeterPollTimer);
+        aeTabMeterPollTimer = null;
+    }
+}
+
+function stopAeGraphRaf() {
+    if (aeGraphRafId !== 0) {
+        cancelAnimationFrame(aeGraphRafId);
+        aeGraphRafId = 0;
+    }
+}
+
+function stopAeTabMeterAndGraph() {
+    stopAeTabMeterPoll();
+    stopAeGraphRaf();
+}
+
+function shouldRunAeTabMeterPoll() {
+    if (!aeAudioEngineTabIsActive()) return false;
+    if (typeof window === 'undefined' || !window._aeOutputStreamRunning) return false;
+    if (_enginePlaybackPollSessionActive) return false;
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return false;
+    if (typeof document !== 'undefined' && document.hidden) return false;
+    return getAeAudioEngineInvoke() != null;
+}
+
+const _aeDiagGraphIds = [
+    'aeGraphMidSide',
+    'aeGraphBalance',
+    'aeGraphCorrelation',
+    'aeGraphWidth',
+    'aeGraphCrest',
+    'aeGraphLMinusR',
+    'aeGraphEnergy',
+    'aeGraphGonio',
+    'aeGraphDcOffset',
+    'aeGraphMagHist',
+    'aeGraphPeakSample',
+    'aeGraphMonoWave',
+    'aeGraphSideWave',
+    'aeGraphLrOverlay',
+    'aeGraphAbsDiffHist',
+    'aeGraphLissajous',
+];
+
+/** True if at least one visible diagnostic canvas is not per-graph frozen (otherwise rAF can stop). */
+function aeDiagAnyGraphUnfrozen() {
+    let saw = false;
+    for (let i = 0; i < _aeDiagGraphIds.length; i++) {
+        const el = document.getElementById(_aeDiagGraphIds[i]);
+        if (!el) continue;
+        saw = true;
+        const fid =
+            typeof window.aeCanvasIdToGraphFreezeId === 'function'
+                ? window.aeCanvasIdToGraphFreezeId(_aeDiagGraphIds[i])
+                : null;
+        if (!fid) return true;
+        if (typeof window.isGraphFrozen !== 'function' || !window.isGraphFrozen(fid)) return true;
+    }
+    return false;
+}
+
+function shouldDrawAeOutputGraphs() {
+    if (!aeAudioEngineTabIsActive()) return false;
+    if (typeof window === 'undefined' || !window._aeOutputStreamRunning) return false;
+    if (typeof document !== 'undefined' && document.hidden) return false;
+    if (typeof window.isUiIdleHeavyCpu === 'function' && window.isUiIdleHeavyCpu()) return false;
+    if (!aeDiagAnyGraphUnfrozen()) return false;
+    return true;
+}
+
+function layoutAeOutputGraphCanvases() {
+    const ids = _aeDiagGraphIds;
+    const dpr =
+        typeof window !== 'undefined' && typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0
+            ? window.devicePixelRatio
+            : 1;
+    for (let i = 0; i < ids.length; i++) {
+        const c = document.getElementById(ids[i]);
+        if (!c || typeof c.getBoundingClientRect !== 'function') continue;
+        const wrap = c.parentElement;
+        const rw = wrap ? wrap.clientWidth : 0;
+        const rh = wrap ? wrap.clientHeight : 0;
+        if (rw < 2 || rh < 2) continue;
+        const w = Math.max(2, Math.floor(rw * dpr));
+        const h = Math.max(2, Math.floor(rh * dpr));
+        if (c.width !== w || c.height !== h) {
+            c.width = w;
+            c.height = h;
+        }
+    }
+}
+
+function bindAeOutputGraphIdleOnce() {
+    if (aeOutputGraphIdleBound) return;
+    aeOutputGraphIdleBound = true;
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopAeTabMeterPoll();
+            stopAeGraphRaf();
+        } else {
+            layoutAeOutputGraphCanvases();
+            startAeTabMeterPollIfNeeded();
+            scheduleAeGraphRafLoop();
+        }
+    });
+    document.addEventListener('ui-idle-heavy-cpu', (e) => {
+        const idle = e.detail && e.detail.idle;
+        if (idle) {
+            stopAeTabMeterPoll();
+            stopAeGraphRaf();
+        } else {
+            startAeTabMeterPollIfNeeded();
+            scheduleAeGraphRafLoop();
+        }
+    });
+    const aeStack = document.querySelector('#tabAudioEngine .ae-main-stack');
+    if (aeStack && typeof ResizeObserver === 'function') {
+        aeGraphResizeObs = new ResizeObserver(() => {
+            if (!aeAudioEngineTabIsActive()) return;
+            layoutAeOutputGraphCanvases();
+        });
+        aeGraphResizeObs.observe(aeStack);
+    }
+    document.addEventListener('graph-freeze-changed', () => {
+        if (!aeAudioEngineTabIsActive()) return;
+        layoutAeOutputGraphCanvases();
+        if (shouldDrawAeOutputGraphs()) scheduleAeGraphRafLoop();
+        else {
+            aeDrawOutputGraphs();
+            stopAeGraphRaf();
+        }
+    });
+}
+
+/** Last engine L/R scope per diagnostic graph id when live; used when that graph is frozen. */
+const _aeGraphScopeSnapByFreezeId = Object.create(null);
+
+/**
+ * @param {string|null} freezeId
+ * @param {Uint8Array|null} liveL
+ * @param {Uint8Array|null} liveR
+ * @param {number} liveN
+ * @returns {{sl: Uint8Array|null, sr: Uint8Array|null, n: number}}
+ */
+function aeGraphResolveScopeForFreezeId(freezeId, liveL, liveR, liveN) {
+    const frozen =
+        !!freezeId && typeof window.isGraphFrozen === 'function' && window.isGraphFrozen(freezeId);
+    const n = typeof liveN === 'number' ? liveN : 0;
+    const liveOk = n >= 16 && liveL && liveR;
+    if (!frozen) {
+        if (liveOk && freezeId) {
+            let ent = _aeGraphScopeSnapByFreezeId[freezeId];
+            if (!ent || ent.n !== n) {
+                ent = {sl: new Uint8Array(liveL), sr: new Uint8Array(liveR), n};
+                _aeGraphScopeSnapByFreezeId[freezeId] = ent;
+            } else {
+                ent.sl.set(liveL);
+                ent.sr.set(liveR);
+            }
+        }
+        return {sl: liveL, sr: liveR, n: liveN};
+    }
+    const ent = freezeId ? _aeGraphScopeSnapByFreezeId[freezeId] : null;
+    if (ent && ent.n >= 16 && ent.sl && ent.sr) {
+        return {sl: ent.sl, sr: ent.sr, n: ent.n};
+    }
+    return {sl: liveL, sr: liveR, n: liveN};
+}
+
+/**
+ * @param {string} canvasId
+ * @param {function(): void} draw
+ */
+function aeGraphWithScopeForCanvasId(canvasId, draw) {
+    const origL = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const origR = typeof window !== 'undefined' ? window._engineScopeR : null;
+    const origLen =
+        typeof window !== 'undefined' && typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const fid =
+        typeof window.aeCanvasIdToGraphFreezeId === 'function' ? window.aeCanvasIdToGraphFreezeId(canvasId) : null;
+    const sc = aeGraphResolveScopeForFreezeId(fid, origL, origR, origLen);
+    window._engineScopeL = sc.sl;
+    window._engineScopeR = sc.sr;
+    window._engineScopeLen = sc.n;
+    try {
+        draw();
+    } finally {
+        window._engineScopeL = origL;
+        window._engineScopeR = origR;
+        window._engineScopeLen = origLen;
+    }
+}
+
+function aeGraphFillBackdrop(ctx, w, h) {
+    ctx.fillStyle = 'rgba(6,8,22,0.88)';
+    ctx.fillRect(0, 0, w, h);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, 'rgba(5,217,232,0.06)');
+    g.addColorStop(1, 'rgba(211,0,197,0.04)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+}
+
+/**
+ * Pearson L/R correlation in [-1, 1] and stereo width RMS(side)/RMS(mid) on engine scope samples.
+ * @param {Uint8Array} sl
+ * @param {Uint8Array} sr
+ * @param {number} n
+ * @returns {{ corr: number|null, width: number|null }}
+ */
+function aeEngineScopeStereoMetrics(sl, sr, n) {
+    if (n < 16 || !sl || !sr) {
+        return {corr: null, width: null};
+    }
+    const step = Math.max(1, Math.floor(n / 420));
+    let cnt = 0;
+    let sumL = 0;
+    let sumR = 0;
+    for (let i = 0; i < n; i += step) {
+        sumL += (sl[i] - 128) / 128;
+        sumR += (sr[i] - 128) / 128;
+        cnt++;
+    }
+    const meanL = sumL / cnt;
+    const meanR = sumR / cnt;
+    let vL = 0;
+    let vR = 0;
+    let cLR = 0;
+    let sqMid = 0;
+    let sqSide = 0;
+    for (let i = 0; i < n; i += step) {
+        const l = (sl[i] - 128) / 128;
+        const r = (sr[i] - 128) / 128;
+        const dl = l - meanL;
+        const dr = r - meanR;
+        vL += dl * dl;
+        vR += dr * dr;
+        cLR += dl * dr;
+        const mid = (l + r) * 0.5;
+        const side = (l - r) * 0.5;
+        sqMid += mid * mid;
+        sqSide += side * side;
+    }
+    const den = Math.sqrt(vL * vR);
+    const corr = den > 1e-12 ? Math.max(-1, Math.min(1, cLR / den)) : null;
+    const rmsMid = Math.sqrt(sqMid / cnt);
+    const rmsSide = Math.sqrt(sqSide / cnt);
+    const width = rmsMid > 1e-8 ? rmsSide / rmsMid : null;
+    return {corr, width};
+}
+
+/**
+ * RMS and peak in dBFS for one engine scope channel (uint8 centered at 128).
+ * @param {Uint8Array} u8
+ * @returns {{ rmsDb: number, peakDb: number }}
+ */
+function aeScopeChannelDbStats(u8) {
+    let sumSq = 0;
+    let peak = 0;
+    const n = u8.length;
+    for (let i = 0; i < n; i++) {
+        const s = (u8[i] - 128) / 128;
+        sumSq += s * s;
+        const a = Math.abs(s);
+        if (a > peak) peak = a;
+    }
+    const denom = Math.max(1, n);
+    const rms = Math.sqrt(sumSq / denom);
+    const rmsDb = rms > 1e-8 ? 20 * Math.log10(rms) : -96;
+    const peakDb = peak > 1e-8 ? 20 * Math.log10(peak) : -96;
+    return {
+        rmsDb: Math.max(-96, Math.min(0, rmsDb)),
+        peakDb: Math.max(-96, Math.min(0, peakDb)),
+    };
+}
+
+function aeDrawMidSideGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    ctx.strokeStyle = 'rgba(122,139,168,0.14)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    ctx.lineTo(w, h / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const sliceW = w / n;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const mid = (l + r) * 0.5;
+        const x = i * sliceW;
+        const y = (0.5 - mid * 0.5) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(120, 220, 255,0.92)';
+    ctx.lineWidth = 1.75;
+    ctx.shadowColor = 'rgba(120, 220, 255, 0.35)';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const side = (l - r) * 0.5;
+        const x = i * sliceW;
+        const y = (0.5 - side * 0.5) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(255, 180, 90, 0.92)';
+    ctx.shadowColor = 'rgba(255, 180, 90, 0.35)';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('Mid', 6, 14);
+    ctx.fillText('Side', 6, 28);
+}
+
+function aeDrawBalanceGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    const L = aeScopeChannelDbStats(sl);
+    const R = aeScopeChannelDbStats(srDat);
+    const diffDb = L.rmsDb - R.rmsDb;
+    const maxDb = 9;
+    const t = Math.max(-1, Math.min(1, diffDb / maxDb));
+    const cy = h * 0.52;
+    const x0 = w * 0.1;
+    const x1 = w * 0.9;
+    const trackH = Math.max(10, h * 0.14);
+    ctx.fillStyle = 'rgba(6,8,22,0.85)';
+    ctx.fillRect(x0, cy - trackH / 2, x1 - x0, trackH);
+    ctx.strokeStyle = 'rgba(122,139,168,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x0, cy - trackH / 2, x1 - x0, trackH);
+    const cx = (x0 + x1) * 0.5 + t * (x1 - x0) * 0.42;
+    ctx.fillStyle = 'rgba(5,217,232,0.95)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - trackH * 0.65);
+    ctx.lineTo(cx + trackH * 0.35, cy);
+    ctx.lineTo(cx, cy + trackH * 0.65);
+    ctx.lineTo(cx - trackH * 0.35, cy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(9, h / 32)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`Δ ${diffDb >= 0 ? '+' : ''}${diffDb.toFixed(1)} dB (L − R RMS)`, w / 2, cy - trackH * 1.15);
+    ctx.textAlign = 'left';
+    ctx.fillText('L hotter', x0, h - 10);
+    ctx.textAlign = 'right';
+    ctx.fillText('R hotter', x1, h - 10);
+}
+
+function aeDrawCorrelationGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    const {corr} = aeEngineScopeStereoMetrics(sl, srDat, n);
+    if (corr == null) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    const y0 = h * 0.38;
+    const barH = Math.max(14, h * 0.2);
+    const x0 = w * 0.08;
+    const x1 = w * 0.92;
+    const mid = (x0 + x1) * 0.5;
+    ctx.fillStyle = 'rgba(6,8,22,0.85)';
+    ctx.fillRect(x0, y0, x1 - x0, barH);
+    ctx.strokeStyle = 'rgba(122,139,168,0.4)';
+    ctx.strokeRect(x0, y0, x1 - x0, barH);
+    const fillW = ((corr + 1) / 2) * (x1 - x0);
+    const g = ctx.createLinearGradient(x0, 0, x1, 0);
+    g.addColorStop(0, 'rgba(255,90,90,0.85)');
+    g.addColorStop(0.5, 'rgba(122,139,168,0.5)');
+    g.addColorStop(1, 'rgba(57,255,120,0.9)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, y0, Math.max(0, fillW), barH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(mid, y0 - 3);
+    ctx.lineTo(mid, y0 + barH + 3);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(224,240,255,0.9)';
+    ctx.font = `${Math.max(10, h / 28)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`ρ = ${corr.toFixed(2)}`, w / 2, y0 - 10);
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.fillStyle = 'rgba(122,139,168,0.65)';
+    ctx.fillText('−1 (wide) ← → +1 (mono)', w / 2, y0 + barH + 22);
+}
+
+function aeDrawWidthGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    const {width} = aeEngineScopeStereoMetrics(sl, srDat, n);
+    if (width == null) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    const wMax = 2.5;
+    const pct = Math.max(0, Math.min(1, width / wMax));
+    const y0 = h * 0.38;
+    const barH = Math.max(14, h * 0.2);
+    const x0 = w * 0.08;
+    const x1 = w * 0.92;
+    ctx.fillStyle = 'rgba(6,8,22,0.85)';
+    ctx.fillRect(x0, y0, x1 - x0, barH);
+    ctx.strokeStyle = 'rgba(211,0,197,0.35)';
+    ctx.strokeRect(x0, y0, x1 - x0, barH);
+    ctx.fillStyle = 'rgba(211,0,197,0.75)';
+    ctx.fillRect(x0, y0, (x1 - x0) * pct, barH);
+    ctx.fillStyle = 'rgba(224,240,255,0.9)';
+    ctx.font = `${Math.max(10, h / 28)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`RMS(side) / RMS(mid) = ${width.toFixed(2)}`, w / 2, y0 - 10);
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.fillStyle = 'rgba(122,139,168,0.65)';
+    ctx.fillText(`0 (mono) — ${wMax.toFixed(1)} (wide)`, w / 2, y0 + barH + 22);
+}
+
+function aeDrawCrestGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    const cL = aeScopeChannelDbStats(sl);
+    const cR = aeScopeChannelDbStats(srDat);
+    const crestL = Math.pow(10, (cL.peakDb - cL.rmsDb) / 20);
+    const crestR = Math.pow(10, (cR.peakDb - cR.rmsDb) / 20);
+    const crestMax = 12;
+    const row = (yBase, label, crest, rgb) => {
+        const pct = Math.max(0, Math.min(1, crest / crestMax));
+        const x0 = w * 0.14;
+        const x1 = w * 0.94;
+        const bh = Math.max(10, h * 0.1);
+        ctx.fillStyle = 'rgba(6,8,22,0.85)';
+        ctx.fillRect(x0, yBase, x1 - x0, bh);
+        ctx.strokeStyle = 'rgba(122,139,168,0.3)';
+        ctx.strokeRect(x0, yBase, x1 - x0, bh);
+        ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.88)`;
+        ctx.fillRect(x0, yBase, (x1 - x0) * pct, bh);
+        ctx.fillStyle = 'rgba(224,240,255,0.9)';
+        ctx.font = `${Math.max(9, h / 30)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`${label}  ${crest.toFixed(2)} :1`, x0, yBase - 6);
+    };
+    row(h * 0.28, 'L', crestL, [5, 217, 232]);
+    row(h * 0.58, 'R', crestR, [211, 0, 197]);
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 38)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`peak / RMS · scale 0–${crestMax}`, w / 2, h - 8);
+}
+
+function aeDrawLMinusRGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    ctx.strokeStyle = 'rgba(122,139,168,0.14)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    ctx.lineTo(w, h / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const sliceW = w / n;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const d = l - r;
+        const x = i * sliceW;
+        const y = (0.5 - d * 0.5) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(57, 255, 120, 0.92)';
+    ctx.lineWidth = 1.75;
+    ctx.shadowColor = 'rgba(57, 255, 120, 0.35)';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('L − R', 6, 14);
+}
+
+function aeDrawEnergyEnvelopeGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    let peak = 1e-8;
+    const e = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const v = Math.sqrt(0.5 * (l * l + r * r));
+        e[i] = v;
+        if (v > peak) peak = v;
+    }
+    const sliceW = w / n;
+    const yBase = h * 0.92;
+    const plotH = h * 0.78;
+    ctx.beginPath();
+    ctx.moveTo(0, yBase);
+    for (let i = 0; i < n; i++) {
+        const x = (i + 0.5) * sliceW;
+        const yn = yBase - (e[i] / peak) * plotH;
+        ctx.lineTo(x, yn);
+    }
+    ctx.lineTo(w, yBase);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, yBase - plotH, 0, yBase);
+    g.addColorStop(0, 'rgba(5, 217, 232, 0.55)');
+    g.addColorStop(1, 'rgba(211, 0, 197, 0.08)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const x = (i + 0.5) * sliceW;
+        const yn = yBase - (e[i] / peak) * plotH;
+        if (i === 0) ctx.moveTo(x, yn);
+        else ctx.lineTo(x, yn);
+    }
+    ctx.strokeStyle = 'rgba(5, 217, 232, 0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = 'rgba(5, 217, 232, 0.25)';
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('√(½(L²+R²)) · frame peak', 6, 14);
+}
+
+function aeDrawGoniometerGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const rad = Math.min(w, h) * 0.42;
+    ctx.strokeStyle = 'rgba(122,139,168,0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath();
+    ctx.moveTo(cx - rad * 1.05, cy);
+    ctx.lineTo(cx + rad * 1.05, cy);
+    ctx.moveTo(cx, cy - rad * 1.05);
+    ctx.lineTo(cx, cy + rad * 1.05);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(cx - rad * 0.74, cy - rad * 0.74);
+    ctx.lineTo(cx + rad * 0.74, cy + rad * 0.74);
+    ctx.moveTo(cx - rad * 0.74, cy + rad * 0.74);
+    ctx.lineTo(cx + rad * 0.74, cy - rad * 0.74);
+    ctx.stroke();
+    const step = Math.max(1, Math.floor(n / 720));
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < n; i += step) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const x = cx + l * rad * 0.95;
+        const y = cy - r * rad * 0.95;
+        if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
+    ctx.strokeStyle = 'rgba(255, 200, 120, 0.85)';
+    ctx.lineWidth = 1.35;
+    ctx.shadowColor = 'rgba(255, 200, 120, 0.3)';
+    ctx.shadowBlur = 7;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('L → R ↑', 6, 14);
+}
+
+function aeDrawDcOffsetGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    let sumL = 0;
+    let sumR = 0;
+    for (let i = 0; i < n; i++) {
+        sumL += (sl[i] - 128) / 128;
+        sumR += (srDat[i] - 128) / 128;
+    }
+    const inv = 1 / n;
+    const mL = sumL * inv;
+    const mR = sumR * inv;
+    const xMid = w * 0.5;
+    const maxShown = 0.22;
+    const half = w * 0.44;
+    const scale = half / maxShown;
+    const row = (y, label, mean, rgb) => {
+        const x0 = Math.min(xMid, xMid + mean * scale);
+        const x1 = Math.max(xMid, xMid + mean * scale);
+        const y0 = y - h * 0.08;
+        const hh = h * 0.11;
+        ctx.fillStyle = 'rgba(6,8,22,0.85)';
+        ctx.fillRect(xMid - half, y0, half * 2, hh);
+        ctx.strokeStyle = 'rgba(122,139,168,0.35)';
+        ctx.strokeRect(xMid - half, y0, half * 2, hh);
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(xMid, y0 - 2);
+        ctx.lineTo(xMid, y0 + hh + 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.88)`;
+        ctx.fillRect(x0, y0, Math.max(1, x1 - x0), hh);
+        ctx.fillStyle = 'rgba(224,240,255,0.92)';
+        ctx.font = `${Math.max(9, h / 32)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`${label}  μ=${mean >= 0 ? '+' : ''}${mean.toFixed(4)}`, w * 0.06, y0 - 6);
+    };
+    row(h * 0.34, 'L', mL, [5, 217, 232]);
+    row(h * 0.64, 'R', mR, [211, 0, 197]);
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 38)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`±${maxShown.toFixed(2)} linear ·0 = mid`, w / 2, h - 6);
+}
+
+function aeDrawMagHistogramGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    const binN = 48;
+    const hist = new Uint32Array(binN);
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        let mag = Math.sqrt(0.5 * (l * l + r * r));
+        if (mag < 0) mag = 0;
+        if (mag > 1) mag = 1;
+        let b = (mag * binN) | 0;
+        if (b >= binN) b = binN - 1;
+        hist[b]++;
+    }
+    let peakC = 1;
+    for (let b = 0; b < binN; b++) {
+        if (hist[b] > peakC) peakC = hist[b];
+    }
+    const padL = w * 0.06;
+    const padR = w * 0.04;
+    const padB = h * 0.14;
+    const padT = h * 0.12;
+    const plotW = w - padL - padR;
+    const plotH = h - padB - padT;
+    const bw = plotW / binN;
+    for (let b = 0; b < binN; b++) {
+        const bh = (hist[b] / peakC) * plotH;
+        const x = padL + b * bw;
+        const g = ctx.createLinearGradient(0, padT + plotH - bh, 0, padT + plotH);
+        g.addColorStop(0, 'rgba(120, 200, 255, 0.75)');
+        g.addColorStop(1, 'rgba(211, 0, 197, 0.35)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x + 0.5, padT + plotH - bh, Math.max(1, bw - 1), bh);
+    }
+    ctx.strokeStyle = 'rgba(122,139,168,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT + plotH);
+    ctx.lineTo(padL + plotW, padT + plotH);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('√(½(L²+R²)) · 0 →1', 6, 14);
+    ctx.textAlign = 'center';
+    ctx.fillText('quiet ← → hot', w / 2, h - 5);
+}
+
+function aeDrawPeakSampleGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    let pkMax = 1e-8;
+    const pk = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const v = Math.max(Math.abs(l), Math.abs(r));
+        pk[i] = v;
+        if (v > pkMax) pkMax = v;
+    }
+    const sliceW = w / n;
+    const yBase = h * 0.9;
+    const plotH = h * 0.76;
+    ctx.beginPath();
+    ctx.moveTo(0, yBase);
+    for (let i = 0; i < n; i++) {
+        const x = (i + 0.5) * sliceW;
+        const yn = yBase - (pk[i] / pkMax) * plotH;
+        ctx.lineTo(x, yn);
+    }
+    ctx.lineTo(w, yBase);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, yBase - plotH, 0, yBase);
+    g.addColorStop(0, 'rgba(255, 160, 70, 0.45)');
+    g.addColorStop(1, 'rgba(255, 90, 120, 0.06)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const x = (i + 0.5) * sliceW;
+        const yn = yBase - (pk[i] / pkMax) * plotH;
+        if (i === 0) ctx.moveTo(x, yn);
+        else ctx.lineTo(x, yn);
+    }
+    ctx.strokeStyle = 'rgba(255, 170, 95, 0.92)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = 'rgba(255, 140, 80, 0.28)';
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('max(|L|,|R|) · frame peak', 6, 14);
+}
+
+function aeDrawMonoWaveGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    ctx.strokeStyle = 'rgba(122,139,168,0.14)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    ctx.lineTo(w, h / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const sliceW = w / n;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const mid = (l + r) * 0.5;
+        const x = i * sliceW;
+        const y = (0.5 - mid * 0.5) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(120, 220, 255, 0.92)';
+    ctx.lineWidth = 1.75;
+    ctx.shadowColor = 'rgba(120, 220, 255, 0.35)';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('M = (L + R) / 2', 6, 14);
+}
+
+function aeDrawSideWaveGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    ctx.strokeStyle = 'rgba(122,139,168,0.14)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    ctx.lineTo(w, h / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const sliceW = w / n;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const side = (l - r) * 0.5;
+        const x = i * sliceW;
+        const y = (0.5 - side * 0.5) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(255, 180, 90, 0.92)';
+    ctx.lineWidth = 1.75;
+    ctx.shadowColor = 'rgba(255, 180, 90, 0.35)';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('S = (L − R) / 2', 6, 14);
+}
+
+function aeDrawLrOverlayGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    ctx.strokeStyle = 'rgba(122,139,168,0.14)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    ctx.lineTo(w, h / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const sliceW = w / n;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const strokeCh = (getS, rgbaStroke, rgbaGlow) => {
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+            const x = i * sliceW;
+            const y = (0.5 - getS(i) * 0.5) * h;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = rgbaStroke;
+        ctx.lineWidth = 1.65;
+        ctx.shadowColor = rgbaGlow;
+        ctx.shadowBlur = 6;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    };
+    strokeCh((i) => (sl[i] - 128) / 128, 'rgba(5, 217, 232, 0.88)', 'rgba(5, 217, 232, 0.28)');
+    strokeCh((i) => (srDat[i] - 128) / 128, 'rgba(211, 0, 197, 0.88)', 'rgba(211, 0, 197, 0.28)');
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('L cyan · R magenta', 6, 14);
+}
+
+function aeDrawAbsDiffHistogramGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    const binN = 48;
+    const hist = new Uint32Array(binN);
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        let d = Math.abs(l - r);
+        if (d > 2) d = 2;
+        let b = ((d / 2) * binN) | 0;
+        if (b >= binN) b = binN - 1;
+        hist[b]++;
+    }
+    let peakC = 1;
+    for (let b = 0; b < binN; b++) {
+        if (hist[b] > peakC) peakC = hist[b];
+    }
+    const padL = w * 0.06;
+    const padR = w * 0.04;
+    const padB = h * 0.14;
+    const padT = h * 0.12;
+    const plotW = w - padL - padR;
+    const plotH = h - padB - padT;
+    const bw = plotW / binN;
+    for (let b = 0; b < binN; b++) {
+        const bh = (hist[b] / peakC) * plotH;
+        const x = padL + b * bw;
+        const g = ctx.createLinearGradient(0, padT + plotH - bh, 0, padT + plotH);
+        g.addColorStop(0, 'rgba(57, 255, 120, 0.78)');
+        g.addColorStop(1, 'rgba(5, 217, 232, 0.35)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x + 0.5, padT + plotH - bh, Math.max(1, bw - 1), bh);
+    }
+    ctx.strokeStyle = 'rgba(122,139,168,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT + plotH);
+    ctx.lineTo(padL + plotW, padT + plotH);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('|L − R| · 0 → 2 linear', 6, 14);
+    ctx.textAlign = 'center';
+    ctx.fillText('mono-ish ← → wide', w / 2, h - 5);
+}
+
+function aeDrawLissajousGraph(ctx, w, h) {
+    aeGraphFillBackdrop(ctx, w, h);
+    const n = typeof window._engineScopeLen === 'number' ? window._engineScopeLen : 0;
+    const sl = typeof window !== 'undefined' ? window._engineScopeL : null;
+    const srDat = typeof window !== 'undefined' ? window._engineScopeR : null;
+    if (n < 16 || !sl || !srDat) {
+        ctx.fillStyle = 'rgba(122,139,168,0.5)';
+        ctx.font = `${Math.max(10, h / 22)}px "Share Tech Mono", ui-monospace, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('—', w / 2, h / 2);
+        return;
+    }
+    let pk = 1e-8;
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const a = Math.max(Math.abs(l), Math.abs(r));
+        if (a > pk) pk = a;
+    }
+    const cx = w * 0.5;
+    const cy = h * 0.5;
+    const scale = (Math.min(w, h) * 0.42) / Math.max(pk, 1e-6);
+    ctx.strokeStyle = 'rgba(122,139,168,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, h);
+    ctx.moveTo(0, cy);
+    ctx.lineTo(w, cy);
+    ctx.stroke();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+        const l = (sl[i] - 128) / 128;
+        const r = (srDat[i] - 128) / 128;
+        const x = cx + l * scale;
+        const y = cy - r * scale;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(180, 120, 255, 0.85)';
+    ctx.lineWidth = 1.35;
+    ctx.shadowColor = 'rgba(140, 90, 255, 0.25)';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(122,139,168,0.55)';
+    ctx.font = `${Math.max(8, h / 36)}px "Share Tech Mono", ui-monospace, monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('L → horizontal · R → vertical', 6, 14);
+}
+
+function aeDrawOutputGraphs() {
+    const ms = document.getElementById('aeGraphMidSide');
+    const bal = document.getElementById('aeGraphBalance');
+    const cor = document.getElementById('aeGraphCorrelation');
+    const wid = document.getElementById('aeGraphWidth');
+    const cr = document.getElementById('aeGraphCrest');
+    const dlr = document.getElementById('aeGraphLMinusR');
+    const ene = document.getElementById('aeGraphEnergy');
+    const gon = document.getElementById('aeGraphGonio');
+    const dc = document.getElementById('aeGraphDcOffset');
+    const mh = document.getElementById('aeGraphMagHist');
+    const pk = document.getElementById('aeGraphPeakSample');
+    const mw = document.getElementById('aeGraphMonoWave');
+    const sw = document.getElementById('aeGraphSideWave');
+    const lro = document.getElementById('aeGraphLrOverlay');
+    const adh = document.getElementById('aeGraphAbsDiffHist');
+    const lis = document.getElementById('aeGraphLissajous');
+    if (ms && ms.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphMidSide', () => {
+            const c2 = ms.getContext('2d');
+            if (c2 && ms.width > 0 && ms.height > 0) aeDrawMidSideGraph(c2, ms.width, ms.height);
+        });
+    }
+    if (bal && bal.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphBalance', () => {
+            const c2 = bal.getContext('2d');
+            if (c2 && bal.width > 0 && bal.height > 0) aeDrawBalanceGraph(c2, bal.width, bal.height);
+        });
+    }
+    if (cor && cor.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphCorrelation', () => {
+            const c2 = cor.getContext('2d');
+            if (c2 && cor.width > 0 && cor.height > 0) aeDrawCorrelationGraph(c2, cor.width, cor.height);
+        });
+    }
+    if (wid && wid.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphWidth', () => {
+            const c2 = wid.getContext('2d');
+            if (c2 && wid.width > 0 && wid.height > 0) aeDrawWidthGraph(c2, wid.width, wid.height);
+        });
+    }
+    if (cr && cr.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphCrest', () => {
+            const c2 = cr.getContext('2d');
+            if (c2 && cr.width > 0 && cr.height > 0) aeDrawCrestGraph(c2, cr.width, cr.height);
+        });
+    }
+    if (dlr && dlr.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphLMinusR', () => {
+            const c2 = dlr.getContext('2d');
+            if (c2 && dlr.width > 0 && dlr.height > 0) aeDrawLMinusRGraph(c2, dlr.width, dlr.height);
+        });
+    }
+    if (ene && ene.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphEnergy', () => {
+            const c2 = ene.getContext('2d');
+            if (c2 && ene.width > 0 && ene.height > 0) aeDrawEnergyEnvelopeGraph(c2, ene.width, ene.height);
+        });
+    }
+    if (gon && gon.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphGonio', () => {
+            const c2 = gon.getContext('2d');
+            if (c2 && gon.width > 0 && gon.height > 0) aeDrawGoniometerGraph(c2, gon.width, gon.height);
+        });
+    }
+    if (dc && dc.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphDcOffset', () => {
+            const c2 = dc.getContext('2d');
+            if (c2 && dc.width > 0 && dc.height > 0) aeDrawDcOffsetGraph(c2, dc.width, dc.height);
+        });
+    }
+    if (mh && mh.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphMagHist', () => {
+            const c2 = mh.getContext('2d');
+            if (c2 && mh.width > 0 && mh.height > 0) aeDrawMagHistogramGraph(c2, mh.width, mh.height);
+        });
+    }
+    if (pk && pk.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphPeakSample', () => {
+            const c2 = pk.getContext('2d');
+            if (c2 && pk.width > 0 && pk.height > 0) aeDrawPeakSampleGraph(c2, pk.width, pk.height);
+        });
+    }
+    if (mw && mw.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphMonoWave', () => {
+            const c2 = mw.getContext('2d');
+            if (c2 && mw.width > 0 && mw.height > 0) aeDrawMonoWaveGraph(c2, mw.width, mw.height);
+        });
+    }
+    if (sw && sw.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphSideWave', () => {
+            const c2 = sw.getContext('2d');
+            if (c2 && sw.width > 0 && sw.height > 0) aeDrawSideWaveGraph(c2, sw.width, sw.height);
+        });
+    }
+    if (lro && lro.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphLrOverlay', () => {
+            const c2 = lro.getContext('2d');
+            if (c2 && lro.width > 0 && lro.height > 0) aeDrawLrOverlayGraph(c2, lro.width, lro.height);
+        });
+    }
+    if (adh && adh.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphAbsDiffHist', () => {
+            const c2 = adh.getContext('2d');
+            if (c2 && adh.width > 0 && adh.height > 0) aeDrawAbsDiffHistogramGraph(c2, adh.width, adh.height);
+        });
+    }
+    if (lis && lis.getContext) {
+        aeGraphWithScopeForCanvasId('aeGraphLissajous', () => {
+            const c2 = lis.getContext('2d');
+            if (c2 && lis.width > 0 && lis.height > 0) aeDrawLissajousGraph(c2, lis.width, lis.height);
+        });
+    }
+}
+
+function aeClearOutputGraphCanvases() {
+    const ids = _aeDiagGraphIds;
+    for (let i = 0; i < ids.length; i++) {
+        const el = document.getElementById(ids[i]);
+        if (!el || !el.getContext) continue;
+        const c2 = el.getContext('2d');
+        if (!c2 || el.width < 2 || el.height < 2) continue;
+        aeGraphFillBackdrop(c2, el.width, el.height);
+    }
+}
+
+function scheduleAeGraphRafLoop() {
+    if (!shouldDrawAeOutputGraphs()) {
+        stopAeGraphRaf();
+        return;
+    }
+    if (aeGraphRafId !== 0) return;
+    const loop = () => {
+        aeGraphRafId = 0;
+        if (!shouldDrawAeOutputGraphs()) return;
+        aeDrawOutputGraphs();
+        aeGraphRafId = requestAnimationFrame(loop);
+    };
+    aeGraphRafId = requestAnimationFrame(loop);
+}
+
+function startAeTabMeterPollIfNeeded() {
+    if (!shouldRunAeTabMeterPoll()) {
+        stopAeTabMeterPoll();
+        return;
+    }
+    stopAeTabMeterPoll();
+    aeTabMeterPollTimer = setInterval(() => void tickAeTabMeterPoll(), AE_TAB_METER_POLL_MS);
+    void tickAeTabMeterPoll();
+}
+
+async function tickAeTabMeterPoll() {
+    if (!shouldRunAeTabMeterPoll()) {
+        stopAeTabMeterPoll();
+        return;
+    }
+    if (aeTabMeterPollInFlight) return;
+    const inv = getAeAudioEngineInvoke();
+    if (!inv) {
+        stopAeTabMeterPoll();
+        return;
+    }
+    aeTabMeterPollInFlight = true;
+    try {
+        const st = await inv(buildEnginePlaybackStatusRequest());
+        if (st && st.ok === true) {
+            applyPlaybackStatusSpectrum(st);
+            applyPlaybackStatusScope(st);
+            if (typeof st.peak === 'number' && !Number.isNaN(st.peak)) {
+                window._enginePlaybackPeak = st.peak;
+            }
+        }
+    } catch {
+        /* ignore */
+    } finally {
+        aeTabMeterPollInFlight = false;
+    }
+}
+
+function syncAeOutputGraphsAfterStreamStateChange() {
+    if (!aeAudioEngineTabIsActive()) {
+        stopAeTabMeterAndGraph();
+        return;
+    }
+    layoutAeOutputGraphCanvases();
+    if (typeof window === 'undefined' || !window._aeOutputStreamRunning) {
+        stopAeTabMeterAndGraph();
+        aeClearOutputGraphCanvases();
+        return;
+    }
+    startAeTabMeterPollIfNeeded();
+    scheduleAeGraphRafLoop();
+}
+
 async function runEnginePlaybackStatusTick() {
     const inv = getAeAudioEngineInvoke();
     if (!inv) return;
     try {
-        const st = await inv({cmd: 'playback_status'});
+        const st = await inv(buildEnginePlaybackStatusRequest());
         if (st && st.ok === true) {
             applyPlaybackStatusSpectrum(st);
+            applyPlaybackStatusScope(st);
+            if (typeof st.peak === 'number' && !Number.isNaN(st.peak)) {
+                window._enginePlaybackPeak = st.peak;
+            }
             if (st.loaded === true) {
                 window._enginePlaybackPosSec = typeof st.position_sec === 'number' ? st.position_sec : 0;
                 window._enginePlaybackDurSec = typeof st.duration_sec === 'number' ? st.duration_sec : 0;
                 window._enginePlaybackPaused = st.paused === true;
-                window._enginePlaybackPeak = typeof st.peak === 'number' ? st.peak : 0;
                 /* Anchor the local interpolation model so `updatePlaybackTime()` can compute
                  * `posSec + (now - anchor) * speed` between polls at rAF rate. Without this the
                  * playhead visibly steps in 30 ms chunks (poll interval) even though the rAF
@@ -2506,7 +4095,10 @@ async function runEnginePlaybackStatusTick() {
 }
 
 function startEnginePlaybackPoll() {
-    stopEnginePlaybackPoll();
+    stopAeTabMeterPoll();
+    stopAeGraphRaf();
+    _enginePlaybackPollSessionActive = false;
+    _haltLibraryPlaybackPollIntervalAndWatchdog();
     _enginePlaybackPollSessionActive = true;
     if (typeof document !== 'undefined' && !_enginePlaybackIdleHooked) {
         _enginePlaybackIdleHooked = true;
@@ -2520,6 +4112,7 @@ function startEnginePlaybackPoll() {
         _enginePlaybackPollTimer = setInterval(() => void runEnginePlaybackStatusTick(), ENGINE_PLAYBACK_POLL_MS);
         syncEnginePlaybackEofWatchdog();
     }
+    scheduleAeGraphRafLoop();
 }
 
 /**
@@ -2694,9 +4287,13 @@ async function enginePlaybackStop() {
     window._engineSpectrumU8 = null;
     window._aeOutputStreamRunning = false;
     if (typeof window.stopEnginePlaybackFftRaf === 'function') window.stopEnginePlaybackFftRaf();
+    stopAeTabMeterAndGraph();
+    aeClearOutputGraphCanvases();
 }
 
 if (typeof window !== 'undefined') {
+    window.buildEnginePlaybackStatusRequest = buildEnginePlaybackStatusRequest;
+    window.ENGINE_PLAYBACK_SPECTRUM_MIN_BINS = ENGINE_PLAYBACK_SPECTRUM_MIN_BINS;
     window.ensureAeOutputStreamOnStartup = ensureAeOutputStreamOnStartup;
     window.enginePlaybackStart = enginePlaybackStart;
     window.enginePlaybackStop = enginePlaybackStop;
@@ -2710,4 +4307,7 @@ if (typeof window !== 'undefined') {
     window.startEnginePlaybackPoll = startEnginePlaybackPoll;
     window.syncEnginePlaybackPollForUiIdle = syncEnginePlaybackPollForUiIdle;
     window.syncAeTransportFromPlayback = syncAeTransportFromPlayback;
+    window.stopAeTabMeterAndGraph = stopAeTabMeterAndGraph;
+    window.stopAeGraphRaf = stopAeGraphRaf;
+    window.scheduleAeGraphRafLoop = scheduleAeGraphRafLoop;
 }

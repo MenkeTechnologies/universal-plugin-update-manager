@@ -31,6 +31,7 @@ async function resolveKvrDownloads() {
     const statusStats = document.getElementById('statusStats');
     statusBar.classList.add('active');
     statusStats.innerHTML = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
 
     let resolved = 0;
     let downloads = 0;
@@ -92,6 +93,9 @@ async function resolveKvrDownloads() {
     }
 
     statusBar.classList.remove('active');
+    if (statusText) statusText.textContent = '';
+    if (statusStats) statusStats.innerHTML = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
     hideStopButton();
 }
 

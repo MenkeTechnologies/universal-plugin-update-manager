@@ -46,6 +46,8 @@ let _pdfStatsTotalBytes = 0;
 const _pdfPagesCache = {};
 let _pdfMetaRunning = false;
 let _pdfMetaProgressCleanup = null;
+/** Last `pdf-metadata-progress` payload for header badge repaint after `ui-idle-heavy-cpu`. */
+let _pdfMetaLastProgress = null;
 /** Debounced + single-flight `pdfMetadataGet` from progress events (avoids SQL churn every 100 files). */
 let _pdfMetaProgDebounceTimer = null;
 let _pdfMetaProgGetInFlight = false;
@@ -372,8 +374,26 @@ function openPdfFile(path) {
 
 // When `unifiedResult` is passed (by scanAll), skip this function's Tauri
 // invoke and consume the shared result from a single scan_unified call.
+function _shouldUpdatePdfScanBadgeUi() {
+    return !(typeof isUiIdleHeavyCpu === 'function' && isUiIdleHeavyCpu());
+}
+
+function applyPdfScanStatusBarProgress(found) {
+    const badge = document.getElementById('bgPdfScanBadge');
+    if (!badge) return;
+    if (!_shouldUpdatePdfScanBadgeUi()) {
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+        return;
+    }
+    const n = found == null ? 0 : found;
+    badge.textContent = formatBgJobBadgeLine('pdfScan', 'ui.stats.pdf_scan_bg_progress', {n: n.toLocaleString()});
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+}
+
 async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = null) {
-    showGlobalProgress();
+    if (typeof window !== 'undefined') window.__statusBarPdfScanJob = true;
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    applyPdfScanStatusBarProgress(0);
     const scanBtn = document.querySelector('[data-action="scanPdfs"]');
     const resumeBtn = document.getElementById('btnResumePdf');
     const stopBtn = document.getElementById('btnStopPdf');
@@ -475,6 +495,7 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
             pendingPdfs.push(...data.pdfs);
             pendingFound = data.found;
             window.__pdfScanPendingFound = pendingFound;
+            applyPdfScanStatusBarProgress(pendingFound);
             if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({pdf: pendingFound});
             else {
                 const headerEl = document.getElementById('pdfCountHeader');
@@ -552,7 +573,10 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
     }
 
     window.__pdfScanPendingFound = 0;
-    hideGlobalProgress();
+    if (typeof window !== 'undefined') window.__statusBarPdfScanJob = false;
+    const pdfScanBadge = document.getElementById('bgPdfScanBadge');
+    if (pdfScanBadge) pdfScanBadge.textContent = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
     if (scanBtn) {
         scanBtn.disabled = false;
         if (typeof btnLoading === 'function') btnLoading(scanBtn, false);
@@ -607,6 +631,70 @@ function shouldStartPdfMetadataExtraction(forceNoIdle) {
 function maybeStartPdfBackgroundMetadataExtraction() {
     if (!isPdfMetadataAutoExtractOn()) return;
     void startPdfMetadataExtraction();
+}
+
+function _shouldUpdatePdfMetaBadgeUi() {
+    return !(typeof isUiIdleHeavyCpu === 'function' && isUiIdleHeavyCpu());
+}
+
+function clearPdfMetaBadge() {
+    _pdfMetaLastProgress = null;
+    const badge = document.getElementById('bgPdfMetaBadge');
+    if (!badge) return;
+    badge.textContent = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+}
+
+/**
+ * Paint PDF metadata progress on the status bar before `pdfMetadataExtractBatch` runs.
+ * Progress events can be delivered after the `invoke` promise settles; without this, `finally`
+ * may clear the badge while the row never showed a label.
+ */
+function paintPdfMetaBadgeQueuedTotal(total) {
+    const badge = document.getElementById('bgPdfMetaBadge');
+    if (!badge) return;
+    if (total != null && Number.isFinite(total) && total > 0) {
+        badge.textContent = formatBgJobBadgeLine('pdfMeta', 'ui.stats.pdf_meta_bg_progress', {done: 0, total});
+    } else {
+        badge.textContent = formatBgJobBadgeLine('pdfMeta', 'ui.stats.pdf_meta_bg_working');
+    }
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+}
+
+function applyPdfMetaBadgePayload(pl) {
+    if (!pl || typeof pl !== 'object') return;
+    const badge = document.getElementById('bgPdfMetaBadge');
+    const phase = pl.phase;
+    if (phase === 'done' || phase === 'aborted') {
+        clearPdfMetaBadge();
+        return;
+    }
+    if (phase === 'start') {
+        _pdfMetaLastProgress = pl;
+        if (!badge || !_shouldUpdatePdfMetaBadgeUi()) {
+            if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+            return;
+        }
+        const t = pl.total;
+        if (t != null && Number.isFinite(t) && t > 0) {
+            badge.textContent = formatBgJobBadgeLine('pdfMeta', 'ui.stats.pdf_meta_bg_progress', {done: 0, total: t});
+        } else {
+            badge.textContent = formatBgJobBadgeLine('pdfMeta', 'ui.stats.pdf_meta_bg_working');
+        }
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+        return;
+    }
+    if (phase === 'progress') {
+        _pdfMetaLastProgress = pl;
+        if (!badge || !_shouldUpdatePdfMetaBadgeUi()) {
+            if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+            return;
+        }
+        if (pl.done != null && pl.total != null && Number.isFinite(pl.total)) {
+            badge.textContent = formatBgJobBadgeLine('pdfMeta', 'ui.stats.pdf_meta_bg_progress', {done: pl.done, total: pl.total});
+        }
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    }
 }
 
 function clearPdfMetaProgressDebounceState() {
@@ -665,10 +753,10 @@ function syncPdfMetaExtractStopButton() {
 }
 
 async function stopPdfMetadataExtractionUser() {
-    if (!_pdfMetaRunning) return;
-    _pdfMetaUserCancelled = true;
+    const wasRunning = _pdfMetaRunning;
+    if (wasRunning) _pdfMetaUserCancelled = true;
     await abortPdfMetadataExtraction();
-    if (typeof showToast === 'function') {
+    if (wasRunning && typeof showToast === 'function') {
         showToast(toastFmt('toast.pdf_metadata_extract_stopped'), 2500);
     }
 }
@@ -698,8 +786,11 @@ async function startPdfMetadataExtraction(opts) {
     if (!shouldStartPdfMetadataExtraction(forceNoIdle)) return;
     _pdfMetaUserCancelled = false;
     _pdfMetaRunning = true;
+    if (typeof window !== 'undefined') window.__statusBarPdfMetaJob = true;
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
     syncPdfMetaExtractStopButton();
     let hadUncachedWork = false;
+    let extractionFailed = false;
     try {
         const uncached = await window.vstUpdater.pdfMetadataUnindexed(100000);
         if (_pdfMetaUserCancelled) {
@@ -714,11 +805,20 @@ async function startPdfMetadataExtraction(opts) {
             _pdfMetaProgressCleanup = null;
         }
         clearPdfMetaProgressDebounceState();
-        _pdfMetaProgressCleanup = await window.vstUpdater.onPdfMetadataProgress(() => {
+        _pdfMetaProgressCleanup = await window.vstUpdater.onPdfMetadataProgress((payload) => {
+            applyPdfMetaBadgePayload(payload);
             schedulePdfMetaProgressPageFetch();
         });
+        paintPdfMetaBadgeQueuedTotal(uncached.length);
         await window.vstUpdater.pdfMetadataExtractBatch(uncached);
+        await new Promise((r) => setTimeout(r, 0));
     } catch (e) {
+        extractionFailed = true;
+        if (window.vstUpdater?.appendLog) {
+            window.vstUpdater.appendLog(
+                `PDF META BG — session error: ${e && e.message ? e.message : e}`
+            );
+        }
         if (typeof showToast === 'function') {
             showToast(toastFmt('toast.pdf_metadata_extract_failed', {err: e && e.message ? e.message : e}), 4000, 'error');
         }
@@ -728,12 +828,23 @@ async function startPdfMetadataExtraction(opts) {
             _pdfMetaProgressCleanup();
             _pdfMetaProgressCleanup = null;
         }
+        clearPdfMetaBadge();
         const skipRefreshAfterUserStop = _pdfMetaUserCancelled;
         _pdfMetaUserCancelled = false;
         _pdfMetaRunning = false;
+        if (typeof window !== 'undefined') window.__statusBarPdfMetaJob = false;
         syncPdfMetaExtractStopButton();
+        if (
+            typeof showToast === 'function' &&
+            hadUncachedWork &&
+            !skipRefreshAfterUserStop &&
+            !extractionFailed
+        ) {
+            showToast(toastFmt('toast.pdf_metadata_extract_complete'), 2500);
+        }
         // Final reload for any rows we missed via progress events (not after explicit user stop — avoids immediate restart)
         if (hadUncachedWork && !skipRefreshAfterUserStop) loadPdfPagesForVisible();
+        if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
     }
 }
 
@@ -748,7 +859,6 @@ async function buildPdfPagesCache() {
     }
     if (typeof showToast === 'function') showToast(toastFmt('toast.pdf_extracting_metadata'), 3000);
     await startPdfMetadataExtraction({ forceNoIdle: true });
-    if (typeof showToast === 'function') showToast(toastFmt('toast.pdf_metadata_extract_complete'), 2500);
 }
 
 (function initPdfMetadataExtractionLifecycle() {
@@ -757,8 +867,43 @@ async function buildPdfPagesCache() {
         const idle = e && e.detail && e.detail.idle;
         if (idle) {
             if (!isPdfMetadataAutoExtractOn()) void abortPdfMetadataExtraction();
-        } else if (typeof loadPdfPagesForVisible === 'function') {
-            void loadPdfPagesForVisible();
+        } else {
+            if (_pdfMetaRunning && _pdfMetaLastProgress) {
+                applyPdfMetaBadgePayload(_pdfMetaLastProgress);
+            }
+            if (window.__statusBarPdfScanJob) {
+                const n = typeof window.__pdfScanPendingFound === 'number' ? window.__pdfScanPendingFound : 0;
+                applyPdfScanStatusBarProgress(n);
+            }
+            if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+            if (typeof loadPdfPagesForVisible === 'function') {
+                void loadPdfPagesForVisible();
+            }
         }
     });
 })();
+
+/** Settings → auto PDF metadata: run page-count extraction once after startup (full library pass). */
+function maybeAutoStartPdfMetadataOnStartup() {
+    try {
+        if (typeof prefs === 'undefined' || prefs.getItem('autoPdfMetadataOnStartup') !== 'on') return;
+        if (typeof startPdfMetadataExtraction !== 'function') return;
+        void startPdfMetadataExtraction({ forceNoIdle: true });
+    } catch {
+        /* ignore */
+    }
+}
+
+/** Settings → auto PDF scan: run once at launch when the indexed count is still zero. */
+function maybeAutoStartPdfScanOnStartup() {
+    try {
+        if (typeof prefs === 'undefined' || prefs.getItem('autoPdfScanOnStartup') !== 'on') return;
+        const roots = (prefs.getItem('pdfScanDirs') || '').split('\n').map((s) => s.trim()).filter(Boolean);
+        if (roots.length === 0) return;
+        const n = typeof _pdfTotalCount === 'number' ? _pdfTotalCount : 0;
+        if (n > 0) return;
+        if (typeof scanPdfs === 'function') void scanPdfs();
+    } catch {
+        /* ignore */
+    }
+}

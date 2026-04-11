@@ -333,6 +333,31 @@ pub struct PdfFile {
     #[serde(rename = "sizeFormatted")]
     pub size_formatted: String,
     pub modified: String,
+    /// Page count from `pdf_metadata` when the export payload was enriched (optional).
+    #[serde(default)]
+    pub pages: Option<u32>,
+    /// PDF Info `CreationDate` string when enriched (optional).
+    #[serde(default, rename = "pdfCreationDate")]
+    pub pdf_creation_date: Option<String>,
+    /// PDF Info `ModDate` string when enriched (optional).
+    #[serde(default, rename = "pdfModDate")]
+    pub pdf_mod_date: Option<String>,
+}
+
+impl Default for PdfFile {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            path: String::new(),
+            directory: String::new(),
+            size: 0,
+            size_formatted: String::new(),
+            modified: String::new(),
+            pages: None,
+            pdf_creation_date: None,
+            pdf_mod_date: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -546,6 +571,8 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
             ("pageSize", "pageSize"),
             ("flushInterval", "flushInterval"),
             ("threadMultiplier", "threadMultiplier"),
+            ("batchAnalysisThreads", "batchAnalysisThreads"),
+            ("contentDupHashThreads", "contentDupHashThreads"),
             ("channelBuffer", "channelBuffer"),
             ("batchSize", "batchSize"),
             ("sqliteReadPoolExtra", "sqliteReadPoolExtra"),
@@ -555,6 +582,16 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
     ),
     ("logging", &[("logVerbosity", "verbosity")]),
     ("player", &[("playerDock", "dock")]),
+    (
+        "audioEngine",
+        &[
+            (
+                "audioEnginePlaybackSpectrumFftOrder",
+                "playbackSpectrumFftOrder",
+            ),
+            ("audioEnginePlaybackSpectrumBands", "playbackSpectrumBands"),
+        ],
+    ),
     ("tabs", &[("tabOrder", "order")]),
     (
         "customScheme",
@@ -3380,6 +3417,7 @@ mod tests {
                 size: 100,
                 size_formatted: "100 B".into(),
                 modified: "d".into(),
+                ..Default::default()
             },
             PdfFile {
                 name: "b".into(),
@@ -3388,6 +3426,7 @@ mod tests {
                 size: 200,
                 size_formatted: "200 B".into(),
                 modified: "d".into(),
+                ..Default::default()
             },
         ];
         let snap = build_pdf_snapshot(&pdfs, &["/roots".into()]);
@@ -3406,6 +3445,7 @@ mod tests {
             size: 1,
             size_formatted: "1 B".into(),
             modified: "2024-01-01".into(),
+            ..Default::default()
         };
         let old = PdfScanSnapshot {
             id: "o".into(),
@@ -3439,6 +3479,7 @@ mod tests {
             size: 10,
             size_formatted: "10 B".into(),
             modified: "d".into(),
+            ..Default::default()
         };
         let old = PdfScanSnapshot {
             id: "o".into(),

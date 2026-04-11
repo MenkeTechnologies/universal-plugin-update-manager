@@ -220,6 +220,9 @@ function showDepGraph() {
     if (existing) existing.remove();
 
     if (data.pluginsByUsage.length === 0 && data.orphaned.length === 0) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(toastFmt('toast.run_plugin_index_first'), 5000, 'error');
+        }
         if (typeof tauriConfirm === 'function') {
             tauriConfirm(
                 catalogFmt('ui.dep_graph.confirm_build_index_body'),
@@ -232,8 +235,6 @@ function showDepGraph() {
                     });
                 }
             });
-        } else {
-            showToast(toastFmt('toast.run_plugin_index_first'), 4000);
         }
         return;
     }

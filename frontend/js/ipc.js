@@ -282,6 +282,9 @@ listen('menu-action', (event) => {
         case 'scan_pdfs':
             if (typeof scanPdfs === 'function') scanPdfs();
             break;
+        case 'stop_pdf_scan':
+            if (typeof stopPdfScan === 'function') void stopPdfScan();
+            break;
         case 'check_updates':
             if (typeof checkUpdates === 'function') checkUpdates();
             break;
@@ -388,6 +391,46 @@ listen('menu-action', (event) => {
         // Tools
         case 'find_duplicates':
             if (typeof showDuplicateReport === 'function') showDuplicateReport();
+            break;
+        case 'bpm_key_lufs_start':
+            if (typeof triggerBackgroundBpmKeyLufsAnalysis === 'function') {
+                triggerBackgroundBpmKeyLufsAnalysis();
+            }
+            break;
+        case 'bpm_key_lufs_stop':
+            if (typeof triggerStopBackgroundBpmKeyLufsAnalysis === 'function') {
+                triggerStopBackgroundBpmKeyLufsAnalysis();
+            }
+            break;
+        case 'extract_pdf_metadata':
+            if (typeof buildPdfPagesCache === 'function') buildPdfPagesCache();
+            break;
+        case 'stop_pdf_metadata':
+            if (typeof stopPdfMetadataExtractionUser === 'function') void stopPdfMetadataExtractionUser();
+            break;
+        case 'build_fingerprint_cache_menu':
+            if (typeof triggerStartFingerprintCacheBuild === 'function') void triggerStartFingerprintCacheBuild();
+            break;
+        case 'stop_fingerprint_cache_menu':
+            if (window.vstUpdater && typeof window.vstUpdater.stopFingerprintCache === 'function') {
+                void window.vstUpdater.stopFingerprintCache();
+            }
+            break;
+        case 'start_content_dup_scan':
+            if (typeof triggerStartBackgroundContentDupScan === 'function') {
+                triggerStartBackgroundContentDupScan();
+            }
+            break;
+        case 'stop_content_dup_scan':
+            if (typeof triggerStopBackgroundContentDupScan === 'function') {
+                triggerStopBackgroundContentDupScan();
+            }
+            break;
+        case 'start_all_background_jobs':
+            if (typeof triggerStartAllBackgroundJobs === 'function') triggerStartAllBackgroundJobs();
+            break;
+        case 'stop_all_background_jobs':
+            if (typeof triggerStopAllBackgroundJobs === 'function') triggerStopAllBackgroundJobs();
             break;
         case 'dep_graph':
             if (typeof showDepGraph === 'function') showDepGraph();
@@ -795,6 +838,16 @@ document.addEventListener('click', (e) => {
             case 'stopBpmKeyLufsAnalysis':
                 if (typeof triggerStopBackgroundBpmKeyLufsAnalysis === 'function') triggerStopBackgroundBpmKeyLufsAnalysis();
                 break;
+            case 'runContentDupScan':
+                if (typeof triggerStartBackgroundContentDupScan === 'function') {
+                    triggerStartBackgroundContentDupScan();
+                }
+                break;
+            case 'stopContentDupScan':
+                if (typeof triggerStopBackgroundContentDupScan === 'function') {
+                    triggerStopBackgroundContentDupScan();
+                }
+                break;
             case 'settingClearAnalysisCache':
                 window.vstUpdater.dbClearCaches().then(() => {
                     if (typeof _bpmCache !== 'undefined') {
@@ -844,11 +897,18 @@ document.addEventListener('click', (e) => {
                         }
                         showToast(toastFmt('toast.fingerprint_building_n_slow', {n: paths.length.toLocaleString()}), 4000);
                         try {
-                            const res = await window.vstUpdater.buildFingerprintCache(paths);
-                            showToast(toastFmt('toast.fingerprint_build_complete_n_cached', {
-                                built: res.built.toLocaleString(),
-                                cached: res.cached.toLocaleString()
-                            }));
+                            const res =
+                                typeof invokeBuildFingerprintCacheWithBadge === 'function'
+                                    ? await invokeBuildFingerprintCacheWithBadge(paths)
+                                    : await window.vstUpdater.buildFingerprintCache(paths);
+                            if (typeof showFingerprintCacheBuildOutcomeToast === 'function') {
+                                showFingerprintCacheBuildOutcomeToast(res, 'withCachedTotals');
+                            } else {
+                                showToast(toastFmt('toast.fingerprint_build_complete_n_cached', {
+                                    built: res.built.toLocaleString(),
+                                    cached: res.cached.toLocaleString()
+                                }));
+                            }
                             if (typeof renderCacheStats === 'function') renderCacheStats();
                         } catch (e) {
                             showToast(toastFmt('toast.fingerprint_build_failed', {err: e.message || e}), 4000, 'error');
@@ -919,6 +979,21 @@ document.addEventListener('click', (e) => {
             case 'settingToggleAutoAnalysis':
                 settingToggleAutoAnalysis();
                 break;
+            case 'settingToggleAutoContentDupScan':
+                settingToggleAutoContentDupScan();
+                break;
+            case 'settingToggleAutoFingerprintCache':
+                settingToggleAutoFingerprintCache();
+                break;
+            case 'settingToggleAutoPdfScanOnStartup':
+                settingToggleAutoPdfScanOnStartup();
+                break;
+            case 'settingToggleAutoPdfMetadataOnStartup':
+                settingToggleAutoPdfMetadataOnStartup();
+                break;
+            case 'settingToggleAutoCheckUpdatesOnStartup':
+                settingToggleAutoCheckUpdatesOnStartup();
+                break;
             case 'settingTogglePdfMetadataAutoExtract':
                 settingTogglePdfMetadataAutoExtract();
                 break;
@@ -987,6 +1062,15 @@ document.addEventListener('click', (e) => {
                 break;
             case 'browseDir':
                 browseDir(el.dataset.target);
+                break;
+            case 'browseSnapshotExportDir':
+                if (typeof browseSnapshotExportDir === 'function') void browseSnapshotExportDir();
+                break;
+            case 'saveSnapshotExportDir':
+                if (typeof saveSnapshotExportDir === 'function') saveSnapshotExportDir();
+                break;
+            case 'clearSnapshotExportDir':
+                if (typeof clearSnapshotExportDir === 'function') clearSnapshotExportDir();
                 break;
             case 'saveCustomDirs':
                 saveCustomDirs();
@@ -1165,6 +1249,8 @@ document.addEventListener('input', (e) => {
     else if (action === 'settingFlushInterval') settingUpdateFlushInterval(e.target.value);
     else if (action === 'settingTooltipHoverDelay') settingUpdateTooltipHoverDelay(e.target.value);
     else if (action === 'settingThreadMultiplier') settingUpdateThreadMultiplier(e.target.value);
+    else if (action === 'settingBatchAnalysisThreads') settingUpdateBatchAnalysisThreads(e.target.value);
+    else if (action === 'settingContentDupHashThreads') settingUpdateContentDupHashThreads(e.target.value);
     else if (action === 'settingSqliteReadPoolExtra') settingUpdateSqliteReadPoolExtra(e.target.value);
     else if (action === 'settingPruneOldScansKeep') settingUpdatePruneOldScansKeep(e.target.value);
     else if (action === 'settingChannelBuffer') settingUpdateChannelBuffer(e.target.value);
@@ -1483,7 +1569,9 @@ window.vstUpdater = {
         maxResults: maxResults || 20
     }),
     buildFingerprintCache: (candidatePaths) => invoke('build_fingerprint_cache', {candidatePaths}),
+    stopFingerprintCache: () => invoke('stop_fingerprint_cache', {}),
     findContentDuplicates: () => invoke('find_content_duplicates', {}),
+    cancelContentDuplicateScan: () => invoke('cancel_content_duplicate_scan', {}),
     pdfMetadataGet: (paths) => invoke('pdf_metadata_get', {paths}),
     pdfMetadataExtractAbort: () => invoke('pdf_metadata_extract_abort'),
     pdfMetadataExtractBatch: (paths) => invoke('pdf_metadata_extract_batch', {paths}),
@@ -1498,6 +1586,8 @@ window.vstUpdater = {
     getActiveScanInventoryCounts: () => invoke('get_active_scan_inventory_counts'),
     openPrefsFile: () => invoke('open_prefs_file'),
     getPrefsPath: () => invoke('get_prefs_path'),
+    /** App data `snapshots/` (mkdir); used when snapshot export folder pref is empty. */
+    ensureSnapshotExportDir: () => invoke('ensure_snapshot_export_dir'),
     prefsGetAll: () => invoke('prefs_get_all'),
     prefsSet: (key, value) => invoke('prefs_set', {key, value}),
     prefsRemove: (key) => invoke('prefs_remove', {key}),
@@ -1523,7 +1613,7 @@ window.vstUpdater = {
     getFileWatcherStatus: () => invoke('get_file_watcher_status'),
     // MIDI
     getMidiInfo: (filePath) => invoke('get_midi_info', {filePath}),
-    /** AudioEngine (persistent stdin loop): `{ cmd, ... }` → JSON. Includes `engine_state`, `start_output_stream` (`start_playback` for file PCM decode), `playback_load` / `playback_pause` / `playback_seek` / `playback_set_dsp` / `playback_set_speed` / `playback_set_reverse` / `playback_set_loop` / `playback_status` (optional `spectrum` + `spectrum_fft_size` / `spectrum_bins` / `spectrum_sr_hz` when output is running) / `playback_stop`, `playback_set_inserts` (VST3/AU bundle paths or cached `fileOrIdentifier`; stop stream first), `playback_open_insert_editor` / `playback_close_insert_editor` (native plug-in UI; `slot` is chain index), `stop_output_stream`, `start_input_stream` / `stop_input_stream`, `set_output_tone`, `plugin_chain` (scan + inserts; while scanning: `scan_done` / `scan_total` / `scan_skipped` / `scan_cache_loaded` / `scan_current_format` / `scan_current_name`). Stream `output_stream_status` / `input_stream_status` include `current_buffer_frames` (actual buffer length). UI: `audio-engine.js` + `audio.js` (`enginePlaybackStart`, waveform `pointerdown` seek, DSP). */
+    /** AudioEngine (persistent stdin loop): `{ cmd, ... }` → JSON. Includes `engine_state`, `start_output_stream` (`start_playback` for file PCM decode), `playback_load` / `playback_pause` / `playback_seek` / `playback_set_dsp` / `playback_set_speed` / `playback_set_reverse` / `playback_set_loop` / `playback_status` (optional `spectrum` default true, `spectrum_fft_order` 8–15 (256…32768 pt), `spectrum_bins` ≥64 capped by FFT Nyquist (`spectrum_fft_size`/2, DC…Nyquist magnitudes; below that each output sample is max of a sub-band so the array still spans DC–Nyquist); `spectrum: false` skips FFT work; response includes `spectrum_fft_size` / `spectrum_bins` / `spectrum_sr_hz`, `spectrum` array or null; optional `scope` + `scope_samples` (64…2048, default off) adds post-FX stereo tap `scope_l`/`scope_r` u8 arrays and `scope_len`) / `playback_stop`, `playback_set_inserts` (VST3/AU bundle paths or cached `fileOrIdentifier`; stop stream first), `playback_open_insert_editor` / `playback_close_insert_editor` (native plug-in UI; `slot` is chain index), `stop_output_stream`, `start_input_stream` / `stop_input_stream`, `set_output_tone`, `plugin_chain` (scan + inserts; while scanning: `scan_done` / `scan_total` / `scan_skipped` / `scan_cache_loaded` / `scan_current_format` / `scan_current_name`). Stream `output_stream_status` / `input_stream_status` include `current_buffer_frames` (actual buffer length). UI: `audio-engine.js` (`buildEnginePlaybackStatusRequest`) + `audio.js` (`enginePlaybackStart`, waveform `pointerdown` seek, DSP). */
     audioEngineInvoke: (request) => invoke('audio_engine_invoke', {request}),
     audioEngineRestart: () => invoke('audio_engine_restart'),
     audioEngineEofWatchdogStart: () => invoke('audio_engine_eof_watchdog_start'),

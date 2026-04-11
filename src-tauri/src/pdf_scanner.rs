@@ -226,6 +226,7 @@ fn walk_dir_parallel(
                     size: meta.len(),
                     size_formatted: format_size(meta.len()),
                     modified,
+                    ..Default::default()
                 });
                 found.fetch_add(1, Ordering::Relaxed);
 

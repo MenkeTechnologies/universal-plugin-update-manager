@@ -67,6 +67,11 @@ const SHORTCUT_LABEL_KEYS = {
     stopPdfScan: 'ui.shortcut.stop_pdf_scan',
     extractPdfMetadata: 'ui.shortcut.extract_pdf_metadata',
     stopPdfMetadata: 'ui.shortcut.stop_pdf_metadata',
+    stopFingerprintCache: 'ui.shortcut.stop_fingerprint_cache',
+    startContentDupScan: 'ui.shortcut.start_content_dup_scan',
+    stopContentDupScan: 'ui.shortcut.stop_content_dup_scan',
+    startAllBackgroundJobs: 'ui.shortcut.start_all_background_jobs',
+    stopAllBackgroundJobs: 'ui.shortcut.stop_all_background_jobs',
     buildFingerprintCache: 'ui.shortcut.build_fingerprint_cache',
     checkUpdates: 'ui.shortcut.check_updates',
     buildPluginIndex: 'ui.shortcut.build_plugin_index',
@@ -171,7 +176,13 @@ const DEFAULT_SHORTCUT_DEFS = {
     scanPdfsOnly: {key: 'f', mod: true, shift: true},
     stopPdfScan: {key: 'y', mod: true, shift: true},
     extractPdfMetadata: {key: 'm', mod: true, shift: true},
-    stopPdfMetadata: {key: 'z', mod: true, shift: true},
+    // Not Z: matches native menu — macOS reserves Cmd+Shift+Z for Edit → Redo.
+    stopPdfMetadata: {key: 'k', mod: true, shift: true},
+    stopFingerprintCache: {key: 'F4', mod: true, shift: true},
+    startContentDupScan: {key: ',', mod: true, shift: true},
+    stopContentDupScan: {key: '.', mod: true, shift: true},
+    startAllBackgroundJobs: {key: 'F5', mod: true, shift: true},
+    stopAllBackgroundJobs: {key: 'F6', mod: true, shift: true},
     buildFingerprintCache: {key: 'b', mod: true, shift: true},
     checkUpdates: {key: 'u', mod: true, shift: true},
     buildPluginIndex: {key: 'x', mod: true, shift: true},
@@ -291,6 +302,8 @@ function formatKey(shortcut) {
     else if (k === 'Escape') k = 'Esc';
     else if (k === '\\') k = '\\';
     else if (k === '`') k = '`';
+    else if (k === ',') k = ',';
+    else if (k === '.') k = '.';
     else k = k.toUpperCase();
     parts.push(k);
     return parts.join('+');
@@ -400,6 +413,13 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (typeof toggleCommandPalette === 'function') toggleCommandPalette();
+        return;
+    }
+    // Matches native Tools → Keyboard Shortcuts (`CmdOrCtrl+Shift+F3`); must work in inputs too.
+    if (mod && e.shiftKey && e.key === 'F3') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof toggleHelpOverlay === 'function') toggleHelpOverlay();
         return;
     }
 
@@ -561,32 +581,18 @@ function executeShortcut(id) {
     } else if (id === 'stopPdfMetadata') {
         if (typeof stopPdfMetadataExtractionUser === 'function') void stopPdfMetadataExtractionUser();
     } else if (id === 'buildFingerprintCache') {
-        void (async () => {
-            const paths = typeof fetchAudioLibraryPathsForFingerprint === 'function'
-                ? await fetchAudioLibraryPathsForFingerprint()
-                : [];
-            if (paths.length === 0) {
-                if (typeof showToast === 'function' && typeof toastFmt === 'function') {
-                    showToast(toastFmt('toast.no_audio_samples_scan_first'), 4000, 'error');
-                }
-                return;
-            }
-            if (typeof showToast === 'function' && typeof toastFmt === 'function') {
-                showToast(toastFmt('toast.fingerprint_building_n', {n: paths.length.toLocaleString()}), 4000);
-            }
-            const vu = window.vstUpdater;
-            if (!vu || typeof vu.buildFingerprintCache !== 'function') return;
-            try {
-                const res = await vu.buildFingerprintCache(paths);
-                if (typeof showToast === 'function' && typeof toastFmt === 'function') {
-                    showToast(toastFmt('toast.fingerprint_build_complete_n', {n: res.built.toLocaleString()}));
-                }
-            } catch (err) {
-                if (typeof showToast === 'function' && typeof toastFmt === 'function') {
-                    showToast(toastFmt('toast.fingerprint_build_failed', {err: err.message || err}), 4000, 'error');
-                }
-            }
-        })();
+        if (typeof triggerStartFingerprintCacheBuild === 'function') void triggerStartFingerprintCacheBuild();
+    } else if (id === 'stopFingerprintCache') {
+        const vu = window.vstUpdater;
+        if (vu && typeof vu.stopFingerprintCache === 'function') void vu.stopFingerprintCache();
+    } else if (id === 'startContentDupScan') {
+        if (typeof triggerStartBackgroundContentDupScan === 'function') void triggerStartBackgroundContentDupScan();
+    } else if (id === 'stopContentDupScan') {
+        if (typeof triggerStopBackgroundContentDupScan === 'function') triggerStopBackgroundContentDupScan();
+    } else if (id === 'startAllBackgroundJobs') {
+        if (typeof triggerStartAllBackgroundJobs === 'function') triggerStartAllBackgroundJobs();
+    } else if (id === 'stopAllBackgroundJobs') {
+        if (typeof triggerStopAllBackgroundJobs === 'function') triggerStopAllBackgroundJobs();
     } else if (id === 'checkUpdates') {
         if (typeof checkUpdates === 'function') checkUpdates();
     } else if (id === 'buildPluginIndex') {

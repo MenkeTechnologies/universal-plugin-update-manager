@@ -76,6 +76,12 @@ static LOG_VERBOSITY_LEVEL: AtomicU8 = AtomicU8::new(1);
 /// Set by `pdf_metadata_extract_abort`; checked between PDF page-count extraction chunks so the UI can stop CPU-heavy work when the PDF tab is hidden or the window is idle.
 static PDF_META_EXTRACT_ABORT: AtomicBool = AtomicBool::new(false);
 
+/// Set by `cancel_content_duplicate_scan`; checked between SHA-256 chunks (same idea as BPM batches).
+static CONTENT_DUP_SCAN_CANCEL: AtomicBool = AtomicBool::new(false);
+
+/// Set by `stop_fingerprint_cache`; checked between fingerprint cache chunks (~500 files).
+static FINGERPRINT_BUILD_CANCEL: AtomicBool = AtomicBool::new(false);
+
 #[inline]
 pub fn log_verbosity_level() -> u8 {
     LOG_VERBOSITY_LEVEL.load(Ordering::Relaxed)
@@ -643,6 +649,8 @@ async fn check_updates(
 ) -> Result<Vec<UpdatedPlugin>, String> {
     let state = app.state::<UpdateState>();
     if state.checking.swap(true, Ordering::SeqCst) {
+        #[cfg(not(test))]
+        append_log("UPDATE CHECK ERROR — already in progress".into());
         return Err("Update check already in progress".into());
     }
     state.stop_updates.store(false, Ordering::SeqCst);
@@ -678,9 +686,11 @@ async fn check_updates(
     let mut results: std::collections::HashMap<String, UpdatedPlugin> =
         std::collections::HashMap::new();
     let mut processed = 0usize;
+    let mut update_cancelled = false;
 
     for (representative, siblings) in &groups {
         if state.stop_updates.load(Ordering::SeqCst) {
+            update_cancelled = true;
             break;
         }
 
@@ -767,6 +777,21 @@ async fn check_updates(
     }
 
     state.checking.store(false, Ordering::SeqCst);
+
+    #[cfg(not(test))]
+    {
+        if update_cancelled {
+            append_log(format!(
+                "UPDATE CHECK END — stopped early | processed {}/{} plugins",
+                processed, total
+            ));
+        } else {
+            append_log(format!(
+                "UPDATE CHECK END — complete | processed {}/{} plugins",
+                processed, total
+            ));
+        }
+    }
 
     let final_plugins: Vec<UpdatedPlugin> = plugins
         .iter()
@@ -2335,13 +2360,14 @@ async fn pdf_metadata_get(paths: Vec<String>) -> Result<serde_json::Value, Strin
     tokio::task::spawn_blocking(move || {
         let map = db::global().get_pdf_metadata(&paths)?;
         let mut out = serde_json::Map::new();
-        for (k, v) in map {
+        for (k, row) in map {
             out.insert(
                 k,
-                match v {
-                    Some(n) => serde_json::json!(n),
-                    None => serde_json::Value::Null,
-                },
+                serde_json::json!({
+                    "pages": row.pages,
+                    "pdfCreationDate": row.pdf_creation_date,
+                    "pdfModDate": row.pdf_mod_date,
+                }),
             );
         }
         Ok::<serde_json::Value, String>(serde_json::Value::Object(out))
@@ -2353,6 +2379,7 @@ async fn pdf_metadata_get(paths: Vec<String>) -> Result<serde_json::Value, Strin
 #[tauri::command]
 fn pdf_metadata_extract_abort() {
     PDF_META_EXTRACT_ABORT.store(true, Ordering::Relaxed);
+    append_log("PDF META EXTRACT STOP — user requested".into());
 }
 
 #[tauri::command]
@@ -2360,12 +2387,14 @@ async fn pdf_metadata_extract_batch(
     app: AppHandle,
     paths: Vec<String>,
 ) -> Result<serde_json::Value, String> {
-    tokio::task::spawn_blocking(move || {
+    let out = tokio::task::spawn_blocking(move || {
         PDF_META_EXTRACT_ABORT.store(false, Ordering::Relaxed);
         let total = paths.len();
         if total == 0 {
-            return serde_json::json!({ "extracted": 0, "total": 0, "aborted": false });
+            crate::app_log_verbose(|| "PDF META EXTRACT — skip (0 paths)".into());
+            return Ok(serde_json::json!({ "extracted": 0, "total": 0, "aborted": false }));
         }
+        append_log(format!("PDF META EXTRACT START — {total} paths"));
         let _ = app.emit(
             "pdf-metadata-progress",
             serde_json::json!({ "phase": "start", "total": total }),
@@ -2388,18 +2417,28 @@ async fn pdf_metadata_extract_batch(
                         "phase": "done", "extracted": extracted, "total": total, "aborted": true
                     }),
                 );
-                return serde_json::json!({ "extracted": extracted, "total": total, "aborted": true });
+                append_log(format!(
+                    "PDF META EXTRACT END — aborted | done {done}/{total} | pages rows {extracted}"
+                ));
+                return Ok(serde_json::json!({ "extracted": extracted, "total": total, "aborted": true }));
             }
-            let pairs = pdf_meta::extract_pages_batch(chunk);
-            // Build a HashMap for O(1) lookup instead of O(n) linear scan per element
-            let pairs_map: std::collections::HashMap<&String, u32> =
-                pairs.iter().map(|(p, n)| (p, *n)).collect();
-            let mut rows: Vec<(String, Option<u32>)> = Vec::with_capacity(chunk.len());
+            let meta_map = pdf_meta::extract_pdf_meta_batch(chunk);
+            let mut rows: Vec<(String, Option<u32>, Option<String>, Option<String>)> =
+                Vec::with_capacity(chunk.len());
             for p in chunk {
-                rows.push((p.clone(), pairs_map.get(p).copied()));
+                if let Some(m) = meta_map.get(p) {
+                    rows.push((
+                        p.clone(),
+                        Some(m.pages),
+                        m.pdf_creation_date.clone(),
+                        m.pdf_mod_date.clone(),
+                    ));
+                    extracted += 1;
+                } else {
+                    rows.push((p.clone(), None, None, None));
+                }
             }
-            let _ = db::global().save_pdf_metadata(&rows);
-            extracted += pairs.len();
+            db::global().save_pdf_metadata(&rows)?;
             done += chunk.len();
             let _ = app.emit(
                 "pdf-metadata-progress",
@@ -2412,10 +2451,24 @@ async fn pdf_metadata_extract_batch(
             "pdf-metadata-progress",
             serde_json::json!({ "phase": "done", "extracted": extracted, "total": total, "aborted": false }),
         );
-        serde_json::json!({ "extracted": extracted, "total": total, "aborted": false })
+        append_log(format!(
+            "PDF META EXTRACT END — complete | pages rows {extracted} | files {total}"
+        ));
+        Ok(serde_json::json!({ "extracted": extracted, "total": total, "aborted": false }))
     })
-    .await
-    .map_err(|e| e.to_string())
+    .await;
+    match out {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => {
+            append_log(format!("PDF META EXTRACT ERROR — {e}"));
+            Err(e)
+        }
+        Err(j) => {
+            let msg = format!("PDF META EXTRACT ERROR — task failed: {j}");
+            append_log(msg.clone());
+            Err(msg)
+        }
+    }
 }
 
 /// Paths in the PDF library (`pdf_library`) with no `pdf_metadata` row yet — used to kick off
@@ -2560,18 +2613,30 @@ async fn measure_lufs(file_path: String) -> Result<Option<f64>, String> {
 /// Analyzes files in parallel (rayon), batch-writes to DB, returns results
 /// directly so the frontend can update visible rows without extra IPC.
 ///
-/// Uses a **small dedicated rayon pool** (at most 4 threads) so a full batch does not claim every
-/// CPU core during a library scan — unbounded default rayon was starving other work (including
-/// audio I/O in the separate engine process on the same machine).
+/// Uses a **small dedicated rayon pool** (default 4 workers, configurable via `batchAnalysisThreads` 1–16)
+/// so a full batch does not claim every CPU core during a library scan.
 #[tauri::command]
 async fn batch_analyze(paths: Vec<String>) -> Result<serde_json::Value, String> {
-    let inner = tokio::task::spawn_blocking(move || {
+    let n = paths.len();
+    if n > 0 {
+        crate::app_log_verbose(|| format!("BPM/LUFS BATCH — start | {n} files"));
+    }
+    let out = tokio::task::spawn_blocking(move || {
         use rayon::prelude::*;
         if paths.is_empty() {
             return Ok(serde_json::json!({ "count": 0, "results": [] }));
         }
-        const MAX_BATCH_ANALYSIS_THREADS: usize = 4;
-        let num_threads = std::cmp::min(paths.len(), MAX_BATCH_ANALYSIS_THREADS).max(1);
+        let prefs = history::load_preferences();
+        let max_batch_threads = prefs
+            .get("batchAnalysisThreads")
+            .and_then(|v| {
+                v.as_str()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .or_else(|| v.as_u64().map(|n| n as usize))
+            })
+            .unwrap_or(4)
+            .clamp(1, 16);
+        let num_threads = std::cmp::min(paths.len(), max_batch_threads).max(1);
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
             .build()
@@ -2605,9 +2670,30 @@ async fn batch_analyze(paths: Vec<String>) -> Result<serde_json::Value, String> 
             .collect();
         Ok(serde_json::json!({ "count": count, "results": items }))
     })
-    .await
-    .map_err(|e| e.to_string())?;
-    inner
+    .await;
+    match out {
+        Ok(Ok(json)) => {
+            if n > 0 {
+                crate::app_log_verbose(|| {
+                    let c = json
+                        .get("count")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    format!("BPM/LUFS BATCH — end | {n} files | {c} rows updated")
+                });
+            }
+            Ok(json)
+        }
+        Ok(Err(e)) => {
+            append_log(format!("BPM/LUFS BATCH ERROR — {e}"));
+            Err(e)
+        }
+        Err(j) => {
+            let msg = format!("BPM/LUFS BATCH ERROR — task failed: {j}");
+            append_log(msg.clone());
+            Err(msg)
+        }
+    }
 }
 
 #[tauri::command]
@@ -2624,7 +2710,8 @@ async fn build_fingerprint_cache(
     app: AppHandle,
     candidate_paths: Vec<String>,
 ) -> Result<serde_json::Value, String> {
-    tokio::task::spawn_blocking(move || {
+    let out = tokio::task::spawn_blocking(move || {
+        FINGERPRINT_BUILD_CANCEL.store(false, Ordering::SeqCst);
         let fp_json = db::global()
             .read_cache("fingerprint-cache.json")
             .unwrap_or_default();
@@ -2638,8 +2725,16 @@ async fn build_fingerprint_cache(
             .collect();
         let total = uncached.len();
         if total == 0 {
-            return serde_json::json!({ "built": 0, "cached": cache.len() });
+            append_log(format!(
+                "FINGERPRINT CACHE END — nothing to build | {} paths already cached",
+                cache.len()
+            ));
+            return Ok(serde_json::json!({ "built": 0, "cached": cache.len(), "stopped": false }));
         }
+        append_log(format!(
+            "FINGERPRINT CACHE START — {total} to build | {} already cached",
+            cache.len()
+        ));
         let _ = app.emit(
             "fingerprint-build-progress",
             serde_json::json!({
@@ -2648,7 +2743,12 @@ async fn build_fingerprint_cache(
         );
         const CHUNK: usize = 500;
         let mut done = 0usize;
+        let mut user_stopped = false;
         for chunk in uncached.chunks(CHUNK) {
+            if FINGERPRINT_BUILD_CANCEL.load(Ordering::SeqCst) {
+                user_stopped = true;
+                break;
+            }
             let new_fps: Vec<similarity::AudioFingerprint> = chunk
                 .par_iter()
                 .filter_map(|p| similarity::compute_fingerprint(p))
@@ -2669,14 +2769,47 @@ async fn build_fingerprint_cache(
                 let _ = db::global().write_cache("fingerprint-cache.json", &val);
             }
         }
+        FINGERPRINT_BUILD_CANCEL.store(false, Ordering::SeqCst);
         let _ = app.emit(
             "fingerprint-build-progress",
-            serde_json::json!({ "phase": "done", "built": done, "cached": cache.len() }),
+            serde_json::json!({
+                "phase": "done",
+                "built": done,
+                "cached": cache.len(),
+                "stopped": user_stopped
+            }),
         );
-        serde_json::json!({ "built": done, "cached": cache.len() })
+        append_log(format!(
+            "FINGERPRINT CACHE END — built {done} | cache {} entries | stopped: {user_stopped}",
+            cache.len()
+        ));
+        Ok(serde_json::json!({
+            "built": done,
+            "cached": cache.len(),
+            "stopped": user_stopped
+        }))
     })
-    .await
-    .map_err(|e| e.to_string())
+    .await;
+    match out {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => {
+            append_log(format!("FINGERPRINT CACHE ERROR — {e}"));
+            Err(e)
+        }
+        Err(j) => {
+            let msg = format!("FINGERPRINT CACHE ERROR — task failed: {j}");
+            append_log(msg.clone());
+            Err(msg)
+        }
+    }
+}
+
+/// Request stop for the in-flight [`build_fingerprint_cache`] job (honored before the next chunk).
+#[tauri::command]
+fn stop_fingerprint_cache() -> Result<(), String> {
+    FINGERPRINT_BUILD_CANCEL.store(true, Ordering::SeqCst);
+    append_log("FINGERPRINT CACHE STOP — user requested".into());
+    Ok(())
 }
 
 #[tauri::command]
@@ -2776,15 +2909,72 @@ async fn find_similar_samples(
 /// Byte-identical files across the scanned library (SHA-256 after grouping by stored size).
 #[tauri::command]
 async fn find_content_duplicates(app: AppHandle) -> Result<serde_json::Value, String> {
+    append_log("CONTENT DUP SCAN START — byte-level SHA-256 (same-size buckets)".into());
     let app_pb = Arc::new(app);
-    tokio::task::spawn_blocking(move || {
-        let entries = db::global().library_paths_for_content_hash()?;
+    let out = tokio::task::spawn_blocking(move || {
+        CONTENT_DUP_SCAN_CANCEL.store(false, Ordering::SeqCst);
+        let entries = match db::global().library_paths_for_content_hash() {
+            Ok(e) => e,
+            Err(e) => {
+                let es = e.to_string();
+                append_log(format!("CONTENT DUP SCAN ERROR — library query: {es}"));
+                return Err(es);
+            }
+        };
         let progress = Some((app_pb, 25usize));
-        let r = content_hash::find_byte_duplicate_groups(entries, progress);
-        serde_json::to_value(&r).map_err(|e| e.to_string())
+        let prefs = history::load_preferences();
+        let hash_threads = prefs
+            .get("contentDupHashThreads")
+            .and_then(|v| {
+                v.as_str()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .or_else(|| v.as_u64().map(|n| n as usize))
+            })
+            .unwrap_or(8)
+            .clamp(1, 32);
+        let r = content_hash::find_byte_duplicate_groups(
+            entries,
+            progress,
+            Some(&CONTENT_DUP_SCAN_CANCEL),
+            hash_threads,
+        );
+        let v = match serde_json::to_value(&r) {
+            Ok(val) => val,
+            Err(e) => {
+                let es = e.to_string();
+                append_log(format!("CONTENT DUP SCAN ERROR — serialize: {es}"));
+                return Err(es);
+            }
+        };
+        append_log(format!(
+            "CONTENT DUP SCAN END — groups={} hashed={} skipped={} cancelled={} candidates={}",
+            r.groups.len(),
+            r.files_hashed,
+            r.skipped,
+            r.cancelled,
+            r.candidates_total
+        ));
+        Ok(v)
     })
-    .await
-    .map_err(|e| e.to_string())?
+    .await;
+    match out {
+        Ok(Ok(v)) => Ok(v),
+        // Inner closure already logged library / serialize failures.
+        Ok(Err(e)) => Err(e),
+        Err(j) => {
+            let msg = format!("CONTENT DUP SCAN ERROR — task failed: {j}");
+            append_log(msg.clone());
+            Err(msg)
+        }
+    }
+}
+
+/// Request stop for the in-flight [`find_content_duplicates`] job (honored after the current hash chunk).
+#[tauri::command]
+fn cancel_content_duplicate_scan() -> Result<(), String> {
+    CONTENT_DUP_SCAN_CANCEL.store(true, Ordering::SeqCst);
+    append_log("CONTENT DUP SCAN STOP — user requested".into());
+    Ok(())
 }
 
 #[tauri::command]
@@ -4511,15 +4701,25 @@ async fn export_pdfs_json(pdfs: Vec<PdfFile>, file_path: String) -> Result<(), S
 async fn export_pdfs_dsv(pdfs: Vec<PdfFile>, file_path: String) -> Result<(), String> {
     blocking_res(move || {
         let sep = detect_separator(&file_path);
-        let mut out = format!("Name{s}Path{s}Directory{s}Size{s}Modified\n", s = sep);
+        let mut out = format!(
+            "Name{s}Path{s}Directory{s}Size{s}Modified{s}Pages{s}PdfCreationDate{s}PdfModDate\n",
+            s = sep
+        );
         for p in &pdfs {
+            let pages_str = p
+                .pages
+                .map(|n| n.to_string())
+                .unwrap_or_default();
             out.push_str(&format!(
-                "{}{sep}{}{sep}{}{sep}{}{sep}{}\n",
+                "{}{sep}{}{sep}{}{sep}{}{sep}{}{sep}{}{sep}{}{sep}{}\n",
                 dsv_escape(&p.name, sep),
                 dsv_escape(&p.path, sep),
                 dsv_escape(&p.directory, sep),
                 dsv_escape(&p.size_formatted, sep),
                 dsv_escape(&p.modified, sep),
+                dsv_escape(&pages_str, sep),
+                dsv_escape(p.pdf_creation_date.as_deref().unwrap_or(""), sep),
+                dsv_escape(p.pdf_mod_date.as_deref().unwrap_or(""), sep),
             ));
         }
         std::fs::write(&file_path, out).map_err(|e| e.to_string())
@@ -5155,6 +5355,22 @@ async fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
 #[tauri::command]
 async fn write_text_file(file_path: String, contents: String) -> Result<(), String> {
     blocking_res(move || std::fs::write(&file_path, &contents).map_err(|e| e.to_string())).await
+}
+
+#[tauri::command]
+async fn write_binary_file(file_path: String, contents: Vec<u8>) -> Result<(), String> {
+    blocking_res(move || std::fs::write(&file_path, &contents).map_err(|e| e.to_string())).await
+}
+
+/// App data directory + `snapshots` (created if missing). Default export target when prefs path is empty.
+#[tauri::command]
+async fn ensure_snapshot_export_dir() -> Result<String, String> {
+    blocking_res(move || {
+        let dir = history::ensure_data_dir().join("snapshots");
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        Ok(dir.to_string_lossy().into_owned())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -7423,7 +7639,9 @@ pub fn run() {
             compute_fingerprint,
             find_similar_samples,
             build_fingerprint_cache,
+            stop_fingerprint_cache,
             find_content_duplicates,
+            cancel_content_duplicate_scan,
             open_update_url,
             open_plugin_folder,
             open_audio_folder,
@@ -7495,6 +7713,8 @@ pub fn run() {
             delete_inventory_item,
             rename_file,
             write_text_file,
+            write_binary_file,
+            ensure_snapshot_export_dir,
             read_text_file,
             get_home_dir,
             get_process_stats,

@@ -213,6 +213,7 @@ fn pdf_scan_diff_roundtrip() {
         size: 100,
         size_formatted: "100 B".into(),
         modified: "m".into(),
+        ..Default::default()
     };
     let d = PdfScanDiff {
         old_scan: sum(),
