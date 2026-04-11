@@ -1211,6 +1211,7 @@ function settingUpdatePageSize(val) {
         PRESET_PAGE_SIZE = n;
         MIDI_PAGE_SIZE = n;
         PDF_PAGE_SIZE = n;
+        VIDEO_PAGE_SIZE = n;
     }
 }
 
@@ -2232,6 +2233,7 @@ function restoreSettings() {
     PRESET_PAGE_SIZE = pageSize;
     MIDI_PAGE_SIZE = pageSize;
     PDF_PAGE_SIZE = pageSize;
+    VIDEO_PAGE_SIZE = pageSize;
 
     const uiLoc = prefs.getItem('uiLocale');
     const localeSel = document.getElementById('settingUiLocale');

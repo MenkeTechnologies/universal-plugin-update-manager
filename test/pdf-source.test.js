@@ -66,18 +66,17 @@ describe('frontend/js/pdf.js (vm-loaded)', () => {
     assert.ok(html.includes('data-pdf-name="say &quot;hello&quot;"'));
   });
 
-  it('patchPdfPagesCell finds td by decoded path (ampersands break CSS attribute selectors)', () => {
+  it('patchPdfMetaRow updates pages td by decoded path (ampersands break CSS attribute selectors)', () => {
     const tricky = '/tmp/report & co/file.pdf';
-    const td = {
+    const tdPages = {
       getAttribute(n) {
         return n === 'data-pdf-pages-cell' ? tricky : null;
       },
       innerHTML: '',
-      textContent: '',
     };
     const tbody = {
       querySelectorAll(sel) {
-        return sel === 'td[data-pdf-pages-cell]' ? [td] : [];
+        return sel === 'td[data-pdf-pages-cell]' ? [tdPages] : [];
       },
     };
     const base = defaultDocument();
@@ -94,8 +93,8 @@ describe('frontend/js/pdf.js (vm-loaded)', () => {
       toastFmt: (k) => k,
       rowBadges: () => '',
     });
-    assert.equal(typeof Px.patchPdfPagesCell, 'function');
-    Px.patchPdfPagesCell(tricky, 42);
-    assert.equal(td.textContent, '42');
+    assert.equal(typeof Px.patchPdfMetaRow, 'function');
+    Px.mergePdfMetaFromApi(tricky, { pages: 42 });
+    assert.ok(tdPages.innerHTML.includes('42'), tdPages.innerHTML);
   });
 });

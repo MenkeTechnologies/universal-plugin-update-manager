@@ -377,6 +377,7 @@ const INVENTORY_COUNT_PAIR_IDS = {
     presets: ['headerPresets', 'presetCountHeader'],
     midi: ['headerMidi', 'midiScanCount'],
     pdf: ['headerPdf', 'pdfCountHeader'],
+    video: ['headerVideo', 'videoCountHeader'],
 };
 
 function _fmtInventoryCount(n) {
@@ -395,6 +396,7 @@ function mapActiveScanInv(raw) {
         presets: Number(raw.presets) || 0,
         pdf: Number(raw.pdfs) || 0,
         midi: Number(raw.midi_files) || 0,
+        video: Number(raw.video_files) || 0,
     };
 }
 
@@ -433,7 +435,12 @@ function computeInventoryCountsLegacy(tc) {
         const p = typeof window.__midiScanPendingFound === 'number' ? window.__midiScanPendingFound : 0;
         midi = Math.max(midi, p);
     }
-    return {plugins, samples, daw, presets, pdf, midi};
+    let video = (typeof _videoTotalUnfiltered !== 'undefined' && _videoTotalUnfiltered) || tc0.video_files || 0;
+    if (typeof videoScanProgressCleanup !== 'undefined' && videoScanProgressCleanup) {
+        const p = typeof window.__videoScanPendingFound === 'number' ? window.__videoScanPendingFound : 0;
+        video = Math.max(video, p);
+    }
+    return {plugins, samples, daw, presets, pdf, midi, video};
 }
 
 async function resolveInventoryCounts(tc, _scanner) {
@@ -734,6 +741,9 @@ async function stopAll() {
             if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
         }),
         window.vstUpdater.stopMidiScan().catch(e => {
+            if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+        }),
+        window.vstUpdater.stopVideoScan().catch(e => {
             if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
         }),
         window.vstUpdater.stopUpdates().catch(e => {

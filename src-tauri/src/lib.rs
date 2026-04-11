@@ -34,6 +34,7 @@ pub mod lufs;
 pub mod midi;
 pub mod midi_scanner;
 pub mod native_menu;
+pub mod video_scanner;
 mod open_with_app;
 pub mod path_norm;
 pub mod pdf_meta;
@@ -250,6 +251,11 @@ struct MidiScanState {
     stop_scan: AtomicBool,
 }
 
+struct VideoScanState {
+    scanning: AtomicBool,
+    stop_scan: AtomicBool,
+}
+
 struct PdfScanState {
     scanning: AtomicBool,
     stop_scan: AtomicBool,
@@ -262,6 +268,7 @@ struct WalkerStatus {
     daw_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     preset_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     midi_dirs: Arc<std::sync::Mutex<Vec<String>>>,
+    video_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     pdf_dirs: Arc<std::sync::Mutex<Vec<String>>>,
     /// True while `scan_unified` is active. Frontend walker-status tiles
     /// collapse 4 → 1 display when this is true (the single walker fans its
@@ -369,6 +376,11 @@ fn get_walker_status(app: AppHandle) -> serde_json::Value {
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .clone();
+    let video = ws
+        .video_dirs
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     let pdf = ws
         .pdf_dirs
         .lock()
@@ -390,6 +402,10 @@ fn get_walker_status(app: AppHandle) -> serde_json::Value {
         .state::<MidiScanState>()
         .scanning
         .load(Ordering::Relaxed);
+    let video_scanning = app
+        .state::<VideoScanState>()
+        .scanning
+        .load(Ordering::Relaxed);
     let unified_scanning = ws.unified_scanning.load(Ordering::Relaxed);
     serde_json::json!({
         "plugin": plugin,
@@ -397,6 +413,7 @@ fn get_walker_status(app: AppHandle) -> serde_json::Value {
         "daw": daw,
         "preset": preset,
         "midi": midi,
+        "video": video,
         "pdf": pdf,
         "poolThreads": pool_threads,
         "pluginScanning": plugin_scanning,
@@ -404,6 +421,7 @@ fn get_walker_status(app: AppHandle) -> serde_json::Value {
         "dawScanning": daw_scanning,
         "presetScanning": preset_scanning,
         "midiScanning": midi_scanning,
+        "videoScanning": video_scanning,
         "pdfScanning": pdf_scanning,
         "unifiedScanning": unified_scanning,
     })
@@ -1616,6 +1634,139 @@ async fn stop_midi_scan(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn scan_video_files(
+    app: AppHandle,
+    custom_roots: Option<Vec<String>>,
+    exclude_paths: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    let state = app.state::<VideoScanState>();
+    let scan_start = Instant::now();
+    append_log(format!(
+        "SCAN START — video | roots: {:?}",
+        custom_roots.as_deref().unwrap_or(&[])
+    ));
+    if state.scanning.swap(true, Ordering::SeqCst) {
+        return Err("Video scan already in progress".into());
+    }
+    state.stop_scan.store(false, Ordering::SeqCst);
+
+    let _ = app.emit(
+        "video-scan-progress",
+        serde_json::json!({
+            "phase": "status",
+            "message": "Walking filesystem directories parallelized for video files..."
+        }),
+    );
+
+    let app_handle = app.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let video_state = app_handle.state::<VideoScanState>();
+        let roots = if let Some(ref extra) = custom_roots {
+            let custom: Vec<std::path::PathBuf> = extra
+                .iter()
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.exists())
+                .collect();
+            if custom.is_empty() {
+                video_scanner::get_video_roots()
+            } else {
+                custom
+            }
+        } else {
+            video_scanner::get_video_roots()
+        };
+        let exclude_set = exclude_paths.map(|v| v.into_iter().collect::<HashSet<String>>());
+        let root_strs: Vec<String> = roots
+            .iter()
+            .map(|r| r.to_string_lossy().to_string())
+            .collect();
+
+        let now_iso = history::now_iso();
+        let video_scan_id = history::gen_id();
+        let db = db::global();
+        let _ = db.video_scan_parent_create(&video_scan_id, &now_iso, &root_strs);
+
+        let mut video_count: u64 = 0;
+        let mut video_bytes: u64 = 0;
+        let mut video_format_counts: HashMap<String, usize> = HashMap::new();
+        let incremental_state = load_incremental_dir_state_for_walk();
+
+        video_scanner::walk_for_video(
+            &roots,
+            &mut |batch, found| {
+                for m in batch {
+                    video_bytes += m.size;
+                    *video_format_counts.entry(m.format.clone()).or_insert(0) += 1;
+                }
+                video_count += batch.len() as u64;
+                let _ = db.insert_video_batch(&video_scan_id, batch);
+                let _ = app_handle.emit(
+                    "video-scan-progress",
+                    serde_json::json!({
+                        "phase": "scanning",
+                        "videoFiles": batch,
+                        "found": found
+                    }),
+                );
+            },
+            &|| video_state.stop_scan.load(Ordering::SeqCst),
+            exclude_set,
+            Some(Arc::clone(&app_handle.state::<WalkerStatus>().video_dirs)),
+            incremental_state.clone(),
+        );
+
+        persist_incremental_dir_state_after_walk(incremental_state.as_ref(), &video_scan_id);
+
+        {
+            let ws = app_handle.state::<WalkerStatus>();
+            let mut ad = ws.video_dirs.lock().unwrap_or_else(|e| e.into_inner());
+            ad.clear();
+        }
+        let was_stopped = video_state.stop_scan.load(Ordering::Relaxed);
+        let _ = db.video_scan_parent_finalize(
+            &video_scan_id,
+            video_count as usize,
+            video_bytes,
+            &video_format_counts,
+        );
+        let _ = db.set_video_scan_complete(&video_scan_id, !was_stopped);
+        db.checkpoint();
+        serde_json::json!({
+            "videoCount": video_count,
+            "roots": root_strs,
+            "stopped": was_stopped,
+            "videoScanId": video_scan_id,
+            "streamed": true
+        })
+    })
+    .await;
+
+    state.scanning.store(false, Ordering::SeqCst);
+    let elapsed = scan_start.elapsed();
+    match &result {
+        Ok(v) => append_log(format!(
+            "SCAN END — video | {}s | {} found",
+            elapsed.as_secs(),
+            v.get("videoCount").and_then(|x| x.as_u64()).unwrap_or(0)
+        )),
+        Err(e) => append_log(format!(
+            "SCAN ERROR — video | {}s | {}",
+            elapsed.as_secs(),
+            e
+        )),
+    }
+    result.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn stop_video_scan(app: AppHandle) -> Result<(), String> {
+    append_log("SCAN STOP — video (user requested)".into());
+    let state = app.state::<VideoScanState>();
+    state.stop_scan.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+#[tauri::command]
 async fn midi_history_save(
     midi_files: Vec<history::MidiFile>,
     roots: Option<Vec<String>>,
@@ -1707,6 +1858,46 @@ async fn db_midi_filter_stats(
     })
     .await
     .map_err(|e| format!("db_midi_filter_stats task: {e}"))?
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn db_query_video(
+    search: Option<String>,
+    format_filter: Option<String>,
+    sort_key: Option<String>,
+    sort_asc: Option<bool>,
+    search_regex: Option<bool>,
+    offset: Option<u64>,
+    limit: Option<u64>,
+) -> Result<db::VideoQueryResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
+    tokio::task::spawn_blocking(move || {
+        db::global().query_video(
+            search.as_deref(),
+            format_filter.as_deref(),
+            sort_key.as_deref().unwrap_or("name"),
+            sort_asc.unwrap_or(true),
+            search_regex,
+            offset.unwrap_or(0),
+            limit.unwrap_or(500),
+        )
+    })
+    .await
+    .map_err(|e| format!("db_query_video task: {e}"))?
+}
+
+#[tauri::command(rename_all = "snake_case")]
+async fn db_video_filter_stats(
+    search: Option<String>,
+    format_filter: Option<String>,
+    search_regex: Option<bool>,
+) -> Result<db::FilterStatsResult, String> {
+    let search_regex = search_regex.unwrap_or(false);
+    tokio::task::spawn_blocking(move || {
+        db::global().video_filter_stats(search.as_deref(), format_filter.as_deref(), search_regex)
+    })
+    .await
+    .map_err(|e| format!("db_video_filter_stats task: {e}"))?
 }
 
 // PDF scanner commands
@@ -3852,6 +4043,7 @@ fn build_process_stats(app: AppHandle) -> serde_json::Value {
     let preset_state = app.state::<PresetScanState>();
     let pdf_state = app.state::<PdfScanState>();
     let midi_state = app.state::<MidiScanState>();
+    let video_state = app.state::<VideoScanState>();
 
     // Preferences for scanner config
     let prefs = history::load_preferences();
@@ -3946,6 +4138,7 @@ fn build_process_stats(app: AppHandle) -> serde_json::Value {
     let preset_formats = dotted_extensions_to_upper_tags(crate::preset_scanner::PRESET_EXTENSIONS);
     let xref_formats = dotted_extensions_to_upper_tags(crate::xref::XREF_SUPPORTED_EXTENSIONS);
     let midi_formats = ["MID", "MIDI"];
+    let video_formats = dotted_extensions_to_upper_tags(crate::video_scanner::VIDEO_EXTENSIONS);
     let pdf_formats = ["PDF"];
 
     serde_json::json!({
@@ -3976,6 +4169,7 @@ fn build_process_stats(app: AppHandle) -> serde_json::Value {
             "presetFormats": preset_formats,
             "xrefFormats": xref_formats,
             "midiFormats": midi_formats,
+            "videoFormats": video_formats,
             "pdfFormats": pdf_formats,
             "analysisEngines": ["BPM (autocorrelation)", "Key (Goertzel chromagram)", "LUFS (RMS dBFS)", "Fingerprint (spectral)"],
             "visualizers": ["FFT spectrum", "Waveform", "Spectrogram", "Stereo Lissajous", "Level meters", "Frequency bands"],
@@ -3999,6 +4193,8 @@ fn build_process_stats(app: AppHandle) -> serde_json::Value {
             "pdfStopped": pdf_state.stop_scan.load(Ordering::Relaxed),
             "midiScanning": midi_state.scanning.load(Ordering::Relaxed),
             "midiStopped": midi_state.stop_scan.load(Ordering::Relaxed),
+            "videoScanning": video_state.scanning.load(Ordering::Relaxed),
+            "videoStopped": video_state.stop_scan.load(Ordering::Relaxed),
         },
         "config": {
             "threadMultiplier": thread_mult,
@@ -6995,6 +7191,7 @@ pub struct PalettePreviewResult {
     pub presets: db::PresetQueryResult,
     pub pdfs: db::PdfQueryResult,
     pub midi: db::MidiQueryResult,
+    pub video: db::VideoQueryResult,
 }
 
 fn palette_preview_empty() -> PalettePreviewResult {
@@ -7035,6 +7232,12 @@ fn palette_preview_empty() -> PalettePreviewResult {
             total_count_capped: false,
             total_unfiltered: 0,
         },
+        video: db::VideoQueryResult {
+            video_files: vec![],
+            total_count: 0,
+            total_count_capped: false,
+            total_unfiltered: 0,
+        },
     }
 }
 
@@ -7061,6 +7264,7 @@ async fn db_query_palette_preview(search: String) -> Result<PalettePreviewResult
         let presets = db.query_presets(Some(&search), None, "name", true, false, 0, 6)?;
         let pdfs = db.query_pdfs(Some(&search), "name", true, false, 0, 6)?;
         let midi = db.query_midi(Some(&search), None, "name", true, false, 0, 6)?;
+        let video = db.query_video(Some(&search), None, "name", true, false, 0, 6)?;
         Ok(PalettePreviewResult {
             plugins,
             audio,
@@ -7068,6 +7272,7 @@ async fn db_query_palette_preview(search: String) -> Result<PalettePreviewResult
             presets,
             pdfs,
             midi,
+            video,
         })
     })
     .await
@@ -7563,6 +7768,10 @@ pub fn run() {
             scanning: AtomicBool::new(false),
             stop_scan: AtomicBool::new(false),
         })
+        .manage(VideoScanState {
+            scanning: AtomicBool::new(false),
+            stop_scan: AtomicBool::new(false),
+        })
         .manage(PdfScanState {
             scanning: AtomicBool::new(false),
             stop_scan: AtomicBool::new(false),
@@ -7573,6 +7782,7 @@ pub fn run() {
             daw_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             preset_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             midi_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            video_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             pdf_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             unified_scanning: AtomicBool::new(false),
         })
@@ -7677,6 +7887,10 @@ pub fn run() {
             midi_history_diff,
             db_query_midi,
             db_midi_filter_stats,
+            scan_video_files,
+            stop_video_scan,
+            db_query_video,
+            db_video_filter_stats,
             scan_pdfs,
             stop_pdf_scan,
             scan_unified,

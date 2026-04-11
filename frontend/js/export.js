@@ -393,21 +393,59 @@ async function writePresetsExport(pr, fmt, filePath) {
 }
 
 async function writePdfsExport(pdf, fmt, filePath) {
+    let metaByPath = {};
+    if (pdf.length > 0 && window.vstUpdater && typeof window.vstUpdater.pdfMetadataGet === 'function') {
+        try {
+            const raw = await window.vstUpdater.pdfMetadataGet(pdf.map((p) => p.path));
+            metaByPath = raw && typeof raw === 'object' ? raw : {};
+        } catch {
+            metaByPath = {};
+        }
+    }
+    const enrichPdfExportRow = (p) => {
+        const m = metaByPath[p.path];
+        let pages = null;
+        let pdfCreationDate = null;
+        let pdfModDate = null;
+        if (m && typeof m === 'object' && !Array.isArray(m)) {
+            if (m.pages != null) pages = m.pages;
+            if (m.pdfCreationDate != null) pdfCreationDate = m.pdfCreationDate;
+            if (m.pdfModDate != null) pdfModDate = m.pdfModDate;
+        }
+        return {
+            ...p,
+            pages,
+            pdfCreationDate,
+            pdfModDate,
+        };
+    };
     if (fmt === 'pdf') {
         const headers = pdfHeaders(
             'ui.export.col_name',
             'ui.export.col_size',
+            'ui.export.col_pages',
+            'ui.export.col_pdf_creation_date',
+            'ui.export.col_pdf_mod_date',
             'ui.export.col_modified',
             'ui.export.col_path',
         );
-        const rows = pdf.map(p => [p.name, p.sizeFormatted || '', p.modified, p.directory]);
+        const rows = pdf.map((p) => {
+            const e = enrichPdfExportRow(p);
+            const pagesStr = e.pages != null && e.pages !== '' ? String(e.pages) : '';
+            const cre = e.pdfCreationDate != null ? String(e.pdfCreationDate) : '';
+            const mod = e.pdfModDate != null ? String(e.pdfModDate) : '';
+            return [p.name, p.sizeFormatted || '', pagesStr, cre, mod, p.modified, p.directory];
+        });
         await window.vstUpdater.exportPdf(_exportFmt('ui.export.title_pdfs'), headers, rows, filePath);
     } else if (fmt === 'csv' || fmt === 'tsv') {
-        await window.vstUpdater.exportPdfsDsv(pdf, filePath);
+        await window.vstUpdater.exportPdfsDsv(pdf.map(enrichPdfExportRow), filePath);
     } else if (fmt === 'toml') {
-        await window.vstUpdater.exportToml({pdfs: pdf}, filePath);
+        await window.vstUpdater.exportToml({pdfs: pdf.map(enrichPdfExportRow)}, filePath);
     } else {
-        await window.vstUpdater.exportPdfsJson(pdf, filePath.endsWith('.json') ? filePath : filePath + '.json');
+        await window.vstUpdater.exportPdfsJson(
+            pdf.map(enrichPdfExportRow),
+            filePath.endsWith('.json') ? filePath : filePath + '.json',
+        );
     }
 }
 

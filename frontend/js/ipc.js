@@ -633,6 +633,27 @@ document.addEventListener('click', (e) => {
             case 'stopMidiScan':
                 if (typeof stopMidiScan === 'function') stopMidiScan();
                 break;
+            case 'scanVideos':
+                if (typeof scanVideos === 'function') void scanVideos();
+                break;
+            case 'resumeVideoScan':
+                if (typeof scanVideos === 'function') void scanVideos(true);
+                break;
+            case 'stopVideoScan':
+                if (typeof stopVideoScan === 'function') void stopVideoScan();
+                break;
+            case 'openVideoFile':
+                if (typeof openVideoFile === 'function') openVideoFile(el.dataset.path);
+                break;
+            case 'sortVideo':
+                if (typeof sortVideo === 'function') sortVideo(el.dataset.key);
+                break;
+            case 'loadMoreVideos':
+                if (typeof loadMoreVideos === 'function') loadMoreVideos();
+                break;
+            case 'filterVideos':
+                if (typeof filterVideos === 'function') filterVideos();
+                break;
             case 'scanPdfs':
                 scanPdfs();
                 break;
@@ -1469,6 +1490,18 @@ window.vstUpdater = {
         format_filter: formatFilter || null,
         search_regex: !!searchRegex,
     }),
+    scanVideoFiles: (customRoots, excludePaths) => invoke('scan_video_files', {
+        customRoots: customRoots || null,
+        excludePaths: excludePaths || null,
+    }),
+    stopVideoScan: () => invoke('stop_video_scan'),
+    onVideoScanProgress: (callback) => listen('video-scan-progress', (event) => callback(event.payload)),
+    dbQueryVideo: (params) => invoke('db_query_video', params || {}),
+    dbVideoFilterStats: (search, formatFilter, searchRegex) => invoke('db_video_filter_stats', {
+        search: search || null,
+        format_filter: formatFilter || null,
+        search_regex: !!searchRegex,
+    }),
     // PDFs
     scanPdfs: (customRoots, excludePaths) => invoke('scan_pdfs', {
         customRoots: customRoots || null,
@@ -1698,6 +1731,7 @@ let DAW_PAGE_SIZE = 200;
 /** Paginated MIDI / PDF tabs — kept in sync with Settings → Performance → Table Page Size. */
 let MIDI_PAGE_SIZE = 200;
 let PDF_PAGE_SIZE = 200;
+let VIDEO_PAGE_SIZE = 200;
 
 // Common audio plugin manufacturers where bundle ID doesn't match KVR slug
 const KVR_MANUFACTURER_MAP = {

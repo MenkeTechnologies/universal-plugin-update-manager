@@ -5,7 +5,7 @@
 use crate::history::{
     self, AudioHistory, AudioSample, AudioScanSnapshot, DawHistory, DawProject, DawScanSnapshot,
     KvrCacheEntry, MidiFile, MidiScanSnapshot, PdfFile, PdfScanSnapshot, PresetFile, PresetHistory,
-    PresetScanSnapshot, ScanHistory, ScanSnapshot,
+    PresetScanSnapshot, ScanHistory, ScanSnapshot, VideoFile,
 };
 use crate::path_norm::{normalize_path_for_db, path_strings_json_normalized};
 use crate::scanner::PluginInfo;
@@ -81,6 +81,8 @@ pub struct Database {
     read_idx: AtomicUsize,
     /// `SELECT COUNT(*) FROM midi_library` is O(rows); cache and invalidate on MIDI library writes.
     midi_library_total_cache: Mutex<Option<u64>>,
+    /// Same pattern as [`Self::midi_library_total_rows`] for `video_library`.
+    video_library_total_cache: Mutex<Option<u64>>,
     /// Same pattern as [`Self::midi_library_total_rows`] for `pdf_library`.
     pdf_library_total_cache: Mutex<Option<u64>>,
     /// `SELECT COUNT(*) FROM audio_library` — invalidated on audio library writes.
@@ -542,6 +544,8 @@ const DAW_LIBRARY_IDS: &str = "id IN (SELECT project_id FROM daw_library)";
 const PRESET_LIBRARY_IDS: &str = "id IN (SELECT preset_id FROM preset_library)";
 const PDF_LIBRARY_IDS: &str = "id IN (SELECT pdf_id FROM pdf_library)";
 const MIDI_LIBRARY_IDS: &str = "id IN (SELECT midi_id FROM midi_library)";
+
+const VIDEO_LIBRARY_IDS: &str = "id IN (SELECT video_id FROM video_library)";
 /// Materialized in `plugin_library` (migration v17) — same semantics as other `*_library` tables.
 const PLUGIN_LIBRARY_IDS: &str = "id IN (SELECT plugin_id FROM plugin_library)";
 const PLUGIN_LIBRARY_IDS_QUALIFIED: &str = "plugins.id IN (SELECT plugin_id FROM plugin_library)";
@@ -663,6 +667,21 @@ pub struct PresetQueryResult {
 pub struct MidiQueryResult {
     #[serde(rename = "midiFiles")]
     pub midi_files: Vec<MidiFile>,
+    #[serde(rename = "totalCount")]
+    pub total_count: u64,
+    #[serde(
+        rename = "totalCountCapped",
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    pub total_count_capped: bool,
+    #[serde(rename = "totalUnfiltered")]
+    pub total_unfiltered: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VideoQueryResult {
+    #[serde(rename = "videoFiles")]
+    pub video_files: Vec<VideoFile>,
     #[serde(rename = "totalCount")]
     pub total_count: u64,
     #[serde(
@@ -990,6 +1009,29 @@ impl Database {
         }
     }
 
+    fn video_library_total_rows(&self, conn: &Connection) -> Result<u64, String> {
+        if let Ok(g) = self.video_library_total_cache.lock() {
+            if let Some(n) = *g {
+                return Ok(n);
+            }
+        }
+        let n: u64 = conn
+            .query_row("SELECT COUNT(*) FROM video_library", [], |r| {
+                r.get::<_, i64>(0).map(|v| v as u64)
+            })
+            .unwrap_or(0);
+        if let Ok(mut g) = self.video_library_total_cache.lock() {
+            *g = Some(n);
+        }
+        Ok(n)
+    }
+
+    fn invalidate_video_library_total_cache(&self) {
+        if let Ok(mut g) = self.video_library_total_cache.lock() {
+            *g = None;
+        }
+    }
+
     fn pdf_library_total_rows(&self, conn: &Connection) -> Result<u64, String> {
         if let Ok(g) = self.pdf_library_total_cache.lock() {
             if let Some(n) = *g {
@@ -1128,6 +1170,11 @@ INSERT OR REPLACE INTO midi_library (path, midi_id)
  SELECT path, MAX(id) FROM midi_files WHERE path IN (SELECT path FROM _midi_lib_refresh_paths) GROUP BY path;
 DROP TABLE _midi_lib_refresh_paths;"#;
 
+    const SYNC_VIDEO_LIBRARY_PATHS_SQL: &'static str = r#"DELETE FROM video_library WHERE path IN (SELECT path FROM _video_lib_refresh_paths) AND path NOT IN (SELECT DISTINCT path FROM video_files);
+INSERT OR REPLACE INTO video_library (path, video_id)
+ SELECT path, MAX(id) FROM video_files WHERE path IN (SELECT path FROM _video_lib_refresh_paths) GROUP BY path;
+DROP TABLE _video_lib_refresh_paths;"#;
+
     const SYNC_PRESET_LIBRARY_PATHS_SQL: &'static str = r#"DELETE FROM preset_library WHERE path IN (SELECT path FROM _preset_lib_refresh_paths) AND path NOT IN (SELECT DISTINCT path FROM presets);
 INSERT OR REPLACE INTO preset_library (path, preset_id)
  SELECT path, MAX(id) FROM presets WHERE path IN (SELECT path FROM _preset_lib_refresh_paths) GROUP BY path;
@@ -1172,6 +1219,14 @@ DROP TABLE _pl_refresh_paths;"#;
 
     fn sync_midi_library_after_paths_refresh_tx(tx: &Transaction<'_>) -> Result<(), String> {
         Self::exec_sync_paths_refresh_tx(tx, Self::SYNC_MIDI_LIBRARY_PATHS_SQL)
+    }
+
+    fn sync_video_library_after_paths_refresh(conn: &Connection) -> Result<(), String> {
+        Self::exec_sync_paths_refresh(conn, Self::SYNC_VIDEO_LIBRARY_PATHS_SQL)
+    }
+
+    fn sync_video_library_after_paths_refresh_tx(tx: &Transaction<'_>) -> Result<(), String> {
+        Self::exec_sync_paths_refresh_tx(tx, Self::SYNC_VIDEO_LIBRARY_PATHS_SQL)
     }
 
     fn sync_preset_library_after_paths_refresh(conn: &Connection) -> Result<(), String> {
@@ -1228,6 +1283,8 @@ DROP TABLE _pl_refresh_paths;"#;
              INSERT INTO pdf_library (path, pdf_id) SELECT path, MAX(id) FROM pdfs GROUP BY path;
              DELETE FROM midi_library;
              INSERT INTO midi_library (path, midi_id) SELECT path, MAX(id) FROM midi_files GROUP BY path;
+             DELETE FROM video_library;
+             INSERT INTO video_library (path, video_id) SELECT path, MAX(id) FROM video_files GROUP BY path;
              DELETE FROM preset_library;
              INSERT INTO preset_library (path, preset_id) SELECT path, MAX(id) FROM presets GROUP BY path;
              DELETE FROM daw_library;
@@ -1257,6 +1314,7 @@ DROP TABLE _pl_refresh_paths;"#;
             read_deadlines: Vec::new(),
             read_idx: AtomicUsize::new(0),
             midi_library_total_cache: Mutex::new(None),
+            video_library_total_cache: Mutex::new(None),
             pdf_library_total_cache: Mutex::new(None),
             audio_library_total_cache: Mutex::new(None),
             preset_inventory_total_cache: Mutex::new(None),
@@ -1332,6 +1390,7 @@ DROP TABLE _pl_refresh_paths;"#;
             ("daw_scans", "daw_projects", "scan_id"),
             ("preset_scans", "presets", "scan_id"),
             ("midi_scans", "midi_files", "scan_id"),
+            ("video_scans", "video_files", "scan_id"),
             ("pdf_scans", "pdfs", "scan_id"),
         ] {
             // One `read_conn()` scope per domain so we do not hold a pooled handle across all
@@ -1357,6 +1416,7 @@ DROP TABLE _pl_refresh_paths;"#;
         } else {
             self.invalidate_preset_inventory_total_cache();
             self.invalidate_midi_library_total_cache();
+            self.invalidate_video_library_total_cache();
             self.invalidate_pdf_library_total_cache();
             self.invalidate_daw_library_total_cache();
             self.invalidate_plugin_library_total_cache();
@@ -1414,6 +1474,16 @@ DROP TABLE _pl_refresh_paths;"#;
         Ok(())
     }
 
+    pub fn set_video_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
+        let conn = self.read_conn();
+        conn.execute(
+            "UPDATE video_scans SET scan_complete = ?2 WHERE id = ?1",
+            params![id, if complete { 1 } else { 0 }],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn set_pdf_scan_complete(&self, id: &str, complete: bool) -> Result<(), String> {
         let conn = self.read_conn();
         conn.execute(
@@ -1434,12 +1504,14 @@ DROP TABLE _pl_refresh_paths;"#;
              SELECT COUNT(*) FROM daw_projects WHERE id=1;
              SELECT COUNT(*) FROM presets WHERE id=1;
              SELECT COUNT(*) FROM midi_files WHERE id=1;
+             SELECT COUNT(*) FROM video_files WHERE id=1;
              SELECT COUNT(*) FROM pdfs WHERE id=1;
              SELECT COUNT(*) FROM plugins WHERE id=1;
              SELECT rowid FROM audio_samples_fts WHERE audio_samples_fts MATCH 'xzyq' LIMIT 1;
              SELECT rowid FROM daw_projects_fts WHERE daw_projects_fts MATCH 'xzyq' LIMIT 1;
              SELECT rowid FROM presets_fts WHERE presets_fts MATCH 'xzyq' LIMIT 1;
              SELECT rowid FROM midi_files_fts WHERE midi_files_fts MATCH 'xzyq' LIMIT 1;
+             SELECT rowid FROM video_files_fts WHERE video_files_fts MATCH 'xzyq' LIMIT 1;
              SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH 'xzyq' LIMIT 1;",
         );
     }
@@ -2173,6 +2245,55 @@ DROP TABLE _pl_refresh_paths;"#;
                 .map_err(|e| format!("Migration v19 schema_version failed: {e}"))?;
         }
 
+        if current < 20 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS video_files (
+                    id              INTEGER PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    path            TEXT NOT NULL,
+                    directory       TEXT NOT NULL,
+                    format          TEXT NOT NULL,
+                    size            INTEGER NOT NULL,
+                    size_formatted  TEXT NOT NULL,
+                    modified        TEXT NOT NULL,
+                    scan_id         TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_video_files_path_scan ON video_files(path, scan_id);
+                CREATE INDEX IF NOT EXISTS idx_video_files_name ON video_files(name COLLATE NOCASE);
+                CREATE INDEX IF NOT EXISTS idx_video_files_scan_id ON video_files(scan_id);
+                CREATE INDEX IF NOT EXISTS idx_video_files_format ON video_files(format);
+                CREATE INDEX IF NOT EXISTS idx_video_scan_name     ON video_files(scan_id, name COLLATE NOCASE, id);
+                CREATE INDEX IF NOT EXISTS idx_video_scan_size     ON video_files(scan_id, size, id);
+                CREATE INDEX IF NOT EXISTS idx_video_scan_modified ON video_files(scan_id, modified, id);
+                CREATE INDEX IF NOT EXISTS idx_video_scan_format   ON video_files(scan_id, format, id);
+
+                CREATE TABLE IF NOT EXISTS video_scans (
+                    id              TEXT PRIMARY KEY,
+                    timestamp       TEXT NOT NULL,
+                    video_count     INTEGER NOT NULL,
+                    total_bytes     INTEGER NOT NULL,
+                    format_counts   TEXT NOT NULL,
+                    roots           TEXT NOT NULL,
+                    scan_complete   INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE VIRTUAL TABLE IF NOT EXISTS video_files_fts USING fts5(
+                    name, path, scan_id UNINDEXED, tokenize='trigram'
+                );
+
+                CREATE TABLE IF NOT EXISTS video_library (
+                    path TEXT PRIMARY KEY NOT NULL,
+                    video_id INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_video_library_video_id ON video_library(video_id);
+                INSERT OR REPLACE INTO video_library (path, video_id)
+                SELECT path, MAX(id) FROM video_files GROUP BY path;",
+            )
+            .map_err(|e| format!("Migration v20 (video inventory) failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (20)", [])
+                .map_err(|e| format!("Migration v20 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
@@ -2320,6 +2441,29 @@ DROP TABLE _pl_refresh_paths;"#;
         .map_err(|e| e.to_string())?;
         Self::exec_sync_paths_refresh_tx(&tx, Self::SYNC_MIDI_LIBRARY_PATHS_SQL)?;
 
+        // ── Video ──
+        tx.execute(
+            "CREATE TEMP TABLE _video_lib_refresh_paths (path TEXT PRIMARY KEY)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute(
+            "INSERT OR REPLACE INTO _video_lib_refresh_paths VALUES (?1)",
+            params![path],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute(
+            "DELETE FROM video_files_fts WHERE rowid IN (SELECT id FROM video_files WHERE path IN (SELECT path FROM _video_lib_refresh_paths))",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute(
+            "DELETE FROM video_files WHERE path IN (SELECT path FROM _video_lib_refresh_paths)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        Self::exec_sync_paths_refresh_tx(&tx, Self::SYNC_VIDEO_LIBRARY_PATHS_SQL)?;
+
         // ── PDFs ──
         tx.execute(
             "CREATE TEMP TABLE _pdf_lib_refresh_paths (path TEXT PRIMARY KEY)",
@@ -2366,6 +2510,7 @@ DROP TABLE _pl_refresh_paths;"#;
         self.invalidate_daw_library_total_cache();
         self.invalidate_preset_inventory_total_cache();
         self.invalidate_midi_library_total_cache();
+        self.invalidate_video_library_total_cache();
         self.invalidate_pdf_library_total_cache();
         self.invalidate_plugin_library_total_cache();
         Ok(())
@@ -2783,6 +2928,71 @@ DROP TABLE _pl_refresh_paths;"#;
   INNER JOIN midi_files AS m ON m.id = midi_files_fts.rowid
   INNER JOIN midi_library AS lib ON lib.midi_id = m.id
   WHERE midi_files_fts MATCH ?1 AND m.format = ?2
+  LIMIT ?3)",
+                    params![fts_match, f, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+        };
+        let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
+        let count = if capped {
+            FTS_INVENTORY_MATCH_COUNT_CAP as u64
+        } else {
+            raw as u64
+        };
+        Ok((count, capped))
+    }
+
+    /// Bounded FTS hit count for video library (same `format_filter` rules as [`Self::query_video`]).
+    fn video_fts_bounded_count_library(
+        conn: &Connection,
+        fts_match: &str,
+        format_filter: Option<&str>,
+    ) -> Result<(u64, bool), String> {
+        let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
+        let raw: i64 = match format_filter {
+            None => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM video_files_fts
+  INNER JOIN video_library AS lib ON lib.video_id = video_files_fts.rowid
+  WHERE video_files_fts MATCH ?1
+  LIMIT ?2)",
+                    params![fts_match, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+            Some(f) if f.trim().is_empty() || f == "all" => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM video_files_fts
+  INNER JOIN video_library AS lib ON lib.video_id = video_files_fts.rowid
+  WHERE video_files_fts MATCH ?1
+  LIMIT ?2)",
+                    params![fts_match, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?,
+            Some(f) if f.contains(',') => {
+                let in_list = Self::in_list_sql(f);
+                let sql = format!(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM video_files_fts
+  INNER JOIN video_files AS v ON v.id = video_files_fts.rowid
+  INNER JOIN video_library AS lib ON lib.video_id = v.id
+  WHERE video_files_fts MATCH ?1 AND v.format IN ({in_list})
+  LIMIT ?2)"
+                );
+                conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
+                    .map_err(|e| e.to_string())?
+            }
+            Some(f) => conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
+  SELECT 1 FROM video_files_fts
+  INNER JOIN video_files AS v ON v.id = video_files_fts.rowid
+  INNER JOIN video_library AS lib ON lib.video_id = v.id
+  WHERE video_files_fts MATCH ?1 AND v.format = ?2
   LIMIT ?3)",
                     params![fts_match, f, cap],
                     |row| row.get::<_, i64>(0),
@@ -6047,6 +6257,453 @@ DROP TABLE _pl_refresh_paths;"#;
         })
     }
 
+    // ── Video scan CRUD (library + FTS — same model as MIDI) ──
+
+    pub fn video_scan_parent_create(
+        &self,
+        id: &str,
+        timestamp: &str,
+        roots: &[String],
+    ) -> Result<(), String> {
+        let conn = self.read_conn();
+        let roots_json = path_strings_json_normalized(roots);
+        conn.execute(
+            "INSERT OR REPLACE INTO video_scans (id, timestamp, video_count, total_bytes, format_counts, roots, scan_complete) VALUES (?1,?2,0,0,'{}',?3,0)",
+            params![id, timestamp, roots_json],
+        ).map_err(|e| e.to_string())?;
+        conn.execute(
+            "CREATE TEMP TABLE _video_lib_refresh_paths (path TEXT PRIMARY KEY)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO _video_lib_refresh_paths SELECT DISTINCT path FROM video_files WHERE scan_id = ?1",
+            params![id],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM video_files WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM video_files_fts WHERE scan_id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Self::sync_video_library_after_paths_refresh(&conn)?;
+        self.invalidate_video_library_total_cache();
+        Ok(())
+    }
+
+    pub fn video_scan_parent_finalize(
+        &self,
+        id: &str,
+        _video_count: usize,
+        _total_bytes: u64,
+        _format_counts: &HashMap<String, usize>,
+    ) -> Result<(), String> {
+        let conn = self.read_conn();
+        let video_count: i64 = conn
+            .query_row("SELECT COUNT(DISTINCT path) FROM video_files", [], |r| {
+                r.get(0)
+            })
+            .unwrap_or(0);
+        let total_bytes: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(size), 0) FROM video_files WHERE id IN (SELECT video_id FROM video_library)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        let mut format_map: HashMap<String, usize> = HashMap::new();
+        let mut stmt = conn
+            .prepare(
+                "SELECT format, COUNT(*) FROM video_files WHERE id IN (SELECT video_id FROM video_library) GROUP BY format",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)? as usize))
+            })
+            .map_err(|e| e.to_string())?;
+        for (fmt, n) in rows.flatten() {
+            format_map.insert(fmt, n);
+        }
+        let fc_json = serde_json::to_string(&format_map).unwrap_or_default();
+        conn.execute(
+            "UPDATE video_scans SET video_count = ?2, total_bytes = ?3, format_counts = ?4 WHERE id = ?1",
+            params![id, video_count, total_bytes, fc_json],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn insert_video_batch(&self, scan_id: &str, video_files: &[VideoFile]) -> Result<(), String> {
+        let conn = self.read_conn();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut inserted: u64 = 0;
+        let mut batch_bytes: u64 = 0;
+        {
+            let mut stmt = tx.prepare_cached("INSERT OR IGNORE INTO video_files (name, path, directory, format, size, size_formatted, modified, scan_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)").map_err(|e| e.to_string())?;
+            let mut fts_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO video_files_fts(rowid, name, path, scan_id) VALUES (?1,?2,?3,?4)",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut lib_stmt = tx
+                .prepare_cached(
+                    "INSERT INTO video_library (path, video_id) VALUES (?1, ?2)
+                     ON CONFLICT(path) DO UPDATE SET video_id = CASE
+                       WHEN excluded.video_id > video_library.video_id THEN excluded.video_id
+                       ELSE video_library.video_id END",
+                )
+                .map_err(|e| e.to_string())?;
+            for m in video_files {
+                let path = normalize_path_for_db(&m.path);
+                let directory = normalize_path_for_db(&m.directory);
+                let changed = stmt
+                    .execute(params![
+                        m.name,
+                        path,
+                        directory,
+                        m.format,
+                        m.size as i64,
+                        m.size_formatted,
+                        m.modified,
+                        scan_id
+                    ])
+                    .map_err(|e| e.to_string())?;
+                if changed > 0 {
+                    let id = tx.last_insert_rowid();
+                    fts_stmt
+                        .execute(params![id, m.name, path, scan_id])
+                        .map_err(|e| e.to_string())?;
+                    lib_stmt
+                        .execute(params![path, id])
+                        .map_err(|e| e.to_string())?;
+                    inserted += 1;
+                    batch_bytes += m.size;
+                }
+            }
+        }
+        if inserted > 0 {
+            tx.execute(
+                "UPDATE video_scans SET video_count = video_count + ?2, total_bytes = total_bytes + ?3 WHERE id = ?1",
+                params![scan_id, inserted as i64, batch_bytes as i64],
+            ).map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        if inserted > 0 {
+            self.invalidate_video_library_total_cache();
+        }
+        Ok(())
+    }
+
+    pub fn query_video(
+        &self,
+        search: Option<&str>,
+        format_filter: Option<&str>,
+        sort_key: &str,
+        sort_asc: bool,
+        search_regex: bool,
+        offset: u64,
+        limit: u64,
+    ) -> Result<VideoQueryResult, String> {
+        let conn = self.read_conn();
+        let total_unfiltered: u64 = self.video_library_total_rows(&conn)?;
+        if total_unfiltered == 0 {
+            return Ok(VideoQueryResult {
+                video_files: vec![],
+                total_count: 0,
+                total_count_capped: false,
+                total_unfiltered: 0,
+            });
+        }
+
+        let mut where_parts = vec![VIDEO_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
+        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        if fts_match.is_some() {
+            where_parts.push(format!(
+                "id IN (SELECT rowid FROM video_files_fts WHERE video_files_fts MATCH ?{bind_idx})",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
+            ));
+            bind_idx += 1;
+        } else if like_pat.is_some() {
+            where_parts.push(format!(
+                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+            ));
+            bind_idx += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" {
+                if f.contains(',') {
+                    where_parts.push(format!(
+                        "format IN ({})",
+                        f.split(',')
+                            .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ));
+                } else {
+                    where_parts.push(format!("format = ?{bind_idx}"));
+                    bind_idx += 1;
+                }
+            }
+        }
+        let where_cl = where_parts.join(" AND ");
+
+        let sort_col = match sort_key {
+            "name" => "name COLLATE NOCASE",
+            "size" => "size",
+            "modified" => "modified",
+            "directory" => "directory COLLATE NOCASE",
+            "format" => "format",
+            _ => "name COLLATE NOCASE",
+        };
+        let dir = if sort_asc { "ASC" } else { "DESC" };
+
+        let use_fts_rank_page = fts_match.is_some();
+
+        let (total_count, total_count_capped) = if fts_match.is_some() {
+            let m = fts_match.as_ref().expect("fts");
+            Self::video_fts_bounded_count_library(&conn, m, format_filter)?
+        } else {
+            let sql = format!("SELECT COUNT(*) FROM video_files WHERE {where_cl}");
+            let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+            let mut bi = 1;
+            if let Some(ref r) = regex_pat {
+                stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
+                bi += 1;
+            } else if let Some(ref pat) = like_pat {
+                stmt.raw_bind_parameter(bi, pat)
+                    .map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+            if let Some(f) = format_filter {
+                if !f.is_empty() && f != "all" && !f.contains(',') {
+                    stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                }
+            }
+            let mut rows = stmt.raw_query();
+            let n = rows
+                .next()
+                .map_err(|e| e.to_string())?
+                .map(|r| r.get::<_, i64>(0).unwrap_or(0) as u64)
+                .unwrap_or(0);
+            (n, false)
+        };
+
+        let sql = if use_fts_rank_page {
+            let mut w = String::from(
+                "SELECT v.name, v.path, v.directory, v.format, v.size, v.size_formatted, v.modified
+                 FROM video_files_fts
+                 INNER JOIN video_files v ON v.id = video_files_fts.rowid
+                 INNER JOIN video_library lib ON lib.video_id = v.id
+                 WHERE video_files_fts MATCH ?1",
+            );
+            let mut next_ph = 2usize;
+            if let Some(f) = format_filter {
+                if !f.is_empty() && f != "all" {
+                    if f.contains(',') {
+                        let vals: Vec<String> = f
+                            .split(',')
+                            .map(|s| format!("'{}'", s.trim().replace('\'', "''")))
+                            .collect();
+                        w.push_str(&format!(" AND v.format IN ({})", vals.join(",")));
+                    } else {
+                        w.push_str(&format!(" AND v.format = ?{next_ph}"));
+                        next_ph += 1;
+                    }
+                }
+            }
+            let li = next_ph;
+            let oi = next_ph + 1;
+            w.push_str(&format!(
+                " ORDER BY bm25(video_files_fts) LIMIT ?{li} OFFSET ?{oi}"
+            ));
+            w
+        } else {
+            format!(
+                "SELECT name, path, directory, format, size, size_formatted, modified
+                 FROM video_files WHERE {where_cl}
+                 ORDER BY {sort_col} {dir} LIMIT ?{limit_idx} OFFSET ?{off_idx}",
+                limit_idx = bind_idx,
+                off_idx = bind_idx + 1
+            )
+        };
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut bi = 1;
+        if use_fts_rank_page {
+            let m = fts_match.as_ref().expect("fts");
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+            if let Some(f) = format_filter {
+                if !f.is_empty() && f != "all" && !f.contains(',') {
+                    stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                    bi += 1;
+                }
+            }
+            stmt.raw_bind_parameter(bi, limit as i64)
+                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi + 1, offset as i64)
+                .map_err(|e| e.to_string())?;
+        } else if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref pat) = like_pat {
+            stmt.raw_bind_parameter(bi, pat)
+                .map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if !use_fts_rank_page {
+            if let Some(f) = format_filter {
+                if !f.is_empty() && f != "all" && !f.contains(',') {
+                    stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+                    bi += 1;
+                }
+            }
+            stmt.raw_bind_parameter(bi, limit as i64)
+                .map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi + 1, offset as i64)
+                .map_err(|e| e.to_string())?;
+        }
+        let mut rows = stmt.raw_query();
+        let mut out = Vec::new();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            out.push(VideoFile {
+                name: row.get(0).unwrap_or_default(),
+                path: row.get(1).unwrap_or_default(),
+                directory: row.get(2).unwrap_or_default(),
+                format: row.get(3).unwrap_or_default(),
+                size: row.get::<_, i64>(4).unwrap_or(0) as u64,
+                size_formatted: row.get(5).unwrap_or_default(),
+                modified: row.get(6).unwrap_or_default(),
+            });
+        }
+        Ok(VideoQueryResult {
+            video_files: out,
+            total_count,
+            total_count_capped,
+            total_unfiltered,
+        })
+    }
+
+    pub fn video_filter_stats(
+        &self,
+        search: Option<&str>,
+        format_filter: Option<&str>,
+        search_regex: bool,
+    ) -> Result<FilterStatsResult, String> {
+        let conn = self.read_conn();
+        let total_unfiltered: u64 = self.video_library_total_rows(&conn)?;
+        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let mut where_parts = vec![VIDEO_LIBRARY_IDS.to_string()];
+        let mut bind_idx = 1usize;
+        if fts_match.is_some() {
+            where_parts.push(format!(
+                "id IN (SELECT rowid FROM video_files_fts WHERE video_files_fts MATCH ?{bind_idx})",
+            ));
+            bind_idx += 1;
+        } else if regex_pat.is_some() {
+            where_parts.push(format!(
+                "((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))"
+            ));
+            bind_idx += 1;
+        } else if like_pat.is_some() {
+            where_parts.push(format!(
+                "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
+            ));
+            bind_idx += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" {
+                if f.contains(',') {
+                    where_parts.push(format!("format IN ({})", Self::in_list_sql(f)));
+                } else {
+                    where_parts.push(format!("format = ?{bind_idx}"));
+                }
+            }
+        }
+        let where_cl = where_parts.join(" AND ");
+        if fts_match.is_some() {
+            let m = fts_match.as_ref().expect("fts");
+            let (bc, capped) = Self::video_fts_bounded_count_library(&conn, m, format_filter)?;
+            if bc == 0 {
+                return Ok(FilterStatsResult {
+                    count: 0,
+                    count_capped: false,
+                    total_bytes: 0,
+                    by_type: HashMap::new(),
+                    bytes_by_type: HashMap::new(),
+                    total_unfiltered,
+                    size_buckets: vec![],
+                    ..Default::default()
+                });
+            }
+            if capped {
+                return Ok(FilterStatsResult {
+                    count: bc,
+                    count_capped: true,
+                    total_bytes: 0,
+                    by_type: HashMap::new(),
+                    bytes_by_type: HashMap::new(),
+                    total_unfiltered,
+                    size_buckets: vec![],
+                    ..Default::default()
+                });
+            }
+        }
+        let sql = format!(
+            "SELECT format, COUNT(*), COALESCE(SUM(size),0) FROM video_files WHERE {where_cl} GROUP BY format"
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut bi = 1;
+        if let Some(ref m) = fts_match {
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref r) = regex_pat {
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
+            bi += 1;
+        } else if let Some(ref pat) = like_pat {
+            stmt.raw_bind_parameter(bi, pat)
+                .map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        if let Some(f) = format_filter {
+            if !f.is_empty() && f != "all" && !f.contains(',') {
+                stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
+            }
+        }
+        let _ = bi;
+        let mut rows = stmt.raw_query();
+        let mut count = 0u64;
+        let mut total_bytes = 0u64;
+        let mut by_type = HashMap::new();
+        let mut bytes_by_type = HashMap::new();
+        while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+            let fmt: String = row.get(0).unwrap_or_default();
+            let n: u64 = row.get::<_, i64>(1).unwrap_or(0) as u64;
+            let sz: u64 = row.get::<_, i64>(2).unwrap_or(0) as u64;
+            count += n;
+            total_bytes += sz;
+            by_type.insert(fmt.clone(), n);
+            bytes_by_type.insert(fmt, sz);
+        }
+        Ok(FilterStatsResult {
+            count,
+            count_capped: false,
+            total_bytes,
+            by_type,
+            bytes_by_type,
+            total_unfiltered,
+            size_buckets: vec![],
+            ..Default::default()
+        })
+    }
+
     // ── PDF scan CRUD ──
 
     pub fn pdf_scan_parent_create(
@@ -7765,6 +8422,9 @@ DROP TABLE _pl_refresh_paths;"#;
             "pdf_library",
             "midi_files",
             "midi_library",
+            "video_files",
+            "video_library",
+            "video_scans",
             "pdf_scans",
             "pdf_metadata",
             "preset_library",
@@ -7810,6 +8470,13 @@ DROP TABLE _pl_refresh_paths;"#;
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
+        let video_lib: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM video_files WHERE id IN (SELECT video_id FROM video_library)",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
 
         map.insert("audio_samples_library".into(), serde_json::json!(audio_lib));
         map.insert("plugins_library".into(), serde_json::json!(plugins_lib));
@@ -7817,6 +8484,7 @@ DROP TABLE _pl_refresh_paths;"#;
         map.insert("presets_library".into(), serde_json::json!(presets_lib));
         map.insert("pdfs_library".into(), serde_json::json!(pdfs_lib));
         map.insert("midi_files_library".into(), serde_json::json!(midi_lib));
+        map.insert("video_files_library".into(), serde_json::json!(video_lib));
 
         Ok(serde_json::Value::Object(map))
     }
@@ -7853,6 +8521,13 @@ DROP TABLE _pl_refresh_paths;"#;
                 |r| r.get::<_, i64>(0).map(|v| v as u64),
             )
             .unwrap_or(0);
+        let count_video: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM video_files WHERE id IN (SELECT video_id FROM video_library)",
+                [],
+                |r| r.get::<_, i64>(0).map(|v| v as u64),
+            )
+            .unwrap_or(0);
 
         Ok(serde_json::json!({
             "plugins": count_plugins,
@@ -7861,6 +8536,7 @@ DROP TABLE _pl_refresh_paths;"#;
             "presets": count_presets,
             "pdfs": count_pdfs,
             "midi_files": count_midi,
+            "video_files": count_video,
         }))
     }
 
@@ -7908,6 +8584,10 @@ DROP TABLE _pl_refresh_paths;"#;
         push_sql(
             "SELECT path, size FROM midi_files WHERE id IN (SELECT midi_id FROM midi_library)",
             "midi",
+        )?;
+        push_sql(
+            "SELECT path, size FROM video_files WHERE id IN (SELECT video_id FROM video_library)",
+            "video",
         )?;
 
         Ok(out)
@@ -8005,6 +8685,7 @@ DROP TABLE _pl_refresh_paths;"#;
             "daw_projects",
             "presets",
             "midi_files",
+            "video_files",
             "pdfs",
         ]
         .iter()
@@ -8022,6 +8703,7 @@ DROP TABLE _pl_refresh_paths;"#;
             ("DAW Scans", "daw_scans", "daw_projects", "daw_scans"),
             ("Preset Scans", "preset_scans", "presets", "preset_scans"),
             ("MIDI Scans", "midi_scans", "midi_files", "midi_scans"),
+            ("Video Scans", "video_scans", "video_files", "video_scans"),
             ("PDF Scans", "pdf_scans", "pdfs", "pdf_scans"),
         ] {
             let scan_count: u64 = conn
@@ -8640,6 +9322,7 @@ mod tests {
             read_deadlines: Vec::new(),
             read_idx: AtomicUsize::new(0),
             midi_library_total_cache: Mutex::new(None),
+            video_library_total_cache: Mutex::new(None),
             pdf_library_total_cache: Mutex::new(None),
             audio_library_total_cache: Mutex::new(None),
             preset_inventory_total_cache: Mutex::new(None),

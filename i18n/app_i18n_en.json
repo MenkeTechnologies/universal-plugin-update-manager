@@ -1180,6 +1180,8 @@
   "ui.export.col_note": "Note",
   "ui.export.col_notes": "Notes",
   "ui.export.col_pages": "Pages",
+  "ui.export.col_pdf_creation_date": "PDF CreationDate",
+  "ui.export.col_pdf_mod_date": "PDF ModDate",
   "ui.export.col_path": "Path",
   "ui.export.col_plugin": "Plugin",
   "ui.export.col_project": "Project",

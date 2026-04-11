@@ -284,6 +284,19 @@ pub struct MidiFile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VideoFile {
+    pub name: String,
+    pub path: String,
+    pub directory: String,
+    /// Uppercase extension tag without dot (e.g. `MP4`, `MOV`).
+    pub format: String,
+    pub size: u64,
+    #[serde(rename = "sizeFormatted")]
+    pub size_formatted: String,
+    pub modified: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MidiScanSnapshot {
     pub id: String,
     pub timestamp: String,

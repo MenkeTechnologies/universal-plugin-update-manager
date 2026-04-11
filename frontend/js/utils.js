@@ -1288,7 +1288,7 @@ function _ensureTabButtonCache() {
 const _tabPanels = {};
 const _tabPanelIds = [
     'plugins', 'history', 'samples', 'daw', 'presets', 'favorites',
-    'notes', 'tags', 'files', 'midi', 'pdf', 'visualizer', 'walkers', 'audioEngine', 'settings',
+    'notes', 'tags', 'files', 'midi', 'pdf', 'videos', 'visualizer', 'walkers', 'audioEngine', 'settings',
 ];
 
 function _ensureTabCache() {
@@ -1350,6 +1350,7 @@ function switchTab(tab) {
                 if (expectedTab === 'files') initFileBrowser();
                 if (expectedTab === 'midi' && typeof loadMidiFiles === 'function' && typeof _midiLoaded !== 'undefined' && !_midiLoaded) loadMidiFiles();
                 if (expectedTab === 'pdf' && typeof loadPdfPagesForVisible === 'function') void loadPdfPagesForVisible();
+                if (expectedTab === 'videos' && typeof loadVideoFiles === 'function' && typeof _videoLoaded !== 'undefined' && !_videoLoaded) void loadVideoFiles();
                 if (expectedTab === 'settings') {
                     refreshSettingsUI();
                     if (typeof renderCacheStats === 'function') renderCacheStats();
