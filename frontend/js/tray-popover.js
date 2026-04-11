@@ -136,7 +136,24 @@
     const btnPrev = document.getElementById('btnPrev');
     const btnPlay = document.getElementById('btnPlay');
     const btnNext = document.getElementById('btnNext');
+    const elTrayVol = document.getElementById('trayVol');
+    const elTrayVolPct = document.getElementById('trayVolPct');
+    const elTrayVolLabel = document.getElementById('trayVolLabel');
+    const elTraySpeed = document.getElementById('traySpeed');
+    const elTraySpeedLabel = document.getElementById('traySpeedLabel');
 
+    /** Same values as main `#npSpeed` — tray window does not load the full index bundle. */
+    const TRAY_SPEED_OPTIONS = [
+        { value: '0.25', i18n: 'ui.opt.0_25x' },
+        { value: '0.5', i18n: 'ui.opt.0_5x' },
+        { value: '0.75', i18n: 'ui.opt.0_75x' },
+        { value: '1', i18n: 'ui.opt.1x' },
+        { value: '1.25', i18n: 'ui.opt.1_25x' },
+        { value: '1.5', i18n: 'ui.opt.1_5x' },
+        { value: '2', i18n: 'ui.opt.2x' },
+    ];
+
+    let _trayApplyingHostControls = false;
     let _trayPopoverDomTheme = '';
 
     function applyTrayDocumentTheme(theme) {
@@ -178,14 +195,34 @@
         return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
-    /** Size the window to the exact `.shell` rect — no outer glow / shadow to pad for. */
+    /** Logical size for `#shell` + document root; extra padding avoids WebKit clipping range rows / descenders. */
+    const TRAY_WIN_PAD_W = 8;
+    const TRAY_WIN_PAD_H = 18;
+
     function syncWindowSize() {
         if (!invoke) return;
         const root = document.getElementById('shell');
         if (!root) return;
         const br = root.getBoundingClientRect();
-        const h = Math.ceil(Math.max(root.scrollHeight, root.offsetHeight, br.height));
-        const w = Math.ceil(Math.max(root.scrollWidth, root.offsetWidth, br.width));
+        const shellH = Math.ceil(Math.max(root.scrollHeight, root.offsetHeight, br.height));
+        const shellW = Math.ceil(Math.max(root.scrollWidth, root.offsetWidth, br.width));
+        const body = document.body;
+        const docEl = document.documentElement;
+        let bodyH = 0;
+        let bodyW = 0;
+        if (body) {
+            const bbr = body.getBoundingClientRect();
+            bodyH = Math.ceil(Math.max(body.scrollHeight, body.offsetHeight, bbr.height));
+            bodyW = Math.ceil(Math.max(body.scrollWidth, body.offsetWidth, bbr.width));
+        }
+        let htmlH = 0;
+        let htmlW = 0;
+        if (docEl) {
+            htmlH = Math.ceil(Math.max(docEl.scrollHeight, docEl.offsetHeight, docEl.clientHeight));
+            htmlW = Math.ceil(Math.max(docEl.scrollWidth, docEl.offsetWidth, docEl.clientWidth));
+        }
+        const h = Math.max(shellH, bodyH, htmlH) + TRAY_WIN_PAD_H;
+        const w = Math.max(shellW, bodyW, htmlW) + TRAY_WIN_PAD_W;
         void invoke('tray_popover_resize', { width: w, height: h }).catch(() => {});
     }
 
@@ -222,8 +259,54 @@
         p.elapsed_sec = elapsed;
         if (p.idle_hint == null && p.idleHint != null) p.idle_hint = p.idleHint;
         if (p.ui_theme == null && p.uiTheme != null) p.ui_theme = p.uiTheme;
+        let vol = p.volume_pct ?? p.volumePct;
+        if (typeof vol === 'string') vol = parseInt(vol, 10);
+        if (typeof vol !== 'number' || !Number.isFinite(vol)) vol = 100;
+        p.volume_pct = Math.max(0, Math.min(100, Math.round(vol)));
+        let pSpeed = p.playback_speed ?? p.playbackSpeed;
+        if (typeof pSpeed === 'string') pSpeed = parseFloat(pSpeed);
+        if (typeof pSpeed !== 'number' || !Number.isFinite(pSpeed)) pSpeed = 1;
+        p.playback_speed = Math.max(0.25, Math.min(2, pSpeed));
         return p;
     }
+
+    function applyTrayExtrasFromState(volumePct, playbackSpeed) {
+        _trayApplyingHostControls = true;
+        try {
+            if (elTrayVol) elTrayVol.value = String(volumePct);
+            if (elTrayVolPct) elTrayVolPct.textContent = `${volumePct}%`;
+            if (elTraySpeed && elTraySpeed.options.length > 0) {
+                const sp = playbackSpeed;
+                let bestIdx = 0;
+                let bestDiff = Infinity;
+                for (let i = 0; i < elTraySpeed.options.length; i++) {
+                    const ov = parseFloat(elTraySpeed.options[i].value);
+                    if (!Number.isFinite(ov)) continue;
+                    const d = Math.abs(ov - sp);
+                    if (d < bestDiff) {
+                        bestDiff = d;
+                        bestIdx = i;
+                    }
+                }
+                elTraySpeed.selectedIndex = bestIdx;
+            }
+        } finally {
+            _trayApplyingHostControls = false;
+        }
+    }
+
+    function populateTraySpeedSelect() {
+        if (!elTraySpeed) return;
+        elTraySpeed.textContent = '';
+        for (const row of TRAY_SPEED_OPTIONS) {
+            const opt = document.createElement('option');
+            opt.value = row.value;
+            const label = window.appFmt(row.i18n);
+            opt.textContent = label && label !== row.i18n ? label : `${row.value}×`;
+            elTraySpeed.appendChild(opt);
+        }
+    }
+    populateTraySpeedSelect();
 
     /**
      * Local playback model — between host pushes (every ~500 ms), a **`requestAnimationFrame`** loop
@@ -325,6 +408,7 @@
             const playT = playing ? window.appFmt('menu.pause') : window.appFmt('menu.play');
             btnPlay.setAttribute('title', playT);
         }
+        applyTrayExtrasFromState(p.volume_pct, p.playback_speed);
         logTrayPopoverApplyState(p, idle, playing, themed);
         scheduleResize();
         setTimeout(() => {
@@ -333,6 +417,9 @@
         setTimeout(() => {
             syncWindowSize();
         }, 80);
+        setTimeout(() => {
+            syncWindowSize();
+        }, 260);
     }
 
     /* Drag-to-seek on the scrubber. Uses pointer capture so the drag still tracks even when the
@@ -402,11 +489,40 @@
     if (btnPlay) btnPlay.addEventListener('click', () => send('play_pause'));
     if (btnNext) btnNext.addEventListener('click', () => send('next_track'));
 
+    if (elTrayVol) {
+        elTrayVol.addEventListener('input', () => {
+            if (_trayApplyingHostControls) return;
+            const v = parseInt(elTrayVol.value, 10);
+            const n = Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 100;
+            if (elTrayVolPct) elTrayVolPct.textContent = `${n}%`;
+            void invoke('tray_popover_action', { action: `volume:${n}` }).catch(() => {});
+        });
+    }
+    if (elTraySpeed) {
+        elTraySpeed.addEventListener('change', () => {
+            if (_trayApplyingHostControls) return;
+            const sp = parseFloat(elTraySpeed.value);
+            if (!Number.isFinite(sp)) return;
+            void invoke('tray_popover_action', { action: `speed:${sp}` }).catch(() => {});
+        });
+    }
+
     /** `WebviewWindow.listen` / `event.listen` return Promises — await so emits are not dropped on first open. */
     async function initTrayIpc() {
         await _trayI18nReady;
         if (btnPrev) btnPrev.setAttribute('title', window.appFmt('tray.previous_track'));
         if (btnNext) btnNext.setAttribute('title', window.appFmt('tray.next_track'));
+        populateTraySpeedSelect();
+        if (elTrayVolLabel) {
+            const vLabel = window.appFmt('ui.ae.playback_volume_label');
+            elTrayVolLabel.textContent = vLabel && vLabel !== 'ui.ae.playback_volume_label' ? vLabel : 'Vol';
+        }
+        if (elTraySpeedLabel) {
+            const sLabel = window.appFmt('ui.np.label_speed');
+            elTraySpeedLabel.textContent = sLabel && sLabel !== 'ui.np.label_speed' ? sLabel : 'Speed';
+        }
+        if (elTrayVol) elTrayVol.setAttribute('title', window.appFmt('ui.tt.volume_cmd_up_down'));
+        if (elTraySpeed) elTraySpeed.setAttribute('title', window.appFmt('ui.tt.playback_speed'));
 
         const tw0 = getTrayWebviewWindow();
         console.info('[tray-popover] boot', {
@@ -471,9 +587,10 @@
 
         if (invoke) {
             try {
-                const [theme, emit] = await Promise.all([
+                const [theme, emit, build] = await Promise.all([
                     invoke('tray_popover_get_ui_theme').catch(() => 'dark'),
                     invoke('tray_popover_get_state').catch(() => null),
+                    invoke('get_build_info').catch(() => null),
                 ]);
                 const bootState = emit ? trayListenUnwrap(emit) : null;
                 console.info('[tray-popover] bootstrap invoke', {
@@ -482,6 +599,20 @@
                 });
                 applyTrayDocumentTheme(typeof theme === 'string' ? theme : 'dark');
                 if (bootState) applyState(bootState);
+                const tm = document.getElementById('trayBuildMeta');
+                if (tm && build && typeof build === 'object' && build.version) {
+                    tm.textContent =
+                        typeof formatBuildMetaLine === 'function'
+                            ? formatBuildMetaLine(build)
+                            : 'Version: v' + build.version;
+                }
+                if (build && typeof build === 'object' && build.version) {
+                    document.title =
+                        'AUDIO_HAXOR · ' +
+                        (typeof formatBuildMetaLine === 'function'
+                            ? formatBuildMetaLine(build)
+                            : 'Version: v' + build.version);
+                }
             } catch (err) {
                 console.warn('[tray-popover] bootstrap invoke failed', err);
             }

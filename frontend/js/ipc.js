@@ -46,14 +46,54 @@ function runExport(fn) {
 }
 
 window.runExport = runExport;
-window.__appReady = invoke('get_app_strings', {locale: null}).then((m) => {
-    window.__appStr = m || {};
-    window.__toastStr = window.__appStr;
-    if (typeof applyUiI18n === 'function') applyUiI18n();
-    /* Cmd+K static rows cache `appFmt` at first build — refresh after SQLite strings land. */
-    if (typeof window.invalidatePaletteStaticCache === 'function') window.invalidatePaletteStaticCache();
-}).catch(() => {
-});
+function applyBuildInfoToDom() {
+    const ver = window.__appBuildVersion ? String(window.__appBuildVersion) : '';
+    const info = window.__appBuildInfo && typeof window.__appBuildInfo === 'object' ? window.__appBuildInfo : {};
+    const verEl = document.getElementById('appVersion');
+    if (verEl && ver) verEl.textContent = 'v' + ver;
+    const gitEl = document.getElementById('appGitRev');
+    if (gitEl) {
+        const line = typeof formatBuildCommitDateLine === 'function' ? formatBuildCommitDateLine(info) : '';
+        if (line) {
+            gitEl.textContent = line;
+            gitEl.hidden = false;
+        } else {
+            gitEl.textContent = '';
+            gitEl.hidden = true;
+        }
+    }
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta && ver) {
+        const bl = typeof formatBuildMetaLine === 'function' ? formatBuildMetaLine(info) : `Version: v${ver}`;
+        meta.setAttribute(
+            'content',
+            `AUDIO_HAXOR — ${bl}. Tauri desktop app: VST/VST3/AU/CLAP plugin scanner, audio samples, DAW projects, KVR updates, SQLite history.`
+        );
+    }
+}
+
+window.__appReady = Promise.all([
+    invoke('get_app_strings', {locale: null}),
+    invoke('get_build_info').catch(() => null),
+])
+    .then(([m, build]) => {
+        window.__appStr = m || {};
+        window.__toastStr = window.__appStr;
+        window.__appBuildInfo = build && typeof build === 'object' ? build : {};
+        window.__appBuildVersion = window.__appBuildInfo.version ? String(window.__appBuildInfo.version) : '';
+        if (typeof applyUiI18n === 'function') applyUiI18n();
+        applyBuildInfoToDom();
+        /* Cmd+K static rows cache `appFmt` at first build — refresh after SQLite strings land. */
+        if (typeof window.invalidatePaletteStaticCache === 'function') window.invalidatePaletteStaticCache();
+        const runAbout = () => {
+            if (typeof window.updateSettingsAboutVersionLine === 'function') {
+                window.updateSettingsAboutVersionLine();
+            }
+        };
+        runAbout();
+        setTimeout(runAbout, 0);
+    })
+    .catch(() => {});
 window.__toastReady = window.__appReady;
 
 async function reloadAppStrings(locale) {
@@ -106,6 +146,14 @@ listen('menu-action', (event) => {
         const sp = parseFloat(id.slice(6));
         if (Number.isFinite(sp) && typeof setPlaybackSpeed === 'function') {
             setPlaybackSpeed(String(sp));
+        }
+        return;
+    }
+    /* Tray popover volume — `volume:<0..100>` matches `#npVolume`. */
+    if (typeof id === 'string' && id.startsWith('volume:')) {
+        const v = parseInt(id.slice(7), 10);
+        if (Number.isFinite(v) && typeof setAudioVolume === 'function') {
+            setAudioVolume(String(Math.max(0, Math.min(100, v))));
         }
         return;
     }
@@ -1145,6 +1193,7 @@ if (typeof document !== 'undefined') {
 
 window.vstUpdater = {
     getVersion: () => invoke('get_version'),
+    getBuildInfo: () => invoke('get_build_info'),
     getAppStrings: (locale) => invoke('get_app_strings', {locale: locale ?? null}),
     getToastStrings: (locale) => invoke('get_toast_strings', {locale: locale ?? null}),
     scanPlugins: (customRoots, excludePaths) => invoke('scan_plugins', {
@@ -1465,21 +1514,6 @@ const KVR_MANUFACTURER_MAP = {
     'arturia': 'arturia',
     'u-he': 'u-he',
 };
-
-// Display app version in header
-window.vstUpdater.getVersion().then(v => {
-    const vStr = 'v' + v;
-    const el = document.getElementById('appVersion');
-    if (el) el.textContent = vStr;
-    const runAboutLine = () => {
-        if (typeof window.updateSettingsAboutVersionLine === 'function') {
-            window.updateSettingsAboutVersionLine();
-        }
-    };
-    runAboutLine();
-    setTimeout(runAboutLine, 0);
-}).catch(() => {
-});
 
 function showStopButton() {
     const btn = document.getElementById('btnStop') || document.getElementById('btnStopAll');

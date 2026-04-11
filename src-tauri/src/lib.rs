@@ -308,6 +308,26 @@ where
 
 // ── Tauri commands ──
 
+/// Package + git metadata baked in at compile time (`build.rs` → `AUDIO_HAXOR_GIT_*` env vars).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildInfo {
+    pub version: String,
+    pub git_sha_short: String,
+    pub git_sha_full: String,
+    pub git_commit_date: String,
+}
+
+#[tauri::command]
+fn get_build_info(app: AppHandle) -> BuildInfo {
+    BuildInfo {
+        version: app.package_info().version.to_string(),
+        git_sha_short: env!("AUDIO_HAXOR_GIT_SHA_SHORT").to_string(),
+        git_sha_full: env!("AUDIO_HAXOR_GIT_SHA_FULL").to_string(),
+        git_commit_date: env!("AUDIO_HAXOR_GIT_COMMIT_DATE").to_string(),
+    }
+}
+
 #[tauri::command]
 fn get_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
@@ -7301,6 +7321,7 @@ pub fn run() {
         .manage(tray_menu::TrayState::default())
         .invoke_handler(tauri::generate_handler![
             get_version,
+            get_build_info,
             get_walker_status,
             scan_plugins,
             stop_scan,

@@ -3171,6 +3171,16 @@ function trayPlaybackSpeedForSync() {
     return Math.max(0.25, Math.min(2, v));
 }
 
+/** Prefs `audioVolume` for tray HUD — same range as `setAudioVolume` (0..100). */
+function trayVolumeForSync() {
+    let v = 100;
+    if (typeof prefs !== 'undefined' && prefs.getItem) {
+        const raw = parseInt(prefs.getItem('audioVolume') || '100', 10);
+        if (Number.isFinite(raw)) v = raw;
+    }
+    return Math.max(0, Math.min(100, v));
+}
+
 function syncTrayNowPlayingFromPlayback() {
     const inv =
         typeof window !== 'undefined' &&
@@ -3196,8 +3206,9 @@ function syncTrayNowPlayingFromPlayback() {
     const uiTheme = traySyncUiTheme();
     const { appearance: trayAppearance, sig: trayAppSig } = trayAppearanceForTraySync();
     const traySp = trayPlaybackSpeedForSync();
+    const trayVol = trayVolumeForSync();
     if (idle) {
-        const idleSig = `idle|${uiTheme}|${trayAppSig}|sp:${traySp}`;
+        const idleSig = `idle|${uiTheme}|${trayAppSig}|sp:${traySp}|vol:${trayVol}`;
         if (_traySyncSig === idleSig) return;
         _traySyncSig = idleSig;
         console.info('[tray-main] update_tray_now_playing → Rust', {
@@ -3220,6 +3231,7 @@ function syncTrayNowPlayingFromPlayback() {
                 popover_playing: false,
                 popover_idle_label: catalogFmt('tray.popover_idle'),
                 playback_speed: traySp,
+                volume_pct: trayVol,
                 ui_theme: uiTheme,
                 appearance: trayAppearance,
             },
@@ -3275,7 +3287,7 @@ function syncTrayNowPlayingFromPlayback() {
     const sigPath = audioPlayerPath || resumePath || '';
     const { appearance: trayAppearancePlaying, sig: trayAppSigPlaying } = trayAppearanceForTraySync();
     /* Include title + subtitle: first ticks often have empty `#npName` / meta; dedupe must not block later updates. */
-    const sig = `${sigPath}|${track}|${popover_subtitle}|${Math.floor(cur)}|${durKey}|${playing ? 1 : 0}|${uiTheme}|${trayAppSigPlaying}|sp:${trayPlaybackSpeedForSync()}`;
+    const sig = `${sigPath}|${track}|${popover_subtitle}|${Math.floor(cur)}|${durKey}|${playing ? 1 : 0}|${uiTheme}|${trayAppSigPlaying}|sp:${trayPlaybackSpeedForSync()}|vol:${trayVolumeForSync()}`;
     if (sig === _traySyncSig) return;
     _traySyncSig = sig;
     console.info('[tray-main] update_tray_now_playing → Rust', {
@@ -3301,6 +3313,7 @@ function syncTrayNowPlayingFromPlayback() {
             total_sec: Number.isFinite(dur) && dur > 0 ? dur : null,
             popover_playing: playing,
             playback_speed: trayPlaybackSpeedForSync(),
+            volume_pct: trayVolumeForSync(),
             ui_theme: uiTheme,
             appearance: trayAppearancePlaying,
         },
@@ -3553,6 +3566,13 @@ function setAudioVolume(value) {
     audioPlayer.volume = Math.max(0, Math.min(1, vol));
     if (_gainNode) {
         _gainNode.gain.value = vol * parseFloat(document.getElementById('npGainSlider')?.value || '1');
+    }
+    if (typeof window !== 'undefined') {
+        if (window._trayVolSyncTimer) clearTimeout(window._trayVolSyncTimer);
+        window._trayVolSyncTimer = setTimeout(() => {
+            window._trayVolSyncTimer = null;
+            if (typeof syncTrayNowPlayingFromPlayback === 'function') syncTrayNowPlayingFromPlayback();
+        }, 150);
     }
 }
 

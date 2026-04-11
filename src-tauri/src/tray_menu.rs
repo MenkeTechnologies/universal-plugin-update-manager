@@ -19,8 +19,9 @@ use crate::history;
 const TRAY_MENU_NOW_PLAYING_MAX: usize = 96;
 
 const TRAY_POPOVER_W: u32 = 280;
-/// Default height until JS measures `#shell` (`tray_popover_resize`); must fit title+meta+transport.
-const TRAY_POPOVER_H: u32 = 220;
+/// Default height until JS measures `#shell` (`tray_popover_resize`); generous so first paint is not clipped
+/// (two-line title + three-line meta + progress + volume + speed + transport + padding).
+const TRAY_POPOVER_H: u32 = 400;
 
 /// Set `AUDIO_HAXOR_TRAY_DEBUG=1` in the environment to print every successful `tray-popover-state` /
 /// `tray-popover-ui-theme` emit to stderr (state includes the ~500 ms host poll). Emit **failures** always log.
@@ -123,6 +124,8 @@ pub struct TrayPopoverEmit {
     pub playing: bool,
     /// Clamped 0.25..=2.0 — mirrors prefs `audioSpeed` / main `#npSpeed`.
     pub playback_speed: f64,
+    /// 0..=100 — mirrors prefs `audioVolume` / main `#npVolume`.
+    pub volume_pct: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub idle_hint: Option<String>,
     /// `"light"` or `"dark"` — tray-popover.html uses this for `html[data-theme]`.
@@ -265,6 +268,7 @@ fn toggle_tray_popover(app: &AppHandle<Wry>, rect: &Rect) -> Result<(), String> 
         total_sec: None,
         playing: false,
         playback_speed: 1.0,
+        volume_pct: 100,
         idle_hint: None,
         ui_theme: tray_popover_ui_theme_from_prefs(),
         appearance: None,
@@ -342,6 +346,9 @@ pub struct TrayNowPlayingPayload {
     /// Optional: main prefs `audioSpeed` (0.25..=2). When omitted, last popover value is kept.
     #[serde(default)]
     pub playback_speed: Option<f64>,
+    /// Optional: main prefs `audioVolume` (0..=100). When omitted, last popover value is kept.
+    #[serde(default)]
+    pub volume_pct: Option<f64>,
     /// Optional: main window `data-theme` (`"light"` / `"dark"`). When omitted, Rust reads prefs.
     #[serde(default)]
     pub ui_theme: Option<String>,
@@ -366,6 +373,14 @@ fn tray_playback_speed_merge(payload: &TrayNowPlayingPayload, last: Option<&Tray
     }
 }
 
+fn tray_volume_pct_merge(payload: &TrayNowPlayingPayload, last: Option<&TrayPopoverEmit>) -> u8 {
+    let fallback = || last.map(|e| e.volume_pct).unwrap_or(100);
+    match payload.volume_pct {
+        Some(v) if v.is_finite() => v.clamp(0.0, 100.0).round() as u8,
+        _ => fallback(),
+    }
+}
+
 #[tauri::command]
 pub fn tray_popover_action(app: AppHandle<Wry>, action: String) -> Result<(), String> {
     // Same delivery path as `on_menu_event` in lib.rs: only the **main** webview runs `ipc.js`
@@ -383,7 +398,7 @@ pub fn tray_popover_resize(app: AppHandle<Wry>, width: f64, height: f64) -> Resu
         return Ok(());
     };
     let w = width.clamp(240.0, 520.0);
-    let h = height.clamp(130.0, 640.0);
+    let h = height.clamp(280.0, 800.0);
     let _ = win.set_size(tauri::Size::Logical(LogicalSize::new(w, h)));
     Ok(())
 }
@@ -426,6 +441,7 @@ pub fn update_tray_now_playing(
     let appearance = guard.last_tray_appearance.clone();
     let last_emit = guard.last_popover_emit.as_ref();
     let playback_speed = tray_playback_speed_merge(&payload, last_emit);
+    let volume_pct = tray_volume_pct_merge(&payload, last_emit);
     let emit = if payload.idle {
         TrayPopoverEmit {
             idle: true,
@@ -435,6 +451,7 @@ pub fn update_tray_now_playing(
             total_sec: None,
             playing: false,
             playback_speed,
+            volume_pct,
             idle_hint: payload
                 .popover_idle_label
                 .clone()
@@ -451,6 +468,7 @@ pub fn update_tray_now_playing(
             total_sec: payload.total_sec,
             playing: payload.popover_playing.unwrap_or(false),
             playback_speed,
+            volume_pct,
             idle_hint: None,
             ui_theme: theme,
             appearance: appearance.clone(),
@@ -598,6 +616,7 @@ pub fn start_tray_host_poll(app: AppHandle<Wry>) {
                     total_sec,
                     playing: !paused,
                     playback_speed: last.playback_speed,
+                    volume_pct: last.volume_pct,
                     idle_hint: None,
                     ui_theme: last.ui_theme.clone(),
                     appearance: last.appearance.clone(),

@@ -27,7 +27,18 @@ function applyUiI18n() {
     if (!m || typeof m !== 'object') return;
     document.querySelectorAll('[data-i18n]').forEach((el) => {
         const k = el.dataset.i18n;
-        if (k && m[k] != null && m[k] !== '') el.textContent = m[k];
+        if (k && m[k] != null && m[k] !== '') {
+            let text = m[k];
+            if (el.tagName === 'TITLE' && window.__appBuildVersion) {
+                const info = window.__appBuildInfo;
+                const extra =
+                    typeof formatBuildMetaLine === 'function' && info
+                        ? formatBuildMetaLine(info)
+                        : `Version: v${window.__appBuildVersion}`;
+                text = `${text} · ${extra}`;
+            }
+            el.textContent = text;
+        }
     });
     applyI18nPlaceholders();
     document.querySelectorAll('[data-i18n-title]').forEach((el) => {

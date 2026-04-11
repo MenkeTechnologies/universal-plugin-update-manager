@@ -258,6 +258,78 @@
     .idle .progress-wrap { opacity: 0.35; pointer-events: none; }
     .idle .transport { opacity: 0.45; }
     .idle .divider { opacity: 0.35; margin: 8px 0 6px; }
+    .tray-build {
+      position: relative;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--cp-divider);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--cp-text-dim);
+      text-align: center;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .tray-build:empty { display: none; }
+    .tray-extras {
+      position: relative;
+      margin-top: 10px;
+      padding-top: 2px;
+    }
+    .tray-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .tray-row:first-child { margin-top: 0; }
+    .tray-mini-label {
+      flex: 0 0 auto;
+      min-width: 42px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--cp-muted);
+    }
+    .tray-vol-pct {
+      flex: 0 0 34px;
+      text-align: right;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--cp-text-dim);
+    }
+    .tray-vol-slider {
+      flex: 1;
+      min-width: 0;
+      height: 6px;
+      margin: 0;
+      accent-color: var(--cp-cyan);
+      cursor: pointer;
+    }
+    .tray-speed-select {
+      flex: 1;
+      min-width: 0;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 4px 6px;
+      border-radius: 0;
+      color: var(--cp-cyan);
+      background: color-mix(in srgb, var(--cp-bg1) 88%, transparent);
+      border: 1px solid var(--cp-cyan);
+      box-shadow: 0 0 6px var(--cp-cyan-dim);
+      cursor: pointer;
+    }
+    .tray-speed-select:focus {
+      outline: 1px solid var(--cp-cyan-hot);
+      outline-offset: 1px;
+    }
   </style>
 </head>
 <body>
@@ -279,12 +351,25 @@
         <span id="total">—</span>
       </div>
     </div>
+    <div class="tray-extras" id="trayExtras">
+      <div class="tray-row">
+        <label class="tray-mini-label" for="trayVol" id="trayVolLabel">Vol</label>
+        <input type="range" class="tray-vol-slider" id="trayVol" min="0" max="100" value="100" />
+        <span class="tray-vol-pct" id="trayVolPct">100%</span>
+      </div>
+      <div class="tray-row">
+        <label class="tray-mini-label" for="traySpeed" id="traySpeedLabel">Speed</label>
+        <select class="tray-speed-select" id="traySpeed" aria-label="Playback speed"></select>
+      </div>
+    </div>
     <div class="transport">
       <button type="button" id="btnPrev" title="Previous">&#x23ee;</button>
       <button type="button" class="play-btn" id="btnPlay" title="Play/Pause">&#x23f8;</button>
       <button type="button" id="btnNext" title="Next">&#x23ed;</button>
     </div>
+    <div class="tray-build" id="trayBuildMeta"></div>
   </div>
+  <script src="js/utils.js"></script>
   <script src="js/tray-popover.js"></script>
 </body>
 </html>

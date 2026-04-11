@@ -166,7 +166,14 @@ async function handleFileWatcherChange(event) {
     if (splash) {
         const ver = document.getElementById('splashVersion');
         try {
-            if (ver) ver.textContent = 'v' + await window.vstUpdater.getVersion();
+            const info = await window.vstUpdater.getBuildInfo();
+            if (ver && info && info.version && typeof formatBuildMetaLine === 'function') {
+                ver.textContent = formatBuildMetaLine(info);
+            } else if (ver && info && info.version) {
+                ver.textContent = 'Version: v' + info.version;
+            } else if (ver) {
+                ver.textContent = 'v' + (await window.vstUpdater.getVersion());
+            }
         } catch {
             if (ver) ver.textContent = 'Ready';
         }

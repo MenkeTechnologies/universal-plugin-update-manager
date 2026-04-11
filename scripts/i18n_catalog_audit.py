@@ -7,8 +7,9 @@ Scans:
   - frontend/js/**/*.js
   - src-tauri/src/native_menu.rs, tray_menu.rs (t("key", …) / t(strings, "key", …))
 
-Writes an HTML report: issue tables plus a full catalog table (every English key,
-reference count, sample locations, value), and a summary of `node --test test/i18n*.test.js`.
+Writes an HTML report: issue tables, the English catalog as multiple tables grouped by
+inferred UI surface (refs and locations scoped per surface; keys may repeat), and a
+summary of `node --test test/i18n*.test.js`.
 Exit 1 if any referenced key is missing or empty in English, or if any i18n Node test fails
 (unless --skip-node-tests). Exit 0 when clean.
 
@@ -35,623 +36,50 @@ GITHUB_REPO_WEB = "https://github.com/MenkeTechnologies/Audio-Haxor"
 GITHUB_ISSUES_WEB = f"{GITHUB_REPO_WEB}/issues"
 EN_JSON = ROOT / "i18n" / "app_i18n_en.json"
 I18N_DIR = ROOT / "i18n"
-PALETTE_JS_REL = "frontend/js/command-palette.js"
 I18N_TEST_GLOB = "i18n*.test.js"
 LOG_TAIL_CHARS = 48_000
 
-# Mirrors `docs/index.html` + `frontend/index.html` tokens (cyber HUD, Orbitron headings, grid bg).
-I18N_REPORT_CSS = """
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap');
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    ::selection {
-      background: rgba(5, 217, 232, 0.3);
-      color: #fff;
-    }
-
-    :root {
-      --bg-primary: #05050a;
-      --bg-secondary: #0a0a14;
-      --bg-card: #0d0d1a;
-      --bg-hover: #12122a;
-      --accent: #ff2a6d;
-      --accent-light: #ff6b9d;
-      --accent-glow: rgba(255, 42, 109, 0.4);
-      --cyan: #05d9e8;
-      --cyan-glow: rgba(5, 217, 232, 0.4);
-      --cyan-dim: rgba(5, 217, 232, 0.15);
-      --magenta: #d300c5;
-      --magenta-glow: rgba(211, 0, 197, 0.3);
-      --green: #39ff14;
-      --green-bg: rgba(57, 255, 20, 0.08);
-      --red: #ff073a;
-      --text: #e0f0ff;
-      --text-dim: #7a8ba8;
-      --text-muted: #3d4f6a;
-      --border: #1a1a3e;
-      --border-glow: #2a1a4e;
-      --cyber-grid-line: rgba(5, 217, 232, 0.042);
-      --cyber-grid-cross: rgba(5, 217, 232, 0.034);
-    }
-
-    [data-theme="light"] {
-      --bg-primary: #f0f2f5;
-      --bg-secondary: #e4e7ec;
-      --bg-card: #ffffff;
-      --bg-hover: #f7f8fa;
-      --accent: #d6196e;
-      --accent-light: #e84d8a;
-      --accent-glow: rgba(214, 25, 110, 0.15);
-      --cyan: #0891b2;
-      --cyan-glow: rgba(8, 145, 178, 0.2);
-      --cyan-dim: rgba(8, 145, 178, 0.08);
-      --magenta: #a300a3;
-      --magenta-glow: rgba(163, 0, 163, 0.15);
-      --green: #15803d;
-      --green-bg: rgba(21, 128, 61, 0.08);
-      --red: #dc2626;
-      --text: #1e293b;
-      --text-dim: #475569;
-      --text-muted: #94a3b8;
-      --border: #cbd5e1;
-      --border-glow: #a5b4c8;
-      --cyber-grid-line: rgba(8, 145, 178, 0.08);
-      --cyber-grid-cross: rgba(8, 145, 178, 0.055);
-    }
-
-    [data-theme="light"] .app::after {
-      background: repeating-linear-gradient(
-        0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.02) 2px, rgba(0, 0, 0, 0.02) 4px);
-    }
-
-    [data-theme="light"] .app::before {
-      background: radial-gradient(ellipse at center, transparent 65%, rgba(0, 0, 0, 0.12) 100%);
-    }
-
-    [data-theme="light"] .crt-scanline {
-      background: linear-gradient(90deg,
-        transparent 0%, rgba(0, 0, 0, 0.04) 20%, rgba(0, 0, 0, 0.08) 50%,
-        rgba(0, 0, 0, 0.04) 80%, transparent 100%);
-      box-shadow: 0 0 15px 5px rgba(0, 0, 0, 0.03);
-    }
-
-    [data-theme="light"] .crt-scanline-v {
-      background: linear-gradient(180deg,
-        transparent 0%, rgba(0, 0, 0, 0.03) 20%, rgba(0, 0, 0, 0.06) 50%,
-        rgba(0, 0, 0, 0.03) 80%, transparent 100%);
-      box-shadow: 0 0 15px 5px rgba(0, 0, 0, 0.02);
-    }
-
-    body {
-      font-family: 'Share Tech Mono', 'SF Mono', 'Fira Code', monospace;
-      background-color: var(--bg-primary);
-      background-image:
-        radial-gradient(ellipse at 20% 50%, rgba(5, 217, 232, 0.045) 0%, transparent 52%),
-        radial-gradient(ellipse at 80% 20%, rgba(211, 0, 197, 0.04) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 82%, rgba(255, 42, 109, 0.035) 0%, transparent 48%),
-        linear-gradient(var(--cyber-grid-line) 1px, transparent 1px),
-        linear-gradient(90deg, var(--cyber-grid-cross) 1px, transparent 1px);
-      background-size: auto, auto, auto, 52px 52px, 52px 52px;
-      background-attachment: fixed;
-      color: var(--text);
-      min-height: 100vh;
-      line-height: 1.55;
-    }
-
-    [data-theme="light"] body {
-      background-image:
-        radial-gradient(ellipse at 22% 48%, rgba(8, 145, 178, 0.09) 0%, transparent 52%),
-        radial-gradient(ellipse at 78% 22%, rgba(163, 0, 163, 0.07) 0%, transparent 50%),
-        linear-gradient(var(--cyber-grid-line) 1px, transparent 1px),
-        linear-gradient(90deg, var(--cyber-grid-cross) 1px, transparent 1px);
-      background-size: auto, auto, 44px 44px, 44px 44px;
-      background-attachment: fixed;
-    }
-
-    .app {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .app::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg, transparent, transparent 2px,
-        rgba(5, 217, 232, 0.015) 2px, rgba(5, 217, 232, 0.015) 4px);
-      pointer-events: none;
-      z-index: 9999;
-    }
-
-    .app::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.5) 100%);
-      pointer-events: none;
-      z-index: 9998;
-    }
-
-    .app.no-crt::after,
-    .app.no-crt::before { display: none; }
-
-    .crt-scanline {
-      position: fixed;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg,
-        transparent 0%, rgba(5, 217, 232, 0.03) 20%, rgba(5, 217, 232, 0.08) 50%,
-        rgba(5, 217, 232, 0.03) 80%, transparent 100%);
-      box-shadow: 0 0 15px 5px rgba(5, 217, 232, 0.04);
-      pointer-events: none;
-      z-index: 9997;
-      animation: hscan 12s linear infinite;
-    }
-
-    .crt-scanline-v {
-      position: fixed;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: linear-gradient(180deg,
-        transparent 0%, rgba(255, 42, 109, 0.03) 20%, rgba(255, 42, 109, 0.06) 50%,
-        rgba(255, 42, 109, 0.03) 80%, transparent 100%);
-      box-shadow: 0 0 15px 5px rgba(255, 42, 109, 0.03);
-      pointer-events: none;
-      z-index: 9997;
-      animation: vscan 18s linear infinite;
-    }
-
-    @keyframes hscan {
-      0% { top: -2px; opacity: 0; }
-      5% { opacity: 1; }
-      95% { opacity: 1; }
-      100% { top: 100%; opacity: 0; }
-    }
-
-    @keyframes vscan {
-      0% { left: -2px; opacity: 0; }
-      5% { opacity: 1; }
-      95% { opacity: 1; }
-      100% { left: 100%; opacity: 0; }
-    }
-
-    body.no-neon-glow * {
-      animation-name: none !important;
-      animation-duration: 0s !important;
-    }
-
-    body.no-neon-glow .doc-card {
-      box-shadow: 0 0 20px var(--cyan-glow), 0 4px 24px rgba(0, 0, 0, 0.35);
-    }
-
-    [data-theme="light"] body.no-neon-glow .doc-card {
-      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-    }
-
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: rgba(5, 5, 10, 0.5); }
-    [data-theme="light"] ::-webkit-scrollbar-track { background: rgba(226, 232, 240, 0.8); }
-    ::-webkit-scrollbar-thumb {
-      background: linear-gradient(180deg, var(--cyan) 0%, var(--magenta) 100%);
-      border-radius: 4px;
-      box-shadow: 0 0 8px var(--cyan-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: linear-gradient(180deg, var(--accent) 0%, var(--cyan) 100%);
-    }
-
-    .docs-header {
-      padding: 20px 24px 16px;
-      border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, #070714 0%, #0d0d22 42%, var(--bg-secondary) 100%);
-      position: relative;
-      box-shadow:
-        0 4px 28px rgba(0, 0, 0, 0.55),
-        0 1px 0 rgba(5, 217, 232, 0.1),
-        inset 0 1px 0 rgba(5, 217, 232, 0.06);
-      z-index: 1;
-    }
-
-    [data-theme="light"] .docs-header {
-      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-    }
-
-    .docs-header::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--cyan), var(--accent), var(--cyan), transparent);
-      opacity: 0.6;
-    }
-
-    .docs-header-inner {
-      max-width: 92rem;
-      margin: 0 auto;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .docs-title-block h1 {
-      font-family: 'Orbitron', sans-serif;
-      font-size: clamp(1rem, 2.5vw, 1.25rem);
-      font-weight: 900;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      background: linear-gradient(90deg, var(--cyan), #fff, var(--accent), var(--cyan));
-      background-size: 300% 100%;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      filter: drop-shadow(0 0 8px var(--cyan-glow));
-      animation: logo-shimmer 6s linear infinite;
-      margin: 0 0 6px;
-    }
-
-    [data-theme="light"] .docs-title-block h1 {
-      filter: drop-shadow(0 0 4px var(--cyan-glow));
-    }
-
-    @keyframes logo-shimmer {
-      0% { background-position: 0% 0%; }
-      100% { background-position: 300% 0%; }
-    }
-
-    .docs-sub {
-      font-size: 11px;
-      color: var(--text-dim);
-      letter-spacing: 0.5px;
-      max-width: 42rem;
-    }
-
-    .docs-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .docs-header-actions {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 10px;
-      min-width: 0;
-    }
-
-    .hud-scheme-row {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 6px;
-      max-width: min(36rem, 92vw);
-    }
-
-    .hud-scheme-label {
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      color: var(--text-muted);
-      text-align: right;
-    }
-
-    .scheme-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 3px;
-    }
-
-    .scheme-btn {
-      padding: 5px 8px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      cursor: pointer;
-      text-align: left;
-      font-family: 'Share Tech Mono', monospace;
-      transition: all 0.2s;
-    }
-
-    .scheme-btn:hover {
-      border-color: var(--cyan);
-      box-shadow: 0 0 10px var(--cyan-dim);
-    }
-
-    .scheme-btn.active {
-      border-color: var(--cyan);
-      border-left: 3px solid var(--cyan);
-      box-shadow: 0 0 12px var(--cyan-glow);
-    }
-
-    .scheme-btn-name {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 2px;
-    }
-
-    .scheme-btn-desc {
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-
-    .scheme-btn-preview {
-      display: flex;
-      gap: 4px;
-      margin-top: 5px;
-      flex-wrap: wrap;
-    }
-
-    .scheme-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-    }
-
-    button, a.btn {
-      font-family: 'Share Tech Mono', monospace;
-    }
-
-    a.btn {
-      text-decoration: none;
-    }
-
-    .btn {
-      padding: 8px 14px;
-      border-radius: 2px;
-      border: none;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 1.2px;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.02) 40%, transparent 60%);
-    }
-
-    .btn-secondary {
-      background: transparent;
-      color: var(--cyan);
-      border: 1px solid var(--cyan);
-      box-shadow: 0 0 8px var(--cyan-dim);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(5, 217, 232, 0.08);
-      box-shadow: 0 0 15px var(--cyan-glow);
-      transform: translateY(-1px);
-    }
-
-    .btn-secondary:active { transform: translateY(1px) scale(0.98); }
-    .btn-secondary.active {
-      background: rgba(5, 217, 232, 0.12);
-      box-shadow: 0 0 12px var(--cyan-glow);
-    }
-
-    [data-theme="light"] .btn-secondary:hover { background: rgba(8, 145, 178, 0.1); }
-
-    .docs-main {
-      position: relative;
-      z-index: 1;
-      flex: 1;
-      max-width: 92rem;
-      margin: 0 auto;
-      padding: 2rem 1.25rem 4rem;
-      width: 100%;
-    }
-
-    .doc-card {
-      background-color: var(--bg-card);
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 30%, transparent 50%);
-      border: 1px solid var(--cyan);
-      border-radius: 2px;
-      padding: 1.25rem 1.35rem;
-      margin: 1.25rem 0;
-      position: relative;
-      box-shadow: 0 0 40px var(--cyan-glow);
-      backdrop-filter: blur(12px) saturate(1.4);
-      -webkit-backdrop-filter: blur(12px) saturate(1.4);
-    }
-
-    .doc-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 10%;
-      right: 10%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      pointer-events: none;
-    }
-
-    body:not(.no-neon-glow) .doc-card {
-      animation: neon-border-glow 2.5s ease-in-out infinite;
-    }
-
-    @keyframes neon-border-glow {
-      0%, 100% {
-        box-shadow: 0 0 20px var(--cyan-glow), 0 0 4px var(--cyan-glow);
-        border-color: var(--cyan);
-      }
-      50% {
-        box-shadow: 0 0 40px var(--cyan-glow), 0 0 12px var(--magenta-glow);
-        border-color: var(--accent);
-      }
-    }
-
-    .doc-card h2 {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 13px;
-      color: var(--cyan);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin: 0 0 0.75rem;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    }
-
-    .doc-card > p, .doc-card > .meta { margin: 0 0 1rem; }
-
-    .meta {
-      color: var(--text-dim);
-      font-size: 13px;
-      margin-top: 8px;
-    }
-
-    .meta.warn { color: var(--accent-light); }
-
-    .banner {
-      padding: 12px 16px;
-      border-radius: 2px;
-      margin: 0 0 1rem;
-      font-size: 13px;
-      border: 1px solid var(--border);
-    }
-
-    .banner.ok {
-      border-color: var(--green);
-      background: var(--green-bg);
-      color: var(--text);
-    }
-
-    .banner.bad {
-      border-color: var(--red);
-      background: rgba(255, 7, 58, 0.08);
-      color: var(--text);
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-      margin-top: 0.5rem;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      min-width: 0;
-    }
-
-    table.catalog-all { min-width: 48rem; }
-
-    th, td {
-      border: 1px solid var(--border);
-      padding: 8px 10px;
-      text-align: left;
-      vertical-align: top;
-    }
-
-    th {
-      background: var(--bg-secondary);
-      color: var(--cyan);
-      font-family: 'Orbitron', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    td.val {
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-width: 36rem;
-      font-size: 12px;
-      color: var(--text-dim);
-    }
-
-    td.locs {
-      max-width: 22rem;
-      word-break: break-all;
-      color: var(--text-muted);
-      font-size: 11px;
-    }
-
-    td.warn { color: var(--accent-light); font-weight: 600; }
-
-    code {
-      font-family: 'Share Tech Mono', ui-monospace, monospace;
-      font-size: 0.88em;
-      padding: 2px 6px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      color: var(--text);
-    }
-
-    pre.testlog {
-      font-size: 11px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      padding: 12px;
-      max-height: 28rem;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      margin-top: 8px;
-      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.25);
-      color: var(--text);
-    }
-
-    [data-theme="light"] pre.testlog {
-      box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.04);
-    }
-
-    span.ok { color: var(--green); font-weight: 600; }
-    span.bad { color: var(--red); font-weight: 600; }
-
-    details {
-      margin-top: 12px;
-      color: var(--text-dim);
-      font-size: 12px;
-    }
-
-    details summary {
-      cursor: pointer;
-      color: var(--cyan);
-      font-weight: 600;
-    }
-
-    a {
-      color: var(--cyan);
-      text-decoration: none;
-      transition: color 0.15s, text-shadow 0.15s;
-    }
-
-    a:hover {
-      color: var(--accent-light);
-      text-shadow: 0 0 8px var(--cyan-glow);
-    }
-
-    .crt-scanline[hidden],
-    .crt-scanline-v[hidden] { display: none !important; }
-
-    .doc-footer {
-      margin-top: 2rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border);
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-"""
+HUD_STATIC_CSS_PATH = ROOT / "docs" / "hud-static.css"
+
+
+def load_package_version(root: Path) -> str:
+    p = root / "package.json"
+    if not p.is_file():
+        return ""
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    v = data.get("version")
+    return str(v).strip() if v is not None else ""
+
+
+def git_head_meta(root: Path) -> tuple[str, str, str]:
+    """(short_sha, full_sha, iso_date). Missing git → ('unknown', 'unknown', '')."""
+    try:
+        full = subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        full = "unknown"
+    short = full[:7] if len(full) >= 7 else full
+    try:
+        date = subprocess.check_output(
+            ["git", "-C", str(root), "log", "-1", "--format=%cI"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        date = ""
+    return short, full, date
+
+
+def load_hud_static_css() -> str:
+    if not HUD_STATIC_CSS_PATH.is_file():
+        raise FileNotFoundError(f"Missing shared HUD stylesheet: {HUD_STATIC_CSS_PATH}")
+    return HUD_STATIC_CSS_PATH.read_text(encoding="utf-8")
 
 
 def parse_node_spec_summary(text: str) -> tuple[int | None, int | None, int | None, float | None]:
@@ -916,17 +344,61 @@ def gather_locale_identical_to_en(en: dict[str, str]) -> list[tuple[str, int]]:
 
 PREFIXES = ("menu.", "tray.", "confirm.", "toast.", "help.", "ui.")
 
-# data-i18n, data-i18n-title, data-i18n-placeholder (allow hyphenated dataset attrs in HTML)
-RE_HTML_I18N = re.compile(
-    r"data-i18n(?:-(?:title|placeholder))?=(?:\"([^\"]+)\"|'([^']+)')",
-    re.IGNORECASE,
+# HTML: attribute distinguishes visible text vs tooltip vs placeholder.
+RE_HTML_VISIBLE = re.compile(r"data-i18n=(?:\"([^\"]+)\"|'([^']+)')", re.IGNORECASE)
+RE_HTML_TITLE = re.compile(r"data-i18n-title=(?:\"([^\"]+)\"|'([^']+)')", re.IGNORECASE)
+RE_HTML_PLACEHOLDER = re.compile(
+    r"data-i18n-placeholder=(?:\"([^\"]+)\"|'([^']+)')", re.IGNORECASE
 )
 
 # First string literal argument to these formatters (static keys only).
 RE_JS_FMT = re.compile(
-    r"\b(?:appFmt|catalogFmt|toastFmt|_audioFmt|_midiFmt|appTableCol|_ui)\s*\(\s*"
+    r"\b(appFmt|catalogFmt|toastFmt|_audioFmt|_midiFmt|appTableCol|_ui)\s*\(\s*"
     r"(?:`([^`]+)`|'([^']+)'|\"([^\"]+)\")",
 )
+
+JS_FILE_SURFACE: dict[str, str] = {
+    "context-menu.js": "Context menu",
+    "command-palette.js": "Command palette",
+    "settings.js": "Settings",
+    "settings-search.js": "Settings",
+    "help-overlay.js": "Help overlay",
+    "tray-popover.js": "Tray popover",
+    "tooltip-hover.js": "Tooltip (hover JS)",
+}
+
+SURFACE_RANK: dict[str, int] = {
+    "HTML (visible text)": 10,
+    "HTML (tooltip title)": 20,
+    "HTML (placeholder)": 30,
+    "Native menu": 40,
+    "Tray menu": 50,
+    "Context menu": 60,
+    "Command palette": 70,
+    "Settings": 80,
+    "Help overlay": 90,
+    "Tray popover": 100,
+    "Tooltip (hover JS)": 110,
+    "Toast": 120,
+    "Table column (JS)": 130,
+}
+
+
+def surface_sort_key(label: str) -> tuple[int, str]:
+    return (SURFACE_RANK.get(label, 1_000), label)
+
+
+def js_surface(path: Path, formatter: str) -> str:
+    if formatter == "toastFmt":
+        return "Toast"
+    if formatter == "appTableCol":
+        return "Table column (JS)"
+    name = path.name
+    if name in JS_FILE_SURFACE:
+        return JS_FILE_SURFACE[name]
+    if formatter in ("_audioFmt", "_midiFmt", "_ui"):
+        return f"JavaScript ({formatter} · {name})"
+    return f"JavaScript ({name})"
 
 # native_menu.rs:  t("menu.foo", "fallback")
 RE_RS_T = re.compile(r"\bt\(\s*\"((?:menu|tray|confirm|toast|help|ui)\.[^\"]+)\"\s*,")
@@ -944,48 +416,62 @@ def is_catalog_key(key: str) -> bool:
     return any(key.startswith(p) for p in PREFIXES)
 
 
-def record(refs: dict[str, list[tuple[str, int]]], key: str, path: Path, line_no: int) -> None:
+RefEntry = tuple[str, int, str]
+
+
+def record(
+    refs: dict[str, list[RefEntry]], key: str, path: Path, line_no: int, surface: str
+) -> None:
     if not is_catalog_key(key):
         return
     rel = path.relative_to(ROOT)
-    refs[key].append((str(rel), line_no))
+    refs[key].append((str(rel), line_no, surface))
 
 
-def scan_file(path: Path, refs: dict[str, list[tuple[str, int]]]) -> None:
+def scan_file(path: Path, refs: dict[str, list[RefEntry]]) -> None:
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines()
     if path.suffix.lower() == ".html":
         for i, line in enumerate(lines, start=1):
-            for m in RE_HTML_I18N.finditer(line):
+            for m in RE_HTML_VISIBLE.finditer(line):
                 key = m.group(1) or m.group(2)
                 if key:
-                    record(refs, key, path, i)
+                    record(refs, key, path, i, "HTML (visible text)")
+            for m in RE_HTML_TITLE.finditer(line):
+                key = m.group(1) or m.group(2)
+                if key:
+                    record(refs, key, path, i, "HTML (tooltip title)")
+            for m in RE_HTML_PLACEHOLDER.finditer(line):
+                key = m.group(1) or m.group(2)
+                if key:
+                    record(refs, key, path, i, "HTML (placeholder)")
         return
 
     if path.suffix.lower() == ".js":
         # Whole-file scan so `appFmt` / `catalogFmt` can be split across lines from `(` to the string.
         for m in RE_JS_FMT.finditer(text):
-            key = m.group(1) or m.group(2) or m.group(3)
+            fmt = m.group(1) or ""
+            key = m.group(2) or m.group(3) or m.group(4)
             if key:
                 line_no = text.count("\n", 0, m.start()) + 1
-                record(refs, key, path, line_no)
+                record(refs, key, path, line_no, js_surface(path, fmt))
         return
 
     if path.name == "native_menu.rs":
         for i, line in enumerate(lines, start=1):
             for m in RE_RS_T.finditer(line):
-                record(refs, m.group(1), path, i)
+                record(refs, m.group(1), path, i, "Native menu")
         return
 
     if path.name == "tray_menu.rs":
         for i, line in enumerate(lines, start=1):
             for m in RE_RS_TRAY_T.finditer(line):
-                record(refs, m.group(1), path, i)
+                record(refs, m.group(1), path, i, "Tray menu")
         return
 
 
-def gather_refs() -> dict[str, list[tuple[str, int]]]:
-    refs: dict[str, list[tuple[str, int]]] = defaultdict(list)
+def gather_refs() -> dict[str, list[RefEntry]]:
+    refs: dict[str, list[RefEntry]] = defaultdict(list)
 
     for html in sorted((ROOT / "frontend").rglob("*.html")):
         scan_file(html, refs)
@@ -1003,15 +489,35 @@ def gather_refs() -> dict[str, list[tuple[str, int]]]:
     return refs
 
 
+def format_build_banner_parts(
+    app_version: str, git_full: str, git_short: str, git_date: str
+) -> str:
+    """Version: / Commit: (full SHA when available) / Commit date: — HTML-escaped, joined by ·."""
+    parts: list[str] = []
+    if app_version:
+        parts.append(f"Version: v{escape(app_version)}")
+    if git_full and git_full != "unknown":
+        parts.append(f"Commit: {escape(git_full)}")
+    elif git_short and git_short != "unknown":
+        parts.append(f"Commit: {escape(git_short)}")
+    if git_date and len(git_date) >= 10:
+        parts.append(f"Commit date: {escape(git_date[:10])}")
+    return " · ".join(parts)
+
+
 def write_html(
     out_path: Path,
     en: dict[str, str],
     missing: list[str],
     empty: list[str],
-    refs: dict[str, list[tuple[str, int]]],
+    refs: dict[str, list[RefEntry]],
     locale_rows: list[dict[str, int | str]],
     identical_pairs: list[tuple[str, int]],
     i18n_tests_section: str,
+    app_version: str,
+    git_short: str,
+    git_full: str,
+    git_date: str,
 ) -> None:
     hud_js_path = ROOT / "docs" / "hud-theme.js"
     if not hud_js_path.is_file():
@@ -1025,7 +531,7 @@ def write_html(
     rows_missing = []
     for key in missing:
         locs = refs.get(key, [])
-        loc_str = "; ".join(f"{f}:{ln}" for f, ln in locs[:12])
+        loc_str = "; ".join(f"{f}:{ln}" for f, ln, _ in locs[:12])
         if len(locs) > 12:
             loc_str += f" … (+{len(locs) - 12} more)"
         rows_missing.append(
@@ -1035,60 +541,86 @@ def write_html(
     rows_empty = []
     for key in empty:
         locs = refs.get(key, [])
-        loc_str = "; ".join(f"{f}:{ln}" for f, ln in locs[:8])
+        loc_str = "; ".join(f"{f}:{ln}" for f, ln, _ in locs[:8])
         rows_empty.append(
             f"<tr><td><code>{escape(key)}</code></td><td>{escape(loc_str)}</td></tr>"
         )
 
-    palette_keys = sorted(
-        k
-        for k, locs in refs.items()
-        if any(loc[0] == PALETTE_JS_REL for loc in locs)
+    all_surfaces = sorted(
+        {loc[2] for locs in refs.values() for loc in locs},
+        key=surface_sort_key,
     )
-    rows_palette: list[str] = []
-    palette_missing_en: list[str] = []
-    for key in palette_keys:
-        if key not in en:
-            palette_missing_en.append(key)
-            rows_palette.append(
-                f"<tr><td><code>{escape(key)}</code></td><td colspan=\"2\">"
-                "<strong>missing from en.json</strong></td></tr>"
+
+    catalog_by_type_parts: list[str] = []
+    for surf in all_surfaces:
+        rows_surf: list[str] = []
+        for key in sorted(en.keys()):
+            locs = refs.get(key, [])
+            locs_here = [loc for loc in locs if loc[2] == surf]
+            if not locs_here:
+                continue
+            n = len(locs_here)
+            loc_preview = "; ".join(f"{f}:{ln}" for f, ln, _ in locs_here[:4])
+            if n > 4:
+                loc_preview += f" … (+{n - 4} more)"
+            other = sorted({loc[2] for loc in locs if loc[2] != surf}, key=surface_sort_key)
+            other_cell = (
+                "<small>" + escape("; ".join(other)) + "</small>" if other else "—"
             )
+            val = "" if en[key] is None else str(en[key])
+            val_esc = escape(val)
+            title_attr = escape(val, quote=True)
+            rows_surf.append(
+                "<tr>"
+                f"<td><code>{escape(key)}</code></td>"
+                f"<td>{n}</td>"
+                f"<td class=\"locs\"><small>{escape(loc_preview)}</small></td>"
+                f"<td class=\"surfaces\">{other_cell}</td>"
+                f'<td class="val" title="{title_attr}">{val_esc}</td>'
+                "</tr>"
+            )
+        if not rows_surf:
             continue
-        plocs = [loc for loc in refs[key] if loc[0] == PALETTE_JS_REL]
-        loc_preview = "; ".join(f"{f}:{ln}" for f, ln in plocs[:3])
-        if len(plocs) > 3:
-            loc_preview += f" … (+{len(plocs) - 3})"
-        val = "" if en[key] is None else str(en[key])
-        rows_palette.append(
-            "<tr>"
-            f"<td><code>{escape(key)}</code></td>"
-            f"<td><small>{escape(loc_preview)}</small></td>"
-            f'<td class="val" title="{escape(val, quote=True)}">{escape(val)}</td>'
-            "</tr>"
+        catalog_by_type_parts.append(
+            f"<h3>{escape(surf)} <span class=\"meta\">({len(rows_surf)} keys)</span></h3>"
+            "<div class=\"table-wrap\">"
+            "<table class=\"catalog-all\">"
+            "<thead><tr><th>Key</th><th>Refs</th><th>Sample locations</th>"
+            "<th>Other UI types</th><th>English value</th></tr></thead>"
+            "<tbody>"
+            f"{''.join(rows_surf)}"
+            "</tbody></table></div>"
         )
 
-    n_unref = 0
-    rows_catalog: list[str] = []
-    for key in sorted(en.keys()):
-        locs = refs.get(key, [])
-        n = len(locs)
-        if n == 0:
-            n_unref += 1
-        loc_preview = "; ".join(f"{f}:{ln}" for f, ln in locs[:4])
-        if n > 4:
-            loc_preview += f" … (+{n - 4} more)"
+    unref_keys = [k for k in sorted(en.keys()) if not refs.get(k)]
+    n_unref = len(unref_keys)
+    rows_unref: list[str] = []
+    for key in unref_keys:
         val = "" if en[key] is None else str(en[key])
         val_esc = escape(val)
         title_attr = escape(val, quote=True)
-        rows_catalog.append(
+        rows_unref.append(
             "<tr>"
             f"<td><code>{escape(key)}</code></td>"
-            f"<td>{n}</td>"
-            f"<td class=\"locs\"><small>{escape(loc_preview) if loc_preview else '—'}</small></td>"
+            "<td>0</td>"
+            "<td class=\"locs\"><small>—</small></td>"
+            "<td class=\"surfaces\">—</td>"
             f'<td class="val" title="{title_attr}">{val_esc}</td>'
             "</tr>"
         )
+    if rows_unref:
+        catalog_by_type_parts.append(
+            f"<h3>Not referenced by scan <span class=\"meta\">({n_unref} keys)</span></h3>"
+            "<div class=\"table-wrap\">"
+            "<table class=\"catalog-all\">"
+            "<thead><tr><th>Key</th><th>Refs</th><th>Sample locations</th>"
+            "<th>Other UI types</th><th>English value</th></tr></thead>"
+            "<tbody>"
+            f"{''.join(rows_unref)}"
+            "</tbody></table></div>"
+        )
+
+    catalog_by_type_html = "\n".join(catalog_by_type_parts)
 
     status_cls = "ok" if clean else "bad"
     status_txt = (
@@ -1140,21 +672,34 @@ def write_html(
         else '<tr><td colspan="3">— no locale files —</td></tr>'
     )
 
-    palette_warn = (
-        "<p class=\"meta warn\"><strong>Palette references keys missing from en.json:</strong> "
-        + escape(", ".join(palette_missing_en))
-        + "</p>"
-        if palette_missing_en
-        else ""
-    )
+    banner = format_build_banner_parts(app_version, git_full, git_short, git_date)
+    rep_title = "app_i18n catalog audit — AUDIO_HAXOR"
+    if banner:
+        rep_title += " · " + banner
+
+    audit_sub = banner if banner else "build unknown"
+
+    build_obj = {
+        "version": app_version,
+        "gitShaShort": git_short,
+        "gitShaFull": git_full,
+        "gitCommitDate": git_date,
+    }
+    build_prelude = "window.__AUDIO_HAXOR_BUILD__=" + json.dumps(
+        build_obj, separators=(",", ":")
+    ) + ";"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>app_i18n catalog audit — AUDIO_HAXOR</title>
-  <style>{I18N_REPORT_CSS}</style>
+  <meta name="color-scheme" content="dark light"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&amp;family=Share+Tech+Mono&amp;display=swap"/>
+  <title>{rep_title}</title>
+  <style>{load_hud_static_css()}</style>
 </head>
 <body>
   <div class="app" id="i18nReportApp">
@@ -1165,7 +710,7 @@ def write_html(
       <div class="docs-header-inner">
         <div class="docs-title-block">
           <h1>// app_i18n catalog audit</h1>
-          <p class="docs-sub">AUDIO_HAXOR · same HUD tokens as <code>docs/index.html</code> · source of truth <code>i18n/app_i18n_en.json</code></p>
+          <p class="docs-sub">{audit_sub} · same HUD tokens as <code>docs/index.html</code> · source of truth <code>i18n/app_i18n_en.json</code></p>
         </div>
         <div class="docs-header-actions">
           <div class="docs-toolbar">
@@ -1247,37 +792,16 @@ def write_html(
       </div>
 
       <div class="doc-card">
-        <h2>Command palette — static catalog keys (<code>command-palette.js</code>)</h2>
-        <p class="meta">{len(palette_keys)} keys referenced via <code>appFmt</code> / <code>catalogFmt</code> / <code>toastFmt</code> in the palette module (DB hit rows use file names, not these keys).</p>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Key</th><th>Locations in palette file</th><th>English value</th></tr></thead>
-            <tbody>
-            {''.join(rows_palette)}
-            </tbody>
-          </table>
-        </div>
-        {palette_warn}
-      </div>
-
-      <div class="doc-card">
         <h2>Full English catalog ({n_en} keys)</h2>
-        <p class="meta">Reference count = static hits in scanned HTML/JS/Rust (hover value cell for full text).</p>
-        <div class="table-wrap">
-          <table class="catalog-all">
-            <thead><tr><th>Key</th><th>Refs</th><th>Sample locations</th><th>English value</th></tr></thead>
-            <tbody>
-            {''.join(rows_catalog)}
-            </tbody>
-          </table>
-        </div>
+        <p class="meta"><strong>{n_en}</strong> keys in <code>app_i18n_en.json</code>, grouped by inferred UI surface. <strong>Refs</strong> and <strong>Sample locations</strong> count only hits for that surface; the same key may appear in several tables. <strong>Other UI types</strong> lists remaining surfaces for that key (or —). Keys with no scan hits are under <em>Not referenced by scan</em>. Hover the English value for the full string.</p>
+        {catalog_by_type_html}
       </div>
 
       <p class="doc-footer">Generated by <code>scripts/i18n_catalog_audit.py</code>. Dynamic keys (computed at runtime) are not detected. Rust keys outside <code>native_menu.rs</code> / <code>tray_menu.rs</code> are not scanned.</p>
     </main>
   </div>
   <script>"""
-    html = html + hud_js + """
+    html = html + build_prelude + "\n" + hud_js + """
 </script>
 </body>
 </html>
@@ -1327,7 +851,22 @@ def main() -> int:
         test_rows, test_skip = run_i18n_node_tests(ROOT)
     i18n_tests_section, node_tests_ok = format_i18n_tests_html(test_rows, test_skip)
 
-    write_html(args.output, en, missing, empty, refs, locale_rows, identical_pairs, i18n_tests_section)
+    app_version = load_package_version(ROOT)
+    git_short, git_full, git_date = git_head_meta(ROOT)
+    write_html(
+        args.output,
+        en,
+        missing,
+        empty,
+        refs,
+        locale_rows,
+        identical_pairs,
+        i18n_tests_section,
+        app_version,
+        git_short,
+        git_full,
+        git_date,
+    )
 
     print(f"Wrote {args.output.relative_to(ROOT)}")
     print(f"  Referenced keys (distinct): {len(refs)}")

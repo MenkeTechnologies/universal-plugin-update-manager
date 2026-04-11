@@ -5,6 +5,27 @@ function escapeHtml(str) {
     return _escDiv.innerHTML;
 }
 
+/** `Commit:` + full SHA (when present) and `Commit date:` (authoritative commit timestamp) — no Version line. */
+function formatBuildCommitDateLine(info) {
+    if (!info || typeof info !== 'object') return '';
+    const parts = [];
+    const full = info.gitShaFull && String(info.gitShaFull).trim();
+    if (full && full !== 'unknown') parts.push('Commit: ' + full);
+    else if (info.gitShaShort && info.gitShaShort !== 'unknown') parts.push('Commit: ' + info.gitShaShort);
+    if (info.gitCommitDate && String(info.gitCommitDate).length >= 10) {
+        parts.push('Commit date: ' + String(info.gitCommitDate).slice(0, 10));
+    }
+    return parts.join(' · ');
+}
+
+/** `Version:` / `Commit:` / `Commit date:` with full git SHA when available (splash, tray, meta, window title). */
+function formatBuildMetaLine(info) {
+    if (!info || !info.version) return '';
+    const head = 'Version: v' + String(info.version);
+    const tail = formatBuildCommitDateLine(info);
+    return tail ? head + ' · ' + tail : head;
+}
+
 /** Throttle: invoke at most once per `ms` milliseconds (trailing call guaranteed). */
 function throttle(fn, ms) {
     let last = 0, timer = null;

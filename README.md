@@ -302,6 +302,8 @@ pnpm doc:sync
 
 After `pnpm doc:sync`, open `docs/index.html` in a browser, or open `docs/api/app_lib/index.html` directly. The canonical build output is always `src-tauri/target/doc/app_lib/index.html`.
 
+`docs/index.html` also hosts an 18-step **Step-by-step tutorial** (first launch → scan roots → Scan All → per-tab workflows → command palette → floating player → tray popover → favorites/notes/tags → files browser → history/diff → visualizer → audio engine → theming → shortcuts). Tab screenshots live in `docs/assets/` named after each tab — `plugins.png`, `samples.png`, `daw.png`, `presets.png`, `midi.png`, `pdf.png`, `favorites.png`, `notes.png`, `tags.png`, `files.png`, `history.png`, `visualizers.png`, `walkers.png`, `audioengine.png`, `settings.png`.
+
 ---
 
 ## // BENCHMARKS //

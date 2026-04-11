@@ -16,7 +16,7 @@
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "doc": "cargo doc --manifest-path src-tauri/Cargo.toml --no-deps --document-private-items",
     "doc:open": "cargo doc --manifest-path src-tauri/Cargo.toml --no-deps --document-private-items --open",
-    "doc:sync": "pnpm run doc && command rm -rf docs/api && mkdir -p docs && cp -R src-tauri/target/doc docs/api",
+    "doc:sync": "node scripts/sync-static-build-meta.mjs && pnpm run doc && command rm -rf docs/api && mkdir -p docs && cp -R src-tauri/target/doc docs/api",
     "clean": "bash scripts/clean.sh",
     "bust": "bash scripts/bust.sh",
     "rebuild": "bash scripts/rebuild.sh",
@@ -26,7 +26,7 @@
     "db:stats": "bash scripts/db-stats.sh",
     "i18n:sort": "python3 scripts/sort_app_i18n_catalogs.py",
     "i18n:sort:check": "python3 scripts/sort_app_i18n_catalogs.py --check",
-    "i18n:audit": "python3 scripts/i18n_catalog_audit.py"
+    "i18n:audit": "node scripts/sync-static-build-meta.mjs && python3 scripts/i18n_catalog_audit.py"
   },
   "keywords": [
     "vst",
