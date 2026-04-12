@@ -495,14 +495,14 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
     const progressFill = document.getElementById('presetProgressFill');
     const tableWrap = document.getElementById('presetTableWrap');
 
-    const excludePaths = resume ? allPresets.map(p => p.path) : null;
-
     if (typeof btnLoading === 'function') btnLoading(btn, true);
     setBtn(resume ? '&#8635; Resuming...' : '&#8635; Scanning...', true);
     setBtnDisplay(resumeBtn, 'none');
     setBtnDisplay(stopBtn, '');
     progressBar.classList.add('active');
     progressFill.style.width = '0%';
+
+    const excludePaths = resume ? allPresets.map(p => p.path) : null;
 
     if (!resume) {
         _presetScanDbView = false;
@@ -603,6 +603,9 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
 
     const scheduleFlush = createScanFlusher(flushPending, FLUSH_INTERVAL);
 
+    if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
+    else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
     if (presetScanProgressCleanup) presetScanProgressCleanup();
     presetScanProgressCleanup = await window.vstUpdater.onPresetScanProgress((data) => {
         if (data.phase === 'status') {
@@ -693,6 +696,27 @@ async function scanPresets(resume = false, unifiedResult = null, overrideRoots =
     progressFill.style.width = '0%';
 }
 
+function clearPresetScanButtonSpinnerImmediate() {
+    const btn = document.getElementById('btnScanPresets');
+    const stopBtn = document.getElementById('btnStopPresets');
+    const progressBar = document.getElementById('presetProgressBar');
+    const progressFill = document.getElementById('presetProgressFill');
+    if (typeof btnLoading === 'function') btnLoading(btn, false);
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '&#127924; Scan Presets';
+    }
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (progressBar) progressBar.classList.remove('active');
+    if (progressFill) progressFill.style.width = '0%';
+    if (typeof updatePresetExportButton === 'function') updatePresetExportButton();
+}
+
 async function stopPresetScan() {
-    await window.vstUpdater.stopPresetScan();
+    clearPresetScanButtonSpinnerImmediate();
+    try {
+        await window.vstUpdater.stopPresetScan();
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+    }
 }

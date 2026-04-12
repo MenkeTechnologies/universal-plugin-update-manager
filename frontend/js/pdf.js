@@ -435,8 +435,6 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
     const progressFill = document.getElementById('pdfProgressFill');
     const tableWrap = document.getElementById('pdfTableWrap');
 
-    const excludePaths = resume ? allPdfs.map(p => p.path) : null;
-
     if (scanBtn) {
         if (typeof btnLoading === 'function') btnLoading(scanBtn, true);
         scanBtn.disabled = true;
@@ -446,6 +444,8 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
     if (stopBtn) stopBtn.style.display = '';
     progressBar.classList.add('active');
     progressFill.style.width = '0%';
+
+    const excludePaths = resume ? allPdfs.map(p => p.path) : null;
 
     if (!resume) {
         _pdfScanDbView = false;
@@ -520,6 +520,9 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
     }
 
     const scheduleFlush = createScanFlusher(flushPending, FLUSH_INTERVAL);
+
+    if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
+    else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     if (pdfScanProgressCleanup) pdfScanProgressCleanup();
     pdfScanProgressCleanup = await window.vstUpdater.onPdfScanProgress((data) => {
@@ -621,8 +624,33 @@ async function scanPdfs(resume = false, unifiedResult = null, overrideRoots = nu
     progressFill.style.width = '0%';
 }
 
+function clearPdfScanButtonSpinnerImmediate() {
+    const scanBtn = document.querySelector('[data-action="scanPdfs"]');
+    const stopBtn = document.getElementById('btnStopPdf');
+    const progressBar = document.getElementById('pdfProgressBar');
+    const progressFill = document.getElementById('pdfProgressFill');
+    if (typeof window !== 'undefined') window.__pdfScanPendingFound = 0;
+    if (typeof window !== 'undefined') window.__statusBarPdfScanJob = false;
+    const pdfScanBadge = document.getElementById('bgPdfScanBadge');
+    if (pdfScanBadge) pdfScanBadge.textContent = '';
+    if (typeof syncAppStatusBarVisibility === 'function') syncAppStatusBarVisibility();
+    if (scanBtn) {
+        scanBtn.disabled = false;
+        if (typeof btnLoading === 'function') btnLoading(scanBtn, false);
+        scanBtn.innerHTML = '&#8635; ' + catalogFmt('ui.btn.scan_pdfs');
+    }
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (progressBar) progressBar.classList.remove('active');
+    if (progressFill) progressFill.style.width = '0%';
+}
+
 async function stopPdfScan() {
-    await window.vstUpdater.stopPdfScan();
+    clearPdfScanButtonSpinnerImmediate();
+    try {
+        await window.vstUpdater.stopPdfScan();
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+    }
 }
 
 // ── PDF metadata (page counts) ──

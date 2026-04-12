@@ -15,6 +15,9 @@ const DISK_LABEL_KIND = {
     FXP: 'cyan', FXB: 'accent', VSTPRESET: 'green', AUPRESET: 'yellow',
     ADG: 'orange', ADV: 'magenta', NKI: 'cyan', NKSN: 'cyan', H2P: 'accent', SYX: 'green',
     TFX: 'orange', PJUNOXL: 'magenta',
+    MP4: 'cyan', M4V: 'cyan', MOV: 'accent', MKV: 'green', WEBM: 'yellow', AVI: 'orange',
+    MPG: 'muted', MPEG: 'muted', WMV: 'magenta', FLV: 'accent', OGV: 'green', '3GP': 'cyan',
+    MTS: 'yellow', M2TS: 'yellow',
 };
 
 function diskLabelKind(label) {
@@ -113,6 +116,26 @@ function updatePresetDiskUsage(bytesByType) {
         sizeStr: formatAudioSize(Number(b) || 0),
     }));
     renderDiskUsageBar('presetDiskUsage', data, total);
+}
+
+/** Videos tab — `bytesByType` from `db_video_filter_stats` (per `format` column). */
+function updateVideoDiskUsage(bytesByType, totalBytes) {
+    const el = document.getElementById('videoDiskUsage');
+    if (!el) return;
+    const raw = bytesByType && typeof bytesByType === 'object' ? bytesByType : {};
+    const entries = Object.entries(raw).filter(([, b]) => Number(b) > 0);
+    const total = Number(totalBytes) || entries.reduce((s, [, b]) => s + Number(b || 0), 0);
+    if (entries.length === 0 || total <= 0) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    const data = entries.map(([label, b]) => ({
+        label,
+        bytes: Number(b) || 0,
+        sizeStr: formatAudioSize(Number(b) || 0),
+    }));
+    renderDiskUsageBar('videoDiskUsage', data, total);
 }
 
 // Build disk usage data from plugin types + populate the plugin stats row

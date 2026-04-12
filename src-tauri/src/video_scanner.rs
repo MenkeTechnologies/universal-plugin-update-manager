@@ -53,16 +53,16 @@ pub fn get_video_roots() -> Vec<PathBuf> {
     roots.into_iter().filter(|r| r.exists()).collect()
 }
 
+/// `user_stop` is polled from parallel workers and the consumer thread; set it to stop the walk promptly.
 pub fn walk_for_video(
     roots: &[PathBuf],
     on_batch: &mut dyn FnMut(&[VideoFile], usize),
-    should_stop: &(dyn Fn() -> bool + Sync),
+    user_stop: Arc<AtomicBool>,
     exclude: Option<HashSet<String>>,
     active_dirs: Option<Arc<Mutex<Vec<String>>>>,
     incremental: Option<Arc<IncrementalDirState>>,
 ) {
     let batch_size = 100;
-    let stop = Arc::new(AtomicBool::new(false));
     let found = Arc::new(AtomicUsize::new(0));
     let active = active_dirs.unwrap_or_else(|| Arc::new(Mutex::new(Vec::new())));
     let (tx, rx) = std::sync::mpsc::sync_channel::<Vec<VideoFile>>(256);
@@ -70,7 +70,7 @@ pub fn walk_for_video(
     let exclude = Arc::new(exclude.unwrap_or_default());
 
     let roots_owned: Vec<PathBuf> = roots.to_vec();
-    let stop2 = stop.clone();
+    let user_stop_w = Arc::clone(&user_stop);
     let found2 = found.clone();
     let incremental = incremental.clone();
     let pool = rayon::ThreadPoolBuilder::new()
@@ -80,7 +80,7 @@ pub fn walk_for_video(
     std::thread::spawn(move || {
         pool.install(|| {
             roots_owned.par_iter().for_each(|root| {
-                if stop2.load(Ordering::Relaxed) {
+                if user_stop_w.load(Ordering::Relaxed) {
                     return;
                 }
                 walk_dir_parallel(
@@ -91,7 +91,7 @@ pub fn walk_for_video(
                     &tx,
                     &found2,
                     batch_size,
-                    &stop2,
+                    Arc::clone(&user_stop_w),
                     &exclude,
                     &active,
                     incremental.clone(),
@@ -103,13 +103,16 @@ pub fn walk_for_video(
 
     let mut total_found = 0usize;
     loop {
-        if should_stop() {
-            stop.store(true, Ordering::Relaxed);
+        if user_stop.load(Ordering::SeqCst) {
             while rx.try_recv().is_ok() {}
             break;
         }
         match rx.recv_timeout(std::time::Duration::from_millis(10)) {
             Ok(video_files) => {
+                if user_stop.load(Ordering::SeqCst) {
+                    while rx.try_recv().is_ok() {}
+                    break;
+                }
                 total_found += video_files.len();
                 on_batch(&video_files, total_found);
             }
@@ -128,12 +131,15 @@ fn walk_dir_parallel(
     tx: &std::sync::mpsc::SyncSender<Vec<VideoFile>>,
     found: &Arc<AtomicUsize>,
     batch_size: usize,
-    stop: &Arc<AtomicBool>,
+    user_stop: Arc<AtomicBool>,
     exclude: &Arc<HashSet<String>>,
     active_dirs: &Arc<Mutex<Vec<String>>>,
     incremental: Option<Arc<IncrementalDirState>>,
 ) {
-    if depth > 30 || stop.load(Ordering::Relaxed) {
+    if user_stop.load(Ordering::Relaxed) {
+        return;
+    }
+    if depth > 30 {
         return;
     }
 
@@ -219,7 +225,10 @@ fn walk_dir_parallel(
     let mut files = Vec::new();
     let mut subdirs = Vec::new();
 
-    for entry in &entries {
+    for (i, entry) in entries.iter().enumerate() {
+        if i != 0 && i % 512 == 0 && user_stop.load(Ordering::Relaxed) {
+            return;
+        }
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
         // `@` prefix = Synology NAS system dirs (@eaDir, @tmp, @syno*, etc.).
@@ -291,6 +300,9 @@ fn walk_dir_parallel(
                 found.fetch_add(1, Ordering::Relaxed);
 
                 if batch.len() >= batch_size {
+                    if user_stop.load(Ordering::Relaxed) {
+                        return;
+                    }
                     let _ = tx.send(batch);
                     batch = Vec::new();
                 }
@@ -298,6 +310,9 @@ fn walk_dir_parallel(
         }
     }
     if !batch.is_empty() {
+        if user_stop.load(Ordering::Relaxed) {
+            return;
+        }
         let _ = tx.send(batch);
     }
 
@@ -310,7 +325,7 @@ fn walk_dir_parallel(
             tx,
             found,
             batch_size,
-            stop,
+            Arc::clone(&user_stop),
             exclude,
             active_dirs,
             incremental.clone(),
@@ -379,7 +394,7 @@ mod tests {
                     found_names.push(m.name.clone());
                 }
             },
-            &|| false,
+            Arc::new(AtomicBool::new(false)),
             None,
             None,
             None,
@@ -405,7 +420,7 @@ mod tests {
                     names.push(m.name.clone());
                 }
             },
-            &|| false,
+            Arc::new(AtomicBool::new(false)),
             Some(excl),
             None,
             None,
@@ -430,7 +445,7 @@ mod tests {
                     names.push(m.name.clone());
                 }
             },
-            &|| false,
+            Arc::new(AtomicBool::new(false)),
             None,
             None,
             None,
@@ -448,7 +463,7 @@ mod tests {
         walk_for_video(
             &[root.clone()],
             &mut |batch, _| files.extend_from_slice(batch),
-            &|| false,
+            Arc::new(AtomicBool::new(false)),
             None,
             None,
             None,

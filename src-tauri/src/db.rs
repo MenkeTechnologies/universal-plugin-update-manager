@@ -1009,7 +1009,45 @@ impl Database {
         }
     }
 
+    /// `query_video` / stats scope rows through `video_library` (one canonical `video_id` per path).
+    /// Rebuild when row counts diverge, or when `video_id` no longer points at the row for `path`
+    /// (stale ids after deletes/re-scans — `COUNT(*)` on `video_library` can still match distinct paths).
+    fn ensure_video_library_aligned(&self, conn: &Connection) -> Result<(), String> {
+        let lib_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM video_library", [], |r| r.get(0))
+            .unwrap_or(0);
+        let distinct_paths: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM (SELECT DISTINCT path FROM video_files)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        if lib_count == distinct_paths {
+            let stale_links: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM video_library lib WHERE NOT EXISTS (\
+                     SELECT 1 FROM video_files v WHERE v.id = lib.video_id AND v.path = lib.path)",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap_or(0);
+            if stale_links == 0 {
+                return Ok(());
+            }
+        }
+        conn.execute_batch(
+            "DELETE FROM video_library;
+             INSERT INTO video_library (path, video_id)
+             SELECT path, MAX(id) FROM video_files GROUP BY path;",
+        )
+        .map_err(|e| e.to_string())?;
+        self.invalidate_video_library_total_cache();
+        Ok(())
+    }
+
     fn video_library_total_rows(&self, conn: &Connection) -> Result<u64, String> {
+        self.ensure_video_library_aligned(conn)?;
         if let Ok(g) = self.video_library_total_cache.lock() {
             if let Some(n) = *g {
                 return Ok(n);
@@ -8398,6 +8436,31 @@ DROP TABLE _pl_refresh_paths;"#;
             }
         }
         tx.commit().map_err(|e| e.to_string())
+    }
+
+    /// Single-row upsert so decoded waveform / spectrogram data hits SQLite immediately (not only on debounced full `write_cache_file`).
+    pub fn upsert_waveform_cache_row(&self, path: &str, data: &serde_json::Value) -> Result<(), String> {
+        let conn = self.write_conn();
+        let k = normalize_path_for_db(path);
+        let val_str = data.to_string();
+        conn.execute(
+            "INSERT OR REPLACE INTO waveform_cache (path, data) VALUES (?1, ?2)",
+            params![k, val_str],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn upsert_spectrogram_cache_row(&self, path: &str, data: &serde_json::Value) -> Result<(), String> {
+        let conn = self.write_conn();
+        let k = normalize_path_for_db(path);
+        let val_str = data.to_string();
+        conn.execute(
+            "INSERT OR REPLACE INTO spectrogram_cache (path, data) VALUES (?1, ?2)",
+            params![k, val_str],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     /// Get row counts for all tables.

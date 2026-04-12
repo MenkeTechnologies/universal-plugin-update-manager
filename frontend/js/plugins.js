@@ -234,6 +234,34 @@ function getPluginExportableCount() {
     return Math.max(_pluginTotalCount || 0, typeof allPlugins !== 'undefined' ? allPlugins.length : 0);
 }
 
+/** Drop scan button spinner / progress chrome as soon as Stop is pressed (Rust may still drain). */
+function clearPluginScanButtonSpinnerImmediate() {
+    const btn = document.getElementById('btnScan');
+    const stopBtn = document.getElementById('btnStopPlugins');
+    const progress = document.getElementById('progressBar');
+    const progressFill = progress && progress.querySelector('.progress-fill');
+    if (typeof btnLoading === 'function') btnLoading(btn, false);
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `&#8635; ${_ui('ui.js.scan_plugins_btn')}`;
+    }
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (progress) progress.classList.remove('active');
+    if (progressFill) {
+        progressFill.style.animation = '';
+        progressFill.style.width = '0%';
+    }
+}
+
+async function stopPluginScan() {
+    clearPluginScanButtonSpinnerImmediate();
+    try {
+        await window.vstUpdater.stopScan();
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+    }
+}
+
 async function scanPlugins(resume = false, overrideRoots = null) {
     showGlobalProgress();
     try {
@@ -245,7 +273,6 @@ async function scanPlugins(resume = false, overrideRoots = null) {
         const list = document.getElementById('pluginList');
 
         const stopBtn = document.getElementById('btnStopPlugins');
-        const excludePaths = resume ? allPlugins.map(p => p.path) : null;
 
         if (typeof btnLoading === 'function') btnLoading(btn, true);
         btn.disabled = true;
@@ -256,6 +283,8 @@ async function scanPlugins(resume = false, overrideRoots = null) {
         progressFill.style.animation = 'none';
         progressFill.style.width = '0%';
 
+        const excludePaths = resume ? allPlugins.map(p => p.path) : null;
+
         if (!resume) {
             _pluginScanDbView = false;
         }
@@ -265,6 +294,8 @@ async function scanPlugins(resume = false, overrideRoots = null) {
         const eta = createETA();
         let streamPluginCount = 0;
         try {
+            if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
+            else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
             if (scanProgressCleanup) scanProgressCleanup();
             // `listen()` is async — must await subscription before invoke or `scan-progress` events are lost.
             scanProgressCleanup = await window.vstUpdater.onScanProgress((data) => {

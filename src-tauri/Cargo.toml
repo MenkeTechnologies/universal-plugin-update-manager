@@ -33,7 +33,7 @@ num_cpus = "1"
 printpdf = { version = "0.9", default-features = false, features = ["images", "png"] }
 lopdf = "0.40"
 flate2 = "1"
-symphonia = { version = "0.5", features = ["mp3", "aac", "flac", "ogg", "pcm"] }
+symphonia = { version = "0.5", features = ["mp3", "aac", "flac", "ogg", "pcm", "isomp4", "mkv", "vorbis"] }
 rusqlite = { version = "0.39", features = ["bundled", "functions", "hooks"] }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 notify = "8"

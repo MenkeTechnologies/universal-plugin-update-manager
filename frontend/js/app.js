@@ -131,17 +131,6 @@ async function handleFileWatcherChange(event) {
     if (typeof loadFzfParams === 'function') loadFzfParams();
     if (typeof initSmartPlaylists === 'function') initSmartPlaylists();
 
-    // Show player on startup if enabled and there's play history
-    if (prefs.getItem('showPlayerOnStartup') === 'on' && typeof recentlyPlayed !== 'undefined' && recentlyPlayed.length > 0) {
-        const np = document.getElementById('audioNowPlaying');
-        if (np) {
-            np.classList.add('active');
-            if (prefs.getItem('playerExpanded') === 'on') {
-                np.classList.add('expanded');
-                if (typeof renderRecentlyPlayed === 'function') renderRecentlyPlayed();
-            }
-        }
-    }
     // renderFzfSettings is invoked from refreshSettingsUI (after reloadAppStrings)
 
     // Start folder watcher if enabled
@@ -607,6 +596,9 @@ async function scanAll(resume = false) {
     resumeBtn.style.display = 'none';
     scanAllRunning = true;
 
+    if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
+    else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
     try {
         // Clear stale unified stop flags from a previous run, then register listeners.
         // `scan_unified` runs after a short delay; without this, it used to reset
@@ -734,6 +726,22 @@ async function scanAll(resume = false) {
 }
 
 async function stopAll() {
+    if (typeof clearPluginScanButtonSpinnerImmediate === 'function') clearPluginScanButtonSpinnerImmediate();
+    if (typeof clearAudioScanButtonSpinnerImmediate === 'function') clearAudioScanButtonSpinnerImmediate();
+    if (typeof clearDawScanButtonSpinnerImmediate === 'function') clearDawScanButtonSpinnerImmediate();
+    if (typeof clearPresetScanButtonSpinnerImmediate === 'function') clearPresetScanButtonSpinnerImmediate();
+    if (typeof clearPdfScanButtonSpinnerImmediate === 'function') clearPdfScanButtonSpinnerImmediate();
+    if (typeof clearMidiScanButtonSpinnerImmediate === 'function') clearMidiScanButtonSpinnerImmediate();
+    if (typeof clearVideoScanButtonSpinnerImmediate === 'function') clearVideoScanButtonSpinnerImmediate();
+    const btnScanAll = document.getElementById('btnScanAll');
+    if (btnScanAll) {
+        if (typeof btnLoading === 'function') btnLoading(btnScanAll, false);
+        btnScanAll.disabled = false;
+        btnScanAll.innerHTML = catalogFmt('ui.btn.9889_scan_all');
+    }
+    const btnStopAllEl = document.getElementById('btnStopAll');
+    if (btnStopAllEl) btnStopAllEl.style.display = 'none';
+    if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
     await Promise.all([
         typeof abortPdfMetadataExtraction === 'function'
             ? abortPdfMetadataExtraction().catch(() => {})

@@ -311,6 +311,9 @@ function refreshRowBadges(path) {
     // PDF table
     const pdfRow = document.getElementById('pdfTableBody')?.querySelector(`tr[data-pdf-path="${escaped}"]`);
     if (pdfRow) updateCell(pdfRow.querySelector('.col-name') || pdfRow.cells?.[1]);
+    // Video table
+    const videoRow = document.getElementById('videoTableBody')?.querySelector(`tr[data-video-path="${escaped}"]`);
+    if (videoRow) updateCell(videoRow.querySelector('.col-name') || videoRow.cells?.[1]);
     // Plugin card
     const pluginCard = document.querySelector(`.plugin-card[data-path="${escaped}"]`);
     if (pluginCard) {

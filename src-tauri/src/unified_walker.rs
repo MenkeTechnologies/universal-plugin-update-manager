@@ -345,6 +345,43 @@ pub struct UnifiedCounts {
     pub pdf: usize,
 }
 
+/// Per-tab stop flags for [`walk_unified`] — any `true` cancels the walk (mirrors `stop_*_scan` commands).
+#[derive(Clone)]
+pub struct UnifiedStopArms {
+    pub audio: Arc<AtomicBool>,
+    pub daw: Arc<AtomicBool>,
+    pub preset: Arc<AtomicBool>,
+    pub pdf: Arc<AtomicBool>,
+}
+
+impl UnifiedStopArms {
+    #[inline]
+    pub fn any(&self) -> bool {
+        self.audio.load(Ordering::Relaxed)
+            || self.daw.load(Ordering::Relaxed)
+            || self.preset.load(Ordering::Relaxed)
+            || self.pdf.load(Ordering::Relaxed)
+    }
+
+    pub fn all_false() -> Self {
+        Self {
+            audio: Arc::new(AtomicBool::new(false)),
+            daw: Arc::new(AtomicBool::new(false)),
+            preset: Arc::new(AtomicBool::new(false)),
+            pdf: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn all_true() -> Self {
+        Self {
+            audio: Arc::new(AtomicBool::new(true)),
+            daw: Arc::new(AtomicBool::new(true)),
+            preset: Arc::new(AtomicBool::new(true)),
+            pdf: Arc::new(AtomicBool::new(true)),
+        }
+    }
+}
+
 /// Walk the union of all roots across types, emitting classified batches.
 ///
 /// The callback is invoked from the main receiving thread (single-threaded),
@@ -352,12 +389,11 @@ pub struct UnifiedCounts {
 pub fn walk_unified(
     spec: &UnifiedSpec,
     on_batch: &mut dyn FnMut(ClassifiedBatch, UnifiedCounts),
-    should_stop: &(dyn Fn() -> bool + Sync),
+    stops: UnifiedStopArms,
     active_dirs: Vec<Arc<Mutex<Vec<String>>>>,
     incremental: Option<Arc<IncrementalDirState>>,
 ) {
     let batch_size = 100;
-    let stop = Arc::new(AtomicBool::new(false));
     // Fan-out sinks — each push goes to every provided Vec, so the walker's
     // single traversal drives all N walker-status tiles simultaneously.
     let active: Vec<Arc<Mutex<Vec<String>>>> = if active_dirs.is_empty() {
@@ -399,7 +435,7 @@ pub fn walk_unified(
     let pdf_found = Arc::new(AtomicUsize::new(0));
 
     let spec = Arc::new(spec.clone());
-    let stop2 = stop.clone();
+    let stops_w = stops.clone();
     let audio_f2 = audio_found.clone();
     let daw_f2 = daw_found.clone();
     let preset_f2 = preset_found.clone();
@@ -415,7 +451,7 @@ pub fn walk_unified(
     std::thread::spawn(move || {
         pool.install(|| {
             union.par_iter().for_each(|root| {
-                if stop2.load(Ordering::Relaxed) {
+                if stops_w.any() {
                     return;
                 }
                 walk_dir_parallel(
@@ -428,7 +464,7 @@ pub fn walk_unified(
                     &preset_f2,
                     &pdf_f2,
                     batch_size,
-                    &stop2,
+                    stops_w.clone(),
                     &spec,
                     &active,
                     &tcc_denied,
@@ -440,13 +476,16 @@ pub fn walk_unified(
     });
 
     loop {
-        if should_stop() {
-            stop.store(true, Ordering::Relaxed);
+        if stops.any() {
             while rx.try_recv().is_ok() {}
             break;
         }
         match rx.recv_timeout(std::time::Duration::from_millis(10)) {
             Ok(batch) => {
+                if stops.any() {
+                    while rx.try_recv().is_ok() {}
+                    break;
+                }
                 let counts = UnifiedCounts {
                     audio: audio_found.load(Ordering::Relaxed),
                     daw: daw_found.load(Ordering::Relaxed),
@@ -485,13 +524,13 @@ fn walk_dir_parallel(
     preset_found: &Arc<AtomicUsize>,
     pdf_found: &Arc<AtomicUsize>,
     batch_size: usize,
-    stop: &Arc<AtomicBool>,
+    stops: UnifiedStopArms,
     spec: &Arc<UnifiedSpec>,
     active_dirs: &[Arc<Mutex<Vec<String>>>],
     tcc_denied: &Arc<DashSet<PathBuf>>,
     incremental: Option<Arc<IncrementalDirState>>,
 ) {
-    if depth > 30 || stop.load(Ordering::Relaxed) {
+    if depth > 30 || stops.any() {
         return;
     }
 
@@ -666,7 +705,10 @@ fn walk_dir_parallel(
     let mut pdf_batch: Vec<PdfFile> = Vec::new();
     let mut subdirs: Vec<PathBuf> = Vec::new();
 
-    for entry in &entries {
+    for (i, entry) in entries.iter().enumerate() {
+        if i != 0 && i % 256 == 0 && stops.any() {
+            return;
+        }
         let name_str = entry.name.as_str();
         // `@` prefix = Synology NAS system dirs (@eaDir is in every media
         // folder on a Synology share — alone it can double a scan's file
@@ -725,6 +767,9 @@ fn walk_dir_parallel(
                     if !(format == "BAND" && !is_valid_band_package(&path)) {
                         let path_str = path.to_string_lossy().to_string();
                         if !spec.daw_exclude.contains(&path_str) {
+                            if stops.any() {
+                                return;
+                            }
                             // Package size still needs recursive directory
                             // walk — that's inherent to the data model.
                             let size = get_directory_size(&path);
@@ -799,6 +844,9 @@ fn walk_dir_parallel(
         if AUDIO_EXTENSIONS.contains(&ext_with_dot) && under_any_root(&path, &spec.audio_roots) {
             let path_str = path.to_string_lossy().to_string();
             if !spec.audio_exclude.contains(&path_str) && size > 0 {
+                if stops.any() {
+                    return;
+                }
                 let sample_name = path
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
@@ -898,20 +946,35 @@ fn walk_dir_parallel(
 
         // Flush any batch that's reached batch_size.
         if audio_batch.len() >= batch_size {
+            if stops.any() {
+                return;
+            }
             let _ = tx.send(ClassifiedBatch::Audio(std::mem::take(&mut audio_batch)));
         }
         if daw_batch.len() >= batch_size {
+            if stops.any() {
+                return;
+            }
             let _ = tx.send(ClassifiedBatch::Daw(std::mem::take(&mut daw_batch)));
         }
         if preset_batch.len() >= batch_size {
+            if stops.any() {
+                return;
+            }
             let _ = tx.send(ClassifiedBatch::Preset(std::mem::take(&mut preset_batch)));
         }
         if pdf_batch.len() >= batch_size {
+            if stops.any() {
+                return;
+            }
             let _ = tx.send(ClassifiedBatch::Pdf(std::mem::take(&mut pdf_batch)));
         }
     }
 
     // Flush any partial batches at end of directory.
+    if stops.any() {
+        return;
+    }
     if !audio_batch.is_empty() {
         let _ = tx.send(ClassifiedBatch::Audio(audio_batch));
     }
@@ -936,7 +999,7 @@ fn walk_dir_parallel(
             preset_found,
             pdf_found,
             batch_size,
-            stop,
+            stops.clone(),
             spec,
             active_dirs,
             tcc_denied,
@@ -1061,7 +1124,7 @@ mod tests {
                 ClassifiedBatch::Preset(b) => preset.extend(b),
                 ClassifiedBatch::Pdf(b) => pdf.extend(b),
             },
-            &|| false,
+            UnifiedStopArms::all_false(),
             Vec::new(),
             None,
         );
@@ -1101,7 +1164,7 @@ mod tests {
                     daw.extend(b);
                 }
             },
-            &|| false,
+            UnifiedStopArms::all_false(),
             Vec::new(),
             None,
         );
@@ -1138,7 +1201,7 @@ mod tests {
                 ClassifiedBatch::Audio(b) => audio += b.len(),
                 _ => other += 1,
             },
-            &|| false,
+            UnifiedStopArms::all_false(),
             Vec::new(),
             None,
         );
@@ -1179,7 +1242,7 @@ mod tests {
                     names.extend(b.into_iter().map(|s| s.name));
                 }
             },
-            &|| false,
+            UnifiedStopArms::all_false(),
             Vec::new(),
             None,
         );
@@ -1213,7 +1276,7 @@ mod tests {
                 ClassifiedBatch::Pdf(b) => pdf.extend(b),
                 _ => {}
             },
-            &|| false,
+            UnifiedStopArms::all_false(),
             Vec::new(),
             None,
         );
@@ -1233,7 +1296,13 @@ mod tests {
             audio_roots: vec![root.clone()],
             ..Default::default()
         };
-        walk_unified(&spec, &mut |_, _| {}, &|| true, Vec::new(), None);
+        walk_unified(
+            &spec,
+            &mut |_, _| {},
+            UnifiedStopArms::all_true(),
+            Vec::new(),
+            None,
+        );
         // No assertion — just ensure stop=true returns promptly (test timeout
         // would catch a hang).
     }
@@ -1260,7 +1329,7 @@ mod tests {
                     names.extend(b.into_iter().map(|s| s.name));
                 }
             },
-            &|| false,
+            UnifiedStopArms::all_false(),
             Vec::new(),
             None,
         );
@@ -1279,7 +1348,7 @@ mod tests {
             &mut |_, _| {
                 batches += 1;
             },
-            &|| false,
+            UnifiedStopArms::all_false(),
             Vec::new(),
             None,
         );
@@ -1307,7 +1376,7 @@ mod tests {
                     count += b.len();
                 }
             },
-            &|| false,
+            UnifiedStopArms::all_false(),
             Vec::new(),
             Some(Arc::new(IncrementalDirState::new(snap))),
         );

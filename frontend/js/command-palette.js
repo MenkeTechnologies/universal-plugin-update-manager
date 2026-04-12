@@ -323,6 +323,11 @@ function buildPaletteStaticItems() {
         }
     });
     items.push({
+        type: 'action', name: appFmt('menu.toggle_video_fullscreen'), icon: '&#9974;', ...paletteShortcutTip('videoToggleFullscreen'), action: () => {
+            if (typeof toggleVideoMaximize === 'function') toggleVideoMaximize();
+        }
+    });
+    items.push({
         type: 'action', name: appFmt('menu.export_videos'), icon: '&#8615;', ...paletteShortcutTip('exportTab'), action: () => {
             if (typeof exportVideos === 'function' && typeof runExport === 'function') runExport(exportVideos); else if (typeof exportVideos === 'function') exportVideos();
         }
@@ -515,6 +520,8 @@ function buildPaletteStaticItems() {
                     _waveformCache = {};
                     _spectrogramCache = {};
                 }
+                if (typeof invalidateDbCacheStatsSnapshot === 'function') invalidateDbCacheStatsSnapshot();
+                if (typeof renderCacheStats === 'function') void renderCacheStats();
                 showToast(toastFmt('toast.all_caches_cleared'));
             }).catch(e => showToast(toastFmt('toast.failed', {err: e}), 4000, 'error'));
         }
@@ -671,13 +678,6 @@ function buildPaletteStaticItems() {
         action: () => settingToggleAutoPlaySampleOnSelect()
     });
     // Autoplay next: session row in buildPaletteDynamicItems (live On/Off detail; see menu.palette_autoplay_next)
-    if (typeof settingToggleShowPlayerOnStartup === 'function') items.push({
-        type: 'toggle',
-        name: appFmt('menu.toggle_show_player_startup'),
-        icon: '&#9835;',
-        ...paletteShortcutTip('toggleShowPlayerStartup'),
-        action: () => settingToggleShowPlayerOnStartup()
-    });
     if (typeof settingToggleExpandOnClick === 'function') items.push({
         type: 'toggle',
         name: appFmt('menu.toggle_expand_on_click'),

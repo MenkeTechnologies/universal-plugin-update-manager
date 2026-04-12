@@ -539,7 +539,9 @@ fn read_engine_json_line<R: Read>(stdout: &mut BufReader<R>) -> Result<String, S
 }
 
 fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_json::Value, String> {
-    let payload = serde_json::to_string(request).map_err(|e| e.to_string())?;
+    let (effective_request, _transcoded_temp) =
+        crate::waveform_container_extract::rewrite_visual_preview_for_juce(request);
+    let payload = serde_json::to_string(&effective_request).map_err(|e| e.to_string())?;
 
     for attempt in 0..2 {
         let path = resolve_audio_engine_binary().map_err(|e| {

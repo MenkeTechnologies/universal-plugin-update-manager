@@ -237,6 +237,7 @@ function renderFavorites() {
         const typeLabel = {
             plugin: 'Plugin',
             sample: 'Sample',
+            video: 'Video',
             daw: 'DAW Project',
             preset: 'Preset',
             folder: 'Folder',
@@ -245,6 +246,7 @@ function renderFavorites() {
         const typeClass = {
             plugin: 'type-vst3',
             sample: 'format-wav',
+            video: 'format-default',
             daw: 'daw-ableton-live',
             preset: 'format-default',
             folder: 'format-default',
@@ -301,6 +303,7 @@ function loadMoreFavs() {
         const typeLabel = {
             plugin: 'Plugin',
             sample: 'Sample',
+            video: 'Video',
             daw: 'DAW Project',
             preset: 'Preset',
             folder: 'Folder',
@@ -309,6 +312,7 @@ function loadMoreFavs() {
         const typeClass = {
             plugin: 'type-vst3',
             sample: 'format-wav',
+            video: 'format-default',
             daw: 'daw-ableton-live',
             preset: 'format-default',
             folder: 'format-default',
@@ -347,7 +351,7 @@ document.addEventListener('click', (e) => {
         const type = folder.dataset.type;
         const path = folder.dataset.path;
         if (type === 'plugin') openFolder(path);
-        else if (type === 'sample') openAudioFolder(path);
+        else if (type === 'sample' || type === 'video') openAudioFolder(path);
         else if (type === 'daw') openDawFolder(path);
         else if (type === 'preset') openPresetFolder(path);
         return;

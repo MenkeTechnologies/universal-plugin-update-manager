@@ -257,6 +257,13 @@ function resolveNativeDragPathsFromTarget(t) {
         return p ? {paths: pathsWithBatch(p)} : null;
     }
 
+    if (id === 'tabVideos') {
+        const tr = t.closest('#videoTableBody tr[data-video-path]');
+        if (!tr || t.closest('[data-action-stop]')) return null;
+        const p = tr.dataset.videoPath;
+        return p ? {paths: pathsWithBatch(p)} : null;
+    }
+
     if (id === 'tabPlugins') {
         const card = t.closest('#pluginList .plugin-card[data-path]');
         if (!card || t.closest('.plugin-actions')) return null;

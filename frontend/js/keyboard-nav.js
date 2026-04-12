@@ -16,6 +16,7 @@ function getNavigableItems() {
     if (id === 'tabPresets') return [...activeTab.querySelectorAll('#presetTableBody tr[data-preset-path]')];
     if (id === 'tabMidi') return [...activeTab.querySelectorAll('#midiTableBody tr[data-midi-path]')];
     if (id === 'tabPdf') return [...activeTab.querySelectorAll('#pdfTableBody tr[data-pdf-path]')];
+    if (id === 'tabVideos') return [...activeTab.querySelectorAll('#videoTableBody tr[data-video-path]')];
     if (id === 'tabFavorites') return [...activeTab.querySelectorAll('.fav-item')];
     return [];
 }
@@ -79,6 +80,7 @@ function syncNavIndexFromClick(ev) {
     else if (id === 'tabPresets') row = t.closest('#presetTableBody tr[data-preset-path]');
     else if (id === 'tabMidi') row = t.closest('#midiTableBody tr[data-midi-path]');
     else if (id === 'tabPdf') row = t.closest('#pdfTableBody tr[data-pdf-path]');
+    else if (id === 'tabVideos') row = t.closest('#videoTableBody tr[data-video-path]');
     else if (id === 'tabPlugins') row = t.closest('.plugin-card');
     else if (id === 'tabFavorites') row = t.closest('.fav-item');
     if (!row) return;
@@ -114,10 +116,17 @@ function setNavIndex(idx) {
                 _lastAutoPlaySamplePath = path;
                 clearTimeout(_sampleSelectPlayTimer);
                 _sampleSelectPlayTimer = setTimeout(() => {
-                    if (typeof previewAudio === 'function') previewAudio(path);
+                    if (typeof previewAudio === 'function') previewAudio(path, { minimizeFloatingPlayer: true });
                     if (typeof syncExpandedMetaWithKeyboardSelection === 'function') syncExpandedMetaWithKeyboardSelection(path);
                 }, 140);
             }
+        }
+    }
+
+    if (activeTab === 'tabVideos') {
+        const path = item.dataset.videoPath;
+        if (path && typeof syncExpandedVideoMetaWithKeyboardSelection === 'function') {
+            syncExpandedVideoMetaWithKeyboardSelection(path);
         }
     }
 }
@@ -130,7 +139,7 @@ function activateNavItem() {
 
     if (activeTab === 'tabSamples') {
         const path = item.getAttribute('data-audio-path');
-        if (path) previewAudio(path);
+        if (path) previewAudio(path, { minimizeFloatingPlayer: true });
     } else if (activeTab === 'tabDaw') {
         const path = item.dataset.dawPath;
         if (path) {
@@ -162,6 +171,11 @@ function activateNavItem() {
             window.vstUpdater.openFileDefault(path)
                 .then(() => showToast(toastFmt('toast.opening_pdf_default_app', {name})))
                 .catch((err) => showToast(toastFmt('toast.failed_open_pdf', {err: err.message || err}), 4000, 'error'));
+        }
+    } else if (activeTab === 'tabVideos') {
+        const path = item.dataset.videoPath;
+        if (path && typeof toggleVideoMeta === 'function') {
+            toggleVideoMeta(path, { target: item });
         }
     } else if (activeTab === 'tabFavorites') {
         const path = item.dataset.path;
@@ -208,6 +222,7 @@ function pathFromNavigableElement(item) {
         || item.dataset.presetPath
         || item.dataset.midiPath
         || item.dataset.pdfPath
+        || item.dataset.videoPath
         || item.dataset.path
         || '';
 }
@@ -375,11 +390,16 @@ document.addEventListener('keydown', (e) => {
         if (typeof _actionOnSelected === 'function') _actionOnSelected('delete');
 
     } else if (e.key === 'p') {
+        // `shortcuts.js` (capture) may own bare `p` (default: toggle floating player). If it handled the
+        // event, do not also run table preview — that would pause the same track right after hidePlayer.
+        if (e.defaultPrevented) return;
         // p = preview/play audio
         e.preventDefault();
         if (_navIndex < 0) syncNavIndexBeforeVerticalMove(activeTab);
         const path = _getSelectedPath();
-        if (path && typeof previewAudio === 'function') previewAudio(path);
+        if (path && typeof previewAudio === 'function') {
+            previewAudio(path, activeTab === 'tabSamples' ? { minimizeFloatingPlayer: true } : undefined);
+        }
 
     } else if (e.key === '/') {
         // / = focus search (vim search)

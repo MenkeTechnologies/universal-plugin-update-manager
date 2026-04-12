@@ -238,15 +238,28 @@ async function fetchWaveformPreviewFromEngine(absPath, widthPx) {
     return wfRes.peaks;
 }
 
-/** Shared with `file-browser.js`: evict + debounced persist after inserting waveform peaks. */
+/** Shared with `file-browser.js` + `video.js`: evict, immediate SQLite row upsert, debounced full snapshot. */
 function storeWaveformPeaksInCache(filePath, peaks) {
     if (typeof _waveformCache === 'undefined' || !peaks) return;
     _waveformCache[filePath] = peaks;
     _evictCache(_waveformCache);
+    if (typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.upsertWaveformCacheEntry === 'function') {
+        void window.vstUpdater.upsertWaveformCacheEntry(filePath, peaks).catch(() => {});
+    }
     _debounceWfSave();
     if (typeof notifyWaveformCacheUpdatedForTray === 'function') {
         notifyWaveformCacheUpdatedForTray(filePath);
     }
+}
+
+function storeSpectrogramDataInCache(filePath, sgData) {
+    if (typeof _spectrogramCache === 'undefined' || !sgData) return;
+    _spectrogramCache[filePath] = sgData;
+    _evictCache(_spectrogramCache);
+    if (typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.upsertSpectrogramCacheEntry === 'function') {
+        void window.vstUpdater.upsertSpectrogramCacheEntry(filePath, sgData).catch(() => {});
+    }
+    _debounceWfSave();
 }
 
 async function fetchSpectrogramPreviewFromEngine(absPath, dims) {
@@ -1360,6 +1373,10 @@ function applyMetaLoopRegionUI(filePath) {
         const npBox = document.getElementById('npWaveform');
         if (npBox) _paintLoopRegionOverlay(npBox, region);
     }
+    const videoBox = document.getElementById('videoWaveformBox');
+    if (videoBox && videoBox.dataset.path === filePath) {
+        _paintLoopRegionOverlay(videoBox, region);
+    }
 }
 
 /** Refresh the now-playing loop overlay from the current `audioPlayerPath` — used on track change. */
@@ -1383,6 +1400,8 @@ function _durationSecForActivePlayback() {
     if (typeof audioPlayer !== 'undefined' && audioPlayer && Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0) {
         return audioPlayer.duration;
     }
+    const vd = videoHostDurationFallbackSec();
+    if (vd > 0) return vd;
     return 0;
 }
 
@@ -1447,6 +1466,13 @@ function _getCurrentPlaybackTimeSec() {
 
 /** Resolve the loop-region target path: the expanded row if any, otherwise the currently playing path. */
 function _sampleLoopRegionTargetPath() {
+    const activeTab = document.querySelector('.tab-content.active')?.id;
+    if (activeTab === 'tabVideos') {
+        const vBox = document.getElementById('videoWaveformBox');
+        if (vBox && vBox.dataset && vBox.dataset.path) return vBox.dataset.path;
+        if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath) return videoPlayerPath;
+        return '';
+    }
     const box = document.getElementById('metaWaveformBox');
     if (box && box.dataset && box.dataset.path) return box.dataset.path;
     return audioPlayerPath || '';
@@ -1795,6 +1821,12 @@ function stopEnginePlaybackFftRaf() {
 if (typeof window !== 'undefined') {
     window.ensureEnginePlaybackFftRaf = ensureEnginePlaybackFftRaf;
     window.stopEnginePlaybackFftRaf = stopEnginePlaybackFftRaf;
+    /** Kick the audio playback RAF loop if not already running (used by video player for NP bar/tray sync). */
+    window.kickPlaybackRafLoop = function () {
+        if (!_playbackRafId && isAudioPlaying()) {
+            _playbackRafId = requestAnimationFrame(_playbackRafLoop);
+        }
+    };
 }
 
 function _playbackRafLoop() {
@@ -2570,8 +2602,6 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
     const progressFill = document.getElementById('audioProgressFill');
     const tableWrap = document.getElementById('audioTableWrap');
 
-    const excludePaths = resume ? allAudioSamples.map(s => s.path) : null;
-
     if (typeof btnLoading === 'function') btnLoading(btn, true);
     btn.disabled = true;
     btn.innerHTML = '&#8635; ' + catalogFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn');
@@ -2579,6 +2609,8 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
     stopBtn.style.display = '';
     progressBar.classList.add('active');
     progressFill.style.width = '0%';
+
+    const excludePaths = resume ? allAudioSamples.map(s => s.path) : null;
 
     if (!resume) {
         _audioScanDbView = false;
@@ -2670,6 +2702,9 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
     }
 
     const scheduleFlush = createScanFlusher(flushPendingSamples, FLUSH_INTERVAL);
+
+    if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
+    else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     if (audioScanProgressCleanup) audioScanProgressCleanup();
     audioScanProgressCleanup = await window.vstUpdater.onAudioScanProgress((data) => {
@@ -2764,8 +2799,31 @@ async function scanAudioSamples(resume = false, unifiedResult = null, overrideRo
     progressFill.style.animation = '';
 }
 
+function clearAudioScanButtonSpinnerImmediate() {
+    const btn = document.getElementById('btnScanAudio');
+    const stopBtn = document.getElementById('btnStopAudio');
+    const progressBar = document.getElementById('audioProgressBar');
+    const progressFill = document.getElementById('audioProgressFill');
+    if (typeof btnLoading === 'function') btnLoading(btn, false);
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = catalogFmt('ui.btn.127925_scan_samples');
+    }
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (progressBar) progressBar.classList.remove('active');
+    if (progressFill) {
+        progressFill.style.width = '0%';
+        progressFill.style.animation = '';
+    }
+}
+
 async function stopAudioScan() {
-    await window.vstUpdater.stopAudioScan();
+    clearAudioScanButtonSpinnerImmediate();
+    try {
+        await window.vstUpdater.stopAudioScan();
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+    }
 }
 
 // Running stat counters — avoid re-scanning the full array every flush
@@ -3256,12 +3314,14 @@ async function showEngineUnplayablePreview(filePath, keepFloatingPlayerHidden = 
             renderRecentlyPlayed();
         }
     } else {
+        np.classList.remove('active');
         const pill = document.getElementById('audioRestorePill');
         if (pill) pill.classList.remove('active');
     }
     np.classList.remove('np-playing');
     const sample = findByPath(allAudioSamples, filePath);
     const displayName = sample ? `${sample.name}.${sample.format.toLowerCase()}` : filePath.split('/').pop();
+    _clearNpVideoSourceFlags();
     const npName = document.getElementById('npName');
     if (npName) npName.textContent = displayName;
     const npTime = document.getElementById('npTime');
@@ -3291,13 +3351,18 @@ async function showEngineUnplayablePreview(filePath, keepFloatingPlayerHidden = 
 // ── Audio Preview / Playback ──
 /**
  * @param {string} filePath
- * @param { { skipRecentReorder?: boolean } } [opts] — When true, **`addToRecentlyPlayed`** updates or appends without moving the row to the top (autoplay, prev/next, and clicks on the player history list keep stable order).
+ * @param { { skipRecentReorder?: boolean, minimizeFloatingPlayer?: boolean } } [opts] — When **`skipRecentReorder`**, **`addToRecentlyPlayed`** updates or appends without moving the row to the top (autoplay, prev/next, and clicks on the player history list keep stable order). When **`minimizeFloatingPlayer`**, do not auto-open the floating bar if it is already hidden (restore pill); if the bar is already visible, leave it visible.
  */
 async function previewAudio(filePath, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
     const np0 = document.getElementById('audioNowPlaying');
     /** User hid the floating player (`hidePlayer`) while a path was still loaded — keep it hidden on new previews. */
-    const keepFloatingPlayerHidden =
+    const userHidPlayerWithPathLoaded =
         !!(np0 && !np0.classList.contains('active') && audioPlayerPath != null);
+    /** Row/keyboard play: stay minimized only when the bar is not already shown. */
+    const rowPlayKeepBarHidden =
+        o.minimizeFloatingPlayer === true && np0 && !np0.classList.contains('active');
+    const keepFloatingPlayerHidden = userHidPlayerWithPathLoaded || rowPlayKeepBarHidden;
 
     const ext = filePath.split('.').pop().toLowerCase();
     if (isEngineUnplayablePath(filePath)) {
@@ -3307,7 +3372,7 @@ async function previewAudio(filePath, opts) {
             typeof toastFmt === 'function'
                 ? toastFmt('toast.preview_not_supported_format', { ext: extDisplay })
                 : undefined;
-        if (await tryPreviewAutoplayNextOnFailureAsync(filePath, unplayableErr)) return;
+        if (await tryPreviewAutoplayNextOnFailureAsync(filePath, unplayableErr, o)) return;
         await showEngineUnplayablePreview(filePath, keepFloatingPlayerHidden);
         return;
     }
@@ -3339,7 +3404,7 @@ async function previewAudio(filePath, opts) {
             try {
                 await audioPlayer.play();
             } catch (e) {
-                if (await tryPreviewAutoplayNextOnFailureAsync(filePath, e)) return;
+                if (await tryPreviewAutoplayNextOnFailureAsync(filePath, e, o)) return;
                 if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
             }
         }
@@ -3360,6 +3425,8 @@ async function previewAudio(filePath, opts) {
         if (canEngine) {
             /* Mute / disconnect `<audio>` before AudioEngine audio starts so WebView path cannot overlap. */
             silenceWebViewAudioForEngine();
+            /* Stop any active video playback that is driving the engine. */
+            if (typeof stopVideoPlayback === 'function') stopVideoPlayback();
             stopReverseBufferPlayback();
             _decodedBuf = null;
             _reversedBuf = null;
@@ -3442,15 +3509,18 @@ async function previewAudio(filePath, opts) {
                 renderRecentlyPlayed();
             }
         } else {
+            np.classList.remove('active');
             const pill = document.getElementById('audioRestorePill');
             if (pill && isAudioPlaying()) pill.classList.add('active');
         }
         const sample = findByPath(allAudioSamples, filePath);
         const displayName = sample ? `${sample.name}.${sample.format.toLowerCase()}` : filePath.split('/').pop();
-        document.getElementById('npName').textContent = displayName;
+        _clearNpVideoSourceFlags();
+        const npNameEl2 = document.getElementById('npName');
+        if (npNameEl2) npNameEl2.textContent = displayName;
 
         // Track recently played
-        addToRecentlyPlayed(filePath, sample, opts);
+        addToRecentlyPlayed(filePath, sample, o);
 
         updatePlayBtnStates();
         updateNowPlayingBtn();
@@ -3473,7 +3543,7 @@ async function previewAudio(filePath, opts) {
     } catch (err) {
         setEnginePlaybackActive(false);
         if (typeof window.stopEnginePlaybackPoll === 'function') window.stopEnginePlaybackPoll();
-        if (await tryPreviewAutoplayNextOnFailureAsync(filePath, err)) return;
+        if (await tryPreviewAutoplayNextOnFailureAsync(filePath, err, o)) return;
         showToast(toastFmt('toast.playback_failed', {
             ext: ext.toUpperCase(),
             err: err.message || err || 'Unknown error'
@@ -3496,6 +3566,17 @@ function toggleAudioPlayback() {
         const playing = isAudioPlaying();
         applyEnginePlaybackPausedFromTransport(playing);
         void window.vstUpdater.audioEngineInvoke({cmd: 'playback_pause', paused: playing});
+        // Sync muted <video> element when toggling via NP bar
+        if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath) {
+            const vid = document.getElementById('videoPlayerEl');
+            if (vid) { playing ? vid.pause() : vid.play().catch(() => {}); }
+            if (typeof _updateVideoPlayBtn === 'function') _updateVideoPlayBtn();
+            if (playing) {
+                if (typeof _videoRafId !== 'undefined' && _videoRafId) { cancelAnimationFrame(_videoRafId); _videoRafId = null; }
+            } else {
+                if (typeof _startVideoRaf === 'function') _startVideoRaf();
+            }
+        }
         /* `previewAudio` schedules the waveform on load / same-track replay; play/pause toggles only
          * hit this path — resuming must redraw (or fill cache) so the floating player waveform is not blank. */
         if (!playing && typeof audioPlayerPath === 'string' && audioPlayerPath !== '') {
@@ -3542,7 +3623,7 @@ function toggleRowLoop(filePath, event) {
         audioPlayer.loop = true;
         prefs.setItem('audioLoop', 'on');
         document.getElementById('npBtnLoop').classList.add('active');
-        previewAudio(filePath);
+        previewAudio(filePath, { minimizeFloatingPlayer: true });
         updateLoopBtnStates();
         return;
     }
@@ -3668,6 +3749,14 @@ function _cachePlaybackEls() {
     _npCursorEl = document.getElementById('npCursor');
 }
 
+/** `<video>` duration when the floating player is driving a video row (not in `allAudioSamples`). */
+function videoHostDurationFallbackSec() {
+    if (typeof videoPlayerPath === 'undefined' || !videoPlayerPath || audioPlayerPath !== videoPlayerPath) return 0;
+    const vid = document.getElementById('videoPlayerEl');
+    if (!vid || !Number.isFinite(vid.duration) || vid.duration <= 0) return 0;
+    return vid.duration;
+}
+
 /** Effective duration (seconds) for engine-routed playback — poll + load may lag or return 0 for some files. */
 function enginePlaybackDurationSec() {
     let dur =
@@ -3677,6 +3766,10 @@ function enginePlaybackDurationSec() {
     if (dur <= 0 && typeof findByPath === 'function' && typeof allAudioSamples !== 'undefined' && audioPlayerPath) {
         const s = findByPath(allAudioSamples, audioPlayerPath);
         if (s && typeof s.duration === 'number' && s.duration > 0) dur = s.duration;
+    }
+    if (dur <= 0) {
+        const vd = videoHostDurationFallbackSec();
+        if (vd > 0) dur = vd;
     }
     return dur;
 }
@@ -3945,6 +4038,20 @@ function syncTrayNowPlayingFromPlayback() {
         const elapsed = _playbackCtx.currentTime - _bufSegStartCtx;
         const posInRev = _bufOffsetInRev + elapsed * _bufPlaybackRate;
         cur = Math.max(0, dur - posInRev);
+    } else if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath && audioPlayerPath === videoPlayerPath) {
+        const vid = document.getElementById('videoPlayerEl');
+        if (vid) {
+            cur = vid.currentTime || 0;
+            dur = Number.isFinite(vid.duration) && vid.duration > 0 ? vid.duration : audioPlayer.duration || 0;
+        } else {
+            cur = audioPlayer.currentTime;
+            dur = audioPlayer.duration;
+        }
+        const pathForMeta = audioPlayerPath || resumePath || null;
+        if ((!Number.isFinite(dur) || dur <= 0) && pathForMeta && typeof findByPath === 'function' && typeof allAudioSamples !== 'undefined') {
+            const s = findByPath(allAudioSamples, pathForMeta);
+            if (s && typeof s.duration === 'number' && s.duration > 0) dur = s.duration;
+        }
     } else {
         cur = audioPlayer.currentTime;
         dur = audioPlayer.duration;
@@ -4104,16 +4211,31 @@ function updatePlaybackTime() {
         const elapsed = _playbackCtx.currentTime - _bufSegStartCtx;
         const posInRev = _bufOffsetInRev + elapsed * _bufPlaybackRate;
         cur = Math.max(0, dur - posInRev);
+    } else if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath && audioPlayerPath === videoPlayerPath) {
+        const vid = document.getElementById('videoPlayerEl');
+        if (vid) {
+            cur = vid.currentTime || 0;
+            dur = Number.isFinite(vid.duration) && vid.duration > 0 ? vid.duration : audioPlayer.duration || 0;
+        } else {
+            cur = audioPlayer.currentTime;
+            dur = audioPlayer.duration;
+        }
     } else {
         cur = audioPlayer.currentTime;
         dur = audioPlayer.duration;
     }
     // A-B loop enforcement (forward playback only)
     if (!audioReverseMode && _abLoop && dur > 0 && cur >= _abLoop.end) {
+        const vidLoop =
+            typeof videoPlayerPath !== 'undefined' && videoPlayerPath === audioPlayerPath
+                ? document.getElementById('videoPlayerEl')
+                : null;
         if (_enginePlaybackActive && typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
             void window.vstUpdater.audioEngineInvoke({cmd: 'playback_seek', position_sec: _abLoop.start});
+            if (vidLoop) vidLoop.currentTime = _abLoop.start;
         } else {
-            audioPlayer.currentTime = _abLoop.start;
+            if (vidLoop) vidLoop.currentTime = _abLoop.start;
+            else audioPlayer.currentTime = _abLoop.start;
         }
     }
     if (!_npTimeEl) _cachePlaybackEls();
@@ -4200,6 +4322,11 @@ function seekPlaybackToPercent(pct) {
     }
     if (_enginePlaybackActive && hasInvoke) {
         let dur = enginePlaybackDurationSec();
+        const vd = dur <= 0 ? videoHostDurationFallbackSec() : 0;
+        if (vd > 0) {
+            window._enginePlaybackDurSec = vd;
+            dur = vd;
+        }
         if (dur <= 0) {
             logWaveformSeek('engine_seek_async_duration', { dur, pct: p });
             void (async () => {
@@ -4214,6 +4341,17 @@ function seekPlaybackToPercent(pct) {
                             position_sec: pos,
                         });
                         logWaveformSeek('engine_playback_seek_result', { position_sec: pos, seekRes });
+                        window._enginePlaybackPosSec = pos;
+                        window._enginePlaybackPosAnchorMs = performance.now();
+                        const vid = document.getElementById('videoPlayerEl');
+                        if (
+                            vid
+                            && typeof videoPlayerPath !== 'undefined'
+                            && videoPlayerPath
+                            && audioPlayerPath === videoPlayerPath
+                        ) {
+                            vid.currentTime = pos;
+                        }
                     } else {
                         logWaveformSeek('engine_seek_skip', {
                             reason: 'playback_status_missing_duration',
@@ -4228,6 +4366,17 @@ function seekPlaybackToPercent(pct) {
         }
         const pos = p * dur;
         logWaveformSeek('engine_seek', { position_sec: pos, dur });
+        window._enginePlaybackPosSec = pos;
+        window._enginePlaybackPosAnchorMs = performance.now();
+        const vidSeek = document.getElementById('videoPlayerEl');
+        if (
+            vidSeek
+            && typeof videoPlayerPath !== 'undefined'
+            && videoPlayerPath
+            && audioPlayerPath === videoPlayerPath
+        ) {
+            vidSeek.currentTime = pos;
+        }
         void (async () => {
             try {
                 const seekRes = await window.vstUpdater.audioEngineInvoke({
@@ -4250,6 +4399,19 @@ function seekPlaybackToPercent(pct) {
         return;
     }
     if (!audioPlayer.duration) {
+        const vid = document.getElementById('videoPlayerEl');
+        if (
+            vid
+            && typeof videoPlayerPath !== 'undefined'
+            && videoPlayerPath === audioPlayerPath
+            && Number.isFinite(vid.duration)
+            && vid.duration > 0
+        ) {
+            const t = p * vid.duration;
+            logWaveformSeek('html5_video_seek', { currentTime: t, duration: vid.duration });
+            vid.currentTime = t;
+            return;
+        }
         logWaveformSeek('abort', {
             reason: 'html5_no_duration',
             enginePlaybackActive: _enginePlaybackActive,
@@ -4278,11 +4440,21 @@ async function skipPlaybackSeconds(delta) {
         try {
             const st = await window.vstUpdater.audioEngineInvoke(enginePlaybackStatusInvokePayload());
             if (!st || st.ok !== true || st.loaded !== true) return;
-            const dur = typeof st.duration_sec === 'number' ? st.duration_sec : 0;
+            let dur = typeof st.duration_sec === 'number' ? st.duration_sec : 0;
+            if (dur <= 0) {
+                const vd = videoHostDurationFallbackSec();
+                if (vd > 0) dur = vd;
+            }
             if (dur <= 0) return;
             const cur = typeof st.position_sec === 'number' ? st.position_sec : 0;
             const next = Math.max(0, Math.min(dur, cur + d));
             await window.vstUpdater.audioEngineInvoke({cmd: 'playback_seek', position_sec: next});
+            window._enginePlaybackPosSec = next;
+            window._enginePlaybackPosAnchorMs = performance.now();
+            const vid = document.getElementById('videoPlayerEl');
+            if (vid && typeof videoPlayerPath !== 'undefined' && videoPlayerPath === audioPlayerPath) {
+                vid.currentTime = next;
+            }
         } catch {
             /* ignore */
         }
@@ -4294,6 +4466,16 @@ async function skipPlaybackSeconds(delta) {
         dur = _reversedBuf.duration;
         if (!(dur > 0)) return;
         cur = _bufPlaying ? getOriginalTimeFromReverseBuffer() : Math.max(0, dur - _pausedOffsetInRev);
+    } else if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath === audioPlayerPath) {
+        const vid = document.getElementById('videoPlayerEl');
+        if (vid && Number.isFinite(vid.duration) && vid.duration > 0) {
+            dur = vid.duration;
+            cur = vid.currentTime || 0;
+        } else {
+            dur = audioPlayer.duration;
+            if (!dur || Number.isNaN(dur)) return;
+            cur = audioPlayer.currentTime;
+        }
     } else {
         dur = audioPlayer.duration;
         if (!dur || Number.isNaN(dur)) return;
@@ -4401,6 +4583,14 @@ function setAudioVolume(value, opts) {
     audioPlayer.volume = Math.max(0, Math.min(1, vol));
     if (_gainNode) {
         _gainNode.gain.value = vol * parseFloat(document.getElementById('npGainSlider')?.value || '1');
+    }
+    /* HTML5 video fallback: loudness comes from `<video>`, not `audioPlayer`. */
+    if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath && audioPlayerPath === videoPlayerPath) {
+        const vid = document.getElementById('videoPlayerEl');
+        if (vid) {
+            vid.volume = Math.max(0, Math.min(1, vol));
+            vid.muted = vol <= 0;
+        }
     }
 }
 
@@ -4645,7 +4835,7 @@ async function toggleMetadata(filePath, event) {
         if (sc !== 'off' && sc !== 'false') {
             // Await so expanded-row waveform/spectrogram IPC/decode runs after playback has started
             // (engine `playback_load` / `<audio>.play()`), not in parallel with it.
-            await previewAudio(filePath);
+            await previewAudio(filePath, { minimizeFloatingPlayer: true });
         }
     }
 
@@ -5358,12 +5548,13 @@ function getAutoplayNextPathAfter(currentPath, opts) {
  * @param {string | Error | undefined} [errDetail]
  * @returns {Promise<boolean>}
  */
-async function tryPreviewAutoplayNextOnFailureAsync(failedPath, errDetail) {
+async function tryPreviewAutoplayNextOnFailureAsync(failedPath, errDetail, previewOpts) {
     if (!canAutoplayAdvanceTrack()) return false;
     const nextPath = getAutoplayNextPathAfter(failedPath, { autoplay: true });
     if (!nextPath || nextPath === failedPath) return false;
     /** Same as {@link nextTrack}: keep expanded metadata under the playing row; only when this hop is the one that stuck (see chained failures below). */
     const hadExpanded = expandedMetaPath !== null;
+    const chainOpts = previewOpts && typeof previewOpts === 'object' ? previewOpts : {};
     if (typeof showToast === 'function' && typeof toastFmt === 'function') {
         const extRaw = (failedPath.split('.').pop() || '').toLowerCase();
         const ext = extRaw ? extRaw.toUpperCase() : '?';
@@ -5375,7 +5566,7 @@ async function tryPreviewAutoplayNextOnFailureAsync(failedPath, errDetail) {
         }
         showToast(toastFmt('toast.playback_failed_autoplay_next', { ext, err: errMsg }), 4000, 'error');
     }
-    await previewAudio(nextPath, { skipRecentReorder: true });
+    await previewAudio(nextPath, { skipRecentReorder: true, ...chainOpts });
     if (hadExpanded && audioPlayerPath === nextPath) {
         await expandMetaForPath(nextPath);
     }
@@ -5873,6 +6064,13 @@ function _npWaveformDrawStale(wfSeq) {
     return wfSeq !== undefined && wfSeq !== _npWaveformDrawSeq;
 }
 
+function _clearNpVideoSourceFlags() {
+    const el = document.getElementById('npName');
+    if (!el) return;
+    el.dataset.videoSource = '';
+    delete el.dataset.videoSizeBytes;
+}
+
 async function drawWaveform(filePath, wfSeq) {
     const canvas = document.getElementById('npWaveformCanvas');
     if (!canvas) return;
@@ -5894,14 +6092,28 @@ async function drawWaveform(filePath, wfSeq) {
 
     const bars = Math.max(1, Math.min(Math.max(1, Math.floor(cw)), 800));
     const src = fileSrcForDecode(filePath);
+    const npNameEl = document.getElementById('npName');
+    const isVideoNowPlaying = !!(npNameEl && npNameEl.dataset.videoSource === 'true');
     try {
         if (typeof yieldToBrowser === 'function') await yieldToBrowser();
         if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
         let peaks = null;
-        try {
-            peaks = await decodePeaksViaWorker(src, bars);
-        } catch {
-            peaks = null;
+        if (isVideoNowPlaying) {
+            // Video: never decodePeaksViaWorker — it would fetch the entire container (multi‑GB UI freeze).
+            // Host transcodes before JUCE (bounded extract) — call engine for any file size.
+            try {
+                if (typeof fetchWaveformPreviewFromEngine === 'function') {
+                    peaks = await fetchWaveformPreviewFromEngine(filePath, bars);
+                }
+            } catch {
+                peaks = null;
+            }
+        } else {
+            try {
+                peaks = await decodePeaksViaWorker(src, bars);
+            } catch {
+                peaks = null;
+            }
         }
 
         if (!peaks) {
@@ -5916,10 +6128,7 @@ async function drawWaveform(filePath, wfSeq) {
         }
 
         if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
-        _waveformCache[filePath] = peaks;
-        _evictCache(_waveformCache);
-        _debounceWfSave();
-        notifyWaveformCacheUpdatedForTray(filePath);
+        storeWaveformPeaksInCache(filePath, peaks);
         renderWaveformData(ctx, canvas, peaks);
     } catch {
         if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
@@ -6075,12 +6284,8 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
                 sgData = decoded.sgData;
             }
             if (_metaPanelStale(metaSeq, filePath)) return;
-            _waveformCache[filePath] = peaks;
-            _spectrogramCache[filePath] = sgData;
-            _evictCache(_waveformCache);
-            _evictCache(_spectrogramCache);
-            _debounceWfSave();
-            notifyWaveformCacheUpdatedForTray(filePath);
+            storeWaveformPeaksInCache(filePath, peaks);
+            storeSpectrogramDataInCache(filePath, sgData);
             renderWaveformData(wfCtx, wfCanvas, peaks);
             _metaSharedDecoded.path = filePath;
             _metaSharedDecoded.buffer = null;
@@ -6093,9 +6298,7 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
             let sgData = await fetchSpectrogramPreviewFromEngine(filePath, sgDims);
             if (!sgData) sgData = await decodeSpectrogramViaWorker(url);
             if (_metaPanelStale(metaSeq, filePath)) return;
-            _spectrogramCache[filePath] = sgData;
-            _evictCache(_spectrogramCache);
-            _debounceWfSave();
+            storeSpectrogramDataInCache(filePath, sgData);
             renderWaveformData(wfCtx, wfCanvas, wfCached);
             _metaSharedDecoded.path = filePath;
             _metaSharedDecoded.buffer = null;
@@ -6108,10 +6311,7 @@ async function drawMetaPanelVisuals(filePath, metaSeq) {
             let peaks = await fetchWaveformPreviewFromEngine(filePath, bars);
             if (!peaks) peaks = await decodePeaksViaWorker(url, bars);
             if (_metaPanelStale(metaSeq, filePath)) return;
-            _waveformCache[filePath] = peaks;
-            _evictCache(_waveformCache);
-            _debounceWfSave();
-            notifyWaveformCacheUpdatedForTray(filePath);
+            storeWaveformPeaksInCache(filePath, peaks);
             renderWaveformData(wfCtx, wfCanvas, peaks);
             _metaSharedDecoded.path = filePath;
             _metaSharedDecoded.buffer = null;
@@ -6204,10 +6404,7 @@ async function drawMetaWaveform(filePath, metaSeq) {
         }
 
         if (_metaPanelStale(metaSeq, filePath)) return;
-        _waveformCache[filePath] = peaks;
-        _evictCache(_waveformCache);
-        _debounceWfSave();
-        notifyWaveformCacheUpdatedForTray(filePath);
+        storeWaveformPeaksInCache(filePath, peaks);
         renderWaveformData(ctx, canvas, peaks);
     } catch {
         if (_metaPanelStale(metaSeq, filePath)) return;
@@ -6343,8 +6540,7 @@ async function drawSpectrogram(filePath, metaSeq) {
         }
 
         if (_metaPanelStale(metaSeq, filePath)) return;
-        _spectrogramCache[filePath] = sgData;
-        _debounceWfSave();
+        storeSpectrogramDataInCache(filePath, sgData);
         renderSpectrogramData(ctx, w, h, sgData);
     } catch {
         _metaSharedDecoded.path = null;
@@ -7314,6 +7510,11 @@ function _loopRegionPathForBox(box) {
     if (!box) return '';
     if (box.id === 'metaWaveformBox') return box.dataset ? box.dataset.path || '' : '';
     if (box.id === 'npWaveform') return audioPlayerPath || '';
+    if (box.id === 'videoWaveformBox') {
+        const fromDs = box.dataset ? box.dataset.path || '' : '';
+        if (fromDs) return fromDs;
+        return (typeof videoPlayerPath !== 'undefined' && videoPlayerPath) ? videoPlayerPath : '';
+    }
     return '';
 }
 
@@ -7341,7 +7542,7 @@ function _loopRegionPathForBox(box) {
         // Loop brace handles consume their own pointerdown (drag); don't treat as seek.
         if (t.closest && t.closest('.waveform-loop-brace')) return;
         // Shift+click on a loop-capable waveform starts the region paint (rubber band); skip seek.
-        if (e.shiftKey && t.closest && t.closest('#metaWaveformBox, #npWaveform')) return;
+        if (e.shiftKey && t.closest && t.closest('#metaWaveformBox, #npWaveform, #videoWaveformBox')) return;
         const meta = typeof t.closest === 'function' ? t.closest('#metaWaveformBox') : null;
         if (meta && typeof seekMetaWaveform === 'function') {
             // Click to the right of the loop end brace exits the loop region — lets playback continue past `end`.
@@ -7355,6 +7556,14 @@ function _loopRegionPathForBox(box) {
             maybeExitLoopOnRightClickFrac(np, e);
             e.preventDefault();
             seekAudio(e);
+            return;
+        }
+        // Video waveform seek
+        const videoWf = typeof t.closest === 'function' ? t.closest('#videoWaveformBox') : null;
+        if (videoWf && typeof seekVideoWaveform === 'function') {
+            maybeExitLoopOnRightClickFrac(videoWf, e);
+            e.preventDefault();
+            seekVideoWaveform(e);
         }
     }
     if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
@@ -7373,8 +7582,7 @@ function _loopRegionPathForBox(box) {
         // Don't start paint when the user shift-clicks a brace or the toggle button.
         if (t.closest('.waveform-loop-brace')) return;
         if (t.closest('button, input, select, textarea')) return;
-        const box = t.closest('#metaWaveformBox, #npWaveform');
-        if (!box) return;
+        const box = t.closest('#metaWaveformBox, #npWaveform, #videoWaveformBox');        if (!box) return;
         const filePath = _loopRegionPathForBox(box);
         if (!filePath) return;
         const rect = box.getBoundingClientRect();
@@ -7397,6 +7605,7 @@ function _loopRegionPathForBox(box) {
         region.endFrac = Math.min(1, anchorFrac + 0.005);
         setSampleLoopRegion(paint.filePath, region);
         applyMetaLoopRegionUI(paint.filePath);
+        syncAbLoopFromSampleRegion(paint.filePath);
         document.addEventListener('pointermove', onPointerMove, true);
         document.addEventListener('pointerup', onPointerUp, true);
         document.addEventListener('pointercancel', onPointerUp, true);
@@ -7424,6 +7633,7 @@ function _loopRegionPathForBox(box) {
     function onPointerUp() {
         if (paint) {
             try { paint.box.releasePointerCapture(paint.pointerId); } catch {}
+            syncAbLoopFromSampleRegion(paint.filePath);
         }
         paint = null;
         document.removeEventListener('pointermove', onPointerMove, true);
@@ -7443,8 +7653,7 @@ function _loopRegionPathForBox(box) {
         if (!t || typeof t.closest !== 'function') return;
         const handle = t.closest('.waveform-loop-brace');
         if (!handle) return;
-        const box = handle.closest('#metaWaveformBox, #npWaveform');
-        if (!box) return;
+        const box = handle.closest('#metaWaveformBox, #npWaveform, #videoWaveformBox');        if (!box) return;
         const kind = handle.dataset.loopBrace;
         if (kind !== 'start' && kind !== 'end') return;
         const filePath = _loopRegionPathForBox(box);
@@ -7497,7 +7706,7 @@ function _loopRegionPathForBox(box) {
     document.addEventListener('pointerdown', onPointerDown, true);
 })();
 
-/** Click on the `L` toggle button above the expanded-row waveform → flip loop-region enabled. */
+/** Click on the `L` toggle on meta / video expanded waveform (NP bar has no L button). */
 (function initMetaLoopToggleClick() {
     if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
     document.addEventListener('click', (e) => {
@@ -7505,9 +7714,15 @@ function _loopRegionPathForBox(box) {
         if (!t || typeof t.closest !== 'function') return;
         const btn = t.closest('.waveform-loop-toggle');
         if (!btn) return;
+        const host = btn.closest('#metaWaveformBox, #videoWaveformBox');
+        if (!host) return;
         e.preventDefault();
         e.stopPropagation();
-        toggleMetaLoopRegion();
+        if (host.id === 'videoWaveformBox') {
+            if (typeof toggleVideoLoopRegionFn === 'function') toggleVideoLoopRegionFn();
+        } else {
+            toggleMetaLoopRegion();
+        }
     }, true);
 })();
 

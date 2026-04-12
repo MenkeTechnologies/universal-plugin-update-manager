@@ -7907,11 +7907,15 @@
             border-radius: 2px;
         }
 
-        /* Metadata detail row */
+        /* Metadata detail row — override .audio-table td ellipsis (max-width:0 + nowrap) */
         .audio-meta-row td {
             padding: 0 !important;
             border-bottom: 1px solid var(--border) !important;
             background: var(--bg-secondary) !important;
+            max-width: none;
+            overflow: visible;
+            text-overflow: clip;
+            white-space: normal;
         }
 
         .meta-close-btn {
@@ -8131,6 +8135,198 @@
 
         .audio-table .row-expanded td {
             border-bottom-color: transparent;
+        }
+
+        /* Video metadata expanded row — same .audio-table td override as audio meta */
+        .video-meta-row td {
+            padding: 0 !important;
+            border-bottom: 1px solid var(--border) !important;
+            background: var(--bg-secondary) !important;
+            max-width: none;
+            overflow: visible;
+            text-overflow: clip;
+            white-space: normal;
+        }
+
+        .video-meta-panel {
+            padding: 14px 18px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            animation: meta-slide 0.15s ease-out;
+            min-width: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .video-meta-panel .video-meta-panel-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 11;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .video-meta-panel .video-meta-panel-actions .meta-close-btn {
+            position: static;
+        }
+
+        .video-maximize-btn {
+            font-size: 11px;
+            padding: 4px 10px;
+            background: var(--bg-primary);
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            border-radius: 2px;
+            cursor: pointer;
+            line-height: 1.2;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            letter-spacing: 1px;
+            box-shadow: 0 0 6px rgba(5, 217, 232, 0.25);
+            transition: all 0.2s;
+        }
+
+        .video-maximize-btn:hover {
+            background: rgba(5, 217, 232, 0.12);
+            box-shadow: 0 0 10px rgba(5, 217, 232, 0.45);
+        }
+
+        .video-player-wrap {
+            position: relative;
+            width: 100%;
+            max-height: 400px;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-player-wrap video {
+            width: 100%;
+            max-height: 400px;
+            display: block;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .video-player-loading {
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.72);
+            pointer-events: none;
+        }
+
+        .video-player-loading.video-player-loading--hidden {
+            display: none;
+        }
+
+        .video-player-loading-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .video-player-loading-text {
+            font-size: 10px;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--cyan);
+        }
+
+        #videoPlayerEl:fullscreen,
+        #videoPlayerEl:-webkit-full-screen {
+            width: 100%;
+            height: 100%;
+            max-height: none;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .video-progress-bar {
+            grid-column: 1 / -1;
+            position: relative;
+            height: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .video-progress-bar .video-progress-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, rgba(5, 217, 232, 0.20), rgba(255, 42, 109, 0.12));
+            pointer-events: none;
+            transition: none;
+        }
+
+        .video-progress-bar .video-progress-cursor {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--cyan);
+            box-shadow: 0 0 6px rgba(5, 217, 232, 0.6);
+            pointer-events: none;
+            transition: none;
+        }
+
+        .video-progress-bar .video-time-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--text-dim);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .video-transport {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .video-transport .btn-video-play {
+            font-size: 14px;
+            padding: 4px 12px;
+            background: var(--bg-card);
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            border-radius: 2px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            letter-spacing: 1px;
+            line-height: 1;
+        }
+
+        .video-transport .btn-video-play:hover {
+            background: rgba(5, 217, 232, 0.1);
+            box-shadow: 0 0 8px rgba(5, 217, 232, 0.3);
+        }
+
+        .video-meta-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 6px 20px;
         }
 
         /* Toast notifications */
@@ -9555,7 +9751,6 @@
             <span class="audio-stats-pair" data-stat-key="size"><span data-i18n="ui.pdf.stat_size">Size:</span> <span class="audio-stat-value"
                                                                         id="pdfTotalSize">0 B</span></span>
         </div>
-        <div class="disk-usage" id="pdfDiskUsage" style="display:none;"></div>
         <div class="table-wrap" id="pdfTableWrap">
             <div class="state-message" id="pdfEmptyState">
                 <div class="state-icon">&#128196;</div>
@@ -9620,6 +9815,7 @@
             <span class="audio-stats-pair" data-stat-key="size"><span data-i18n="ui.video.stat_size">Size:</span> <span class="audio-stat-value"
                                                                         id="videoTotalSize">0 B</span></span>
         </div>
+        <div class="disk-usage" id="videoDiskUsage" style="display:none;"></div>
         <div class="table-wrap" id="videoTableWrap">
             <div class="state-message" id="videoEmptyState">
                 <div class="state-icon">&#127909;</div>
@@ -10446,6 +10642,34 @@
                         <span class="settings-saved-msg" id="savedMsgPdfScanDirs"></span>
                     </div>
                 </div>
+                <div class="settings-row settings-scan-dirs-row">
+                    <div class="settings-label">
+                        <span class="settings-title"
+                              data-i18n="ui.st.video_scan_directories">Video Scan Directories</span>
+                        <span class="settings-desc"
+                              data-i18n="ui.sd.additional_directories_to_scan_for_video_files">Additional directories to scan for video files (one per line)</span>
+                    </div>
+                    <div class="settings-control">
+                        <textarea autocapitalize="off" autocomplete="off" autocorrect="off"
+                                  class="settings-textarea settings-textarea-scan-paths" data-i18n-placeholder="ui.ph.path_to_videos_10_another_path" data-i18n-title="ui.tt.additional_directories_to_scan_for_video_files"
+                                  id="settingVideoScanDirs" placeholder="/path/to/videos&#10;/another/path"
+                                  rows="6"
+                                  spellcheck="false"
+                                  title="Additional directories to scan for video files, one path per line"
+                                  wrap="off"></textarea>
+                        <button class="btn btn-secondary btn-settings-action" data-action="browseDir"
+                                data-i18n="ui.btn.browse" data-i18n-title="ui.tt.browse_for_folder_grants_macos_access"
+                                data-target="settingVideoScanDirs"
+                                style="margin-top: 6px;" title="Browse for folder (grants macOS access)">
+                            Browse
+                        </button>
+                        <button class="btn btn-secondary btn-settings-action" data-action="saveVideoScanDirs"
+                                data-i18n="ui.btn.save" data-i18n-title="ui.tt.save_custom_video_scan_directories"
+                                style="margin-top: 6px;" title="Save custom video scan directories">Save
+                        </button>
+                        <span class="settings-saved-msg" id="savedMsgVideoScanDirs"></span>
+                    </div>
+                </div>
             </div>
 
             <div class="settings-section" data-section="performance">
@@ -11035,23 +11259,6 @@
                                 id="settingExpandOnClick"
                                 title="Toggle metadata expansion on double-click">
                             <span class="settings-toggle-label" id="settingExpandOnClickLabel">On</span>
-                            <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
-                        </button>
-                    </div>
-                </div>
-                <div class="settings-row">
-                    <div class="settings-label">
-                        <span class="settings-title"
-                              data-i18n="ui.st.show_player_on_startup">Show Player on Startup</span>
-                        <span class="settings-desc"
-                              data-i18n="ui.sd.show_the_audio_player_when_the_app_starts_restores">Show the audio player when the app starts (restores last playing state)</span>
-                    </div>
-                    <div class="settings-control">
-                        <button class="settings-toggle" data-action="settingToggleShowPlayerOnStartup"
-                                data-i18n-title="ui.tt.show_audio_player_automatically_on_app_launch"
-                                id="settingShowPlayerOnStartup"
-                                title="Show audio player automatically on app launch">
-                            <span class="settings-toggle-label" id="settingShowPlayerOnStartupLabel">Off</span>
                             <span class="settings-toggle-track"><span class="settings-toggle-thumb"></span></span>
                         </button>
                     </div>
@@ -11728,48 +11935,48 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=15846"></script>
-<script src="js/utils.js?v=15846"></script>
-<script src="js/ui-idle.js?v=15846"></script>
-<script src="js/ipc.js?v=15846"></script>
-<script src="js/tooltip-hover.js?v=15846"></script>
-<script src="js/drag-reorder.js?v=15846"></script>
-<script src="js/modal-drag.js?v=15846"></script>
-<script src="js/columns.js?v=15846"></script>
-<script src="js/notes.js?v=15846"></script>
-<script src="js/favorites.js?v=15846"></script>
-<script src="js/export.js?v=15846"></script>
-<script src="js/plugins.js?v=15846"></script>
-<script src="js/settings.js?v=15846"></script>
-<script src="js/history.js?v=15846"></script>
-<script src="js/kvr.js?v=15846"></script>
-<script src="js/graph-freeze.js?v=15846"></script>
-<script src="js/audio.js?v=15846"></script>
-<script src="js/daw.js?v=15846"></script>
-<script src="js/disk-usage.js?v=15846"></script>
-<script src="js/presets.js?v=15846"></script>
-<script src="js/batch-select.js?v=15846"></script>
-<script src="js/native-file-drag.js?v=15846"></script>
-<script src="js/sort-persist.js?v=15846"></script>
-<script src="js/multi-filter.js?v=15846"></script>
-<script src="js/file-browser.js?v=15846"></script>
-<script src="js/duplicates.js?v=15846"></script>
-<script src="js/command-palette.js?v=15846"></script>
-<script src="js/xref.js?v=15846"></script>
-<script src="js/dep-graph.js?v=15846"></script>
-<script src="js/smart-playlists.js?v=15846"></script>
-<script src="js/heatmap-dashboard.js?v=15846"></script>
-<script src="js/midi.js?v=15846"></script>
-<script src="js/pdf.js?v=15846"></script>
-<script src="js/video.js?v=15846"></script>
-<script src="js/settings-search.js?v=15846"></script>
-<script src="js/visualizer.js?v=15846"></script>
-<script src="js/walker-status.js?v=15846"></script>
-<script src="js/audio-engine.js?v=15846"></script>
-<script src="js/context-menu.js?v=15846"></script>
-<script src="js/shortcuts.js?v=15846"></script>
-<script src="js/help-overlay.js?v=15846"></script>
-<script src="js/keyboard-nav.js?v=15846"></script>
-<script src="js/app.js?v=15846"></script>
+<script src="js/i18n-ui.js?v=65564"></script>
+<script src="js/utils.js?v=65564"></script>
+<script src="js/ui-idle.js?v=65564"></script>
+<script src="js/ipc.js?v=65564"></script>
+<script src="js/tooltip-hover.js?v=65564"></script>
+<script src="js/drag-reorder.js?v=65564"></script>
+<script src="js/modal-drag.js?v=65564"></script>
+<script src="js/columns.js?v=65564"></script>
+<script src="js/notes.js?v=65564"></script>
+<script src="js/favorites.js?v=65564"></script>
+<script src="js/export.js?v=65564"></script>
+<script src="js/plugins.js?v=65564"></script>
+<script src="js/settings.js?v=65564"></script>
+<script src="js/history.js?v=65564"></script>
+<script src="js/kvr.js?v=65564"></script>
+<script src="js/graph-freeze.js?v=65564"></script>
+<script src="js/audio.js?v=65564"></script>
+<script src="js/daw.js?v=65564"></script>
+<script src="js/disk-usage.js?v=65564"></script>
+<script src="js/presets.js?v=65564"></script>
+<script src="js/batch-select.js?v=65564"></script>
+<script src="js/native-file-drag.js?v=65564"></script>
+<script src="js/sort-persist.js?v=65564"></script>
+<script src="js/multi-filter.js?v=65564"></script>
+<script src="js/file-browser.js?v=65564"></script>
+<script src="js/duplicates.js?v=65564"></script>
+<script src="js/command-palette.js?v=65564"></script>
+<script src="js/xref.js?v=65564"></script>
+<script src="js/dep-graph.js?v=65564"></script>
+<script src="js/smart-playlists.js?v=65564"></script>
+<script src="js/heatmap-dashboard.js?v=65564"></script>
+<script src="js/midi.js?v=65564"></script>
+<script src="js/pdf.js?v=65564"></script>
+<script src="js/video.js?v=65564"></script>
+<script src="js/settings-search.js?v=65564"></script>
+<script src="js/visualizer.js?v=65564"></script>
+<script src="js/walker-status.js?v=65564"></script>
+<script src="js/audio-engine.js?v=65564"></script>
+<script src="js/context-menu.js?v=65564"></script>
+<script src="js/shortcuts.js?v=65564"></script>
+<script src="js/help-overlay.js?v=65564"></script>
+<script src="js/keyboard-nav.js?v=65564"></script>
+<script src="js/app.js?v=65564"></script>
 </body>
 </html>

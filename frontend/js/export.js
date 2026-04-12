@@ -805,7 +805,17 @@ async function importPdfs() {
 // ── Video export / import ──
 
 async function writeVideosExport(videos, fmt, filePath) {
-    if (fmt === 'csv' || fmt === 'tsv') {
+    if (fmt === 'pdf') {
+        const headers = pdfHeaders(
+            'ui.export.col_name',
+            'ui.export.col_format',
+            'ui.export.col_size',
+            'ui.export.col_modified',
+            'ui.export.col_path',
+        );
+        const rows = videos.map(row => [row.name, row.format || '', row.sizeFormatted, row.modified, row.directory]);
+        await window.vstUpdater.exportPdf(_exportFmt('ui.export.title_videos'), headers, rows, filePath);
+    } else if (fmt === 'csv' || fmt === 'tsv') {
         await window.vstUpdater.exportVideosDsv(videos, filePath);
     } else if (fmt === 'toml') {
         await window.vstUpdater.exportToml({videos}, filePath);
@@ -833,14 +843,8 @@ async function exportVideosSubset(itemsRaw) {
 }
 
 async function exportVideos() {
-    let videos = null;
-    if (typeof videoScanProgressCleanup === 'undefined' || !videoScanProgressCleanup) {
-        videos = typeof allVideos !== 'undefined' && allVideos.length > 0 ? allVideos : null;
-    }
     const pageHint = typeof filteredVideos !== 'undefined' && filteredVideos ? filteredVideos.length : 0;
-    const countForModal = videos && videos.length > 0
-        ? videos.length
-        : Math.max(Number(typeof _videoTotalCount !== 'undefined' ? _videoTotalCount : 0) || 0, pageHint);
+    const countForModal = Math.max(Number(typeof _videoTotalCount !== 'undefined' ? _videoTotalCount : 0) || 0, pageHint);
     if (countForModal === 0) {
         showToast(toastFmt('toast.no_list_export'));
         return;
@@ -849,13 +853,10 @@ async function exportVideos() {
         titleKey: 'ui.export.title_videos',
         defaultName: exportFileName('videos'),
         exportFn: async (fmt, filePath) => {
-            let vids = videos;
-            if (!vids || vids.length === 0) {
-                if (typeof fetchVideosForExport !== 'function') {
-                    throw new Error('fetchVideosForExport unavailable');
-                }
-                vids = await fetchVideosForExport();
+            if (typeof fetchVideosForExport !== 'function') {
+                throw new Error('fetchVideosForExport unavailable');
             }
+            const vids = await fetchVideosForExport();
             if (!vids || vids.length === 0) throw new Error('No videos to export');
             await writeVideosExport(capExportList(vids), fmt, filePath);
         },

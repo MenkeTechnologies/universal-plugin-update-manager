@@ -502,8 +502,6 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     const progressFill = document.getElementById('dawProgressFill');
     const tableWrap = document.getElementById('dawTableWrap');
 
-    const excludePaths = resume ? allDawProjects.map(p => p.path) : null;
-
     if (typeof btnLoading === 'function') btnLoading(btn, true);
     btn.disabled = true;
     btn.innerHTML = resume ? '&#8635; Resuming...' : '&#8635; Scanning...';
@@ -511,6 +509,8 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     stopBtn.style.display = '';
     progressBar.classList.add('active');
     progressFill.style.width = '0%';
+
+    const excludePaths = resume ? allDawProjects.map(p => p.path) : null;
 
     if (!resume) {
         _dawScanDbView = false;
@@ -594,6 +594,9 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     }
 
     const scheduleFlush = createScanFlusher(flushPendingProjects, FLUSH_INTERVAL);
+
+    if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
+    else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     if (dawScanProgressCleanup) dawScanProgressCleanup();
     dawScanProgressCleanup = await window.vstUpdater.onDawScanProgress((data) => {
@@ -689,8 +692,31 @@ async function scanDawProjects(resume = false, unifiedResult = null, overrideRoo
     progressFill.style.animation = '';
 }
 
+function clearDawScanButtonSpinnerImmediate() {
+    const btn = document.getElementById('btnScanDaw');
+    const stopBtn = document.getElementById('btnStopDaw');
+    const progressBar = document.getElementById('dawProgressBar');
+    const progressFill = document.getElementById('dawProgressFill');
+    if (typeof btnLoading === 'function') btnLoading(btn, false);
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '&#127911; Scan DAW Projects';
+    }
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (progressBar) progressBar.classList.remove('active');
+    if (progressFill) {
+        progressFill.style.width = '0%';
+        progressFill.style.animation = '';
+    }
+}
+
 async function stopDawScan() {
-    await window.vstUpdater.stopDawScan();
+    clearDawScanButtonSpinnerImmediate();
+    try {
+        await window.vstUpdater.stopDawScan();
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+    }
 }
 
 function openDawFolder(filePath) {

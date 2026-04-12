@@ -920,7 +920,7 @@ function triggerStopAllBackgroundJobs() {
 }
 
 // ── Persist filter dropdowns ──
-const _filterIds = ['typeFilter', 'statusFilter', 'favTypeFilter', 'audioFormatFilter', 'dawDawFilter', 'presetFormatFilter'];
+const _filterIds = ['typeFilter', 'statusFilter', 'favTypeFilter', 'audioFormatFilter', 'dawDawFilter', 'presetFormatFilter', 'videoFormatFilter'];
 
 function saveFilterState(id) {
     const el = document.getElementById(id);
@@ -1303,6 +1303,10 @@ function _ensureTabCache() {
 function switchTab(tab) {
     _ensureTabCache();
     _ensureTabButtonCache();
+    const prevTab = typeof prefs !== 'undefined' ? prefs.getItem('activeTab') : null;
+    if (prevTab === 'videos' && tab !== 'videos' && typeof closeVideoMetaRow === 'function') {
+        closeVideoMetaRow();
+    }
     // Batch selection is stored per inventory tab (`batchByTab` in batch-select.js); clear on switch so counts/actions never mix tables.
     if (typeof deselectAll === 'function') deselectAll();
     // Toggle tab buttons + panels in one pass — pure class mutations, no layout reads.

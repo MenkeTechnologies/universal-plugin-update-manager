@@ -65,6 +65,7 @@ const SHORTCUT_LABEL_KEYS = {
     scanPresetsOnly: 'ui.shortcut.scan_presets_only',
     scanPdfsOnly: 'ui.shortcut.scan_pdfs_only',
     scanVideosOnly: 'ui.shortcut.scan_videos_only',
+    videoToggleFullscreen: 'ui.shortcut.video_toggle_fullscreen',
     stopPdfScan: 'ui.shortcut.stop_pdf_scan',
     stopVideoScan: 'ui.shortcut.stop_video_scan',
     extractPdfMetadata: 'ui.shortcut.extract_pdf_metadata',
@@ -101,7 +102,6 @@ const SHORTCUT_LABEL_KEYS = {
     toggleAutoAnalysis: 'ui.shortcut.toggle_auto_analysis',
     toggleAutoPlaySampleOnSelect: 'ui.shortcut.toggle_auto_play_sample_on_select',
     toggleAutoScan: 'ui.shortcut.toggle_auto_scan',
-    toggleShowPlayerStartup: 'ui.shortcut.toggle_show_player_startup',
     toggleAutoUpdate: 'ui.shortcut.toggle_auto_update',
     toggleExpandOnClick: 'ui.shortcut.toggle_expand_on_click',
     toggleFolderWatch: 'ui.shortcut.toggle_folder_watch',
@@ -177,6 +177,7 @@ const DEFAULT_SHORTCUT_DEFS = {
     scanPresetsOnly: {key: 'r', mod: true, shift: true},
     scanPdfsOnly: {key: 'f', mod: true, shift: true},
     scanVideosOnly: {key: 'e', mod: true, shift: true},
+    videoToggleFullscreen: {key: 'Enter', mod: true, shift: false},
     stopPdfScan: {key: 'y', mod: true, shift: true},
     stopVideoScan: {key: 'q', mod: true, shift: true},
     extractPdfMetadata: {key: 'm', mod: true, shift: true},
@@ -214,7 +215,6 @@ const DEFAULT_SHORTCUT_DEFS = {
     toggleAutoAnalysis: {key: 'F7', mod: true, shift: false},
     toggleAutoPlaySampleOnSelect: {key: 'F7', mod: true, shift: true},
     toggleAutoScan: {key: 'F8', mod: true, shift: false},
-    toggleShowPlayerStartup: {key: 'F8', mod: true, shift: true},
     toggleAutoUpdate: {key: 'F9', mod: true, shift: false},
     toggleExpandOnClick: {key: 'F9', mod: true, shift: true},
     toggleFolderWatch: {key: 'F10', mod: true, shift: false},
@@ -304,6 +304,7 @@ function formatKey(shortcut) {
     else if (k === 'ArrowUp') k = '\u2191';
     else if (k === 'ArrowDown') k = '\u2193';
     else if (k === 'Escape') k = 'Esc';
+    else if (k === 'Enter') k = 'Enter';
     else if (k === '\\') k = '\\';
     else if (k === '`') k = '`';
     else if (k === ',') k = ',';
@@ -460,7 +461,19 @@ function executeShortcut(id) {
     } else if (id === 'help') {
         if (typeof toggleHelpOverlay === 'function') toggleHelpOverlay();
     } else if (id === 'playPause') {
+        // If video player is active, toggle video transport instead
+        if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath && typeof previewVideo === 'function') {
+            const activeTab = document.querySelector('.tab-content.active')?.id;
+            if (activeTab === 'tabVideos') {
+                previewVideo(videoPlayerPath);
+                return;
+            }
+        }
         toggleAudioPlayback();
+    } else if (id === 'videoToggleFullscreen') {
+        if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath && typeof toggleVideoMaximize === 'function') {
+            toggleVideoMaximize();
+        }
     } else if (id === 'nextTrack') {
         nextTrack({ respectAutoplaySource: true });
     } else if (id === 'prevTrack') {
@@ -532,21 +545,42 @@ function executeShortcut(id) {
             window.toggleAbLoopShortcut();
         }
     } else if (id === 'toggleSampleLoopRegion') {
-        // Prefer the expanded metadata row; fall back to the currently playing path
-        // so the shortcut works even without an expanded row.
-        const box = document.getElementById('metaWaveformBox');
-        if (box && box.dataset.path && typeof toggleMetaLoopRegion === 'function') {
-            toggleMetaLoopRegion();
-        } else if (typeof audioPlayerPath === 'string' && audioPlayerPath
-            && typeof getSampleLoopRegion === 'function'
-            && typeof setSampleLoopRegion === 'function'
-            && typeof syncAbLoopFromSampleRegion === 'function') {
-            const region = getSampleLoopRegion(audioPlayerPath);
-            region.enabled = !region.enabled;
-            setSampleLoopRegion(audioPlayerPath, region);
-            syncAbLoopFromSampleRegion(audioPlayerPath);
-            if (typeof showToast === 'function' && typeof toastFmt === 'function') {
-                showToast(toastFmt(region.enabled ? 'toast.sample_loop_region_on' : 'toast.sample_loop_region_off'));
+        // `#metaWaveformBox` stays in the DOM when Samples is hidden — on Videos tab that
+        // would toggle the wrong path unless we branch on the active panel first.
+        const activeTab = document.querySelector('.tab-content.active')?.id;
+        if (activeTab === 'tabVideos') {
+            const vBox = document.getElementById('videoWaveformBox');
+            if (vBox && vBox.dataset.path && typeof toggleVideoLoopRegionFn === 'function') {
+                toggleVideoLoopRegionFn();
+            } else if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath
+                && typeof getSampleLoopRegion === 'function'
+                && typeof setSampleLoopRegion === 'function'
+                && typeof syncAbLoopFromSampleRegion === 'function'
+                && typeof applyMetaLoopRegionUI === 'function') {
+                const region = getSampleLoopRegion(videoPlayerPath);
+                region.enabled = !region.enabled;
+                setSampleLoopRegion(videoPlayerPath, region);
+                applyMetaLoopRegionUI(videoPlayerPath);
+                syncAbLoopFromSampleRegion(videoPlayerPath);
+                if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+                    showToast(toastFmt(region.enabled ? 'toast.sample_loop_region_on' : 'toast.sample_loop_region_off'));
+                }
+            }
+        } else {
+            const box = document.getElementById('metaWaveformBox');
+            if (box && box.dataset.path && typeof toggleMetaLoopRegion === 'function') {
+                toggleMetaLoopRegion();
+            } else if (typeof audioPlayerPath === 'string' && audioPlayerPath
+                && typeof getSampleLoopRegion === 'function'
+                && typeof setSampleLoopRegion === 'function'
+                && typeof syncAbLoopFromSampleRegion === 'function') {
+                const region = getSampleLoopRegion(audioPlayerPath);
+                region.enabled = !region.enabled;
+                setSampleLoopRegion(audioPlayerPath, region);
+                syncAbLoopFromSampleRegion(audioPlayerPath);
+                if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+                    showToast(toastFmt(region.enabled ? 'toast.sample_loop_region_on' : 'toast.sample_loop_region_off'));
+                }
             }
         }
     } else if (id === 'setSampleLoopRegionStart') {
@@ -623,6 +657,8 @@ function executeShortcut(id) {
                 _waveformCache = {};
                 _spectrogramCache = {};
             }
+            if (typeof invalidateDbCacheStatsSnapshot === 'function') invalidateDbCacheStatsSnapshot();
+            if (typeof renderCacheStats === 'function') void renderCacheStats();
             if (typeof showToast === 'function' && typeof toastFmt === 'function') {
                 showToast(toastFmt('toast.all_caches_cleared'));
             }
@@ -690,8 +726,6 @@ function executeShortcut(id) {
         if (typeof settingToggleAutoPlaySampleOnSelect === 'function') settingToggleAutoPlaySampleOnSelect();
     } else if (id === 'toggleAutoScan') {
         if (typeof settingToggleAutoScan === 'function') settingToggleAutoScan();
-    } else if (id === 'toggleShowPlayerStartup') {
-        if (typeof settingToggleShowPlayerOnStartup === 'function') settingToggleShowPlayerOnStartup();
     } else if (id === 'toggleAutoUpdate') {
         if (typeof settingToggleAutoUpdate === 'function') settingToggleAutoUpdate();
     } else if (id === 'toggleExpandOnClick') {
@@ -781,6 +815,9 @@ async function deleteFile(filePath) {
     } else if (tab === 'tabPdf' && typeof fetchPdfPage === 'function') {
         _pdfOffset = 0;
         await fetchPdfPage();
+    } else if (tab === 'tabVideos' && typeof fetchVideoPage === 'function') {
+        _videoOffset = 0;
+        await fetchVideoPage();
     } else if (tab === 'tabPlugins' && typeof fetchPluginPage === 'function') {
         _pluginOffset = 0;
         await fetchPluginPage();
@@ -801,7 +838,36 @@ function _actionOnSelected(action) {
         if (typeof copyToClipboard === 'function') copyToClipboard(path);
     } else if (action === 'favorite') {
         if (typeof isFavorite === 'function' && typeof addFavorite === 'function' && typeof removeFavorite === 'function') {
-            isFavorite(path) ? removeFavorite(path) : addFavorite('item', path, name);
+            if (isFavorite(path)) {
+                removeFavorite(path);
+            } else {
+                const tabId = document.querySelector('.tab-content.active')?.id || '';
+                const row = r.item;
+                if (tabId === 'tabVideos') {
+                    const format = row?.querySelector('.col-format')?.textContent?.trim() || '';
+                    addFavorite('video', path, name, format ? {format} : undefined);
+                } else if (tabId === 'tabPdf') {
+                    addFavorite('pdf', path, name);
+                } else if (tabId === 'tabSamples') {
+                    const format = row?.querySelector('.format-badge')?.textContent?.trim() || '';
+                    addFavorite('sample', path, name, format ? {format} : undefined);
+                } else if (tabId === 'tabMidi') {
+                    addFavorite('midi', path, name);
+                } else if (tabId === 'tabDaw' && row) {
+                    const badges = row.querySelectorAll('.col-format .format-badge');
+                    const daw = (badges[0]?.textContent || row.dataset.dawName || '').trim();
+                    const format = (badges[1]?.textContent || '').trim();
+                    const meta = {};
+                    if (daw) meta.daw = daw;
+                    if (format) meta.format = format;
+                    addFavorite('daw', path, name, Object.keys(meta).length ? meta : undefined);
+                } else if (tabId === 'tabPresets' && row) {
+                    const format = (row.dataset.presetFormat || row.querySelector('.format-badge')?.textContent || '').trim();
+                    addFavorite('preset', path, name, format ? {format} : undefined);
+                } else {
+                    addFavorite('item', path, name);
+                }
+            }
         }
     } else if (action === 'note') {
         if (typeof showNoteEditor === 'function') showNoteEditor(path, name);

@@ -752,7 +752,8 @@ document.addEventListener('contextmenu', (e) => {
         const pdfRow = e.target.closest('#pdfTableBody tr[data-pdf-path]');
         if (pdfRow) {
             const path = pdfRow.dataset.pdfPath;
-            const name = pdfRow.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
+            const name = pdfRow.querySelector('.col-name')?.getAttribute('title')?.trim() ||
+                pdfRow.querySelector('.col-name')?.textContent?.trim() || '';
             const items = [
                 {
                     icon: '&#128193;',
@@ -831,7 +832,12 @@ document.addEventListener('contextmenu', (e) => {
                     return {
                         icon: f ? '&#9734;' : '&#9733;',
                         label: f ? appFmt('menu.remove_from_favorites') : appFmt('menu.add_to_favorites'), ..._noEcho, ...shortcutTip('toggleFavorite'),
-                        action: () => f ? removeFavorite(path) : addFavorite('video', path, name)
+                        action: () =>
+                            f
+                                ? removeFavorite(path)
+                                : addFavorite('video', path, name, {
+                                    format: videoRow.querySelector('.col-format')?.textContent?.trim() || '',
+                                })
                     };
                 })()],
                 {icon: '&#128221;', label: appFmt('menu.add_note'), action: () => showNoteEditor(path, name)},

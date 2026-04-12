@@ -472,7 +472,7 @@ document.addEventListener('click', (e) => {
     const el = clickEl.closest('[data-action]');
     if (!el) return;
     // If there's a data-action-stop container between the target and the matched action element, skip parent actions
-    if (el.dataset.action === 'toggleMetadata') {
+    if (el.dataset.action === 'toggleMetadata' || el.dataset.action === 'toggleVideoMeta') {
         const stop = clickEl.closest('[data-action-stop]');
         if (stop && el.contains(stop)) return;
     }
@@ -498,7 +498,8 @@ document.addEventListener('click', (e) => {
                 scanPlugins(true);
                 break;
             case 'stopPluginScan':
-                window.vstUpdater.stopScan();
+                if (typeof stopPluginScan === 'function') void stopPluginScan();
+                else window.vstUpdater.stopScan();
                 break;
             case 'checkUpdates':
                 checkUpdates();
@@ -583,7 +584,7 @@ document.addEventListener('click', (e) => {
                 toggleMetadata(el.dataset.path, e);
                 break;
             case 'previewAudio':
-                previewAudio(el.dataset.path);
+                previewAudio(el.dataset.path, { minimizeFloatingPlayer: true });
                 break;
             case 'toggleRowLoop':
                 toggleRowLoop(el.dataset.path, e);
@@ -651,6 +652,24 @@ document.addEventListener('click', (e) => {
             case 'loadMoreVideos':
                 if (typeof loadMoreVideos === 'function') loadMoreVideos();
                 break;
+            case 'toggleVideoMeta':
+                if (typeof toggleVideoMeta === 'function') toggleVideoMeta(el.dataset.path, e);
+                break;
+            case 'closeVideoMetaRow':
+                if (typeof closeVideoMetaRow === 'function') closeVideoMetaRow();
+                break;
+            case 'toggleVideoMaximize':
+                if (typeof toggleVideoMaximize === 'function') toggleVideoMaximize();
+                break;
+            case 'videoPlayPause':
+                if (typeof previewVideo === 'function' && typeof videoPlayerPath !== 'undefined' && videoPlayerPath) {
+                    previewVideo(videoPlayerPath);
+                }
+                break;
+            case 'toggleVideoLoopRegion': {
+                if (typeof toggleVideoLoopRegionFn === 'function') toggleVideoLoopRegionFn();
+                break;
+            }
             case 'filterVideos':
                 if (typeof filterVideos === 'function') filterVideos();
                 break;
@@ -1045,9 +1064,6 @@ document.addEventListener('click', (e) => {
             case 'settingToggleExpandOnClick':
                 settingToggleExpandOnClick();
                 break;
-            case 'settingToggleShowPlayerOnStartup':
-                settingToggleShowPlayerOnStartup();
-                break;
             case 'settingToggleAutoplayNext':
                 settingToggleAutoplayNext();
                 break;
@@ -1221,7 +1237,7 @@ document.addEventListener('dblclick', (e) => {
     const audioRow = e.target.closest('#audioTableBody tr[data-audio-path]');
     if (audioRow && !e.target.closest('.col-actions')) {
         e.preventDefault();
-        previewAudio(audioRow.getAttribute('data-audio-path'));
+        previewAudio(audioRow.getAttribute('data-audio-path'), { minimizeFloatingPlayer: true });
         return;
     }
 
@@ -1578,6 +1594,8 @@ window.vstUpdater = {
     measureLufs: (path) => invoke('measure_lufs', {filePath: path}),
     readCacheFile: (name) => invoke('read_cache_file', {name}),
     writeCacheFile: (name, data) => invoke('write_cache_file', {name, data}),
+    upsertWaveformCacheEntry: (path, data) => invoke('upsert_waveform_cache_entry', {path, data}),
+    upsertSpectrogramCacheEntry: (path, data) => invoke('upsert_spectrogram_cache_entry', {path, data}),
     getWalkerStatus: () => invoke('get_walker_status'),
     appendLog: (msg) => invoke('append_log', {msg}).catch(e => {
         if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
@@ -1799,17 +1817,21 @@ function hideStopButton() {
 
 async function stopCurrentOperation() {
     if (currentOperation === 'scan') {
-        await window.vstUpdater.stopScan();
+        if (typeof stopPluginScan === 'function') await stopPluginScan();
+        else await window.vstUpdater.stopScan();
     } else if (currentOperation === 'updates') {
         await window.vstUpdater.stopUpdates();
     } else if (currentOperation === 'kvr-resolve') {
         stopKvrResolve();
     } else if (currentOperation === 'audio-scan') {
-        await window.vstUpdater.stopAudioScan();
+        if (typeof stopAudioScan === 'function') await stopAudioScan();
+        else await window.vstUpdater.stopAudioScan();
     } else if (currentOperation === 'daw-scan') {
-        await window.vstUpdater.stopDawScan();
+        if (typeof stopDawScan === 'function') await stopDawScan();
+        else await window.vstUpdater.stopDawScan();
     } else if (currentOperation === 'preset-scan') {
-        await window.vstUpdater.stopPresetScan();
+        if (typeof stopPresetScan === 'function') await stopPresetScan();
+        else await window.vstUpdater.stopPresetScan();
     }
 }
 

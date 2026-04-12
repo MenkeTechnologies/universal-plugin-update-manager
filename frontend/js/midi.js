@@ -167,7 +167,26 @@ async function refreshMidiStatsSnapshot(force) {
 let _midiScanProgressCleanup = null;
 let _midiScanDbView = false;
 
+function clearMidiScanButtonSpinnerImmediate() {
+    const btn = document.getElementById('btnScanMidi');
+    const stopBtn = document.getElementById('btnStopMidi');
+    const progressBar = document.getElementById('midiProgressBar');
+    const progressFill = document.getElementById('midiProgressFill');
+    if (typeof btnLoading === 'function') btnLoading(btn, false);
+    if (btn) {
+        btn.innerHTML = '&#127929; ' + catalogFmt('ui.btn.127924_scan_midi');
+        btn.disabled = false;
+    }
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (progressBar) progressBar.classList.remove('active');
+    if (progressFill) {
+        progressFill.style.width = '0%';
+        progressFill.style.animation = '';
+    }
+}
+
 async function stopMidiScan() {
+    clearMidiScanButtonSpinnerImmediate();
     try {
         await window.vstUpdater.stopMidiScan();
     } catch (e) { /* ignore */
@@ -189,8 +208,6 @@ async function scanMidi(resume = false, overrideRoots = null) {
         }
     };
 
-    const excludePaths = resume ? allMidiFiles.map(m => m.path) : null;
-
     if (typeof btnLoading === 'function') btnLoading(btn, true);
     setBtn(
         '&#8635; ' + catalogFmt(resume ? 'ui.js.resuming_btn' : 'ui.js.scanning_btn'),
@@ -203,6 +220,8 @@ async function scanMidi(resume = false, overrideRoots = null) {
         progressFill.style.width = '';
         progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
     }
+
+    const excludePaths = resume ? allMidiFiles.map(m => m.path) : null;
 
     if (!resume) {
         _midiScanDbView = false;
@@ -286,6 +305,9 @@ async function scanMidi(resume = false, overrideRoots = null) {
     }
 
     const scheduleMidiFlush = createScanFlusher(flushPendingMidi, FLUSH_INTERVAL);
+
+    if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
+    else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     if (_midiScanProgressCleanup) _midiScanProgressCleanup();
     _midiScanProgressCleanup = await window.vstUpdater.onMidiScanProgress((data) => {

@@ -491,6 +491,8 @@ function formatCacheSize(bytes) {
 
 /** Last successful `db_cache_stats` rows — repainted synchronously when available (app startup + Settings tab open) so the table is not blank while SQLite runs COUNT/dbstat work. */
 let _lastDbCacheStatsRows = null;
+/** Bumps on each `renderCacheStats` call so a slow in-flight `dbCacheStats` cannot repaint stale counts after a clear. */
+let _cacheStatsFetchGen = 0;
 
 function invalidateDbCacheStatsSnapshot() {
     _lastDbCacheStatsRows = null;
@@ -569,15 +571,18 @@ function cacheStatRowLabel(statKey, fallbackLabel, _cf) {
 async function renderCacheStats() {
     const grid = document.getElementById('cacheStatsGrid');
     if (!grid) return;
+    const gen = ++_cacheStatsFetchGen;
     if (Array.isArray(_lastDbCacheStatsRows) && _lastDbCacheStatsRows.length > 0) {
         grid.innerHTML = buildCacheStatsTableHtml(_lastDbCacheStatsRows);
     }
     try {
         const stats = await window.vstUpdater.dbCacheStats();
+        if (gen !== _cacheStatsFetchGen) return;
         const rows = Array.isArray(stats) ? stats : [];
         _lastDbCacheStatsRows = rows;
         grid.innerHTML = buildCacheStatsTableHtml(rows);
     } catch (e) {
+        if (gen !== _cacheStatsFetchGen) return;
         const msg = catalogFmt('ui.settings.cache_load_failed', {err: e.message || String(e)});
         grid.innerHTML = `<span style="color:var(--red);font-size:11px;">${typeof escapeHtml === 'function' ? escapeHtml(msg) : msg}</span>`;
     }
@@ -773,6 +778,8 @@ async function settingClearAnalysisCache() {
         _spectrogramCache = {};
     }
     showToast(toastFmt('toast.analysis_cache_cleared_long'));
+    invalidateDbCacheStatsSnapshot();
+    void renderCacheStats();
 }
 
 function settingResetAllUI() {
@@ -940,6 +947,8 @@ async function settingClearKvrCache() {
     try {
         await window.vstUpdater.updateKvrCache([]);
         showToast(toastFmt('toast.kvr_cache_cleared_palette'));
+        invalidateDbCacheStatsSnapshot();
+        void renderCacheStats();
     } catch (e) {
         showToast(toastFmt('toast.failed_clear_kvr', {err: e.message || e}), 4000, 'error');
     } finally {
@@ -1155,14 +1164,6 @@ function settingSetTrayTransportSource(val) {
         showToast(toastFmt('toast.tray_transport_source', {source: srcLabel}));
     }
     if (typeof refreshSettingsUI === 'function') refreshSettingsUI();
-}
-
-function settingToggleShowPlayerOnStartup() {
-    const current = prefs.getItem('showPlayerOnStartup') === 'on';
-    const next = !current;
-    prefs.setItem('showPlayerOnStartup', next ? 'on' : 'off');
-    showToast(toastFmt('toast.show_player_startup', {state: next ? 'on' : 'off'}));
-    refreshSettingsUI();
 }
 
 function settingToggleExpandOnClick() {
@@ -1715,15 +1716,6 @@ function refreshSettingsUI() {
     if (expandBtn) {
         expandBtn.classList.toggle('active', expandOnClick);
         expandLabel.textContent = _uiToggle(expandOnClick);
-    }
-
-    // Show player on startup
-    const showPlayer = prefs.getItem('showPlayerOnStartup') === 'on';
-    const showPlayerBtn = document.getElementById('settingShowPlayerOnStartup');
-    const showPlayerLabel = document.getElementById('settingShowPlayerOnStartupLabel');
-    if (showPlayerBtn) {
-        showPlayerBtn.classList.toggle('active', showPlayer);
-        showPlayerLabel.textContent = _uiToggle(showPlayer);
     }
 
     // Autoplay next (Settings + Command Palette)

@@ -10,6 +10,8 @@ let filteredVideos = [];
 let videoSortKey = 'name';
 let videoSortAsc = true;
 let videoScanProgressCleanup = null;
+/** When true, video scan streaming flush must not touch the DOM (late IPC after invoke, or Stop cleared the UI). */
+let _videoScanProgressFlushDisabled = false;
 let _videoScanDbView = false;
 let videoRenderCount = 0;
 let _videoOffset = 0;
@@ -111,6 +113,7 @@ async function rebuildVideoStats(force) {
     let displayCount = 0;
     let displayBytes = 0;
     let unfiltered = 0;
+    let aggResolved = null;
     {
         const cacheHit = !force && key === _lastVideoAggKey && _videoAggCache;
         try {
@@ -123,6 +126,7 @@ async function rebuildVideoStats(force) {
                 _lastVideoAggKey = key;
                 _videoAggCache = agg;
             }
+            aggResolved = agg;
             displayCount = agg.count || 0;
             displayBytes = agg.totalBytes || 0;
             unfiltered = agg.totalUnfiltered || 0;
@@ -130,6 +134,7 @@ async function rebuildVideoStats(force) {
             _videoTotalCountCapped = agg.countCapped === true;
             _videoTotalUnfiltered = unfiltered;
         } catch {
+            aggResolved = null;
             displayCount = allVideos.length;
             displayBytes = 0;
             unfiltered = allVideos.length;
@@ -153,6 +158,19 @@ async function rebuildVideoStats(force) {
     }
     const exportBtn = document.getElementById('btnExportVideo');
     if (exportBtn) exportBtn.style.display = (u > 0) ? '' : 'none';
+    if (typeof updateVideoDiskUsage === 'function') {
+        if (
+            aggResolved
+            && displayCount > 0
+            && aggResolved.countCapped !== true
+            && aggResolved.bytesByType
+            && Object.keys(aggResolved.bytesByType).length > 0
+        ) {
+            updateVideoDiskUsage(aggResolved.bytesByType, displayBytes);
+        } else {
+            updateVideoDiskUsage(null, 0);
+        }
+    }
 }
 
 function buildVideoRow(v) {
@@ -162,7 +180,7 @@ function buildVideoRow(v) {
     const rowTt = typeof escapeHtml === 'function'
         ? escapeHtml(_videoFmt('ui.tt.video_row_double_click_open'))
         : _videoFmt('ui.tt.video_row_double_click_open');
-    return `<tr data-video-path="${hp}" data-video-name="${escapeHtml((v.name || '').toLowerCase())}" style="cursor: pointer;" title="${rowTt}">
+    return `<tr data-video-path="${hp}" data-video-name="${escapeHtml((v.name || '').toLowerCase())}" data-action="toggleVideoMeta" data-path="${hp}" data-video-size="${Number(v.size) || 0}" style="cursor: pointer;" title="${rowTt}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
     <td class="col-name" title="${escapeHtml(v.name)}">${_lastVideoSearch ? highlightMatch(v.name, _lastVideoSearch, _lastVideoMode) : escapeHtml(v.name)}${typeof rowBadges === 'function' ? rowBadges(v.path) : ''}</td>
     <td class="col-path" title="${hp}">${_lastVideoSearch ? highlightMatch(v.directory, _lastVideoSearch, _lastVideoMode) : escapeHtml(v.directory)}</td>
@@ -191,6 +209,7 @@ function renderVideoTable() {
     if (!tbody) return;
     videoRenderCount = _videoOffset + filteredVideos.length;
     if (_videoOffset === 0) {
+        closeVideoMetaRow();
         tbody.innerHTML = filteredVideos.map(buildVideoRow).join('');
     } else {
         const loadMoreRow = tbody.querySelector('tr [data-action="loadMoreVideos"]')?.closest('tr');
@@ -211,6 +230,12 @@ function renderVideoTable() {
         ${typeof escapeHtml === 'function' ? escapeHtml(line) : line}
       </td></tr>`);
     }
+}
+
+function isVideoScanTableEmpty() {
+    const tbody = document.getElementById('videoTableBody');
+    if (!tbody) return true;
+    return tbody.querySelector('tr[data-video-path]') == null;
 }
 
 function buildVideoTableHtml() {
@@ -289,7 +314,28 @@ async function loadVideoFiles() {
     }
 }
 
+function clearVideoScanButtonSpinnerImmediate() {
+    _videoScanProgressFlushDisabled = true;
+    const btn = document.getElementById('btnScanVideos');
+    const stopBtn = document.getElementById('btnStopVideo');
+    const progressBar = document.getElementById('videoProgressBar');
+    const progressFill = document.getElementById('videoProgressFill');
+    if (typeof btnLoading === 'function') btnLoading(btn, false);
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '&#127909; <span data-i18n="ui.btn.scan_videos">' + (typeof appFmt === 'function' ? appFmt('ui.btn.scan_videos') : 'Scan videos') + '</span>';
+    }
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (progressBar) progressBar.classList.remove('active');
+    if (progressFill) {
+        progressFill.style.width = '0%';
+        progressFill.style.animation = '';
+    }
+    if (typeof updateHeaderInfo === 'function') void updateHeaderInfo();
+}
+
 async function stopVideoScan() {
+    clearVideoScanButtonSpinnerImmediate();
     try {
         await window.vstUpdater.stopVideoScan();
     } catch {
@@ -299,14 +345,13 @@ async function stopVideoScan() {
 
 async function scanVideos(resume = false, overrideRoots = null) {
     if (typeof showGlobalProgress === 'function') showGlobalProgress();
+    _videoScanProgressFlushDisabled = false;
     const btn = document.getElementById('btnScanVideos');
     const resumeBtn = document.getElementById('btnResumeVideo');
     const stopBtn = document.getElementById('btnStopVideo');
     const progressBar = document.getElementById('videoProgressBar');
     const progressFill = document.getElementById('videoProgressFill');
     const tableWrap = document.getElementById('videoTableWrap');
-
-    const excludePaths = resume ? allVideos.map((v) => v.path) : null;
 
     if (typeof btnLoading === 'function') btnLoading(btn, true);
     if (btn) {
@@ -316,79 +361,184 @@ async function scanVideos(resume = false, overrideRoots = null) {
     if (resumeBtn) resumeBtn.style.display = 'none';
     if (stopBtn) stopBtn.style.display = '';
     if (progressBar) progressBar.classList.add('active');
-    if (progressFill) progressFill.style.width = '0%';
+    if (progressFill) {
+        progressFill.style.width = '';
+        progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
+    }
 
-    allVideos = [];
-    filteredVideos = [];
-    _videoOffset = 0;
-    videoRenderCount = 0;
-    _videoScanDbView = false;
-    if (tableWrap) {
-        tableWrap.innerHTML = `<div class="state-message" id="videoEmptyState">
+    const excludePaths = resume ? allVideos.map((v) => v.path) : null;
+
+    if (!resume) {
+        _videoScanDbView = false;
+        allVideos = [];
+        filteredVideos = [];
+        _videoOffset = 0;
+        videoRenderCount = 0;
+        closeVideoMetaRow();
+        if (tableWrap) {
+            tableWrap.innerHTML = `<div class="state-message" id="videoEmptyState">
             <div class="state-icon">&#127909;</div>
             <h2 data-i18n="ui.h2.video_index">${typeof appFmt === 'function' ? appFmt('ui.h2.video_index') : 'Video index'}</h2>
             <p data-i18n="ui.p.videos_scanning">${typeof appFmt === 'function' ? appFmt('ui.p.videos_scanning') : 'Scanning…'}</p>
         </div>`;
+        }
     }
 
-    let foundApprox = 0;
-    const onProg = window.vstUpdater.onVideoScanProgress((payload) => {
-        if (!payload) return;
-        if (payload.phase === 'scanning' && Array.isArray(payload.videoFiles)) {
-            const batch = payload.videoFiles;
-            allVideos.push(...batch);
-            foundApprox = payload.found != null ? payload.found : allVideos.length;
-            if (typeof window !== 'undefined') window.__videoScanPendingFound = foundApprox;
-            if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({video: foundApprox});
-            if (progressFill && foundApprox > 0) {
-                const w = Math.min(100, 8 + Math.log1p(foundApprox) * 4);
-                progressFill.style.width = w + '%';
-            }
-            if (_videoScanDbView) {
-                _videoOffset = 0;
-                videoRenderCount = 0;
-                void fetchVideoPage();
+    if (typeof yieldForFilterFieldPaint === 'function') await yieldForFilterFieldPaint();
+    else await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    let pendingVideos = [];
+    let pendingFound = 0;
+    let scanVideoDomActive = false;
+    let firstVideoBatch = true;
+    const videoEta = typeof createETA === 'function' ? createETA() : null;
+    if (videoEta) videoEta.start();
+    const FLUSH_INTERVAL = parseInt((typeof prefs !== 'undefined' ? prefs.getItem('flushInterval') : null) || '100', 10);
+
+    function filterVideoScanBatch(toAdd) {
+        const search = (document.getElementById('videoSearchInput')?.value || '').trim();
+        const scanFmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('videoFormatFilter') : null;
+        const scanMode = typeof getSearchMode === 'function' ? getSearchMode('regexVideo') : 'fuzzy';
+        return toAdd.filter((v) => {
+            if (scanFmtSet && scanFmtSet.size > 0 && !scanFmtSet.has(v.format)) return false;
+            if (search && typeof searchMatch === 'function' && !searchMatch(search, [v.name, v.directory || ''], scanMode)) return false;
+            return true;
+        });
+    }
+
+    function flushPendingVideo() {
+        if (_videoScanProgressFlushDisabled) {
+            pendingVideos.length = 0;
+            return;
+        }
+        if (pendingVideos.length === 0) return;
+        const toAdd = pendingVideos;
+        pendingVideos = [];
+
+        const videoElapsed = videoEta ? videoEta.elapsed() : '';
+        if (btn) {
+            btn.innerHTML = catalogFmt('ui.audio.scan_progress_line', {
+                n: pendingFound.toLocaleString(),
+                elapsed: videoElapsed ? ' — ' + videoElapsed : '',
+            });
+        }
+        if (progressFill) {
+            progressFill.style.width = '';
+            progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
+        }
+
+        const allowDom =
+            scanVideoDomActive ||
+            (typeof isVideoScanTableEmpty === 'function' && isVideoScanTableEmpty());
+        if (!allowDom) {
+            allVideos.push(...toAdd);
+            if (allVideos.length > 100000) allVideos.length = 100000;
+            const matching = filterVideoScanBatch(toAdd);
+            filteredVideos.push(...matching);
+            if (filteredVideos.length > 100000) filteredVideos.length = 100000;
+            return;
+        }
+        scanVideoDomActive = true;
+
+        if (firstVideoBatch) {
+            firstVideoBatch = false;
+            if (resume) videoRenderCount = 0;
+        }
+
+        if (!document.getElementById('videoTableBody') && tableWrap) {
+            tableWrap.innerHTML = buildVideoTableHtml();
+            const st = document.getElementById('videoStats');
+            if (st) st.style.display = 'flex';
+            if (typeof initColumnResize === 'function') initColumnResize(document.getElementById('videoTable'));
+            if (typeof initTableColumnReorder === 'function') initTableColumnReorder('videoTable', 'videoColumnOrder');
+        }
+
+        allVideos.push(...toAdd);
+        if (allVideos.length > 100000) allVideos.length = 100000;
+        const matching = filterVideoScanBatch(toAdd);
+        filteredVideos.push(...matching);
+        if (filteredVideos.length > 100000) filteredVideos.length = 100000;
+
+        if (!_videoScanDbView) {
+            const tbody = document.getElementById('videoTableBody');
+            if (tbody && videoRenderCount < 2000) {
+                const loadMoreHint = tbody.querySelector('tr [data-action="loadMoreVideos"]')?.closest('tr');
+                if (loadMoreHint) loadMoreHint.remove();
+                const toRender = matching.slice(0, 2000 - videoRenderCount);
+                tbody.insertAdjacentHTML('beforeend', toRender.map(buildVideoRow).join(''));
+                videoRenderCount += toRender.length;
+                if (typeof reorderNewTableRows === 'function') reorderNewTableRows('videoTable');
             }
         }
-    });
-    videoScanProgressCleanup = onProg;
+    }
 
+    const scheduleVideoFlush = typeof createScanFlusher === 'function'
+        ? createScanFlusher(flushPendingVideo, FLUSH_INTERVAL)
+        : () => flushPendingVideo();
+
+    if (videoScanProgressCleanup) {
+        if (typeof videoScanProgressCleanup === 'function') videoScanProgressCleanup();
+        videoScanProgressCleanup = null;
+    }
+    videoScanProgressCleanup = await window.vstUpdater.onVideoScanProgress((payload) => {
+        if (!payload) return;
+        if (payload.phase === 'scanning' && Array.isArray(payload.videoFiles)) {
+            pendingVideos.push(...payload.videoFiles);
+            pendingFound = payload.found != null ? payload.found : pendingFound;
+            if (typeof window !== 'undefined') window.__videoScanPendingFound = pendingFound;
+            if (typeof applyInventoryCountsPartial === 'function') applyInventoryCountsPartial({video: pendingFound});
+            scheduleVideoFlush();
+        }
+    });
+
+    let videoScanStopped = false;
     try {
         const roots = (overrideRoots && overrideRoots.length > 0)
             ? overrideRoots
             : (typeof prefs !== 'undefined' ? (prefs.getItem('videoScanDirs') || '') : '').split('\n').map(s => s.trim()).filter(Boolean);
-        await window.vstUpdater.scanVideoFiles(roots.length ? roots : undefined, excludePaths);
-    } catch (e) {
-        if (typeof showToast === 'function') showToast(String(e && e.message ? e.message : e), 5000, 'error');
-    } finally {
-        if (typeof btnLoading === 'function') btnLoading(btn, false);
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '&#127909; <span data-i18n="ui.btn.scan_videos">' + (typeof appFmt === 'function' ? appFmt('ui.btn.scan_videos') : 'Scan videos') + '</span>';
-        }
-        if (stopBtn) stopBtn.style.display = 'none';
-        if (resumeBtn && allVideos.length > 0) resumeBtn.style.display = '';
-        if (progressBar) progressBar.classList.remove('active');
-        if (progressFill) progressFill.style.width = '100%';
-        if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
-        if (videoScanProgressCleanup) {
+        const scanResult = await window.vstUpdater.scanVideoFiles(roots.length ? roots : undefined, excludePaths);
+        videoScanStopped = !!(scanResult && scanResult.stopped);
+        if (typeof videoScanProgressCleanup === 'function') {
             videoScanProgressCleanup();
             videoScanProgressCleanup = null;
         }
-        if (typeof window !== 'undefined') delete window.__videoScanPendingFound;
-        if (typeof scheduleRefreshInventoryFromDb === 'function') scheduleRefreshInventoryFromDb();
-        _videoScanDbView = true;
-        _videoOffset = 0;
-        videoRenderCount = 0;
-        await fetchVideoPage();
-        await rebuildVideoStats(true);
-        const empty = document.getElementById('videoEmptyState');
-        if (empty) empty.remove();
+        flushPendingVideo();
+        _videoScanProgressFlushDisabled = true;
+        scanVideoDomActive = false;
+    } catch (e) {
+        if (typeof videoScanProgressCleanup === 'function') {
+            videoScanProgressCleanup();
+            videoScanProgressCleanup = null;
+        }
+        scanVideoDomActive = false;
+        flushPendingVideo();
+        _videoScanProgressFlushDisabled = true;
+        if (typeof showToast === 'function') showToast(String(e && e.message ? e.message : e), 5000, 'error');
     }
+
+    clearVideoScanButtonSpinnerImmediate();
+    if (resumeBtn) {
+        resumeBtn.style.display = videoScanStopped && allVideos.length > 0 ? '' : 'none';
+    }
+    if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
+    if (typeof window !== 'undefined') delete window.__videoScanPendingFound;
+    if (typeof scheduleRefreshInventoryFromDb === 'function') scheduleRefreshInventoryFromDb();
+    _videoScanDbView = true;
+    _videoOffset = 0;
+    videoRenderCount = 0;
+    await fetchVideoPage();
+    await rebuildVideoStats(true);
+    const empty = document.getElementById('videoEmptyState');
+    if (empty) empty.remove();
 }
 
 function openVideoFile(path) {
-    window.vstUpdater.openFileDefault(path)
+    /** Same as PDF row folder control: reveal in Finder / Explorer (`open_plugin_folder`), not default-app open. */
+    const inv =
+        typeof window !== 'undefined' && window.vstUpdater && typeof window.vstUpdater.openPluginFolder === 'function'
+            ? window.vstUpdater.openPluginFolder(path)
+            : Promise.reject(new Error('openPluginFolder unavailable'));
+    inv
         .then(() => {
             if (typeof showToast === 'function') showToast(toastFmt('toast.revealed_in_finder'));
         })
@@ -397,15 +547,803 @@ function openVideoFile(path) {
         });
 }
 
+// ── Video player expanded row ──
+
+let expandedVideoPath = null;
+let videoPlayerPath = null;
+let _videoRafId = null;
+let _videoEngineActive = false;
+let _videoFallbackAudio = false;
+let _videoWfDrawSeq = 0;
+/** Bumps on each new `previewVideo` load and on `stopVideoPlayback` — stale `loadeddata` handlers must not hide the spinner for the wrong file. */
+let _videoPlayerLoadUiSeq = 0;
+/** Skip `<video>` frame-sampled waveform fallback above this — many seeks stress demux on huge files. Host `waveform_preview` still runs (ffmpeg/Symphonia extract ≤300s, then JUCE). */
+const VIDEO_VISUAL_WAVEFORM_MAX_FILE_BYTES = 96 * 1024 * 1024;
+let _lastVideoVisualSeekMs = 0;
+
+function _videoFileSrc(path) {
+    const tauri = typeof window !== 'undefined' ? window.__TAURI__ : null;
+    if (tauri?.core?.convertFileSrc) return tauri.core.convertFileSrc(path);
+    if (typeof window !== 'undefined' && typeof window.convertFileSrc === 'function') return window.convertFileSrc(path);
+    return path;
+}
+
+function _showVideoPlayerLoading() {
+    const el = document.getElementById('videoPlayerLoading');
+    if (el) {
+        el.classList.remove('video-player-loading--hidden');
+        el.setAttribute('aria-busy', 'true');
+    }
+}
+
+function _hideVideoPlayerLoading() {
+    const el = document.getElementById('videoPlayerLoading');
+    if (el) {
+        el.classList.add('video-player-loading--hidden');
+        el.setAttribute('aria-busy', 'false');
+    }
+}
+
+function _wireVideoPlayerLoadingListeners(vid, filePath, loadUiSeq) {
+    if (!vid || !filePath || typeof loadUiSeq !== 'number') return;
+    _showVideoPlayerLoading();
+    const hide = () => {
+        if (loadUiSeq !== _videoPlayerLoadUiSeq) return;
+        if (typeof videoPlayerPath !== 'undefined' && videoPlayerPath !== filePath) return;
+        _hideVideoPlayerLoading();
+    };
+    vid.addEventListener('loadeddata', hide, { once: true });
+    vid.addEventListener('canplay', hide, { once: true });
+    vid.addEventListener('error', hide, { once: true });
+    const trySync = () => {
+        if (loadUiSeq !== _videoPlayerLoadUiSeq) return;
+        if (vid.readyState >= 2) hide();
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(trySync);
+    else setTimeout(trySync, 0);
+}
+
+function _videoExitFullscreenIfActive() {
+    const vid = document.getElementById('videoPlayerEl');
+    if (!vid) return;
+    const doc = document;
+    const el = doc.fullscreenElement ?? doc.webkitFullscreenElement;
+    if (el !== vid) return;
+    if (typeof doc.exitFullscreen === 'function') void doc.exitFullscreen();
+    else if (typeof doc.webkitExitFullscreen === 'function') void doc.webkitExitFullscreen();
+}
+
+function _syncVideoMaximizeBtnState() {
+    const btn = document.getElementById('btnVideoMaximize');
+    const vid = document.getElementById('videoPlayerEl');
+    if (!btn || !vid) return;
+    const doc = document;
+    const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
+    const fs = fsEl === vid;
+    const maxT = typeof appFmt === 'function' ? appFmt('ui.tt.video_maximize') : 'Fullscreen video';
+    const restT = typeof appFmt === 'function' ? appFmt('ui.tt.video_restore') : 'Exit fullscreen';
+    btn.title = fs ? restT : maxT;
+}
+
+function toggleVideoMaximize() {
+    const vid = document.getElementById('videoPlayerEl');
+    if (!vid) return;
+    const doc = document;
+    const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
+    if (fsEl === vid) {
+        if (typeof doc.exitFullscreen === 'function') void doc.exitFullscreen();
+        else if (typeof doc.webkitExitFullscreen === 'function') void doc.webkitExitFullscreen();
+        return;
+    }
+    if (typeof vid.requestFullscreen === 'function') {
+        void vid.requestFullscreen().catch(() => {});
+    } else if (typeof vid.webkitRequestFullscreen === 'function') {
+        void vid.webkitRequestFullscreen();
+    } else if (typeof vid.webkitEnterFullscreen === 'function') {
+        vid.webkitEnterFullscreen();
+    }
+}
+
+function closeVideoMetaRow() {
+    _videoExitFullscreenIfActive();
+    stopVideoPlayback();
+    const meta = document.getElementById('videoMetaRow');
+    if (meta) meta.remove();
+    const expanded = document.querySelector('#videoTableBody tr.row-expanded');
+    if (expanded) expanded.classList.remove('row-expanded');
+    expandedVideoPath = null;
+}
+
+function stopVideoPlayback() {
+    _videoPlayerLoadUiSeq++;
+    _videoExitFullscreenIfActive();
+    if (_videoRafId) {
+        cancelAnimationFrame(_videoRafId);
+        _videoRafId = null;
+    }
+    const vid = document.getElementById('videoPlayerEl');
+    if (vid) {
+        vid.pause();
+        vid.removeAttribute('src');
+        vid.load();
+    }
+    _hideVideoPlayerLoading();
+    if (_videoEngineActive) {
+        _videoEngineActive = false;
+        if (typeof window.enginePlaybackStop === 'function') {
+            void window.enginePlaybackStop();
+        }
+        if (typeof window.setEnginePlaybackActive === 'function') {
+            window.setEnginePlaybackActive(false);
+        }
+    }
+    _videoFallbackAudio = false;
+    videoPlayerPath = null;
+    // Clear now-playing bar if it was showing this video
+    if (typeof audioPlayerPath !== 'undefined') {
+        // Only clear if audioPlayerPath was set by us (video)
+        const npName = document.getElementById('npName');
+        if (npName && npName.dataset.videoSource === 'true') {
+            audioPlayerPath = null;
+            npName.dataset.videoSource = '';
+            delete npName.dataset.videoSizeBytes;
+            if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
+            if (typeof syncTrayNowPlayingFromPlayback === 'function') syncTrayNowPlayingFromPlayback();
+        }
+    }
+}
+
+/** Show video in the floating now-playing bar + kick the audio RAF loop for tray updates. */
+function _showVideoInNowPlaying(filePath, opts) {
+    const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
+    const o = opts && typeof opts === 'object' ? opts : {};
+
+    const np = document.getElementById('audioNowPlaying');
+    // Respect "player hidden" state: if the bar is not active but a track was loaded,
+    // the user explicitly hid it — don't force it open.
+    const wasHiddenByUser = !!(np && !np.classList.contains('active') && typeof audioPlayerPath !== 'undefined' && audioPlayerPath != null);
+
+    // Set audioPlayerPath so tray + now-playing bar recognize active playback
+    if (typeof audioPlayerPath !== 'undefined') {
+        audioPlayerPath = filePath;
+    }
+    if (typeof window !== 'undefined') {
+        window._enginePlaybackResumePath = filePath;
+    }
+
+    if (np) {
+        if (o.minimizeFloatingPlayer === true && !np.classList.contains('active')) {
+            const pill = document.getElementById('audioRestorePill');
+            if (pill) pill.classList.add('active');
+        } else if (!wasHiddenByUser) {
+            np.classList.add('active');
+        }
+    }
+
+    const npName = document.getElementById('npName');
+    if (npName) {
+        npName.textContent = '🎬 ' + fileName;
+        npName.dataset.videoSource = 'true';
+        const vtbody = document.getElementById('videoTableBody');
+        let szAttr = '';
+        if (vtbody) {
+            const tr = vtbody.querySelector(`tr[data-video-path="${CSS.escape(filePath)}"]`);
+            if (tr && tr.dataset.videoSize != null && tr.dataset.videoSize !== '') {
+                szAttr = String(tr.dataset.videoSize);
+            }
+        }
+        if (szAttr !== '') npName.dataset.videoSizeBytes = szAttr;
+        else delete npName.dataset.videoSizeBytes;
+    }
+
+    if (typeof updatePlayBtnStates === 'function') updatePlayBtnStates();
+    if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
+
+    // Draw waveform in the now-playing bar
+    if (typeof scheduleNowPlayingWaveform === 'function') scheduleNowPlayingWaveform(filePath);
+
+    // Kick the audio RAF loop so it runs updatePlaybackTime + syncTrayNowPlayingFromPlayback
+    if (typeof window.kickPlaybackRafLoop === 'function') window.kickPlaybackRafLoop();
+
+    // Apply loop region braces
+    if (typeof applyMetaLoopRegionUI === 'function') applyMetaLoopRegionUI(filePath);
+    if (typeof syncAbLoopFromSampleRegion === 'function') syncAbLoopFromSampleRegion(filePath);
+    if (typeof refreshNpLoopRegionUI === 'function') refreshNpLoopRegionUI();
+}
+
+function toggleVideoLoopRegionFn() {
+    const box = document.getElementById('videoWaveformBox');
+    if (!box) return;
+    const filePath = box.dataset.path || '';
+    if (!filePath) return;
+    if (typeof getSampleLoopRegion !== 'function' || typeof setSampleLoopRegion !== 'function') return;
+    const region = getSampleLoopRegion(filePath);
+    region.enabled = !region.enabled;
+    setSampleLoopRegion(filePath, region);
+    if (typeof applyMetaLoopRegionUI === 'function') applyMetaLoopRegionUI(filePath);
+    if (typeof syncAbLoopFromSampleRegion === 'function') syncAbLoopFromSampleRegion(filePath);
+}
+
+function toggleVideoMeta(filePath, event) {
+    if (event && event.target.closest('.col-actions')) return;
+
+    if (expandedVideoPath === filePath) {
+        closeVideoMetaRow();
+        return;
+    }
+
+    void expandVideoMetaForPath(filePath);
+}
+
+function expandVideoMetaForPath(filePath) {
+    const tbody = document.getElementById('videoTableBody');
+    if (!tbody) return;
+
+    // Close any existing video meta row
+    const existing = document.getElementById('videoMetaRow');
+    if (existing) {
+        stopVideoPlayback();
+        existing.remove();
+        const prev = tbody.querySelector('tr.row-expanded');
+        if (prev) prev.classList.remove('row-expanded');
+    }
+
+    // Also close audio expanded row if open to avoid two engine streams
+    if (typeof closeMetaRow === 'function') closeMetaRow();
+
+    expandedVideoPath = filePath;
+
+    const row = tbody.querySelector(`tr[data-video-path="${CSS.escape(filePath)}"]`);
+    if (!row) return;
+    row.classList.add('row-expanded');
+
+    const metaRow = document.createElement('tr');
+    metaRow.id = 'videoMetaRow';
+    metaRow.className = 'video-meta-row';
+    metaRow.setAttribute('data-meta-path', filePath);
+    metaRow.innerHTML = `<td colspan="7"><div class="video-meta-panel" style="justify-items:center;"><div class="spinner" style="width:18px;height:18px;"></div></div></td>`;
+    row.after(metaRow);
+    row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Build the panel HTML
+    const hp = typeof escapeHtml === 'function' ? escapeHtml(filePath) : filePath;
+    const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
+
+    const maxBtnLabel = typeof appFmt === 'function' ? appFmt('ui.video.btn_maximize') : 'Maximize';
+    const maxBtnTt = typeof appFmt === 'function' ? appFmt('ui.tt.video_maximize') : 'Fullscreen video';
+    metaRow.innerHTML = `<td colspan="7"><div class="video-meta-panel">
+      <div class="video-meta-panel-actions">
+        <button type="button" class="video-maximize-btn" id="btnVideoMaximize" data-action="toggleVideoMaximize" data-i18n="ui.video.btn_maximize" data-i18n-title="ui.tt.video_maximize" title="${typeof escapeHtml === 'function' ? escapeHtml(maxBtnTt) : maxBtnTt}">${typeof escapeHtml === 'function' ? escapeHtml(maxBtnLabel) : maxBtnLabel}</button>
+        <span class="meta-close-btn" data-action="closeVideoMetaRow" title="Close">&#10005;</span>
+      </div>
+      <div class="video-player-wrap">
+        <div id="videoPlayerLoading" class="video-player-loading" aria-busy="true" role="status">
+          <div class="video-player-loading-inner">
+            <div class="spinner" style="width:28px;height:28px;"></div>
+            <span class="video-player-loading-text" data-i18n="ui.js.query_loading">Loading…</span>
+          </div>
+        </div>
+        <video id="videoPlayerEl" playsinline></video>
+      </div>
+      <div class="meta-waveform" id="videoWaveformBox" data-path="${hp}" title="Click to seek">
+        <canvas id="videoWaveformCanvas"></canvas>
+        <div class="waveform-progress-fill"></div>
+        <div class="waveform-loop-region" style="display:none;"></div>
+        <div class="waveform-loop-brace waveform-loop-brace-start" data-loop-brace="start" style="display:none;left:25%;" title="Drag to set loop start"></div>
+        <div class="waveform-loop-brace waveform-loop-brace-end" data-loop-brace="end" style="display:none;left:75%;" title="Drag to set loop end"></div>
+        <button type="button" class="waveform-loop-toggle" data-action="toggleVideoLoopRegion" title="Toggle loop region">L</button>
+        <div class="waveform-cursor" style="left:0;"></div>
+        <div class="waveform-time-label"></div>
+      </div>
+      <div class="video-transport">
+        <button type="button" class="btn-video-play" id="btnVideoPlayPause" data-action="videoPlayPause" title="Play / Pause">&#9654;</button>
+        <span style="font-size:11px;font-family:'Orbitron',sans-serif;color:var(--text-muted);" id="videoTimeDisplay">0:00 / 0:00</span>
+      </div>
+      <div class="video-meta-info">
+        <div class="meta-item"><span class="meta-label">FILE</span><span class="meta-value">${typeof escapeHtml === 'function' ? escapeHtml(fileName) : fileName}</span></div>
+        <div class="meta-item"><span class="meta-label">PATH</span><span class="meta-value" style="font-size:10px;">${hp}</span></div>
+      </div>
+    </div></td>`;
+
+    // Start playback immediately — do not await engine or waveform work on this stack.
+    void previewVideo(filePath, { minimizeFloatingPlayer: true });
+
+    // Waveform decode hits IPC/workers; defer past paint + playback start so it never blocks the click path.
+    _videoWfDrawSeq++;
+    const seq = _videoWfDrawSeq;
+    const runWaveform = () => {
+        if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
+        void drawVideoWaveform(filePath, seq);
+    };
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => requestAnimationFrame(runWaveform));
+    } else {
+        setTimeout(runWaveform, 0);
+    }
+
+    if (typeof applyUiI18n === 'function') applyUiI18n();
+    if (typeof applyMetaLoopRegionUI === 'function') applyMetaLoopRegionUI(filePath);
+    _syncVideoMaximizeBtnState();
+}
+
+async function previewVideo(filePath, opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    if (videoPlayerPath === filePath && _videoEngineActive) {
+        // Toggle pause
+        const paused = window._enginePlaybackPaused === true;
+        if (typeof window.vstUpdater?.audioEngineInvoke === 'function') {
+            await window.vstUpdater.audioEngineInvoke({ cmd: 'playback_pause', paused: !paused });
+        }
+        window._enginePlaybackPaused = !paused;
+        const vid = document.getElementById('videoPlayerEl');
+        if (vid) {
+            if (!paused) vid.pause();
+            else vid.play().catch(() => {});
+        }
+        _updateVideoPlayBtn();
+        if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
+        if (!paused) {
+            // Pausing — stop RAF
+            if (_videoRafId) { cancelAnimationFrame(_videoRafId); _videoRafId = null; }
+        } else {
+            // Resuming — restart RAF
+            if (!_videoRafId) _videoRafId = requestAnimationFrame(_videoRafLoop);
+        }
+        return;
+    }
+
+    _lastVideoVisualSeekMs = 0;
+    // Set before any `await` so deferred `drawVideoWaveform` (double rAF) does not skip the visual
+    // fallback while `enginePlaybackStop` is still running.
+    videoPlayerPath = filePath;
+
+    // Stop any current audio playback first
+    if (typeof window._enginePlaybackActive !== 'undefined' && window._enginePlaybackActive) {
+        if (typeof window.enginePlaybackStop === 'function') await window.enginePlaybackStop();
+        if (typeof window.setEnginePlaybackActive === 'function') window.setEnginePlaybackActive(false);
+    }
+    // Pause HTML5 audio player if active
+    if (typeof audioPlayer !== 'undefined' && audioPlayer && !audioPlayer.paused) {
+        audioPlayer.pause();
+    }
+
+    const vid = document.getElementById('videoPlayerEl');
+    if (!vid) return;
+
+    _videoPlayerLoadUiSeq++;
+    const videoLoadUiSeq = _videoPlayerLoadUiSeq;
+    _wireVideoPlayerLoadingListeners(vid, filePath, videoLoadUiSeq);
+
+    const canEngine =
+        typeof window !== 'undefined' &&
+        window.vstUpdater &&
+        typeof window.vstUpdater.audioEngineInvoke === 'function' &&
+        typeof window.enginePlaybackStart === 'function';
+
+    _videoFallbackAudio = false;
+    _videoEngineActive = false;
+
+    // Set video source (muted — audio via engine)
+    vid.src = _videoFileSrc(filePath);
+    vid.muted = true;
+    vid.preload = 'auto';
+    const loopPathForMeta = filePath;
+    vid.addEventListener(
+        'loadedmetadata',
+        () => {
+            if (videoPlayerPath !== loopPathForMeta) return;
+            if (typeof syncAbLoopFromSampleRegion === 'function') syncAbLoopFromSampleRegion(loopPathForMeta);
+        },
+        { once: true },
+    );
+
+    if (canEngine) {
+        void vid.play().catch(() => {});
+        _startVideoRaf();
+        _updateVideoPlayBtn();
+        _showVideoInNowPlaying(filePath, o);
+
+        void (async () => {
+            try {
+                await window.enginePlaybackStart(filePath);
+                if (videoPlayerPath !== filePath) return;
+                _videoEngineActive = true;
+                _videoFallbackAudio = false;
+                vid.muted = true;
+                void vid.play().catch(() => {});
+                _updateVideoPlayBtn();
+                if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
+                if (typeof syncAbLoopFromSampleRegion === 'function') syncAbLoopFromSampleRegion(filePath);
+            } catch {
+                if (videoPlayerPath !== filePath) return;
+                if (typeof window.setEnginePlaybackActive === 'function') window.setEnginePlaybackActive(false);
+                if (typeof window.stopEnginePlaybackPoll === 'function') window.stopEnginePlaybackPoll();
+                _videoEngineActive = false;
+                _videoFallbackAudio = true;
+                vid.muted = false;
+                try {
+                    await vid.play();
+                } catch (e) {
+                    if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+                }
+                _updateVideoPlayBtn();
+                if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
+            }
+        })();
+        return;
+    }
+
+    // Fallback: unmuted HTML5 video (no engine)
+    _videoFallbackAudio = true;
+    _videoEngineActive = false;
+    vid.muted = false;
+    try {
+        await vid.play();
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
+    }
+    _startVideoRaf();
+    _updateVideoPlayBtn();
+    _showVideoInNowPlaying(filePath, o);
+}
+
+function _startVideoRaf() {
+    if (_videoRafId) cancelAnimationFrame(_videoRafId);
+    _videoRafId = requestAnimationFrame(_videoRafLoop);
+}
+
+function _videoRafLoop() {
+    _videoRafId = null;
+    if (!videoPlayerPath) return;
+
+    const vid = document.getElementById('videoPlayerEl');
+    let cur = 0;
+    let dur = 0;
+
+    if (_videoEngineActive && typeof window._enginePlaybackPosSec === 'number') {
+        // Interpolate engine position at rAF rate (honor playback speed)
+        const basePos = window._enginePlaybackPosSec;
+        const anchor = typeof window._enginePlaybackPosAnchorMs === 'number'
+            ? window._enginePlaybackPosAnchorMs : performance.now();
+        const paused = window._enginePlaybackPaused === true;
+        let speed = 1;
+        if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function') {
+            const raw = parseFloat(prefs.getItem('audioSpeed') || '1');
+            if (Number.isFinite(raw)) speed = Math.max(0.25, Math.min(2, raw));
+        }
+        const elapsed = paused ? 0 : (performance.now() - anchor) / 1000;
+        cur = basePos + elapsed * speed;
+        dur = typeof window._enginePlaybackDurSec === 'number' ? window._enginePlaybackDurSec : 0;
+        if (dur <= 0 && vid && Number.isFinite(vid.duration) && vid.duration > 0) dur = vid.duration;
+        if (dur > 0 && cur > dur) cur = dur;
+        if (cur < 0) cur = 0;
+
+        // A-B loop enforcement — seek engine and snap `<video>` so the picture cannot sit past the end brace
+        // while audio loops (skew throttle would otherwise delay the visual jump).
+        if (typeof _abLoop !== 'undefined' && _abLoop && dur > 0 && cur >= _abLoop.end) {
+            if (typeof window.vstUpdater?.audioEngineInvoke === 'function') {
+                void window.vstUpdater.audioEngineInvoke({ cmd: 'playback_seek', position_sec: _abLoop.start });
+            }
+            cur = _abLoop.start;
+            if (vid) {
+                vid.currentTime = _abLoop.start;
+                _lastVideoVisualSeekMs = performance.now();
+            }
+        }
+
+        // Sync <video> to engine clock — throttle seeks: constant currentTime writes on big files freeze WebKit.
+        if (vid) {
+            const skew = Math.abs(vid.currentTime - cur);
+            const now = performance.now();
+            if (skew > 0.48 || (skew > 0.2 && now - _lastVideoVisualSeekMs >= 380)) {
+                vid.currentTime = cur;
+                _lastVideoVisualSeekMs = now;
+            }
+        }
+    } else if (vid) {
+        cur = vid.currentTime || 0;
+        dur = vid.duration || 0;
+        if (typeof _abLoop !== 'undefined' && _abLoop && dur > 0 && cur >= _abLoop.end) {
+            vid.currentTime = _abLoop.start;
+            cur = _abLoop.start;
+            _lastVideoVisualSeekMs = performance.now();
+        }
+    }
+
+    // Update progress bar
+    const wfBox = document.getElementById('videoWaveformBox');
+    if (wfBox && dur > 0) {
+        const pct = (cur / dur) * 100;
+        const fill = wfBox.querySelector('.waveform-progress-fill');
+        const cursor = wfBox.querySelector('.waveform-cursor');
+        const timeLabel = wfBox.querySelector('.waveform-time-label');
+        if (fill) fill.style.width = pct + '%';
+        if (cursor) cursor.style.left = pct + '%';
+        if (timeLabel) timeLabel.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+    }
+    const timeDisp = document.getElementById('videoTimeDisplay');
+    if (timeDisp) timeDisp.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
+
+    // Check if playback ended
+    if (_videoEngineActive && dur > 0 && cur >= dur - 0.05) {
+        _updateVideoPlayBtn();
+        if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
+        return;
+    }
+    if (_videoFallbackAudio && vid && vid.ended) {
+        _updateVideoPlayBtn();
+        if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
+        return;
+    }
+
+    // Continue loop if still playing
+    const playing = _videoEngineActive
+        ? (window._enginePlaybackPaused !== true)
+        : (vid && !vid.paused && !vid.ended);
+    if (playing) {
+        _videoRafId = requestAnimationFrame(_videoRafLoop);
+    }
+}
+
+function _updateVideoPlayBtn() {
+    const btn = document.getElementById('btnVideoPlayPause');
+    if (!btn) return;
+    const playing = _videoEngineActive
+        ? (window._enginePlaybackPaused !== true)
+        : (() => { const v = document.getElementById('videoPlayerEl'); return v && !v.paused && !v.ended; })();
+    btn.innerHTML = playing ? '&#9646;&#9646;' : '&#9654;';
+}
+
+function seekVideoToPercent(pct) {
+    const p = Math.max(0, Math.min(1, pct));
+    const vid = document.getElementById('videoPlayerEl');
+    if (_videoEngineActive && window.vstUpdater && typeof window.vstUpdater.audioEngineInvoke === 'function') {
+        let dur = typeof window._enginePlaybackDurSec === 'number' ? window._enginePlaybackDurSec : 0;
+        if (dur <= 0 && vid && Number.isFinite(vid.duration) && vid.duration > 0) dur = vid.duration;
+        if (dur <= 0) return;
+        const pos = p * dur;
+        void window.vstUpdater.audioEngineInvoke({ cmd: 'playback_seek', position_sec: pos });
+        if (vid) {
+            vid.currentTime = pos;
+            _lastVideoVisualSeekMs = performance.now();
+        }
+        window._enginePlaybackPosSec = pos;
+        window._enginePlaybackPosAnchorMs = performance.now();
+    } else if (vid && Number.isFinite(vid.duration) && vid.duration > 0) {
+        vid.currentTime = p * vid.duration;
+    }
+    // Restart RAF if paused so UI updates
+    if (!_videoRafId) _videoRafId = requestAnimationFrame(_videoRafLoop);
+}
+
+function seekVideoWaveform(event) {
+    const box = document.getElementById('videoWaveformBox');
+    if (!box || !videoPlayerPath) return;
+    const rect = box.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const pct = (event.clientX - rect.left) / rect.width;
+    seekVideoToPercent(pct);
+}
+
+function _videoRowSizeBytes(filePath) {
+    const tbody = document.getElementById('videoTableBody');
+    if (!tbody) return NaN;
+    const row = tbody.querySelector(`tr[data-video-path="${CSS.escape(filePath)}"]`);
+    if (!row || row.dataset.videoSize == null || row.dataset.videoSize === '') return NaN;
+    const n = parseInt(row.dataset.videoSize, 10);
+    return Number.isFinite(n) && n >= 0 ? n : NaN;
+}
+
+/** Host transcodes video containers (ffmpeg→MP3 or Symphonia→WAV) before JUCE `waveform_preview`. */
+async function _ensureVideoElDuration(vid) {
+    if (!vid) return false;
+    if (vid.readyState >= 1 && Number.isFinite(vid.duration) && vid.duration > 0) return true;
+    await new Promise((resolve) => {
+        const done = () => resolve();
+        vid.addEventListener('loadedmetadata', done, { once: true });
+        vid.addEventListener('error', done, { once: true });
+        setTimeout(done, 12000);
+    });
+    return Number.isFinite(vid.duration) && vid.duration > 0;
+}
+
+/**
+ * Coarse timeline envelope from decoded video frames (spatial variance per time slice).
+ * Not a true audio waveform; fills the bar when the engine cannot demux the container.
+ */
+async function _buildVideoVisualPeaksFromElement(vid, numCols, isStillValid) {
+    if (!vid || numCols < 1 || typeof isStillValid !== 'function') return null;
+    const okDur = await _ensureVideoElDuration(vid);
+    if (!okDur || !isStillValid()) return null;
+    const duration = vid.duration;
+    const n = Math.min(120, Math.max(48, Math.min(numCols, 200)));
+    const metrics = new Array(n);
+    const w = 48;
+    const h = 48;
+    const oc = document.createElement('canvas');
+    oc.width = w;
+    oc.height = h;
+    const octx = oc.getContext('2d', { willReadFrequently: true });
+    if (!octx) return null;
+
+    const wasPaused = vid.paused;
+    if (!wasPaused) vid.pause();
+
+    const t0 = vid.currentTime;
+    try {
+        for (let i = 0; i < n; i++) {
+            if (!isStillValid()) return null;
+            const target = ((i + 0.5) / n) * duration;
+            if (Math.abs(vid.currentTime - target) > 0.05) {
+                vid.currentTime = target;
+                await new Promise((resolve) => {
+                    const onSeeked = () => {
+                        vid.removeEventListener('seeked', onSeeked);
+                        resolve();
+                    };
+                    vid.addEventListener('seeked', onSeeked);
+                    setTimeout(() => {
+                        vid.removeEventListener('seeked', onSeeked);
+                        resolve();
+                    }, 2500);
+                });
+            }
+            if (!isStillValid()) return null;
+            octx.fillStyle = '#000';
+            octx.fillRect(0, 0, w, h);
+            try {
+                octx.drawImage(vid, 0, 0, w, h);
+            } catch {
+                return null;
+            }
+            let img;
+            try {
+                img = octx.getImageData(0, 0, w, h);
+            } catch {
+                return null;
+            }
+            const d = img.data;
+            let sum = 0;
+            let sum2 = 0;
+            let count = 0;
+            for (let p = 0; p < d.length; p += 64) {
+                const lum = 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
+                sum += lum;
+                sum2 += lum * lum;
+                count++;
+            }
+            if (count < 1) {
+                metrics[i] = 0;
+            } else {
+                const mean = sum / count;
+                const variance = Math.max(0, sum2 / count - mean * mean);
+                metrics[i] = Math.min(1, Math.sqrt(variance) / 96);
+            }
+            if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+        }
+    } finally {
+        try {
+            vid.currentTime = t0;
+        } catch { /* ignore */ }
+        if (!wasPaused && isStillValid()) void vid.play().catch(() => {});
+    }
+
+    const peaks = [];
+    for (let i = 0; i < numCols; i++) {
+        const u = (i + 0.5) / numCols;
+        const ix = u * (n - 1);
+        const i0 = Math.floor(ix);
+        const i1 = Math.min(n - 1, i0 + 1);
+        const f = ix - i0;
+        const m = metrics[i0] * (1 - f) + metrics[i1] * f;
+        const amp = Math.min(1, m * 2.8);
+        peaks.push({ min: -amp * 0.42, max: amp * 0.95 });
+    }
+    return peaks;
+}
+
+async function drawVideoWaveform(filePath, seq) {
+    const canvas = document.getElementById('videoWaveformCanvas');
+    if (!canvas) return;
+    if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
+
+    const container = canvas.parentElement;
+    let cw = 560;
+    let ch = 56;
+    if (typeof resolveWaveformBoxSize === 'function') {
+        const dim = await resolveWaveformBoxSize(container, 560, 56);
+        cw = dim.w;
+        ch = dim.h;
+    } else if (container) {
+        cw = container.clientWidth || 560;
+        ch = container.clientHeight || 56;
+    }
+    if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(cw * dpr));
+    canvas.height = Math.max(1, Math.round(ch * dpr));
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const cachedPeaks = typeof _waveformCache !== 'undefined' ? _waveformCache[filePath] : null;
+    if (cachedPeaks && Array.isArray(cachedPeaks) && cachedPeaks.length > 0 && typeof renderWaveformData === 'function') {
+        renderWaveformData(ctx, canvas, cachedPeaks);
+        return;
+    }
+
+    const bars = Math.max(1, Math.min(Math.floor(cw), 800));
+
+    const rowBytes = _videoRowSizeBytes(filePath);
+    const skipVisualSeekHeavy = Number.isFinite(rowBytes) && rowBytes > VIDEO_VISUAL_WAVEFORM_MAX_FILE_BYTES;
+
+    // Never use decodePeaksViaWorker for video — it fetch()+ArrayBuffers the entire file (multi‑GB hang).
+    // Engine path: host transcodes first (bounded audio extract) — safe for multi‑GB MP4.
+    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
+    if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
+
+    let peaks = null;
+    try {
+        if (typeof fetchWaveformPreviewFromEngine === 'function') {
+            peaks = await fetchWaveformPreviewFromEngine(filePath, bars);
+        }
+    } catch { /* ignore */ }
+
+    // `expandedVideoPath` is set before `previewVideo` — unlike `videoPlayerPath`, it is not delayed
+    // by `await enginePlaybackStop()`, so frame-sampled peaks still run when engine path fails.
+    if (
+        (!peaks || !peaks.length)
+        && !skipVisualSeekHeavy
+        && typeof renderWaveformData === 'function'
+        && expandedVideoPath === filePath
+    ) {
+        const vid = document.getElementById('videoPlayerEl');
+        const visual = await _buildVideoVisualPeaksFromElement(vid, bars, () => seq === _videoWfDrawSeq && expandedVideoPath === filePath);
+        if (visual && visual.length) peaks = visual;
+    }
+
+    if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
+
+    if (peaks && Array.isArray(peaks) && peaks.length > 0) {
+        if (typeof storeWaveformPeaksInCache === 'function') {
+            storeWaveformPeaksInCache(filePath, peaks);
+        } else if (typeof _waveformCache !== 'undefined') {
+            _waveformCache[filePath] = peaks;
+            if (typeof _evictCache === 'function') _evictCache(_waveformCache);
+        }
+    }
+
+    if (peaks && typeof renderWaveformData === 'function') {
+        renderWaveformData(ctx, canvas, peaks);
+    } else {
+        ctx.strokeStyle = 'rgba(5,217,232,0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height / 2);
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+    }
+}
+
+/** Called from keyboard-nav when navigating video rows with expand open. */
+function syncExpandedVideoMetaWithKeyboardSelection(newPath) {
+    if (expandedVideoPath === null) return;
+    if (expandedVideoPath === newPath) return;
+    void expandVideoMetaForPath(newPath);
+}
+
 const _VIDEO_EXPORT_MAX = 100000;
 
 async function fetchVideosForExport() {
     const search = _lastVideoSearch || '';
+    const fmtSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('videoFormatFilter') : null;
+    const formatFilter = fmtSet ? [...fmtSet].join(',') : null;
     let total = _videoTotalCount || 0;
     if (total <= 0) {
         try {
             const probe = await window.vstUpdater.dbQueryVideo({
                 search: search || null,
+                format_filter: formatFilter,
                 sort_key: videoSortKey,
                 sort_asc: videoSortAsc,
                 search_regex: _lastVideoMode === 'regex',
@@ -421,6 +1359,7 @@ async function fetchVideosForExport() {
     if (n <= 0) return [];
     const result = await window.vstUpdater.dbQueryVideo({
         search: search || null,
+        format_filter: formatFilter,
         sort_key: videoSortKey,
         sort_asc: videoSortAsc,
         search_regex: _lastVideoMode === 'regex',
@@ -428,4 +1367,28 @@ async function fetchVideosForExport() {
         limit: n,
     });
     return result.videoFiles || [];
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('fullscreenchange', _syncVideoMaximizeBtnState);
+    document.addEventListener('webkitfullscreenchange', _syncVideoMaximizeBtnState);
+    /** Waveform seek is unavailable while only the `<video>` is fullscreen — map clicks on the video to `seekVideoToPercent`. */
+    document.addEventListener(
+        'pointerdown',
+        (e) => {
+            if (!videoPlayerPath) return;
+            const vid = e.target instanceof Element ? e.target.closest('#videoPlayerEl') : null;
+            if (!vid) return;
+            const doc = document;
+            const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
+            if (fsEl !== vid) return;
+            if (e.button !== 0) return;
+            const r = vid.getBoundingClientRect();
+            if (r.width <= 0) return;
+            e.preventDefault();
+            const pct = (e.clientX - r.left) / r.width;
+            seekVideoToPercent(pct);
+        },
+        true
+    );
 }
