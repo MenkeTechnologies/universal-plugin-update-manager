@@ -786,7 +786,7 @@ function settingResetAllUI() {
     // All layout/ordering/sizing prefs keys
     const uiKeys = [
         'tabOrder', 'settingsSectionOrder', 'audioEngineSectionOrder', 'columnWidths',
-        'playerSectionOrder', 'playerDock', 'playerWidth', 'playerHeight', 'playerExpanded',
+        'playerSectionOrder', 'playerDock', 'playerWidth', 'playerHeight', 'playerExpanded', 'playerPaneHidden',
         'headerStatsOrder', 'statsBarOrder',
         'pluginStatsOrder', 'audioStatsOrder', 'dawStatsOrder', 'presetStatsOrder', 'midiStatsOrder', 'pdfStatsOrder',
         'audioColumnOrder', 'dawColumnOrder', 'presetColumnOrder',

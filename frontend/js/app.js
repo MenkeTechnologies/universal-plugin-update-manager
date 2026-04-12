@@ -111,9 +111,10 @@ async function handleFileWatcherChange(event) {
     if (typeof initTooltipHoverDelay === 'function') initTooltipHoverDelay();
     // Preload Settings → Database Caches (`db_cache_stats`) so counts warm before first Settings visit.
     if (typeof renderCacheStats === 'function') void renderCacheStats();
-    // Restore audio player state — must run post-prefs-load (the IIFEs run too early).
+    // Restore player pane layout — must run post-prefs-load (the IIFEs run too early).
     if (typeof restorePlayerDock === 'function') restorePlayerDock();
     if (typeof restorePlayerDimensions === 'function') restorePlayerDimensions();
+    if (typeof restorePlayerPaneVisibilityFromPrefs === 'function') restorePlayerPaneVisibilityFromPrefs();
     initTabDragReorder();
     initMultiFilters();
     initSortPersistence();

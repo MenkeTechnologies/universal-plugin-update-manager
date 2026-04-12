@@ -230,12 +230,29 @@ function metaSpectrogramEnginePixelDims() {
     return { width_px: 256, height_px: 64 };
 }
 
+/** Coalesce concurrent `waveform_preview` calls (same path + clamped width) — video row hits NP + expanded UI together. */
+const _wfEngineInflight = new Map();
+
 async function fetchWaveformPreviewFromEngine(absPath, widthPx) {
     const invoke = audioEngineInvokeMetaVisuals();
     if (!invoke) return null;
-    const wfRes = await invoke({ cmd: 'waveform_preview', path: absPath, width_px: widthPx });
-    if (!wfRes || wfRes.ok !== true || !wfRes.peaks) return null;
-    return wfRes.peaks;
+    const w = Math.max(32, Math.min(8192, Math.floor(Number(widthPx)) || 800));
+    const key = absPath + '\0' + w;
+    const inflight = _wfEngineInflight.get(key);
+    if (inflight) {
+        return inflight;
+    }
+    const task = (async () => {
+        try {
+            const wfRes = await invoke({ cmd: 'waveform_preview', path: absPath, width_px: w });
+            if (!wfRes || wfRes.ok !== true || !wfRes.peaks) return null;
+            return wfRes.peaks;
+        } finally {
+            _wfEngineInflight.delete(key);
+        }
+    })();
+    _wfEngineInflight.set(key, task);
+    return task;
 }
 
 /** Shared with `file-browser.js` + `video.js`: evict, immediate SQLite row upsert, debounced full snapshot. */
@@ -544,6 +561,15 @@ function isEngineUnplayablePath(filePath) {
 function isAudioPlaying() {
     if (_enginePlaybackActive) {
         return window._enginePlaybackPaused !== true;
+    }
+    if (
+        typeof videoPlayerPath !== 'undefined' &&
+        videoPlayerPath &&
+        typeof audioPlayerPath !== 'undefined' &&
+        audioPlayerPath === videoPlayerPath
+    ) {
+        const vid = document.getElementById('videoPlayerEl');
+        if (vid && !vid.paused && !vid.ended) return true;
     }
     if (audioReverseMode && _bufPlaying) return true;
     return typeof audioPlayer !== 'undefined' && audioPlayer && !audioPlayer.paused;
@@ -3351,7 +3377,7 @@ async function showEngineUnplayablePreview(filePath, keepFloatingPlayerHidden = 
 // ── Audio Preview / Playback ──
 /**
  * @param {string} filePath
- * @param { { skipRecentReorder?: boolean, minimizeFloatingPlayer?: boolean } } [opts] — When **`skipRecentReorder`**, **`addToRecentlyPlayed`** updates or appends without moving the row to the top (autoplay, prev/next, and clicks on the player history list keep stable order). When **`minimizeFloatingPlayer`**, do not auto-open the floating bar if it is already hidden (restore pill); if the bar is already visible, leave it visible.
+ * @param { { skipRecentReorder?: boolean, minimizeFloatingPlayer?: boolean } } [opts] — When **`skipRecentReorder`**, **`addToRecentlyPlayed`** updates or appends without moving the row to the top (autoplay, prev/next, and clicks on the player history list keep stable order). When **`minimizeFloatingPlayer`**, do not auto-open the floating bar if it is already hidden (restore pill); if the bar is already visible, leave it visible. Pref **`playerPaneHidden`** (`on` after **Hide player**) keeps the pane minimized across launches until **Show player** sets it off.
  */
 async function previewAudio(filePath, opts) {
     const o = opts && typeof opts === 'object' ? opts : {};
@@ -3362,7 +3388,13 @@ async function previewAudio(filePath, opts) {
     /** Row/keyboard play: stay minimized only when the bar is not already shown. */
     const rowPlayKeepBarHidden =
         o.minimizeFloatingPlayer === true && np0 && !np0.classList.contains('active');
-    const keepFloatingPlayerHidden = userHidPlayerWithPathLoaded || rowPlayKeepBarHidden;
+    /** Persisted from `hidePlayer` / `showPlayer` (`playerPaneHidden` pref). */
+    const playerPaneHiddenByPref =
+        typeof prefs !== 'undefined' &&
+        typeof prefs.getItem === 'function' &&
+        prefs.getItem('playerPaneHidden') === 'on';
+    const keepFloatingPlayerHidden =
+        userHidPlayerWithPathLoaded || rowPlayKeepBarHidden || playerPaneHiddenByPref;
 
     const ext = filePath.split('.').pop().toLowerCase();
     if (isEngineUnplayablePath(filePath)) {
@@ -4512,6 +4544,10 @@ function setAudioVolume(value, opts) {
     if (npSlider) npSlider.value = String(value);
     const npPct = document.getElementById('npVolumePct');
     if (npPct) npPct.textContent = value + '%';
+    const vfsPct = document.getElementById('videoFsVolumePct');
+    if (vfsPct) vfsPct.textContent = value + '%';
+    const vfs = document.getElementById('videoFsVolume');
+    if (vfs && document.activeElement !== vfs) vfs.value = String(value);
     const eqVs = document.getElementById('npEqVolSlider');
     if (eqVs) eqVs.value = String(value);
     const eqVp = document.getElementById('npEqVolVal');
@@ -5794,6 +5830,7 @@ function collapsePlayer() {
 function hidePlayer() {
     const np = document.getElementById('audioNowPlaying');
     prefs.setItem('playerExpanded', np.classList.contains('expanded') ? 'on' : 'off');
+    prefs.setItem('playerPaneHidden', 'on');
     // Hide player but keep audio playing
     np.classList.remove('active');
     const pill = document.getElementById('audioRestorePill');
@@ -5805,6 +5842,7 @@ function hidePlayer() {
 function showPlayer() {
     const pill = document.getElementById('audioRestorePill');
     if (pill) pill.classList.remove('active');
+    prefs.setItem('playerPaneHidden', 'off');
     const np = document.getElementById('audioNowPlaying');
     np.classList.add('active');
     if (prefs.getItem('playerExpanded') === 'on') np.classList.add('expanded');
@@ -5824,6 +5862,25 @@ function showPlayer() {
     void np.offsetWidth;
     renderRecentlyPlayed();
     updateNowPlayingBtn();
+}
+
+/**
+ * After `prefs.load()`: if the user last hid the player pane, ensure it stays dismissed
+ * (guards stray `.active` from devtools or partial init). Full visibility rules apply again
+ * when `previewAudio` / video playback runs (reads `playerPaneHidden`).
+ */
+function restorePlayerPaneVisibilityFromPrefs() {
+    if (typeof prefs === 'undefined' || typeof prefs.getItem !== 'function') return;
+    if (prefs.getItem('playerPaneHidden') !== 'on') return;
+    const np = document.getElementById('audioNowPlaying');
+    if (!np) return;
+    np.classList.remove('active');
+    const pill = document.getElementById('audioRestorePill');
+    if (pill) pill.classList.remove('active');
+}
+
+if (typeof window !== 'undefined') {
+    window.restorePlayerPaneVisibilityFromPrefs = restorePlayerPaneVisibilityFromPrefs;
 }
 
 // Double-click to expand/collapse player
@@ -6076,6 +6133,37 @@ async function drawWaveform(filePath, wfSeq) {
     if (!canvas) return;
     if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
     const container = canvas.parentElement;
+    const npNameEl = document.getElementById('npName');
+    const isVideoNowPlaying = !!(npNameEl && npNameEl.dataset.videoSource === 'true');
+
+    if (_waveformCache[filePath]) {
+        const { w: cw, h: ch } = await resolveWaveformBoxSize(container, 280, 24);
+        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.round(cw * dpr));
+        canvas.height = Math.max(1, Math.round(ch * dpr));
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        renderWaveformData(ctx, canvas, _waveformCache[filePath]);
+        return;
+    }
+
+    let cwHintNp = 280;
+    if (container) {
+        try {
+            const r = container.getBoundingClientRect();
+            if (r.width >= 2) cwHintNp = Math.min(2000, Math.round(r.width));
+            else if (container.clientWidth >= 2) cwHintNp = Math.min(2000, container.clientWidth);
+        } catch {
+            /* ignore */
+        }
+    }
+    const barsEarlyVideo = Math.max(1, Math.min(Math.max(1, Math.floor(cwHintNp)), 800));
+    const videoEnginePromise =
+        isVideoNowPlaying && typeof fetchWaveformPreviewFromEngine === 'function'
+            ? fetchWaveformPreviewFromEngine(filePath, barsEarlyVideo)
+            : null;
+
     const { w: cw, h: ch } = await resolveWaveformBoxSize(container, 280, 24);
     if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
     const dpr = window.devicePixelRatio || 1;
@@ -6084,16 +6172,8 @@ async function drawWaveform(filePath, wfSeq) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (_waveformCache[filePath]) {
-        if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
-        renderWaveformData(ctx, canvas, _waveformCache[filePath]);
-        return;
-    }
-
     const bars = Math.max(1, Math.min(Math.max(1, Math.floor(cw)), 800));
     const src = fileSrcForDecode(filePath);
-    const npNameEl = document.getElementById('npName');
-    const isVideoNowPlaying = !!(npNameEl && npNameEl.dataset.videoSource === 'true');
     try {
         if (typeof yieldToBrowser === 'function') await yieldToBrowser();
         if (_npWaveformDrawStale(wfSeq) || filePath !== audioPlayerPath) return;
@@ -6101,10 +6181,9 @@ async function drawWaveform(filePath, wfSeq) {
         if (isVideoNowPlaying) {
             // Video: never decodePeaksViaWorker — it would fetch the entire container (multi‑GB UI freeze).
             // Host transcodes before JUCE (bounded extract) — call engine for any file size.
+            // `fetchWaveformPreviewFromEngine` is started before `resolveWaveformBoxSize` so MP4 IPC overlaps layout waits.
             try {
-                if (typeof fetchWaveformPreviewFromEngine === 'function') {
-                    peaks = await fetchWaveformPreviewFromEngine(filePath, bars);
-                }
+                peaks = videoEnginePromise ? await videoEnginePromise : null;
             } catch {
                 peaks = null;
             }

@@ -177,7 +177,8 @@ const DEFAULT_SHORTCUT_DEFS = {
     scanPresetsOnly: {key: 'r', mod: true, shift: true},
     scanPdfsOnly: {key: 'f', mod: true, shift: true},
     scanVideosOnly: {key: 'e', mod: true, shift: true},
-    videoToggleFullscreen: {key: 'Enter', mod: true, shift: false},
+    /** Single key: Cmd/Ctrl+Enter is unreliable in WKWebView / embedded hosts. */
+    videoToggleFullscreen: {key: 'v', mod: false, shift: false},
     stopPdfScan: {key: 'y', mod: true, shift: true},
     stopVideoScan: {key: 'q', mod: true, shift: true},
     extractPdfMetadata: {key: 'm', mod: true, shift: true},
@@ -314,11 +315,31 @@ function formatKey(shortcut) {
     return parts.join('+');
 }
 
+/** Pixels: full shortcut list height. While filtering, `#shortcutsList` keeps this min-height so CSS
+ *  multicol (`column-fill: balance` on `.settings-container`) does not reflow every settings pane. */
+let _shortcutsListLayoutHeightPx = 0;
+
 function renderShortcutSettings(filter) {
     const list = document.getElementById('shortcutsList');
     if (!list) return;
+    const tabSettings = document.getElementById('tabSettings');
+    const prevScrollTop = tabSettings ? tabSettings.scrollTop : 0;
     const shortcuts = getShortcuts();
     const q = (filter || '').trim();
+    const multicolSettings =
+        typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 900px)').matches;
+    if (!q) {
+        list.style.minHeight = '';
+    } else if (multicolSettings) {
+        if (_shortcutsListLayoutHeightPx <= 0) {
+            _shortcutsListLayoutHeightPx = list.offsetHeight;
+        }
+        if (_shortcutsListLayoutHeightPx > 0) {
+            list.style.minHeight = `${_shortcutsListLayoutHeightPx}px`;
+        }
+    } else {
+        list.style.minHeight = '';
+    }
     let entries;
     if (!q) {
         entries = Object.entries(shortcuts).map(([id, sc]) => [id, sc, 0]);
@@ -345,6 +366,15 @@ function renderShortcutSettings(filter) {
             // Drag from anywhere on the row (skip list handles buttons)
         });
     }
+    requestAnimationFrame(() => {
+        if (!q) {
+            _shortcutsListLayoutHeightPx = list.offsetHeight;
+        }
+        if (tabSettings) {
+            const max = Math.max(0, tabSettings.scrollHeight - tabSettings.clientHeight);
+            tabSettings.scrollTop = Math.min(prevScrollTop, max);
+        }
+    });
 }
 
 // Filter input — uses unified filter system
@@ -440,6 +470,12 @@ document.addEventListener('keydown', (e) => {
         if (normalizeKeyForMatch(sc.key) !== eventKey) continue;
         if (sc.mod !== mod) continue;
         if (!shortcutShiftMatches(sc, e)) continue;
+        if (
+            id === 'videoToggleFullscreen' &&
+            (typeof videoPlayerPath === 'undefined' || !videoPlayerPath)
+        ) {
+            continue;
+        }
         e.preventDefault();
         executeShortcut(id);
         return;

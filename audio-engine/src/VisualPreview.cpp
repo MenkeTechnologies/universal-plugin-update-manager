@@ -115,17 +115,19 @@ juce::var waveformPreview(juce::AudioFormatManager& fm, const juce::var& req)
 
     std::vector<float> mono((size_t) numSamples, 0.f);
 
-    constexpr int kChunk = 65536;
+    /** Larger chunks → fewer `read` calls and no per-chunk vector churn (important for long previews). */
+    constexpr int kChunk = 131072;
+    std::vector<std::vector<float>> ch((size_t) numCh);
+    for (int c = 0; c < numCh; ++c)
+        ch[(size_t) c].resize((size_t) kChunk);
+    std::vector<float*> ptrs((size_t) numCh);
+    for (int c = 0; c < numCh; ++c)
+        ptrs[(size_t) c] = ch[(size_t) c].data();
+
     int64_t readOff = 0;
     while (readOff < numSamples)
     {
         const int n = (int) juce::jmin<int64_t>(kChunk, numSamples - readOff);
-        std::vector<std::vector<float>> ch((size_t) numCh);
-        for (int c = 0; c < numCh; ++c)
-            ch[(size_t) c].resize((size_t) n);
-        std::vector<float*> ptrs((size_t) numCh);
-        for (int c = 0; c < numCh; ++c)
-            ptrs[(size_t) c] = ch[(size_t) c].data();
 
         if (!reader->read(ptrs.data(), numCh, startSample + readOff, n))
             return errPrev("read failed");

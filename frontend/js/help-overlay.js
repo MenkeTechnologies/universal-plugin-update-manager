@@ -43,7 +43,7 @@ const HELP_MORE_SHORTCUT_IDS = [
     'newSmartPlaylist', 'togglePlayerExpand', 'toggleEq', 'toggleMono',
     'toggleABLoop', 'heatmapDash', 'togglePlayer', 'toggleCrt', 'toggleNeonGlow',
     'clearPlayHistory', 'deselectAll', 'openPrefs',
-    'scanPluginsOnly', 'scanSamplesOnly', 'scanDawOnly', 'scanPresetsOnly', 'scanPdfsOnly', 'videoToggleFullscreen',
+    'scanPluginsOnly', 'scanSamplesOnly', 'scanDawOnly', 'scanPresetsOnly', 'scanPdfsOnly',
     'stopPdfScan', 'extractPdfMetadata', 'stopPdfMetadata', 'togglePdfMetadataAutoExtract',
     'buildFingerprintCache', 'checkUpdates', 'buildPluginIndex', 'bpmKeyLufsStart', 'bpmKeyLufsStop',
     'clearAllCaches', 'exportSettingsPdf', 'exportLogPdf', 'exportMidiPalette', 'exportPluginXref', 'exportSmartPlaylists',
@@ -69,6 +69,13 @@ function _helpMoreRows() {
     return rows.join('');
 }
 
+function _helpVideoFullscreenRow(h) {
+    if (typeof getShortcuts !== 'function' || typeof formatKey !== 'function') return '';
+    const ent = getShortcuts().videoToggleFullscreen;
+    if (!ent) return '';
+    return `<div class="help-row"><kbd>${_helpEsc(formatKey(ent))}</kbd> <span>${h('help.play.video_maximize')}</span></div>`;
+}
+
 function toggleHelpOverlay() {
     let existing = document.getElementById('helpOverlay');
     if (existing) {
@@ -81,6 +88,7 @@ function toggleHelpOverlay() {
     const k19 = `${_helpModKbdDigit('1')}<span style="color:var(--text-dim);">\u2013</span>${_helpModKbdDigit('9')}`;
     const k0 = _helpModKbdDigit('0');
     const moreRows = _helpMoreRows();
+    const videoFsRow = _helpVideoFullscreenRow(h);
 
     const html = `<div class="modal-overlay" id="helpOverlay" data-action-modal="closeHelp">
     <div class="modal-content">
@@ -122,6 +130,7 @@ function toggleHelpOverlay() {
             <div class="help-row"><kbd>M</kbd> <span>${h('help.play.mute')}</span></div>
             <div class="help-row">${_helpModArrow('Up')} <span>${h('help.play.vol_up')}</span></div>
             <div class="help-row">${_helpModArrow('Down')} <span>${h('help.play.vol_down')}</span></div>
+            ${videoFsRow}
           </div>
           <div class="help-section">
             <h3>${h('help.section.actions')}</h3>

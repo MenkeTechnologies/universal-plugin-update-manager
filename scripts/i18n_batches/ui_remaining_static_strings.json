@@ -7,7 +7,7 @@
   "ui.dock.top_right": "TOP RIGHT ↗",
   "ui.dock.bottom_left": "BOTTOM LEFT",
   "ui.dock.bottom_right": "BOTTOM RIGHT ↘",
-  "ui.np.toolbar_title": "Audio Player",
+  "ui.np.toolbar_title": "Player",
   "ui.np.label_speed": "Speed",
   "ui.np.expand_hint": "double-click to expand",
   "ui.np.eq_title": "PARAMETRIC EQ & FX",

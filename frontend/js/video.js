@@ -555,11 +555,44 @@ let _videoRafId = null;
 let _videoEngineActive = false;
 let _videoFallbackAudio = false;
 let _videoWfDrawSeq = 0;
+/** True while user drags `#videoFsSeek` — RAF must not overwrite the thumb. */
+let _videoFsSeekUserDrag = false;
 /** Bumps on each new `previewVideo` load and on `stopVideoPlayback` — stale `loadeddata` handlers must not hide the spinner for the wrong file. */
 let _videoPlayerLoadUiSeq = 0;
 /** Skip `<video>` frame-sampled waveform fallback above this — many seeks stress demux on huge files. Host `waveform_preview` still runs (ffmpeg/Symphonia extract ≤300s, then JUCE). */
 const VIDEO_VISUAL_WAVEFORM_MAX_FILE_BYTES = 96 * 1024 * 1024;
 let _lastVideoVisualSeekMs = 0;
+
+/** Match `video_scanner::VIDEO_EXTENSIONS` basename suffixes (no dot). */
+const _VIDEO_CONTAINER_PLAYBACK_EXT = new Set([
+    'mp4',
+    'm4v',
+    'mov',
+    'mkv',
+    'webm',
+    'avi',
+    'mpg',
+    'mpeg',
+    'wmv',
+    'flv',
+    'ogv',
+    '3gp',
+    'mts',
+    'm2ts',
+]);
+
+/**
+ * Use `<video>` element audio for these files. JUCE `start_output_stream` memory-loads the whole
+ * container for SMB stability — multi‑GB MP4 can hang with `<video>` muted until then; bounded
+ * `waveform_preview` transcode can finish first, so it looked like “no audio until waveform”.
+ */
+function _playbackUsesHtml5VideoAudio(filePath) {
+    if (!filePath || typeof filePath !== 'string') return false;
+    const base = filePath.split(/[/\\]/).pop() || '';
+    const dot = base.lastIndexOf('.');
+    if (dot < 0 || dot >= base.length - 1) return false;
+    return _VIDEO_CONTAINER_PLAYBACK_EXT.has(base.slice(dot + 1).toLowerCase());
+}
 
 function _videoFileSrc(path) {
     const tauri = typeof window !== 'undefined' ? window.__TAURI__ : null;
@@ -603,45 +636,93 @@ function _wireVideoPlayerLoadingListeners(vid, filePath, loadUiSeq) {
     else setTimeout(trySync, 0);
 }
 
+function _videoFullscreenHostEl() {
+    return document.getElementById('videoFullscreenRoot');
+}
+
 function _videoExitFullscreenIfActive() {
+    const host = _videoFullscreenHostEl();
     const vid = document.getElementById('videoPlayerEl');
-    if (!vid) return;
     const doc = document;
     const el = doc.fullscreenElement ?? doc.webkitFullscreenElement;
-    if (el !== vid) return;
-    if (typeof doc.exitFullscreen === 'function') void doc.exitFullscreen();
-    else if (typeof doc.webkitExitFullscreen === 'function') void doc.webkitExitFullscreen();
-}
-
-function _syncVideoMaximizeBtnState() {
-    const btn = document.getElementById('btnVideoMaximize');
-    const vid = document.getElementById('videoPlayerEl');
-    if (!btn || !vid) return;
-    const doc = document;
-    const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
-    const fs = fsEl === vid;
-    const maxT = typeof appFmt === 'function' ? appFmt('ui.tt.video_maximize') : 'Fullscreen video';
-    const restT = typeof appFmt === 'function' ? appFmt('ui.tt.video_restore') : 'Exit fullscreen';
-    btn.title = fs ? restT : maxT;
-}
-
-function toggleVideoMaximize() {
-    const vid = document.getElementById('videoPlayerEl');
-    if (!vid) return;
-    const doc = document;
-    const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
-    if (fsEl === vid) {
+    if (host && el === host) {
         if (typeof doc.exitFullscreen === 'function') void doc.exitFullscreen();
         else if (typeof doc.webkitExitFullscreen === 'function') void doc.webkitExitFullscreen();
         return;
     }
-    if (typeof vid.requestFullscreen === 'function') {
-        void vid.requestFullscreen().catch(() => {});
-    } else if (typeof vid.webkitRequestFullscreen === 'function') {
-        void vid.webkitRequestFullscreen();
-    } else if (typeof vid.webkitEnterFullscreen === 'function') {
-        vid.webkitEnterFullscreen();
+    /* Legacy: older builds fullscreened `<video>` only. */
+    if (vid && el === vid) {
+        if (typeof doc.exitFullscreen === 'function') void doc.exitFullscreen();
+        else if (typeof doc.webkitExitFullscreen === 'function') void doc.webkitExitFullscreen();
     }
+}
+
+function _syncVideoFsControlsFromNp() {
+    const np = document.getElementById('npVolume');
+    const fs = document.getElementById('videoFsVolume');
+    const fsp = document.getElementById('videoFsVolumePct');
+    if (np && fs) fs.value = np.value;
+    if (np && fsp) fsp.textContent = (np.value || '100') + '%';
+}
+
+function _syncVideoMaximizeBtnState() {
+    const btn = document.getElementById('btnVideoMaximize');
+    const host = _videoFullscreenHostEl();
+    const vid = document.getElementById('videoPlayerEl');
+    if (!btn || (!host && !vid)) return;
+    const doc = document;
+    const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
+    const fs = (host && fsEl === host) || (!!vid && fsEl === vid);
+    const maxT = typeof appFmt === 'function' ? appFmt('ui.tt.video_maximize') : 'Fullscreen video';
+    const restT = typeof appFmt === 'function' ? appFmt('ui.tt.video_restore') : 'Exit fullscreen';
+    btn.title = fs ? restT : maxT;
+    if (fs && host && fsEl === host) _syncVideoFsControlsFromNp();
+}
+
+function toggleVideoMaximize() {
+    const host = _videoFullscreenHostEl();
+    const vid = document.getElementById('videoPlayerEl');
+    if (!host || !vid) return;
+    const doc = document;
+    const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
+    if (fsEl === host || fsEl === vid) {
+        if (typeof doc.exitFullscreen === 'function') void doc.exitFullscreen();
+        else if (typeof doc.webkitExitFullscreen === 'function') void doc.webkitExitFullscreen();
+        return;
+    }
+    const fallbackVidFs = () => {
+        if (typeof vid.requestFullscreen === 'function') {
+            return vid.requestFullscreen();
+        }
+        if (typeof vid.webkitRequestFullscreen === 'function') {
+            vid.webkitRequestFullscreen();
+            return Promise.resolve();
+        }
+        if (typeof vid.webkitEnterFullscreen === 'function') {
+            vid.webkitEnterFullscreen();
+        }
+        return Promise.resolve();
+    };
+    if (typeof host.requestFullscreen === 'function') {
+        void host.requestFullscreen().catch(() => fallbackVidFs());
+        return;
+    }
+    if (typeof host.webkitRequestFullscreen === 'function') {
+        try {
+            host.webkitRequestFullscreen();
+        } catch {
+            void fallbackVidFs();
+        }
+        return;
+    }
+    void fallbackVidFs();
+}
+
+/** Fullscreen scrubber (`#videoFsSeek` 0…1000). */
+function onVideoFsSeekInput(raw) {
+    const v = parseInt(String(raw), 10);
+    if (!Number.isFinite(v)) return;
+    seekVideoToPercent(Math.max(0, Math.min(1, v / 1000)));
 }
 
 function closeVideoMetaRow() {
@@ -702,6 +783,10 @@ function _showVideoInNowPlaying(filePath, opts) {
     // Respect "player hidden" state: if the bar is not active but a track was loaded,
     // the user explicitly hid it — don't force it open.
     const wasHiddenByUser = !!(np && !np.classList.contains('active') && typeof audioPlayerPath !== 'undefined' && audioPlayerPath != null);
+    const playerPaneHiddenByPref =
+        typeof prefs !== 'undefined' &&
+        typeof prefs.getItem === 'function' &&
+        prefs.getItem('playerPaneHidden') === 'on';
 
     // Set audioPlayerPath so tray + now-playing bar recognize active playback
     if (typeof audioPlayerPath !== 'undefined') {
@@ -712,11 +797,22 @@ function _showVideoInNowPlaying(filePath, opts) {
     }
 
     if (np) {
-        if (o.minimizeFloatingPlayer === true && !np.classList.contains('active')) {
+        const stayHidden =
+            (o.minimizeFloatingPlayer === true && !np.classList.contains('active')) ||
+            playerPaneHiddenByPref ||
+            wasHiddenByUser;
+        if (stayHidden) {
+            np.classList.remove('active');
             const pill = document.getElementById('audioRestorePill');
             if (pill) pill.classList.add('active');
-        } else if (!wasHiddenByUser) {
+        } else {
+            const pill = document.getElementById('audioRestorePill');
+            if (pill) pill.classList.remove('active');
             np.classList.add('active');
+            if (typeof prefs !== 'undefined' && typeof prefs.getItem === 'function' && prefs.getItem('playerExpanded') === 'on') {
+                np.classList.add('expanded');
+                if (typeof renderRecentlyPlayed === 'function') renderRecentlyPlayed();
+            }
         }
     }
 
@@ -823,7 +919,20 @@ function expandVideoMetaForPath(filePath) {
             <span class="video-player-loading-text" data-i18n="ui.js.query_loading">Loading…</span>
           </div>
         </div>
-        <video id="videoPlayerEl" playsinline></video>
+        <div id="videoFullscreenRoot" class="video-fullscreen-root">
+          <div class="video-fs-stage">
+            <video id="videoPlayerEl" playsinline></video>
+          </div>
+          <div class="video-fs-overlay" aria-label="Fullscreen video controls">
+            <input type="range" id="videoFsSeek" class="video-fs-seek" data-action="videoFsSeek" min="0" max="1000" value="0" step="1"
+              data-i18n-title="ui.audio.meta_waveform_seek_title" title="Seek playback position" />
+            <span class="video-fs-vol-wrap">
+              <input type="range" id="videoFsVolume" class="video-fs-vol-slider" data-action="setVolume" min="0" max="100" value="100" step="1"
+                data-i18n-title="ui.tt.volume_cmd_up_down" title="Volume" />
+              <span class="volume-pct" id="videoFsVolumePct">100%</span>
+            </span>
+          </div>
+        </div>
       </div>
       <div class="meta-waveform" id="videoWaveformBox" data-path="${hp}" title="Click to seek">
         <canvas id="videoWaveformCanvas"></canvas>
@@ -848,7 +957,7 @@ function expandVideoMetaForPath(filePath) {
     // Start playback immediately — do not await engine or waveform work on this stack.
     void previewVideo(filePath, { minimizeFloatingPlayer: true });
 
-    // Waveform decode hits IPC/workers; defer past paint + playback start so it never blocks the click path.
+    // Waveform: one animation frame yields layout for `#videoWaveformCanvas` (double rAF cost ~32ms+ before IPC).
     _videoWfDrawSeq++;
     const seq = _videoWfDrawSeq;
     const runWaveform = () => {
@@ -856,7 +965,7 @@ function expandVideoMetaForPath(filePath) {
         void drawVideoWaveform(filePath, seq);
     };
     if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(() => requestAnimationFrame(runWaveform));
+        requestAnimationFrame(runWaveform);
     } else {
         setTimeout(runWaveform, 0);
     }
@@ -868,32 +977,40 @@ function expandVideoMetaForPath(filePath) {
 
 async function previewVideo(filePath, opts) {
     const o = opts && typeof opts === 'object' ? opts : {};
-    if (videoPlayerPath === filePath && _videoEngineActive) {
-        // Toggle pause
-        const paused = window._enginePlaybackPaused === true;
-        if (typeof window.vstUpdater?.audioEngineInvoke === 'function') {
-            await window.vstUpdater.audioEngineInvoke({ cmd: 'playback_pause', paused: !paused });
-        }
-        window._enginePlaybackPaused = !paused;
+    if (videoPlayerPath === filePath && (_videoEngineActive || _videoFallbackAudio)) {
         const vid = document.getElementById('videoPlayerEl');
-        if (vid) {
-            if (!paused) vid.pause();
-            else vid.play().catch(() => {});
+        if (_videoEngineActive) {
+            const paused = window._enginePlaybackPaused === true;
+            if (typeof window.vstUpdater?.audioEngineInvoke === 'function') {
+                await window.vstUpdater.audioEngineInvoke({ cmd: 'playback_pause', paused: !paused });
+            }
+            window._enginePlaybackPaused = !paused;
+            if (vid) {
+                if (!paused) vid.pause();
+                else void vid.play().catch(() => {});
+            }
+        } else if (vid) {
+            if (vid.paused) void vid.play().catch(() => {});
+            else vid.pause();
         }
         _updateVideoPlayBtn();
         if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
-        if (!paused) {
-            // Pausing — stop RAF
-            if (_videoRafId) { cancelAnimationFrame(_videoRafId); _videoRafId = null; }
-        } else {
-            // Resuming — restart RAF
-            if (!_videoRafId) _videoRafId = requestAnimationFrame(_videoRafLoop);
+        const playingNow = _videoEngineActive
+            ? window._enginePlaybackPaused !== true
+            : !!(vid && !vid.paused && !vid.ended);
+        if (!playingNow) {
+            if (_videoRafId) {
+                cancelAnimationFrame(_videoRafId);
+                _videoRafId = null;
+            }
+        } else if (!_videoRafId) {
+            _videoRafId = requestAnimationFrame(_videoRafLoop);
         }
         return;
     }
 
     _lastVideoVisualSeekMs = 0;
-    // Set before any `await` so deferred `drawVideoWaveform` (double rAF) does not skip the visual
+    // Set before any `await` so deferred `drawVideoWaveform` does not skip the visual
     // fallback while `enginePlaybackStop` is still running.
     videoPlayerPath = filePath;
 
@@ -923,9 +1040,11 @@ async function previewVideo(filePath, opts) {
     _videoFallbackAudio = false;
     _videoEngineActive = false;
 
+    const html5ContainerAudio = _playbackUsesHtml5VideoAudio(filePath);
+
     // Set video source (muted — audio via engine)
     vid.src = _videoFileSrc(filePath);
-    vid.muted = true;
+    vid.muted = !html5ContainerAudio;
     vid.preload = 'auto';
     const loopPathForMeta = filePath;
     vid.addEventListener(
@@ -937,7 +1056,7 @@ async function previewVideo(filePath, opts) {
         { once: true },
     );
 
-    if (canEngine) {
+    if (canEngine && !html5ContainerAudio) {
         void vid.play().catch(() => {});
         _startVideoRaf();
         _updateVideoPlayBtn();
@@ -973,7 +1092,7 @@ async function previewVideo(filePath, opts) {
         return;
     }
 
-    // Fallback: unmuted HTML5 video (no engine)
+    // Video containers (and no-engine): `<video>` carries audio — avoids JUCE full-file RAM load on MP4/MKV/…
     _videoFallbackAudio = true;
     _videoEngineActive = false;
     vid.muted = false;
@@ -1064,6 +1183,11 @@ function _videoRafLoop() {
     const timeDisp = document.getElementById('videoTimeDisplay');
     if (timeDisp) timeDisp.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
 
+    const fsSeek = document.getElementById('videoFsSeek');
+    if (fsSeek && dur > 0 && !_videoFsSeekUserDrag) {
+        fsSeek.value = String(Math.min(1000, Math.max(0, Math.round((cur / dur) * 1000))));
+    }
+
     // Check if playback ended
     if (_videoEngineActive && dur > 0 && cur >= dur - 0.05) {
         _updateVideoPlayBtn();
@@ -1112,6 +1236,8 @@ function seekVideoToPercent(pct) {
     } else if (vid && Number.isFinite(vid.duration) && vid.duration > 0) {
         vid.currentTime = p * vid.duration;
     }
+    const fsSeek = document.getElementById('videoFsSeek');
+    if (fsSeek) fsSeek.value = String(Math.min(1000, Math.max(0, Math.round(p * 1000))));
     // Restart RAF if paused so UI updates
     if (!_videoRafId) _videoRafId = requestAnimationFrame(_videoRafLoop);
 }
@@ -1242,23 +1368,67 @@ async function _buildVideoVisualPeaksFromElement(vid, numCols, isStillValid) {
     return peaks;
 }
 
+/** Sync width for `waveform_preview` width_px — starts IPC before `resolveWaveformBoxSize` (can wait many rAFs). */
+function _videoWaveformBoxWidthHint(container) {
+    if (!container) return 560;
+    try {
+        const r = container.getBoundingClientRect();
+        if (r.width >= 2) return Math.min(2000, Math.round(r.width));
+    } catch {
+        /* ignore */
+    }
+    const cw = container.clientWidth;
+    if (cw >= 2) return Math.min(2000, cw);
+    return 560;
+}
+
 async function drawVideoWaveform(filePath, seq) {
     const canvas = document.getElementById('videoWaveformCanvas');
     if (!canvas) return;
     if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
 
     const container = canvas.parentElement;
-    let cw = 560;
+    const cwHint = _videoWaveformBoxWidthHint(container);
+
+    const cachedPeaks = typeof _waveformCache !== 'undefined' ? _waveformCache[filePath] : null;
+    if (cachedPeaks && Array.isArray(cachedPeaks) && cachedPeaks.length > 0 && typeof renderWaveformData === 'function') {
+        let cw = cwHint;
+        let ch = 56;
+        if (typeof resolveWaveformBoxSize === 'function') {
+            const dim = await resolveWaveformBoxSize(container, 560, 56);
+            if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
+            cw = dim.w;
+            ch = dim.h;
+        } else if (container) {
+            cw = container.clientWidth || cwHint;
+            ch = container.clientHeight || 56;
+        }
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.round(cw * dpr));
+        canvas.height = Math.max(1, Math.round(ch * dpr));
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        renderWaveformData(ctx, canvas, cachedPeaks);
+        return;
+    }
+
+    const barsEarly = Math.max(1, Math.min(Math.floor(cwHint), 800));
+    const enginePromise =
+        typeof fetchWaveformPreviewFromEngine === 'function'
+            ? fetchWaveformPreviewFromEngine(filePath, barsEarly)
+            : Promise.resolve(null);
+
+    let cw = cwHint;
     let ch = 56;
     if (typeof resolveWaveformBoxSize === 'function') {
         const dim = await resolveWaveformBoxSize(container, 560, 56);
+        if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
         cw = dim.w;
         ch = dim.h;
     } else if (container) {
-        cw = container.clientWidth || 560;
+        cw = container.clientWidth || cwHint;
         ch = container.clientHeight || 56;
     }
-    if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
 
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.max(1, Math.round(cw * dpr));
@@ -1266,28 +1436,17 @@ async function drawVideoWaveform(filePath, seq) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const cachedPeaks = typeof _waveformCache !== 'undefined' ? _waveformCache[filePath] : null;
-    if (cachedPeaks && Array.isArray(cachedPeaks) && cachedPeaks.length > 0 && typeof renderWaveformData === 'function') {
-        renderWaveformData(ctx, canvas, cachedPeaks);
-        return;
-    }
-
-    const bars = Math.max(1, Math.min(Math.floor(cw), 800));
-
     const rowBytes = _videoRowSizeBytes(filePath);
     const skipVisualSeekHeavy = Number.isFinite(rowBytes) && rowBytes > VIDEO_VISUAL_WAVEFORM_MAX_FILE_BYTES;
 
-    // Never use decodePeaksViaWorker for video — it fetch()+ArrayBuffers the entire file (multi‑GB hang).
-    // Engine path: host transcodes first (bounded audio extract) — safe for multi‑GB MP4.
-    if (typeof yieldToBrowser === 'function') await yieldToBrowser();
-    if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
-
     let peaks = null;
     try {
-        if (typeof fetchWaveformPreviewFromEngine === 'function') {
-            peaks = await fetchWaveformPreviewFromEngine(filePath, bars);
-        }
-    } catch { /* ignore */ }
+        peaks = await enginePromise;
+    } catch {
+        /* ignore */
+    }
+
+    if (seq !== _videoWfDrawSeq || expandedVideoPath !== filePath) return;
 
     // `expandedVideoPath` is set before `previewVideo` — unlike `videoPlayerPath`, it is not delayed
     // by `await enginePlaybackStop()`, so frame-sampled peaks still run when engine path fails.
@@ -1298,7 +1457,8 @@ async function drawVideoWaveform(filePath, seq) {
         && expandedVideoPath === filePath
     ) {
         const vid = document.getElementById('videoPlayerEl');
-        const visual = await _buildVideoVisualPeaksFromElement(vid, bars, () => seq === _videoWfDrawSeq && expandedVideoPath === filePath);
+        const barsVisual = Math.max(1, Math.min(Math.floor(cw), 800));
+        const visual = await _buildVideoVisualPeaksFromElement(vid, barsVisual, () => seq === _videoWfDrawSeq && expandedVideoPath === filePath);
         if (visual && visual.length) peaks = visual;
     }
 
@@ -1372,16 +1532,34 @@ async function fetchVideosForExport() {
 if (typeof document !== 'undefined') {
     document.addEventListener('fullscreenchange', _syncVideoMaximizeBtnState);
     document.addEventListener('webkitfullscreenchange', _syncVideoMaximizeBtnState);
-    /** Waveform seek is unavailable while only the `<video>` is fullscreen — map clicks on the video to `seekVideoToPercent`. */
+    document.addEventListener(
+        'pointerdown',
+        (e) => {
+            const t = e.target;
+            if (t && typeof t.id === 'string' && t.id === 'videoFsSeek') _videoFsSeekUserDrag = true;
+        },
+        true
+    );
+    document.addEventListener('pointerup', () => {
+        _videoFsSeekUserDrag = false;
+    });
+    document.addEventListener('pointercancel', () => {
+        _videoFsSeekUserDrag = false;
+    });
+    /** Fullscreen: click picture to seek when the host is `#videoFullscreenRoot` or legacy video-only fullscreen. */
     document.addEventListener(
         'pointerdown',
         (e) => {
             if (!videoPlayerPath) return;
             const vid = e.target instanceof Element ? e.target.closest('#videoPlayerEl') : null;
             if (!vid) return;
+            if (e.target instanceof Element && e.target.closest('.video-fs-overlay')) return;
             const doc = document;
             const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
-            if (fsEl !== vid) return;
+            const host = _videoFullscreenHostEl();
+            const fsVideo = fsEl === vid;
+            const fsHost = !!(host && fsEl === host);
+            if (!fsVideo && !fsHost) return;
             if (e.button !== 0) return;
             const r = vid.getBoundingClientRect();
             if (r.width <= 0) return;

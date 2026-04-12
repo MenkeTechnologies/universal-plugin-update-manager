@@ -412,6 +412,7 @@ document.addEventListener('keydown', (e) => {
         }
 
     } else if (e.key === 'v') {
+        if (e.defaultPrevented) return;
         // v = toggle batch select on current item
         e.preventDefault();
         if (_navIndex < 0) syncNavIndexBeforeVerticalMove(activeTab);

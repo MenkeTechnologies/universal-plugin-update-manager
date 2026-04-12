@@ -1,10 +1,12 @@
 //! Video containers (MP4/MOV/MKV/…) are not readable by JUCE `AudioFormatManager` for
 //! `waveform_preview` / `spectrogram_preview`. Before forwarding those IPC requests to the
-//! AudioEngine, we extract the **first audio stream** (up to 300 s): **ffmpeg → MP3** (LAME),
-//! else **ffmpeg → WAV** (PCM), else **Symphonia → mono PCM WAV** (ISO MP4 / Matroska / …).
+//! AudioEngine, we extract the **first audio stream** (up to 300 s): **ffmpeg → mono PCM WAV**
+//! first (faster than LAME MP3 + smaller JUCE decode cost), then **ffmpeg → MP3** (LAME), else
+//! **Symphonia → mono PCM WAV** (ISO MP4 / Matroska / …).
 //!
 //! **Multi‑gigabyte files:** `ffmpeg` uses `-t 300`, so it does not decode the whole movie; JUCE only
-//! reads the small temp MP3/WAV. Symphonia caps decoded samples the same way.
+//! reads the small temp WAV/MP3. Transcodes use **22.05 kHz** mono — enough for on-screen peaks and
+//! ~half the samples vs 44.1 kHz. Symphonia caps decoded samples the same way.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,6 +18,10 @@ use crate::video_scanner::VIDEO_EXTENSIONS;
 
 /// Matches JUCE `VisualPreview.cpp` `kMaxDurationSec` for `waveform_preview`.
 const MAX_EXTRACT_SEC: u32 = 300;
+
+/// Preview transcode sample rate — lower than 44.1 kHz cuts ffmpeg + JUCE work (~50%) with minimal
+/// visual loss for bar waveforms.
+const PREVIEW_EXTRACT_HZ: &str = "22050";
 
 /// Temp file for a transcode; deleted on drop (best effort).
 pub(crate) struct TempTranscoded {
@@ -67,6 +73,8 @@ fn try_ffmpeg_extract_mp3(src: &Path) -> Option<TempTranscoded> {
             "error",
             "-nostdin",
             "-y",
+            "-threads",
+            "0",
             "-i",
             src_s.as_ref(),
             "-t",
@@ -75,11 +83,11 @@ fn try_ffmpeg_extract_mp3(src: &Path) -> Option<TempTranscoded> {
             "-ac",
             "1",
             "-ar",
-            "44100",
+            PREVIEW_EXTRACT_HZ,
             "-codec:a",
             "libmp3lame",
             "-q:a",
-            "4",
+            "5",
             out_s.as_ref(),
         ])
         .status()
@@ -109,6 +117,8 @@ fn try_ffmpeg_extract_wav_pcm(src: &Path) -> Option<TempTranscoded> {
             "error",
             "-nostdin",
             "-y",
+            "-threads",
+            "0",
             "-i",
             src_s.as_ref(),
             "-t",
@@ -117,7 +127,7 @@ fn try_ffmpeg_extract_wav_pcm(src: &Path) -> Option<TempTranscoded> {
             "-ac",
             "1",
             "-ar",
-            "44100",
+            PREVIEW_EXTRACT_HZ,
             "-f",
             "wav",
             out_s.as_ref(),
@@ -249,7 +259,7 @@ fn try_symphonia_extract_wav(src: &Path) -> Option<TempTranscoded> {
 }
 
 /// If `req` is `waveform_preview` / `spectrogram_preview` on a video-container path, transcode
-/// to a temp MP3 (ffmpeg) or WAV (Symphonia) and return a cloned request pointing at that file.
+/// to a temp WAV/MP3 (ffmpeg) or WAV (Symphonia) and return a cloned request pointing at that file.
 /// Otherwise returns `req` unchanged. On transcode failure, returns the original request (JUCE will
 /// respond `unsupported` and the UI can fall back).
 pub(crate) fn rewrite_visual_preview_for_juce(req: &Value) -> (Value, Option<TempTranscoded>) {
@@ -269,7 +279,7 @@ pub(crate) fn rewrite_visual_preview_for_juce(req: &Value) -> (Value, Option<Tem
         return (req.clone(), None);
     }
 
-    if let Some(tmp) = try_ffmpeg_extract_mp3(path) {
+    if let Some(tmp) = try_ffmpeg_extract_wav_pcm(path) {
         let mut out = req.clone();
         if let Some(obj) = out.as_object_mut() {
             obj.insert(
@@ -280,7 +290,7 @@ pub(crate) fn rewrite_visual_preview_for_juce(req: &Value) -> (Value, Option<Tem
         return (out, Some(tmp));
     }
 
-    if let Some(tmp) = try_ffmpeg_extract_wav_pcm(path) {
+    if let Some(tmp) = try_ffmpeg_extract_mp3(path) {
         let mut out = req.clone();
         if let Some(obj) = out.as_object_mut() {
             obj.insert(

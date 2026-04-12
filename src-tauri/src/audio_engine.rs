@@ -1,6 +1,8 @@
 //! **AudioEngine** subprocess: the main app spawns the **`audio-engine`** JUCE binary (`audio-engine/` CMake target),
-//! sends JSON lines on stdin, reads one JSON line per request. Keeps **one** child process alive
-//! (stdin loop in the AudioEngine) so stream state and IPC stay cheap.
+//! sends JSON lines on stdin, reads one JSON line per request. Keeps a **main** child for playback
+//! and device/plugin IPC, plus a **preview** child used only for `waveform_preview` /
+//! `spectrogram_preview` so long visual decodes never block `playback_load` / transport on the main
+//! stdin loop (one JSON line in → one line out per process).
 //! On app quit, [`shutdown_audio_engine_child`] runs from Tauri `RunEvent::Exit` / `ExitRequested` and from `libc::atexit`
 //! so the AudioEngine is always terminated with the host. **`AUDIO_HAXOR_PARENT_PID`** is set at spawn so the AudioEngine can
 //! exit if the host disappears without cleanup (e.g. macOS force quit / SIGKILL).
@@ -71,9 +73,12 @@ fn log_ipc_failure(msg: impl Into<String>, tail: Option<&Arc<Mutex<String>>>) {
 }
 
 static ENGINE_CHILD: Mutex<Option<EngineChild>> = Mutex::new(None);
+/// Second process: visual preview only (`waveform_preview` / `spectrogram_preview`). Same binary as main.
+static PREVIEW_ENGINE_CHILD: Mutex<Option<EngineChild>> = Mutex::new(None);
 /// OS PID of the current AudioEngine (`Child::id`), or `0` if none. Used for kill-on-exit without
 /// waiting on [`ENGINE_CHILD`] (see module comment).
 static ENGINE_CHILD_PID: AtomicU32 = AtomicU32::new(0);
+static PREVIEW_ENGINE_CHILD_PID: AtomicU32 = AtomicU32::new(0);
 
 /// Host-side `playback_status` poll for library playback EOF when the WebView defers its **`setInterval`**
 /// poll (**`isUiIdleHeavyCpu`** — hidden, unfocused, minimized; see `syncEnginePlaybackEofWatchdog` in
@@ -93,6 +98,16 @@ fn record_engine_pid(child: &Child) {
 #[inline]
 fn clear_engine_pid() {
     ENGINE_CHILD_PID.store(0, Ordering::SeqCst);
+}
+
+#[inline]
+fn record_preview_engine_pid(child: &Child) {
+    PREVIEW_ENGINE_CHILD_PID.store(child.id(), Ordering::SeqCst);
+}
+
+#[inline]
+fn clear_preview_engine_pid() {
+    PREVIEW_ENGINE_CHILD_PID.store(0, Ordering::SeqCst);
 }
 
 /// OS PID of the current AudioEngine subprocess (`Child::id`), or `0` if none has been spawned yet.
@@ -126,6 +141,14 @@ fn kill_pid_raw(pid: u32) {
 fn take_and_reap_engine_child(guard: &mut Option<EngineChild>) {
     if let Some(mut eng) = guard.take() {
         clear_engine_pid();
+        let _ = eng.child.kill();
+        let _ = eng.child.wait();
+    }
+}
+
+fn take_and_reap_preview_engine_child(guard: &mut Option<EngineChild>) {
+    if let Some(mut eng) = guard.take() {
+        clear_preview_engine_pid();
         let _ = eng.child.kill();
         let _ = eng.child.wait();
     }
@@ -263,7 +286,7 @@ fn child_dead(child: &mut Child) -> bool {
     }
 }
 
-fn spawn_engine_child(path: &Path) -> Result<EngineChild, String> {
+fn spawn_engine_child(path: &Path, preview_only_process: bool) -> Result<EngineChild, String> {
     let identity = std::fs::metadata(path).ok().map(|m| {
         (
             m.modified().unwrap_or_else(|_| SystemTime::UNIX_EPOCH),
@@ -355,7 +378,11 @@ fn spawn_engine_child(path: &Path) -> Result<EngineChild, String> {
     });
 
     let stdout = BufReader::new(stdout);
-    record_engine_pid(&child);
+    if preview_only_process {
+        record_preview_engine_pid(&child);
+    } else {
+        record_engine_pid(&child);
+    }
     Ok(EngineChild {
         child,
         stdin,
@@ -388,7 +415,34 @@ fn ensure_engine_child(path: &Path) -> Result<(), String> {
         if guard.is_some() {
             take_and_reap_engine_child(&mut *guard);
         }
-        *guard = Some(spawn_engine_child(path)?);
+        *guard = Some(spawn_engine_child(path, false)?);
+    }
+    Ok(())
+}
+
+fn ensure_preview_engine_child(path: &Path) -> Result<(), String> {
+    let mut guard = PREVIEW_ENGINE_CHILD
+        .lock()
+        .map_err(|_| "audio-engine preview child mutex poisoned")?;
+    let disk_identity = std::fs::metadata(path).ok().map(|m| {
+        (
+            m.modified().unwrap_or_else(|_| SystemTime::UNIX_EPOCH),
+            m.len(),
+        )
+    });
+    let need_spawn = match guard.as_mut() {
+        None => true,
+        Some(eng) => {
+            child_dead(&mut eng.child)
+                || eng.binary_path != path
+                || disk_identity.is_some() && disk_identity != eng.binary_identity
+        }
+    };
+    if need_spawn {
+        if guard.is_some() {
+            take_and_reap_preview_engine_child(&mut *guard);
+        }
+        *guard = Some(spawn_engine_child(path, true)?);
     }
     Ok(())
 }
@@ -405,15 +459,20 @@ pub fn restart_audio_engine_child() -> Result<(), String> {
     if pid != 0 {
         kill_pid_raw(pid);
     }
+    let pidp = PREVIEW_ENGINE_CHILD_PID.swap(0, Ordering::SeqCst);
+    if pidp != 0 {
+        kill_pid_raw(pidp);
+    }
     std::thread::spawn(|| {
-        let reaped = clear_engine_slot_after_os_kill();
-        if reaped {
+        let reaped_main = clear_engine_slot_after_os_kill();
+        let reaped_prev = clear_preview_engine_slot_after_os_kill();
+        if reaped_main && reaped_prev {
             crate::write_app_log(
-                "audio-engine: AudioEngine process restarted (user request)".to_string(),
+                "audio-engine: AudioEngine + preview processes restarted (user request)".to_string(),
             );
         } else {
             log_ipc_failure(
-                "ENGINE_CHILD mutex not acquired after OS kill (timeout); next IPC may respawn",
+                "ENGINE_CHILD / PREVIEW_ENGINE_CHILD mutex not acquired after OS kill (timeout); next IPC may respawn",
                 None,
             );
         }
@@ -435,6 +494,18 @@ fn clear_engine_slot_after_os_kill() -> bool {
     false
 }
 
+fn clear_preview_engine_slot_after_os_kill() -> bool {
+    const MAX_ITERS: u32 = 6000;
+    for _ in 0..MAX_ITERS {
+        if let Ok(mut g) = PREVIEW_ENGINE_CHILD.try_lock() {
+            take_and_reap_preview_engine_child(&mut *g);
+            return true;
+        }
+        thread::sleep(Duration::from_millis(5));
+    }
+    false
+}
+
 /// Kill the JUCE AudioEngine when the host app exits. Idempotent (safe if no child was spawned).
 pub fn shutdown_audio_engine_child() -> Result<(), String> {
     audio_engine_eof_watchdog_stop();
@@ -442,8 +513,13 @@ pub fn shutdown_audio_engine_child() -> Result<(), String> {
     if pid != 0 {
         kill_pid_raw(pid);
     }
+    let pidp = PREVIEW_ENGINE_CHILD_PID.swap(0, Ordering::SeqCst);
+    if pidp != 0 {
+        kill_pid_raw(pidp);
+    }
     let _ = clear_engine_slot_after_os_kill();
-    crate::write_app_log("audio-engine: AudioEngine terminated (app shutdown)".to_string());
+    let _ = clear_preview_engine_slot_after_os_kill();
+    crate::write_app_log("audio-engine: AudioEngine + preview processes terminated (app shutdown)".to_string());
     Ok(())
 }
 
@@ -538,9 +614,108 @@ fn read_engine_json_line<R: Read>(stdout: &mut BufReader<R>) -> Result<String, S
     Err("audio-engine stdout: no JSON line (exceeded line read limit)".to_string())
 }
 
+/// Visual decode IPC on a **dedicated** `audio-engine` child so a slow `waveform_preview` /
+/// `spectrogram_preview` never blocks the main child's stdin (playback, devices, `ping`, …).
+fn spawn_preview_engine_request_at(request: &serde_json::Value) -> Result<serde_json::Value, String> {
+    let payload = serde_json::to_string(request).map_err(|e| e.to_string())?;
+
+    for attempt in 0..2 {
+        let path = resolve_audio_engine_binary().map_err(|e| {
+            log_ipc_failure(format!("failed to resolve audio-engine binary: {e}"), None);
+            e
+        })?;
+        ensure_preview_engine_child(&path)?;
+        let mut guard = PREVIEW_ENGINE_CHILD
+            .lock()
+            .map_err(|_| "audio-engine preview child mutex poisoned".to_string())?;
+        let eng = guard
+            .as_mut()
+            .ok_or_else(|| "audio-engine preview child missing".to_string())?;
+
+        if eng
+            .stdin
+            .write_all(payload.as_bytes())
+            .map_err(|e| e.to_string())
+            .and_then(|_| {
+                eng.stdin
+                    .write_all(b"\n")
+                    .map_err(|e| format!("audio-engine preview stdin: {e}"))
+            })
+            .and_then(|_| {
+                eng.stdin
+                    .flush()
+                    .map_err(|e| format!("audio-engine preview stdin: {e}"))
+            })
+            .is_err()
+        {
+            let stderr_tail = Arc::clone(&eng.stderr_tail);
+            clear_preview_engine_pid();
+            *guard = None;
+            if attempt == 1 {
+                log_ipc_failure("preview engine stdin write failed", Some(&stderr_tail));
+                return Err("audio-engine preview stdin write failed".to_string());
+            }
+            continue;
+        }
+
+        match read_engine_json_line(&mut eng.stdout) {
+            Ok(json_line) => {
+                let v: serde_json::Value = match serde_json::from_str(&json_line) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let stderr_tail = Arc::clone(&eng.stderr_tail);
+                        log_ipc_failure(
+                            format!("preview engine invalid JSON on stdout: {e}; line={json_line:?}"),
+                            Some(&stderr_tail),
+                        );
+                        return Err(format!("audio-engine preview JSON: {e}: {json_line}"));
+                    }
+                };
+                if attempt == 0 {
+                    if let Some(err) = v.get("error").and_then(|e| e.as_str()) {
+                        if err.to_ascii_lowercase().contains("unknown cmd") {
+                            clear_preview_engine_pid();
+                            *guard = None;
+                            continue;
+                        }
+                    }
+                }
+                return Ok(v);
+            }
+            Err(e) => {
+                let stderr_tail = Arc::clone(&eng.stderr_tail);
+                let is_eof = e == "audio-engine closed stdout";
+                clear_preview_engine_pid();
+                *guard = None;
+                if attempt == 1 {
+                    if is_eof {
+                        log_ipc_failure(
+                            "AudioEngine preview process closed stdout (exited or crashed)",
+                            Some(&stderr_tail),
+                        );
+                    } else {
+                        log_ipc_failure(format!("preview engine stdout read: {e}"), Some(&stderr_tail));
+                    }
+                    return Err(e);
+                }
+            }
+        }
+    }
+    log_ipc_failure("preview engine request failed after retry", None);
+    Err("audio-engine preview request failed after retry".to_string())
+}
+
 fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_json::Value, String> {
     let (effective_request, _transcoded_temp) =
         crate::waveform_container_extract::rewrite_visual_preview_for_juce(request);
+    let cmd = effective_request
+        .get("cmd")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    if cmd == "waveform_preview" || cmd == "spectrogram_preview" {
+        return spawn_preview_engine_request_at(&effective_request);
+    }
+
     let payload = serde_json::to_string(&effective_request).map_err(|e| e.to_string())?;
 
     for attempt in 0..2 {

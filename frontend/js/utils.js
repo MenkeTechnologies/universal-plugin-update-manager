@@ -1303,10 +1303,8 @@ function _ensureTabCache() {
 function switchTab(tab) {
     _ensureTabCache();
     _ensureTabButtonCache();
-    const prevTab = typeof prefs !== 'undefined' ? prefs.getItem('activeTab') : null;
-    if (prevTab === 'videos' && tab !== 'videos' && typeof closeVideoMetaRow === 'function') {
-        closeVideoMetaRow();
-    }
+    // Do not call `closeVideoMetaRow` when leaving Videos — that runs `stopVideoPlayback()` and kills
+    // engine/HTML5 audio. The meta row stays in the (hidden) panel until the user closes it or previews another file.
     // Batch selection is stored per inventory tab (`batchByTab` in batch-select.js); clear on switch so counts/actions never mix tables.
     if (typeof deselectAll === 'function') deselectAll();
     // Toggle tab buttons + panels in one pass — pure class mutations, no layout reads.
