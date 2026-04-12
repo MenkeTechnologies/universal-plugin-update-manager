@@ -1033,9 +1033,12 @@ async function previewVideo(filePath, opts) {
     // already called `enginePlaybackStop` while nothing can play video.
     videoPlayerPath = filePath;
 
-    // Stop any current audio playback first
+    // Fire-and-forget stop: `enginePlaybackStart → start_output_stream` always calls
+    // `stopOutputLocked()` internally, and the C++ generation counter protects `sessionPath`
+    // from stale `playback_stop` clears.  Awaiting the stop here would serialize a full
+    // CoreAudio device close (~200-500 ms) that `start_output_stream` repeats anyway.
     if (typeof window._enginePlaybackActive !== 'undefined' && window._enginePlaybackActive) {
-        if (typeof window.enginePlaybackStop === 'function') await window.enginePlaybackStop();
+        if (typeof window.enginePlaybackStop === 'function') void window.enginePlaybackStop();
         if (typeof window.setEnginePlaybackActive === 'function') window.setEnginePlaybackActive(false);
     }
     // Pause HTML5 audio player if active

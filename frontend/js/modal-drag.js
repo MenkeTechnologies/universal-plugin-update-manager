@@ -7,6 +7,13 @@
     let _dragState = null;
     let _resizeState = null;
 
+    const EDGE_CURSOR = {
+        n: 'ns-resize', s: 'ns-resize',
+        e: 'ew-resize', w: 'ew-resize',
+        ne: 'nesw-resize', sw: 'nesw-resize',
+        nw: 'nwse-resize', se: 'nwse-resize',
+    };
+
     /** Dock classes pin the player with bottom/right (or top/left) using !important — conflicts with resize math that uses left/top + width/height. */
     const PLAYER_DOCK_CLASSES = ['dock-tl', 'dock-tr', 'dock-bl', 'dock-br'];
 
@@ -143,6 +150,7 @@
                 modal.style.width = rect.width + 'px';
 
                 document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'move';
                 _dragState = {modal, startX: e.clientX, startY: e.clientY, origLeft: rect.left, origTop: rect.top};
             });
         }
@@ -178,6 +186,7 @@
             }
 
             document.body.style.userSelect = 'none';
+            document.body.style.cursor = EDGE_CURSOR[handle.dataset.modalResize] || '';
             _resizeState = {
                 modal, edge: handle.dataset.modalResize,
                 startX: e.clientX, startY: e.clientY,

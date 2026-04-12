@@ -2592,6 +2592,12 @@ function initSimilarPanelDrag() {
         panel.style.width = rect.width + 'px';
         panel.style.height = rect.height + 'px';
         document.body.style.userSelect = 'none';
+        document.body.style.cursor = ({
+            n: 'ns-resize', s: 'ns-resize',
+            e: 'ew-resize', w: 'ew-resize',
+            ne: 'nesw-resize', sw: 'nesw-resize',
+            nw: 'nwse-resize', se: 'nwse-resize',
+        })[handle.dataset.simResize] || '';
         resizing = {
             edge: handle.dataset.simResize,
             startX: e.clientX,
@@ -2630,6 +2636,7 @@ function initSimilarPanelDrag() {
             prefs.setItem('similarHeight', Math.round(rect.height));
             resizing = null;
             document.body.style.userSelect = '';
+            document.body.style.cursor = '';
         }
     }, sig);
 }
