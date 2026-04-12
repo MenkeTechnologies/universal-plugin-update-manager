@@ -1093,6 +1093,11 @@ async function previewVideo(filePath, opts) {
         try {
             vid.pause();
         } catch (_) {}
+        /* Invalidate the <video> loadeddata/canplay hide — the muted <video> element finishes
+         * loading well before `enginePlaybackStart` resolves, so the spinner would vanish while
+         * the picture stays frozen.  Hide manually after `vid.play()` below instead. */
+        _videoPlayerLoadUiSeq++;
+        const engineLoadUiSeq = _videoPlayerLoadUiSeq;
         _startVideoRaf();
         _updateVideoPlayBtn();
         _showVideoInNowPlaying(filePath, o);
@@ -1121,6 +1126,7 @@ async function previewVideo(filePath, opts) {
                     _lastVideoVisualSeekMs = performance.now();
                 } catch (_) {}
                 void vid.play().catch(() => {});
+                if (engineLoadUiSeq === _videoPlayerLoadUiSeq) _hideVideoPlayerLoading();
                 if (typeof window.syncVideoPlayerElPlaybackRate === 'function') window.syncVideoPlayerElPlaybackRate();
                 _updateVideoPlayBtn();
                 if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
@@ -1139,6 +1145,7 @@ async function previewVideo(filePath, opts) {
                 } catch (e) {
                     if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
                 }
+                if (engineLoadUiSeq === _videoPlayerLoadUiSeq) _hideVideoPlayerLoading();
                 if (
                     !vid.paused &&
                     typeof window.connectVideoHtml5AudioThroughWebAudio === 'function'
