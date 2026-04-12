@@ -1107,7 +1107,7 @@ async function previewVideo(filePath, opts) {
 
         void (async () => {
             try {
-                await window.enginePlaybackStart(filePath);
+                await window.enginePlaybackStart(filePath, { streamFromDisk: true });
                 if (videoPlayerPath !== filePath) return;
                 _videoEngineActive = true;
                 _videoFallbackAudio = false;

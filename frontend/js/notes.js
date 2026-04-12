@@ -564,6 +564,158 @@ function _tagItemTab(type) {
     return null;
 }
 
+/** Map any item type to its home tab (used by tags + favorites). */
+function _itemTypeToTab(type) {
+    if (type === 'sample') return 'samples';
+    if (type === 'video') return 'videos';
+    if (type === 'plugin') return 'plugins';
+    if (type === 'daw') return 'daw';
+    if (type === 'preset') return 'presets';
+    return null;
+}
+
+/**
+ * Switch to the appropriate tab and scroll to the row/card for `path`.
+ * If the item isn't in the table yet, add it on the fly.
+ */
+async function _goToTableItem(tab, path) {
+    switchTab(tab);
+    const fileName = (path || '').split('/').pop() || '';
+    const name = fileName.replace(/\.[^.]+$/, '');
+    const ext = fileName.includes('.') ? fileName.split('.').pop().toUpperCase() : '';
+
+    // Highlight helper — flash the row briefly so the user spots it.
+    const _flash = (row) => {
+        row.scrollIntoView({behavior: 'smooth', block: 'center'});
+        row.classList.add('row-playing');
+        setTimeout(() => row.classList.remove('row-playing'), 2000);
+    };
+
+    if (tab === 'samples') {
+        // ── Audio / Samples ──
+        const sel = `#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`;
+        let row = document.querySelector(sel);
+        if (row) { _flash(row); return; }
+
+        // Not in table — try to add from metadata IPC (richest), recentlyPlayed, or bare minimum.
+        if (typeof allAudioSamples !== 'undefined') {
+            let sample = typeof findByPath === 'function' ? findByPath(allAudioSamples, path) : null;
+            if (!sample) {
+                try {
+                    if (window.vstUpdater && typeof window.vstUpdater.getAudioMetadata === 'function') {
+                        const meta = await window.vstUpdater.getAudioMetadata(path);
+                        sample = {
+                            name: meta.fileName ? meta.fileName.replace(/\.[^.]+$/, '') : name,
+                            path: meta.fullPath || path,
+                            directory: meta.directory || path.replace(/\/[^/]+$/, ''),
+                            format: meta.format || ext,
+                            size: meta.sizeBytes || 0,
+                            sizeBytes: meta.sizeBytes || 0,
+                            sizeFormatted: typeof formatAudioSize === 'function' ? formatAudioSize(meta.sizeBytes) : '',
+                            modified: meta.modified || '',
+                            duration: meta.duration || null,
+                            sampleRate: meta.sampleRate || null,
+                            channels: meta.channels || null,
+                            bitsPerSample: meta.bitsPerSample || null,
+                        };
+                    }
+                } catch (_) { /* fall through to bare-minimum */ }
+                if (!sample) {
+                    const recent = typeof recentlyPlayed !== 'undefined'
+                        ? recentlyPlayed.find(r => r.path === path) : null;
+                    sample = {
+                        name, path,
+                        directory: path.replace(/\/[^/]+$/, ''),
+                        format: recent?.format || ext,
+                        size: 0,
+                        sizeFormatted: recent?.size || '?',
+                        modified: '',
+                    };
+                }
+                allAudioSamples.push(sample);
+                if (typeof filteredAudioSamples !== 'undefined') filteredAudioSamples.push(sample);
+            }
+            const tbody = document.getElementById('audioTableBody');
+            if (tbody && typeof buildAudioRow === 'function' && !document.querySelector(sel)) {
+                tbody.insertAdjacentHTML('beforeend', buildAudioRow(sample));
+            }
+        }
+        // Clear search so the new row is visible, then re-filter.
+        const searchInput = document.getElementById('audioSearchInput');
+        if (searchInput && searchInput.value) searchInput.value = '';
+        if (typeof filterAudioSamples === 'function') filterAudioSamples();
+        setTimeout(() => {
+            row = document.querySelector(sel);
+            if (row) _flash(row);
+            else if (typeof showToast === 'function') showToast(`Could not locate ${name} in Samples table`, 3000, 'warn');
+        }, 150);
+    } else if (tab === 'videos') {
+        // ── Video ──
+        const sel = `#videoTableBody tr[data-video-path="${CSS.escape(path)}"]`;
+        let row = document.querySelector(sel);
+        if (row) { _flash(row); return; }
+
+        // Not in table — add a minimal video entry.
+        if (typeof allVideos !== 'undefined') {
+            let vid = typeof findByPath === 'function' ? findByPath(allVideos, path) : null;
+            if (!vid) {
+                vid = {
+                    name, path,
+                    directory: path.replace(/\/[^/]+$/, ''),
+                    format: ext,
+                    size: 0,
+                    sizeFormatted: '?',
+                    modified: '',
+                };
+                allVideos.push(vid);
+                if (typeof filteredVideos !== 'undefined') filteredVideos.push(vid);
+            }
+            const tbody = document.getElementById('videoTableBody');
+            if (tbody && typeof buildVideoRow === 'function' && !document.querySelector(sel)) {
+                tbody.insertAdjacentHTML('beforeend', buildVideoRow(vid));
+            }
+        }
+        const searchInput = document.getElementById('videoSearchInput');
+        if (searchInput && searchInput.value) searchInput.value = '';
+        if (typeof filterVideos === 'function') filterVideos();
+        setTimeout(() => {
+            row = document.querySelector(sel);
+            if (row) _flash(row);
+            else if (typeof showToast === 'function') showToast(`Could not locate ${name} in Videos table`, 3000, 'warn');
+        }, 150);
+    } else if (tab === 'plugins') {
+        // ── Plugin ──
+        const sel = `.plugin-card[data-path="${CSS.escape(path)}"]`;
+        let card = document.querySelector(sel);
+        if (card) { _flash(card); return; }
+        setTimeout(() => {
+            card = document.querySelector(sel);
+            if (card) _flash(card);
+            else if (typeof showToast === 'function') showToast(`Could not locate ${name} in Plugins`, 3000, 'warn');
+        }, 150);
+    } else if (tab === 'daw') {
+        // ── DAW Projects ──
+        const sel = `#dawTableBody tr[data-daw-path="${CSS.escape(path)}"]`;
+        let row = document.querySelector(sel);
+        if (row) { _flash(row); return; }
+        setTimeout(() => {
+            row = document.querySelector(sel);
+            if (row) _flash(row);
+            else if (typeof showToast === 'function') showToast(`Could not locate ${name} in DAW Projects`, 3000, 'warn');
+        }, 150);
+    } else if (tab === 'presets') {
+        // ── Presets ──
+        const sel = `#presetTableBody tr[data-preset-path="${CSS.escape(path)}"]`;
+        let row = document.querySelector(sel);
+        if (row) { _flash(row); return; }
+        setTimeout(() => {
+            row = document.querySelector(sel);
+            if (row) _flash(row);
+            else if (typeof showToast === 'function') showToast(`Could not locate ${name} in Presets`, 3000, 'warn');
+        }, 150);
+    }
+}
+
 registerFilter('filterTags', {
     inputId: 'tagSearchInput',
     regexToggleId: 'regexTags',
@@ -645,9 +797,12 @@ function renderTagsManager() {
             const noteSnippet = item.note
                 ? `<span class="tag-manager-item-note" title="${escapeHtml(item.note)}">${escapeHtml(item.note.length > 40 ? item.note.slice(0, 40) + '…' : item.note)}</span>`
                 : '';
+            const nameEl = goTab
+                ? `<a class="tag-manager-item-name" data-tag-action="go-to-tab" data-path="${hp}" data-tab="${goTab}" title="${escapeHtml(item.path)}">${escapeHtml(name)}</a>`
+                : `<span class="tag-manager-item-name" title="${escapeHtml(item.path)}">${escapeHtml(name)}</span>`;
             return `<div class="tag-manager-item" data-path="${hp}" data-item-type="${itemType}">
             <span class="tag-manager-item-icon">${typeIcon}</span>
-            <span class="tag-manager-item-name" title="${escapeHtml(item.path)}">${escapeHtml(name)}</span>
+            ${nameEl}
             ${badge}
             ${noteSnippet}
             <span class="tag-manager-item-actions">
@@ -1033,17 +1188,11 @@ document.addEventListener('click', (e) => {
             const path = tagAction.dataset.path;
             if (path && typeof previewVideo === 'function') previewVideo(path);
         } else if (act === 'go-to-tab') {
+            e.preventDefault();
             const path = tagAction.dataset.path;
             const tab = tagAction.dataset.tab;
             if (tab && typeof switchTab === 'function') {
-                switchTab(tab);
-                requestAnimationFrame(() => {
-                    const sel = tab === 'samples'
-                        ? `#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`
-                        : `#videoTableBody tr[data-video-path="${CSS.escape(path)}"]`;
-                    const row = document.querySelector(sel);
-                    if (row) row.scrollIntoView({behavior: 'smooth', block: 'center'});
-                });
+                void _goToTableItem(tab, path);
             }
         }
     }

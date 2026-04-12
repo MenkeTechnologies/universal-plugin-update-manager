@@ -1481,6 +1481,10 @@ struct Engine::Impl
     juce::AudioFormatManager formatManager;
     ToneAudioSource toneSource;
     std::unique_ptr<DspStereoFileSource> fileSource;
+    /// Background read-ahead thread for `stream_from_disk` playback (video files).
+    juce::TimeSliceThread readAheadThread{"AE ReadAhead"};
+    /// Read-ahead buffer size in samples (~5.5 s at 48 kHz). Covers brief SMB stalls.
+    static constexpr int kReadAheadSamples = 262144;
     std::atomic<float> playbackPeak{0.0f};
     /** 0.25–4.0, tape-style playback (`juce::ResamplingAudioSource`); ignored in reverse mode. */
     std::atomic<float> playbackSpeed{1.0f};
@@ -2610,6 +2614,7 @@ struct Engine::Impl
     {
         const bool startPlayback = req.hasProperty("start_playback") && (bool) req["start_playback"];
         const bool tone = req.hasProperty("tone") && (bool) req["tone"];
+        const bool streamFromDisk = req.hasProperty("stream_from_disk") && (bool) req["stream_from_disk"];
         const juce::String deviceId = req["device_id"].toString();
         uint32_t bf = 0;
         if (req.hasProperty("buffer_frames") && !req["buffer_frames"].isVoid())
@@ -2709,19 +2714,39 @@ struct Engine::Impl
                     }
                 }
             }
+            else if (streamFromDisk)
+            {
+                /* Video files: stream decoded samples from the file-backed reader instead of
+                 * slurping the whole container into RAM (which blocks for 10-20+ s on large
+                 * video files).  `AudioTransportSource` read-ahead via `readAheadThread`
+                 * buffers ~5 s of decoded audio in a background thread, covering brief SMB
+                 * stalls from Finder thumbnailing / metadata bursts without the upfront cost. */
+                std::unique_ptr<juce::AudioFormatReader> reader(
+                    formatManager.createReaderFor(juce::File(sessionPath)));
+                if (reader == nullptr)
+                    return errObj("open file failed");
+                auto* raw = reader.release();
+                fileSource->readerSource = std::make_unique<juce::AudioFormatReaderSource>(raw, true);
+                fileSource->speedResampler =
+                    std::make_unique<juce::ResamplingAudioSource>(fileSource->readerSource.get(), false, 2);
+                fileSource->speedResampler->setResamplingRatio((double) juce::jlimit(0.25f, 4.0f, playbackSpeed.load()));
+                fileSource->playbackSpeed = &playbackSpeed;
+                fileSource->speedMode = &speedMode;
+            }
             else
             {
-                /* Slurp the full file into a `MemoryBlock` and wrap it in a `MemoryInputStream`
-                 * so JUCE's `AudioFormatReader` streams decoded samples from RAM instead of
-                 * demand-reading the original file during playback. Rationale: when the audio
-                 * library lives on an SMB share, the user reports audio dropouts the moment they
-                 * click "Reveal in Finder". Root cause is SMB contention — Finder's thumbnail /
-                 * metadata burst competes with the audio-engine's streaming reads on the same
-                 * SMB connection, AND macOS evicts our file from the unified buffer cache under
-                 * the memory pressure Finder creates (Rust-side page-cache warmers don't help
-                 * for exactly that reason). Process-heap memory is pinned and can't be evicted,
-                 * so once the file is loaded, playback is SMB-free regardless of what Finder
-                 * does on the share. One-time upfront load cost per track; any file
+                /* Audio-only files: slurp the full file into a `MemoryBlock` and wrap it in a
+                 * `MemoryInputStream` so JUCE's `AudioFormatReader` streams decoded samples
+                 * from RAM instead of demand-reading the original file during playback.
+                 * Rationale: when the audio library lives on an SMB share, the user reports
+                 * audio dropouts the moment they click "Reveal in Finder". Root cause is SMB
+                 * contention — Finder's thumbnail / metadata burst competes with the
+                 * audio-engine's streaming reads on the same SMB connection, AND macOS evicts
+                 * our file from the unified buffer cache under the memory pressure Finder
+                 * creates (Rust-side page-cache warmers don't help for exactly that reason).
+                 * Process-heap memory is pinned and can't be evicted, so once the file is
+                 * loaded, playback is SMB-free regardless of what Finder does on the share.
+                 * One-time upfront load cost per track; any file
                  * `juce::AudioFormatManager` can decode (wav/mp3/flac/m4a/…) works unchanged. */
                 juce::File f(sessionPath);
                 juce::MemoryBlock mb;
@@ -2742,7 +2767,19 @@ struct Engine::Impl
             }
 
             fileSource->playbackLoop = &playbackLoopWanted;
-            transport.setSource(fileSource.get(), 0, nullptr, (double) sessionSrcRate);
+            /* `stream_from_disk`: use JUCE read-ahead buffer so a background `TimeSliceThread`
+             * pre-fills decoded audio — covers brief I/O stalls on network mounts. For the
+             * preloaded (RAM) path, read-ahead is unnecessary (zero I/O during playback). */
+            if (streamFromDisk)
+            {
+                if (!readAheadThread.isThreadRunning())
+                    readAheadThread.startThread(juce::Thread::Priority::normal);
+                transport.setSource(fileSource.get(), kReadAheadSamples, &readAheadThread, (double) sessionSrcRate);
+            }
+            else
+            {
+                transport.setSource(fileSource.get(), 0, nullptr, (double) sessionSrcRate);
+            }
             fileSource->insertChain = insertRunner.get();
             if (!reverseWanted)
                 fileSource->setLooping(playbackLoopWanted.load());
