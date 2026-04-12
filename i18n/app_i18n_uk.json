@@ -2602,7 +2602,7 @@
   "ui.xref.collapse_all": "Згорнути все",
   "ui.xref.decompressing": "Декомпресія…",
   "ui.xref.expand_all": "Розгорнути все",
-  "ui.xref.failed_to_read": "Failed to read: {message}",
+  "ui.xref.failed_to_read": "Не вдалося прочитати: {message}",
   "ui.xref.format_binary": "Двійковий",
   "ui.xref.json_collapsed_n_items": "…{n} елементів",
   "ui.xref.json_collapsed_n_keys": "…{n} ключів",

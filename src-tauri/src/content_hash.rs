@@ -268,4 +268,88 @@ mod tests {
         assert_eq!(r.candidates_total, 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn hash_file_sha256_missing_file_returns_none() {
+        assert!(hash_file_sha256(Path::new("/nonexistent/ah_sha256.bin")).is_none());
+    }
+
+    #[test]
+    fn different_bytes_yield_different_hashes() {
+        let dir = test_dir("diff");
+        let a = dir.join("a.bin");
+        let b = dir.join("b.bin");
+        std::fs::write(&a, b"alpha").unwrap();
+        std::fs::write(&b, b"beta").unwrap();
+        let ha = hash_file_sha256(&a).expect("readable");
+        let hb = hash_file_sha256(&b).expect("readable");
+        assert_ne!(ha, hb);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn single_size_collision_path_is_not_hashed() {
+        let entries = vec![("/only/one.wav".into(), 42, "audio".into())];
+        let r = find_byte_duplicate_groups(entries, None, None, 2);
+        assert!(r.groups.is_empty());
+        assert_eq!(r.files_hashed, 0);
+        assert_eq!(r.candidates_total, 0);
+    }
+
+    #[test]
+    fn two_groups_and_paths_sorted_within_group() {
+        let dir = test_dir("twogroups");
+        let a1 = dir.join("z.bin");
+        let a2 = dir.join("a.bin");
+        let b1 = dir.join("m.bin");
+        let b2 = dir.join("n.bin");
+        std::fs::write(&a1, b"X").unwrap();
+        std::fs::write(&a2, b"X").unwrap();
+        std::fs::write(&b1, b"Y").unwrap();
+        std::fs::write(&b2, b"Y").unwrap();
+        let entries = vec![
+            (a1.to_string_lossy().into_owned(), 1, "audio".into()),
+            (a2.to_string_lossy().into_owned(), 1, "presets".into()),
+            (b1.to_string_lossy().into_owned(), 2, "daw".into()),
+            (b2.to_string_lossy().into_owned(), 2, "daw".into()),
+        ];
+        let r = find_byte_duplicate_groups(entries, None, None, 4);
+        assert_eq!(r.groups.len(), 2);
+        for g in &r.groups {
+            assert_eq!(g.paths.len(), 2);
+            let p0 = &g.paths[0].path;
+            let p1 = &g.paths[1].path;
+            assert!(
+                p0 < p1,
+                "paths should be sorted: {:?} before {:?}",
+                p0,
+                p1
+            );
+        }
+        let mut hashes: Vec<_> = r.groups.iter().map(|g| g.hash_hex.as_str()).collect();
+        hashes.sort();
+        assert_eq!(hashes.len(), 2);
+        assert!(hashes[0] < hashes[1], "group order by hash_hex");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unreadable_path_in_bucket_counts_skipped_but_still_groups_readable_dupes() {
+        let dir = test_dir("partial");
+        let good_a = dir.join("ga.wav");
+        let good_b = dir.join("gb.wav");
+        std::fs::write(&good_a, b"same").unwrap();
+        std::fs::write(&good_b, b"same").unwrap();
+        let missing = dir.join("nope.wav");
+        let entries = vec![
+            (good_a.to_string_lossy().into_owned(), 9, "audio".into()),
+            (good_b.to_string_lossy().into_owned(), 9, "audio".into()),
+            (missing.to_string_lossy().into_owned(), 9, "audio".into()),
+        ];
+        let r = find_byte_duplicate_groups(entries, None, None, 2);
+        assert_eq!(r.skipped, 1);
+        assert_eq!(r.groups.len(), 1);
+        assert_eq!(r.groups[0].paths.len(), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

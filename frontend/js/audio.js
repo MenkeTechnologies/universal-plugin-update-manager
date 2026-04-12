@@ -4516,10 +4516,11 @@ function updatePlaybackTime() {
             _npCursorEl.style.display = '';
             _npCursorEl.style.left = pct + '%';
         }
-        // Playback cursor — metadata panel (cache `#metaWaveformBox`; path switch or DOM detach refreshes)
+        // Playback cursor — metadata panel (cache `#metaWaveformBox`; path switch, DOM detach, or null ref refreshes)
         if (
             _npMetaWaveformCachedPath !== audioPlayerPath ||
-            (_npMetaWaveformBox && !_npMetaWaveformBox.isConnected)
+            !_npMetaWaveformBox ||
+            !_npMetaWaveformBox.isConnected
         ) {
             _npMetaWaveformCachedPath = audioPlayerPath;
             _npMetaWaveformBox = audioPlayerPath ? document.getElementById('metaWaveformBox') : null;

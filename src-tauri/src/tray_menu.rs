@@ -1280,3 +1280,120 @@ pub fn start_tray_host_poll(app: AppHandle<Wry>) {
         TRAY_POLL_ACTIVE.store(false, Ordering::SeqCst);
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::{Value, json};
+
+    #[test]
+    fn fmt_tray_time_non_negative_mm_ss() {
+        assert_eq!(fmt_tray_time(0.0), "0:00");
+        assert_eq!(fmt_tray_time(59.0), "0:59");
+        assert_eq!(fmt_tray_time(60.0), "1:00");
+        assert_eq!(fmt_tray_time(125.0), "2:05");
+    }
+
+    #[test]
+    fn fmt_tray_time_truncates_fractional_seconds() {
+        assert_eq!(fmt_tray_time(61.9), "1:01");
+    }
+
+    #[test]
+    fn fmt_tray_time_negative_clamped_to_zero() {
+        assert_eq!(fmt_tray_time(-10.0), "0:00");
+    }
+
+    #[test]
+    fn truncate_tray_menu_line_trims_and_respects_char_boundary() {
+        assert_eq!(truncate_tray_menu_line("  hi  "), "hi");
+        let s = "a".repeat(TRAY_MENU_NOW_PLAYING_MAX);
+        assert_eq!(truncate_tray_menu_line(&s), s);
+        let long = "a".repeat(TRAY_MENU_NOW_PLAYING_MAX + 1);
+        let t = truncate_tray_menu_line(&long);
+        assert!(t.ends_with('…'));
+        assert_eq!(t.chars().count(), TRAY_MENU_NOW_PLAYING_MAX);
+    }
+
+    #[test]
+    fn truncate_tray_menu_line_counts_unicode_scalars_not_utf8_bytes() {
+        let euro = "€";
+        let mut s = String::new();
+        for _ in 0..TRAY_MENU_NOW_PLAYING_MAX {
+            s.push_str(euro);
+        }
+        assert_eq!(truncate_tray_menu_line(&s), s);
+        s.push_str(euro);
+        let t = truncate_tray_menu_line(&s);
+        assert!(t.ends_with('…'));
+        assert_eq!(t.chars().count(), TRAY_MENU_NOW_PLAYING_MAX);
+    }
+
+    #[test]
+    fn truncate_tray_title_matches_44_char_policy() {
+        assert_eq!(truncate_tray_title("  x  "), "x");
+        let s = "b".repeat(44);
+        assert_eq!(truncate_tray_title(&s), s);
+        let long = "b".repeat(45);
+        let t = truncate_tray_title(&long);
+        assert!(t.ends_with('…'));
+        assert_eq!(t.chars().count(), 44);
+    }
+
+    fn minimal_tray_emit() -> TrayPopoverEmit {
+        TrayPopoverEmit {
+            idle: false,
+            title: "t".into(),
+            subtitle: "s".into(),
+            reveal_path: None,
+            elapsed_sec: 0.0,
+            total_sec: None,
+            playing: false,
+            playback_speed: 1.0,
+            volume_pct: 50,
+            idle_hint: None,
+            ui_theme: "dark".into(),
+            appearance: None,
+            shuffle_on: false,
+            loop_on: false,
+            favorite_on: false,
+            loop_region_enabled: false,
+            loop_region_start_sec: 0.0,
+            loop_region_end_sec: 0.0,
+            waveform_peaks: vec![],
+        }
+    }
+
+    #[test]
+    fn tray_popover_emit_json_omits_none_and_empty_waveform() {
+        let v = serde_json::to_value(minimal_tray_emit()).unwrap();
+        let o = v.as_object().unwrap();
+        assert!(!o.contains_key("reveal_path"));
+        assert!(!o.contains_key("total_sec"));
+        assert!(!o.contains_key("idle_hint"));
+        assert!(!o.contains_key("appearance"));
+        assert!(!o.contains_key("waveform_peaks"));
+        assert_eq!(o.get("title"), Some(&Value::String("t".into())));
+        assert_eq!(o.get("ui_theme"), Some(&Value::String("dark".into())));
+    }
+
+    #[test]
+    fn tray_popover_emit_json_includes_optional_fields_when_present() {
+        let mut e = minimal_tray_emit();
+        e.reveal_path = Some("/music/a.flac".into());
+        e.total_sec = Some(120.0);
+        e.idle_hint = Some("hint".into());
+        e.appearance = Some(HashMap::from([("--cyan".into(), "#fff".into())]));
+        e.waveform_peaks = vec![0.5, -0.5];
+        let v = serde_json::to_value(e).unwrap();
+        let o = v.as_object().unwrap();
+        assert_eq!(
+            o.get("reveal_path"),
+            Some(&Value::String("/music/a.flac".into()))
+        );
+        assert_eq!(o.get("total_sec"), Some(&json!(120.0)));
+        assert_eq!(o.get("idle_hint"), Some(&Value::String("hint".into())));
+        assert!(o.get("appearance").is_some());
+        assert_eq!(o.get("waveform_peaks"), Some(&json!([0.5, -0.5])));
+    }
+}

@@ -141,4 +141,110 @@ describe('frontend/js/i18n-ui.js applyUiI18n (vm-loaded)', () => {
     J.applyUiI18n();
     assert.strictEqual(ta.placeholder, '/a\n/b');
   });
+
+  it('applyI18nPlaceholders uses regex key when .btn-regex is active in .search-box', () => {
+    const input = {
+      dataset: {
+        i18nPlaceholder: 'ph.fuzzy',
+        i18nPlaceholderRegex: 'ph.regex',
+      },
+      placeholder: '',
+      closest: () => ({
+        querySelector: (sel) => (sel === '.btn-regex' ? { classList: { contains: (c) => c === 'active' } } : null),
+      }),
+    };
+    const J = loadFrontendScripts(['i18n-ui.js'], {
+      __appStr: {
+        'ph.fuzzy': 'fuzzy text',
+        'ph.regex': 'regex mode',
+      },
+      document: {
+        querySelectorAll(sel) {
+          if (sel === '[data-i18n-placeholder]') return [input];
+          return [];
+        },
+        createElement: () => ({}),
+        getElementById: () => null,
+        addEventListener: () => {},
+        body: { insertAdjacentHTML: () => {} },
+      },
+    });
+    J.applyI18nPlaceholders();
+    assert.strictEqual(input.placeholder, 'regex mode');
+  });
+
+  it('applyI18nPlaceholders keeps fuzzy key when regex sibling is inactive', () => {
+    const input = {
+      dataset: { i18nPlaceholder: 'ph.fuzzy', i18nPlaceholderRegex: 'ph.regex' },
+      placeholder: '',
+      closest: () => ({
+        querySelector: () => ({ classList: { contains: () => false } }),
+      }),
+    };
+    const J = loadFrontendScripts(['i18n-ui.js'], {
+      __appStr: { 'ph.fuzzy': 'fuzzy only', 'ph.regex': 'regex only' },
+      document: {
+        querySelectorAll(sel) {
+          if (sel === '[data-i18n-placeholder]') return [input];
+          return [];
+        },
+        createElement: () => ({}),
+        getElementById: () => null,
+        addEventListener: () => {},
+        body: { insertAdjacentHTML: () => {} },
+      },
+    });
+    J.applyI18nPlaceholders();
+    assert.strictEqual(input.placeholder, 'fuzzy only');
+  });
+
+  it('TITLE + __appBuildVersion appends default version line', () => {
+    const titleEl = {
+      tagName: 'TITLE',
+      dataset: { i18n: 'app.title' },
+      textContent: 'old',
+    };
+    const J = loadFrontendScripts(['i18n-ui.js'], {
+      __appStr: { 'app.title': 'Audio Haxor' },
+      __appBuildVersion: '9.9.9',
+      document: {
+        querySelectorAll(sel) {
+          if (sel === '[data-i18n]') return [titleEl];
+          return [];
+        },
+        createElement: () => ({}),
+        getElementById: () => null,
+        addEventListener: () => {},
+        body: { insertAdjacentHTML: () => {} },
+      },
+    });
+    J.applyUiI18n();
+    assert.strictEqual(titleEl.textContent, 'Audio Haxor · Version: v9.9.9');
+  });
+
+  it('TITLE uses formatBuildMetaLine when provided', () => {
+    const titleEl = {
+      tagName: 'TITLE',
+      dataset: { i18n: 'app.title' },
+      textContent: 'old',
+    };
+    const J = loadFrontendScripts(['i18n-ui.js'], {
+      __appStr: { 'app.title': 'App' },
+      __appBuildVersion: '1.0.0',
+      __appBuildInfo: { channel: 'beta' },
+      formatBuildMetaLine: (info) => `ch=${info.channel}`,
+      document: {
+        querySelectorAll(sel) {
+          if (sel === '[data-i18n]') return [titleEl];
+          return [];
+        },
+        createElement: () => ({}),
+        getElementById: () => null,
+        addEventListener: () => {},
+        body: { insertAdjacentHTML: () => {} },
+      },
+    });
+    J.applyUiI18n();
+    assert.strictEqual(titleEl.textContent, 'App · ch=beta');
+  });
 });

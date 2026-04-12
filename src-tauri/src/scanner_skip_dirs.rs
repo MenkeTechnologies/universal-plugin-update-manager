@@ -111,4 +111,18 @@ mod tests {
             assert!(seen.insert(d), "duplicate skip dir entry: {:?}", d);
         }
     }
+
+    /// Walkers match the final path component only — entries must be single segment names.
+    #[test]
+    fn skip_dirs_entries_are_single_path_components() {
+        for &d in SCANNER_SKIP_DIRS {
+            assert!(!d.is_empty(), "empty skip dir");
+            assert!(
+                !d.contains('/') && !d.contains('\\'),
+                "skip dir must be a name, not a path: {:?}",
+                d
+            );
+        }
+    }
+
 }

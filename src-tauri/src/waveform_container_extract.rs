@@ -389,6 +389,7 @@ pub(crate) fn rewrite_visual_preview_for_juce(req: &Value) -> (Value, Option<Tem
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::video_scanner::VIDEO_EXTENSIONS;
 
     #[test]
     fn mp4_needs_extract_mov_mkv_too() {
@@ -401,5 +402,23 @@ mod tests {
     fn wav_and_plain_audio_do_not_need_extract() {
         assert!(!path_needs_container_extract(Path::new("/a/x.wav")));
         assert!(!path_needs_container_extract(Path::new("/a/x.mp3")));
+    }
+
+    /// `path_needs_container_extract` must stay aligned with `VIDEO_EXTENSIONS` (scanner + preview).
+    #[test]
+    fn every_registered_video_extension_needs_container_extract() {
+        for ext in VIDEO_EXTENSIONS {
+            let path = Path::new("/tmp/demo").with_extension(&ext[1..]);
+            assert!(
+                path_needs_container_extract(&path),
+                "extension {ext:?} should require container extract"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_video_like_extension_does_not_need_extract() {
+        assert!(!path_needs_container_extract(Path::new("/x/foo.xyz")));
+        assert!(!path_needs_container_extract(Path::new("/x/noext")));
     }
 }

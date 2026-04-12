@@ -45,4 +45,41 @@ mod tests {
             "/System/Volumes/Data/Users/x/a.wav"
         );
     }
+
+    #[test]
+    fn path_strings_json_normalized_empty_array() {
+        let empty: Vec<String> = vec![];
+        assert_eq!(path_strings_json_normalized(&empty), "[]");
+    }
+
+    #[test]
+    fn path_strings_json_normalized_preserves_order_and_valid_json() {
+        let paths = vec![
+            "/first/a.wav".into(),
+            "/second/b.wav".into(),
+        ];
+        let j = path_strings_json_normalized(&paths);
+        let parsed: Vec<String> = serde_json::from_str(&j).expect("valid JSON array");
+        assert_eq!(parsed, paths);
+    }
+
+    #[test]
+    fn path_strings_json_normalized_escapes_special_chars() {
+        let paths = vec!["/q/\"quote\".wav".into(), "/u/ünïcöde.flac".into()];
+        let j = path_strings_json_normalized(&paths);
+        let parsed: Vec<String> = serde_json::from_str(&j).expect("round-trip");
+        assert_eq!(parsed, paths);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn path_strings_json_normalized_applies_per_element_on_macos() {
+        let paths = vec![
+            "/System/Volumes/Data/Users/x/a.wav".into(),
+            "/Users/y/b.wav".into(),
+        ];
+        let j = path_strings_json_normalized(&paths);
+        let parsed: Vec<String> = serde_json::from_str(&j).unwrap();
+        assert_eq!(parsed, vec!["/Users/x/a.wav", "/Users/y/b.wav"]);
+    }
 }

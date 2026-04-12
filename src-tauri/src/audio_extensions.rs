@@ -45,4 +45,28 @@ mod tests {
             AUDIO_EXTENSIONS.len()
         );
     }
+
+    #[test]
+    fn is_audio_extension_lowercase_rejects_unknown_and_uppercase() {
+        assert!(!is_audio_extension_lowercase("exe"));
+        assert!(!is_audio_extension_lowercase("WAV"));
+        assert!(!is_audio_extension_lowercase(""));
+    }
+
+    #[test]
+    fn audio_extensions_list_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for &e in AUDIO_EXTENSIONS {
+            assert!(seen.insert(e), "duplicate audio extension: {:?}", e);
+        }
+    }
+
+    #[test]
+    fn tags_are_uppercase_of_extensions_without_dot() {
+        let tags = audio_format_tags_for_app_info();
+        for (i, ext) in AUDIO_EXTENSIONS.iter().enumerate() {
+            let plain = ext.strip_prefix('.').unwrap();
+            assert_eq!(tags[i], plain.to_ascii_uppercase());
+        }
+    }
 }

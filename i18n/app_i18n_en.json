@@ -693,6 +693,7 @@
   "toast.snapshot_export_dir_cleared": "Snapshot export folder cleared (app data snapshots folder)",
   "toast.snapshot_export_dir_saved": "Snapshot export folder saved",
   "toast.snapshot_exported": "Snapshot exported",
+  "toast.speed_mode": "Speed mode: {value}",
   "toast.speed_value": "Speed: {value}x",
   "toast.sqlite_read_pool_extra_set": "SQLite read pool: {val} — restart to apply",
   "toast.start_all_background_jobs": "Starting all background jobs (analysis, dup scan, PDF scan, PDF metadata, fingerprints, KVR update check)...",
