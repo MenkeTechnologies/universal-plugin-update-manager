@@ -4,19 +4,28 @@ use std::collections::HashMap;
 use tauri::menu::*;
 use tauri::{AppHandle, Runtime};
 
+/// Resolve a menu label from the merged `app_i18n` map (same rules as tray `t()`).
+#[must_use]
+pub(crate) fn resolve_menu_bar_label(
+    strings: &HashMap<String, String>,
+    key: &str,
+    fallback: &str,
+) -> String {
+    strings
+        .get(key)
+        .map(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
 /// Rebuilds the full menu bar using merged strings for the active UI locale.
 pub fn build_native_menu_bar<R: Runtime>(
     handle: &AppHandle<R>,
     strings: &HashMap<String, String>,
 ) -> Result<Menu<R>, tauri::Error> {
-    let t = |key: &str, fallback: &str| -> String {
-        strings
-            .get(key)
-            .map(|s| s.as_str())
-            .filter(|s| !s.is_empty())
-            .unwrap_or(fallback)
-            .to_string()
-    };
+    let t =
+        |key: &str, fallback: &str| -> String { resolve_menu_bar_label(strings, key, fallback) };
 
     // App menu (macOS convention — first menu shows app name)
     let about_title = t("menu.about", "About AUDIO_HAXOR");
@@ -734,4 +743,36 @@ pub fn build_native_menu_bar<R: Runtime>(
             &help_menu,
         ],
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_menu_bar_label_missing_key_uses_fallback() {
+        let m = HashMap::new();
+        assert_eq!(resolve_menu_bar_label(&m, "menu.file", "File"), "File");
+    }
+
+    #[test]
+    fn resolve_menu_bar_label_empty_catalog_value_uses_fallback() {
+        let m = HashMap::from([("menu.file".into(), "".into())]);
+        assert_eq!(resolve_menu_bar_label(&m, "menu.file", "File"), "File");
+    }
+
+    #[test]
+    fn resolve_menu_bar_label_whitespace_only_value_is_kept() {
+        let m = HashMap::from([("k".into(), "   ".into())]);
+        assert_eq!(resolve_menu_bar_label(&m, "k", "fb"), "   ");
+    }
+
+    #[test]
+    fn resolve_menu_bar_label_non_empty_catalog_wins() {
+        let m = HashMap::from([("menu.about".into(), "À propos".into())]);
+        assert_eq!(
+            resolve_menu_bar_label(&m, "menu.about", "About"),
+            "À propos"
+        );
+    }
 }
