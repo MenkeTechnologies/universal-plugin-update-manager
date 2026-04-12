@@ -116,8 +116,8 @@ function ctxMenuVideoAudioRouteItems() {
             ? 'html5'
             : 'engine';
     const act = typeof catalogFmt === 'function' ? catalogFmt('ui.palette.autoplay_source_active') : 'Active';
-    const engBase = typeof appFmt === 'function' ? appFmt('menu.video_audio_route_engine') : 'Audio Engine';
-    const h5Base = typeof appFmt === 'function' ? appFmt('menu.video_audio_route_html5') : 'WebView (HTML5)';
+    const engBase = catalogFmt('menu.video_audio_route_engine');
+    const h5Base = catalogFmt('menu.video_audio_route_html5');
     return [
         {
             icon: '&#127898;',

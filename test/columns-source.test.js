@@ -45,10 +45,10 @@ describe('frontend/js/columns.js loadColumnWidths (vm-loaded)', () => {
   });
 
   it('returns pcts when version and shape match', () => {
-    // v must match COL_LAYOUT_VERSION in frontend/js/columns.js (currently 3)
+    // v must match COL_LAYOUT_VERSION in frontend/js/columns.js (currently 4)
     const C = loadColumnsSandbox({
       columnWidths: {
-        pluginTable: { v: 3, keys: ['n', 'v'], pcts: [62.5, 37.5] },
+        pluginTable: { v: 4, keys: ['n', 'v'], pcts: [62.5, 37.5] },
       },
     });
     const pcts = C.loadColumnWidths('pluginTable');
@@ -59,7 +59,7 @@ describe('frontend/js/columns.js loadColumnWidths (vm-loaded)', () => {
   it('returns empty pcts array when stored as [] (truthy)', () => {
     const C = loadColumnsSandbox({
       columnWidths: {
-        pluginTable: { v: 3, keys: ['a'], pcts: [] },
+        pluginTable: { v: 4, keys: ['a'], pcts: [] },
       },
     });
     const pcts = C.loadColumnWidths('pluginTable');
@@ -103,7 +103,7 @@ describe('frontend/js/columns.js saveColumnWidths (vm-loaded)', () => {
     C.saveColumnWidths('audioTable');
     const stored = cache.columnWidths.audioTable;
     assert.ok(stored);
-    assert.strictEqual(stored.v, 3);
+    assert.strictEqual(stored.v, 4);
     // VM may wrap arrays; compare elements, not deepStrictEqual on array identity
     assert.strictEqual(stored.keys.length, 2);
     assert.strictEqual(stored.keys[0], 'name');

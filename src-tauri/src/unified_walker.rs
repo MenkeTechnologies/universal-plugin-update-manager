@@ -444,7 +444,13 @@ pub fn walk_unified(
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(num_cpus::get().max(4))
         .build()
-        .unwrap();
+        .unwrap_or_else(|e| {
+            crate::append_log(format!("Unified walker thread pool failed ({e}), retrying with 2 threads"));
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(2)
+                .build()
+                .expect("fallback 2-thread pool")
+        });
 
     let tcc_denied: Arc<DashSet<PathBuf>> = Arc::new(DashSet::new());
     let tcc_summary = tcc_denied.clone();

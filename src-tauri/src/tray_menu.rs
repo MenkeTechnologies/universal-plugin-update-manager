@@ -1168,14 +1168,19 @@ pub fn start_tray_host_poll(app: AppHandle<Wry>) {
         return;
     }
     thread::spawn(move || {
+        // Adaptive polling: ramp up to longer sleep intervals when idle so we don't
+        // wake the CPU every 500 ms for nothing (saves power on battery / background).
+        let mut idle_streak: u32 = 0;
         while TRAY_POLL_ACTIVE.load(Ordering::SeqCst) {
-            thread::sleep(Duration::from_millis(TRAY_POLL_MS));
+            let sleep_ms = if idle_streak > 6 { 2000 } else { TRAY_POLL_MS };
+            thread::sleep(Duration::from_millis(sleep_ms));
             if !TRAY_POLL_ACTIVE.load(Ordering::SeqCst) {
                 break;
             }
             /* Short-circuit BEFORE touching the audio-engine — no point spawning the child process
              * or locking its stdin mutex until JS has reported a non-idle track. */
             let Some(tray_state) = app.try_state::<TrayState>() else {
+                idle_streak = idle_streak.saturating_add(1);
                 continue;
             };
             {
@@ -1184,8 +1189,13 @@ pub fn start_tray_host_poll(app: AppHandle<Wry>) {
                     Err(_) => continue,
                 };
                 match guard.last_popover_emit.as_ref() {
-                    Some(e) if !e.idle => {}
-                    _ => continue,
+                    Some(e) if !e.idle => {
+                        idle_streak = 0;
+                    }
+                    _ => {
+                        idle_streak = idle_streak.saturating_add(1);
+                        continue;
+                    }
                 }
             }
             let v = match crate::audio_engine::spawn_audio_engine_request(

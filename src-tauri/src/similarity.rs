@@ -182,15 +182,25 @@ pub fn find_similar(
     candidates: &[AudioFingerprint],
     max_results: usize,
 ) -> Vec<(String, f64)> {
-    let mut scored: Vec<(String, f64)> = candidates
+    let cmp = |a: &f64, b: &f64| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal);
+
+    // Defer path cloning until after partial sort so only the top-K results allocate.
+    let mut scored: Vec<(&AudioFingerprint, f64)> = candidates
         .iter()
         .filter(|c| c.path != reference.path)
-        .map(|c| (c.path.clone(), fingerprint_distance(reference, c)))
+        .map(|c| (c, fingerprint_distance(reference, c)))
         .collect();
 
-    scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-    scored.truncate(max_results);
+    if scored.len() > max_results {
+        // O(n) partial sort — only the smallest max_results distances need ordering
+        scored.select_nth_unstable_by(max_results, |a, b| cmp(&a.1, &b.1));
+        scored.truncate(max_results);
+    }
+    scored.sort_unstable_by(|a, b| cmp(&a.1, &b.1));
     scored
+        .into_iter()
+        .map(|(c, d)| (c.path.clone(), d))
+        .collect()
 }
 
 #[cfg(test)]

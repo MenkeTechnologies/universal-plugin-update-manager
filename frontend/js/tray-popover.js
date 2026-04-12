@@ -721,6 +721,7 @@
     let _trayScrubCancelled = false;
     let _dragFrac = 0;
     let _rafId = null;
+    let _syncTimers = [null, null, null];
     /** Last `applyState` progress tuple from host — when unchanged, ignore drift (shuffle/loop-only
      * emits while main is hidden can carry a stale `elapsed_sec` vs local rAF interpolation). */
     let _trayLastApplyProgressKey = null;
@@ -745,12 +746,13 @@
 
     /* ResizeObserver: the tray popover can resize for title-length changes, so the canvas
      * backing store needs to follow `clientWidth` / `clientHeight`. Single observer — reusable. */
+    let _roWaveform = null;
     if (elWaveformCanvas && typeof ResizeObserver === 'function') {
-        const ro = new ResizeObserver(() => {
+        _roWaveform = new ResizeObserver(() => {
             // Defer to next frame so the new layout is measurable.
             requestAnimationFrame(() => renderTrayWaveform());
         });
-        try { ro.observe(elWaveformCanvas); } catch {}
+        try { _roWaveform.observe(elWaveformCanvas); } catch {}
     }
 
     function renderTrayWaveform() {
@@ -823,8 +825,11 @@
     }
 
     function animationTick() {
+        if (_currentIdle) {
+            _rafId = null;
+            return;
+        }
         _rafId = null;
-        if (_currentIdle) return;
         if (_dragging) {
             /* Drag preview: render whatever the pointer is pointing at, elapsed text follows. */
             renderProgress(_dragFrac * (_currentTotal || 0), _currentTotal);
@@ -985,15 +990,12 @@
         logTrayPopoverApplyState(p, idle, playing, themed);
         syncTrayPopoverTooltips();
         scheduleResize();
-        setTimeout(() => {
-            syncWindowSize();
-        }, 0);
-        setTimeout(() => {
-            syncWindowSize();
-        }, 80);
-        setTimeout(() => {
-            syncWindowSize();
-        }, 260);
+        for (let i = 0; i < _syncTimers.length; i++) {
+            if (_syncTimers[i] != null) { clearTimeout(_syncTimers[i]); _syncTimers[i] = null; }
+        }
+        _syncTimers[0] = setTimeout(() => { _syncTimers[0] = null; syncWindowSize(); }, 0);
+        _syncTimers[1] = setTimeout(() => { _syncTimers[1] = null; syncWindowSize(); }, 80);
+        _syncTimers[2] = setTimeout(() => { _syncTimers[2] = null; syncWindowSize(); }, 260);
     }
 
     /* Drag-to-seek: window-level pointer listeners (no `setPointerCapture`). Capture retargeting on
@@ -1469,12 +1471,18 @@
             run();
         }
     }
+    let _roShell = null;
     if (typeof ResizeObserver === 'function' && shell) {
-        const ro = new ResizeObserver(() => {
+        _roShell = new ResizeObserver(() => {
             scheduleResize();
         });
-        ro.observe(shell);
+        _roShell.observe(shell);
     }
+
+    window.addEventListener('unload', () => {
+        if (_roWaveform) { _roWaveform.disconnect(); _roWaveform = null; }
+        if (_roShell) { _roShell.disconnect(); _roShell = null; }
+    }, { once: true });
 
     if (document.readyState === 'complete') {
         initSizeAfterFonts();

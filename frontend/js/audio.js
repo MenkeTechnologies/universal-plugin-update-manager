@@ -24,6 +24,7 @@ function _audioDecodeWorkerScriptUrl() {
 let _audioDecodeWorker = null;
 let _audioDecodeWorkerJobId = 0;
 const _audioDecodeWorkerPending = new Map();
+const _AUDIO_DECODE_TIMEOUT_MS = 30_000;
 
 function _audioDecodeWorkerOnMessage(ev) {
     const d = ev.data;
@@ -31,6 +32,7 @@ function _audioDecodeWorkerOnMessage(ev) {
     const pending = _audioDecodeWorkerPending.get(d.id);
     if (!pending) return;
     _audioDecodeWorkerPending.delete(d.id);
+    clearTimeout(pending.timer);
     if (d.ok) pending.resolve(d);
     else pending.reject(new Error(d.error || 'worker decode failed'));
 }
@@ -43,6 +45,7 @@ function getAudioDecodeWorker() {
         _audioDecodeWorker.onmessage = _audioDecodeWorkerOnMessage;
         _audioDecodeWorker.onerror = () => {
             for (const [, p] of _audioDecodeWorkerPending) {
+                clearTimeout(p.timer);
                 p.reject(new Error('audio decode worker failed'));
             }
             _audioDecodeWorkerPending.clear();
@@ -64,10 +67,15 @@ function postAudioDecodeWorker(payload, transfer) {
     if (!w) return Promise.reject(new Error('no worker'));
     return new Promise((resolve, reject) => {
         const id = ++_audioDecodeWorkerJobId;
-        _audioDecodeWorkerPending.set(id, { resolve, reject });
+        const timer = setTimeout(() => {
+            _audioDecodeWorkerPending.delete(id);
+            reject(new Error('audio decode worker timeout'));
+        }, _AUDIO_DECODE_TIMEOUT_MS);
+        _audioDecodeWorkerPending.set(id, { resolve, reject, timer });
         try {
             w.postMessage({ ...payload, id }, transfer || []);
         } catch (e) {
+            clearTimeout(timer);
             _audioDecodeWorkerPending.delete(id);
             reject(e);
         }
@@ -3553,7 +3561,7 @@ async function previewAudio(filePath, opts) {
         } else {
             if (typeof stopVideoPlayback === 'function') stopVideoPlayback({ keepVideoFrame: true });
             if (_enginePlaybackActive && typeof window.enginePlaybackStop === 'function') {
-                void window.enginePlaybackStop();
+                window._pendingEngineStop = window.enginePlaybackStop();
                 setEnginePlaybackActive(false);
             }
             if (typeof window !== 'undefined') {
@@ -3775,7 +3783,7 @@ function updateLoopBtnStates() {
 
 function stopAudioPlayback() {
     if (_enginePlaybackActive && typeof window !== 'undefined' && typeof window.enginePlaybackStop === 'function') {
-        void window.enginePlaybackStop();
+        window._pendingEngineStop = window.enginePlaybackStop();
         setEnginePlaybackActive(false);
     }
     stopReverseBufferPlayback();

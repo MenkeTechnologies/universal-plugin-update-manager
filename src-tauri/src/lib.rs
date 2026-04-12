@@ -2951,7 +2951,13 @@ async fn batch_analyze(paths: Vec<String>) -> Result<serde_json::Value, String> 
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(num_threads)
             .build()
-            .expect("batch_analyze rayon pool");
+            .unwrap_or_else(|e| {
+                append_log(format!("batch_analyze thread pool failed ({e}), retrying with 2 threads"));
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(2)
+                    .build()
+                    .expect("fallback 2-thread pool")
+            });
         let results: Vec<db::AnalysisBatchRow> = pool.install(|| {
             paths
                 .par_iter()

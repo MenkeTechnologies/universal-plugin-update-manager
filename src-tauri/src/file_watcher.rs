@@ -100,12 +100,17 @@ pub fn start_watching(
 
     let app_handle = app.clone();
 
-    // Debounce: collect per-category scan roots for 2 seconds before emitting
+    // Debounce: collect per-category scan roots for 2 seconds before emitting.
+    // A single debounce thread (guarded by `debounce_active`) replaces the old per-event
+    // thread::spawn — under heavy file activity (bulk copy, npm install, builds) the old
+    // approach could spawn thousands of short-lived threads, exhausting system resources.
     let pending: Arc<Mutex<HashMap<String, HashSet<String>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     let pending_clone = pending.clone();
     let last_emit = Arc::new(Mutex::new(Instant::now()));
     let last_emit_clone = last_emit.clone();
+    let debounce_active = Arc::new(AtomicBool::new(false));
+    let debounce_active_clone = debounce_active.clone();
 
     let mut watcher = RecommendedWatcher::new(
         move |result: Result<Event, notify::Error>| {
@@ -136,45 +141,56 @@ pub fn start_watching(
                     .insert(root.to_string_lossy().to_string());
             }
 
-            // Debounce: emit after 2 seconds of quiet
+            // Debounce: emit after 2 seconds of quiet (single thread, not per-event)
             let mut last = last_emit_clone.lock().unwrap();
             *last = Instant::now();
-            let pending_ref = pending_clone.clone();
-            let app_ref = app_handle.clone();
-            let last_ref = last_emit_clone.clone();
 
-            std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_secs(2));
-                let last = last_ref.lock().unwrap();
-                if last.elapsed() < Duration::from_millis(1900) {
-                    return; // More events came in, skip
-                }
-                drop(last);
+            if !debounce_active_clone.swap(true, Ordering::SeqCst) {
+                let pending_ref = pending_clone.clone();
+                let app_ref = app_handle.clone();
+                let last_ref = last_emit_clone.clone();
+                let flag = debounce_active_clone.clone();
 
-                let mut map = pending_ref.lock().unwrap();
-                if map.is_empty() {
-                    return;
-                }
-                let categories: Vec<String> = map.keys().cloned().collect();
-                let mut roots_by_category = serde_json::Map::new();
-                for (cat, path_strs) in map.drain() {
-                    let paths: Vec<PathBuf> = path_strs.into_iter().map(PathBuf::from).collect();
-                    let minimized = minimize_scan_roots(paths);
-                    let arr: Vec<String> = minimized
-                        .into_iter()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .collect();
-                    roots_by_category.insert(cat, serde_json::json!(arr));
-                }
-                let _ = app_ref.emit(
-                    "file-watcher-change",
-                    serde_json::json!({
-                        "categories": categories,
-                        "roots_by_category": roots_by_category,
-                        "timestamp": chrono::Utc::now().to_rfc3339(),
-                    }),
-                );
-            });
+                std::thread::spawn(move || {
+                    loop {
+                        std::thread::sleep(Duration::from_secs(2));
+                        let last = last_ref.lock().unwrap();
+                        if last.elapsed() < Duration::from_millis(1900) {
+                            drop(last);
+                            continue; // More events arrived — wait another cycle
+                        }
+                        drop(last);
+
+                        let mut map = pending_ref.lock().unwrap();
+                        if map.is_empty() {
+                            flag.store(false, Ordering::SeqCst);
+                            return;
+                        }
+                        let categories: Vec<String> = map.keys().cloned().collect();
+                        let mut roots_by_category = serde_json::Map::new();
+                        for (cat, path_strs) in map.drain() {
+                            let paths: Vec<PathBuf> =
+                                path_strs.into_iter().map(PathBuf::from).collect();
+                            let minimized = minimize_scan_roots(paths);
+                            let arr: Vec<String> = minimized
+                                .into_iter()
+                                .map(|p| p.to_string_lossy().to_string())
+                                .collect();
+                            roots_by_category.insert(cat, serde_json::json!(arr));
+                        }
+                        let _ = app_ref.emit(
+                            "file-watcher-change",
+                            serde_json::json!({
+                                "categories": categories,
+                                "roots_by_category": roots_by_category,
+                                "timestamp": chrono::Utc::now().to_rfc3339(),
+                            }),
+                        );
+                        flag.store(false, Ordering::SeqCst);
+                        return;
+                    }
+                });
+            }
         },
         Config::default().with_poll_interval(Duration::from_secs(5)),
     )

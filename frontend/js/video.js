@@ -335,7 +335,7 @@ function clearVideoScanButtonSpinnerImmediate() {
     if (typeof btnLoading === 'function') btnLoading(btn, false);
     if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '&#127909; <span data-i18n="ui.btn.scan_videos">' + (typeof appFmt === 'function' ? appFmt('ui.btn.scan_videos') : 'Scan videos') + '</span>';
+        btn.innerHTML = '&#127909; <span data-i18n="ui.btn.scan_videos">' + catalogFmt('ui.btn.scan_videos') + '</span>';
     }
     if (stopBtn) stopBtn.style.display = 'none';
     if (progressBar) progressBar.classList.remove('active');
@@ -390,8 +390,8 @@ async function scanVideos(resume = false, overrideRoots = null) {
         if (tableWrap) {
             tableWrap.innerHTML = `<div class="state-message" id="videoEmptyState">
             <div class="state-icon">&#127909;</div>
-            <h2 data-i18n="ui.h2.video_index">${typeof appFmt === 'function' ? appFmt('ui.h2.video_index') : 'Video index'}</h2>
-            <p data-i18n="ui.p.videos_scanning">${typeof appFmt === 'function' ? appFmt('ui.p.videos_scanning') : 'Scanning…'}</p>
+            <h2 data-i18n="ui.h2.video_index">${catalogFmt('ui.h2.video_index')}</h2>
+            <p data-i18n="ui.p.videos_scanning">${catalogFmt('ui.p.videos_scanning')}</p>
         </div>`;
         }
     }
@@ -671,8 +671,8 @@ function _syncVideoMaximizeBtnState() {
     const doc = document;
     const fsEl = doc.fullscreenElement ?? doc.webkitFullscreenElement;
     const fs = (host && fsEl === host) || (!!vid && fsEl === vid);
-    const maxT = typeof appFmt === 'function' ? appFmt('ui.tt.video_maximize') : 'Fullscreen video';
-    const restT = typeof appFmt === 'function' ? appFmt('ui.tt.video_restore') : 'Exit fullscreen';
+    const maxT = catalogFmt('ui.tt.video_maximize');
+    const restT = catalogFmt('ui.tt.video_restore');
     btn.title = fs ? restT : maxT;
     if (fs && host && fsEl === host) _syncVideoFsControlsFromNp();
 }
@@ -764,7 +764,7 @@ function stopVideoPlayback(opts) {
     if (_videoEngineActive) {
         _videoEngineActive = false;
         if (typeof window.enginePlaybackStop === 'function') {
-            void window.enginePlaybackStop();
+            window._pendingEngineStop = window.enginePlaybackStop();
         }
         if (typeof window.setEnginePlaybackActive === 'function') {
             window.setEnginePlaybackActive(false);
@@ -920,8 +920,8 @@ function expandVideoMetaForPath(filePath) {
     const hp = typeof escapeHtml === 'function' ? escapeHtml(filePath) : filePath;
     const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
 
-    const maxBtnLabel = typeof appFmt === 'function' ? appFmt('ui.video.btn_maximize') : 'Maximize';
-    const maxBtnTt = typeof appFmt === 'function' ? appFmt('ui.tt.video_maximize') : 'Fullscreen video';
+    const maxBtnLabel = catalogFmt('ui.video.btn_maximize');
+    const maxBtnTt = catalogFmt('ui.tt.video_maximize');
     metaRow.innerHTML = `<td colspan="7"><div class="video-meta-panel">
       <div class="video-meta-panel-actions">
         <button type="button" class="video-maximize-btn" id="btnVideoMaximize" data-action="toggleVideoMaximize" data-i18n="ui.video.btn_maximize" data-i18n-title="ui.tt.video_maximize" title="${typeof escapeHtml === 'function' ? escapeHtml(maxBtnTt) : maxBtnTt}">${typeof escapeHtml === 'function' ? escapeHtml(maxBtnLabel) : maxBtnLabel}</button>

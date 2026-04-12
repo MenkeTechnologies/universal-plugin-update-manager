@@ -104,6 +104,8 @@ function runEngineExchange(bin, requestLines, opts = {}) {
    * handle open waiting for a clean shutdown. Measured engine shutdown is <200 ms on macOS. */
   const postEofGraceMs = opts.postEofGraceMs ?? 1500;
   const expectedOut = opts.expectedOutputLines ?? requestLines.length;
+  const writePauseAfterIdx = opts.writePauseAfterIdx ?? -1;
+  const writePauseMs = opts.writePauseMs ?? 0;
   return new Promise((resolve, reject) => {
     /* Arm the C++ `ParentWatchdog` (see `audio-engine/src/ParentWatchdog.cpp`) so the spawned
      * audio-engine self-destructs within ~2 s if this test runner dies (Ctrl+C, crash, timeout).
@@ -197,17 +199,23 @@ function runEngineExchange(bin, requestLines, opts = {}) {
       finish(resolve, { code, signal, outLines, stderr: stderrChunks.join('') });
     });
 
-    for (const l of requestLines) {
+    const writeNext = (idx) => {
+      if (settled || idx >= requestLines.length) return;
       try {
-        child.stdin.write(`${l}\n`);
+        child.stdin.write(`${requestLines[idx]}\n`);
       } catch (err) {
         finish(reject, err);
         return;
       }
-    }
+      if (idx === writePauseAfterIdx && writePauseMs > 0) {
+        setTimeout(() => writeNext(idx + 1), writePauseMs);
+      } else {
+        writeNext(idx + 1);
+      }
+    };
+    writeNext(0);
   });
 }
-
 const bin = resolveAudioEngineBin();
 const cmakeVersion = readProjectVersionFromCMake();
 
@@ -1355,39 +1363,32 @@ if (!bin) {
     });
 
     it('playback_status scope true clamps scope_samples and returns paired arrays when output running', async () => {
-      const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'start_output_stream', tone: true })], {
-        timeoutMs: 90_000,
-      });
+      const { outLines } = await runEngineExchange(
+        bin,
+        [
+          jl({ cmd: 'start_output_stream', tone: true }),
+          jl({ cmd: 'playback_status', spectrum: false, scope: true, scope_samples: 4096 }),
+        ],
+        {
+          timeoutMs: 90_000,
+          expectedOutputLines: 2,
+          writePauseAfterIdx: 0,
+          writePauseMs: 500,
+        },
+      );
       const start = JSON.parse(outLines[0]);
       if (!start.ok) {
         assertOkOrNoAudioDevice(start, 'output');
         return;
       }
-      try {
-        await new Promise((r) => setTimeout(r, 80));
-        const { outLines: outSt } = await runEngineExchange(
-          bin,
-          [
-            jl({
-              cmd: 'playback_status',
-              spectrum: false,
-              scope: true,
-              scope_samples: 4096,
-            }),
-          ],
-          { timeoutMs: 90_000 },
-        );
-        const st = JSON.parse(outSt[0]);
-        assert.equal(st.ok, true);
-        const want = 2048;
-        assert.equal(st.scope_len, want);
-        assert.ok(Array.isArray(st.scope_l));
-        assert.ok(Array.isArray(st.scope_r));
-        assert.equal(st.scope_l.length, want);
-        assert.equal(st.scope_r.length, want);
-      } finally {
-        await runEngineExchange(bin, [jl({ cmd: 'stop_output_stream' })], { timeoutMs: 90_000 });
-      }
+      const st = JSON.parse(outLines[1]);
+      assert.equal(st.ok, true);
+      const want = 2048;
+      assert.equal(st.scope_len, want);
+      assert.ok(Array.isArray(st.scope_l));
+      assert.ok(Array.isArray(st.scope_r));
+      assert.equal(st.scope_l.length, want);
+      assert.equal(st.scope_r.length, want);
     });
 
     it('playback_status clamps spectrum_fft_order and spectrum_bins in metadata', async () => {

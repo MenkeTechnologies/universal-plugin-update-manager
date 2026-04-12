@@ -117,7 +117,13 @@ pub fn find_byte_duplicate_groups(
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build()
-        .expect("content_dup rayon pool");
+        .unwrap_or_else(|e| {
+            crate::append_log(format!("Content hash thread pool failed ({e}), retrying with 2 threads"));
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(2)
+                .build()
+                .expect("fallback 2-thread pool")
+        });
 
     for chunk in to_hash.chunks(HASH_CHUNK) {
         if cancel.is_some_and(|c| c.load(Ordering::Relaxed)) {

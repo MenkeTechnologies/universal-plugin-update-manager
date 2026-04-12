@@ -271,7 +271,13 @@ pub fn walk_for_daw(
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(num_cpus::get().max(4))
         .build()
-        .unwrap();
+        .unwrap_or_else(|e| {
+            crate::append_log(format!("DAW scanner thread pool failed ({e}), retrying with 2 threads"));
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(2)
+                .build()
+                .expect("fallback 2-thread pool")
+        });
     std::thread::spawn(move || {
         pool.install(|| {
             roots_owned.par_iter().for_each(|root| {
