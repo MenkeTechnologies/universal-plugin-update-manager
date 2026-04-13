@@ -2998,11 +2998,14 @@ struct Engine::Impl
             appendPlaybackScopeJson(o, wantScope, scopeSamples);
             return out;
         }
-        /* Forward + resampler: timeline from reader samples (transport time drifts vs. ResamplingAudioSource). */
+        /* Forward + resampler: timeline from reader samples (transport time drifts vs. ResamplingAudioSource).
+         * When `bufferedReader` is active, `readerSource->getNextReadPosition()` returns the
+         * background read-ahead position (up to kReadAheadSamples ahead); use `fileSource` which
+         * returns the true playback position from `bufferedReader` instead. */
         double posSrc = transport.getCurrentPosition();
         if (!reverseWanted && fileSource != nullptr && fileSource->readerSource != nullptr)
         {
-            const juce::int64 sp = fileSource->readerSource->getNextReadPosition();
+            const juce::int64 sp = fileSource->getNextReadPosition();
             posSrc = (double) sp / juce::jmax(1.0e-9, (double) sessionSrcRate);
         }
         double pos = reverseWanted ? (sessionDurationSec - posSrc) : posSrc;

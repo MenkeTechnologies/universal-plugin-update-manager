@@ -579,8 +579,10 @@ function _itemTypeToTab(type) {
  * If the item isn't in the table yet, add it on the fly.
  */
 async function _goToTableItem(tab, path) {
+    // Normalize backslashes (Windows Rust paths) to forward slashes.
+    const norm = (path || '').replace(/\\/g, '/');
     switchTab(tab);
-    const fileName = (path || '').split('/').pop() || '';
+    const fileName = norm.split('/').pop() || '';
     const name = fileName.replace(/\.[^.]+$/, '');
     const ext = fileName.includes('.') ? fileName.split('.').pop().toUpperCase() : '';
 
@@ -592,100 +594,103 @@ async function _goToTableItem(tab, path) {
     };
 
     if (tab === 'samples') {
-        // ── Audio / Samples ──
-        const sel = `#audioTableBody tr[data-audio-path="${CSS.escape(path)}"]`;
+        // ── Audio / Samples (DB-backed paginated table) ──
+        const sel = `#audioTableBody tr[data-audio-path="${CSS.escape(norm)}"]`;
         let row = document.querySelector(sel);
         if (row) { _flash(row); return; }
 
-        // Not in table — try to add from metadata IPC (richest), recentlyPlayed, or bare minimum.
-        if (typeof allAudioSamples !== 'undefined') {
-            let sample = typeof findByPath === 'function' ? findByPath(allAudioSamples, path) : null;
-            if (!sample) {
-                try {
-                    if (window.vstUpdater && typeof window.vstUpdater.getAudioMetadata === 'function') {
-                        const meta = await window.vstUpdater.getAudioMetadata(path);
-                        sample = {
-                            name: meta.fileName ? meta.fileName.replace(/\.[^.]+$/, '') : name,
-                            path: meta.fullPath || path,
-                            directory: meta.directory || path.replace(/\/[^/]+$/, ''),
-                            format: meta.format || ext,
-                            size: meta.sizeBytes || 0,
-                            sizeBytes: meta.sizeBytes || 0,
-                            sizeFormatted: typeof formatAudioSize === 'function' ? formatAudioSize(meta.sizeBytes) : '',
-                            modified: meta.modified || '',
-                            duration: meta.duration || null,
-                            sampleRate: meta.sampleRate || null,
-                            channels: meta.channels || null,
-                            bitsPerSample: meta.bitsPerSample || null,
-                        };
-                    }
-                } catch (_) { /* fall through to bare-minimum */ }
-                if (!sample) {
-                    const recent = typeof recentlyPlayed !== 'undefined'
-                        ? recentlyPlayed.find(r => r.path === path) : null;
-                    sample = {
-                        name, path,
-                        directory: path.replace(/\/[^/]+$/, ''),
-                        format: recent?.format || ext,
-                        size: 0,
-                        sizeFormatted: recent?.size || '?',
-                        modified: '',
-                    };
-                }
-                allAudioSamples.push(sample);
-                if (typeof filteredAudioSamples !== 'undefined') filteredAudioSamples.push(sample);
-            }
-            const tbody = document.getElementById('audioTableBody');
-            if (tbody && typeof buildAudioRow === 'function' && !document.querySelector(sel)) {
-                tbody.insertAdjacentHTML('beforeend', buildAudioRow(sample));
-            }
-        }
-        // Clear search so the new row is visible, then re-filter.
+        // Row not visible — clear filters and re-fetch from DB so it can surface.
         const searchInput = document.getElementById('audioSearchInput');
         if (searchInput && searchInput.value) searchInput.value = '';
-        if (typeof filterAudioSamples === 'function') filterAudioSamples();
-        setTimeout(() => {
-            row = document.querySelector(sel);
-            if (row) _flash(row);
-            else if (typeof showToast === 'function') showToast(`Could not locate ${name} in Samples table`, 3000, 'warn');
-        }, 150);
+        if (typeof _lastAudioSearch !== 'undefined') _lastAudioSearch = '';
+        if (typeof audioCurrentOffset !== 'undefined') audioCurrentOffset = 0;
+        try { if (typeof fetchAudioPage === 'function') await fetchAudioPage(); } catch (_) {}
+        row = document.querySelector(sel);
+        if (row) { _flash(row); return; }
+
+        // Still not found (not in DB) — build a temporary row manually.
+        let sample = null;
+        try {
+            if (window.vstUpdater && typeof window.vstUpdater.getAudioMetadata === 'function') {
+                const meta = await window.vstUpdater.getAudioMetadata(norm);
+                sample = {
+                    name: meta.fileName ? meta.fileName.replace(/\.[^.]+$/, '') : name,
+                    path: meta.fullPath || norm,
+                    directory: meta.directory || norm.replace(/\/[^/]+$/, ''),
+                    format: meta.format || ext,
+                    size: meta.sizeBytes || 0,
+                    sizeBytes: meta.sizeBytes || 0,
+                    sizeFormatted: typeof formatAudioSize === 'function' ? formatAudioSize(meta.sizeBytes) : '',
+                    modified: meta.modified || '',
+                    duration: meta.duration || null,
+                    sampleRate: meta.sampleRate || null,
+                    channels: meta.channels || null,
+                    bitsPerSample: meta.bitsPerSample || null,
+                };
+            }
+        } catch (_) { /* fall through to bare-minimum */ }
+        if (!sample) {
+            const recent = typeof recentlyPlayed !== 'undefined'
+                ? recentlyPlayed.find(r => (r.path || '').replace(/\\/g, '/') === norm) : null;
+            sample = {
+                name, path: norm,
+                directory: norm.replace(/\/[^/]+$/, ''),
+                format: recent?.format || ext,
+                size: 0,
+                sizeFormatted: recent?.size || '?',
+                modified: '',
+            };
+        }
+        if (typeof allAudioSamples !== 'undefined') {
+            allAudioSamples.push(sample);
+            if (typeof filteredAudioSamples !== 'undefined') filteredAudioSamples.push(sample);
+        }
+        const tbody = document.getElementById('audioTableBody');
+        if (tbody && typeof buildAudioRow === 'function') {
+            tbody.insertAdjacentHTML('beforeend', buildAudioRow(sample));
+        }
+        // Do NOT call filterAudioSamples() — it would wipe the just-added row via async DB re-render.
+        row = document.querySelector(sel);
+        if (row) _flash(row);
+        else if (typeof showToast === 'function') showToast(`Could not locate ${name} in Samples table`, 3000, 'warn');
     } else if (tab === 'videos') {
-        // ── Video ──
-        const sel = `#videoTableBody tr[data-video-path="${CSS.escape(path)}"]`;
+        // ── Video (DB-backed paginated table) ──
+        const sel = `#videoTableBody tr[data-video-path="${CSS.escape(norm)}"]`;
         let row = document.querySelector(sel);
         if (row) { _flash(row); return; }
 
-        // Not in table — add a minimal video entry.
-        if (typeof allVideos !== 'undefined') {
-            let vid = typeof findByPath === 'function' ? findByPath(allVideos, path) : null;
-            if (!vid) {
-                vid = {
-                    name, path,
-                    directory: path.replace(/\/[^/]+$/, ''),
-                    format: ext,
-                    size: 0,
-                    sizeFormatted: '?',
-                    modified: '',
-                };
-                allVideos.push(vid);
-                if (typeof filteredVideos !== 'undefined') filteredVideos.push(vid);
-            }
-            const tbody = document.getElementById('videoTableBody');
-            if (tbody && typeof buildVideoRow === 'function' && !document.querySelector(sel)) {
-                tbody.insertAdjacentHTML('beforeend', buildVideoRow(vid));
-            }
-        }
+        // Clear filters and re-fetch from DB.
         const searchInput = document.getElementById('videoSearchInput');
         if (searchInput && searchInput.value) searchInput.value = '';
-        if (typeof filterVideos === 'function') filterVideos();
-        setTimeout(() => {
-            row = document.querySelector(sel);
-            if (row) _flash(row);
-            else if (typeof showToast === 'function') showToast(`Could not locate ${name} in Videos table`, 3000, 'warn');
-        }, 150);
+        if (typeof _lastVideoSearch !== 'undefined') _lastVideoSearch = '';
+        if (typeof _videoOffset !== 'undefined') _videoOffset = 0;
+        try { if (typeof fetchVideoPage === 'function') await fetchVideoPage(); } catch (_) {}
+        row = document.querySelector(sel);
+        if (row) { _flash(row); return; }
+
+        // Not in DB — add a temporary row.
+        const vid = {
+            name, path: norm,
+            directory: norm.replace(/\/[^/]+$/, ''),
+            format: ext,
+            size: 0,
+            sizeFormatted: '?',
+            modified: '',
+        };
+        if (typeof allVideos !== 'undefined') {
+            allVideos.push(vid);
+            if (typeof filteredVideos !== 'undefined') filteredVideos.push(vid);
+        }
+        const tbody = document.getElementById('videoTableBody');
+        if (tbody && typeof buildVideoRow === 'function') {
+            tbody.insertAdjacentHTML('beforeend', buildVideoRow(vid));
+        }
+        row = document.querySelector(sel);
+        if (row) _flash(row);
+        else if (typeof showToast === 'function') showToast(`Could not locate ${name} in Videos table`, 3000, 'warn');
     } else if (tab === 'plugins') {
         // ── Plugin ──
-        const sel = `.plugin-card[data-path="${CSS.escape(path)}"]`;
+        const sel = `.plugin-card[data-path="${CSS.escape(norm)}"]`;
         let card = document.querySelector(sel);
         if (card) { _flash(card); return; }
         setTimeout(() => {
@@ -695,7 +700,7 @@ async function _goToTableItem(tab, path) {
         }, 150);
     } else if (tab === 'daw') {
         // ── DAW Projects ──
-        const sel = `#dawTableBody tr[data-daw-path="${CSS.escape(path)}"]`;
+        const sel = `#dawTableBody tr[data-daw-path="${CSS.escape(norm)}"]`;
         let row = document.querySelector(sel);
         if (row) { _flash(row); return; }
         setTimeout(() => {
@@ -705,7 +710,7 @@ async function _goToTableItem(tab, path) {
         }, 150);
     } else if (tab === 'presets') {
         // ── Presets ──
-        const sel = `#presetTableBody tr[data-preset-path="${CSS.escape(path)}"]`;
+        const sel = `#presetTableBody tr[data-preset-path="${CSS.escape(norm)}"]`;
         let row = document.querySelector(sel);
         if (row) { _flash(row); return; }
         setTimeout(() => {
