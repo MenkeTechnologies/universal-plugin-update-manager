@@ -91,6 +91,7 @@ function addTagToItem(path, tag) {
         note.tags.push(tag);
         setNote(path, note.note, note.tags);
         refreshRowBadges(path);
+        _tagsDirty = true;
     }
 }
 
@@ -100,6 +101,7 @@ function removeTagFromItem(path, tag) {
     note.tags = note.tags.filter(t => t !== tag);
     setNote(path, note.note, note.tags);
     refreshRowBadges(path);
+    _tagsDirty = true;
 }
 
 function renameTag(oldTag, newTag) {
@@ -603,8 +605,9 @@ async function expandTagMeta(filePath) {
     panel.id = 'tagMetaPanel';
     panel.className = 'tag-meta-panel';
     panel.innerHTML = `<div class="audio-meta-panel" style="justify-items:center;"><div class="spinner" style="width:18px;height:18px;"></div></div>`;
+    // Insert right after the clicked item so it stays visually associated.
     item.after(panel);
-    item.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
 
     try {
         const meta = await window.vstUpdater.getAudioMetadata(filePath);
@@ -636,7 +639,7 @@ async function expandTagMeta(filePath) {
       <div class="waveform-time-label">${meta.duration && typeof formatTime === 'function' ? formatTime(meta.duration) : ''}</div>
     </div>
     <div class="meta-waveform" style="height:80px;cursor:default;" title="Spectrogram">
-      <canvas id="metaSpectrogramCanvas" width="800" height="80" style="position:absolute;top:0;left:0;width:100%;height:100;"></canvas>
+      <canvas id="metaSpectrogramCanvas" width="800" height="80" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
       <span style="position:absolute;top:2px;left:4px;font-size:8px;color:var(--text-dim);pointer-events:none;">Spectrogram</span>
     </div>`;
 
@@ -825,6 +828,9 @@ async function _goToTableItem(tab, path) {
     }
 }
 
+let _tagsHasRendered = false;
+let _tagsDirty = false;
+
 registerFilter('filterTags', {
     inputId: 'tagSearchInput',
     regexToggleId: 'regexTags',
@@ -909,7 +915,8 @@ function renderTagsManager() {
             const nameEl = goTab
                 ? `<a class="tag-manager-item-name" data-tag-action="go-to-tab" data-path="${hp}" data-tab="${goTab}" title="${escapeHtml(item.path)}">${escapeHtml(name)}</a>`
                 : `<span class="tag-manager-item-name" title="${escapeHtml(item.path)}">${escapeHtml(name)}</span>`;
-            return `<div class="tag-manager-item" data-path="${hp}" data-item-type="${itemType}">
+            const cursor = itemType === 'sample' ? ' style="cursor:pointer;"' : '';
+            return `<div class="tag-manager-item" data-path="${hp}" data-item-type="${itemType}"${cursor}>
             <span class="tag-manager-item-icon">${typeIcon}</span>
             ${nameEl}
             ${badge}
@@ -932,6 +939,8 @@ function renderTagsManager() {
             getKey: (el) => el.querySelector('.tag-manager-name')?.textContent?.trim() || '',
         });
     }
+    _tagsHasRendered = true;
+    _tagsDirty = false;
 }
 
 // ── Tag Wizard Modal ──
@@ -1292,10 +1301,20 @@ document.addEventListener('click', (e) => {
             showToast(toastFmt('toast.tag_removed_from_note', {tag}));
         } else if (act === 'play-audio') {
             const path = tagAction.dataset.path;
-            if (path && typeof previewAudio === 'function') previewAudio(path);
+            if (path && typeof previewAudio === 'function') {
+                previewAudio(path).then(() => {
+                    if (_tagExpandedPath === path) {
+                        closeTagMeta();
+                    } else {
+                        expandTagMeta(path);
+                    }
+                });
+            }
         } else if (act === 'play-video') {
             const path = tagAction.dataset.path;
             if (path && typeof previewVideo === 'function') previewVideo(path);
+        } else if (act === 'closeTagMeta') {
+            closeTagMeta();
         } else if (act === 'go-to-tab') {
             e.preventDefault();
             const path = tagAction.dataset.path;
@@ -1303,6 +1322,21 @@ document.addEventListener('click', (e) => {
             if (tab && typeof switchTab === 'function') {
                 void _goToTableItem(tab, path);
             }
+        }
+    }
+
+    // Click on sample tag item row → play + toggle expanded meta
+    const tagItem = e.target.closest('.tag-manager-item[data-item-type="sample"]');
+    if (tagItem && !e.target.closest('.tag-manager-item-actions') && !e.target.closest('button') && !e.target.closest('a')) {
+        const path = tagItem.dataset.path;
+        if (path && typeof previewAudio === 'function') {
+            previewAudio(path).then(() => {
+                if (_tagExpandedPath === path) {
+                    closeTagMeta();
+                } else {
+                    expandTagMeta(path);
+                }
+            });
         }
     }
 

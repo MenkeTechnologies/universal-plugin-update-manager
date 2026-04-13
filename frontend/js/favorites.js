@@ -10,6 +10,8 @@ function normalizeFavoritePathKey(p) {
 // Cache favorites array + Set for O(1) isFavorite lookups.
 let _favsCache = null;
 let _favsPathSet = null;
+let _favHasRendered = false;
+let _favDirty = false;
 
 function getFavorites() {
     if (!_favsCache) {
@@ -74,6 +76,7 @@ function addFavorite(type, path, name, extra) {
     saveFavorites(favs);
     showToast(toastFmt('toast.added_to_favorites', {name}));
     if (typeof refreshRowBadges === 'function') refreshRowBadges(key);
+    _favDirty = true;
 }
 
 function removeFavorite(path) {
@@ -82,6 +85,7 @@ function removeFavorite(path) {
     saveFavorites(favs);
     showToast(toastFmt('toast.removed_from_favorites'));
     if (typeof refreshRowBadges === 'function') refreshRowBadges(key);
+    _favDirty = true;
     renderFavorites();
 }
 
@@ -296,6 +300,8 @@ function renderFavorites() {
       </div>`);
     }
     if (typeof initFavDragReorder === 'function') requestAnimationFrame(initFavDragReorder);
+    _favHasRendered = true;
+    _favDirty = false;
 }
 
 let _favFiltered = [];

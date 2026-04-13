@@ -2670,8 +2670,9 @@ function closeMetaRow() {
     const expanded = document.querySelector('tr.row-expanded');
     if (expanded) expanded.classList.remove('row-expanded');
     expandedMetaPath = null;
-    // Also close favorites meta panel if open
+    // Also close favorites/tags meta panel if open
     if (typeof closeFavMeta === 'function') closeFavMeta();
+    if (typeof closeTagMeta === 'function') closeTagMeta();
 }
 
 function getFormatClass(format) {
@@ -5122,8 +5123,9 @@ async function expandMetaForPath(filePath) {
         const prevRow = tbody.querySelector('tr.row-expanded');
         if (prevRow) prevRow.classList.remove('row-expanded');
     }
-    // Close favorites meta panel if open
+    // Close favorites/tags meta panel if open
     if (typeof closeFavMeta === 'function') closeFavMeta();
+    if (typeof closeTagMeta === 'function') closeTagMeta();
 
     expandedMetaPath = filePath;
 

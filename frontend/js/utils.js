@@ -1346,9 +1346,9 @@ function switchTab(tab) {
                 if (expectedTab === 'walkers' && typeof startWalkerPolling === 'function') startWalkerPolling();
                 if (expectedTab === 'audioEngine' && typeof initAudioEngineTab === 'function') initAudioEngineTab();
                 if (expectedTab === 'history' && typeof loadHistory === 'function') loadHistory({preferCache: true});
-                if (expectedTab === 'favorites') renderFavorites();
+                if (expectedTab === 'favorites' && typeof _favHasRendered !== 'undefined' && (!_favHasRendered || _favDirty)) renderFavorites();
                 if (expectedTab === 'notes') renderNotesTab();
-                if (expectedTab === 'tags') renderTagsManager();
+                if (expectedTab === 'tags' && typeof _tagsHasRendered !== 'undefined' && (!_tagsHasRendered || _tagsDirty)) renderTagsManager();
                 if (expectedTab === 'files') initFileBrowser();
                 if (expectedTab === 'midi' && typeof loadMidiFiles === 'function' && typeof _midiLoaded !== 'undefined' && !_midiLoaded) loadMidiFiles();
                 if (expectedTab === 'pdf' && typeof loadPdfPagesForVisible === 'function') void loadPdfPagesForVisible();
