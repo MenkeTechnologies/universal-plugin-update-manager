@@ -2328,6 +2328,43 @@ DROP TABLE _pl_refresh_paths;"#;
                 .map_err(|e| format!("Migration v20 schema_version failed: {e}"))?;
         }
 
+        if current < 21 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS favorites (
+                    id         INTEGER PRIMARY KEY,
+                    type       TEXT NOT NULL,
+                    path       TEXT NOT NULL UNIQUE,
+                    name       TEXT NOT NULL,
+                    format     TEXT NOT NULL DEFAULT '',
+                    daw        TEXT NOT NULL DEFAULT '',
+                    added_at   TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE INDEX IF NOT EXISTS idx_favorites_path ON favorites(path);
+                CREATE INDEX IF NOT EXISTS idx_favorites_sort ON favorites(sort_order);
+
+                CREATE TABLE IF NOT EXISTS item_notes (
+                    path       TEXT PRIMARY KEY NOT NULL,
+                    note       TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS item_tags (
+                    path TEXT NOT NULL,
+                    tag  TEXT NOT NULL,
+                    PRIMARY KEY (path, tag)
+                );
+                CREATE INDEX IF NOT EXISTS idx_item_tags_tag ON item_tags(tag);
+
+                CREATE TABLE IF NOT EXISTS standalone_tags (
+                    tag TEXT PRIMARY KEY NOT NULL
+                );",
+            )
+            .map_err(|e| format!("Migration v21 (favorites/notes/tags) failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (21)", [])
+                .map_err(|e| format!("Migration v21 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
@@ -2340,6 +2377,398 @@ DROP TABLE _pl_refresh_paths;"#;
         }
 
         Ok(())
+    }
+
+    // ── Favorites ──
+
+    pub fn favorites_list(&self) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare("SELECT id, type, path, name, format, daw, added_at, sort_order FROM favorites ORDER BY sort_order ASC, id ASC")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "type": row.get::<_, String>(1)?,
+                    "path": row.get::<_, String>(2)?,
+                    "name": row.get::<_, String>(3)?,
+                    "format": row.get::<_, String>(4)?,
+                    "daw": row.get::<_, String>(5)?,
+                    "addedAt": row.get::<_, String>(6)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(out)
+    }
+
+    pub fn favorites_add(
+        &self,
+        fav_type: &str,
+        path: &str,
+        name: &str,
+        format: &str,
+        daw: &str,
+        added_at: &str,
+    ) -> Result<bool, String> {
+        let conn = self.write_conn();
+        let min_order: i64 = conn
+            .query_row("SELECT COALESCE(MIN(sort_order), 0) FROM favorites", [], |r| r.get(0))
+            .unwrap_or(0);
+        let res = conn.execute(
+            "INSERT OR IGNORE INTO favorites (type, path, name, format, daw, added_at, sort_order) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+            params![fav_type, path, name, format, daw, added_at, min_order - 1],
+        ).map_err(|e| e.to_string())?;
+        Ok(res > 0)
+    }
+
+    pub fn favorites_remove(&self, path: &str) -> Result<bool, String> {
+        let conn = self.write_conn();
+        let n = conn
+            .execute("DELETE FROM favorites WHERE path = ?1", params![path])
+            .map_err(|e| e.to_string())?;
+        Ok(n > 0)
+    }
+
+    pub fn favorites_clear(&self) -> Result<(), String> {
+        let conn = self.write_conn();
+        conn.execute("DELETE FROM favorites", [])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn favorites_is(&self, path: &str) -> Result<bool, String> {
+        let conn = self.read_conn();
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM favorites WHERE path = ?1)",
+                params![path],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(exists)
+    }
+
+    /// Bulk-replace all favorites (for import).
+    pub fn favorites_set_all(&self, favs: &[serde_json::Value]) -> Result<(), String> {
+        let conn = self.write_conn();
+        conn.execute("DELETE FROM favorites", [])
+            .map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("INSERT INTO favorites (type, path, name, format, daw, added_at, sort_order) VALUES (?1,?2,?3,?4,?5,?6,?7)")
+            .map_err(|e| e.to_string())?;
+        for (i, f) in favs.iter().enumerate() {
+            let fav_type = f.get("type").and_then(|v| v.as_str()).unwrap_or("sample");
+            let path = f.get("path").and_then(|v| v.as_str()).unwrap_or("");
+            let name = f.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let format = f.get("format").and_then(|v| v.as_str()).unwrap_or("");
+            let daw = f.get("daw").and_then(|v| v.as_str()).unwrap_or("");
+            let added_at = f.get("addedAt").and_then(|v| v.as_str()).unwrap_or("");
+            if path.is_empty() {
+                continue;
+            }
+            stmt.execute(params![fav_type, path, name, format, daw, added_at, i as i64])
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    // ── Notes ──
+
+    pub fn note_get(&self, path: &str) -> Result<Option<serde_json::Value>, String> {
+        let conn = self.read_conn();
+        let note: Option<(String, String)> = conn
+            .query_row(
+                "SELECT note, updated_at FROM item_notes WHERE path = ?1",
+                params![path],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        let Some((note_text, updated_at)) = note else {
+            return Ok(None);
+        };
+        let mut tag_stmt = conn
+            .prepare("SELECT tag FROM item_tags WHERE path = ?1 ORDER BY tag")
+            .map_err(|e| e.to_string())?;
+        let tags: Vec<String> = tag_stmt
+            .query_map(params![path], |r| r.get(0))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(Some(serde_json::json!({
+            "note": note_text,
+            "tags": tags,
+            "updatedAt": updated_at,
+        })))
+    }
+
+    pub fn note_set(&self, path: &str, note: &str, tags: &[String]) -> Result<(), String> {
+        let conn = self.write_conn();
+        let is_empty = note.trim().is_empty() && tags.is_empty();
+        // If note is only whitespace but tags exist, keep the note text verbatim.
+        if is_empty && note.is_empty() {
+            conn.execute("DELETE FROM item_notes WHERE path = ?1", params![path])
+                .map_err(|e| e.to_string())?;
+            conn.execute("DELETE FROM item_tags WHERE path = ?1", params![path])
+                .map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO item_notes (path, note, updated_at) VALUES (?1,?2,?3)
+             ON CONFLICT(path) DO UPDATE SET note=excluded.note, updated_at=excluded.updated_at",
+            params![path, note, now],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM item_tags WHERE path = ?1", params![path])
+            .map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("INSERT OR IGNORE INTO item_tags (path, tag) VALUES (?1,?2)")
+            .map_err(|e| e.to_string())?;
+        for t in tags {
+            stmt.execute(params![path, t]).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    pub fn notes_get_all(&self) -> Result<serde_json::Value, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare("SELECT path, note, updated_at FROM item_notes")
+            .map_err(|e| e.to_string())?;
+        let mut map = serde_json::Map::new();
+        let rows: Vec<(String, String, String)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        for (path, note, updated_at) in &rows {
+            map.insert(
+                path.clone(),
+                serde_json::json!({"note": note, "tags": Vec::<String>::new(), "updatedAt": updated_at}),
+            );
+        }
+        // Fill in tags
+        let mut tag_stmt = conn
+            .prepare("SELECT path, tag FROM item_tags ORDER BY path, tag")
+            .map_err(|e| e.to_string())?;
+        let tag_rows: Vec<(String, String)> = tag_stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        for (path, tag) in tag_rows {
+            if let Some(entry) = map.get_mut(&path) {
+                if let Some(tags) = entry.get_mut("tags").and_then(|v| v.as_array_mut()) {
+                    tags.push(serde_json::Value::String(tag));
+                }
+            } else {
+                // Tags for paths without a note row: create a stub entry
+                map.insert(
+                    path.clone(),
+                    serde_json::json!({"note": "", "tags": [tag], "updatedAt": ""}),
+                );
+            }
+        }
+        Ok(serde_json::Value::Object(map))
+    }
+
+    // ── Tags ──
+
+    pub fn tags_standalone_list(&self) -> Result<Vec<String>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare("SELECT tag FROM standalone_tags ORDER BY tag")
+            .map_err(|e| e.to_string())?;
+        let tags: Vec<String> = stmt
+            .query_map([], |r| r.get(0))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(tags)
+    }
+
+    pub fn tags_standalone_set(&self, tags: &[String]) -> Result<(), String> {
+        let conn = self.write_conn();
+        conn.execute("DELETE FROM standalone_tags", [])
+            .map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("INSERT OR IGNORE INTO standalone_tags (tag) VALUES (?1)")
+            .map_err(|e| e.to_string())?;
+        for t in tags {
+            stmt.execute(params![t]).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    pub fn tags_standalone_add(&self, tag: &str) -> Result<(), String> {
+        let conn = self.write_conn();
+        conn.execute(
+            "INSERT OR IGNORE INTO standalone_tags (tag) VALUES (?1)",
+            params![tag],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn tags_standalone_remove(&self, tag: &str) -> Result<(), String> {
+        let conn = self.write_conn();
+        conn.execute("DELETE FROM standalone_tags WHERE tag = ?1", params![tag])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn tags_all(&self) -> Result<Vec<String>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare(
+                "SELECT tag FROM standalone_tags
+                 UNION
+                 SELECT tag FROM item_tags
+                 ORDER BY tag",
+            )
+            .map_err(|e| e.to_string())?;
+        let tags: Vec<String> = stmt
+            .query_map([], |r| r.get(0))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(tags)
+    }
+
+    pub fn tags_counts(&self) -> Result<serde_json::Value, String> {
+        let conn = self.read_conn();
+        let mut map = serde_json::Map::new();
+        // Standalone tags seed at 0
+        let mut stmt = conn
+            .prepare("SELECT tag FROM standalone_tags")
+            .map_err(|e| e.to_string())?;
+        let standalone: Vec<String> = stmt
+            .query_map([], |r| r.get(0))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        for t in standalone {
+            map.insert(t, serde_json::json!(0));
+        }
+        // Item tag counts
+        let mut stmt2 = conn
+            .prepare("SELECT tag, COUNT(*) FROM item_tags GROUP BY tag")
+            .map_err(|e| e.to_string())?;
+        let counts: Vec<(String, i64)> = stmt2
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        for (tag, count) in counts {
+            map.insert(tag, serde_json::json!(count));
+        }
+        Ok(serde_json::Value::Object(map))
+    }
+
+    pub fn tags_items_with(&self, tag: &str) -> Result<Vec<serde_json::Value>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare(
+                "SELECT it.path, COALESCE(n.note,'') AS note, COALESCE(n.updated_at,'') AS updated_at
+                 FROM item_tags it
+                 LEFT JOIN item_notes n ON n.path = it.path
+                 WHERE it.tag = ?1",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows: Vec<serde_json::Value> = stmt
+            .query_map(params![tag], |r| {
+                Ok(serde_json::json!({
+                    "path": r.get::<_, String>(0)?,
+                    "note": r.get::<_, String>(1)?,
+                    "updatedAt": r.get::<_, String>(2)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(rows)
+    }
+
+    pub fn tag_rename(&self, old_tag: &str, new_tag: &str) -> Result<i64, String> {
+        let conn = self.write_conn();
+        // Delete item_tags rows where the new_tag already exists for the same path (dedup)
+        conn.execute(
+            "DELETE FROM item_tags WHERE tag = ?1 AND path IN (SELECT path FROM item_tags WHERE tag = ?2)",
+            params![old_tag, new_tag],
+        )
+        .map_err(|e| e.to_string())?;
+        let changed = conn
+            .execute(
+                "UPDATE item_tags SET tag = ?2 WHERE tag = ?1",
+                params![old_tag, new_tag],
+            )
+            .map_err(|e| e.to_string())? as i64;
+        // Rename in standalone
+        conn.execute(
+            "DELETE FROM standalone_tags WHERE tag = ?1",
+            params![old_tag],
+        )
+        .map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT OR IGNORE INTO standalone_tags (tag) VALUES (?1)",
+            params![new_tag],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(changed)
+    }
+
+    pub fn tag_delete(&self, tag: &str) -> Result<i64, String> {
+        let conn = self.write_conn();
+        let changed = conn
+            .execute("DELETE FROM item_tags WHERE tag = ?1", params![tag])
+            .map_err(|e| e.to_string())? as i64;
+        conn.execute("DELETE FROM standalone_tags WHERE tag = ?1", params![tag])
+            .map_err(|e| e.to_string())?;
+        Ok(changed)
+    }
+
+    pub fn tag_add_to_item(&self, path: &str, tag: &str) -> Result<bool, String> {
+        let conn = self.write_conn();
+        // Ensure item_notes row exists
+        conn.execute(
+            "INSERT OR IGNORE INTO item_notes (path, note, updated_at) VALUES (?1, '', ?2)",
+            params![path, chrono::Utc::now().to_rfc3339()],
+        )
+        .map_err(|e| e.to_string())?;
+        let n = conn
+            .execute(
+                "INSERT OR IGNORE INTO item_tags (path, tag) VALUES (?1,?2)",
+                params![path, tag],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(n > 0)
+    }
+
+    pub fn tag_remove_from_item(&self, path: &str, tag: &str) -> Result<(), String> {
+        let conn = self.write_conn();
+        conn.execute(
+            "DELETE FROM item_tags WHERE path = ?1 AND tag = ?2",
+            params![path, tag],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn tag_has(&self, path: &str, tag: &str) -> Result<bool, String> {
+        let conn = self.read_conn();
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM item_tags WHERE path = ?1 AND tag = ?2)",
+                params![path, tag],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(exists)
     }
 
     /// Insert a batch of audio samples in a single transaction.

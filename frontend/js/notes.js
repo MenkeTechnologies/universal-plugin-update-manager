@@ -1,4 +1,8 @@
 // ── Notes & Tags ──
+// Stored in SQLite via Tauri commands.
+// Read functions are synchronous, reading from _badgeCtx (a pre-fetched snapshot).
+// Write functions are async (IPC to SQLite) and refresh _badgeCtx after each write.
+// Call prepareBadgeContext() before renders that need badge/note/tag data.
 
 /** Aligns with favorites: host paths may use `\\` while `audioPlayerPath` uses `/`. */
 function normalizeItemNotePathKey(p) {
@@ -6,143 +10,114 @@ function normalizeItemNotePathKey(p) {
     return p.replace(/\\/g, '/');
 }
 
-// Cache parsed notes object — avoids JSON.parse on every row render.
-let _notesCache = null;
+// ── Pre-fetched render context ──
+// Refreshed before renders and after writes. NOT a persistent cache.
+let _badgeCtx = { favs: [], favPaths: new Set(), notes: {}, standaloneTags: [] };
+
+async function prepareBadgeContext() {
+    const [favs, notes, standaloneTags] = await Promise.all([
+        window.vstUpdater.favoritesList(),
+        window.vstUpdater.notesGetAll(),
+        window.vstUpdater.tagsStandaloneList(),
+    ]);
+    _badgeCtx.favs = favs;
+    _badgeCtx.favPaths = new Set(favs.map(f => f.path));
+    _badgeCtx.notes = notes;
+    _badgeCtx.standaloneTags = standaloneTags;
+}
+
+// ── Sync read functions (from _badgeCtx) ──
 
 function getNotes() {
-    if (!_notesCache) {
-        const raw = prefs.getObject('itemNotes', {});
-        _notesCache = {};
-        let dirty = false;
-        for (const [p, n] of Object.entries(raw)) {
-            const k = normalizeItemNotePathKey(p);
-            if (k !== p) dirty = true;
-            _notesCache[k] = n;
-        }
-        if (dirty) prefs.setItem('itemNotes', _notesCache);
-    }
-    return _notesCache;
+    return _badgeCtx.notes;
 }
 
 function getNote(path) {
     const k = normalizeItemNotePathKey(path);
-    return getNotes()[k] || null;
-}
-
-function setNote(path, note, tags) {
-    _notesCache = null; // invalidate cache before read
-    const notes = getNotes();
-    const k = normalizeItemNotePathKey(path);
-    if ((!note || !note.trim()) && (!tags || tags.length === 0)) {
-        delete notes[k];
-    } else {
-        notes[k] = {note: note || '', tags: tags || [], updatedAt: new Date().toISOString()};
-    }
-    prefs.setItem('itemNotes', notes);
-    _notesCache = null;
-    if (typeof window.updateNoteBtn === 'function') window.updateNoteBtn();
+    return _badgeCtx.notes[k] || null;
 }
 
 function getStandaloneTags() {
-    return prefs.getObject('standaloneTags', []);
-}
-
-function setStandaloneTags(tags) {
-    prefs.setItem('standaloneTags', tags);
+    return _badgeCtx.standaloneTags;
 }
 
 function getAllTags() {
-    const notes = getNotes();
-    const tags = new Set(getStandaloneTags());
-    for (const entry of Object.values(notes)) {
-        if (entry.tags) entry.tags.forEach(t => tags.add(t));
+    const tagSet = new Set(_badgeCtx.standaloneTags);
+    for (const n of Object.values(_badgeCtx.notes)) {
+        for (const t of (n.tags || [])) tagSet.add(t);
     }
-    return [...tags].sort();
+    return [...tagSet].sort();
 }
 
 function getTagCounts() {
-    const notes = getNotes();
     const counts = {};
-    // Include standalone tags with 0 count
-    for (const t of getStandaloneTags()) counts[t] = 0;
-    for (const entry of Object.values(notes)) {
-        if (entry.tags) entry.tags.forEach(t => {
+    for (const n of Object.values(_badgeCtx.notes)) {
+        for (const t of (n.tags || [])) {
             counts[t] = (counts[t] || 0) + 1;
-        });
+        }
+    }
+    for (const t of _badgeCtx.standaloneTags) {
+        if (!(t in counts)) counts[t] = 0;
     }
     return counts;
 }
 
 function getItemsWithTag(tag) {
-    const notes = getNotes();
-    return Object.entries(notes)
-        .filter(([, n]) => n.tags && n.tags.includes(tag))
-        .map(([path, n]) => ({path, ...n}));
+    return Object.entries(_badgeCtx.notes)
+        .filter(([_, n]) => n.tags?.includes(tag))
+        .map(([path, n]) => ({ path, note: n.note || '', tags: n.tags || [] }));
 }
 
 function hasTag(path, tag) {
-    const note = getNote(path);
-    return note?.tags?.includes(tag) || false;
+    const k = normalizeItemNotePathKey(path);
+    const n = _badgeCtx.notes[k];
+    return !!(n && n.tags && n.tags.includes(tag));
 }
 
-function addTagToItem(path, tag) {
-    const note = getNote(path) || {note: '', tags: []};
-    if (!note.tags.includes(tag)) {
-        note.tags.push(tag);
-        setNote(path, note.note, note.tags);
+// ── Async write functions (IPC → SQLite, then refresh _badgeCtx) ──
+
+async function setNote(path, note, tags) {
+    const k = normalizeItemNotePathKey(path);
+    if ((!note || !note.trim()) && (!tags || tags.length === 0)) {
+        await window.vstUpdater.noteSet(k, '', []);
+    } else {
+        await window.vstUpdater.noteSet(k, note || '', tags || []);
+    }
+    await prepareBadgeContext();
+    if (typeof window.updateNoteBtn === 'function') window.updateNoteBtn();
+}
+
+async function addTagToItem(path, tag) {
+    const added = await window.vstUpdater.tagAddToItem(normalizeItemNotePathKey(path), tag);
+    if (added) {
+        await prepareBadgeContext();
         refreshRowBadges(path);
         _tagsDirty = true;
     }
 }
 
-function removeTagFromItem(path, tag) {
-    const note = getNote(path);
-    if (!note) return;
-    note.tags = note.tags.filter(t => t !== tag);
-    setNote(path, note.note, note.tags);
+async function removeTagFromItem(path, tag) {
+    const k = normalizeItemNotePathKey(path);
+    const n = _badgeCtx.notes[k];
+    if (!n) return;
+    await window.vstUpdater.tagRemoveFromItem(k, tag);
+    await prepareBadgeContext();
     refreshRowBadges(path);
     _tagsDirty = true;
 }
 
-function renameTag(oldTag, newTag) {
-    const notes = getNotes();
-    let changed = 0;
-    for (const [path, n] of Object.entries(notes)) {
-        if (n.tags && n.tags.includes(oldTag)) {
-            n.tags = n.tags.map(t => t === oldTag ? newTag : t);
-            n.tags = [...new Set(n.tags)]; // dedupe
-            changed++;
-        }
-    }
+async function renameTag(oldTag, newTag) {
+    const changed = await window.vstUpdater.tagRename(oldTag, newTag);
     if (changed > 0) {
-        prefs.setItem('itemNotes', notes);
-        _notesCache = null;
+        await prepareBadgeContext();
         showToast(toastFmt('toast.tag_renamed_items', {oldTag, newTag, changed}));
         if (typeof window.updateNoteBtn === 'function') window.updateNoteBtn();
     }
 }
 
-function deleteTag(tag) {
-    const notes = getNotes();
-    let changed = 0;
-    for (const [path, n] of Object.entries(notes)) {
-        if (n.tags && n.tags.includes(tag)) {
-            n.tags = n.tags.filter(t => t !== tag);
-            changed++;
-        }
-    }
-    if (changed > 0) {
-        prefs.setItem('itemNotes', notes);
-        _notesCache = null;
-        if (typeof window.updateNoteBtn === 'function') window.updateNoteBtn();
-    }
-    // Also remove from standalone tags
-    const standalone = getStandaloneTags();
-    const idx = standalone.indexOf(tag);
-    if (idx !== -1) {
-        standalone.splice(idx, 1);
-        setStandaloneTags(standalone);
-    }
+async function deleteTag(tag) {
+    const changed = await window.vstUpdater.tagDelete(tag);
+    await prepareBadgeContext();
     showToast(changed > 0 ? toastFmt('toast.tag_removed_from_n', {
         tag,
         n: changed
@@ -200,23 +175,23 @@ function closeNoteModal() {
     _noteModalPath = null;
 }
 
-function saveNoteFromModal() {
+async function saveNoteFromModal() {
     if (!_noteModalPath) return;
     const path = _noteModalPath;
     const note = document.getElementById('noteText').value;
     const tagsStr = document.getElementById('noteTags').value;
     const tags = tagsStr.split(',').map(t => t.trim()).filter(Boolean);
-    setNote(path, note, tags);
+    await setNote(path, note, tags);
     closeNoteModal();
     showToast(toastFmt('toast.note_saved'));
     refreshRowBadges(path);
     if (document.getElementById('tabNotes')?.classList.contains('active')) renderNotesTab();
 }
 
-function deleteNoteFromModal() {
+async function deleteNoteFromModal() {
     if (!_noteModalPath) return;
     const path = _noteModalPath;
-    setNote(path, '', []);
+    await setNote(path, '', []);
     closeNoteModal();
     showToast(toastFmt('toast.note_deleted'));
     refreshRowBadges(path);
@@ -260,21 +235,21 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Get note indicator HTML for a row
+// Get note indicator HTML for a row (sync — uses _badgeCtx)
 function noteIndicator(path) {
-    const note = getNote(path);
+    const note = _badgeCtx.notes[path];
     if (!note) return '';
     const tagHtml = note.tags?.length ? ` [${note.tags.join(', ')}]` : '';
     return `<span class="note-icon" title="${escapeHtml(note.note + tagHtml)}">&#128221;</span>`;
 }
 
-// Rich badge: star + tags + note icon for any path
+// Rich badge: star + tags + note icon for any path (sync — uses _badgeCtx)
 function rowBadges(path) {
     let html = '';
-    if (typeof isFavorite === 'function' && isFavorite(path)) {
+    if (_badgeCtx.favPaths.has(path)) {
         html += '<span class="row-badge row-badge-fav" title="Favorited">&#9733;</span>';
     }
-    const note = typeof getNote === 'function' ? getNote(path) : null;
+    const note = _badgeCtx.notes[path] || null;
     if (note) {
         if (note.note) html += '<span class="row-badge row-badge-note" title="Has note">&#128221;</span>';
         if (note.tags?.length) {
@@ -286,8 +261,9 @@ function rowBadges(path) {
 }
 
 // Update badges on all visible rows for a given path
-function refreshRowBadges(path) {
+async function refreshRowBadges(path) {
     if (!path) return;
+    await prepareBadgeContext();
     const badges = rowBadges(path);
     const escaped = CSS.escape(path);
 
@@ -343,11 +319,12 @@ registerFilter('filterNotes', {
     },
 });
 
-function renderNotesTab() {
+async function renderNotesTab() {
     const list = document.getElementById('notesList');
     const empty = document.getElementById('notesEmptyState');
     if (!list) return;
 
+    await prepareBadgeContext();
     const notes = getNotes();
     const entries = Object.entries(notes);
     const search = _notesSearch || (document.getElementById('noteSearchInput')?.value || '').trim();
@@ -424,7 +401,7 @@ function renderNotesTab() {
     }
 }
 
-function exportNotes() {
+async function exportNotes() {
     const notes = getNotes();
     const tags = getStandaloneTags();
     const entries = Object.entries(notes);
@@ -502,12 +479,10 @@ async function importNotes() {
             for (const [path, note] of Object.entries(imported.notes)) {
                 const k = normalizeItemNotePathKey(path);
                 if (!existing[k]) {
-                    existing[k] = note;
+                    await setNote(k, note.note || '', note.tags || []);
                     added++;
                 }
             }
-            prefs.setItem('itemNotes', existing);
-            _notesCache = null;
             if (typeof window.updateNoteBtn === 'function') window.updateNoteBtn();
         }
         // Merge standalone tags
@@ -516,11 +491,10 @@ async function importNotes() {
             let tagAdded = 0;
             for (const t of imported.standaloneTags) {
                 if (!current.has(t)) {
-                    current.add(t);
+                    await window.vstUpdater.tagsStandaloneAdd(t);
                     tagAdded++;
                 }
             }
-            setStandaloneTags([...current]);
             added += tagAdded;
         }
         renderNotesTab();
@@ -531,11 +505,18 @@ async function importNotes() {
     }
 }
 
-function clearAllNotes() {
+async function clearAllNotes() {
     if (!confirm(appFmt('confirm.delete_all_notes'))) return;
-    prefs.setItem('itemNotes', {});
-    _notesCache = null;
-    setStandaloneTags([]);
+    // Delete all notes by setting each to empty
+    const notes = getNotes();
+    for (const path of Object.keys(notes)) {
+        await setNote(path, '', []);
+    }
+    // Clear all standalone tags
+    const tags = getStandaloneTags();
+    for (const t of tags) {
+        await window.vstUpdater.tagsStandaloneRemove(t);
+    }
     renderNotesTab();
     renderGlobalTagBar();
     showToast(toastFmt('toast.all_notes_deleted'));
@@ -841,11 +822,12 @@ registerFilter('filterTags', {
     },
 });
 
-function renderTagsManager() {
+async function renderTagsManager() {
     const container = document.getElementById('tagsManager');
     const empty = document.getElementById('tagsEmptyState');
     if (!container) return;
 
+    await prepareBadgeContext();
     const tagCounts = getTagCounts();
     const allTags = Object.keys(tagCounts).sort();
     const search = _tagsSearch || (document.getElementById('tagSearchInput')?.value || '').trim();
@@ -873,9 +855,14 @@ function renderTagsManager() {
 
     let html = `<div class="tag-stats">${allTags.length} tags across ${totalItems} items</div>`;
 
+    const tagItemsMap = {};
+    for (const tag of filtered) {
+        tagItemsMap[tag] = getItemsWithTag(tag);
+    }
+
     html += filtered.map(tag => {
         const count = tagCounts[tag];
-        const items = getItemsWithTag(tag);
+        const items = tagItemsMap[tag];
         return `<div class="tag-manager-card">
       <div class="tag-manager-header">
         <span class="tag-manager-name">${_tagsSearch ? highlightMatch(tag, _tagsSearch, _lastTagsMode) : escapeHtml(tag)}</span>
@@ -984,10 +971,11 @@ function closeTagWizard() {
     renderGlobalTagBar();
 }
 
-function renderTagWizardList() {
+async function renderTagWizardList() {
     const list = document.getElementById('tagWizardList');
     if (!list) return;
 
+    await prepareBadgeContext();
     const tagCounts = getTagCounts();
     const allTags = Object.keys(tagCounts).sort();
 
@@ -1026,7 +1014,7 @@ function renderTagWizardList() {
     }
 }
 
-function tagWizardAdd() {
+async function tagWizardAdd() {
     const input = document.getElementById('tagWizardInput');
     if (!input) return;
     const name = input.value.trim();
@@ -1038,17 +1026,15 @@ function tagWizardAdd() {
         return;
     }
 
-    const standalone = getStandaloneTags();
-    standalone.push(name);
-    setStandaloneTags(standalone);
+    await window.vstUpdater.tagsStandaloneAdd(name);
     input.value = '';
     renderTagWizardList();
     showToast(toastFmt('toast.tag_created', {name}));
 }
 
-function tagWizardDelete(tag) {
+async function tagWizardDelete(tag) {
     if (!confirm(appFmt('confirm.delete_tag_globally', {tag}))) return;
-    deleteTag(tag);
+    await deleteTag(tag);
     renderTagWizardList();
 }
 
@@ -1062,7 +1048,7 @@ function tagWizardCancelRename() {
     renderTagWizardList();
 }
 
-function tagWizardConfirmRename(oldTag) {
+async function tagWizardConfirmRename(oldTag) {
     const input = document.querySelector(`.tag-wizard-rename-input[data-tw-rename-tag="${CSS.escape(oldTag)}"]`);
     if (!input) return;
     const newName = input.value.trim();
@@ -1075,13 +1061,12 @@ function tagWizardConfirmRename(oldTag) {
         showToast(toastFmt('toast.tag_newname_exists', {newName}));
         return;
     }
-    renameTag(oldTag, newName);
+    await renameTag(oldTag, newName);
     // Also rename in standalone tags
     const standalone = getStandaloneTags();
-    const idx = standalone.indexOf(oldTag);
-    if (idx !== -1) {
-        standalone[idx] = newName;
-        setStandaloneTags(standalone);
+    if (standalone.includes(oldTag)) {
+        await window.vstUpdater.tagsStandaloneRemove(oldTag);
+        await window.vstUpdater.tagsStandaloneAdd(newName);
     }
     _tagWizardRenaming = null;
     renderTagWizardList();
@@ -1145,12 +1130,13 @@ function getGlobalActiveTag() {
 /**
  * @param {boolean} [force] — bypass signature check (prefs/tag mutations that must repaint)
  */
-function renderGlobalTagBar(force) {
+async function renderGlobalTagBar(force) {
     if (force === true) _tagBarRenderSig = null;
     const bar = document.getElementById('globalTagBar');
     const list = document.getElementById('globalTagList');
     if (!bar || !list) return;
 
+    await prepareBadgeContext();
     const tagBarPref = typeof prefs !== 'undefined' ? (prefs.getItem('tagBarVisible') || 'on') : 'on';
     const tagBarOff = tagBarPref === 'off';
     const allTags = tagBarOff ? [] : getAllTags();
@@ -1241,7 +1227,7 @@ switchTab = function (tab) {
 };
 
 // Tag click filtering + note card actions + tag management + global tag
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
     // Global tag bar
     const globalTag = e.target.closest('[data-action-global-tag]');
     if (globalTag) {
@@ -1265,7 +1251,7 @@ document.addEventListener('click', (e) => {
         if (act === 'edit') {
             showNoteEditor(path, noteAction.dataset.name);
         } else if (act === 'delete') {
-            setNote(path, '', []);
+            await setNote(path, '', []);
             renderNotesTab();
             renderGlobalTagBar();
             showToast(toastFmt('toast.note_deleted'));
@@ -1280,13 +1266,13 @@ document.addEventListener('click', (e) => {
         if (act === 'rename') {
             const newName = prompt(`Rename tag "${tag}" to:`, tag);
             if (newName && newName.trim() && newName.trim() !== tag) {
-                renameTag(tag, newName.trim());
+                await renameTag(tag, newName.trim());
                 renderTagsManager();
                 renderGlobalTagBar();
             }
         } else if (act === 'delete') {
             if (confirm(appFmt('confirm.remove_tag_globally', {tag}))) {
-                deleteTag(tag);
+                await deleteTag(tag);
                 renderTagsManager();
                 renderGlobalTagBar();
             }
@@ -1295,7 +1281,7 @@ document.addEventListener('click', (e) => {
             switchTab('plugins'); // Switch to plugins to see the filter in action
         } else if (act === 'remove-from') {
             const path = tagAction.dataset.path;
-            removeTagFromItem(path, tag);
+            await removeTagFromItem(path, tag);
             renderTagsManager();
             renderGlobalTagBar();
             showToast(toastFmt('toast.tag_removed_from_note', {tag}));

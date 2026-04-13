@@ -1,5 +1,5 @@
 // ── Favorites ──
-// Stored in prefs as an array of { type, path, name, ... }
+// Stored in SQLite via Tauri commands.
 
 /** Same rule as file-browser: Rust may emit `\\` on Windows; `audioPlayerPath` uses `/`. */
 function normalizeFavoritePathKey(p) {
@@ -7,45 +7,55 @@ function normalizeFavoritePathKey(p) {
     return p.replace(/\\/g, '/');
 }
 
-// Cache favorites array + Set for O(1) isFavorite lookups.
-let _favsCache = null;
-let _favsPathSet = null;
 let _favHasRendered = false;
 let _favDirty = false;
 
-function getFavorites() {
-    if (!_favsCache) {
-        _favsCache = prefs.getObject('favorites', []);
-        _favsPathSet = new Set(_favsCache.map((f) => normalizeFavoritePathKey(f.path)));
-    }
-    return _favsCache;
+async function getFavorites() {
+    return await window.vstUpdater.favoritesList();
 }
 
-function saveFavorites(favs) {
-    _favsCache = null;
-    _favsPathSet = null;
-    prefs.setItem('favorites', favs);
+async function addFavorite(type, path, name, extra) {
+    const key = normalizeFavoritePathKey(path);
+    const added = await window.vstUpdater.favoritesAdd(
+        type, key, name,
+        (extra && extra.format) || null,
+        (extra && extra.daw) || null,
+        new Date().toISOString(),
+    );
+    if (!added) {
+        showToast(toastFmt('toast.already_in_favorites', {name}));
+        return;
+    }
+    _badgeCtx.favPaths.add(key);
     if (typeof window.updateFavBtn === 'function') window.updateFavBtn();
+    showToast(toastFmt('toast.added_to_favorites', {name}));
+    if (typeof refreshRowBadges === 'function') refreshRowBadges(key);
+    _favDirty = true;
+}
+
+async function removeFavorite(path) {
+    const key = normalizeFavoritePathKey(path);
+    await window.vstUpdater.favoritesRemove(key);
+    _badgeCtx.favPaths.delete(key);
+    if (typeof window.updateFavBtn === 'function') window.updateFavBtn();
+    showToast(toastFmt('toast.removed_from_favorites'));
+    if (typeof refreshRowBadges === 'function') refreshRowBadges(key);
+    _favDirty = true;
+    renderFavorites();
+}
+
+function isFavorite(path) {
+    return _badgeCtx.favPaths.has(normalizeFavoritePathKey(path));
 }
 
 /** After tray popover toggles favorite in Rust (main webview may have been suspended).
  *
  * CRITICAL: do NOT call `syncTrayNowPlayingFromPlayback` here. Rust already owns the authoritative
  * favorite flag (it was set inside `tray_popover_toggle_favorite` before this event fired), so a
- * round-trip push is redundant. Worse, when the main window is minimized on macOS, WebKit freezes
- * `<audio>` element state updates to background windows — `audioPlayer.currentTime` gets stuck at
- * the value it held when the window lost visibility. Pushing that stale elapsed back through
- * `update_tray_now_playing` then re-emits `tray-popover-state` to the popover with the stale value,
- * and the popover's drift-rebase yanks the progress thumb backward to the "last point where main app
- * was visible" on every favorite click. The tray popover gets its own lightweight
- * `tray-popover-favorite` event for the star highlight, so nothing here needs to drive it. */
+ * round-trip push is redundant. */
 function applyTrayFavoritesFromHost(favorites, pathForBadge, favoriteOn) {
     if (!Array.isArray(favorites)) return;
-    _favsCache = favorites;
-    _favsPathSet = new Set(favorites.map((f) => normalizeFavoritePathKey(f.path)));
-    if (typeof prefs !== 'undefined' && prefs._cache) {
-        prefs._cache.favorites = favorites;
-    }
+    _badgeCtx.favPaths = new Set(favorites.map(f => f.path));
     if (typeof window.updateFavBtn === 'function') window.updateFavBtn();
     const key = pathForBadge ? normalizeFavoritePathKey(String(pathForBadge)) : '';
     if (key && typeof refreshRowBadges === 'function') refreshRowBadges(key);
@@ -60,37 +70,8 @@ function applyTrayFavoritesFromHost(favorites, pathForBadge, favoriteOn) {
 
 window.applyTrayFavoritesFromHost = applyTrayFavoritesFromHost;
 
-function isFavorite(path) {
-    if (!_favsPathSet) getFavorites();
-    return _favsPathSet.has(normalizeFavoritePathKey(path));
-}
-
-function addFavorite(type, path, name, extra) {
-    const key = normalizeFavoritePathKey(path);
-    const favs = getFavorites();
-    if (favs.some((f) => normalizeFavoritePathKey(f.path) === key)) {
-        showToast(toastFmt('toast.already_in_favorites', {name}));
-        return;
-    }
-    favs.unshift({type, path: key, name, ...extra, addedAt: new Date().toISOString()});
-    saveFavorites(favs);
-    showToast(toastFmt('toast.added_to_favorites', {name}));
-    if (typeof refreshRowBadges === 'function') refreshRowBadges(key);
-    _favDirty = true;
-}
-
-function removeFavorite(path) {
-    const key = normalizeFavoritePathKey(path);
-    const favs = getFavorites().filter((f) => normalizeFavoritePathKey(f.path) !== key);
-    saveFavorites(favs);
-    showToast(toastFmt('toast.removed_from_favorites'));
-    if (typeof refreshRowBadges === 'function') refreshRowBadges(key);
-    _favDirty = true;
-    renderFavorites();
-}
-
-function exportFavorites() {
-    const favs = getFavorites();
+async function exportFavorites() {
+    const favs = await getFavorites();
     if (favs.length === 0) {
         showToast(toastFmt('toast.no_favorites_export'));
         return;
@@ -156,19 +137,17 @@ async function importFavorites() {
             imported = JSON.parse(text);
         }
         if (!Array.isArray(imported)) throw new Error('Expected an array');
-        const favs = getFavorites();
-        const existing = new Set(favs.map((f) => normalizeFavoritePathKey(f.path)));
         let added = 0;
         for (const item of imported) {
             if (!item.path) continue;
             const k = normalizeFavoritePathKey(item.path);
-            if (!existing.has(k)) {
-                favs.push({...item, path: k});
-                existing.add(k);
-                added++;
-            }
+            const ok = await window.vstUpdater.favoritesAdd(
+                item.type || 'sample', k, item.name || k.split('/').pop() || k,
+                item.format || null, item.daw || null,
+                item.addedAt || new Date().toISOString(),
+            );
+            if (ok) { added++; _badgeCtx.favPaths.add(k); }
         }
-        saveFavorites(favs);
         renderFavorites();
         showToast(toastFmt('toast.imported_favorites', {added, dup: imported.length - added}));
     } catch (e) {
@@ -176,9 +155,11 @@ async function importFavorites() {
     }
 }
 
-function clearFavorites() {
+async function clearFavorites() {
     if (!confirm(appFmt('confirm.remove_all_favorites'))) return;
-    saveFavorites([]);
+    await window.vstUpdater.favoritesClear();
+    _badgeCtx.favPaths.clear();
+    if (typeof window.updateFavBtn === 'function') window.updateFavBtn();
     showToast(toastFmt('toast.all_favorites_cleared'));
     renderFavorites();
 }
@@ -199,13 +180,13 @@ registerFilter('filterFavorites', {
     },
 });
 
-function renderFavorites() {
+async function renderFavorites() {
     if (typeof saveAllFilterStates === 'function') saveAllFilterStates();
     const list = document.getElementById('favList');
     const empty = document.getElementById('favEmptyState');
     if (!list) return;
 
-    const favs = getFavorites();
+    const favs = await getFavorites();
     const search = _favSearch || (document.getElementById('favSearchInput')?.value || '').trim();
     const typeSet = typeof getMultiFilterValues === 'function' ? getMultiFilterValues('favTypeFilter') : null;
 

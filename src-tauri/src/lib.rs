@@ -3469,6 +3469,128 @@ async fn prefs_save_all(prefs: history::PrefsMap) {
     refresh_log_verbosity_from_prefs();
 }
 
+// ── Favorites (SQLite-backed) ──
+
+#[tauri::command]
+async fn favorites_list() -> Result<Vec<serde_json::Value>, String> {
+    blocking_res(|| db::global().favorites_list()).await
+}
+
+#[tauri::command]
+async fn favorites_add(
+    fav_type: String,
+    path: String,
+    name: String,
+    format: Option<String>,
+    daw: Option<String>,
+    added_at: Option<String>,
+) -> Result<bool, String> {
+    blocking_res(move || {
+        let at = added_at.unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+        db::global().favorites_add(&fav_type, &path, &name, &format.unwrap_or_default(), &daw.unwrap_or_default(), &at)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn favorites_remove(path: String) -> Result<bool, String> {
+    blocking_res(move || db::global().favorites_remove(&path)).await
+}
+
+#[tauri::command]
+async fn favorites_clear() -> Result<(), String> {
+    blocking_res(|| db::global().favorites_clear()).await
+}
+
+#[tauri::command]
+async fn favorites_is(path: String) -> Result<bool, String> {
+    blocking_res(move || db::global().favorites_is(&path)).await
+}
+
+#[tauri::command]
+async fn favorites_set_all(favs: Vec<serde_json::Value>) -> Result<(), String> {
+    blocking_res(move || db::global().favorites_set_all(&favs)).await
+}
+
+// ── Notes (SQLite-backed) ──
+
+#[tauri::command]
+async fn note_get(path: String) -> Result<Option<serde_json::Value>, String> {
+    blocking_res(move || db::global().note_get(&path)).await
+}
+
+#[tauri::command]
+async fn note_set(path: String, note: String, tags: Vec<String>) -> Result<(), String> {
+    blocking_res(move || db::global().note_set(&path, &note, &tags)).await
+}
+
+#[tauri::command]
+async fn notes_get_all() -> Result<serde_json::Value, String> {
+    blocking_res(|| db::global().notes_get_all()).await
+}
+
+// ── Tags (SQLite-backed) ──
+
+#[tauri::command]
+async fn tags_standalone_list() -> Result<Vec<String>, String> {
+    blocking_res(|| db::global().tags_standalone_list()).await
+}
+
+#[tauri::command]
+async fn tags_standalone_set(tags: Vec<String>) -> Result<(), String> {
+    blocking_res(move || db::global().tags_standalone_set(&tags)).await
+}
+
+#[tauri::command]
+async fn tags_standalone_add(tag: String) -> Result<(), String> {
+    blocking_res(move || db::global().tags_standalone_add(&tag)).await
+}
+
+#[tauri::command]
+async fn tags_standalone_remove(tag: String) -> Result<(), String> {
+    blocking_res(move || db::global().tags_standalone_remove(&tag)).await
+}
+
+#[tauri::command]
+async fn tags_all() -> Result<Vec<String>, String> {
+    blocking_res(|| db::global().tags_all()).await
+}
+
+#[tauri::command]
+async fn tags_counts() -> Result<serde_json::Value, String> {
+    blocking_res(|| db::global().tags_counts()).await
+}
+
+#[tauri::command]
+async fn tags_items_with(tag: String) -> Result<Vec<serde_json::Value>, String> {
+    blocking_res(move || db::global().tags_items_with(&tag)).await
+}
+
+#[tauri::command]
+async fn tag_rename(old_tag: String, new_tag: String) -> Result<i64, String> {
+    blocking_res(move || db::global().tag_rename(&old_tag, &new_tag)).await
+}
+
+#[tauri::command]
+async fn tag_delete(tag: String) -> Result<i64, String> {
+    blocking_res(move || db::global().tag_delete(&tag)).await
+}
+
+#[tauri::command]
+async fn tag_add_to_item(path: String, tag: String) -> Result<bool, String> {
+    blocking_res(move || db::global().tag_add_to_item(&path, &tag)).await
+}
+
+#[tauri::command]
+async fn tag_remove_from_item(path: String, tag: String) -> Result<(), String> {
+    blocking_res(move || db::global().tag_remove_from_item(&path, &tag)).await
+}
+
+#[tauri::command]
+async fn tag_has(path: String, tag: String) -> Result<bool, String> {
+    blocking_res(move || db::global().tag_has(&path, &tag)).await
+}
+
 #[tauri::command]
 async fn open_prefs_file() -> Result<(), String> {
     let path = history::get_preferences_path();
@@ -8057,6 +8179,27 @@ pub fn run() {
             prefs_set,
             prefs_remove,
             prefs_save_all,
+            favorites_list,
+            favorites_add,
+            favorites_remove,
+            favorites_clear,
+            favorites_is,
+            favorites_set_all,
+            note_get,
+            note_set,
+            notes_get_all,
+            tags_standalone_list,
+            tags_standalone_set,
+            tags_standalone_add,
+            tags_standalone_remove,
+            tags_all,
+            tags_counts,
+            tags_items_with,
+            tag_rename,
+            tag_delete,
+            tag_add_to_item,
+            tag_remove_from_item,
+            tag_has,
             scan_presets,
             stop_preset_scan,
             preset_history_save,
