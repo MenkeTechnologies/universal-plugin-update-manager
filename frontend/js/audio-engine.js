@@ -2378,6 +2378,9 @@ async function ensureAeOutputStreamOnStartup() {
         }
         if (playbackLoaded) {
             startPayload.start_playback = true;
+            if (typeof window !== 'undefined' && window.videoPlayerPath) {
+                startPayload.stream_from_disk = true;
+            }
         }
         const start = await inv(startPayload);
         throwIfAeNotOk(start, 'start_output_stream failed');
@@ -2479,6 +2482,9 @@ async function applyAudioEngineDevice() {
         }
         if (playbackLoaded) {
             startPayload.start_playback = true;
+            if (typeof window !== 'undefined' && window.videoPlayerPath) {
+                startPayload.stream_from_disk = true;
+            }
         }
         const start = await inv(startPayload);
         throwIfAeNotOk(start, 'start_output_stream failed');
@@ -4225,6 +4231,9 @@ async function enginePlaybackRestartStream() {
     if (bufferFrames !== undefined) {
         payload.buffer_frames = bufferFrames;
     }
+    if (typeof window !== 'undefined' && window.videoPlayerPath) {
+        payload.stream_from_disk = true;
+    }
     const r = await inv(payload);
     throwIfAeNotOk(r, 'start_output_stream failed');
     syncEnginePlaybackDspFromPrefs();
@@ -4249,16 +4258,9 @@ async function engineApplyReversePrefPlayback() {
  * Load file + start cpal output with `start_playback` (see audio-engine README).
  * @param {string} filePath — absolute host path
  */
-async function enginePlaybackStart(filePath) {
+async function enginePlaybackStart(filePath, opts) {
     if (typeof window !== 'undefined' && typeof window.resetEnginePlaybackEofFlag === 'function') {
         window.resetEnginePlaybackEofFlag();
-    }
-    /* Drain any fire-and-forget `enginePlaybackStop()` so its `playback_stop` IPC does not land
-     * between our `playback_load` and `start_output_stream` and clear `sessionPath` in the C++
-     * engine — that race produces "playback_load required before start_playback". */
-    if (typeof window !== 'undefined' && window._pendingEngineStop) {
-        try { await window._pendingEngineStop; } catch {}
-        window._pendingEngineStop = null;
     }
     const inv = getAeAudioEngineInvoke();
     if (!inv) throw new Error('audio engine IPC unavailable');
@@ -4292,6 +4294,9 @@ async function enginePlaybackStart(filePath) {
     };
     if (bufferFrames !== undefined) {
         payload.buffer_frames = bufferFrames;
+    }
+    if (opts && opts.streamFromDisk) {
+        payload.stream_from_disk = true;
     }
     r = await inv(payload);
     throwIfAeNotOk(r, 'start_output_stream failed');

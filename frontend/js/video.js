@@ -764,7 +764,7 @@ function stopVideoPlayback(opts) {
     if (_videoEngineActive) {
         _videoEngineActive = false;
         if (typeof window.enginePlaybackStop === 'function') {
-            window._pendingEngineStop = window.enginePlaybackStop();
+            void window.enginePlaybackStop();
         }
         if (typeof window.setEnginePlaybackActive === 'function') {
             window.setEnginePlaybackActive(false);
@@ -1033,9 +1033,12 @@ async function previewVideo(filePath, opts) {
     // already called `enginePlaybackStop` while nothing can play video.
     videoPlayerPath = filePath;
 
-    // Stop any current audio playback first
+    // Fire-and-forget stop: `enginePlaybackStart → start_output_stream` always calls
+    // `stopOutputLocked()` internally, and the C++ generation counter protects `sessionPath`
+    // from stale `playback_stop` clears.  Awaiting the stop here would serialize a full
+    // CoreAudio device close (~200-500 ms) that `start_output_stream` repeats anyway.
     if (typeof window._enginePlaybackActive !== 'undefined' && window._enginePlaybackActive) {
-        if (typeof window.enginePlaybackStop === 'function') await window.enginePlaybackStop();
+        if (typeof window.enginePlaybackStop === 'function') void window.enginePlaybackStop();
         if (typeof window.setEnginePlaybackActive === 'function') window.setEnginePlaybackActive(false);
     }
     // Pause HTML5 audio player if active
@@ -1093,13 +1096,18 @@ async function previewVideo(filePath, opts) {
         try {
             vid.pause();
         } catch (_) {}
+        /* Invalidate the <video> loadeddata/canplay hide — the muted <video> element finishes
+         * loading well before `enginePlaybackStart` resolves, so the spinner would vanish while
+         * the picture stays frozen.  Hide manually after `vid.play()` below instead. */
+        _videoPlayerLoadUiSeq++;
+        const engineLoadUiSeq = _videoPlayerLoadUiSeq;
         _startVideoRaf();
         _updateVideoPlayBtn();
         _showVideoInNowPlaying(filePath, o);
 
         void (async () => {
             try {
-                await window.enginePlaybackStart(filePath);
+                await window.enginePlaybackStart(filePath, { streamFromDisk: true });
                 if (videoPlayerPath !== filePath) return;
                 _videoEngineActive = true;
                 _videoFallbackAudio = false;
@@ -1121,6 +1129,7 @@ async function previewVideo(filePath, opts) {
                     _lastVideoVisualSeekMs = performance.now();
                 } catch (_) {}
                 void vid.play().catch(() => {});
+                if (engineLoadUiSeq === _videoPlayerLoadUiSeq) _hideVideoPlayerLoading();
                 if (typeof window.syncVideoPlayerElPlaybackRate === 'function') window.syncVideoPlayerElPlaybackRate();
                 _updateVideoPlayBtn();
                 if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
@@ -1139,6 +1148,7 @@ async function previewVideo(filePath, opts) {
                 } catch (e) {
                     if (typeof showToast === 'function') showToast(String(e), 4000, 'error');
                 }
+                if (engineLoadUiSeq === _videoPlayerLoadUiSeq) _hideVideoPlayerLoading();
                 if (
                     !vid.paused &&
                     typeof window.connectVideoHtml5AudioThroughWebAudio === 'function'

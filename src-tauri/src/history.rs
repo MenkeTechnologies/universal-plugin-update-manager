@@ -614,8 +614,6 @@ const SECTION_MAP: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
     ("data", &[("columnWidths", "widths")]),
-    ("favorites", &[("favorites", "items")]),
-    ("notes", &[("itemNotes", "itemNotes")]),
     ("history", &[("recentlyPlayed", "recentlyPlayed")]),
 ];
 
@@ -1885,14 +1883,6 @@ mod tests {
         assert_eq!(
             toml_key_to_flat("performance", "pageSize").as_deref(),
             Some("pageSize")
-        );
-    }
-
-    #[test]
-    fn test_toml_key_to_flat_favorites_items_to_flat_key() {
-        assert_eq!(
-            toml_key_to_flat("favorites", "items").as_deref(),
-            Some("favorites")
         );
     }
 

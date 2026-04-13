@@ -1088,13 +1088,211 @@ struct OlaTimeStretch
     }
 };
 
+/// Lock-free ring-buffered audio source for real-time-safe file streaming.
+///
+/// Moves all file I/O to a background `TimeSliceThread` and communicates with the
+/// audio thread through a power-of-two circular buffer.  Counter updates use a
+/// `juce::SpinLock` (a few nanoseconds, no kernel transition, no priority inversion)
+/// instead of the `CriticalSection` inside `juce::BufferingAudioSource` which blocks
+/// the macOS CoreAudio real-time thread and causes audible clicks.
+class LockFreeStreamSource final : public juce::PositionableAudioSource,
+                                    private juce::TimeSliceClient
+{
+public:
+    LockFreeStreamSource(juce::PositionableAudioSource* src,
+                         juce::TimeSliceThread& thread,
+                         int ringPow2Size,
+                         int channels)
+        : source(src), bgThread(thread),
+          ringSize(ringPow2Size), ringMask(ringPow2Size - 1),
+          numCh(channels)
+    {
+        jassert(juce::isPowerOfTwo(ringSize));
+        ring.setSize(numCh, ringSize);
+        ring.clear();
+        tempBuf.setSize(numCh, kChunkSize);
+    }
+
+    ~LockFreeStreamSource() override
+    {
+        bgThread.removeTimeSliceClient(this);
+    }
+
+    void prepareToPlay(int blockSize, double sampleRate) override
+    {
+        source->prepareToPlay(blockSize, sampleRate);
+        {
+            const juce::SpinLock::ScopedLockType sl(posLock);
+            readCount = 0;
+            writeCount = 0;
+            basePos = 0;
+            ++generation;
+        }
+        ring.clear();
+        bgThread.addTimeSliceClient(this);
+    }
+
+    void releaseResources() override
+    {
+        bgThread.removeTimeSliceClient(this);
+        source->releaseResources();
+    }
+
+    /// Called on the real-time audio thread.  Reads from the ring buffer only —
+    /// no file I/O, no kernel calls, just memcpy from pre-filled data.
+    void getNextAudioBlock(const juce::AudioSourceChannelInfo& info) override
+    {
+        int64_t rc, wc;
+        uint32_t gen;
+        {
+            const juce::SpinLock::ScopedLockType sl(posLock);
+            rc = readCount;
+            wc = writeCount;
+            gen = generation;
+        }
+
+        const int needed = info.numSamples;
+        const int avail = (int) std::max(wc - rc, (int64_t) 0);
+        const int have  = std::min(avail, needed);
+
+        if (have > 0)
+            copyFromRing(info.buffer, info.startSample, rc, have);
+        if (have < needed)
+        {
+            for (int c = 0; c < info.buffer->getNumChannels(); ++c)
+                info.buffer->clear(c, info.startSample + have, needed - have);
+        }
+
+        {
+            const juce::SpinLock::ScopedLockType sl(posLock);
+            if (generation == gen)
+                readCount = rc + have;
+        }
+    }
+
+    void setNextReadPosition(juce::int64 newPos) override
+    {
+        pendingSeek.store((int64_t) newPos, std::memory_order_release);
+        const juce::SpinLock::ScopedLockType sl(posLock);
+        basePos = (int64_t) newPos;
+        readCount = 0;
+        writeCount = 0;
+        ++generation;
+    }
+
+    juce::int64 getNextReadPosition() const override
+    {
+        const juce::SpinLock::ScopedLockType sl(posLock);
+        return (juce::int64)(basePos + readCount);
+    }
+
+    juce::int64 getTotalLength() const override { return source->getTotalLength(); }
+    bool isLooping() const override { return source->isLooping(); }
+    void setLooping(bool b) override { source->setLooping(b); }
+
+private:
+    static constexpr int kChunkSize = 32768;
+
+    /// Called on the background TimeSliceThread.  Reads from the file-backed source
+    /// and copies decoded audio into the ring buffer.
+    int useTimeSlice() override
+    {
+        const int64_t seekTo = pendingSeek.exchange(-1, std::memory_order_acq_rel);
+        if (seekTo >= 0)
+        {
+            source->setNextReadPosition((juce::int64) seekTo);
+            return 0;
+        }
+
+        int64_t rc, wc;
+        uint32_t gen;
+        {
+            const juce::SpinLock::ScopedLockType sl(posLock);
+            rc = readCount;
+            wc = writeCount;
+            gen = generation;
+        }
+
+        const int buffered = (int)(wc - rc);
+        if (buffered >= ringSize)
+            return 5;
+
+        const int toRead = std::min(kChunkSize, ringSize - buffered);
+        if (toRead <= 0)
+            return 5;
+
+        juce::AudioSourceChannelInfo readInfo(&tempBuf, 0, toRead);
+        source->getNextAudioBlock(readInfo);
+
+        // Copy temp → ring at (wc & mask), handling wrap
+        const int ringPos = (int)(wc & (int64_t) ringMask);
+        const int first = std::min(toRead, ringSize - ringPos);
+        for (int c = 0; c < numCh; ++c)
+        {
+            std::memcpy(ring.getWritePointer(c) + ringPos,
+                        tempBuf.getReadPointer(c), (size_t) first * sizeof(float));
+            if (first < toRead)
+                std::memcpy(ring.getWritePointer(c),
+                            tempBuf.getReadPointer(c) + first,
+                            (size_t)(toRead - first) * sizeof(float));
+        }
+
+        {
+            const juce::SpinLock::ScopedLockType sl(posLock);
+            if (generation == gen)
+                writeCount = wc + toRead;
+        }
+
+        return (buffered + toRead < ringSize / 2) ? 0 : 1;
+    }
+
+    void copyFromRing(juce::AudioBuffer<float>* dest, int destStart,
+                      int64_t offset, int count) const
+    {
+        const int ringPos = (int)(offset & (int64_t) ringMask);
+        const int first = std::min(count, ringSize - ringPos);
+        for (int c = 0; c < dest->getNumChannels() && c < numCh; ++c)
+        {
+            std::memcpy(dest->getWritePointer(c) + destStart,
+                        ring.getReadPointer(c) + ringPos, (size_t) first * sizeof(float));
+            if (first < count)
+                std::memcpy(dest->getWritePointer(c) + destStart + first,
+                            ring.getReadPointer(c),
+                            (size_t)(count - first) * sizeof(float));
+        }
+    }
+
+    juce::PositionableAudioSource* source;
+    juce::TimeSliceThread& bgThread;
+
+    juce::AudioBuffer<float> ring;
+    const int ringSize;
+    const int ringMask;
+    const int numCh;
+    juce::AudioBuffer<float> tempBuf;
+
+    mutable juce::SpinLock posLock;
+    int64_t readCount  = 0;
+    int64_t writeCount = 0;
+    int64_t basePos    = 0;
+    uint32_t generation = 0;
+
+    std::atomic<int64_t> pendingSeek{-1};
+};
+
 class DspStereoFileSource final : public juce::PositionableAudioSource
 {
 public:
     std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
-    /** Forward playback only: wraps `readerSource` for tape-style speed (pitch follows rate). */
+    /// Lock-free read-ahead buffer for stream-from-disk playback (wraps `readerSource`).
+    /// When set, `speedResampler` and OLA read from this instead of `readerSource` directly.
+    std::unique_ptr<LockFreeStreamSource> bufferedReader;
+    /** Forward playback only: wraps `readerSource` (or `bufferedReader`) for tape-style speed (pitch follows rate). */
     std::unique_ptr<juce::ResamplingAudioSource> speedResampler;
     std::atomic<float>* playbackSpeed = nullptr;
+    /** Source-to-device sample rate ratio for stream-from-disk paths (1.0 when rates match or not streaming).
+     *  Folded into `speedResampler` ratio so the transport needs no internal resampler. */
+    double rateCorrection = 1.0;
     /** Pointer to the global speed-mode atomic (0 = Resample, 1 = TimeStretch). */
     std::atomic<int>* speedMode = nullptr;
     /** OLA time-stretcher state (used when mode == TimeStretch). */
@@ -1112,6 +1310,13 @@ public:
     juce::dsp::IIR::Filter<float> lowL, lowR, midL, midR, hiL, hiR;
     double processRate = 44100.0;
     InsertChainRunner* insertChain = nullptr;
+    /** After a seek the counter is set to `kSeekMuteSamples + kSeekFadeSamples`.
+     *  While > kSeekFadeSamples → output is zeroed (buffer refill window).
+     *  While 1..kSeekFadeSamples → linear fade-in from 0 → 1. */
+    static constexpr int kSeekMuteSamples = 1024;   // ~21 ms @ 48 kHz — silent while buffer refills
+    static constexpr int kSeekFadeSamples = 512;     // ~10 ms @ 48 kHz — smooth ramp-in
+    static constexpr int kSeekTotalSamples = kSeekMuteSamples + kSeekFadeSamples;
+    std::atomic<int> seekFadeRemaining{0};
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override
     {
@@ -1126,10 +1331,16 @@ public:
         midR.prepare(spec);
         hiL.prepare(spec);
         hiR.prepare(spec);
-        if (readerSource != nullptr)
-            readerSource->prepareToPlay(samplesPerBlockExpected, sampleRate);
+        /* Let speedResampler->prepareToPlay propagate to bufferedReader/readerSource
+         * through the chain.  Calling bufferedReader->prepareToPlay manually first
+         * would not cause harm (second call is a no-op when params match), but only
+         * the leaf source (readerSource) needs explicit prepare when no resampler exists. */
         if (speedResampler != nullptr)
             speedResampler->prepareToPlay(samplesPerBlockExpected, sampleRate);
+        else if (bufferedReader != nullptr)
+            bufferedReader->prepareToPlay(samplesPerBlockExpected, sampleRate);
+        else if (readerSource != nullptr)
+            readerSource->prepareToPlay(samplesPerBlockExpected, sampleRate);
         if (insertChain != nullptr)
             insertChain->prepare(sampleRate, samplesPerBlockExpected);
         ola.prepare();
@@ -1139,7 +1350,9 @@ public:
     {
         if (speedResampler != nullptr)
             speedResampler->releaseResources();
-        if (readerSource != nullptr)
+        if (bufferedReader != nullptr)
+            bufferedReader->releaseResources();
+        else if (readerSource != nullptr)
             readerSource->releaseResources();
         if (insertChain != nullptr)
             insertChain->release();
@@ -1155,8 +1368,17 @@ public:
             else
                 reverseFrame = (int) juce::jlimit<juce::int64>(0, (juce::int64) frames - 1, newPosition);
         }
+        else if (bufferedReader != nullptr)
+        {
+            seekFadeRemaining.store(kSeekTotalSamples, std::memory_order_relaxed);
+            bufferedReader->setNextReadPosition(newPosition);
+            if (speedResampler != nullptr)
+                speedResampler->flushBuffers();
+            ola.reset();
+        }
         else if (readerSource != nullptr)
         {
+            seekFadeRemaining.store(kSeekTotalSamples, std::memory_order_relaxed);
             readerSource->setNextReadPosition(newPosition);
             if (speedResampler != nullptr)
                 speedResampler->flushBuffers();
@@ -1168,6 +1390,8 @@ public:
     {
         if (reverseMode)
             return (juce::int64) reverseFrame;
+        if (bufferedReader != nullptr)
+            return bufferedReader->getNextReadPosition();
         if (readerSource != nullptr)
             return readerSource->getNextReadPosition();
         return 0;
@@ -1264,14 +1488,17 @@ public:
         if (timeStretch)
         {
             const float sp = playbackSpeed != nullptr ? playbackSpeed->load() : 1.0f;
-            ola.process(readerSource.get(), sp, bufferToFill);
+            juce::PositionableAudioSource* olaSource = bufferedReader != nullptr
+                ? static_cast<juce::PositionableAudioSource*>(bufferedReader.get())
+                : static_cast<juce::PositionableAudioSource*>(readerSource.get());
+            ola.process(olaSource, sp, bufferToFill);
         }
         else if (speedResampler != nullptr)
         {
             if (playbackSpeed != nullptr)
             {
                 const double r = (double) playbackSpeed->load();
-                speedResampler->setResamplingRatio(juce::jlimit(0.25, 4.0, r));
+                speedResampler->setResamplingRatio(juce::jlimit(0.1, 8.0, r * rateCorrection));
             }
             speedResampler->getNextAudioBlock(bufferToFill);
         }
@@ -1286,6 +1513,34 @@ public:
             {
                 const float x = bufferToFill.buffer->getSample(0, bufferToFill.startSample + i);
                 bufferToFill.buffer->setSample(1, bufferToFill.startSample + i, x);
+            }
+        }
+
+        /* Two-phase seek smoothing — applied BEFORE EQ / inserts so that IIR filters
+         * see silence (or a gentle ramp) rather than a raw discontinuity, which would
+         * produce transient clicks even though the output gets zeroed later.
+         *   Phase 1 (counter > kSeekFadeSamples): hard mute while buffer refills.
+         *   Phase 2 (counter 1..kSeekFadeSamples): linear fade-in 0 → 1.
+         * Counter is set atomically by `setNextReadPosition` (mute flag FIRST, before
+         * the source position changes) and consumed here on the audio thread. */
+        {
+            int fadeRem = seekFadeRemaining.load(std::memory_order_relaxed);
+            if (fadeRem > 0)
+            {
+                const int toConsume = juce::jmin(fadeRem, n);
+                for (int i = 0; i < toConsume; ++i)
+                {
+                    const int phase = fadeRem - i;
+                    float gain;
+                    if (phase > kSeekFadeSamples)
+                        gain = 0.0f;
+                    else
+                        gain = 1.0f - (float) phase / (float) kSeekFadeSamples;
+                    const int idx = bufferToFill.startSample + i;
+                    bufferToFill.buffer->setSample(0, idx, bufferToFill.buffer->getSample(0, idx) * gain);
+                    bufferToFill.buffer->setSample(1, idx, bufferToFill.buffer->getSample(1, idx) * gain);
+                }
+                seekFadeRemaining.store(fadeRem - toConsume, std::memory_order_relaxed);
             }
         }
 
@@ -1481,6 +1736,13 @@ struct Engine::Impl
     juce::AudioFormatManager formatManager;
     ToneAudioSource toneSource;
     std::unique_ptr<DspStereoFileSource> fileSource;
+    /// Background read-ahead thread for `stream_from_disk` playback (video files).
+    juce::TimeSliceThread readAheadThread{"AE ReadAhead"};
+    /// Read-ahead buffer size in samples (~22 s at 48 kHz).  Oversized on purpose:
+    /// the larger circular buffer reduces the chance the background TimeSliceThread
+    /// falls behind the audio thread, which would make BufferingAudioSource zero-fill
+    /// the gap and produce audible clicks.
+    static constexpr int kReadAheadSamples = 1048576;
     std::atomic<float> playbackPeak{0.0f};
     /** 0.25–4.0, tape-style playback (`juce::ResamplingAudioSource`); ignored in reverse mode. */
     std::atomic<float> playbackSpeed{1.0f};
@@ -1713,6 +1975,12 @@ struct Engine::Impl
     juce::String sessionPath;
     double sessionDurationSec = 0.0;
     uint32_t sessionSrcRate = 44100;
+    /// Monotonic counter incremented by `playbackLoad`.  `playbackStopLocked` only clears
+    /// `sessionPath` when a matching `startOutputStreamLocked` has consumed the load, so a
+    /// stale `playback_stop` arriving between a newer `playback_load` / `start_output_stream`
+    /// pair cannot clear the session mid-transition.
+    uint64_t loadGen = 0;
+    uint64_t consumedGen = 0;
     std::atomic<uint32_t> deviceRate{0};
     bool reverseWanted = false;
     /** Forward: `AudioFormatReaderSource::setLooping`. Reverse: `DspStereoFileSource` wraps RAM buffer. */
@@ -2559,6 +2827,7 @@ struct Engine::Impl
         std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(f));
         if (reader == nullptr)
             return errObj("unsupported or unreadable file");
+        ++loadGen;
         sessionPath = path;
         sessionSrcRate = (uint32_t) reader->sampleRate;
         sessionDurationSec = (double) reader->lengthInSamples / juce::jmax(1.0, reader->sampleRate);
@@ -2582,8 +2851,11 @@ struct Engine::Impl
         transport.releaseResources();
         fileSource.reset();
         playbackMode = false;
-        sessionPath.clear();
-        sessionDurationSec = 0.0;
+        if (loadGen == consumedGen)
+        {
+            sessionPath.clear();
+            sessionDurationSec = 0.0;
+        }
         if (outputRunning)
         {
             toneSource.toneOn.store(false);
@@ -2600,6 +2872,7 @@ struct Engine::Impl
     {
         const bool startPlayback = req.hasProperty("start_playback") && (bool) req["start_playback"];
         const bool tone = req.hasProperty("tone") && (bool) req["tone"];
+        const bool streamFromDisk = req.hasProperty("stream_from_disk") && (bool) req["stream_from_disk"];
         const juce::String deviceId = req["device_id"].toString();
         uint32_t bf = 0;
         if (req.hasProperty("buffer_frames") && !req["buffer_frames"].isVoid())
@@ -2611,6 +2884,9 @@ struct Engine::Impl
 
         if (startPlayback && sessionPath.isEmpty())
             return errObj("playback_load required before start_playback");
+
+        if (startPlayback)
+            consumedGen = loadGen;
 
         juce::String devName = resolveOutputDeviceName(outputManager, deviceId);
         if (devName.isEmpty() && !deviceId.isEmpty())
@@ -2696,19 +2972,65 @@ struct Engine::Impl
                     }
                 }
             }
+            else if (streamFromDisk)
+            {
+                /* Video files: stream decoded samples from the file-backed reader via a
+                 * lock-free ring buffer (`LockFreeStreamSource`).
+                 *
+                 * Why not `juce::BufferingAudioSource`?  It uses a `CriticalSection`
+                 * (`bufferStartPosLock`) contested between the real-time CoreAudio
+                 * thread and the background filler thread.  On macOS the RT thread is
+                 * extremely sensitive to any mutex wait — even microseconds of priority
+                 * inversion cause the HAL to skip the buffer, producing audible clicks.
+                 *
+                 * Why not direct file I/O on the audio thread?  `ExtAudioFileRead`
+                 * (the syscall behind JUCE's CoreAudioFormat reader) can block for
+                 * variable durations depending on codec decode time and page-cache
+                 * state.  Any syscall on the RT thread risks an overrun.
+                 *
+                 * `LockFreeStreamSource` moves all I/O to a background TimeSliceThread
+                 * and exposes a spin-lock-guarded ring buffer to the audio thread —
+                 * the spin-lock critical sections are a few nanoseconds (counter
+                 * updates only, no I/O, no kernel transition, no priority inversion). */
+                std::unique_ptr<juce::AudioFormatReader> reader(
+                    formatManager.createReaderFor(juce::File(sessionPath)));
+                if (reader == nullptr)
+                    return errObj("open file failed");
+                auto* raw = reader.release();
+                fileSource->readerSource = std::make_unique<juce::AudioFormatReaderSource>(raw, true);
+                if (!readAheadThread.isThreadRunning())
+                    readAheadThread.startThread(juce::Thread::Priority::high);
+                fileSource->bufferedReader = std::make_unique<LockFreeStreamSource>(
+                    fileSource->readerSource.get(), readAheadThread, kReadAheadSamples, 2);
+                /* Fold source→device rate correction into our speedResampler so the
+                 * transport has no internal ResamplingAudioSource.  That resampler keeps
+                 * a history buffer that survives seeks and interpolates stale samples
+                 * with the muted post-seek data, leaking clicks through our mute window. */
+                const double devRate = dev->getCurrentSampleRate();
+                fileSource->rateCorrection = (devRate > 0 && sessionSrcRate > 0)
+                    ? (double) sessionSrcRate / devRate
+                    : 1.0;
+                fileSource->speedResampler =
+                    std::make_unique<juce::ResamplingAudioSource>(fileSource->bufferedReader.get(), false, 2);
+                const double initSpeed = (double) juce::jlimit(0.25f, 4.0f, playbackSpeed.load());
+                fileSource->speedResampler->setResamplingRatio(initSpeed * fileSource->rateCorrection);
+                fileSource->playbackSpeed = &playbackSpeed;
+                fileSource->speedMode = &speedMode;
+            }
             else
             {
-                /* Slurp the full file into a `MemoryBlock` and wrap it in a `MemoryInputStream`
-                 * so JUCE's `AudioFormatReader` streams decoded samples from RAM instead of
-                 * demand-reading the original file during playback. Rationale: when the audio
-                 * library lives on an SMB share, the user reports audio dropouts the moment they
-                 * click "Reveal in Finder". Root cause is SMB contention — Finder's thumbnail /
-                 * metadata burst competes with the audio-engine's streaming reads on the same
-                 * SMB connection, AND macOS evicts our file from the unified buffer cache under
-                 * the memory pressure Finder creates (Rust-side page-cache warmers don't help
-                 * for exactly that reason). Process-heap memory is pinned and can't be evicted,
-                 * so once the file is loaded, playback is SMB-free regardless of what Finder
-                 * does on the share. One-time upfront load cost per track; any file
+                /* Audio-only files: slurp the full file into a `MemoryBlock` and wrap it in a
+                 * `MemoryInputStream` so JUCE's `AudioFormatReader` streams decoded samples
+                 * from RAM instead of demand-reading the original file during playback.
+                 * Rationale: when the audio library lives on an SMB share, the user reports
+                 * audio dropouts the moment they click "Reveal in Finder". Root cause is SMB
+                 * contention — Finder's thumbnail / metadata burst competes with the
+                 * audio-engine's streaming reads on the same SMB connection, AND macOS evicts
+                 * our file from the unified buffer cache under the memory pressure Finder
+                 * creates (Rust-side page-cache warmers don't help for exactly that reason).
+                 * Process-heap memory is pinned and can't be evicted, so once the file is
+                 * loaded, playback is SMB-free regardless of what Finder does on the share.
+                 * One-time upfront load cost per track; any file
                  * `juce::AudioFormatManager` can decode (wav/mp3/flac/m4a/…) works unchanged. */
                 juce::File f(sessionPath);
                 juce::MemoryBlock mb;
@@ -2729,12 +3051,25 @@ struct Engine::Impl
             }
 
             fileSource->playbackLoop = &playbackLoopWanted;
-            transport.setSource(fileSource.get(), 0, nullptr, (double) sessionSrcRate);
+            /* For stream-from-disk, pass source rate = 0 so the transport creates NO
+             * internal ResamplingAudioSource — rate correction is folded into our own
+             * speedResampler which we properly flush on seek.  For RAM-preloaded audio,
+             * the transport's resampler is harmless (seeks are instant, no stale-buffer
+             * click) and provides correct rate correction automatically. */
+            const double transportSrcRate = streamFromDisk ? 0.0 : (double) sessionSrcRate;
+            transport.setSource(fileSource.get(), 0, nullptr, transportSrcRate);
             fileSource->insertChain = insertRunner.get();
             if (!reverseWanted)
                 fileSource->setLooping(playbackLoopWanted.load());
             sourcePlayer.setSource(&transport);
             outputManager.addAudioCallback(&sourcePlayer);
+            /* Give the lock-free ring buffer time to pre-fill before the transport
+             * starts draining it.  200 ms ≈ 9 600 samples at 48 kHz — well above a
+             * typical audio callback block size (512–4096).  The TimeSliceThread runs
+             * at high priority and fills 32 768 samples per chunk, so 200 ms yields
+             * roughly 200 k samples of headroom. */
+            if (streamFromDisk && fileSource->bufferedReader != nullptr)
+                juce::Thread::sleep(200);
             transport.start();
             playbackMode = true;
             toneMode = false;
@@ -2906,11 +3241,14 @@ struct Engine::Impl
             appendPlaybackScopeJson(o, wantScope, scopeSamples);
             return out;
         }
-        /* Forward + resampler: timeline from reader samples (transport time drifts vs. ResamplingAudioSource). */
+        /* Forward + resampler: timeline from reader samples (transport time drifts vs. ResamplingAudioSource).
+         * When `bufferedReader` is active, `readerSource->getNextReadPosition()` returns the
+         * background read-ahead position (up to kReadAheadSamples ahead); use `fileSource` which
+         * returns the true playback position from `bufferedReader` instead. */
         double posSrc = transport.getCurrentPosition();
         if (!reverseWanted && fileSource != nullptr && fileSource->readerSource != nullptr)
         {
-            const juce::int64 sp = fileSource->readerSource->getNextReadPosition();
+            const juce::int64 sp = fileSource->getNextReadPosition();
             posSrc = (double) sp / juce::jmax(1.0e-9, (double) sessionSrcRate);
         }
         double pos = reverseWanted ? (sessionDurationSec - posSrc) : posSrc;

@@ -78,11 +78,5 @@ widths = {}
 vars = {}
 presets = []
 
-[favorites]
-items = []
-
-[notes]
-itemNotes = {}
-
 [history]
 recentlyPlayed = []

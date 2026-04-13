@@ -2592,6 +2592,12 @@ function initSimilarPanelDrag() {
         panel.style.width = rect.width + 'px';
         panel.style.height = rect.height + 'px';
         document.body.style.userSelect = 'none';
+        document.body.style.cursor = ({
+            n: 'ns-resize', s: 'ns-resize',
+            e: 'ew-resize', w: 'ew-resize',
+            ne: 'nesw-resize', sw: 'nesw-resize',
+            nw: 'nwse-resize', se: 'nwse-resize',
+        })[handle.dataset.simResize] || '';
         resizing = {
             edge: handle.dataset.simResize,
             startX: e.clientX,
@@ -2630,6 +2636,7 @@ function initSimilarPanelDrag() {
             prefs.setItem('similarHeight', Math.round(rect.height));
             resizing = null;
             document.body.style.userSelect = '';
+            document.body.style.cursor = '';
         }
     }, sig);
 }
@@ -2663,6 +2670,9 @@ function closeMetaRow() {
     const expanded = document.querySelector('tr.row-expanded');
     if (expanded) expanded.classList.remove('row-expanded');
     expandedMetaPath = null;
+    // Also close favorites/tags meta panel if open
+    if (typeof closeFavMeta === 'function') closeFavMeta();
+    if (typeof closeTagMeta === 'function') closeTagMeta();
 }
 
 function getFormatClass(format) {
@@ -3561,7 +3571,7 @@ async function previewAudio(filePath, opts) {
         } else {
             if (typeof stopVideoPlayback === 'function') stopVideoPlayback({ keepVideoFrame: true });
             if (_enginePlaybackActive && typeof window.enginePlaybackStop === 'function') {
-                window._pendingEngineStop = window.enginePlaybackStop();
+                void window.enginePlaybackStop();
                 setEnginePlaybackActive(false);
             }
             if (typeof window !== 'undefined') {
@@ -3779,11 +3789,21 @@ function updateLoopBtnStates() {
             if (vb) vb.classList.toggle('active', audioLooping);
         }
     }
+    // Favorites loop buttons
+    const favList = document.getElementById('favList');
+    if (favList) {
+        favList.querySelectorAll(`.fav-item[data-type="sample"] .btn-loop`).forEach(btn => {
+            const fav = btn.closest('.fav-item');
+            const isThis = fav && fav.dataset.path &&
+                fav.dataset.path.replace(/\\/g, '/') === audioPlayerPath.replace(/\\/g, '/');
+            btn.classList.toggle('active', isThis && audioLooping);
+        });
+    }
 }
 
 function stopAudioPlayback() {
     if (_enginePlaybackActive && typeof window !== 'undefined' && typeof window.enginePlaybackStop === 'function') {
-        window._pendingEngineStop = window.enginePlaybackStop();
+        void window.enginePlaybackStop();
         setEnginePlaybackActive(false);
     }
     stopReverseBufferPlayback();
@@ -3828,6 +3848,8 @@ function clearAudioPlaybackUI() {
 
 let _prevPlayingRow = null;
 let _prevVideoPlayingRow = null;
+let _prevFavPlayingRow = null;
+let _prevTagPlayingItems = [];
 
 function updatePlayBtnStates() {
     // Clear previous playing row
@@ -3851,8 +3873,28 @@ function updatePlayBtnStates() {
         const vloop = _prevVideoPlayingRow.querySelector('.btn-loop');
         if (vloop) vloop.classList.remove('active');
     }
+    if (_prevFavPlayingRow) {
+        const fbtn = _prevFavPlayingRow.querySelector('.btn-play');
+        if (fbtn) {
+            fbtn.classList.remove('playing');
+            fbtn.innerHTML = '&#9654;';
+        }
+        _prevFavPlayingRow.classList.remove('row-playing');
+        const floop = _prevFavPlayingRow.querySelector('.btn-loop');
+        if (floop) floop.classList.remove('active');
+    }
+    for (const tEl of _prevTagPlayingItems) {
+        const tbtn = tEl.querySelector('.btn-play');
+        if (tbtn) {
+            tbtn.classList.remove('playing');
+            tbtn.innerHTML = '&#9654;';
+        }
+        tEl.classList.remove('row-playing');
+    }
     _prevPlayingRow = null;
     _prevVideoPlayingRow = null;
+    _prevFavPlayingRow = null;
+    _prevTagPlayingItems = [];
     // Set current playing row(s)
     if (audioPlayerPath) {
         const playing = isAudioPlaying();
@@ -3886,6 +3928,30 @@ function updatePlayBtnStates() {
                 _prevVideoPlayingRow = vRow;
             }
         }
+        // Favorites tab
+        const favRow = document.querySelector(`#favList .fav-item[data-path="${CSS.escape(audioPlayerPath)}"]`);
+        if (favRow) {
+            favRow.classList.add('row-playing');
+            const fbtn = favRow.querySelector('.btn-play');
+            if (fbtn) {
+                fbtn.classList.toggle('playing', playing);
+                fbtn.innerHTML = playing ? '&#9646;&#9646;' : '&#9654;';
+            }
+            const floop = favRow.querySelector('.btn-loop');
+            if (floop) floop.classList.toggle('active', audioLooping);
+            _prevFavPlayingRow = favRow;
+        }
+        // Tags manager tab
+        const tagItems = document.querySelectorAll(`#tagsManager .tag-manager-item[data-path="${CSS.escape(audioPlayerPath)}"]`);
+        tagItems.forEach(tEl => {
+            tEl.classList.add('row-playing');
+            const tbtn = tEl.querySelector('.btn-play');
+            if (tbtn) {
+                tbtn.classList.toggle('playing', playing);
+                tbtn.innerHTML = playing ? '&#9646;&#9646;' : '&#9654;';
+            }
+            _prevTagPlayingItems.push(tEl);
+        });
     }
     // Lightweight history update — just toggle active/icon classes, skip full re-render
     const histItems = document.querySelectorAll('#npHistoryList .np-history-item');
@@ -5057,6 +5123,9 @@ async function expandMetaForPath(filePath) {
         const prevRow = tbody.querySelector('tr.row-expanded');
         if (prevRow) prevRow.classList.remove('row-expanded');
     }
+    // Close favorites/tags meta panel if open
+    if (typeof closeFavMeta === 'function') closeFavMeta();
+    if (typeof closeTagMeta === 'function') closeTagMeta();
 
     expandedMetaPath = filePath;
 

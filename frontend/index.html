@@ -3430,67 +3430,67 @@
         }
 
         .modal-resize-n {
-            top: -3px;
-            left: 8px;
-            right: 8px;
-            height: 6px;
-            cursor: n-resize;
+            top: -4px;
+            left: 14px;
+            right: 14px;
+            height: 8px;
+            cursor: ns-resize;
         }
 
         .modal-resize-s {
-            bottom: -3px;
-            left: 8px;
-            right: 8px;
-            height: 6px;
-            cursor: s-resize;
+            bottom: -4px;
+            left: 14px;
+            right: 14px;
+            height: 8px;
+            cursor: ns-resize;
         }
 
         .modal-resize-e {
-            top: 8px;
-            right: -3px;
-            bottom: 8px;
-            width: 6px;
-            cursor: e-resize;
+            top: 14px;
+            right: -4px;
+            bottom: 14px;
+            width: 8px;
+            cursor: ew-resize;
         }
 
         .modal-resize-w {
-            top: 8px;
-            left: -3px;
-            bottom: 8px;
-            width: 6px;
-            cursor: w-resize;
+            top: 14px;
+            left: -4px;
+            bottom: 14px;
+            width: 8px;
+            cursor: ew-resize;
         }
 
         .modal-resize-ne {
-            top: -3px;
-            right: -3px;
-            width: 12px;
-            height: 12px;
-            cursor: ne-resize;
+            top: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
+            cursor: nesw-resize;
         }
 
         .modal-resize-nw {
-            top: -3px;
-            left: -3px;
-            width: 12px;
-            height: 12px;
-            cursor: nw-resize;
+            top: -4px;
+            left: -4px;
+            width: 18px;
+            height: 18px;
+            cursor: nwse-resize;
         }
 
         .modal-resize-se {
-            bottom: -3px;
-            right: -3px;
-            width: 12px;
-            height: 12px;
-            cursor: se-resize;
+            bottom: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
+            cursor: nwse-resize;
         }
 
         .modal-resize-sw {
-            bottom: -3px;
-            left: -3px;
-            width: 12px;
-            height: 12px;
-            cursor: sw-resize;
+            bottom: -4px;
+            left: -4px;
+            width: 18px;
+            height: 18px;
+            cursor: nesw-resize;
         }
 
         /* Player: drag strip + toolbar sit above default z-index:10 handles without this */
@@ -4848,7 +4848,6 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
-            max-height: 200px;
             overflow-y: auto;
         }
 
@@ -4860,17 +4859,77 @@
             font-size: 12px;
             color: var(--text-dim);
             border-radius: 2px;
+            transition: background 0.15s;
         }
 
         .tag-manager-item:hover {
             background: rgba(5, 217, 232, 0.04);
         }
 
+        .tag-manager-item.row-playing {
+            background: rgba(5, 217, 232, 0.08);
+        }
+
+        .tag-manager-item-icon {
+            flex-shrink: 0;
+            font-size: 13px;
+            width: 18px;
+            text-align: center;
+        }
+
         .tag-manager-item-name {
-            flex: 1;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            min-width: 0;
+            flex-shrink: 1;
+        }
+
+        a.tag-manager-item-name {
+            color: var(--accent, #58a6ff);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        a.tag-manager-item-name:hover {
+            text-decoration: underline;
+        }
+
+        .tag-manager-item-note {
+            flex-shrink: 1;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .tag-manager-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        .tag-manager-item .format-badge {
+            font-size: 9px;
+            padding: 1px 5px;
+            flex-shrink: 0;
+        }
+
+        .tag-manager-item.tag-expanded {
+            background: rgba(5, 217, 232, 0.08);
+        }
+
+        .tag-meta-panel {
+            margin-bottom: 2px;
+            border: 1px solid var(--border);
+            border-top: none;
+            background: var(--bg-secondary);
+            animation: meta-slide 0.15s ease-out;
         }
 
         .tag-stats {
@@ -5910,67 +5969,67 @@
         }
 
         .sim-resize-n {
-            top: -3px;
-            left: 8px;
-            right: 8px;
-            height: 6px;
-            cursor: n-resize;
+            top: -4px;
+            left: 14px;
+            right: 14px;
+            height: 8px;
+            cursor: ns-resize;
         }
 
         .sim-resize-s {
-            bottom: -3px;
-            left: 8px;
-            right: 8px;
-            height: 6px;
-            cursor: s-resize;
+            bottom: -4px;
+            left: 14px;
+            right: 14px;
+            height: 8px;
+            cursor: ns-resize;
         }
 
         .sim-resize-e {
-            top: 8px;
-            right: -3px;
-            bottom: 8px;
-            width: 6px;
-            cursor: e-resize;
+            top: 14px;
+            right: -4px;
+            bottom: 14px;
+            width: 8px;
+            cursor: ew-resize;
         }
 
         .sim-resize-w {
-            top: 8px;
-            left: -3px;
-            bottom: 8px;
-            width: 6px;
-            cursor: w-resize;
+            top: 14px;
+            left: -4px;
+            bottom: 14px;
+            width: 8px;
+            cursor: ew-resize;
         }
 
         .sim-resize-ne {
-            top: -3px;
-            right: -3px;
-            width: 12px;
-            height: 12px;
-            cursor: ne-resize;
+            top: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
+            cursor: nesw-resize;
         }
 
         .sim-resize-nw {
-            top: -3px;
-            left: -3px;
-            width: 12px;
-            height: 12px;
-            cursor: nw-resize;
+            top: -4px;
+            left: -4px;
+            width: 18px;
+            height: 18px;
+            cursor: nwse-resize;
         }
 
         .sim-resize-se {
-            bottom: -3px;
-            right: -3px;
-            width: 12px;
-            height: 12px;
-            cursor: se-resize;
+            bottom: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
+            cursor: nwse-resize;
         }
 
         .sim-resize-sw {
-            bottom: -3px;
-            left: -3px;
-            width: 12px;
-            height: 12px;
-            cursor: sw-resize;
+            bottom: -4px;
+            left: -4px;
+            width: 18px;
+            height: 18px;
+            cursor: nesw-resize;
         }
 
         .audio-now-playing {
@@ -6019,8 +6078,8 @@
 
         /* Corners */
         .np-resize-tl {
-            top: -2px;
-            left: -2px;
+            top: -4px;
+            left: -4px;
             width: 18px;
             height: 18px;
             cursor: nwse-resize;
@@ -6035,8 +6094,8 @@
         }
 
         .np-resize-tr {
-            top: -2px;
-            right: -2px;
+            top: -4px;
+            right: -4px;
             width: 18px;
             height: 18px;
             cursor: nesw-resize;
@@ -6051,8 +6110,8 @@
         }
 
         .np-resize-bl {
-            bottom: -2px;
-            left: -2px;
+            bottom: -4px;
+            left: -4px;
             width: 18px;
             height: 18px;
             cursor: nesw-resize;
@@ -6067,8 +6126,8 @@
         }
 
         .np-resize-br {
-            bottom: -2px;
-            right: -2px;
+            bottom: -4px;
+            right: -4px;
             width: 18px;
             height: 18px;
             cursor: nwse-resize;
@@ -6084,34 +6143,34 @@
 
         /* Edges */
         .np-resize-t {
-            top: -3px;
+            top: -4px;
             left: 18px;
             right: 18px;
-            height: 6px;
+            height: 8px;
             cursor: ns-resize;
         }
 
         .np-resize-b {
-            bottom: -3px;
+            bottom: -4px;
             left: 18px;
             right: 18px;
-            height: 6px;
+            height: 8px;
             cursor: ns-resize;
         }
 
         .np-resize-l {
-            left: -3px;
+            left: -4px;
             top: 18px;
             bottom: 18px;
-            width: 6px;
+            width: 8px;
             cursor: ew-resize;
         }
 
         .np-resize-r {
-            right: -3px;
+            right: -4px;
             top: 18px;
             bottom: 18px;
-            width: 6px;
+            width: 8px;
             cursor: ew-resize;
         }
 
@@ -7702,8 +7761,9 @@
             border-color: var(--cyan);
         }
 
-        /* Inner chrome above the glow layer so flex layout does not fight the pseudo stacking context */
-        .audio-now-playing.np-playing > * {
+        /* Inner chrome above the glow layer so flex layout does not fight the pseudo stacking context.
+           Exclude resize handles — they need position:absolute + z-index:200 to stay at edges. */
+        .audio-now-playing.np-playing > *:not(.modal-resize) {
             position: relative;
             z-index: 1;
         }
@@ -8681,19 +8741,44 @@
         }
 
         .fav-name {
-            flex: 1;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
             font-size: 13px;
             font-weight: 600;
             color: var(--text);
+            min-width: 0;
+            flex-shrink: 1;
+        }
+
+        a.fav-name {
+            color: var(--accent, #58a6ff);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        a.fav-name:hover {
+            text-decoration: underline;
+        }
+
+        .fav-item.fav-expanded {
+            border-left-color: var(--cyan);
+            background: var(--bg-secondary);
+        }
+
+        .fav-meta-panel {
+            margin-bottom: 4px;
+            border: 1px solid var(--border);
+            border-top: none;
+            background: var(--bg-secondary);
+            animation: meta-slide 0.15s ease-out;
         }
 
         .fav-actions {
             display: flex;
             gap: 4px;
             flex-shrink: 0;
+            margin-left: auto;
         }
 
         .ctx-menu-sep {
@@ -12140,48 +12225,48 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=19723"></script>
-<script src="js/utils.js?v=19723"></script>
-<script src="js/ui-idle.js?v=19723"></script>
-<script src="js/ipc.js?v=19723"></script>
-<script src="js/tooltip-hover.js?v=19723"></script>
-<script src="js/drag-reorder.js?v=19723"></script>
-<script src="js/modal-drag.js?v=19723"></script>
-<script src="js/columns.js?v=19723"></script>
-<script src="js/notes.js?v=19723"></script>
-<script src="js/favorites.js?v=19723"></script>
-<script src="js/export.js?v=19723"></script>
-<script src="js/plugins.js?v=19723"></script>
-<script src="js/settings.js?v=19723"></script>
-<script src="js/history.js?v=19723"></script>
-<script src="js/kvr.js?v=19723"></script>
-<script src="js/graph-freeze.js?v=19723"></script>
-<script src="js/audio.js?v=19723"></script>
-<script src="js/daw.js?v=19723"></script>
-<script src="js/disk-usage.js?v=19723"></script>
-<script src="js/presets.js?v=19723"></script>
-<script src="js/batch-select.js?v=19723"></script>
-<script src="js/native-file-drag.js?v=19723"></script>
-<script src="js/sort-persist.js?v=19723"></script>
-<script src="js/multi-filter.js?v=19723"></script>
-<script src="js/file-browser.js?v=19723"></script>
-<script src="js/duplicates.js?v=19723"></script>
-<script src="js/command-palette.js?v=19723"></script>
-<script src="js/xref.js?v=19723"></script>
-<script src="js/dep-graph.js?v=19723"></script>
-<script src="js/smart-playlists.js?v=19723"></script>
-<script src="js/heatmap-dashboard.js?v=19723"></script>
-<script src="js/midi.js?v=19723"></script>
-<script src="js/pdf.js?v=19723"></script>
-<script src="js/video.js?v=19723"></script>
-<script src="js/settings-search.js?v=19723"></script>
-<script src="js/visualizer.js?v=19723"></script>
-<script src="js/walker-status.js?v=19723"></script>
-<script src="js/audio-engine.js?v=19723"></script>
-<script src="js/context-menu.js?v=19723"></script>
-<script src="js/shortcuts.js?v=19723"></script>
-<script src="js/help-overlay.js?v=19723"></script>
-<script src="js/keyboard-nav.js?v=19723"></script>
-<script src="js/app.js?v=19723"></script>
+<script src="js/i18n-ui.js?v=81642"></script>
+<script src="js/utils.js?v=81642"></script>
+<script src="js/ui-idle.js?v=81642"></script>
+<script src="js/ipc.js?v=81642"></script>
+<script src="js/tooltip-hover.js?v=81642"></script>
+<script src="js/drag-reorder.js?v=81642"></script>
+<script src="js/modal-drag.js?v=81642"></script>
+<script src="js/columns.js?v=81642"></script>
+<script src="js/notes.js?v=81642"></script>
+<script src="js/favorites.js?v=81642"></script>
+<script src="js/export.js?v=81642"></script>
+<script src="js/plugins.js?v=81642"></script>
+<script src="js/settings.js?v=81642"></script>
+<script src="js/history.js?v=81642"></script>
+<script src="js/kvr.js?v=81642"></script>
+<script src="js/graph-freeze.js?v=81642"></script>
+<script src="js/audio.js?v=81642"></script>
+<script src="js/daw.js?v=81642"></script>
+<script src="js/disk-usage.js?v=81642"></script>
+<script src="js/presets.js?v=81642"></script>
+<script src="js/batch-select.js?v=81642"></script>
+<script src="js/native-file-drag.js?v=81642"></script>
+<script src="js/sort-persist.js?v=81642"></script>
+<script src="js/multi-filter.js?v=81642"></script>
+<script src="js/file-browser.js?v=81642"></script>
+<script src="js/duplicates.js?v=81642"></script>
+<script src="js/command-palette.js?v=81642"></script>
+<script src="js/xref.js?v=81642"></script>
+<script src="js/dep-graph.js?v=81642"></script>
+<script src="js/smart-playlists.js?v=81642"></script>
+<script src="js/heatmap-dashboard.js?v=81642"></script>
+<script src="js/midi.js?v=81642"></script>
+<script src="js/pdf.js?v=81642"></script>
+<script src="js/video.js?v=81642"></script>
+<script src="js/settings-search.js?v=81642"></script>
+<script src="js/visualizer.js?v=81642"></script>
+<script src="js/walker-status.js?v=81642"></script>
+<script src="js/audio-engine.js?v=81642"></script>
+<script src="js/context-menu.js?v=81642"></script>
+<script src="js/shortcuts.js?v=81642"></script>
+<script src="js/help-overlay.js?v=81642"></script>
+<script src="js/keyboard-nav.js?v=81642"></script>
+<script src="js/app.js?v=81642"></script>
 </body>
 </html>

@@ -564,42 +564,16 @@ fn normalize_fav_path_key(s: &str) -> String {
     s.replace('\\', "/").trim().to_string()
 }
 
-fn prefs_favorites_array() -> Vec<serde_json::Value> {
-    match history::get_preference("favorites") {
-        Some(serde_json::Value::Array(a)) => a,
-        Some(serde_json::Value::String(s)) => {
-            if let Ok(a) = serde_json::from_str::<Vec<serde_json::Value>>(&s) {
-                return a;
-            }
-            match serde_json::from_str::<serde_json::Value>(&s) {
-                Ok(serde_json::Value::Array(a)) => a,
-                _ => vec![],
-            }
-        }
-        _ => vec![],
-    }
-}
-
-/// Toggle favorite for `path` in prefs (`favorites` key). Returns new `favorite_on` and the updated list.
+/// Toggle favorite for `path` in SQLite. Returns new `favorite_on` and the updated list.
 fn tray_prefs_toggle_favorite(path: &str) -> Option<(bool, Vec<serde_json::Value>)> {
     let key = normalize_fav_path_key(path);
     if key.is_empty() {
         return None;
     }
-    let mut arr = prefs_favorites_array();
-    let mut found: Option<usize> = None;
-    for (i, item) in arr.iter().enumerate() {
-        let p = item
-            .get("path")
-            .and_then(|v| v.as_str())
-            .map(normalize_fav_path_key);
-        if p.as_deref() == Some(key.as_str()) {
-            found = Some(i);
-            break;
-        }
-    }
-    let now_fav = if let Some(i) = found {
-        arr.remove(i);
+    let db = crate::db::global();
+    let is_fav = db.favorites_is(&key).unwrap_or(false);
+    let now_fav = if is_fav {
+        let _ = db.favorites_remove(&key);
         false
     } else {
         let name = Path::new(&key)
@@ -607,17 +581,10 @@ fn tray_prefs_toggle_favorite(path: &str) -> Option<(bool, Vec<serde_json::Value
             .and_then(|s| s.to_str())
             .unwrap_or(key.as_str())
             .to_string();
-        let entry = serde_json::json!({
-            "type": "sample",
-            "path": key,
-            "name": name,
-            "format": "",
-            "addedAt": chrono::Utc::now().to_rfc3339(),
-        });
-        arr.insert(0, entry);
+        let _ = db.favorites_add("sample", &key, &name, "", "", &chrono::Utc::now().to_rfc3339());
         true
     };
-    history::set_preference("favorites", serde_json::Value::Array(arr.clone()));
+    let arr = db.favorites_list().unwrap_or_default();
     Some((now_fav, arr))
 }
 
