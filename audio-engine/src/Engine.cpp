@@ -1092,7 +1092,10 @@ class DspStereoFileSource final : public juce::PositionableAudioSource
 {
 public:
     std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
-    /** Forward playback only: wraps `readerSource` for tape-style speed (pitch follows rate). */
+    /// Read-ahead I/O buffer for stream-from-disk playback (wraps `readerSource`).
+    /// When set, `speedResampler` and OLA read from this instead of `readerSource` directly.
+    std::unique_ptr<juce::BufferingAudioSource> bufferedReader;
+    /** Forward playback only: wraps `readerSource` (or `bufferedReader`) for tape-style speed (pitch follows rate). */
     std::unique_ptr<juce::ResamplingAudioSource> speedResampler;
     std::atomic<float>* playbackSpeed = nullptr;
     /** Pointer to the global speed-mode atomic (0 = Resample, 1 = TimeStretch). */
@@ -1112,6 +1115,9 @@ public:
     juce::dsp::IIR::Filter<float> lowL, lowR, midL, midR, hiL, hiR;
     double processRate = 44100.0;
     InsertChainRunner* insertChain = nullptr;
+    /// Remaining samples of linear fade-in after a seek to mask discontinuities.
+    static constexpr int kSeekFadeSamples = 128;
+    std::atomic<int> seekFadeRemaining{0};
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override
     {
@@ -1126,7 +1132,9 @@ public:
         midR.prepare(spec);
         hiL.prepare(spec);
         hiR.prepare(spec);
-        if (readerSource != nullptr)
+        if (bufferedReader != nullptr)
+            bufferedReader->prepareToPlay(samplesPerBlockExpected, sampleRate);
+        else if (readerSource != nullptr)
             readerSource->prepareToPlay(samplesPerBlockExpected, sampleRate);
         if (speedResampler != nullptr)
             speedResampler->prepareToPlay(samplesPerBlockExpected, sampleRate);
@@ -1139,7 +1147,9 @@ public:
     {
         if (speedResampler != nullptr)
             speedResampler->releaseResources();
-        if (readerSource != nullptr)
+        if (bufferedReader != nullptr)
+            bufferedReader->releaseResources();
+        else if (readerSource != nullptr)
             readerSource->releaseResources();
         if (insertChain != nullptr)
             insertChain->release();
@@ -1155,12 +1165,23 @@ public:
             else
                 reverseFrame = (int) juce::jlimit<juce::int64>(0, (juce::int64) frames - 1, newPosition);
         }
+        else if (bufferedReader != nullptr)
+        {
+            bufferedReader->setNextReadPosition(newPosition);
+            if (speedResampler != nullptr)
+                speedResampler->flushBuffers();
+            ola.reset();
+            lowL.reset(); lowR.reset(); midL.reset(); midR.reset(); hiL.reset(); hiR.reset();
+            seekFadeRemaining.store(kSeekFadeSamples);
+        }
         else if (readerSource != nullptr)
         {
             readerSource->setNextReadPosition(newPosition);
             if (speedResampler != nullptr)
                 speedResampler->flushBuffers();
             ola.reset();
+            lowL.reset(); lowR.reset(); midL.reset(); midR.reset(); hiL.reset(); hiR.reset();
+            seekFadeRemaining.store(kSeekFadeSamples);
         }
     }
 
@@ -1168,6 +1189,8 @@ public:
     {
         if (reverseMode)
             return (juce::int64) reverseFrame;
+        if (bufferedReader != nullptr)
+            return bufferedReader->getNextReadPosition();
         if (readerSource != nullptr)
             return readerSource->getNextReadPosition();
         return 0;
@@ -1264,7 +1287,10 @@ public:
         if (timeStretch)
         {
             const float sp = playbackSpeed != nullptr ? playbackSpeed->load() : 1.0f;
-            ola.process(readerSource.get(), sp, bufferToFill);
+            juce::PositionableAudioSource* olaSource = bufferedReader != nullptr
+                ? static_cast<juce::PositionableAudioSource*>(bufferedReader.get())
+                : static_cast<juce::PositionableAudioSource*>(readerSource.get());
+            ola.process(olaSource, sp, bufferToFill);
         }
         else if (speedResampler != nullptr)
         {
@@ -1306,6 +1332,25 @@ public:
 
         if (insertChain != nullptr && insertChain->isActive())
             insertChain->process(*bufferToFill.buffer, bufferToFill.startSample, n);
+
+        /* Apply a short linear fade-in after a seek to mask the discontinuity from
+         * stale buffer data / IIR filter reset.  The fade counter is set atomically
+         * by `setNextReadPosition` and consumed here on the audio thread. */
+        {
+            int fadeRem = seekFadeRemaining.load();
+            if (fadeRem > 0)
+            {
+                const int fadeSamples = juce::jmin(fadeRem, n);
+                for (int i = 0; i < fadeSamples; ++i)
+                {
+                    const float gain = (float)(kSeekFadeSamples - fadeRem + i + 1) / (float) kSeekFadeSamples;
+                    const int idx = bufferToFill.startSample + i;
+                    bufferToFill.buffer->setSample(0, idx, bufferToFill.buffer->getSample(0, idx) * gain);
+                    bufferToFill.buffer->setSample(1, idx, bufferToFill.buffer->getSample(1, idx) * gain);
+                }
+                seekFadeRemaining.store(fadeRem - fadeSamples);
+            }
+        }
 
         if (dsp != nullptr && loadMonoOn(dsp->monoBits))
         {
@@ -2718,17 +2763,23 @@ struct Engine::Impl
             {
                 /* Video files: stream decoded samples from the file-backed reader instead of
                  * slurping the whole container into RAM (which blocks for 10-20+ s on large
-                 * video files).  `AudioTransportSource` read-ahead via `readAheadThread`
-                 * buffers ~5 s of decoded audio in a background thread, covering brief SMB
-                 * stalls from Finder thumbnailing / metadata bursts without the upfront cost. */
+                 * video files).  A `BufferingAudioSource` wraps the raw reader so a background
+                 * `TimeSliceThread` pre-fills ~5 s of decoded audio — covering brief SMB
+                 * stalls from Finder thumbnailing / metadata bursts without the upfront cost.
+                 * The buffering layer sits *below* the DSP chain so that EQ / inserts / speed
+                 * resampling all run on the audio thread with correct state. */
                 std::unique_ptr<juce::AudioFormatReader> reader(
                     formatManager.createReaderFor(juce::File(sessionPath)));
                 if (reader == nullptr)
                     return errObj("open file failed");
                 auto* raw = reader.release();
                 fileSource->readerSource = std::make_unique<juce::AudioFormatReaderSource>(raw, true);
+                if (!readAheadThread.isThreadRunning())
+                    readAheadThread.startThread(juce::Thread::Priority::normal);
+                fileSource->bufferedReader = std::make_unique<juce::BufferingAudioSource>(
+                    fileSource->readerSource.get(), readAheadThread, false, kReadAheadSamples, 2);
                 fileSource->speedResampler =
-                    std::make_unique<juce::ResamplingAudioSource>(fileSource->readerSource.get(), false, 2);
+                    std::make_unique<juce::ResamplingAudioSource>(fileSource->bufferedReader.get(), false, 2);
                 fileSource->speedResampler->setResamplingRatio((double) juce::jlimit(0.25f, 4.0f, playbackSpeed.load()));
                 fileSource->playbackSpeed = &playbackSpeed;
                 fileSource->speedMode = &speedMode;
@@ -2767,19 +2818,10 @@ struct Engine::Impl
             }
 
             fileSource->playbackLoop = &playbackLoopWanted;
-            /* `stream_from_disk`: use JUCE read-ahead buffer so a background `TimeSliceThread`
-             * pre-fills decoded audio — covers brief I/O stalls on network mounts. For the
-             * preloaded (RAM) path, read-ahead is unnecessary (zero I/O during playback). */
-            if (streamFromDisk)
-            {
-                if (!readAheadThread.isThreadRunning())
-                    readAheadThread.startThread(juce::Thread::Priority::normal);
-                transport.setSource(fileSource.get(), kReadAheadSamples, &readAheadThread, (double) sessionSrcRate);
-            }
-            else
-            {
-                transport.setSource(fileSource.get(), 0, nullptr, (double) sessionSrcRate);
-            }
+            /* Read-ahead buffering (when needed) is now inside `DspStereoFileSource` wrapping
+             * only the raw reader.  Transport-level read-ahead is disabled for all paths so
+             * DSP (EQ, inserts, spectrum) always runs on the audio thread with correct state. */
+            transport.setSource(fileSource.get(), 0, nullptr, (double) sessionSrcRate);
             fileSource->insertChain = insertRunner.get();
             if (!reverseWanted)
                 fileSource->setLooping(playbackLoopWanted.load());

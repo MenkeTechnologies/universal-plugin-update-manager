@@ -266,14 +266,22 @@ function renderFavorites() {
         const loopBtn = f.type === 'sample'
             ? `<button class="btn-small btn-loop" data-action="toggleRowLoop" data-path="${hp}" title="Loop">&#8634;</button>`
             : '';
+        const goTab = typeof _itemTypeToTab === 'function' ? _itemTypeToTab(f.type) : null;
+        const goBtn = goTab
+            ? `<button class="btn-small btn-secondary" data-action="favGoToTable" data-path="${hp}" data-tab="${goTab}" style="padding:2px 6px;font-size:9px;" title="Show in ${typeLabel} tab">&#8599;</button>`
+            : '';
+        const nameContent = _favSearch && typeof highlightMatch === 'function' ? highlightMatch(f.name, _favSearch, _lastFavMode) : escapeHtml(f.name);
+        const nameEl = goTab
+            ? `<a class="fav-name fav-name-link" data-action="favGoToTable" data-path="${hp}" data-tab="${goTab}" title="${hp}">${nameContent}</a>`
+            : `<span class="fav-name" title="${hp}">${nameContent}</span>`;
         const cursor = (f.type === 'sample' || f.type === 'daw') ? ' style="cursor:pointer;"' : '';
         return `<div class="fav-item" data-path="${hp}" data-type="${f.type}" data-name="${escapeHtml(f.name)}"${cursor}>
       <span class="fav-star">&#9733;</span>
       <span class="fav-type"><span class="format-badge ${typeClass}">${typeLabel}</span></span>
-      <span class="fav-name" title="${hp}">${_favSearch && typeof highlightMatch === 'function' ? highlightMatch(f.name, _favSearch, _lastFavMode) : escapeHtml(f.name)}</span>
+      ${nameEl}
       ${extra}${daw}
       <span class="fav-actions">
-        ${playBtn}${loopBtn}
+        ${playBtn}${loopBtn}${goBtn}
         <button class="btn-small btn-folder" data-action="openFavFolder" data-path="${hp}" data-type="${f.type}" title="Reveal in Finder">&#128193;</button>
         <button class="btn-small btn-stop" data-action="removeFav" data-path="${hp}" title="Remove from favorites">&#10005;</button>
       </span>
@@ -320,11 +328,26 @@ function loadMoreFavs() {
         }[f.type] || 'format-default';
         const extra = f.format ? `<span class="format-badge format-default">${escapeHtml(f.format)}</span>` : '';
         const hp = escapeHtml(f.path);
+        const goTab = typeof _itemTypeToTab === 'function' ? _itemTypeToTab(f.type) : null;
+        const goBtn = goTab
+            ? `<button class="btn-small btn-secondary" data-action="favGoToTable" data-path="${hp}" data-tab="${goTab}" style="padding:2px 6px;font-size:9px;" title="Show in ${typeLabel} tab">&#8599;</button>`
+            : '';
+        const nameContent = _favSearch && typeof highlightMatch === 'function' ? highlightMatch(f.name, _favSearch, _lastFavMode) : escapeHtml(f.name);
+        const nameEl = goTab
+            ? `<a class="fav-name fav-name-link" data-action="favGoToTable" data-path="${hp}" data-tab="${goTab}" title="${hp}">${nameContent}</a>`
+            : `<span class="fav-name" title="${hp}">${nameContent}</span>`;
+        const playBtn = f.type === 'sample'
+            ? `<button class="btn-small btn-play" data-action="previewAudio" data-path="${hp}" title="Play">&#9654;</button>`
+            : '';
+        const loopBtn = f.type === 'sample'
+            ? `<button class="btn-small btn-loop" data-action="toggleRowLoop" data-path="${hp}" title="Loop">&#8634;</button>`
+            : '';
         return `<div class="fav-item" data-path="${hp}" data-type="${f.type}" data-name="${escapeHtml(f.name)}">
       <span class="fav-star">&#9733;</span>
       <span class="fav-type"><span class="format-badge ${typeClass}">${typeLabel}</span></span>
-      <span class="fav-name" title="${hp}">${_favSearch && typeof highlightMatch === 'function' ? highlightMatch(f.name, _favSearch, _lastFavMode) : escapeHtml(f.name)}</span>${extra}
+      ${nameEl}${extra}
       <span class="fav-actions">
+        ${playBtn}${loopBtn}${goBtn}
         <button class="btn-small btn-folder" data-action="openFavFolder" data-path="${hp}" data-type="${f.type}" title="Reveal in Finder">&#128193;</button>
         <button class="btn-small btn-stop" data-action="removeFav" data-path="${hp}" title="Remove">&#10005;</button>
       </span>
@@ -336,6 +359,116 @@ function loadMoreFavs() {
             `<div id="favLoadMore" data-action="loadMoreFavs" style="text-align:center;padding:12px;color:var(--text-muted);cursor:pointer;font-size:12px;">
         Showing ${_favRenderCount} of ${_favFiltered.length} — click to load more
       </div>`);
+    }
+}
+
+// ── Favorites expanded meta panel (waveform + spectrogram) ──
+let _favExpandedPath = null;
+let _favMetaDrawSeq = 0;
+
+function closeFavMeta() {
+    const panel = document.getElementById('favMetaPanel');
+    if (panel) panel.remove();
+    const prev = document.querySelector('.fav-item.fav-expanded');
+    if (prev) prev.classList.remove('fav-expanded');
+    _favExpandedPath = null;
+}
+
+async function expandFavMeta(filePath) {
+    // Close any existing audio-table meta row so only one panel is open
+    if (typeof closeMetaRow === 'function') closeMetaRow();
+    closeFavMeta();
+
+    const list = document.getElementById('favList');
+    if (!list) return;
+    const favItem = list.querySelector(`.fav-item[data-path="${CSS.escape(filePath)}"]`);
+    if (!favItem) return;
+
+    _favExpandedPath = filePath;
+    favItem.classList.add('fav-expanded');
+
+    // Insert loading panel after fav item
+    const panel = document.createElement('div');
+    panel.id = 'favMetaPanel';
+    panel.className = 'fav-meta-panel';
+    panel.innerHTML = `<div class="audio-meta-panel" style="justify-items:center;"><div class="spinner" style="width:18px;height:18px;"></div></div>`;
+    favItem.after(panel);
+    favItem.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+
+    try {
+        const meta = await window.vstUpdater.getAudioMetadata(filePath);
+        if (_favExpandedPath !== filePath) return;
+
+        let items = '';
+        if (typeof metaItem === 'function') {
+            const _fmt = typeof _audioFmt === 'function' ? _audioFmt : (k) => k;
+            items += metaItem(_fmt('ui.audio.meta_label_file_name'), meta.fileName, true);
+            items += metaItem(_fmt('ui.audio.meta_label_format'), meta.format);
+            items += metaItem(_fmt('ui.audio.meta_label_size'), typeof formatAudioSize === 'function' ? formatAudioSize(meta.sizeBytes) : meta.sizeBytes);
+            if (meta.sampleRate) items += metaItem(_fmt('ui.audio.meta_label_sample_rate'), meta.sampleRate.toLocaleString() + ' Hz');
+            if (meta.bitsPerSample) items += metaItem(_fmt('ui.audio.meta_label_bit_depth'), meta.bitsPerSample + '-bit');
+            if (meta.channels) {
+                const chVal = meta.channels === 1 ? 'Mono' : meta.channels === 2 ? 'Stereo' : meta.channels + ' ch';
+                items += metaItem(_fmt('ui.audio.meta_label_channels'), chVal);
+            }
+            if (meta.duration) items += metaItem(_fmt('ui.audio.meta_label_duration'), typeof formatTime === 'function' ? formatTime(meta.duration) : meta.duration);
+        }
+
+        const waveformHtml = `<div class="meta-waveform" id="metaWaveformBox" data-path="${escapeHtml(filePath)}" title="Click to seek">
+      <canvas id="metaWaveformCanvas"></canvas>
+      <div class="waveform-progress-fill"></div>
+      <div class="waveform-loop-region" style="display:none;"></div>
+      <div class="waveform-loop-brace waveform-loop-brace-start" data-loop-brace="start" style="display:none;left:25%;" title="Drag to set loop start"></div>
+      <div class="waveform-loop-brace waveform-loop-brace-end" data-loop-brace="end" style="display:none;left:75%;" title="Drag to set loop end"></div>
+      <button type="button" class="waveform-loop-toggle" data-action="toggleMetaLoopRegion" title="Toggle loop region">L</button>
+      <div class="waveform-cursor" style="left:0;"></div>
+      <div class="waveform-time-label">${meta.duration && typeof formatTime === 'function' ? formatTime(meta.duration) : ''}</div>
+    </div>
+    <div class="meta-waveform" style="height:80px;cursor:default;" title="Spectrogram">
+      <canvas id="metaSpectrogramCanvas" width="800" height="80" style="position:absolute;top:0;left:0;width:100%;height:100;"></canvas>
+      <span style="position:absolute;top:2px;left:4px;font-size:8px;color:var(--text-dim);pointer-events:none;">Spectrogram</span>
+    </div>`;
+
+        panel.innerHTML = `<div class="audio-meta-panel"><span class="meta-close-btn" data-action="closeFavMeta" title="Close">&#10005;</span>${waveformHtml}${items}</div>`;
+
+        // Hydrate loop-region braces
+        if (typeof applyMetaLoopRegionUI === 'function') applyMetaLoopRegionUI(filePath);
+
+        // Set expandedMetaPath so playback cursor updates work
+        if (typeof expandedMetaPath !== 'undefined') expandedMetaPath = filePath;
+
+        // Draw waveform + spectrogram
+        _favMetaDrawSeq++;
+        const seq = _favMetaDrawSeq;
+        if (typeof _metaPanelDrawSeq !== 'undefined') _metaPanelDrawSeq = seq;
+
+        const doDraw = () => {
+            if (typeof scheduleIdleVisualWork === 'function') {
+                scheduleIdleVisualWork(() => {
+                    if (_favExpandedPath !== filePath) return;
+                    if (typeof drawMetaPanelVisuals === 'function') {
+                        void drawMetaPanelVisuals(filePath, seq);
+                    }
+                }, {delayMs: 0});
+            } else if (typeof drawMetaPanelVisuals === 'function') {
+                void drawMetaPanelVisuals(filePath, seq);
+            }
+        };
+
+        if (filePath === audioPlayerPath) {
+            requestAnimationFrame(doDraw);
+        } else {
+            doDraw();
+        }
+
+        // Sync playhead if already playing this file
+        if (typeof audioPlayerPath !== 'undefined' && audioPlayerPath === filePath) {
+            requestAnimationFrame(() => {
+                if (typeof updatePlaybackTime === 'function') updatePlaybackTime();
+            });
+        }
+    } catch (err) {
+        panel.innerHTML = `<div class="audio-meta-panel"><span style="color:var(--red);">Failed to load metadata</span></div>`;
     }
 }
 
@@ -356,11 +489,35 @@ document.addEventListener('click', (e) => {
         else if (type === 'preset') openPresetFolder(path);
         return;
     }
-    // Single click on sample favorite → play
+    // "Go to table" link / button
+    const goEl = e.target.closest('[data-action="favGoToTable"]');
+    if (goEl) {
+        e.preventDefault();
+        const path = goEl.dataset.path;
+        const tab = goEl.dataset.tab;
+        if (tab && typeof _goToTableItem === 'function') {
+            void _goToTableItem(tab, path);
+        }
+        return;
+    }
+    // Close fav meta panel
+    if (e.target.closest('[data-action="closeFavMeta"]')) {
+        closeFavMeta();
+        return;
+    }
+    // Single click on sample favorite → play + expand meta
     const favItem = e.target.closest('.fav-item[data-type="sample"]');
-    if (favItem && !e.target.closest('.fav-actions') && !e.target.closest('button')) {
+    if (favItem && !e.target.closest('.fav-actions') && !e.target.closest('button') && !e.target.closest('a')) {
         const path = favItem.dataset.path;
-        if (path && typeof previewAudio === 'function') previewAudio(path);
+        if (path && typeof previewAudio === 'function') {
+            previewAudio(path).then(() => {
+                if (_favExpandedPath === path) {
+                    closeFavMeta();
+                } else {
+                    expandFavMeta(path);
+                }
+            });
+        }
     }
 });
 

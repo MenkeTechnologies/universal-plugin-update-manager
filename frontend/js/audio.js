@@ -2670,6 +2670,8 @@ function closeMetaRow() {
     const expanded = document.querySelector('tr.row-expanded');
     if (expanded) expanded.classList.remove('row-expanded');
     expandedMetaPath = null;
+    // Also close favorites meta panel if open
+    if (typeof closeFavMeta === 'function') closeFavMeta();
 }
 
 function getFormatClass(format) {
@@ -5110,6 +5112,8 @@ async function expandMetaForPath(filePath) {
         const prevRow = tbody.querySelector('tr.row-expanded');
         if (prevRow) prevRow.classList.remove('row-expanded');
     }
+    // Close favorites meta panel if open
+    if (typeof closeFavMeta === 'function') closeFavMeta();
 
     expandedMetaPath = filePath;
 
