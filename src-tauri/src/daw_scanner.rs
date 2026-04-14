@@ -345,11 +345,10 @@ fn walk_dir_parallel(
         visited.insert(orig); // also mark original to prevent re-entry via different route
     }
 
-    if let Some(ref inc) = incremental {
-        if inc.should_skip(dir) {
+    if let Some(ref inc) = incremental
+        && inc.should_skip(dir) {
             return;
         }
-    }
 
     let dir_str = dir.to_string_lossy().to_string();
     {

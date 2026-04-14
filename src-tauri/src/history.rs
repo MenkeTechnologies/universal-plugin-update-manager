@@ -338,6 +338,7 @@ pub struct MidiScanDiff {
 
 // PDF scan types
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct PdfFile {
     pub name: String,
     pub path: String,
@@ -357,21 +358,6 @@ pub struct PdfFile {
     pub pdf_mod_date: Option<String>,
 }
 
-impl Default for PdfFile {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            path: String::new(),
-            directory: String::new(),
-            size: 0,
-            size_formatted: String::new(),
-            modified: String::new(),
-            pages: None,
-            pdf_creation_date: None,
-            pdf_mod_date: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PdfScanSnapshot {
@@ -441,11 +427,10 @@ fn app_data_dir_from_home(home: &std::path::Path) -> PathBuf {
 pub fn get_data_dir() -> PathBuf {
     #[cfg(test)]
     {
-        if let Ok(g) = TEST_DATA_DIR_GLOBAL.lock() {
-            if let Some(ref dir) = *g {
+        if let Ok(g) = TEST_DATA_DIR_GLOBAL.lock()
+            && let Some(ref dir) = *g {
                 return dir.clone();
             }
-        }
         if let Some(dir) = TEST_DATA_DIR.with(|d| d.borrow().clone()) {
             return dir;
         }
@@ -641,13 +626,11 @@ fn toml_key_to_flat(section: &str, toml_key: &str) -> Option<String> {
 fn migrate_json_string(val: serde_json::Value) -> serde_json::Value {
     if let serde_json::Value::String(s) = &val {
         let trimmed = s.trim();
-        if (trimmed.starts_with('[') && trimmed.ends_with(']'))
-            || (trimmed.starts_with('{') && trimmed.ends_with('}'))
-        {
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        if ((trimmed.starts_with('[') && trimmed.ends_with(']'))
+            || (trimmed.starts_with('{') && trimmed.ends_with('}')))
+            && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(trimmed) {
                 return parsed;
             }
-        }
     }
     val
 }
@@ -778,17 +761,15 @@ fn load_preferences_from_disk() -> PrefsMap {
     // Migrate from legacy JSON if TOML doesn't exist yet
     if !path.exists() {
         let legacy = legacy_preferences_file();
-        if legacy.exists() {
-            if let Ok(data) = fs::read_to_string(&legacy) {
-                if let Ok(serde_json::Value::Object(user)) = serde_json::from_str(&data) {
+        if legacy.exists()
+            && let Ok(data) = fs::read_to_string(&legacy)
+                && let Ok(serde_json::Value::Object(user)) = serde_json::from_str(&data) {
                     let defaults = default_config();
                     let merged = merge_prefs(&defaults, &user);
                     save_preferences(&merged);
                     let _ = fs::remove_file(&legacy);
                     return merged;
                 }
-            }
-        }
     }
 
     if path.exists() {
@@ -817,13 +798,11 @@ pub fn load_preferences() -> PrefsMap {
     let now = prefs_cache_now_ms();
     let path = preferences_file();
     {
-        if let Ok(guard) = PREF_CACHE.lock() {
-            if let Some((t, cached_path, p)) = guard.as_ref() {
-                if now.saturating_sub(*t) < PREF_CACHE_TTL_MS && *cached_path == path {
+        if let Ok(guard) = PREF_CACHE.lock()
+            && let Some((t, cached_path, p)) = guard.as_ref()
+                && now.saturating_sub(*t) < PREF_CACHE_TTL_MS && *cached_path == path {
                     return p.clone();
                 }
-            }
-        }
     }
     let loaded = load_preferences_from_disk();
     if let Ok(mut guard) = PREF_CACHE.lock() {
@@ -906,13 +885,11 @@ pub fn now_iso() -> String {
 
 fn load_history() -> ScanHistory {
     let path = history_file();
-    if path.exists() {
-        if let Ok(data) = fs::read_to_string(&path) {
-            if let Ok(h) = serde_json::from_str(&data) {
+    if path.exists()
+        && let Ok(data) = fs::read_to_string(&path)
+            && let Ok(h) = serde_json::from_str(&data) {
                 return h;
             }
-        }
-    }
     ScanHistory { scans: vec![] }
 }
 
@@ -1117,13 +1094,11 @@ pub fn compute_plugin_diff(old_scan: &ScanSnapshot, new_scan: &ScanSnapshot) -> 
 
 pub fn load_kvr_cache() -> std::collections::HashMap<String, KvrCacheEntry> {
     let path = kvr_cache_file();
-    if path.exists() {
-        if let Ok(data) = fs::read_to_string(&path) {
-            if let Ok(cache) = serde_json::from_str(&data) {
+    if path.exists()
+        && let Ok(data) = fs::read_to_string(&path)
+            && let Ok(cache) = serde_json::from_str(&data) {
                 return cache;
             }
-        }
-    }
     std::collections::HashMap::new()
 }
 
@@ -1156,13 +1131,11 @@ pub fn update_kvr_cache(entries: &[KvrCacheUpdateEntry]) {
 
 fn load_audio_history() -> AudioHistory {
     let path = audio_history_file();
-    if path.exists() {
-        if let Ok(data) = fs::read_to_string(&path) {
-            if let Ok(h) = serde_json::from_str(&data) {
+    if path.exists()
+        && let Ok(data) = fs::read_to_string(&path)
+            && let Ok(h) = serde_json::from_str(&data) {
                 return h;
             }
-        }
-    }
     AudioHistory { scans: vec![] }
 }
 
@@ -1300,13 +1273,11 @@ pub fn get_latest_audio_scan() -> Option<AudioScanSnapshot> {
 
 fn load_daw_history() -> DawHistory {
     let path = daw_history_file();
-    if path.exists() {
-        if let Ok(data) = fs::read_to_string(&path) {
-            if let Ok(h) = serde_json::from_str(&data) {
+    if path.exists()
+        && let Ok(data) = fs::read_to_string(&path)
+            && let Ok(h) = serde_json::from_str(&data) {
                 return h;
             }
-        }
-    }
     DawHistory { scans: vec![] }
 }
 
@@ -1535,13 +1506,11 @@ fn preset_history_file() -> PathBuf {
 
 fn load_preset_history() -> PresetHistory {
     let path = preset_history_file();
-    if path.exists() {
-        if let Ok(data) = fs::read_to_string(&path) {
-            if let Ok(h) = serde_json::from_str(&data) {
+    if path.exists()
+        && let Ok(data) = fs::read_to_string(&path)
+            && let Ok(h) = serde_json::from_str(&data) {
                 return h;
             }
-        }
-    }
     PresetHistory { scans: vec![] }
 }
 
@@ -2110,7 +2079,7 @@ mod tests {
         let id = gen_id();
         assert!(
             id.chars()
-                .all(|c| c.is_ascii_digit() || ('a'..='z').contains(&c)),
+                .all(|c: char| c.is_ascii_digit() || c.is_ascii_lowercase()),
             "gen_id must be radix-36 digits only, got {:?}",
             id
         );

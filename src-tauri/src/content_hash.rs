@@ -155,8 +155,8 @@ pub fn find_byte_duplicate_groups(
         }
 
         // Emit only here (never from Rayon workers): `done` is strictly increasing.
-        if let Some((app, every)) = progress.as_ref() {
-            if *every > 0 {
+        if let Some((app, every)) = progress.as_ref()
+            && *every > 0 {
                 let n = processed_ctr.load(Ordering::Relaxed);
                 if n > last_emitted_done {
                     last_emitted_done = n;
@@ -166,7 +166,6 @@ pub fn find_byte_duplicate_groups(
                     );
                 }
             }
-        }
     }
 
     let mut groups: Vec<ContentDupGroup> = by_hash

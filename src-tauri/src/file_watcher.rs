@@ -137,7 +137,7 @@ pub fn start_watching(
                 }
                 let mut p = pending_clone.lock().unwrap();
                 p.entry(category.to_string())
-                    .or_insert_with(HashSet::new)
+                    .or_default()
                     .insert(root.to_string_lossy().to_string());
             }
 

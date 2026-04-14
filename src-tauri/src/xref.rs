@@ -1843,7 +1843,7 @@ mod tests {
         let names: Vec<&str> = result.iter().map(|p| p.name.as_str()).collect();
         assert!(names.contains(&"Pro-Q 3"), "missing Pro-Q 3: {:?}", names);
         assert!(
-            !names.iter().any(|n| *n == "FabFilter"),
+            !names.contains(&"FabFilter"),
             "deviceName is vendor/model, not a second plugin: {:?}",
             names
         );

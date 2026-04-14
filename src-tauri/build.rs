@@ -1,6 +1,13 @@
 use std::path::Path;
 use std::process::Command;
 
+fn read_package_json_version(repo_root: &Path) -> Option<String> {
+    let pkg = repo_root.join("package.json");
+    let contents = std::fs::read_to_string(&pkg).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    json.get("version")?.as_str().map(|s| s.to_string())
+}
+
 fn git_first_line(repo_root: &Path, args: &[&str]) -> Option<String> {
     let out = Command::new("git")
         .current_dir(repo_root)
@@ -23,6 +30,11 @@ fn main() {
 
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let repo_root = manifest_dir.parent().unwrap_or(manifest_dir);
+
+    if let Some(ver) = read_package_json_version(repo_root) {
+        println!("cargo:rustc-env=CARGO_PKG_VERSION={ver}");
+    }
+    println!("cargo:rerun-if-changed=../package.json");
 
     let full =
         git_first_line(repo_root, &["rev-parse", "HEAD"]).unwrap_or_else(|| "unknown".to_string());

@@ -236,6 +236,7 @@ pub struct TrayState {
     pub inner: Mutex<TrayStateInner>,
 }
 
+#[derive(Default)]
 pub struct TrayStateInner {
     pub tray: Option<TrayIcon<Wry>>,
     pub menu_strings: HashMap<String, String>,
@@ -244,17 +245,6 @@ pub struct TrayStateInner {
     pub last_tray_appearance: Option<HashMap<String, String>>,
 }
 
-impl Default for TrayStateInner {
-    fn default() -> Self {
-        Self {
-            tray: None,
-            menu_strings: HashMap::new(),
-            now_playing_menu_line: None,
-            last_popover_emit: None,
-            last_tray_appearance: None,
-        }
-    }
-}
 
 impl Default for TrayState {
     fn default() -> Self {
@@ -758,27 +748,20 @@ pub fn tray_popover_action(app: AppHandle<Wry>, action: String) -> Result<(), St
      * snaps back to the old value. Updating the cache here makes the host poll always emit the
      * latest user intent. */
     if let Some(rest) = action.strip_prefix("volume:") {
-        if let Ok(n) = rest.parse::<f64>() {
-            if let Some(tray_state) = app.try_state::<TrayState>() {
-                if let Ok(mut guard) = tray_state.inner.lock() {
-                    if let Some(emit) = guard.last_popover_emit.as_mut() {
+        if let Ok(n) = rest.parse::<f64>()
+            && let Some(tray_state) = app.try_state::<TrayState>()
+                && let Ok(mut guard) = tray_state.inner.lock()
+                    && let Some(emit) = guard.last_popover_emit.as_mut() {
                         emit.volume_pct = n.clamp(0.0, 100.0).round() as u8;
                     }
-                }
-            }
-        }
     } else if let Some(rest) = action.strip_prefix("speed:") {
-        if let Ok(s) = rest.parse::<f64>() {
-            if s.is_finite() {
-                if let Some(tray_state) = app.try_state::<TrayState>() {
-                    if let Ok(mut guard) = tray_state.inner.lock() {
-                        if let Some(emit) = guard.last_popover_emit.as_mut() {
+        if let Ok(s) = rest.parse::<f64>()
+            && s.is_finite()
+                && let Some(tray_state) = app.try_state::<TrayState>()
+                    && let Ok(mut guard) = tray_state.inner.lock()
+                        && let Some(emit) = guard.last_popover_emit.as_mut() {
                             emit.playback_speed = s.clamp(0.25, 4.0);
                         }
-                    }
-                }
-            }
-        }
     } else if let Some(rest) = action.strip_prefix("seek:") {
         /* Seek directly to the audio-engine from Rust rather than round-tripping through the
          * main window's `listen('menu-action')` → `seekPlaybackToPercent` path. The main webview
@@ -789,8 +772,8 @@ pub fn tray_popover_action(app: AppHandle<Wry>, action: String) -> Result<(), St
          * webview-state-independent. We still emit `menu-action` below so the main window's
          * waveform / now-playing UI picks up the new position on the next poll tick OR as soon
          * as it resumes. */
-        if let Ok(frac) = rest.parse::<f64>() {
-            if frac.is_finite() {
+        if let Ok(frac) = rest.parse::<f64>()
+            && frac.is_finite() {
                 let frac = frac.clamp(0.0, 1.0);
                 let total_sec = app.try_state::<TrayState>().and_then(|s| {
                     s.inner
@@ -798,8 +781,8 @@ pub fn tray_popover_action(app: AppHandle<Wry>, action: String) -> Result<(), St
                         .ok()
                         .and_then(|g| g.last_popover_emit.as_ref().and_then(|e| e.total_sec))
                 });
-                if let Some(dur) = total_sec {
-                    if dur > 0.0 {
+                if let Some(dur) = total_sec
+                    && dur > 0.0 {
                         let position_sec = frac * dur;
                         std::thread::spawn(move || {
                             let _ = crate::audio_engine::dedicated_audio_engine_request(
@@ -810,9 +793,7 @@ pub fn tray_popover_action(app: AppHandle<Wry>, action: String) -> Result<(), St
                             );
                         });
                     }
-                }
             }
-        }
     } else if action == "toggle_shuffle" {
         return tray_popover_toggle_shuffle(&app);
     } else if action == "toggle_loop" {
@@ -871,11 +852,10 @@ pub fn update_tray_now_playing(
     };
     guard.now_playing_menu_line.clone_from(&np_line);
 
-    if let Some(ref map) = payload.appearance {
-        if !map.is_empty() {
+    if let Some(ref map) = payload.appearance
+        && !map.is_empty() {
             guard.last_tray_appearance = Some(map.clone());
         }
-    }
 
     let theme = tray_emit_ui_theme(&payload);
     let appearance = guard.last_tray_appearance.clone();
@@ -1003,22 +983,19 @@ pub fn update_tray_now_playing(
      * parallel read-through would just double the initial SMB bandwidth used at track change
      * with zero benefit. */
     let new_reveal_path = emit.reveal_path.clone();
-    if new_reveal_path != prev_reveal_path {
-        if let Some(rp) = new_reveal_path {
+    if new_reveal_path != prev_reveal_path
+        && let Some(rp) = new_reveal_path {
             std::thread::spawn(move || {
                 let p = std::path::Path::new(&rp);
-                if let Some(parent) = p.parent() {
-                    if !parent.as_os_str().is_empty() {
-                        if let Ok(entries) = std::fs::read_dir(parent) {
+                if let Some(parent) = p.parent()
+                    && !parent.as_os_str().is_empty()
+                        && let Ok(entries) = std::fs::read_dir(parent) {
                             for entry in entries.flatten() {
                                 let _ = entry.metadata();
                             }
                         }
-                    }
-                }
             });
         }
-    }
     Ok(())
 }
 

@@ -111,6 +111,7 @@ def fill_one_locale(
         return loc, 0
 
     uniq_vals = list(dict.fromkeys(en[k] for k in to_fix))
+    print(f"  found {len(to_fix)} English keys, translating ({len(uniq_vals)} API calls after dedup)", flush=True)
     val_to_t: dict[str, str] = {}
     for i, v in enumerate(uniq_vals):
         try:
@@ -128,7 +129,7 @@ def fill_one_locale(
             t = align_brace_tokens(v, t)
         val_to_t[v] = t
         if (i + 1) % 80 == 0:
-            print(f"  [{suffix}] {i + 1}/{len(uniq_vals)}", flush=True)
+            print(f"  translating... {i + 1}/{len(uniq_vals)}", flush=True)
         time.sleep(sleep_s)
 
     out = dict(loc)
@@ -191,11 +192,7 @@ def main() -> None:
             json.dumps(updated, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        n_remain = len(gap_keys(en, updated))
-        print(
-            f"Wrote {path} (filled {n_filled} keys; {n_remain} still match English)",
-            flush=True,
-        )
+        print(f"  wrote {path.name}: filled {n_filled} keys", flush=True)
 
 
 if __name__ == "__main__":

@@ -131,8 +131,8 @@ pub fn extract_download_url(html: &str) -> Option<(String, bool)> {
             regex::escape(kw),
             regex::escape(kw)
         );
-        if let Ok(re) = Regex::new(&pattern) {
-            if let Some(caps) = re.captures(html) {
+        if let Ok(re) = Regex::new(&pattern)
+            && let Some(caps) = re.captures(html) {
                 let url = caps
                     .get(1)
                     .or_else(|| caps.get(2))
@@ -141,7 +141,6 @@ pub fn extract_download_url(html: &str) -> Option<(String, bool)> {
                     return Some((u, true));
                 }
             }
-        }
     }
 
     // Any download link
@@ -189,15 +188,14 @@ pub async fn resolve_kvr(direct_url: &str, plugin_name: &str) -> KvrResult {
     let client = build_client();
 
     // Try direct URL first
-    if let Some((html, final_url, valid)) = fetch_with_validation(&client, direct_url).await {
-        if valid {
+    if let Some((html, final_url, valid)) = fetch_with_validation(&client, direct_url).await
+        && valid {
             let download_url = extract_download_url(&html).map(|(u, _)| u);
             return KvrResult {
                 product_url: final_url,
                 download_url,
             };
         }
-    }
 
     // Fallback: search KVR
     let search_url = format!(
@@ -236,26 +234,24 @@ pub async fn resolve_kvr(direct_url: &str, plugin_name: &str) -> KvrResult {
                 .count();
             let threshold = (name_words.len() as f64 * 0.5).ceil() as usize;
 
-            if url_slug.contains(&name_slug) || matching_words >= threshold {
-                if let Some(page_html) = fetch_html(&client, found_url).await {
+            if (url_slug.contains(&name_slug) || matching_words >= threshold)
+                && let Some(page_html) = fetch_html(&client, found_url).await {
                     let download_url = extract_download_url(&page_html).map(|(u, _)| u);
                     return KvrResult {
                         product_url: found_url.clone(),
                         download_url,
                     };
                 }
-            }
         }
 
-        if let Some(first_url) = product_links.first() {
-            if let Some(page_html) = fetch_html(&client, first_url).await {
+        if let Some(first_url) = product_links.first()
+            && let Some(page_html) = fetch_html(&client, first_url).await {
                 let download_url = extract_download_url(&page_html).map(|(u, _)| u);
                 return KvrResult {
                     product_url: first_url.clone(),
                     download_url,
                 };
             }
-        }
     }
 
     // Last resort
@@ -362,8 +358,8 @@ pub async fn find_latest_version(
         for kvr_url in kvr_links.iter().take(2) {
             tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
 
-            if let Some(page_html) = fetch_html(&client, kvr_url).await {
-                if let Some(version) = extract_version(&page_html) {
+            if let Some(page_html) = fetch_html(&client, kvr_url).await
+                && let Some(version) = extract_version(&page_html) {
                     let (download_url, has_platform) =
                         extract_download_url(&page_html).unwrap_or((kvr_url.clone(), false));
                     let has_update =
@@ -377,7 +373,6 @@ pub async fn find_latest_version(
                         has_platform_download: has_platform,
                     });
                 }
-            }
         }
     }
 

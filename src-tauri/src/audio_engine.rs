@@ -373,7 +373,7 @@ fn child_dead(child: &mut Child) -> bool {
 fn spawn_engine_child(path: &Path, preview_only_process: bool) -> Result<EngineChild, String> {
     let identity = std::fs::metadata(path).ok().map(|m| {
         (
-            m.modified().unwrap_or_else(|_| SystemTime::UNIX_EPOCH),
+            m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
             m.len(),
         )
     });
@@ -483,7 +483,7 @@ fn ensure_engine_child(path: &Path) -> Result<(), String> {
         .map_err(|_| "audio-engine child mutex poisoned")?;
     let disk_identity = std::fs::metadata(path).ok().map(|m| {
         (
-            m.modified().unwrap_or_else(|_| SystemTime::UNIX_EPOCH),
+            m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
             m.len(),
         )
     });
@@ -497,7 +497,7 @@ fn ensure_engine_child(path: &Path) -> Result<(), String> {
     };
     if need_spawn {
         if guard.is_some() {
-            take_and_reap_engine_child(&mut *guard);
+            take_and_reap_engine_child(&mut guard);
         }
         *guard = Some(spawn_engine_child(path, false)?);
     }
@@ -510,7 +510,7 @@ fn ensure_preview_engine_child(path: &Path) -> Result<(), String> {
         .map_err(|_| "audio-engine preview child mutex poisoned")?;
     let disk_identity = std::fs::metadata(path).ok().map(|m| {
         (
-            m.modified().unwrap_or_else(|_| SystemTime::UNIX_EPOCH),
+            m.modified().unwrap_or(SystemTime::UNIX_EPOCH),
             m.len(),
         )
     });
@@ -524,7 +524,7 @@ fn ensure_preview_engine_child(path: &Path) -> Result<(), String> {
     };
     if need_spawn {
         if guard.is_some() {
-            take_and_reap_preview_engine_child(&mut *guard);
+            take_and_reap_preview_engine_child(&mut guard);
         }
         *guard = Some(spawn_engine_child(path, true)?);
     }
@@ -570,7 +570,7 @@ fn clear_engine_slot_after_os_kill() -> bool {
     const MAX_ITERS: u32 = 6000;
     for _ in 0..MAX_ITERS {
         if let Ok(mut g) = ENGINE_CHILD.try_lock() {
-            take_and_reap_engine_child(&mut *g);
+            take_and_reap_engine_child(&mut g);
             return true;
         }
         thread::sleep(Duration::from_millis(5));
@@ -582,7 +582,7 @@ fn clear_preview_engine_slot_after_os_kill() -> bool {
     const MAX_ITERS: u32 = 6000;
     for _ in 0..MAX_ITERS {
         if let Ok(mut g) = PREVIEW_ENGINE_CHILD.try_lock() {
-            take_and_reap_preview_engine_child(&mut *g);
+            take_and_reap_preview_engine_child(&mut g);
             return true;
         }
         thread::sleep(Duration::from_millis(5));
@@ -659,12 +659,11 @@ pub fn spawn_audio_engine_request(
 /// stdin matches the audio-engine line protocol. If the top-level object already has `cmd`, it is
 /// left unchanged (even when `request` is also present).
 pub(crate) fn normalize_ipc_request_payload(v: &serde_json::Value) -> serde_json::Value {
-    if let Some(obj) = v.as_object() {
-        if !obj.contains_key("cmd") {
-            if let Some(inner) = obj.get("request") {
-                return inner.clone();
-            }
-        }
+    if let Some(obj) = v.as_object()
+        && !obj.contains_key("cmd")
+        && let Some(inner) = obj.get("request")
+    {
+        return inner.clone();
     }
     v.clone()
 }
@@ -756,15 +755,13 @@ fn spawn_preview_engine_request_at(request: &serde_json::Value) -> Result<serde_
                         return Err(format!("audio-engine preview JSON: {e}: {json_line}"));
                     }
                 };
-                if attempt == 0 {
-                    if let Some(err) = v.get("error").and_then(|e| e.as_str()) {
-                        if err.to_ascii_lowercase().contains("unknown cmd") {
+                if attempt == 0
+                    && let Some(err) = v.get("error").and_then(|e| e.as_str())
+                        && err.to_ascii_lowercase().contains("unknown cmd") {
                             clear_preview_engine_pid();
                             *guard = None;
                             continue;
                         }
-                    }
-                }
                 return Ok(v);
             }
             Err(e) => {
@@ -848,15 +845,13 @@ fn do_main_engine_request(request: &serde_json::Value) -> Result<serde_json::Val
                         return Err(format!("audio-engine JSON: {e}: {json_line}"));
                     }
                 };
-                if attempt == 0 {
-                    if let Some(err) = v.get("error").and_then(|e| e.as_str()) {
-                        if err.to_ascii_lowercase().contains("unknown cmd") {
+                if attempt == 0
+                    && let Some(err) = v.get("error").and_then(|e| e.as_str())
+                        && err.to_ascii_lowercase().contains("unknown cmd") {
                             clear_engine_pid();
                             *guard = None;
                             continue;
                         }
-                    }
-                }
                 return Ok(v);
             }
             Err(e) => {
@@ -951,15 +946,13 @@ fn spawn_audio_engine_request_at(request: &serde_json::Value) -> Result<serde_js
                 // return `unknown cmd` for verbs added in a newer AudioEngine. Respawn once (see also
                 // [`ensure_engine_child`] binary identity). Retry even if `ok` is missing — some
                 // older builds only set `error`.
-                if attempt == 0 {
-                    if let Some(err) = v.get("error").and_then(|e| e.as_str()) {
-                        if err.to_ascii_lowercase().contains("unknown cmd") {
+                if attempt == 0
+                    && let Some(err) = v.get("error").and_then(|e| e.as_str())
+                        && err.to_ascii_lowercase().contains("unknown cmd") {
                             clear_engine_pid();
                             *guard = None;
                             continue;
                         }
-                    }
-                }
                 return Ok(v);
             }
             Err(e) => {

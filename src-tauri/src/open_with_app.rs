@@ -20,7 +20,7 @@ pub fn open_with_application(file_path: &Path, app_name: &str) -> Result<(), Str
 
     #[cfg(target_os = "macos")]
     {
-        return open_macos(file_path, app);
+        open_macos(file_path, app)
     }
     #[cfg(target_os = "windows")]
     {

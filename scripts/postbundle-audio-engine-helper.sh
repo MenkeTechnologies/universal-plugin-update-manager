@@ -238,10 +238,10 @@ if [ -z "$DMG_BUNDLE_SCRIPT" ]; then
 fi
 mkdir -p "$DMG_DIR"
 
-# Pull product name + version from tauri.conf.json so we don't drift if either changes.
+# Pull product name from tauri.conf.json, version from package.json (single source of truth).
 TAURI_CONF="$REPO_ROOT/src-tauri/tauri.conf.json"
 PRODUCT_NAME="$(node -e "console.log(require('$TAURI_CONF').productName)")"
-VERSION="$(node -e "console.log(require('$TAURI_CONF').version)")"
+VERSION="$(node -e "console.log(require('$REPO_ROOT/package.json').version)")"
 # Tauri's DMG filename uses the bare CPU arch from the rustc host triple (aarch64
 # for arm64, x86_64 for Intel) — see `target/release/bundle/macos/rw.*.dmg` left
 # behind by the original Tauri DMG step for the exact pattern.

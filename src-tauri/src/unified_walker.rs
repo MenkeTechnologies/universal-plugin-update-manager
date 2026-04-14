@@ -77,11 +77,10 @@ impl IncrementalDirState {
             return false;
         }
         let map = self.mtimes.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(&stored) = map.get(&key) {
-            if cur <= stored {
+        if let Some(&stored) = map.get(&key)
+            && cur <= stored {
                 return true;
             }
-        }
         false
     }
 
@@ -541,15 +540,14 @@ fn walk_dir_parallel(
         // on SMB) and must not block other workers while in flight.
         let orig = normalize_macos_path(dir.to_path_buf());
         let canon_result = fs::canonicalize(dir);
-        if is_network_path(dir) {
-            if let Err(ref e) = canon_result {
+        if is_network_path(dir)
+            && let Err(ref e) = canon_result {
                 crate::write_app_log_verbose(format!(
                     "SCAN NETWORK CANONICALIZE FAIL — unified | {} | {} (using original path as dedup key)",
                     dir.display(),
                     e,
                 ));
             }
-        }
         let canon = canon_result.ok().map(normalize_macos_path);
         let key = canon.clone().unwrap_or_else(|| orig.clone());
         if !visited.insert(key.clone()) {
@@ -569,18 +567,17 @@ fn walk_dir_parallel(
         visited.insert(orig);
     }
 
-    if let Some(ref inc) = incremental {
-        if inc.should_skip(dir) {
+    if let Some(ref inc) = incremental
+        && inc.should_skip(dir) {
             return;
         }
-    }
 
     let dir_str = dir.to_string_lossy().to_string();
 
     // Log when entering a network share root (depth 0-2) so the user can
     // verify their mounts are actually being traversed.
-    if depth <= 2 {
-        if let Some(fstype) = network_fs_type(dir) {
+    if depth <= 2
+        && let Some(fstype) = network_fs_type(dir) {
             crate::write_app_log_verbose(format!(
                 "SCAN NETWORK ENTER — unified | {} | fs={} | depth={}",
                 dir.display(),
@@ -588,7 +585,6 @@ fn walk_dir_parallel(
                 depth,
             ));
         }
-    }
     {
         // Fan out the dir-status push to every sink (walker-status tiles).
         for sink in active_dirs {
@@ -758,10 +754,10 @@ fn walk_dir_parallel(
                 .iter()
                 .any(|ext| name_lower.ends_with(ext));
 
-            if is_daw_pkg && under_any_root(&path, &spec.daw_roots) {
-                if let Some(ext_with_dot) = ext_match(&name_lower, DAW_EXTENSIONS) {
+            if is_daw_pkg && under_any_root(&path, &spec.daw_roots)
+                && let Some(ext_with_dot) = ext_match(&name_lower, DAW_EXTENSIONS) {
                     let format = ext_with_dot.strip_prefix('.').unwrap_or("").to_uppercase();
-                    if !(format == "BAND" && !is_valid_band_package(&path)) {
+                    if format != "BAND" || is_valid_band_package(&path) {
                         let path_str = path.to_string_lossy().to_string();
                         if !spec.daw_exclude.contains(&path_str) {
                             if stops.any() {
@@ -803,7 +799,6 @@ fn walk_dir_parallel(
                         }
                     }
                 }
-            }
 
             if is_plugin_bundle {
                 // Plugin bundles: DAW skips entirely. Others may still want to

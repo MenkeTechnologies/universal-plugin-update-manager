@@ -41,7 +41,7 @@ fn ext_matches_video_list(path: &Path) -> bool {
         .map(|e| {
             let lower = e.to_ascii_lowercase();
             let dot = format!(".{lower}");
-            VIDEO_EXTENSIONS.iter().any(|vx| *vx == dot.as_str())
+            VIDEO_EXTENSIONS.contains(&dot.as_str())
         })
         .unwrap_or(false)
 }

@@ -182,16 +182,13 @@ fn read_plist_info(plugin_path: &Path) -> (Option<String>, Option<String>, Optio
         }
     }
 
-    if manufacturer_url.is_none() {
-        if let Some(copyright) = dict
+    if manufacturer_url.is_none()
+        && let Some(copyright) = dict
             .get("NSHumanReadableCopyright")
             .and_then(|v| v.as_string())
-        {
-            if let Some(m) = crate::kvr::URL_RE.find(copyright) {
+            && let Some(m) = crate::kvr::URL_RE.find(copyright) {
                 manufacturer_url = Some(m.as_str().to_string());
             }
-        }
-    }
 
     (version, manufacturer, manufacturer_url)
 }
@@ -427,11 +424,10 @@ pub fn discover_plugins(
 
     for dir in directories {
         let root = Path::new(dir);
-        if let Some(inc) = incremental {
-            if inc.should_skip(root) {
+        if let Some(inc) = incremental
+            && inc.should_skip(root) {
                 continue;
             }
-        }
         if let Ok(entries) = fs::read_dir(root) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -570,7 +566,7 @@ mod tests {
         let _ = fs::remove_dir_all(&tmp);
         let _ = fs::create_dir_all(&tmp);
         let nested = tmp.join("nested");
-        let _ = fs::create_dir_all(&nested.join("Deep.vst3"));
+        let _ = fs::create_dir_all(nested.join("Deep.vst3"));
         let top = tmp.join("Shallow.vst3");
         let _ = fs::create_dir_all(&top);
         let dirs = vec![tmp.to_string_lossy().to_string()];

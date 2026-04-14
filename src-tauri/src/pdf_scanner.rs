@@ -136,11 +136,10 @@ fn walk_dir_parallel(
         visited.insert(orig);
     }
 
-    if let Some(ref inc) = incremental {
-        if inc.should_skip(dir) {
+    if let Some(ref inc) = incremental
+        && inc.should_skip(dir) {
             return;
         }
-    }
 
     let dir_str = dir.to_string_lossy().to_string();
     {

@@ -227,6 +227,12 @@ pub fn should_yield_for_playback() -> bool {
 
 /// RAII guard for tracking active background I/O.
 pub struct BgIoGuard;
+impl Default for BgIoGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BgIoGuard {
     pub fn new() -> Self {
         BG_WORKERS_ACTIVE.fetch_add(1, Ordering::Relaxed);
@@ -887,11 +893,15 @@ async fn check_updates(
     let mut results: std::collections::HashMap<String, UpdatedPlugin> =
         std::collections::HashMap::new();
     let mut processed = 0usize;
+    #[allow(unused_variables, unused_assignments)]
     let mut update_cancelled = false;
 
     for (representative, siblings) in &groups {
         if state.stop_updates.load(Ordering::SeqCst) {
-            update_cancelled = true;
+            #[allow(unused_assignments)]
+            {
+                update_cancelled = true;
+            }
             break;
         }
 
@@ -3010,8 +3020,8 @@ async fn open_daw_project(file_path: String) -> Result<(), String> {
 async fn extract_project_plugins(file_path: String) -> Result<Vec<xref::PluginRef>, String> {
     let mut result = xref::extract_plugins(&file_path);
     // Enrich empty manufacturers from scanned plugin database
-    if result.iter().any(|p| p.manufacturer.is_empty()) {
-        if let Ok(all) =
+    if result.iter().any(|p| p.manufacturer.is_empty())
+        && let Ok(all) =
             db::global().query_plugins(None, None, None, "name", true, false, 0, 100000)
         {
             let mfg_map: std::collections::HashMap<String, String> = all
@@ -3021,14 +3031,12 @@ async fn extract_project_plugins(file_path: String) -> Result<Vec<xref::PluginRe
                 .map(|p| (p.name.to_lowercase(), p.manufacturer.clone()))
                 .collect();
             for p in &mut result {
-                if p.manufacturer.is_empty() {
-                    if let Some(mfg) = mfg_map.get(&p.name.to_lowercase()) {
+                if p.manufacturer.is_empty()
+                    && let Some(mfg) = mfg_map.get(&p.name.to_lowercase()) {
                         p.manufacturer = mfg.clone();
                     }
-                }
             }
         }
-    }
     #[cfg(not(test))]
     append_log(format!(
         "XREF EXTRACT — {} | {} plugins found",
@@ -3533,14 +3541,13 @@ async fn open_plugin_folder(plugin_path: String) -> Result<(), String> {
                     .spawn();
             } else if target.is_dir() {
                 let _ = std::process::Command::new("open").arg(&target).spawn();
-            } else if let Some(parent) = p.parent() {
-                if !parent.as_os_str().is_empty() {
+            } else if let Some(parent) = p.parent()
+                && !parent.as_os_str().is_empty() {
                     let pp = parent
                         .canonicalize()
                         .unwrap_or_else(|_| parent.to_path_buf());
                     let _ = std::process::Command::new("open").arg(&pp).spawn();
                 }
-            }
         });
     }
     #[cfg(target_os = "windows")]
@@ -3570,7 +3577,7 @@ async fn open_audio_folder(file_path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn prefs_get_all() -> history::PrefsMap {
-    blocking(|| history::load_preferences())
+    blocking(history::load_preferences)
         .await
         .unwrap_or_default()
 }
@@ -3904,15 +3911,14 @@ fn write_app_log_line(msg: &str) {
     }
     // Rotate if > 5MB — rename to app.log.1 (drop prior backup); if rename fails, truncate in place
     const MAX_LOG_SIZE: u64 = 5 * 1024 * 1024;
-    if let Ok(meta) = std::fs::metadata(&path) {
-        if meta.len() > MAX_LOG_SIZE {
+    if let Ok(meta) = std::fs::metadata(&path)
+        && meta.len() > MAX_LOG_SIZE {
             let backup = path.with_extension("log.1");
             let _ = std::fs::remove_file(&backup);
             if std::fs::rename(&path, &backup).is_err() {
                 let _ = std::fs::write(&path, "");
             }
         }
-    }
     let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let line = format!("[{}] {}\n", timestamp, msg);
     let _ = std::fs::OpenOptions::new()
@@ -4024,12 +4030,11 @@ fn read_zip_xml(file_path: &str, names: &[&str]) -> Result<String, String> {
     // List all files and return the first XML found
     let mut xml_name = None;
     for i in 0..archive.len() {
-        if let Ok(entry) = archive.by_index(i) {
-            if entry.name().ends_with(".xml") {
+        if let Ok(entry) = archive.by_index(i)
+            && entry.name().ends_with(".xml") {
                 xml_name = Some(entry.name().to_string());
                 break;
             }
-        }
     }
     if let Some(name) = xml_name {
         let mut entry = archive.by_name(&name).map_err(|e| e.to_string())?;
@@ -4475,9 +4480,9 @@ fn compute_slow_stats(data_dir: &std::path::Path) -> (u64, u64, u64, u64, serde_
 fn cached_slow_stats(data_dir: &std::path::Path) -> (u64, u64, u64, u64, serde_json::Value) {
     let now = Instant::now();
     let dir_key = data_dir.to_string_lossy().to_string();
-    if let Ok(guard) = SLOW_STATS_CACHE.lock() {
-        if let Some(s) = guard.as_ref() {
-            if s.dir_key == dir_key && now.saturating_duration_since(s.at) < SLOW_STATS_TTL {
+    if let Ok(guard) = SLOW_STATS_CACHE.lock()
+        && let Some(s) = guard.as_ref()
+            && s.dir_key == dir_key && now.saturating_duration_since(s.at) < SLOW_STATS_TTL {
                 return (
                     s.disk_total,
                     s.disk_free,
@@ -4486,8 +4491,6 @@ fn cached_slow_stats(data_dir: &std::path::Path) -> (u64, u64, u64, u64, serde_j
                     s.table_counts.clone(),
                 );
             }
-        }
-    }
     let (disk_total, disk_free, db_bytes, prefs_bytes, table_counts) = compute_slow_stats(data_dir);
     if let Ok(mut guard) = SLOW_STATS_CACHE.lock() {
         *guard = Some(SlowStatsSnapshot {
@@ -4921,7 +4924,7 @@ fn foreign_process_cpu_times_us(pid: u32) -> Option<(i64, i64)> {
         // Nanoseconds → microseconds (same scale as `getrusage` path in `get_cpu_percent`).
         let user_us = (info.total_user / 1000) as i64;
         let sys_us = (info.total_system / 1000) as i64;
-        return Some((user_us, sys_us));
+        Some((user_us, sys_us))
     }
     #[cfg(target_os = "windows")]
     {
@@ -5358,7 +5361,7 @@ fn build_audio_engine_process_stats() -> serde_json::Value {
 
 #[tauri::command]
 async fn get_audio_engine_process_stats() -> serde_json::Value {
-    blocking(move || build_audio_engine_process_stats())
+    blocking(build_audio_engine_process_stats)
         .await
         .unwrap_or_else(|_| serde_json::json!({}))
 }
@@ -8564,22 +8567,19 @@ pub fn run() {
         .setup(|app| {
             // Restore window size/position
             let prefs = history::load_preferences();
-            if let Some(win_val) = prefs.get("window") {
-                if let Some(win) = app.get_webview_window("main") {
-                    if let Some(w) = win_val.get("width").and_then(|v| v.as_u64()) {
-                        if let Some(h) = win_val.get("height").and_then(|v| v.as_u64()) {
+            if let Some(win_val) = prefs.get("window")
+                && let Some(win) = app.get_webview_window("main") {
+                    if let Some(w) = win_val.get("width").and_then(|v| v.as_u64())
+                        && let Some(h) = win_val.get("height").and_then(|v| v.as_u64()) {
                             let size = tauri::PhysicalSize::new(w as u32, h as u32);
                             let _ = win.set_size(tauri::Size::Physical(size));
                         }
-                    }
-                    if let Some(x) = win_val.get("x").and_then(|v| v.as_i64()) {
-                        if let Some(y) = win_val.get("y").and_then(|v| v.as_i64()) {
+                    if let Some(x) = win_val.get("x").and_then(|v| v.as_i64())
+                        && let Some(y) = win_val.get("y").and_then(|v| v.as_i64()) {
                             let pos = tauri::PhysicalPosition::new(x as i32, y as i32);
                             let _ = win.set_position(tauri::Position::Physical(pos));
                         }
-                    }
                 }
-            }
 
             // Build menu bar
             let handle = app.handle();
@@ -8709,22 +8709,20 @@ pub fn run() {
                 event: tauri::WindowEvent::Focused(false),
                 ..
             } if label == "tray-popover" => {
-                if let Some(popover) = app.get_webview_window("tray-popover") {
-                    if popover.is_visible().unwrap_or(false) {
+                if let Some(popover) = app.get_webview_window("tray-popover")
+                    && popover.is_visible().unwrap_or(false) {
                         let _ = popover.hide();
                     }
-                }
             }
             tauri::RunEvent::WindowEvent {
                 label,
                 event: tauri::WindowEvent::Focused(true),
                 ..
             } if label != "tray-popover" => {
-                if let Some(popover) = app.get_webview_window("tray-popover") {
-                    if popover.is_visible().unwrap_or(false) {
+                if let Some(popover) = app.get_webview_window("tray-popover")
+                    && popover.is_visible().unwrap_or(false) {
                         let _ = popover.hide();
                     }
-                }
             }
             _ => {}
         });
