@@ -1,15 +1,20 @@
 //! Ableton Live Set (.als) generator for programmatic techno track creation.
 //!
 //! Generates valid gzip-compressed XML files that Ableton Live can open.
-//! Automatically detects installed Ableton version for maximum compatibility.
+//! Uses an embedded reference template from Live 12.3.7 for guaranteed compatibility.
 //! Uses samples from the indexed library to create full arrangements.
 
+use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::process::Command;
+
+/// Embedded empty project template (gzipped) from Ableton Live 12.3.7
+/// This is a valid minimal project that Ableton will open without errors.
+const EMPTY_PROJECT_TEMPLATE: &[u8] = include_bytes!("empty_project_template.als.gz");
 
 /// Ableton Live version info extracted from installed app
 #[derive(Debug, Clone)]
@@ -75,12 +80,13 @@ impl AbletonVersion {
         let minor: u32 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
         let patch: u32 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
 
-        let creator = format!("Ableton Live {}.{}.{}", major, minor, patch);
-        let minor_version_string = format!(
-            "{}.0_{}",
-            major,
-            major * 10000 + minor * 100 + patch
-        );
+        // Use Live 11.0 creator string for compatibility
+        let creator = "Ableton Live 11.0".to_string();
+        
+        // Use Live 11 format for maximum compatibility.
+        // Live 12 can open Live 11 files, but not vice versa.
+        // The XML structure differs significantly between versions.
+        let minor_version_string = "11.0_433".to_string();
 
         Some(Self {
             major,
@@ -415,11 +421,47 @@ pub fn generate_als_with_version(
 		<ViewStateSessionMixerHeight Value="120" />
 		<IsContentSplitterOpen Value="true" />
 		<IsExpressionSplitterOpen Value="true" />
-		<ExpressionLanes />
-		<ContentLanes />
-		<Locators />
+		<ExpressionLanes>
+			<ExpressionLane Id="0">
+				<Type Value="0" />
+				<Size Value="41" />
+				<IsMinimized Value="false" />
+			</ExpressionLane>
+			<ExpressionLane Id="1">
+				<Type Value="1" />
+				<Size Value="41" />
+				<IsMinimized Value="false" />
+			</ExpressionLane>
+			<ExpressionLane Id="2">
+				<Type Value="2" />
+				<Size Value="41" />
+				<IsMinimized Value="true" />
+			</ExpressionLane>
+			<ExpressionLane Id="3">
+				<Type Value="3" />
+				<Size Value="41" />
+				<IsMinimized Value="true" />
+			</ExpressionLane>
+		</ExpressionLanes>
+		<ContentLanes>
+			<ExpressionLane Id="0">
+				<Type Value="4" />
+				<Size Value="41" />
+				<IsMinimized Value="false" />
+			</ExpressionLane>
+			<ExpressionLane Id="1">
+				<Type Value="5" />
+				<Size Value="25" />
+				<IsMinimized Value="true" />
+			</ExpressionLane>
+		</ContentLanes>
+		<ViewStateFxSlotCount Value="4" />
+		<Locators>
+			<Locators />
+		</Locators>
 		<DetailClipKeyMidis />
 		<TracksListWrapper LomId="0" />
+		<VisibleTracksListWrapper LomId="0" />
 		<ReturnTracksListWrapper LomId="0" />
 		<ScenesListWrapper LomId="0" />
 		<CuePointsListWrapper LomId="0" />
@@ -1665,4 +1707,66 @@ mod tests {
         println!("Generated ALS at: {}", output.display());
         println!("File size: {} bytes", metadata.len());
     }
+}
+
+/// Generate an empty Ableton project using the embedded template.
+/// This is guaranteed to open in Ableton Live 12.x without errors.
+pub fn generate_empty_als(output_path: &Path) -> Result<(), String> {
+    // Decompress the embedded template
+    let mut decoder = GzDecoder::new(EMPTY_PROJECT_TEMPLATE);
+    let mut xml = String::new();
+    decoder
+        .read_to_string(&mut xml)
+        .map_err(|e| format!("Failed to decompress template: {}", e))?;
+
+    // Re-compress and write to output
+    let file = File::create(output_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut encoder = GzEncoder::new(file, Compression::default());
+    encoder
+        .write_all(xml.as_bytes())
+        .map_err(|e| format!("Failed to write compressed data: {}", e))?;
+    encoder
+        .finish()
+        .map_err(|e| format!("Failed to finish compression: {}", e))?;
+
+    Ok(())
+}
+
+/// Generate an empty Ableton project with a specific BPM using the embedded template.
+pub fn generate_empty_als_with_bpm(output_path: &Path, bpm: f64) -> Result<(), String> {
+    // Decompress the embedded template
+    let mut decoder = GzDecoder::new(EMPTY_PROJECT_TEMPLATE);
+    let mut xml = String::new();
+    decoder
+        .read_to_string(&mut xml)
+        .map_err(|e| format!("Failed to decompress template: {}", e))?;
+
+    // Replace the default tempo (120) with the requested BPM
+    // The template has: <Manual Value="120" /> in the Tempo section
+    // We need to be careful to only replace the tempo value, not other 120s
+    let xml = xml.replace(
+        r#"<Tempo>
+						<LomId Value="0" />
+						<Manual Value="120" />"#,
+        &format!(
+            r#"<Tempo>
+						<LomId Value="0" />
+						<Manual Value="{}" />"#,
+            bpm
+        ),
+    );
+
+    // Re-compress and write to output
+    let file = File::create(output_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut encoder = GzEncoder::new(file, Compression::default());
+    encoder
+        .write_all(xml.as_bytes())
+        .map_err(|e| format!("Failed to write compressed data: {}", e))?;
+    encoder
+        .finish()
+        .map_err(|e| format!("Failed to finish compression: {}", e))?;
+
+    Ok(())
 }
