@@ -39,9 +39,10 @@ zip = { version = "8", default-features = false, features = ["deflate"] }
 notify = "8"
 sysinfo = "0.38"
 image_crate = { version = "0.25", default-features = false, features = ["png"], package = "image" }
-sha2 = "0.10"
+sha2 = "0.11"
 dashmap = "6"
 tauri-plugin-drag = "2.1"
+base16ct = { version = "1.0.0", features = ["alloc"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = { version = "0.6", default-features = false, features = ["alloc"] }

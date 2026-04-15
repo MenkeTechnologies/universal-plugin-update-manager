@@ -54,5 +54,11 @@ fn main() {
         println!("cargo:rerun-if-changed={}", git_head.display());
     }
 
-    tauri_build::build();
+    // Skip tauri_build when TAURI_SKIP_BUILD=1 — it embeds a Windows GUI manifest that causes
+    // STATUS_ENTRYPOINT_NOT_FOUND (0xC0000139) when running `cargo test` in a console context.
+    // CI sets this for test runs; normal builds and `pnpm tauri build/dev` leave it unset.
+    // See: https://github.com/orgs/tauri-apps/discussions/11179
+    if std::env::var("TAURI_SKIP_BUILD").is_err() {
+        tauri_build::build();
+    }
 }

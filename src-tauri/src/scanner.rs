@@ -194,6 +194,7 @@ fn read_plist_info(plugin_path: &Path) -> (Option<String>, Option<String>, Optio
 }
 
 #[cfg(not(target_os = "macos"))]
+#[allow(dead_code)]
 fn read_plist_info(_plugin_path: &Path) -> (Option<String>, Option<String>, Option<String>) {
     (None, None, None)
 }

@@ -92,6 +92,8 @@ jobs:
       # each harness (no second Cargo invoke — avoids tauri-build recopying sidecars).
       - name: Run Rust tests (library + integration)
         if: matrix.os != 'windows-latest'
+        env:
+          TAURI_SKIP_BUILD: 1
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Run Rust tests (library + integration, Windows)
@@ -100,6 +102,7 @@ jobs:
         env:
           # RUSTFLAGS (+crt-static): job-level `test.env` so rust-cache and this step agree.
           RUST_BACKTRACE: 1
+          TAURI_SKIP_BUILD: 1
         run: |
           $logFile = Join-Path $env:RUNNER_TEMP 'cargo-test-no-run.txt'
           & cargo test --manifest-path src-tauri/Cargo.toml --no-run --color never *> $logFile

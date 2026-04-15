@@ -414,6 +414,7 @@ pub fn create_tray(app: &App, strings: &HashMap<String, String>) -> Result<TrayI
     let handle = app.handle().clone();
     let tray_menu = build_tray_popup_menu(&handle, strings, None)?;
     let icon = tray_menu_bar_icon(app).map_err(|e| e.to_string())?;
+    #[allow(unused_mut)]
     let mut builder = TrayIconBuilder::new()
         .menu(&tray_menu)
         .icon(icon)

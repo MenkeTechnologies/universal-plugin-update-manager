@@ -39,7 +39,7 @@ pub fn hash_file_sha256(path: &Path) -> Option<String> {
         }
         hasher.update(&buf[..n]);
     }
-    Some(format!("{:x}", hasher.finalize()))
+    Some(base16ct::lower::encode_string(&hasher.finalize()))
 }
 
 #[derive(Debug, Clone, Serialize)]
