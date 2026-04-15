@@ -141,6 +141,27 @@ jobs:
           Remove-WindowsTestSidecars $td
 
           $depsDll = Join-Path $td 'deps'
+          # TAURI_SKIP_BUILD=1 skips tauri_build::build(), so WebView2Loader.dll is never copied to
+          # target/debug. Find it in the cargo registry (webview2-com-sys crate) and copy manually.
+          $cargoHome = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE '.cargo' }
+          $wv2Pattern = Join-Path $cargoHome 'registry/cache/index.crates.io-*'
+          $wv2Crate = Get-ChildItem -Path $wv2Pattern -Filter 'webview2-com-sys-*.crate' -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($wv2Crate) {
+            $extractDir = Join-Path $env:RUNNER_TEMP 'webview2-extract'
+            New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+            # .crate files are gzipped tarballs
+            tar -xzf $wv2Crate.FullName -C $extractDir 2>$null
+            $wv2Dll = Get-ChildItem -Path $extractDir -Filter 'WebView2Loader.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($wv2Dll) {
+              Copy-Item -Force -LiteralPath $wv2Dll.FullName -Destination $td
+              Write-Host "Copied WebView2Loader.dll from cargo registry to $td"
+            } else {
+              Write-Host "WARNING: WebView2Loader.dll not found in webview2-com-sys crate"
+            }
+          } else {
+            Write-Host "WARNING: webview2-com-sys crate not found in cargo registry"
+          }
+
           # Harness exes sit in `deps/`; Windows resolves static imports from the exe directory before PATH.
           # `WebView2Loader.dll` is normally next to the main app in `target/debug` only — copy every
           # surviving root `target/debug/*.dll` (post-strip: allowlist is tiny) beside test binaries.
