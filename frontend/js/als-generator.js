@@ -254,6 +254,46 @@
   // Sample Analysis
   // ---------------------------------------------------------------------------
 
+  // Status bar badge elements
+  function getBadgeRow() { return document.getElementById('bgSampleAnalysisBadgeRow'); }
+  function getBadge() { return document.getElementById('bgSampleAnalysisBadge'); }
+
+  function showBadge(text) {
+    const row = getBadgeRow();
+    const badge = getBadge();
+    if (row) row.style.display = '';
+    if (badge) badge.textContent = text;
+  }
+
+  function hideBadge() {
+    const row = getBadgeRow();
+    if (row) row.style.display = 'none';
+  }
+
+  function updateAnalysisUI(phase, payload) {
+    const status = document.getElementById('alsAnalysisStatus');
+    const startBtn = document.getElementById('alsAnalysisBtn');
+    const stopBtn = document.getElementById('alsStopAnalysisBtn');
+
+    if (phase === 'analyzing') {
+      const pct = payload.total > 0 ? Math.round((payload.analyzed / payload.total) * 100) : 0;
+      const text = `Analyzing: ${payload.analyzed} / ${payload.total} (${pct}%)`;
+      if (status) status.textContent = text;
+      showBadge(`ALS Analysis ${pct}%`);
+    } else if (phase === 'completed' || phase === 'stopped') {
+      if (status) status.textContent = `${payload.analyzed} / ${payload.total} — ${phase}`;
+      if (startBtn) startBtn.style.display = '';
+      if (stopBtn) stopBtn.style.display = 'none';
+      hideBadge();
+    } else if (phase === 'error') {
+      if (status) status.textContent = 'Error: ' + (payload.message || 'unknown');
+      hideBadge();
+    } else if (phase === 'started') {
+      if (status) status.textContent = 'Starting...';
+      showBadge('ALS Analysis starting...');
+    }
+  }
+
   async function checkAnalysisStatus() {
     const status = document.getElementById('alsAnalysisStatus');
     const startBtn = document.getElementById('alsAnalysisBtn');
@@ -262,6 +302,7 @@
       const stats = await window.ipc.sampleAnalysisStats();
       status.textContent = `${stats.analyzed} analyzed / ${stats.total} total`;
       if (startBtn && stats.unanalyzed > 0) startBtn.style.display = '';
+      if (startBtn && stats.unanalyzed === 0) startBtn.style.display = 'none';
     } catch (e) {
       status.textContent = 'unavailable';
     }
@@ -270,33 +311,23 @@
   async function startAnalysis() {
     const startBtn = document.getElementById('alsAnalysisBtn');
     const stopBtn = document.getElementById('alsStopAnalysisBtn');
-    const status = document.getElementById('alsAnalysisStatus');
     if (typeof window.ipc?.sampleAnalysisStart !== 'function') return;
 
     if (startBtn) startBtn.style.display = 'none';
     if (stopBtn) stopBtn.style.display = '';
+    showBadge('ALS Analysis starting...');
 
     if (!_analysisListenerAttached && typeof window.ipc.onSampleAnalysisProgress === 'function') {
       _analysisListenerAttached = true;
       window.ipc.onSampleAnalysisProgress((payload) => {
-        if (status) {
-          if (payload.phase === 'analyzing') {
-            status.textContent = `${payload.analyzed} / ${payload.total} (${payload.keys_detected || 0} keys detected)`;
-          } else if (payload.phase === 'completed' || payload.phase === 'stopped') {
-            status.textContent = `${payload.analyzed} / ${payload.total} — ${payload.phase}`;
-            if (startBtn) startBtn.style.display = '';
-            if (stopBtn) stopBtn.style.display = 'none';
-          } else if (payload.phase === 'error') {
-            status.textContent = 'Error: ' + payload.message;
-          }
-        }
+        updateAnalysisUI(payload.phase, payload);
       });
     }
 
     try {
       await window.ipc.sampleAnalysisStart();
     } catch (e) {
-      if (status) status.textContent = 'Error: ' + e;
+      updateAnalysisUI('error', { message: String(e) });
       if (startBtn) startBtn.style.display = '';
       if (stopBtn) stopBtn.style.display = 'none';
     }
