@@ -1578,7 +1578,7 @@ Based on analysis of professional sample packs (Dave Parkinson Trance, ZTEKNO Te
 
 | Track | Include Keywords | Exclude Keywords | Loop/Oneshot |
 |-------|------------------|------------------|--------------|
-| **KICK** | `kick`, `kick_loop` | `snare`, `&_bass` | Both |
+| **KICK** | `kick`, `kick_loop` | `snare`, `&_bass`, `no_kick`, `no kick`, `nokick`, `without_kick`, `without kick` | Both |
 | **CLAP** | `clap`, `snare`, `clap_loop`, `snare_loop` | `kick`, `build` | Both |
 | **HAT** | `hat`, `hihat`, `chat`, `ohat`, `ride` | `kick`, `snare` | Both |
 | **PERC** | `perc`, `percussion`, `shaker`, `conga`, `bongo`, `tom` | `kick`, `snare`, `hat` | Both |
