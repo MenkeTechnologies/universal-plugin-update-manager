@@ -2378,6 +2378,81 @@ DROP TABLE _pl_refresh_paths;"#;
                 .map_err(|e| format!("Migration v23 schema_version failed: {e}"))?;
         }
 
+        if current < 24 {
+            conn.execute_batch(
+                "-- =======================================================================
+                 -- ALS Generator: sample analysis lookup / cache tables
+                 -- =======================================================================
+
+                 -- Manufacturers / labels with genre & hardness scores
+                 CREATE TABLE IF NOT EXISTS sample_pack_manufacturers (
+                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                     name            TEXT UNIQUE NOT NULL,
+                     genre_score     REAL NOT NULL DEFAULT 0.0,
+                     hardness_score  REAL NOT NULL DEFAULT 0.0,
+                     website         TEXT,
+                     description     TEXT,
+                     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_spm_name     ON sample_pack_manufacturers(name);
+                 CREATE INDEX IF NOT EXISTS idx_spm_genre    ON sample_pack_manufacturers(genre_score);
+                 CREATE INDEX IF NOT EXISTS idx_spm_hardness ON sample_pack_manufacturers(hardness_score);
+
+                 -- Individual sample packs (FK to manufacturer)
+                 CREATE TABLE IF NOT EXISTS sample_packs (
+                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                     name            TEXT UNIQUE NOT NULL,
+                     manufacturer_id INTEGER REFERENCES sample_pack_manufacturers(id),
+                     genre_score     REAL,
+                     hardness_score  REAL,
+                     default_bpm     INTEGER,
+                     website         TEXT,
+                     description     TEXT,
+                     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_sp_name ON sample_packs(name);
+                 CREATE INDEX IF NOT EXISTS idx_sp_mfr  ON sample_packs(manufacturer_id);
+
+                 -- Hierarchical sample categories with regex patterns
+                 CREATE TABLE IF NOT EXISTS sample_categories (
+                     id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                     name              TEXT UNIQUE NOT NULL,
+                     parent_name       TEXT,
+                     is_oneshot        INTEGER NOT NULL DEFAULT 0,
+                     is_key_sensitive  INTEGER NOT NULL DEFAULT 0,
+                     is_loop_preferred INTEGER NOT NULL DEFAULT 0,
+                     pattern           TEXT NOT NULL
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_sc_name ON sample_categories(name);
+
+                 -- Per-sample parsed analysis (FK to audio_samples.id)
+                 CREATE TABLE IF NOT EXISTS sample_analysis (
+                     sample_id           INTEGER PRIMARY KEY REFERENCES audio_samples(id),
+                     parsed_bpm          INTEGER,
+                     parsed_key          TEXT,
+                     category_id         INTEGER REFERENCES sample_categories(id),
+                     pack_id             INTEGER REFERENCES sample_packs(id),
+                     manufacturer_id     INTEGER REFERENCES sample_pack_manufacturers(id),
+                     category_confidence REAL,
+                     is_loop             INTEGER NOT NULL DEFAULT 0,
+                     analyzed_at         TEXT NOT NULL DEFAULT (datetime('now'))
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_sa_category     ON sample_analysis(category_id);
+                 CREATE INDEX IF NOT EXISTS idx_sa_bpm          ON sample_analysis(parsed_bpm);
+                 CREATE INDEX IF NOT EXISTS idx_sa_key          ON sample_analysis(parsed_key);
+                 CREATE INDEX IF NOT EXISTS idx_sa_pack         ON sample_analysis(pack_id);
+                 CREATE INDEX IF NOT EXISTS idx_sa_mfr          ON sample_analysis(manufacturer_id);
+                 CREATE INDEX IF NOT EXISTS idx_sa_loop         ON sample_analysis(is_loop);
+                 CREATE INDEX IF NOT EXISTS idx_sa_cat_bpm      ON sample_analysis(category_id, parsed_bpm);
+                 CREATE INDEX IF NOT EXISTS idx_sa_cat_key      ON sample_analysis(category_id, parsed_key);
+                 CREATE INDEX IF NOT EXISTS idx_sa_cat_bpm_key  ON sample_analysis(category_id, parsed_bpm, parsed_key);
+                 ",
+            )
+            .map_err(|e| format!("Migration v24 (sample analysis tables) failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (24)", [])
+                .map_err(|e| format!("Migration v24 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
@@ -9390,6 +9465,160 @@ DROP TABLE _pl_refresh_paths;"#;
         }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(rows_changed)
+    }
+
+    // ── ALS Generator: sample analysis ──
+
+    /// Seed `sample_pack_manufacturers` from the hardcoded MANUFACTURER_SIGNALS list.
+    /// Uses INSERT OR IGNORE so it is safe to call multiple times.
+    pub fn seed_sample_manufacturers(&self) -> Result<u32, String> {
+        let conn = self.read_conn();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut count: u32 = 0;
+        {
+            let mut stmt = tx
+                .prepare_cached(
+                    "INSERT OR IGNORE INTO sample_pack_manufacturers (name, genre_score, hardness_score)
+                     VALUES (?1, ?2, ?3)",
+                )
+                .map_err(|e| e.to_string())?;
+            for &(name, genre, hardness) in crate::sample_analysis::MANUFACTURER_SIGNALS {
+                let n = stmt
+                    .execute(rusqlite::params![name, genre, hardness])
+                    .map_err(|e| e.to_string())?;
+                count = count.saturating_add(n as u32);
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(count)
+    }
+
+    /// Seed `sample_categories` from the hardcoded CATEGORY_PATTERNS list.
+    /// Uses INSERT OR IGNORE so it is safe to call multiple times.
+    pub fn seed_sample_categories(&self) -> Result<u32, String> {
+        let conn = self.read_conn();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut count: u32 = 0;
+        {
+            let mut stmt = tx
+                .prepare_cached(
+                    "INSERT OR IGNORE INTO sample_categories
+                         (name, parent_name, is_oneshot, is_key_sensitive, is_loop_preferred, pattern)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                )
+                .map_err(|e| e.to_string())?;
+            for &(name, pattern, parent, oneshot, key_sens, loop_pref) in
+                crate::sample_analysis::CATEGORY_PATTERNS
+            {
+                let n = stmt
+                    .execute(rusqlite::params![
+                        name,
+                        parent,
+                        oneshot as i32,
+                        key_sens as i32,
+                        loop_pref as i32,
+                        pattern,
+                    ])
+                    .map_err(|e| e.to_string())?;
+                count = count.saturating_add(n as u32);
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(count)
+    }
+
+    /// Get sample IDs + names + directories that have not been analyzed yet.
+    /// Only returns WAV samples from the canonical audio_library.
+    pub fn unanalyzed_sample_ids(&self, limit: u64) -> Result<Vec<(i64, String, String)>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT s.id, s.name, s.directory
+                 FROM audio_samples s
+                 LEFT JOIN sample_analysis a ON s.id = a.sample_id
+                 WHERE a.sample_id IS NULL
+                   AND s.format = 'WAV'
+                   AND ({AUDIO_LIBRARY_IDS})
+                 LIMIT ?1"
+            ))
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(rusqlite::params![limit as i64], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
+    }
+
+    /// Count of WAV samples in audio_library that have not been analyzed.
+    pub fn unanalyzed_sample_count(&self) -> Result<u64, String> {
+        let conn = self.read_conn();
+        let n: i64 = conn
+            .query_row(
+                &format!(
+                    "SELECT COUNT(*)
+                     FROM audio_samples s
+                     LEFT JOIN sample_analysis a ON s.id = a.sample_id
+                     WHERE a.sample_id IS NULL
+                       AND s.format = 'WAV'
+                       AND ({AUDIO_LIBRARY_IDS})"
+                ),
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(n as u64)
+    }
+
+    /// Count of WAV samples already analyzed.
+    pub fn analyzed_sample_count(&self) -> Result<u64, String> {
+        let conn = self.read_conn();
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sample_analysis", [], |row| row.get(0))
+            .map_err(|e| e.to_string())?;
+        Ok(n as u64)
+    }
+
+    /// Batch insert analysis results. Each row is:
+    /// (sample_id, parsed_bpm, parsed_key, category_name, manufacturer_pattern, category_confidence, is_loop)
+    pub fn batch_insert_sample_analysis(
+        &self,
+        rows: &[(i64, Option<u32>, Option<String>, Option<String>, Option<String>, f32, bool)],
+    ) -> Result<u32, String> {
+        let conn = self.read_conn();
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let mut count: u32 = 0;
+        {
+            let mut stmt = tx
+                .prepare_cached(
+                    "INSERT OR REPLACE INTO sample_analysis
+                         (sample_id, parsed_bpm, parsed_key, category_id, manufacturer_id, category_confidence, is_loop)
+                     VALUES (
+                         ?1, ?2, ?3,
+                         (SELECT id FROM sample_categories WHERE name = ?4),
+                         (SELECT id FROM sample_pack_manufacturers WHERE name = ?5),
+                         ?6, ?7
+                     )",
+                )
+                .map_err(|e| e.to_string())?;
+            for (sample_id, bpm, key, cat_name, mfr_pattern, confidence, is_loop) in rows {
+                let n = stmt
+                    .execute(rusqlite::params![
+                        sample_id,
+                        bpm,
+                        key,
+                        cat_name,
+                        mfr_pattern,
+                        confidence,
+                        *is_loop as i32,
+                    ])
+                    .map_err(|e| e.to_string())?;
+                count = count.saturating_add(n as u32);
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(count)
     }
 
     /// Clear a specific cache table.

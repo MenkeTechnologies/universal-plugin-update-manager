@@ -924,7 +924,7 @@ Linear interpolation = no curve controls.
 | **Track count** | 21-49 | 61-109 | 17-23 |
 | **Duration (beats)** | 780-1040 | 800-1168 | 832-944 |
 | **Duration (bars)** | ~196-260 | ~200-292 | ~208-236 |
-| **Structure** | Grouped | Heavily grouped | Flat (no groups) |
+| **Structure** | Grouped | Heavily grouped | Grouped (same as techno) |
 | **Melodic content** | Moderate | Heavy | None |
 | **Effects/track** | 0.13 | 0.28 | 0.17 |
 | **Return buses** | 2-3 (reverb/delay) | 3-4 (reverb/delay/comp) | 4 (glue/beef/OD/haas) |
@@ -998,7 +998,7 @@ FX:
 ```
 
 **Key characteristics:**
-- **Minimal track count** (17-23 vs techno's 30-50, trance's 80-100)
+- **Fewer tracks** (17-23 vs techno's 30-50, trance's 80-100) but same group hierarchy
 - **Heavy reliance on pre-mixed loops** — SCHRANZ_LOOP is a complete drum pattern
 - **Layered kick system**: SOLO_KICK + RUMBLE_KICK for punch + sub
 - **Atonal synth stabs**: Many samples marked "X" (no key)
@@ -1034,23 +1034,38 @@ Examples:
 
 ```
 Techno typical structure:
-├── DRUMS (Group)
-│   ├── KICK
-│   ├── CLAP
-│   ├── HAT
-│   ├── RIDE
-│   └── PERC
-├── BASS
-├── MELODICS (Group)
-│   ├── SYNTH 1
-│   ├── SYNTH 2
-│   └── PAD
+├── Drums (Group)
+│   ├── Kick
+│   ├── Clap
+│   ├── Hat (Closed)
+│   ├── Hat (Open)
+│   ├── Ride
+│   ├── Perc 1-2
+│   └── Shakers
+├── Bass (Group)
+│   ├── Sub
+│   └── Mid Bass
+├── Leads (Group)
+│   ├── Synth 1
+│   ├── Synth 2
+│   ├── Stab
+│   └── Saw
+├── Pads (Group)
+│   ├── Pad
+│   ├── Atmos
+│   └── Strings
 ├── FX (Group)
-│   ├── RISER
-│   ├── CRASH
-│   └── ATMOS
+│   ├── Riser
+│   ├── Down
+│   ├── Crash
+│   ├── Impact
+│   └── Snare Roll
+├── Atmosphere (Group)
+│   ├── Atmo 1
+│   └── Vox
 ├── A-Reverb (Return)
 ├── B-Delay (Return)
+├── C-Parallel Comp (Return)
 └── Master
 
 Trance typical structure:
@@ -1085,31 +1100,44 @@ Trance typical structure:
 ├── C-Parallel Comp (Return)
 └── Master
 
-Schranz typical structure (same hierarchy as techno/trance):
-├── DRUMS (Group)
-│   ├── KICK              — clean kick pattern
-│   ├── CLAP              — clap/snare loops
-│   ├── HAT               — hi-hats/rides
-│   └── PERC              — percussion
-├── BASS                  — rumble/sub bass (schranz signature)
-├── MELODICS (Group)
-│   ├── SYNTH 1           — stabs/synth shots
-│   ├── SYNTH 2           — lead loops (often atonal)
-│   └── PAD               — minimal pads (if any)
+Schranz typical structure (same group hierarchy as techno/trance):
+├── Drums (Group)
+│   ├── Kick              — sharp, cutting transient
+│   ├── Kick Roll         — kick rolls for fills
+│   ├── Clap              — clap/snare loops
+│   ├── Hat               — hi-hats
+│   ├── Ride              — ride cymbals
+│   └── Perc              — percussion
+├── Bass (Group)
+│   ├── Drive 1           — rumble/drive (SEPARATE from kick)
+│   ├── Drive 2           — second drive layer
+│   └── Sub               — rumble sub bass
+├── Melodics (Group)
+│   ├── Synth Stab 1      — distorted stabs (often atonal)
+│   ├── Synth Stab 2      — rave stabs
+│   ├── Synth Loop         — synth patterns
+│   └── Pad               — minimal pads (if any)
 ├── FX (Group)
-│   ├── RISER             — builds/sweeps
-│   ├── HITS              — impacts/crashes
-│   └── ATMOS             — atmosphere
-├── A-Reverb (Return)
-├── B-Delay (Return)
+│   ├── Riser             — builds/sweeps
+│   ├── Impact            — impacts/crashes
+│   ├── Atmos             — atmosphere/texture
+│   └── Snare Roll        — fills
+├── Atmosphere (Group)
+│   ├── Atmo              — industrial textures
+│   └── Vox               — rap vocals/shouts (optional)
+├── A-Glue (Return)       — parallel compression
+├── B-Beef (Return)       — saturation
+├── C-OD (Return)         — overdrive
+├── D-Haas (Return)       — stereo widening
 └── Master
 
 Key differences from techno (same structure, different content):
-- KICK includes rumble/drive patterns (layered sound)
-- BASS is heavily distorted rumble sub
-- Minimal melodic content — mostly stabs, rarely pads
+- KICK is 3-layer: punch + rumble + grit (separate tracks)
+- BASS/DRIVES are separate from kick (not processed together)
+- Melodic content mostly atonal stabs, rarely pads
 - Higher BPM (150-160)
 - More aggressive/distorted samples throughout
+- Return buses focused on distortion/saturation instead of reverb/delay
 ```
 
 ---

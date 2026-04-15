@@ -42,6 +42,7 @@ pub mod path_norm;
 pub mod pdf_meta;
 pub mod pdf_scanner;
 pub mod preset_scanner;
+pub mod sample_analysis;
 pub mod scanner;
 pub mod scanner_skip_dirs;
 pub mod similarity;
@@ -446,6 +447,11 @@ struct VideoScanState {
 struct PdfScanState {
     scanning: AtomicBool,
     stop_scan: std::sync::Arc<AtomicBool>,
+}
+
+struct SampleAnalysisState {
+    running: AtomicBool,
+    stop: std::sync::Arc<AtomicBool>,
 }
 
 /// Tracks active directory paths being walked by each scanner for live status display.
@@ -3171,6 +3177,177 @@ async fn batch_analyze(paths: Vec<String>) -> Result<serde_json::Value, String> 
             Err(msg)
         }
     }
+}
+
+// ── Sample analysis for ALS generator ──
+
+/// Seed lookup tables (manufacturers + categories) and return counts.
+#[tauri::command]
+async fn sample_analysis_seed() -> Result<serde_json::Value, String> {
+    tokio::task::spawn_blocking(|| {
+        let db = db::global();
+        let mfr = db.seed_sample_manufacturers()?;
+        let cat = db.seed_sample_categories()?;
+        Ok(serde_json::json!({ "manufacturers": mfr, "categories": cat }))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Start the background sample analysis job. Parses filenames + directory paths
+/// for BPM, key, category, and manufacturer. No audio decoding.
+#[tauri::command]
+async fn sample_analysis_start(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let state = app.state::<SampleAnalysisState>();
+    if state.running.swap(true, Ordering::SeqCst) {
+        return Err("Sample analysis already running".into());
+    }
+    state.stop.store(false, Ordering::SeqCst);
+
+    // Seed lookup tables first
+    let db = db::global();
+    db.seed_sample_manufacturers()?;
+    db.seed_sample_categories()?;
+
+    let total = db.unanalyzed_sample_count()?;
+    let already = db.analyzed_sample_count()?;
+    let _ = app.emit(
+        "sample-analysis-progress",
+        serde_json::json!({
+            "phase": "started",
+            "total": total,
+            "analyzed": already,
+        }),
+    );
+
+    let stop_flag = Arc::clone(&state.stop);
+    let app_handle = app.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let batch_size: u64 = 1000;
+        let mut total_analyzed: u64 = 0;
+        let mut total_failed: u64 = 0;
+        let start = std::time::Instant::now();
+
+        loop {
+            if stop_flag.load(Ordering::Relaxed) {
+                break;
+            }
+
+            let samples = match db::global().unanalyzed_sample_ids(batch_size) {
+                Ok(s) => s,
+                Err(e) => {
+                    let _ = app_handle.emit(
+                        "sample-analysis-progress",
+                        serde_json::json!({ "phase": "error", "message": e }),
+                    );
+                    break;
+                }
+            };
+
+            if samples.is_empty() {
+                break;
+            }
+
+            let mut batch_rows: Vec<(
+                i64,
+                Option<u32>,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+                f32,
+                bool,
+            )> = Vec::with_capacity(samples.len());
+
+            for (sample_id, name, directory) in &samples {
+                if stop_flag.load(Ordering::Relaxed) {
+                    break;
+                }
+                yield_if_playback_active();
+
+                let analysis = sample_analysis::analyze_sample(name, directory);
+                batch_rows.push((
+                    *sample_id,
+                    analysis.parsed_bpm,
+                    analysis.parsed_key,
+                    analysis.category.as_ref().map(|c| c.name.clone()),
+                    analysis.manufacturer.as_ref().map(|m| m.manufacturer_pattern.clone()),
+                    analysis.category.as_ref().map(|c| c.confidence).unwrap_or(0.0),
+                    analysis.is_loop,
+                ));
+            }
+
+            match db::global().batch_insert_sample_analysis(&batch_rows) {
+                Ok(n) => total_analyzed += n as u64,
+                Err(e) => {
+                    total_failed += batch_rows.len() as u64;
+                    let _ = app_handle.emit(
+                        "sample-analysis-progress",
+                        serde_json::json!({ "phase": "error", "message": e }),
+                    );
+                }
+            }
+
+            // Emit progress every batch
+            let _ = app_handle.emit(
+                "sample-analysis-progress",
+                serde_json::json!({
+                    "phase": "analyzing",
+                    "analyzed": total_analyzed + already,
+                    "total": total + already,
+                    "failed": total_failed,
+                    "elapsed_ms": start.elapsed().as_millis() as u64,
+                }),
+            );
+        }
+
+        let _ = app_handle.emit(
+            "sample-analysis-progress",
+            serde_json::json!({
+                "phase": if stop_flag.load(Ordering::Relaxed) { "stopped" } else { "completed" },
+                "analyzed": total_analyzed + already,
+                "total": total + already,
+                "failed": total_failed,
+                "elapsed_ms": start.elapsed().as_millis() as u64,
+            }),
+        );
+
+        app_handle
+            .state::<SampleAnalysisState>()
+            .running
+            .store(false, Ordering::SeqCst);
+    });
+
+    Ok(serde_json::json!({
+        "total": total,
+        "already_analyzed": already,
+    }))
+}
+
+/// Stop a running sample analysis job.
+#[tauri::command]
+async fn sample_analysis_stop(app: tauri::AppHandle) -> Result<(), String> {
+    app.state::<SampleAnalysisState>()
+        .stop
+        .store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+/// Get current sample analysis stats.
+#[tauri::command]
+async fn sample_analysis_stats() -> Result<serde_json::Value, String> {
+    tokio::task::spawn_blocking(|| {
+        let db = db::global();
+        let analyzed = db.analyzed_sample_count()?;
+        let unanalyzed = db.unanalyzed_sample_count()?;
+        Ok(serde_json::json!({
+            "analyzed": analyzed,
+            "unanalyzed": unanalyzed,
+            "total": analyzed + unanalyzed,
+        }))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -8324,6 +8501,10 @@ pub fn run() {
             scanning: AtomicBool::new(false),
             stop_scan: std::sync::Arc::new(AtomicBool::new(false)),
         })
+        .manage(SampleAnalysisState {
+            running: AtomicBool::new(false),
+            stop: std::sync::Arc::new(AtomicBool::new(false)),
+        })
         .manage(WalkerStatus {
             plugin_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             audio_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
@@ -8564,6 +8745,10 @@ pub fn run() {
             stop_file_watcher,
             get_file_watcher_status,
             get_midi_info,
+            sample_analysis_seed,
+            sample_analysis_start,
+            sample_analysis_stop,
+            sample_analysis_stats,
         ])
         .setup(|app| {
             // Restore window size/position

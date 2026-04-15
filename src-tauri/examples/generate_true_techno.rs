@@ -3,7 +3,10 @@
 //! - Place according to song structure (intro, build, breakdown, drop, outro)
 //! - Elements enter/exit at correct bar positions
 
+mod sample_filters;
+
 use app_lib::als_generator::generate_empty_als;
+use sample_filters::BAD_GENRES;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -18,8 +21,14 @@ use std::sync::atomic::{AtomicU32, Ordering};
 const DB_PATH: &str = "/Users/wizard/Library/Application Support/com.menketechnologies.audio-haxor/audio_haxor.db";
 const PROJECT_BPM: f64 = 128.0;
 
+// Number of songs to generate in one ALS file
+const NUM_SONGS: u32 = 4;
+// Silence between songs (bars)
+const GAP_BETWEEN_SONGS: u32 = 32;
+
 // Arrangement structure (224 bars = 7 minutes at 128 BPM)
 // All values in bars (1-indexed)
+const SONG_LENGTH_BARS: u32 = 224;
 const TOTAL_BARS: u32 = 224;
 
 // Section boundaries (all 32 bars each)
@@ -46,6 +55,63 @@ struct TrackArrangement {
     sections: Vec<(f64, f64)>, // (start_bar, end_bar) pairs where element plays
 }
 
+// Offset all sections by a given number of bars (for multi-song generation)
+fn offset_sections(sections: &[(f64, f64)], offset_bars: f64) -> Vec<(f64, f64)> {
+    sections.iter()
+        .map(|(start, end)| (start + offset_bars, end + offset_bars))
+        .collect()
+}
+
+// All samples needed for one song
+struct SongSamples {
+    key: String,
+    kick: Vec<SampleInfo>,
+    clap: Vec<SampleInfo>,
+    hat: Vec<SampleInfo>,
+    hat2: Vec<SampleInfo>,
+    perc: Vec<SampleInfo>,
+    perc2: Vec<SampleInfo>,
+    ride: Vec<SampleInfo>,
+    bass: Vec<SampleInfo>,
+    sub: Vec<SampleInfo>,
+    main_synth: Vec<SampleInfo>,
+    synth1: Vec<SampleInfo>,
+    synth2: Vec<SampleInfo>,
+    synth3: Vec<SampleInfo>,
+    pad: Vec<SampleInfo>,
+    pad2: Vec<SampleInfo>,
+    arp: Vec<SampleInfo>,
+    arp2: Vec<SampleInfo>,
+    riser1: Vec<SampleInfo>,
+    riser2: Vec<SampleInfo>,
+    riser3: Vec<SampleInfo>,
+    downlifter: Vec<SampleInfo>,
+    crash: Vec<SampleInfo>,
+    impact: Vec<SampleInfo>,
+    hit: Vec<SampleInfo>,
+    sweep_up: Vec<SampleInfo>,
+    sweep_down: Vec<SampleInfo>,
+    sweep_up2: Vec<SampleInfo>,
+    sweep_down2: Vec<SampleInfo>,
+    noise: Vec<SampleInfo>,
+    noise2: Vec<SampleInfo>,
+    snare_roll: Vec<SampleInfo>,
+    fill_1a: Vec<SampleInfo>,
+    fill_1b: Vec<SampleInfo>,
+    fill_2a: Vec<SampleInfo>,
+    fill_2b: Vec<SampleInfo>,
+    fill_4a: Vec<SampleInfo>,
+    fill_4b: Vec<SampleInfo>,
+    fill_4c: Vec<SampleInfo>,
+    fill_4d: Vec<SampleInfo>,
+    reverse1: Vec<SampleInfo>,
+    reverse2: Vec<SampleInfo>,
+    sub_drop: Vec<SampleInfo>,
+    atmos: Vec<SampleInfo>,
+    atmos2: Vec<SampleInfo>,
+    vox: Vec<SampleInfo>,
+}
+
 fn get_arrangement() -> Vec<TrackArrangement> {
     // 8-BAR RULE: Every 8 bars, add something (intro/build) or drop something (fadedown)
     // 224 bars = 7 sections of 32 bars each
@@ -64,41 +130,42 @@ fn get_arrangement() -> Vec<TrackArrangement> {
     vec![
         // === DRUMS ===
         // KICK: gaps for varied fill lengths
-        // 1 beat gap (0.25 bars): bars 16, 56, 104, 136, 168, 216
-        // 2 beat gap (0.5 bars): bars 24, 40, 72, 88, 120, 152, 184, 208
-        // 4 beat gap (1 bar): bars 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192
+        // Gap is the LAST bar/beats before a phrase boundary, fill plays IN the gap
+        // 1 beat gap: last beat of bar 16, 56, 104, 136, 168, 216 (beat 4)
+        // 2 beat gap: last 2 beats of bar 24, 40, 72, 88, 120, 152, 184, 208 (beats 3-4)
+        // 4 beat gap: full bar 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192
         TrackArrangement {
             name: "KICK",
             sections: vec![
-                // INTRO (1-32)
-                (1.0, 15.75),     // 1-16 (1 beat gap)
-                (17.0, 23.5),     // 17-24 (2 beat gap)
-                (25.0, 31.0),     // 25-32 (4 beat gap)
-                // BUILD (33-64)
-                (33.0, 39.5),     // 33-40 (2 beat gap)
-                (41.0, 47.0),     // 41-48 (4 beat gap)
-                (49.0, 55.75),    // 49-56 (1 beat gap)
-                (57.0, 63.0),     // 57-64 (4 beat gap)
+                // INTRO (1-32) - gap at bar 16 (1 beat), bar 24 (2 beats), bar 32 (4 beats)
+                (1.0, 16.75),     // ends beat 4 of bar 16, gap is beat 4 (1 beat fill)
+                (17.0, 24.5),     // ends beat 3 of bar 24, gap is beats 3-4 (2 beat fill)
+                (25.0, 32.0),     // ends at bar 32, gap is bar 32 (4 beat fill)
+                // BUILD (33-64) - gap at bar 40 (2 beats), bar 48 (4 beats), bar 56 (1 beat), bar 64 (4 beats)
+                (33.0, 40.5),     // gap beats 3-4 of bar 40
+                (41.0, 48.0),     // gap bar 48
+                (49.0, 56.75),    // gap beat 4 of bar 56
+                (57.0, 64.0),     // gap bar 64
                 // BREAKDOWN: kick OUT (65-96)
-                // DROP 1 (97-128)
-                (97.0, 103.75),   // 97-104 (1 beat gap)
-                (105.0, 111.0),   // 105-112 (4 beat gap)
-                (113.0, 119.5),   // 113-120 (2 beat gap)
-                (121.0, 127.0),   // 121-128 (4 beat gap)
+                // DROP 1 (97-128) - gap at 104 (1 beat), 112 (4 beats), 120 (2 beats), 128 (4 beats)
+                (97.0, 104.75),   // gap beat 4 of bar 104
+                (105.0, 112.0),   // gap bar 112
+                (113.0, 120.5),   // gap beats 3-4 of bar 120
+                (121.0, 128.0),   // gap bar 128
                 // DROP 2 (129-160)
-                (129.0, 135.75),  // 129-136 (1 beat gap)
-                (137.0, 143.0),   // 137-144 (4 beat gap)
-                (145.0, 151.5),   // 145-152 (2 beat gap)
-                (153.0, 159.0),   // 153-160 (4 beat gap)
+                (129.0, 136.75),  // gap beat 4 of bar 136
+                (137.0, 144.0),   // gap bar 144
+                (145.0, 152.5),   // gap beats 3-4 of bar 152
+                (153.0, 160.0),   // gap bar 160
                 // FADEDOWN (161-192)
-                (161.0, 167.75),  // 161-168 (1 beat gap)
-                (169.0, 175.0),   // 169-176 (4 beat gap)
-                (177.0, 183.5),   // 177-184 (2 beat gap)
-                (185.0, 191.0),   // 185-192 (4 beat gap)
+                (161.0, 168.75),  // gap beat 4 of bar 168
+                (169.0, 176.0),   // gap bar 176
+                (177.0, 184.5),   // gap beats 3-4 of bar 184
+                (185.0, 192.0),   // gap bar 192
                 // OUTRO (193-224)
-                (193.0, 207.5),   // 193-208 (2 beat gap)
-                (209.0, 215.75),  // 209-216 (1 beat gap)
-                (217.0, 224.0),   // final phrase
+                (193.0, 208.5),   // gap beats 3-4 of bar 208
+                (209.0, 216.75),  // gap beat 4 of bar 216
+                (217.0, 224.0),   // final phrase, no gap
             ],
         },
         // FADEDOWN (161-192) + OUTRO (193-224) drops every 8 bars:
@@ -111,188 +178,188 @@ fn get_arrangement() -> Vec<TrackArrangement> {
         // Bar 209: (kick + atmos only)
         // Bar 217: (kick + atmos only)
         
-        // CLAP: enters bar 9, varied gaps for fills
+        // CLAP: enters bar 9, gaps match KICK timing
         TrackArrangement {
             name: "CLAP",
             sections: vec![
-                // INTRO
-                (9.0, 15.75),     // 9-16 (1 beat gap)
-                (17.0, 23.5),     // 17-24 (2 beat gap)
-                (25.0, 31.0),     // 25-32 (4 beat gap)
-                // BUILD
-                (33.0, 39.5),
-                (41.0, 47.0),
-                (49.0, 55.75),
-                (57.0, 63.0),
+                // INTRO - gaps at bar 16 (1 beat), 24 (2 beats), 32 (4 beats)
+                (9.0, 16.75),     // ends beat 4 of bar 16
+                (17.0, 24.5),     // ends beat 3 of bar 24
+                (25.0, 32.0),     // ends at bar 32
+                // BUILD - gaps at 40 (2 beats), 48 (4 beats), 56 (1 beat), 64 (4 beats)
+                (33.0, 40.5),
+                (41.0, 48.0),
+                (49.0, 56.75),
+                (57.0, 64.0),
                 // Breakdown: out
-                // DROP 1
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
+                // DROP 1 - gaps at 104 (1 beat), 112 (4 beats), 120 (2 beats), 128 (4 beats)
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
                 // DROP 2
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
                 // FADEDOWN
-                (161.0, 167.75),
-                (169.0, 175.0),
-                (177.0, 183.5),
-                (185.0, 191.0),   // drops at 193
+                (161.0, 168.75),
+                (169.0, 176.0),
+                (177.0, 184.5),
+                (185.0, 192.0),   // drops at 193
             ],
         },
-        // HAT: enters bar 17, varied gaps
+        // HAT: enters bar 17, gaps match KICK
         TrackArrangement {
             name: "HAT",
             sections: vec![
                 // INTRO
-                (17.0, 23.5),
-                (25.0, 31.0),
+                (17.0, 24.5),
+                (25.0, 32.0),
                 // BUILD
-                (33.0, 39.5),
-                (41.0, 47.0),
-                (49.0, 55.75),
-                (57.0, 63.0),
+                (33.0, 40.5),
+                (41.0, 48.0),
+                (49.0, 56.75),
+                (57.0, 64.0),
                 // Breakdown: out
                 // DROP 1
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
                 // DROP 2
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
                 // FADEDOWN
-                (161.0, 167.75),
-                (169.0, 175.0),
-                (177.0, 183.0),   // drops at 185
+                (161.0, 168.75),
+                (169.0, 176.0),
+                (177.0, 184.0),   // drops at 185
             ],
         },
         TrackArrangement {
             name: "HAT 2",
             sections: vec![
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),
-                (169.0, 175.0),   // drops at 177
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),
+                (169.0, 176.0),   // drops at 177
             ],
         },
         TrackArrangement {
             name: "PERC",
             sections: vec![
-                (25.0, 31.0),
+                (25.0, 32.0),
                 // BUILD
-                (33.0, 39.5),
-                (41.0, 47.0),
-                (49.0, 55.75),
-                (57.0, 63.0),
+                (33.0, 40.5),
+                (41.0, 48.0),
+                (49.0, 56.75),
+                (57.0, 64.0),
                 // Breakdown: out
                 // DROP 1
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
                 // DROP 2
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
                 // FADEDOWN
-                (161.0, 167.75),
-                (169.0, 175.0),
-                (177.0, 183.0),   // drops at 185
+                (161.0, 168.75),
+                (169.0, 176.0),
+                (177.0, 184.0),   // drops at 185
             ],
         },
         TrackArrangement {
             name: "PERC 2",
             sections: vec![
-                (41.0, 47.0),
-                (49.0, 55.75),
-                (57.0, 63.0),
+                (41.0, 48.0),
+                (49.0, 56.75),
+                (57.0, 64.0),
                 // Breakdown: out
-                (113.0, 119.5),
-                (121.0, 127.0),
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),
-                (169.0, 175.0),   // drops at 177
+                (113.0, 120.5),
+                (121.0, 128.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),
+                (169.0, 176.0),   // drops at 177
             ],
         },
         TrackArrangement {
             name: "RIDE",
             sections: vec![
-                (33.0, 39.5),
-                (41.0, 47.0),
-                (49.0, 55.75),
-                (57.0, 63.0),
+                (33.0, 40.5),
+                (41.0, 48.0),
+                (49.0, 56.75),
+                (57.0, 64.0),
                 // Breakdown: out
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),
-                (169.0, 175.0),   // drops at 177
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),
+                (169.0, 176.0),   // drops at 177
             ],
         },
         
         // === BASS ===
-        // BASS: enters bar 33, varied gaps
+        // BASS: enters bar 33, gaps match drums
         TrackArrangement {
             name: "BASS",
             sections: vec![
                 // BUILD
-                (33.0, 39.5),
-                (41.0, 47.0),
-                (49.0, 55.75),
-                (57.0, 63.0),
+                (33.0, 40.5),
+                (41.0, 48.0),
+                (49.0, 56.75),
+                (57.0, 64.0),
                 // Breakdown: out
                 // DROP 1
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
                 // DROP 2
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
                 // FADEDOWN
-                (161.0, 167.75),
-                (169.0, 175.0),
-                (177.0, 183.5),
-                (185.0, 191.0),
-                (193.0, 199.0),   // drops at 201
+                (161.0, 168.75),
+                (169.0, 176.0),
+                (177.0, 184.5),
+                (185.0, 192.0),
+                (193.0, 200.0),   // drops at 201
             ],
         },
-        // SUB: gaps for fills (same pattern as bass)
+        // SUB: gaps match bass
         TrackArrangement {
             name: "SUB",
             sections: vec![
                 // DROP 1
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
                 // DROP 2
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),  // drops at 169
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),  // drops at 169
             ],
         },
         
@@ -301,237 +368,268 @@ fn get_arrangement() -> Vec<TrackArrangement> {
         TrackArrangement {
             name: "MAIN SYNTH",
             sections: vec![
-                (81.0, 87.5),     // mid-breakdown (2 beat gap at 88)
-                (89.0, 95.0),     // (4 beat gap at 96)
+                (81.0, 88.5),     // mid-breakdown, gap at 88 (2 beats)
+                (89.0, 96.0),     // gap at 96 (4 beats)
                 // DROP 1
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
                 // DROP 2
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
                 // brief return in outro
-                (185.0, 191.0),
+                (185.0, 192.0),
             ],
         },
         TrackArrangement {
             name: "SYNTH 1",
             sections: vec![
                 // BUILD
-                (41.0, 47.0),
-                (49.0, 55.75),
-                (57.0, 63.0),
+                (41.0, 48.0),
+                (49.0, 56.75),
+                (57.0, 64.0),
                 // BREAKDOWN
-                (73.0, 79.0),
-                (81.0, 87.5),
-                (89.0, 95.0),
+                (73.0, 80.0),
+                (81.0, 88.5),
+                (89.0, 96.0),
                 // DROPS
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),
-                (169.0, 175.0),   // drops at 177
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),
+                (169.0, 176.0),   // drops at 177
             ],
         },
         TrackArrangement {
             name: "SYNTH 2",
             sections: vec![
-                (105.0, 111.0),
-                (113.0, 119.5),
-                (121.0, 127.0),
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),  // drops at 169
+                (105.0, 112.0),
+                (113.0, 120.5),
+                (121.0, 128.0),
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),  // drops at 169
             ],
         },
         TrackArrangement {
             name: "SYNTH 3",
             sections: vec![
-                (113.0, 119.5),
-                (121.0, 127.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),  // drops at 169
+                (113.0, 120.5),
+                (121.0, 128.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),  // drops at 169
             ],
         },
         TrackArrangement {
             name: "PAD",
             sections: vec![
                 // BUILD
-                (49.0, 55.75),
-                (57.0, 63.0),
+                (49.0, 56.75),
+                (57.0, 64.0),
                 // BREAKDOWN
-                (65.0, 71.5),
-                (73.0, 79.0),
-                (81.0, 87.5),
-                (89.0, 95.0),
+                (65.0, 72.5),
+                (73.0, 80.0),
+                (81.0, 88.5),
+                (89.0, 96.0),
                 // DROPS
-                (129.0, 135.75),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),
-                (169.0, 175.0),   // drops at 177
+                (129.0, 136.75),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),
+                (169.0, 176.0),   // drops at 177
             ],
         },
         TrackArrangement {
             name: "PAD 2",
             sections: vec![
-                (81.0, 87.5),
-                (89.0, 95.0),
+                (81.0, 88.5),
+                (89.0, 96.0),
             ],
         },
         TrackArrangement {
             name: "ARP",
             sections: vec![
-                (57.0, 63.0),
-                (89.0, 95.0),
+                (57.0, 64.0),
+                (89.0, 96.0),
                 // DROP 1
-                (97.0, 103.75),
-                (105.0, 111.0),
-                (113.0, 119.5),
+                (97.0, 104.75),
+                (105.0, 112.0),
+                (113.0, 120.5),
                 // DROP 2
-                (129.0, 135.75),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),  // drops at 169
+                (129.0, 136.75),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),  // drops at 169
             ],
         },
         TrackArrangement {
             name: "ARP 2",
             sections: vec![
-                (121.0, 127.0),
-                (137.0, 143.0),
-                (145.0, 151.5),
-                (153.0, 159.0),
-                (161.0, 167.75),  // drops at 169
+                (121.0, 128.0),
+                (137.0, 144.0),
+                (145.0, 152.5),
+                (153.0, 160.0),
+                (161.0, 168.75),  // drops at 169
             ],
         },
         
-        // === FX - RISERS (layered for maximum tension) ===
+        // === FX - RISERS (CONTINUE THROUGH FILL GAPS for seamless tension) ===
         TrackArrangement {
-            name: "RISER 1",  // main long risers (8 bars)
+            name: "RISER 1",  // main long risers (8 bars) - through fill gaps
             sections: vec![
-                (25.0, 32.0),     // pre-build
-                (57.0, 64.0),     // pre-breakdown
-                (89.0, 96.0),     // PRE-DROP 1 - the big one!
-                (121.0, 128.0),   // mid drop 1
-                (153.0, 160.0),   // pre-fadedown
-                (185.0, 192.0),   // pre-outro
+                (25.0, 33.0),     // pre-build (through fill gap into build)
+                (57.0, 65.0),     // pre-breakdown (through fill gap)
+                (89.0, 97.0),     // PRE-DROP 1 - the big one! (through to drop)
+                (121.0, 129.0),   // mid drop 1 (through fill gap)
+                (153.0, 161.0),   // pre-fadedown (through fill gap)
+                (185.0, 193.0),   // pre-outro (through fill gap)
             ],
         },
         TrackArrangement {
-            name: "RISER 2",  // secondary risers (different sample)
+            name: "RISER 2",  // secondary risers (different sample) - through fill gaps
             sections: vec![
-                (9.0, 16.0),      // early intro tension
-                (41.0, 48.0),     // mid build
-                (89.0, 96.0),     // PRE-DROP 1 - layer
-                (137.0, 144.0),   // mid drop 2
-                (177.0, 184.0),   // fadedown tension
+                (9.0, 17.0),      // early intro tension (through fill gap)
+                (41.0, 49.0),     // mid build (through fill gap)
+                (89.0, 97.0),     // PRE-DROP 1 - layer (through to drop)
+                (137.0, 145.0),   // mid drop 2 (through fill gap)
+                (177.0, 185.0),   // fadedown tension (through fill gap)
             ],
         },
         TrackArrangement {
-            name: "RISER 3",  // short accent risers (4 bars)
+            name: "RISER 3",  // short accent risers (4 bars) - through fill gaps
             sections: vec![
-                (13.0, 16.0),     // intro accent
-                (29.0, 32.0),     // pre-build accent
-                (45.0, 48.0),     // build accent
-                (61.0, 64.0),     // pre-breakdown
-                (77.0, 80.0),     // breakdown tension
-                (93.0, 96.0),     // PRE-DROP final 4
-                (109.0, 112.0),   // drop 1 accent
-                (125.0, 128.0),   // end drop 1
-                (141.0, 144.0),   // drop 2 accent
-                (157.0, 160.0),   // end drop 2
-                (173.0, 176.0),   // fadedown accent
-                (189.0, 192.0),   // pre-outro
+                (13.0, 17.0),     // intro accent (through fill gap)
+                (29.0, 33.0),     // pre-build accent (through fill gap)
+                (45.0, 49.0),     // build accent (through fill gap)
+                (61.0, 65.0),     // pre-breakdown (through fill gap)
+                (77.0, 81.0),     // breakdown tension (through fill gap)
+                (93.0, 97.0),     // PRE-DROP final 4 (through to drop)
+                (109.0, 113.0),   // drop 1 accent (through fill gap)
+                (125.0, 129.0),   // end drop 1 (through fill gap)
+                (141.0, 145.0),   // drop 2 accent (through fill gap)
+                (157.0, 161.0),   // end drop 2 (through fill gap)
+                (173.0, 177.0),   // fadedown accent (through fill gap)
+                (189.0, 193.0),   // pre-outro (through fill gap)
             ],
         },
         
         // === FX - SNARE ROLLS (critical for tension!) ===
         TrackArrangement {
-            name: "SNARE ROLL",
+            name: "SNARE ROLL",  // tension builder - CONTINUES THROUGH FILL GAPS
             sections: vec![
-                (29.0, 32.0),     // pre-build (4 bars)
-                (61.0, 64.0),     // pre-breakdown (4 bars)
-                (89.0, 96.0),     // PRE-DROP 1 - full 8 bar roll!
-                (125.0, 128.0),   // end drop 1 (4 bars)
-                (153.0, 160.0),   // pre-fadedown (8 bars)
-                (189.0, 192.0),   // pre-outro (4 bars)
+                (29.0, 33.0),     // pre-build (through fill gap into build)
+                (61.0, 65.0),     // pre-breakdown (through fill gap)
+                (89.0, 97.0),     // PRE-DROP 1 - full roll into the drop!
+                (125.0, 129.0),   // end drop 1 (through fill gap)
+                (153.0, 161.0),   // pre-fadedown (through fill gap)
+                (189.0, 193.0),   // pre-outro (through fill gap)
             ],
         },
         
-        // === FX - DRUM FILLS (varied lengths - unpredictable) ===
-        // 1 BEAT fills (0.25 bars) - quick accents
+        // === FX - DRUM FILLS (4 different samples, staggered) ===
+        // Pattern: FILL A, B, C, D rotate through positions for variety
+        // 1 BEAT fills - 2 different samples alternating
+        TrackArrangement {
+            name: "FILL 1A",
+            sections: vec![
+                (16.75, 17.0),    // bar 16
+                (104.75, 105.0),  // bar 104
+                (168.75, 169.0),  // bar 168
+            ],
+        },
         TrackArrangement {
             name: "FILL 1B",
             sections: vec![
-                (15.75, 16.0),    // bar 16
-                (55.75, 56.0),    // bar 56
-                (103.75, 104.0),  // bar 104
-                (135.75, 136.0),  // bar 136
-                (167.75, 168.0),  // bar 168
-                (215.75, 216.0),  // bar 216
+                (56.75, 57.0),    // bar 56
+                (136.75, 137.0),  // bar 136
+                (216.75, 217.0),  // bar 216
             ],
         },
-        // 2 BEAT fills (0.5 bars) - medium energy
+        // 2 BEAT fills - 2 different samples alternating
+        TrackArrangement {
+            name: "FILL 2A",
+            sections: vec![
+                (24.5, 25.0),     // bar 24
+                (72.5, 73.0),     // bar 72
+                (120.5, 121.0),   // bar 120
+                (184.5, 185.0),   // bar 184
+            ],
+        },
         TrackArrangement {
             name: "FILL 2B",
             sections: vec![
-                (23.5, 24.0),     // bar 24
-                (39.5, 40.0),     // bar 40
-                (71.5, 72.0),     // bar 72
-                (87.5, 88.0),     // bar 88
-                (119.5, 120.0),   // bar 120
-                (151.5, 152.0),   // bar 152
-                (183.5, 184.0),   // bar 184
-                (207.5, 208.0),   // bar 208
+                (40.5, 41.0),     // bar 40
+                (88.5, 89.0),     // bar 88
+                (152.5, 153.0),   // bar 152
+                (208.5, 209.0),   // bar 208
             ],
         },
-        // 4 BEAT fills (1 bar) - big transitions
+        // 4 BEAT fills - 4 different samples rotating: A, B, C, D, A, B, C, D...
+        TrackArrangement {
+            name: "FILL 4A",
+            sections: vec![
+                (32.0, 33.0),     // bar 32, into build
+                (96.0, 97.0),     // bar 96, INTO DROP 1 - biggest!
+                (160.0, 161.0),   // bar 160, into fadedown
+            ],
+        },
         TrackArrangement {
             name: "FILL 4B",
             sections: vec![
-                (31.0, 32.0),     // into build
-                (47.0, 48.0),     // mid build
-                (63.0, 64.0),     // into breakdown
-                (79.0, 80.0),     // mid breakdown
-                (95.0, 96.0),     // INTO DROP 1 - the big one!
-                (111.0, 112.0),   // mid drop 1
-                (127.0, 128.0),   // into drop 2
-                (143.0, 144.0),   // mid drop 2
-                (159.0, 160.0),   // into fadedown
-                (175.0, 176.0),   // mid fadedown
-                (191.0, 192.0),   // into outro
+                (48.0, 49.0),     // bar 48, mid build
+                (112.0, 113.0),   // bar 112, mid drop 1
+                (176.0, 177.0),   // bar 176, mid fadedown
+            ],
+        },
+        TrackArrangement {
+            name: "FILL 4C",
+            sections: vec![
+                (64.0, 65.0),     // bar 64, into breakdown
+                (128.0, 129.0),   // bar 128, into drop 2
+                (192.0, 193.0),   // bar 192, into outro
+            ],
+        },
+        TrackArrangement {
+            name: "FILL 4D",
+            sections: vec![
+                (80.0, 81.0),     // bar 80, mid breakdown
+                (144.0, 145.0),   // bar 144, mid drop 2
             ],
         },
         
-        // === FX - REVERSE CRASHES (suck into sections) ===
+        // === FX - REVERSE CRASHES (2 samples alternating) ===
         TrackArrangement {
-            name: "REVERSE",
+            name: "REVERSE 1",
             sections: vec![
-                (15.0, 16.0),     // into bar 17
-                (31.0, 32.0),     // into build
-                (47.0, 48.0),     // mid build
-                (63.0, 64.0),     // into breakdown
-                (79.0, 80.0),     // mid breakdown
-                (95.0, 96.0),     // INTO DROP 1
-                (111.0, 112.0),   // mid drop 1
-                (127.0, 128.0),   // into drop 2
-                (143.0, 144.0),   // mid drop 2
-                (159.0, 160.0),   // into fadedown
-                (175.0, 176.0),   // mid fadedown
-                (191.0, 192.0),   // into outro
+                (16.0, 17.0),     // bar 16
+                (48.0, 49.0),     // bar 48
+                (80.0, 81.0),     // bar 80
+                (112.0, 113.0),   // bar 112
+                (144.0, 145.0),   // bar 144
+                (176.0, 177.0),   // bar 176
+            ],
+        },
+        TrackArrangement {
+            name: "REVERSE 2",
+            sections: vec![
+                (32.0, 33.0),     // bar 32, into build
+                (64.0, 65.0),     // bar 64, into breakdown
+                (96.0, 97.0),     // bar 96, INTO DROP 1
+                (128.0, 129.0),   // bar 128, into drop 2
+                (160.0, 161.0),   // bar 160, into fadedown
+                (192.0, 193.0),   // bar 192, into outro
             ],
         },
         
@@ -600,100 +698,100 @@ fn get_arrangement() -> Vec<TrackArrangement> {
             ],
         },
         
-        // === FX - SWEEPS (many more!) ===
+        // === FX - SWEEPS (CONTINUE THROUGH FILL GAPS) ===
         TrackArrangement {
             name: "SWEEP UP",
             sections: vec![
-                // Short sweeps (2 bars)
-                (7.0, 8.0),       // intro
-                (15.0, 16.0),
-                (23.0, 24.0),
-                // Medium sweeps (4 bars)
-                (29.0, 32.0),     // pre-build
-                (45.0, 48.0),
-                (61.0, 64.0),     // pre-breakdown
-                (77.0, 80.0),
-                // Long sweep before drop
-                (89.0, 96.0),     // PRE-DROP 1 - 8 bar sweep!
-                // More throughout
-                (109.0, 112.0),
-                (125.0, 128.0),
-                (141.0, 144.0),
-                (157.0, 160.0),
-                (173.0, 176.0),
-                (185.0, 192.0),   // pre-outro
+                // Short sweeps (2 bars) - extend through gaps
+                (7.0, 9.0),       // intro
+                (15.0, 17.0),
+                (23.0, 25.0),
+                // Medium sweeps (4 bars) - extend through gaps
+                (29.0, 33.0),     // pre-build (through fill gap)
+                (45.0, 49.0),
+                (61.0, 65.0),     // pre-breakdown (through fill gap)
+                (77.0, 81.0),
+                // Long sweep before drop (through fill gap)
+                (89.0, 97.0),     // PRE-DROP 1 - 8 bar sweep!
+                // More throughout (through fill gaps)
+                (109.0, 113.0),
+                (125.0, 129.0),
+                (141.0, 145.0),
+                (157.0, 161.0),
+                (173.0, 177.0),
+                (185.0, 193.0),   // pre-outro (through fill gap)
             ],
         },
         TrackArrangement {
             name: "SWEEP DOWN",
             sections: vec![
-                // After every major hit, sweep down
+                // After every major hit, sweep down - no gaps needed
                 (1.0, 4.0),       // track start
                 (17.0, 20.0),
-                (33.0, 36.0),     // build start
-                (49.0, 52.0),
-                (65.0, 72.0),     // breakdown start - long
-                (81.0, 84.0),
-                (97.0, 104.0),    // post-drop 1
-                (113.0, 116.0),
-                (129.0, 136.0),   // post-drop 2
-                (145.0, 148.0),
-                (161.0, 168.0),   // fadedown
-                (177.0, 180.0),
-                (193.0, 200.0),   // outro
-                (209.0, 212.0),
+                (33.0, 40.0),     // build start
+                (49.0, 56.0),
+                (65.0, 80.0),     // breakdown start - long
+                (81.0, 88.0),
+                (97.0, 108.0),    // post-drop 1
+                (113.0, 120.0),
+                (129.0, 140.0),   // post-drop 2
+                (145.0, 152.0),
+                (161.0, 172.0),   // fadedown
+                (177.0, 184.0),
+                (193.0, 204.0),   // outro
+                (209.0, 216.0),
             ],
         },
         TrackArrangement {
-            name: "SWEEP UP 2",  // second sweep layer
+            name: "SWEEP UP 2",  // second sweep layer - THROUGH FILL GAPS
             sections: vec![
-                (13.0, 16.0),
-                (29.0, 32.0),
-                (53.0, 56.0),
-                (61.0, 64.0),
-                (89.0, 96.0),     // layer on pre-drop
-                (121.0, 128.0),
-                (153.0, 160.0),
-                (185.0, 192.0),
+                (13.0, 17.0),
+                (29.0, 33.0),
+                (53.0, 57.0),
+                (61.0, 65.0),
+                (89.0, 97.0),     // layer on pre-drop (through fill gap)
+                (121.0, 129.0),
+                (153.0, 161.0),
+                (185.0, 193.0),
             ],
         },
         TrackArrangement {
             name: "SWEEP DOWN 2",  // second down sweep
             sections: vec![
-                (17.0, 24.0),
-                (65.0, 80.0),     // long breakdown sweep
-                (97.0, 112.0),    // post-drop decay
-                (161.0, 176.0),   // fadedown atmosphere
+                (17.0, 25.0),
+                (65.0, 81.0),     // long breakdown sweep
+                (97.0, 113.0),    // post-drop decay
+                (161.0, 177.0),   // fadedown atmosphere
             ],
         },
         
-        // === FX - NOISE (white noise - more texture) ===
+        // === FX - NOISE (white noise - CONTINUES THROUGH FILL GAPS) ===
         TrackArrangement {
             name: "NOISE",
             sections: vec![
-                (9.0, 16.0),      // intro texture
-                (25.0, 32.0),     // pre-build
-                (41.0, 48.0),     // build tension
-                (57.0, 64.0),     // pre-breakdown
-                (73.0, 80.0),     // breakdown texture
-                (89.0, 96.0),     // PRE-DROP 1 - full noise
-                (105.0, 112.0),   // drop 1 texture
-                (121.0, 128.0),   // end drop 1
-                (137.0, 144.0),   // drop 2 texture
-                (153.0, 160.0),   // pre-fadedown
-                (169.0, 176.0),   // fadedown texture
-                (185.0, 192.0),   // pre-outro
+                (9.0, 17.0),      // intro texture (through fill gap)
+                (25.0, 33.0),     // pre-build (through fill gap)
+                (41.0, 49.0),     // build tension (through fill gap)
+                (57.0, 65.0),     // pre-breakdown (through fill gap)
+                (73.0, 81.0),     // breakdown texture (through fill gap)
+                (89.0, 97.0),     // PRE-DROP 1 - full noise (through fill gap)
+                (105.0, 113.0),   // drop 1 texture (through fill gap)
+                (121.0, 129.0),   // end drop 1 (through fill gap)
+                (137.0, 145.0),   // drop 2 texture (through fill gap)
+                (153.0, 161.0),   // pre-fadedown (through fill gap)
+                (169.0, 177.0),   // fadedown texture (through fill gap)
+                (185.0, 193.0),   // pre-outro (through fill gap)
             ],
         },
         TrackArrangement {
-            name: "NOISE 2",  // second noise layer
+            name: "NOISE 2",  // second noise layer - CONTINUES THROUGH FILL GAPS
             sections: vec![
-                (29.0, 32.0),     // build accent
-                (61.0, 64.0),     // pre-breakdown accent
-                (89.0, 96.0),     // pre-drop layer
-                (125.0, 128.0),   // end drop 1
-                (157.0, 160.0),   // end drop 2
-                (189.0, 192.0),   // pre-outro
+                (29.0, 33.0),     // build accent (through fill gap)
+                (61.0, 65.0),     // pre-breakdown accent (through fill gap)
+                (89.0, 97.0),     // pre-drop layer (through fill gap)
+                (125.0, 129.0),   // end drop 1 (through fill gap)
+                (157.0, 161.0),   // end drop 2 (through fill gap)
+                (189.0, 193.0),   // pre-outro (through fill gap)
             ],
         },
         
@@ -917,11 +1015,65 @@ impl SampleInfo {
     }
 }
 
+fn pick_random_key() -> String {
+    let conn = match Connection::open(DB_PATH) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Warning: Cannot open DB for key selection: {}", e);
+            return "A Minor".to_string();
+        }
+    };
+    
+    // Pick a key that has enough melodic samples (bass/synth/lead/pad/arp)
+    // Focus on keys with actual melodic content, not just any samples
+    let query = "SELECT s.key_name, COUNT(*) as cnt 
+                 FROM audio_library al 
+                 JOIN audio_samples s ON al.sample_id = s.id 
+                 WHERE s.key_name IS NOT NULL AND s.key_name != '' 
+                 AND (al.path LIKE '%bass%' OR al.path LIKE '%synth%' OR al.path LIKE '%lead%' 
+                      OR al.path LIKE '%pad%' OR al.path LIKE '%arp%' OR al.path LIKE '%melody%')
+                 GROUP BY s.key_name 
+                 HAVING COUNT(*) >= 15
+                 ORDER BY RANDOM() LIMIT 1";
+    
+    conn.query_row(query, [], |row| row.get(0))
+        .unwrap_or_else(|_| "A Minor".to_string())
+}
+
 fn query_samples(
     include_patterns: &[&str],
-    exclude_patterns: &[&str],
+    exclude_patterns: Vec<&str>,
     require_loop: bool,
     count: usize,
+) -> Vec<SampleInfo> {
+    query_samples_with_key(include_patterns, exclude_patterns, require_loop, count, None)
+}
+
+fn query_samples_with_key(
+    include_patterns: &[&str],
+    exclude_patterns: Vec<&str>,
+    require_loop: bool,
+    count: usize,
+    key: Option<&str>,
+) -> Vec<SampleInfo> {
+    // Try with key first
+    let results = query_samples_internal(include_patterns, exclude_patterns.clone(), require_loop, count, key);
+    
+    // If no results with key, fallback to no key filter
+    if results.is_empty() && key.is_some() {
+        eprintln!("  (no samples in key, falling back to any key)");
+        return query_samples_internal(include_patterns, exclude_patterns, require_loop, count, None);
+    }
+    
+    results
+}
+
+fn query_samples_internal(
+    include_patterns: &[&str],
+    exclude_patterns: Vec<&str>,
+    require_loop: bool,
+    count: usize,
+    key: Option<&str>,
 ) -> Vec<SampleInfo> {
     let conn = match Connection::open(DB_PATH) {
         Ok(c) => c,
@@ -948,6 +1100,11 @@ fn query_samples(
     
     let loop_clause = if require_loop { "AND al.path LIKE '%loop%'" } else { "" };
     
+    let key_clause = match key {
+        Some(k) => format!("AND s.key_name = '{}'", k),
+        None => String::new(),
+    };
+    
     let query = format!(
         "SELECT al.path, COALESCE(s.duration, 0), s.bpm 
          FROM audio_library al 
@@ -955,12 +1112,13 @@ fn query_samples(
          WHERE s.format = 'WAV' 
          AND ({})
          {}
+         {}
          AND al.path LIKE '%MusicProduction/Samples%'
          AND al.path NOT LIKE '%Splice%'
          {}
          ORDER BY RANDOM() 
          LIMIT {}",
-        include_clause, loop_clause, exclude_clause, count * 2
+        include_clause, loop_clause, key_clause, exclude_clause, count * 2
     );
     
     let mut stmt = match conn.prepare(&query) {
@@ -992,8 +1150,8 @@ fn query_samples(
     .unwrap_or_default()
 }
 
-// Section locators for arrangement navigation
-fn get_locators() -> Vec<(&'static str, u32)> {
+// Section locators for arrangement navigation (for one song)
+fn get_song_locators() -> Vec<(&'static str, u32)> {
     vec![
         ("INTRO", INTRO_START),        // 1
         ("BUILD", BUILD1_START),       // 33
@@ -1005,24 +1163,44 @@ fn get_locators() -> Vec<(&'static str, u32)> {
     ]
 }
 
-fn create_locators_xml(ids: &IdAllocator) -> String {
-    let locators: Vec<String> = get_locators()
-        .iter()
-        .map(|(name, bar)| {
-            let id = ids.alloc();
-            let time_beats = (*bar - 1) * 4; // bar 1 = beat 0
-            format!(
-                r#"<Locator Id="{}">
+fn create_locators_xml_multi(ids: &IdAllocator, num_songs: u32, song_keys: &[String]) -> String {
+    let mut locators: Vec<String> = Vec::new();
+    let bars_per_song = SONG_LENGTH_BARS + GAP_BETWEEN_SONGS;
+    
+    for song_idx in 0..num_songs {
+        let offset = song_idx * bars_per_song;
+        let key = song_keys.get(song_idx as usize).map(|s| s.as_str()).unwrap_or("?");
+        
+        // Add song start marker with key
+        let song_start_id = ids.alloc();
+        let song_start_beat = offset * 4;
+        locators.push(format!(
+            r#"<Locator Id="{}">
 					<LomId Value="0" />
 					<Time Value="{}" />
-					<Name Value="{}" />
+					<Name Value="=== SONG {} ({}) ===" />
 					<Annotation Value="" />
 					<IsSongStart Value="false" />
 				</Locator>"#,
-                id, time_beats, name
-            )
-        })
-        .collect();
+            song_start_id, song_start_beat, song_idx + 1, key
+        ));
+        
+        // Add section markers for this song
+        for (name, bar) in get_song_locators() {
+            let id = ids.alloc();
+            let time_beats = (bar - 1 + offset) * 4; // bar 1 = beat 0
+            locators.push(format!(
+                r#"<Locator Id="{}">
+					<LomId Value="0" />
+					<Time Value="{}" />
+					<Name Value="{} {}" />
+					<Annotation Value="" />
+					<IsSongStart Value="false" />
+				</Locator>"#,
+                id, time_beats, song_idx + 1, name
+            ));
+        }
+    }
 
     format!(
         "<Locators>\n\t\t\t{}\n\t\t</Locators>",
@@ -1030,128 +1208,477 @@ fn create_locators_xml(ids: &IdAllocator) -> String {
     )
 }
 
-fn generate_true_techno(output_path: &Path) -> Result<(), String> {
-    let ids = IdAllocator::new(1000000);
-
-    // Load 1 sample per track for consistency
-    eprintln!("\n=== Loading samples (1 per track) ===");
+fn load_song_samples(song_num: u32) -> SongSamples {
+    eprintln!("\n=== Loading samples for SONG {} ===", song_num);
     
-    // DRUMS
+    let track_key = pick_random_key();
+    eprintln!("*** SONG {} KEY: {} ***\n", song_num, track_key);
+    
+    // DRUMS - no key needed
     eprintln!("KICK:");
-    let kick_samples = query_samples(&["kick"], &["no_kick", "no kick", "nokick", "without_kick", "without kick", "snare"], true, 1);
+    let kick = query_samples(
+        &["kick_loop", "kick"],
+        [BAD_GENRES, &["no_kick", "no kick", "nokick", "without_kick", "without kick", "snare", "bass", "sub", "synth", "melody", "lead", "pad", "arp", "chord"]].concat(),
+        true, 1
+    );
     eprintln!("CLAP:");
-    let clap_samples = query_samples(&["clap", "snare"], &["kick"], true, 1);
+    let clap = query_samples(
+        &["clap_loop", "clap", "snare_loop", "snare"],
+        [BAD_GENRES, &["kick", "bass", "sub", "synth", "melody", "lead", "pad", "arp", "chord", "roll", "fill"]].concat(),
+        true, 1
+    );
     eprintln!("HAT:");
-    let hat_samples = query_samples(&["hat", "hihat", "closed"], &["open", "ride"], true, 1);
+    let hat = query_samples(
+        &["hat_loop", "hihat_loop", "hat", "hihat", "closed_hat"],
+        [BAD_GENRES, &["open", "ride", "bass", "sub", "synth", "melody", "lead", "pad", "arp", "chord", "kick"]].concat(),
+        true, 1
+    );
     eprintln!("HAT 2:");
-    let hat2_samples = query_samples(&["hat", "open", "hihat"], &["closed"], true, 1);
+    let hat2 = query_samples(
+        &["open_hat", "ohat", "hat_open"],
+        [BAD_GENRES, &["closed", "bass", "sub", "synth", "melody", "lead", "pad", "arp", "chord", "kick"]].concat(),
+        true, 1
+    );
     eprintln!("PERC:");
-    let perc_samples = query_samples(&["perc", "percussion", "shaker"], &["kick", "snare", "hat"], true, 1);
+    let perc = query_samples(
+        &["perc_loop", "percussion_loop", "perc"],
+        [BAD_GENRES, &["kick", "snare", "hat", "bass", "sub", "synth", "melody", "lead", "pad", "arp", "chord", "full", "drums_full", "kit"]].concat(),
+        true, 1
+    );
     eprintln!("PERC 2:");
-    let perc2_samples = query_samples(&["perc", "conga", "bongo", "tom"], &["kick", "snare"], true, 1);
+    let perc2 = query_samples(
+        &["tom_loop", "tom", "perc"],
+        [BAD_GENRES, &["kick", "snare", "bass", "sub", "synth", "melody", "lead", "pad", "arp", "chord", "full", "kit"]].concat(),
+        true, 1
+    );
     eprintln!("RIDE:");
-    let ride_samples = query_samples(&["ride", "cymbal"], &["crash", "hit"], true, 1);
+    let ride = query_samples(
+        &["ride_loop", "ride", "cymbal_loop"],
+        [BAD_GENRES, &["crash", "hit", "bass", "sub", "synth", "melody", "lead", "pad", "arp", "chord", "kick"]].concat(),
+        true, 1
+    );
     
-    // BASS
-    eprintln!("BASS:");
-    let bass_samples = query_samples(&["bass", "bassline"], &["kick", "sub"], true, 1);
-    eprintln!("SUB:");
-    let sub_samples = query_samples(&["sub", "808", "low"], &["kick"], true, 1);
+    // BASS - MATCH KEY
+    eprintln!("BASS (key: {}):", track_key);
+    let bass = query_samples_with_key(
+        &["bass_loop", "bassline", "bass"],
+        [BAD_GENRES, &["kick", "sub", "drum", "drums", "hat", "snare", "clap", "perc", "ride", "cymbal", "tom", "full", "kit", "synth", "lead", "pad", "arp", "melody"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("SUB (key: {}):", track_key);
+    let sub = query_samples_with_key(
+        &["sub_loop", "sub_bass", "808_loop", "sub"],
+        [BAD_GENRES, &["kick", "drum", "drums", "hat", "snare", "clap", "perc", "ride", "full", "kit", "synth", "lead", "pad", "arp", "melody"]].concat(),
+        true, 1, Some(&track_key)
+    );
     
-    // MELODICS - exclude disco/nudisco/funky stuff, keep it dark techno
-    let exclude_melodics = &["pad", "bass", "drum", "disco", "nudisco", "nu_disco", "funky", "funk", "house", "edm", "pop", "tropical"];
-    eprintln!("MAIN SYNTH:");
-    let main_synth_samples = query_samples(&["lead", "techno", "dark", "acid", "industrial"], exclude_melodics, true, 1);
-    eprintln!("SYNTH 1:");
-    let synth1_samples = query_samples(&["synth", "acid", "sequence", "techno"], &["pad", "lead", "disco", "nudisco", "funky", "house"], true, 1);
-    eprintln!("SYNTH 2:");
-    let synth2_samples = query_samples(&["lead", "melody", "synth_lead", "dark"], &["pad", "disco", "nudisco", "funky", "house", "pop"], true, 1);
-    eprintln!("SYNTH 3 (stabs):");
-    let synth3_samples = query_samples(&["stab", "techno", "industrial", "hard"], &["pad", "disco", "nudisco", "funky", "house"], false, 1);
-    eprintln!("PAD:");
-    let pad_samples = query_samples(&["pad", "dark", "ambient", "drone"], &["drum", "stab", "disco", "nudisco", "funky", "bright"], true, 1);
-    eprintln!("PAD 2:");
-    let pad2_samples = query_samples(&["pad", "atmosphere", "drone", "dark"], &["drum", "kick", "stab", "disco", "nudisco", "funky"], true, 1);
-    eprintln!("ARP:");
-    let arp_samples = query_samples(&["arp", "arpegg", "sequence", "techno"], &["pad", "drum", "disco", "nudisco", "funky", "house"], true, 1);
-    eprintln!("ARP 2:");
-    let arp2_samples = query_samples(&["pluck", "stab", "arp", "dark"], &["pad", "drum", "chord", "disco", "nudisco", "funky", "house"], true, 1);
+    // MELODICS - MATCH KEY
+    eprintln!("MAIN SYNTH (key: {}):", track_key);
+    let main_synth = query_samples_with_key(
+        &["lead_loop", "synth_lead", "lead"],
+        [BAD_GENRES, &["pad", "bass", "sub", "drum", "drums", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "arp"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("SYNTH 1 (key: {}):", track_key);
+    let synth1 = query_samples_with_key(
+        &["synth_loop", "acid_loop", "synth"],
+        [BAD_GENRES, &["pad", "lead", "bass", "sub", "drum", "drums", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("SYNTH 2 (key: {}):", track_key);
+    let synth2 = query_samples_with_key(
+        &["melody_loop", "synth_melody", "melody"],
+        [BAD_GENRES, &["pad", "bass", "sub", "drum", "drums", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("SYNTH 3 (stabs, key: {}):", track_key);
+    let synth3 = query_samples_with_key(
+        &["stab", "synth_shot", "chord_stab"],
+        [BAD_GENRES, &["pad", "bass", "sub", "drum", "drums", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "loop"]].concat(),
+        false, 1, Some(&track_key)
+    );
+    eprintln!("PAD (key: {}):", track_key);
+    let pad = query_samples_with_key(
+        &["pad_loop", "pad"],
+        [BAD_GENRES, &["drum", "drums", "stab", "bass", "sub", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "lead", "arp"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("PAD 2 (key: {}):", track_key);
+    let pad2 = query_samples_with_key(
+        &["drone_loop", "atmosphere_loop", "drone", "atmosphere"],
+        [BAD_GENRES, &["drum", "drums", "kick", "stab", "bass", "sub", "hat", "snare", "clap", "perc", "ride", "full", "kit", "lead", "arp"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("ARP (key: {}):", track_key);
+    let arp = query_samples_with_key(
+        &["arp_loop", "arpegg", "arp"],
+        [BAD_GENRES, &["pad", "drum", "drums", "bass", "sub", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "lead"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("ARP 2 (key: {}):", track_key);
+    let arp2 = query_samples_with_key(
+        &["pluck_loop", "sequence_loop", "pluck"],
+        [BAD_GENRES, &["pad", "drum", "drums", "chord", "bass", "sub", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "lead"]].concat(),
+        true, 1, Some(&track_key)
+    );
     
     // FX - RISERS
     eprintln!("RISER 1:");
-    let riser1_samples = query_samples(&["riser", "uplifter"], &["down", "impact"], false, 1);
+    let riser1 = query_samples(&["riser", "uplifter"], [BAD_GENRES, &["down", "impact"]].concat(), false, 1);
     eprintln!("RISER 2:");
-    let riser2_samples = query_samples(&["build", "riser", "tension"], &["down", "impact"], false, 1);
-    eprintln!("RISER 3 (short):");
-    let riser3_samples = query_samples(&["whoosh", "sweep_up", "upsweep"], &["down"], false, 1);
+    let riser2 = query_samples(&["build", "riser", "tension"], [BAD_GENRES, &["down", "impact"]].concat(), false, 1);
+    eprintln!("RISER 3:");
+    let riser3 = query_samples(&["whoosh", "sweep_up", "upsweep"], [BAD_GENRES, &["down"]].concat(), false, 1);
     
     // FX - DOWNLIFTERS
     eprintln!("DOWNLIFTER:");
-    let downlifter_samples = query_samples(&["downlifter", "downsweep", "down_sweep", "fall"], &["up", "riser"], false, 1);
+    let downlifter = query_samples(&["downlifter", "downsweep", "down_sweep", "fall"], [BAD_GENRES, &["up", "riser"]].concat(), false, 1);
     
     // FX - IMPACTS
     eprintln!("CRASH:");
-    let crash_samples = query_samples(&["crash", "cymbal_crash"], &["loop", "ride"], false, 1);
+    let crash = query_samples(&["crash", "cymbal_crash"], [BAD_GENRES, &["loop", "ride"]].concat(), false, 1);
     eprintln!("IMPACT:");
-    let impact_samples = query_samples(&["impact", "boom", "thud"], &["loop", "riser"], false, 1);
+    let impact = query_samples(&["impact", "boom", "thud"], [BAD_GENRES, &["loop", "riser"]].concat(), false, 1);
     eprintln!("HIT:");
-    let hit_samples = query_samples(&["hit", "fx_hit", "perc_shot"], &["loop", "riser", "crash"], false, 1);
+    let hit = query_samples(&["hit", "fx_hit", "perc_shot"], [BAD_GENRES, &["loop", "riser", "crash"]].concat(), false, 1);
     
-    // FX - SWEEPS (multiple variations)
+    // FX - SWEEPS
     eprintln!("SWEEP UP:");
-    let sweep_up_samples = query_samples(&["sweep_up", "upsweep", "white_noise_up"], &["down"], false, 1);
+    let sweep_up = query_samples(&["sweep_up", "upsweep", "white_noise_up"], [BAD_GENRES, &["down"]].concat(), false, 1);
     eprintln!("SWEEP DOWN:");
-    let sweep_down_samples = query_samples(&["sweep_down", "downsweep", "white_noise_down"], &["up"], false, 1);
+    let sweep_down = query_samples(&["sweep_down", "downsweep", "white_noise_down"], [BAD_GENRES, &["up"]].concat(), false, 1);
     eprintln!("SWEEP UP 2:");
-    let sweep_up2_samples = query_samples(&["sweep", "riser", "build"], &["down", "impact"], false, 1);
+    let sweep_up2 = query_samples(&["sweep", "riser", "build"], [BAD_GENRES, &["down", "impact"]].concat(), false, 1);
     eprintln!("SWEEP DOWN 2:");
-    let sweep_down2_samples = query_samples(&["fall", "drop", "down"], &["up", "sub"], false, 1);
+    let sweep_down2 = query_samples(&["sweep", "down", "fall"], [BAD_GENRES, &["up", "riser"]].concat(), false, 1);
     
-    // FX - NOISE (multiple layers)
+    // FX - NOISE
     eprintln!("NOISE:");
-    let noise_samples = query_samples(&["noise", "white_noise", "hiss"], &["drum", "kick"], false, 1);
+    let noise = query_samples(&["noise", "white_noise", "texture"], [BAD_GENRES, &["drum", "kick"]].concat(), false, 1);
     eprintln!("NOISE 2:");
-    let noise2_samples = query_samples(&["texture", "noise", "static"], &["drum", "kick", "bass"], false, 1);
+    let noise2 = query_samples(&["hiss", "static", "noise"], [BAD_GENRES, &["drum", "kick"]].concat(), false, 1);
     
-    // FX - SNARE ROLLS (tension builders)
+    // FX - SNARE ROLL
     eprintln!("SNARE ROLL:");
-    let snare_roll_samples = query_samples(&["snare_roll", "snare_build", "snare_fill", "roll"], &["kick", "hat"], false, 1);
+    let snare_roll = query_samples(&["snare_roll", "buildup", "roll"], [BAD_GENRES, &["bass", "synth", "pad", "melody"]].concat(), false, 1);
     
-    // FX - DRUM FILLS (different lengths) - MUST be drum fills, not bass/synth
+    // FX - FILLS (drum fills only)
+    eprintln!("FILL 1A:");
+    let fill_1a = query_samples(&["fill", "drum_fill", "perc_hit", "snare_hit"], [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat(), false, 1);
+    eprintln!("FILL 1B:");
+    let fill_1b = query_samples(&["fill", "tom_hit", "drum_hit"], [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat(), false, 1);
+    eprintln!("FILL 2A:");
+    let fill_2a = query_samples(&["fill", "drum_fill"], [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat(), false, 1);
+    eprintln!("FILL 2B:");
+    let fill_2b = query_samples(&["fill", "break", "drum_break"], [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat(), false, 1);
+    eprintln!("FILL 4A:");
+    let fill_4a = query_samples(&["fill", "drum_fill", "break"], [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat(), false, 1);
+    eprintln!("FILL 4B:");
+    let fill_4b = query_samples(&["fill", "tom_fill"], [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat(), false, 1);
+    eprintln!("FILL 4C:");
+    let fill_4c = query_samples(&["fill", "snare_fill"], [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat(), false, 1);
+    eprintln!("FILL 4D:");
+    let fill_4d = query_samples(&["fill", "perc_fill"], [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat(), false, 1);
+    
+    // FX - REVERSE
+    eprintln!("REVERSE 1:");
+    let reverse1 = query_samples(&["reverse", "rev_cymbal", "rev_crash"], [BAD_GENRES, &["loop"]].concat(), false, 1);
+    eprintln!("REVERSE 2:");
+    let reverse2 = query_samples(&["reverse", "rev_fx", "reversed"], [BAD_GENRES, &["loop"]].concat(), false, 1);
+    
+    // FX - SUB DROP
+    eprintln!("SUB DROP:");
+    let sub_drop = query_samples(&["sub_drop", "808_hit", "sub_boom", "low_impact"], [BAD_GENRES, &["loop"]].concat(), false, 1);
+    
+    // ATMOSPHERE - MATCH KEY
+    eprintln!("ATMOS (key: {}):", track_key);
+    let atmos = query_samples_with_key(&["atmos", "atmosphere", "ambient", "dark", "industrial"], [BAD_GENRES, &["drum", "kick"]].concat(), false, 1, Some(&track_key));
+    eprintln!("ATMOS 2 (key: {}):", track_key);
+    let atmos2 = query_samples_with_key(&["texture", "drone", "soundscape", "dark"], [BAD_GENRES, &["drum", "kick"]].concat(), false, 1, Some(&track_key));
+    eprintln!("VOX (key: {}):", track_key);
+    let vox = query_samples_with_key(&["vox", "vocal", "voice", "dark", "industrial"], [BAD_GENRES, &["drum"]].concat(), false, 1, Some(&track_key));
+    
+    SongSamples {
+        key: track_key,
+        kick, clap, hat, hat2, perc, perc2, ride,
+        bass, sub,
+        main_synth, synth1, synth2, synth3, pad, pad2, arp, arp2,
+        riser1, riser2, riser3, downlifter, crash, impact, hit,
+        sweep_up, sweep_down, sweep_up2, sweep_down2, noise, noise2,
+        snare_roll, fill_1a, fill_1b, fill_2a, fill_2b, fill_4a, fill_4b, fill_4c, fill_4d,
+        reverse1, reverse2, sub_drop, atmos, atmos2, vox,
+    }
+}
+
+fn generate_true_techno(output_path: &Path) -> Result<(), String> {
+    let ids = IdAllocator::new(1000000);
+    let bars_per_song = (SONG_LENGTH_BARS + GAP_BETWEEN_SONGS) as f64;
+    
+    eprintln!("\n========================================");
+    eprintln!("GENERATING {} SONGS IN ONE ALS FILE", NUM_SONGS);
+    eprintln!("Each song: {} bars + {} bar gap = {} bars total", 
+              SONG_LENGTH_BARS, GAP_BETWEEN_SONGS, bars_per_song as u32);
+    eprintln!("Total length: {} bars", bars_per_song as u32 * NUM_SONGS);
+    eprintln!("========================================\n");
+    
+    // Load samples for each song (each gets its own key)
+    let mut all_songs: Vec<SongSamples> = Vec::new();
+    for song_num in 1..=NUM_SONGS {
+        all_songs.push(load_song_samples(song_num));
+    }
+    
+    // Collect keys for locators
+    let song_keys: Vec<String> = all_songs.iter().map(|s| s.key.clone()).collect();
+    
+    eprintln!("\n========================================");
+    eprintln!("SONG KEYS:");
+    for (i, key) in song_keys.iter().enumerate() {
+        eprintln!("  Song {}: {}", i + 1, key);
+    }
+    eprintln!("========================================\n");
+
+    // Use samples from each song for their respective sections
+    // For now, use the first song's samples and repeat the arrangement for each song
+    let song1 = &all_songs[0];
+    // Use all samples from SongSamples - samples were already loaded by load_song_samples()
+    let track_key = song1.key.clone();
+    
+    // DRUMS
+    let kick_samples = song1.kick.clone();
+    let clap_samples = song1.clap.clone();
+    let hat_samples = song1.hat.clone();
+    let hat2_samples = song1.hat2.clone();
+    let perc_samples = song1.perc.clone();
+    let perc2_samples = song1.perc2.clone();
+    let ride_samples = song1.ride.clone();
+    
+    // BASS
+    let bass_samples = song1.bass.clone();
+    let sub_samples = song1.sub.clone();
+    
+    // MELODICS
+    let main_synth_samples = song1.main_synth.clone();
+    let synth1_samples = song1.synth1.clone();
+    let synth2_samples = song1.synth2.clone();
+    eprintln!("SYNTH 3 (stabs, key: {}):", track_key);
+    let synth3_samples = query_samples_with_key(
+        &["stab", "synth_shot", "chord_stab"],
+        [BAD_GENRES, &["pad", "bass", "sub", "drum", "drums", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "loop"]].concat(),
+        false, 1, Some(&track_key)
+    );
+    eprintln!("PAD (key: {}):", track_key);
+    let pad_samples = query_samples_with_key(
+        &["pad_loop", "pad"],
+        [BAD_GENRES, &["drum", "drums", "stab", "bass", "sub", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "lead", "arp"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("PAD 2 (key: {}):", track_key);
+    let pad2_samples = query_samples_with_key(
+        &["drone_loop", "atmosphere_loop", "drone", "atmosphere"],
+        [BAD_GENRES, &["drum", "drums", "kick", "stab", "bass", "sub", "hat", "snare", "clap", "perc", "ride", "full", "kit", "lead", "arp"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("ARP (key: {}):", track_key);
+    let arp_samples = query_samples_with_key(
+        &["arp_loop", "arpegg", "arp"],
+        [BAD_GENRES, &["pad", "drum", "drums", "bass", "sub", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "lead"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    eprintln!("ARP 2 (key: {}):", track_key);
+    let arp2_samples = query_samples_with_key(
+        &["pluck_loop", "sequence_loop", "pluck"],
+        [BAD_GENRES, &["pad", "drum", "drums", "chord", "bass", "sub", "kick", "hat", "snare", "clap", "perc", "ride", "full", "kit", "lead"]].concat(),
+        true, 1, Some(&track_key)
+    );
+    
+    // FX - RISERS
+    eprintln!("RISER 1:");
+    let riser1_samples = query_samples(
+        &["riser", "uplifter"],
+        [BAD_GENRES, &["down", "impact"]].concat(),
+        false, 1
+    );
+    eprintln!("RISER 2:");
+    let riser2_samples = query_samples(
+        &["build", "riser", "tension"],
+        [BAD_GENRES, &["down", "impact"]].concat(),
+        false, 1
+    );
+    eprintln!("RISER 3 (short):");
+    let riser3_samples = query_samples(
+        &["whoosh", "sweep_up", "upsweep"],
+        [BAD_GENRES, &["down"]].concat(),
+        false, 1
+    );
+    
+    // FX - DOWNLIFTERS
+    eprintln!("DOWNLIFTER:");
+    let downlifter_samples = query_samples(
+        &["downlifter", "downsweep", "down_sweep", "fall"],
+        [BAD_GENRES, &["up", "riser"]].concat(),
+        false, 1
+    );
+    
+    // FX - IMPACTS
+    eprintln!("CRASH:");
+    let crash_samples = query_samples(
+        &["crash", "cymbal_crash"],
+        [BAD_GENRES, &["loop", "ride"]].concat(),
+        false, 1
+    );
+    eprintln!("IMPACT:");
+    let impact_samples = query_samples(
+        &["impact", "boom", "thud"],
+        [BAD_GENRES, &["loop", "riser"]].concat(),
+        false, 1
+    );
+    eprintln!("HIT:");
+    let hit_samples = query_samples(
+        &["hit", "fx_hit", "perc_shot"],
+        [BAD_GENRES, &["loop", "riser", "crash"]].concat(),
+        false, 1
+    );
+    
+    // FX - SWEEPS
+    eprintln!("SWEEP UP:");
+    let sweep_up_samples = query_samples(
+        &["sweep_up", "upsweep", "white_noise_up"],
+        [BAD_GENRES, &["down"]].concat(),
+        false, 1
+    );
+    eprintln!("SWEEP DOWN:");
+    let sweep_down_samples = query_samples(
+        &["sweep_down", "downsweep", "white_noise_down"],
+        [BAD_GENRES, &["up"]].concat(),
+        false, 1
+    );
+    eprintln!("SWEEP UP 2:");
+    let sweep_up2_samples = query_samples(
+        &["sweep", "riser", "build"],
+        [BAD_GENRES, &["down", "impact"]].concat(),
+        false, 1
+    );
+    eprintln!("SWEEP DOWN 2:");
+    let sweep_down2_samples = query_samples(
+        &["fall", "drop", "down"],
+        [BAD_GENRES, &["up", "sub"]].concat(),
+        false, 1
+    );
+    
+    // FX - NOISE
+    eprintln!("NOISE:");
+    let noise_samples = query_samples(
+        &["noise", "white_noise", "hiss"],
+        [BAD_GENRES, &["drum", "kick"]].concat(),
+        false, 1
+    );
+    eprintln!("NOISE 2:");
+    let noise2_samples = query_samples(
+        &["texture", "noise", "static"],
+        [BAD_GENRES, &["drum", "kick", "bass"]].concat(),
+        false, 1
+    );
+    
+    // FX - SNARE ROLLS
+    eprintln!("SNARE ROLL:");
+    let snare_roll_samples = query_samples(
+        &["snare_roll", "snare_build", "snare_fill", "roll"],
+        [BAD_GENRES, &["kick", "hat"]].concat(),
+        false, 1
+    );
+    
+    // FX - DRUM FILLS - multiple samples for variation (A/B alternating)
+    let fill_exclude = [BAD_GENRES, &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"]].concat();
+    eprintln!("FILL 1A (1 beat):");
+    let fill_1a_samples = query_samples(
+        &["drum_fill", "fill", "perc_hit", "tom_hit"],
+        fill_exclude.clone(),
+        false, 1
+    );
     eprintln!("FILL 1B (1 beat):");
     let fill_1b_samples = query_samples(
-        &["drum_fill", "fill", "perc_hit", "tom_hit", "snare_hit", "drum_hit"],
-        &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord"],
+        &["snare_hit", "drum_hit", "hit"],
+        fill_exclude.clone(),
+        false, 1
+    );
+    eprintln!("FILL 2A (2 beats):");
+    let fill_2a_samples = query_samples(
+        &["drum_fill", "fill", "snare_roll"],
+        fill_exclude.clone(),
         false, 1
     );
     eprintln!("FILL 2B (2 beats):");
     let fill_2b_samples = query_samples(
-        &["drum_fill", "fill", "snare_roll", "tom_roll", "drum_roll"],
-        &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar"],
+        &["tom_roll", "drum_roll", "roll"],
+        fill_exclude.clone(),
+        false, 1
+    );
+    eprintln!("FILL 4A (1 bar):");
+    let fill_4a_samples = query_samples(
+        &["drum_fill", "fill", "break"],
+        fill_exclude.clone(),
         false, 1
     );
     eprintln!("FILL 4B (1 bar):");
     let fill_4b_samples = query_samples(
-        &["drum_fill", "fill", "break", "drum_break", "tom_fill"],
-        &["bass", "synth", "pad", "lead", "melody", "loop", "full", "8bar", "4bar", "chord", "breakdown"],
+        &["drum_break", "tom_fill", "fill"],
+        fill_exclude.clone(),
+        false, 1
+    );
+    eprintln!("FILL 4C (1 bar):");
+    let fill_4c_samples = query_samples(
+        &["snare_fill", "perc_fill", "fill"],
+        fill_exclude.clone(),
+        false, 1
+    );
+    eprintln!("FILL 4D (1 bar):");
+    let fill_4d_samples = query_samples(
+        &["crash_fill", "cymbal_fill", "fill", "break"],
+        fill_exclude,
         false, 1
     );
     
-    // FX - REVERSE (reverse crashes/cymbals for tension)
-    eprintln!("REVERSE:");
-    let reverse_samples = query_samples(&["reverse", "rev_crash", "rev_cymbal", "reversed"], &["loop"], false, 1);
+    // FX - REVERSE (2 different samples)
+    eprintln!("REVERSE 1:");
+    let reverse1_samples = query_samples(
+        &["reverse", "rev_crash", "reversed"],
+        [BAD_GENRES, &["loop"]].concat(),
+        false, 1
+    );
+    eprintln!("REVERSE 2:");
+    let reverse2_samples = query_samples(
+        &["rev_cymbal", "reverse_hit", "reverse"],
+        [BAD_GENRES, &["loop"]].concat(),
+        false, 1
+    );
     
-    // FX - SUB DROP (impact on drop)
+    // FX - SUB DROP
     eprintln!("SUB DROP:");
-    let sub_drop_samples = query_samples(&["sub_drop", "808_hit", "sub_boom", "low_impact"], &["loop"], false, 1);
+    let sub_drop_samples = query_samples(
+        &["sub_drop", "808_hit", "sub_boom", "low_impact"],
+        [BAD_GENRES, &["loop"]].concat(),
+        false, 1
+    );
     
-    // ATMOSPHERE
-    eprintln!("ATMOS:");
-    let atmos_samples = query_samples(&["atmos", "atmosphere", "ambient"], &["drum", "kick"], false, 1);
-    eprintln!("ATMOS 2:");
-    let atmos2_samples = query_samples(&["texture", "drone", "soundscape"], &["drum", "kick"], false, 1);
-    eprintln!("VOX:");
-    let vox_samples = query_samples(&["vox", "vocal", "voice"], &["drum"], false, 1);
+    // ATMOSPHERE - dark/industrial only
+    eprintln!("ATMOS (key: {}):", track_key);
+    let atmos_samples = query_samples_with_key(
+        &["atmos", "atmosphere", "ambient", "dark", "industrial"],
+        [BAD_GENRES, &["drum", "kick"]].concat(),
+        false, 1, Some(&track_key)
+    );
+    eprintln!("ATMOS 2 (key: {}):", track_key);
+    let atmos2_samples = query_samples_with_key(
+        &["texture", "drone", "soundscape", "dark"],
+        [BAD_GENRES, &["drum", "kick"]].concat(),
+        false, 1, Some(&track_key)
+    );
+    eprintln!("VOX (key: {}):", track_key);
+    let vox_samples = query_samples_with_key(
+        &["vox", "vocal", "voice", "dark", "industrial"],
+        [BAD_GENRES, &["drum"]].concat(),
+        false, 1, Some(&track_key)
+    );
 
     // Generate base ALS
     generate_empty_als(output_path)?;
@@ -1234,10 +1761,18 @@ fn generate_true_techno(output_path: &Path) -> Result<(), String> {
     let noise_track = create_arranged_track(&original_audio_track, "NOISE", FX_COLOR, fx_group_id as i32, &noise_samples, &find_arr("NOISE"), &ids)?;
     let noise2_track = create_arranged_track(&original_audio_track, "NOISE 2", FX_COLOR, fx_group_id as i32, &noise2_samples, &find_arr("NOISE 2"), &ids)?;
     let snare_roll_track = create_arranged_track(&original_audio_track, "SNARE ROLL", FX_COLOR, fx_group_id as i32, &snare_roll_samples, &find_arr("SNARE ROLL"), &ids)?;
+    // Fills - multiple samples for variation
+    let fill_1a_track = create_arranged_track(&original_audio_track, "FILL 1A", DRUMS_COLOR, drums_group_id as i32, &fill_1a_samples, &find_arr("FILL 1A"), &ids)?;
     let fill_1b_track = create_arranged_track(&original_audio_track, "FILL 1B", DRUMS_COLOR, drums_group_id as i32, &fill_1b_samples, &find_arr("FILL 1B"), &ids)?;
+    let fill_2a_track = create_arranged_track(&original_audio_track, "FILL 2A", DRUMS_COLOR, drums_group_id as i32, &fill_2a_samples, &find_arr("FILL 2A"), &ids)?;
     let fill_2b_track = create_arranged_track(&original_audio_track, "FILL 2B", DRUMS_COLOR, drums_group_id as i32, &fill_2b_samples, &find_arr("FILL 2B"), &ids)?;
+    let fill_4a_track = create_arranged_track(&original_audio_track, "FILL 4A", DRUMS_COLOR, drums_group_id as i32, &fill_4a_samples, &find_arr("FILL 4A"), &ids)?;
     let fill_4b_track = create_arranged_track(&original_audio_track, "FILL 4B", DRUMS_COLOR, drums_group_id as i32, &fill_4b_samples, &find_arr("FILL 4B"), &ids)?;
-    let reverse_track = create_arranged_track(&original_audio_track, "REVERSE", FX_COLOR, fx_group_id as i32, &reverse_samples, &find_arr("REVERSE"), &ids)?;
+    let fill_4c_track = create_arranged_track(&original_audio_track, "FILL 4C", DRUMS_COLOR, drums_group_id as i32, &fill_4c_samples, &find_arr("FILL 4C"), &ids)?;
+    let fill_4d_track = create_arranged_track(&original_audio_track, "FILL 4D", DRUMS_COLOR, drums_group_id as i32, &fill_4d_samples, &find_arr("FILL 4D"), &ids)?;
+    // Reverse - 2 samples alternating
+    let reverse1_track = create_arranged_track(&original_audio_track, "REVERSE 1", FX_COLOR, fx_group_id as i32, &reverse1_samples, &find_arr("REVERSE 1"), &ids)?;
+    let reverse2_track = create_arranged_track(&original_audio_track, "REVERSE 2", FX_COLOR, fx_group_id as i32, &reverse2_samples, &find_arr("REVERSE 2"), &ids)?;
     let sub_drop_track = create_arranged_track(&original_audio_track, "SUB DROP", FX_COLOR, fx_group_id as i32, &sub_drop_samples, &find_arr("SUB DROP"), &ids)?;
     let atmos_track = create_arranged_track(&original_audio_track, "ATMOS", FX_COLOR, fx_group_id as i32, &atmos_samples, &find_arr("ATMOS"), &ids)?;
     let atmos2_track = create_arranged_track(&original_audio_track, "ATMOS 2", FX_COLOR, fx_group_id as i32, &atmos2_samples, &find_arr("ATMOS 2"), &ids)?;
@@ -1251,7 +1786,9 @@ fn generate_true_techno(output_path: &Path) -> Result<(), String> {
         // DRUMS group
         &drums_group, &kick_track, &clap_track, &hat_track, &hat2_track, 
         &perc_track, &perc2_track, &ride_track, 
-        &fill_1b_track, &fill_2b_track, &fill_4b_track,
+        // Fills (8 tracks with different samples)
+        &fill_1a_track, &fill_1b_track, &fill_2a_track, &fill_2b_track,
+        &fill_4a_track, &fill_4b_track, &fill_4c_track, &fill_4d_track,
         // BASS (no group)
         &bass_track, &sub_track,
         // MELODICS group
@@ -1262,7 +1799,7 @@ fn generate_true_techno(output_path: &Path) -> Result<(), String> {
         &downlifter_track, &crash_track, &impact_track, &hit_track,
         &sweep_up_track, &sweep_down_track, &sweep_up2_track, &sweep_down2_track,
         &noise_track, &noise2_track,
-        &snare_roll_track, &reverse_track, &sub_drop_track,
+        &snare_roll_track, &reverse1_track, &reverse2_track, &sub_drop_track,
         &atmos_track, &atmos2_track, &vox_track,
     ].into_iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n\t\t\t");
     
@@ -1279,16 +1816,16 @@ fn generate_true_techno(output_path: &Path) -> Result<(), String> {
         r#"<MixerInArrangement Value="0" />"#,
     );
 
-    // Add locators at section boundaries
-    let locators_xml = create_locators_xml(&ids);
+    // Add locators at section boundaries for ALL songs
+    let locators_xml = create_locators_xml_multi(&ids, NUM_SONGS, &song_keys);
     xml = xml.replace(
         "<Locators>\n\t\t\t<Locators />\n\t\t</Locators>",
-        &format!("<Locators>\n\t\t\t{}\n\t\t</Locators>", locators_xml),
+        &locators_xml,
     );
     // Also try alternate format
     xml = xml.replace(
         "<Locators><Locators /></Locators>",
-        &format!("<Locators>{}</Locators>", locators_xml),
+        &locators_xml,
     );
 
     // Set tempo to 128 BPM
