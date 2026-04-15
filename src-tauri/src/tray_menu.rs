@@ -8,7 +8,9 @@ use std::thread;
 use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::MenuBuilder;
-use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{TrayIcon, TrayIconBuilder};
+#[cfg(not(target_os = "linux"))]
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::{
     App, AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, Position, Rect, Size, State,
     Wry,
