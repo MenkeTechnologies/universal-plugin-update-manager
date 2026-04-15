@@ -1,6 +1,7 @@
 //! Ableton Live Set (.als) generator for programmatic techno track creation.
 //!
-//! Generates valid gzip-compressed XML files that Ableton Live 12 can open.
+//! Generates valid gzip-compressed XML files that Ableton Live can open.
+//! Automatically detects installed Ableton version for maximum compatibility.
 //! Uses samples from the indexed library to create full arrangements.
 
 use flate2::write::GzEncoder;
@@ -8,6 +9,88 @@ use flate2::Compression;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
+
+/// Ableton Live version info extracted from installed app
+#[derive(Debug, Clone)]
+pub struct AbletonVersion {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+    pub creator: String,
+    pub minor_version_string: String,
+}
+
+impl Default for AbletonVersion {
+    fn default() -> Self {
+        Self {
+            major: 12,
+            minor: 0,
+            patch: 0,
+            creator: "Ableton Live 12.0".to_string(),
+            minor_version_string: "12.0_12000".to_string(),
+        }
+    }
+}
+
+impl AbletonVersion {
+    /// Detect Ableton version from installed app at standard macOS path
+    pub fn detect() -> Self {
+        Self::detect_from_path("/Applications/Ableton Live 12 Suite.app")
+            .or_else(|| Self::detect_from_path("/Applications/Ableton Live 12 Standard.app"))
+            .or_else(|| Self::detect_from_path("/Applications/Ableton Live 12 Intro.app"))
+            .or_else(|| Self::detect_from_path("/Applications/Ableton Live 11 Suite.app"))
+            .or_else(|| Self::detect_from_path("/Applications/Ableton Live 11 Standard.app"))
+            .unwrap_or_default()
+    }
+
+    /// Detect version from a specific app bundle path
+    pub fn detect_from_path(app_path: &str) -> Option<Self> {
+        let plist_path = format!("{}/Contents/Info.plist", app_path);
+        if !Path::new(&plist_path).exists() {
+            return None;
+        }
+
+        let output = Command::new("defaults")
+            .args(["read", &plist_path, "CFBundleShortVersionString"])
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            return None;
+        }
+
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        let version_str = version_str.trim();
+
+        Self::parse_version_string(version_str)
+    }
+
+    /// Parse version string like "12.3.7 (2026-03-30_c92a51f028)"
+    fn parse_version_string(version_str: &str) -> Option<Self> {
+        let version_part = version_str.split_whitespace().next()?;
+        let parts: Vec<&str> = version_part.split('.').collect();
+
+        let major: u32 = parts.first()?.parse().ok()?;
+        let minor: u32 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let patch: u32 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
+
+        let creator = format!("Ableton Live {}.{}.{}", major, minor, patch);
+        let minor_version_string = format!(
+            "{}.0_{}",
+            major,
+            major * 10000 + minor * 100 + patch
+        );
+
+        Some(Self {
+            major,
+            minor,
+            patch,
+            creator,
+            minor_version_string,
+        })
+    }
+}
 
 /// Unique ID allocator for ALS XML elements
 struct IdAllocator {
@@ -241,6 +324,16 @@ pub fn generate_als(
     tracks: &[TrackInfo],
     bpm: f64,
 ) -> Result<(), String> {
+    generate_als_with_version(output_path, tracks, bpm, &AbletonVersion::detect())
+}
+
+/// Generate ALS with specific Ableton version
+pub fn generate_als_with_version(
+    output_path: &Path,
+    tracks: &[TrackInfo],
+    bpm: f64,
+    version: &AbletonVersion,
+) -> Result<(), String> {
     let mut ids = IdAllocator::new(1000);
 
     let mut tracks_xml = String::new();
@@ -252,7 +345,11 @@ pub fn generate_als(
 
     let xml = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
-<Ableton MajorVersion="5" MinorVersion="12.0_12049" SchemaChangeCount="3" Creator="Ableton Live 12.0" Revision="">
+<Ableton MajorVersion="5" MinorVersion="{minor_version}" SchemaChangeCount="3" Creator="{creator}" Revision="">"#,
+        minor_version = version.minor_version_string,
+        creator = version.creator,
+    ) + &format!(
+        r#"
 	<LiveSet>
 		<NextPointeeId Value="{next_pointee_id}" />
 		<OverwriteProtectionNumber Value="2819" />
