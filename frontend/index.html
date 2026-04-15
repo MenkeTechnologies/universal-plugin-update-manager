@@ -2649,7 +2649,12 @@
             background-image: linear-gradient(180deg, rgba(8, 145, 178, 0.06) 0%, transparent 96px);
         }
 
-        /* ALS Generator wizard */
+        /* ALS Generator wizard — override columns layout */
+        #tabAlsGenerator .settings-container {
+            columns: 1 !important;
+            max-width: 700px;
+            margin: 0 auto;
+        }
         .als-wizard-panel { display: none; }
         .als-wizard-panel.active { display: block; }
         .als-step-btn {
