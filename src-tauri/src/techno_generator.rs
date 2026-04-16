@@ -207,7 +207,7 @@ fn generate_scatter_hits(section_scatter: &SectionValues, global_scatter: f32) -
         
         for (_, section_start, section_end, density) in &active_sections {
             // Hits per 32 bars based on density (density 1.0 = ~32 hits, density 0.5 = ~16 hits)
-            let target_hits = ((**density * 32.0) as u32).max(2);
+            let target_hits = ((*density * 32.0) as u32).max(2);
             
             // Generate a 32-bar pattern of random 1/16th positions (0-511)
             let mut pattern_sixteenths: Vec<u32> = Vec::new();
@@ -978,35 +978,54 @@ fn get_arrangement(chaos: f32) -> Vec<TrackArrangement> {
 fn get_arrangement_with_params(chaos: f32, glitch_intensity: f32, section_overrides: &SectionOverrides, density: f32, variation: f32, parallelism: f32, scatter: f32) -> Vec<TrackArrangement> {
     let mut arrangements = get_arrangement(chaos);
     
-    // Apply parallelism - limit how many tracks of same type play at once
-    // Variation controls the switch interval (low = stable, high = frequent switching)
-    if parallelism < 1.0 {
-        arrangements = apply_parallelism(arrangements, parallelism, variation);
+    // Apply chaos per-section (bar-level gaps within sections)
+    let has_any_chaos = chaos > 0.0 || section_overrides.chaos.intro.is_some() ||
+                        section_overrides.chaos.build.is_some() || section_overrides.chaos.breakdown.is_some() ||
+                        section_overrides.chaos.drop1.is_some() || section_overrides.chaos.drop2.is_some() ||
+                        section_overrides.chaos.fadedown.is_some() || section_overrides.chaos.outro.is_some();
+    if has_any_chaos {
+        arrangements = apply_chaos_per_section(arrangements, &section_overrides.chaos, chaos);
     }
     
-    // Apply variation - elements drop in/out more frequently
-    if variation > 0.0 {
-        arrangements = apply_variation(arrangements, variation);
+    // Apply parallelism per-section - limit how many tracks of same type play at once
+    let has_any_parallelism = parallelism < 1.0 || section_overrides.parallelism.intro.is_some() ||
+                              section_overrides.parallelism.build.is_some() || section_overrides.parallelism.breakdown.is_some() ||
+                              section_overrides.parallelism.drop1.is_some() || section_overrides.parallelism.drop2.is_some() ||
+                              section_overrides.parallelism.fadedown.is_some() || section_overrides.parallelism.outro.is_some();
+    if has_any_parallelism {
+        arrangements = apply_parallelism_per_section(arrangements, &section_overrides.parallelism, parallelism, &section_overrides.variation, variation);
+    }
+    
+    // Apply variation per-section - elements drop in/out more frequently
+    let has_any_variation = variation > 0.0 || section_overrides.variation.intro.is_some() ||
+                            section_overrides.variation.build.is_some() || section_overrides.variation.breakdown.is_some() ||
+                            section_overrides.variation.drop1.is_some() || section_overrides.variation.drop2.is_some() ||
+                            section_overrides.variation.fadedown.is_some() || section_overrides.variation.outro.is_some();
+    if has_any_variation {
+        arrangements = apply_variation_per_section(arrangements, &section_overrides.variation, variation);
+    }
+    
+    // Apply density per-section (extra clips in dense sections)
+    let has_any_density = density > 0.0 || section_overrides.density.intro.is_some() ||
+                          section_overrides.density.build.is_some() || section_overrides.density.breakdown.is_some() ||
+                          section_overrides.density.drop1.is_some() || section_overrides.density.drop2.is_some() ||
+                          section_overrides.density.fadedown.is_some() || section_overrides.density.outro.is_some();
+    if has_any_density {
+        arrangements = apply_density_per_section(arrangements, &section_overrides.density, density);
     }
     
     // Add scattered one-shot hits on 1/16 grid
     // Uses per-section scatter overrides, falling back to global scatter parameter
-    // Also check density for backwards compat (density used to drive scatter)
-    let has_any_scatter = scatter > 0.0 || density > 0.0 ||
-                          section_overrides.scatter.intro.is_some() ||
-                          section_overrides.scatter.build.is_some() ||
-                          section_overrides.scatter.breakdown.is_some() ||
-                          section_overrides.scatter.drop1.is_some() ||
-                          section_overrides.scatter.drop2.is_some() ||
-                          section_overrides.scatter.fadedown.is_some() ||
-                          section_overrides.scatter.outro.is_some();
+    let has_any_scatter = scatter > 0.0 || section_overrides.scatter.intro.is_some() ||
+                          section_overrides.scatter.build.is_some() || section_overrides.scatter.breakdown.is_some() ||
+                          section_overrides.scatter.drop1.is_some() || section_overrides.scatter.drop2.is_some() ||
+                          section_overrides.scatter.fadedown.is_some() || section_overrides.scatter.outro.is_some();
     if has_any_scatter {
-        // Pass section overrides and global scatter (use max of scatter/density for backwards compat)
-        arrangements.extend(generate_scatter_hits(&section_overrides.scatter, scatter.max(density)));
+        arrangements.extend(generate_scatter_hits(&section_overrides.scatter, scatter));
     }
     
     // Apply glitch edits (beat-level micro-edits, stutters, dropouts)
-    // Now uses per-section intensity from section_overrides.glitch
+    // Uses per-section intensity from section_overrides.glitch
     arrangements = apply_glitch_edits(arrangements, glitch_intensity, &section_overrides.glitch);
     
     arrangements
@@ -1353,6 +1372,124 @@ fn apply_chaos_to_arrangements(mut arrangements: Vec<TrackArrangement>, chaos: f
             }
         }
         
+        arr.sections = new_sections;
+    }
+    
+    arrangements
+}
+
+// ============================================================================
+// Per-section wrapper functions for all 6 override parameters
+// These functions apply effects using per-section intensity values
+// ============================================================================
+
+/// Apply chaos per-section - uses section-specific chaos values
+fn apply_chaos_per_section(arrangements: Vec<TrackArrangement>, section_chaos: &SectionValues, global_chaos: f32) -> Vec<TrackArrangement> {
+    // Calculate effective chaos as average of all sections that have values
+    let vals: Vec<f32> = [
+        section_chaos.intro, section_chaos.build, section_chaos.breakdown,
+        section_chaos.drop1, section_chaos.drop2, section_chaos.fadedown, section_chaos.outro,
+    ].iter().filter_map(|v| *v).collect();
+    let effective = if vals.is_empty() { global_chaos } else { vals.iter().sum::<f32>() / vals.len() as f32 };
+    if effective > 0.0 {
+        apply_chaos_to_arrangements(arrangements, effective)
+    } else {
+        arrangements
+    }
+}
+
+/// Apply parallelism per-section - uses section-specific parallelism values
+fn apply_parallelism_per_section(arrangements: Vec<TrackArrangement>, section_parallelism: &SectionValues, global_parallelism: f32, section_variation: &SectionValues, global_variation: f32) -> Vec<TrackArrangement> {
+    // Calculate effective parallelism as average
+    let p_vals: Vec<f32> = [
+        section_parallelism.intro, section_parallelism.build, section_parallelism.breakdown,
+        section_parallelism.drop1, section_parallelism.drop2, section_parallelism.fadedown, section_parallelism.outro,
+    ].iter().filter_map(|v| *v).collect();
+    let effective_p = if p_vals.is_empty() { global_parallelism } else { p_vals.iter().sum::<f32>() / p_vals.len() as f32 };
+    
+    // Calculate effective variation for switch interval
+    let v_vals: Vec<f32> = [
+        section_variation.intro, section_variation.build, section_variation.breakdown,
+        section_variation.drop1, section_variation.drop2, section_variation.fadedown, section_variation.outro,
+    ].iter().filter_map(|v| *v).collect();
+    let effective_v = if v_vals.is_empty() { global_variation } else { v_vals.iter().sum::<f32>() / v_vals.len() as f32 };
+    
+    if effective_p < 1.0 {
+        apply_parallelism(arrangements, effective_p, effective_v)
+    } else {
+        arrangements
+    }
+}
+
+/// Apply variation per-section - uses section-specific variation values
+fn apply_variation_per_section(arrangements: Vec<TrackArrangement>, section_variation: &SectionValues, global_variation: f32) -> Vec<TrackArrangement> {
+    // Calculate effective variation as average
+    let vals: Vec<f32> = [
+        section_variation.intro, section_variation.build, section_variation.breakdown,
+        section_variation.drop1, section_variation.drop2, section_variation.fadedown, section_variation.outro,
+    ].iter().filter_map(|v| *v).collect();
+    let effective = if vals.is_empty() { global_variation } else { vals.iter().sum::<f32>() / vals.len() as f32 };
+    if effective > 0.0 {
+        apply_variation(arrangements, effective)
+    } else {
+        arrangements
+    }
+}
+
+/// Apply density per-section - adds extra clips/layers in high-density sections
+fn apply_density_per_section(mut arrangements: Vec<TrackArrangement>, section_density: &SectionValues, global_density: f32) -> Vec<TrackArrangement> {
+    let mut rng = rand::rng();
+    
+    // Section bar ranges
+    let sections: [(u32, u32, Option<f32>); 7] = [
+        (1, 32, section_density.intro),
+        (33, 64, section_density.build),
+        (65, 96, section_density.breakdown),
+        (97, 128, section_density.drop1),
+        (129, 160, section_density.drop2),
+        (161, 192, section_density.fadedown),
+        (193, 224, section_density.outro),
+    ];
+    
+    // Tracks that can have density-based doubling
+    let densifiable = ["HAT", "PERC", "SYNTH", "ARP", "PAD"];
+    
+    for arr in arrangements.iter_mut() {
+        if !densifiable.iter().any(|p| arr.name.starts_with(p)) {
+            continue;
+        }
+        
+        let mut new_sections: Vec<(f64, f64)> = Vec::new();
+        
+        for &(start, end) in &arr.sections {
+            new_sections.push((start, end));
+            
+            // Check which section this falls into and get its density
+            for &(sec_start, sec_end, sec_density) in &sections {
+                let density = sec_density.unwrap_or(global_density);
+                if density <= 0.0 { continue; }
+                
+                let sec_start_f = sec_start as f64;
+                let sec_end_f = sec_end as f64;
+                
+                // If this section overlaps with our clip
+                if start < sec_end_f && end > sec_start_f {
+                    // Probability of adding extra micro-clips based on density
+                    if rng.random_bool(density as f64 * 0.4) {
+                        // Add 1-2 bar "accent" clip within the section
+                        let clip_len = if rng.random_bool(0.5) { 1.0 } else { 2.0 };
+                        let clip_start = start.max(sec_start_f) + rng.random_range(0..(((end.min(sec_end_f) - start.max(sec_start_f)) as u32).max(1))) as f64;
+                        let clip_end = (clip_start + clip_len).min(end).min(sec_end_f);
+                        if clip_end > clip_start {
+                            new_sections.push((clip_start, clip_end));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Sort and dedupe
+        new_sections.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         arr.sections = new_sections;
     }
     
@@ -3555,7 +3692,7 @@ fn create_arranged_track_multi(
 
     // Set volume to -12dB (except KICK which is 0dB)
     let volume_re = Regex::new(r#"(<Volume>\s*<LomId Value="0" />\s*<Manual Value=")[^"]+(" />)"#).unwrap();
-    let volume_value = if name == "KICK" { "1" } else { "0.251188643" };
+    let volume_value = if name.starts_with("KICK") { "1" } else { "0.251188643" };
     track = volume_re.replace(&track, format!(r#"${{1}}{}${{2}}"#, volume_value)).to_string();
 
     // Create clips for each song, offset by song index * bars_per_song
