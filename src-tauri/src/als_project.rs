@@ -1250,6 +1250,27 @@ mod tests {
     }
 
     #[test]
+    fn test_sections_continuous() {
+        let sections = sections_continuous(1, 32);
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0], (1.0, 33.0));
+    }
+
+    #[test]
+    fn test_distribution_helpers() {
+        let d = distribute_drums(6);
+        assert_eq!(d.kicks, 1);
+        assert_eq!(d.claps, 1);
+        assert_eq!(d.hats, 2);
+        assert_eq!(d.rides, 1);
+        assert_eq!(d.percs, 1);
+        
+        let b = distribute_bass(3);
+        assert_eq!(b.sub, 1);
+        assert_eq!(b.mid, 2);
+    }
+
+    #[test]
     fn test_arrangement_schranz() {
         let config = ProjectConfig {
             genre: Genre::Schranz,
@@ -1340,6 +1361,72 @@ mod tests {
         sv.intro = None;
         sv.outro = Some(0.1);
         assert!(sv.any());
+    }
+
+    #[test]
+    fn test_is_key_sensitive() {
+        assert!(is_key_sensitive("sub_bass"));
+        assert!(is_key_sensitive("lead"));
+        assert!(is_key_sensitive("pad"));
+        assert!(is_key_sensitive("vocal"));
+        assert!(is_key_sensitive("schranz_drive"));
+        
+        assert!(!is_key_sensitive("kick"));
+        assert!(!is_key_sensitive("clap"));
+        assert!(!is_key_sensitive("closed_hat"));
+        assert!(!is_key_sensitive("fx_riser"));
+        assert!(!is_key_sensitive("perc"));
+    }
+
+    #[test]
+    fn test_category_to_like_pattern() {
+        let kick_pattern = category_to_like_pattern("kick");
+        assert!(kick_pattern.contains("kick"));
+        assert!(kick_pattern.contains("kik"));
+        assert!(kick_pattern.contains("bd"));
+        
+        let sub_pattern = category_to_like_pattern("sub_bass");
+        assert!(sub_pattern.contains("sub"));
+        assert!(sub_pattern.contains("808"));
+        
+        let unknown_pattern = category_to_like_pattern("some_unknown_cat");
+        assert!(unknown_pattern.contains("fx"));
+    }
+
+    #[test]
+    fn test_build_target_keys() {
+        let mut config = ProjectConfig {
+            genre: Genre::Techno,
+            hardness: 0.5,
+            chaos: 0.3,
+            glitch_intensity: 0.0,
+            section_overrides: SectionOverridesConfig::default(),
+            density: 0.0,
+            variation: 0.0,
+            parallelism: 0.4,
+            scatter: 0.0,
+            bpm: 130,
+            root_note: Some("C".into()),
+            mode: Some("Aeolian".into()),
+            atonal: false,
+            keywords: vec![],
+            element_keywords: Default::default(),
+            sample_source_path: None,
+            tracks: TrackConfig::default(),
+            track_counts: TrackCountsConfig::default(),
+            type_atonal: TypeAtonalConfig::default(),
+            output_path: "/tmp/test.als".into(),
+            project_name: None,
+            num_songs: 1,
+        };
+        
+        let keys = build_target_keys(&config);
+        assert!(!keys.is_empty());
+        assert!(keys.contains(&"D# Major".to_string()));
+        
+        config.atonal = true;
+        let keys_atonal = build_target_keys(&config);
+        assert!(keys_atonal.is_empty());
     }
 
     #[test]

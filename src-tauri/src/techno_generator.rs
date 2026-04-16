@@ -3896,3 +3896,38 @@ mod tests {
         assert_eq!(result[0].name, "HAT");
     }
 }
+
+#[cfg(test)]
+mod additional_tests {
+    use super::*;
+
+    #[test]
+    fn test_get_arrangement_basics() {
+        let arr = get_arrangement(0.0);
+        assert!(!arr.is_empty());
+        
+        let kick = arr.iter().find(|t| t.name == "KICK").expect("KICK track missing");
+        assert!(kick.sections.len() >= 10); // Lots of gaps for fills
+        
+        let clap = arr.iter().find(|t| t.name == "CLAP").expect("CLAP track missing");
+        assert!(clap.sections.iter().all(|s| s.0 >= 9.0)); // Enters at bar 9
+    }
+
+    #[test]
+    fn test_generate_swoosh_arrangements() {
+        let swooshes = generate_swoosh_arrangements();
+        assert!(!swooshes.is_empty());
+        
+        for s in swooshes {
+            assert!(s.name.contains("SWEEP"));
+            assert!(!s.sections.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_track_arrangement_new() {
+        let t = TrackArrangement::new("TEST", vec![(1.0, 10.0)]);
+        assert_eq!(t.name, "TEST");
+        assert_eq!(t.sections, vec![(1.0, 10.0)]);
+    }
+}
