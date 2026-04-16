@@ -1365,17 +1365,51 @@ mod tests {
 
     #[test]
     fn test_is_key_sensitive() {
+        // Tonal categories
         assert!(is_key_sensitive("sub_bass"));
+        assert!(is_key_sensitive("mid_bass"));
         assert!(is_key_sensitive("lead"));
         assert!(is_key_sensitive("pad"));
+        assert!(is_key_sensitive("arp"));
+        assert!(is_key_sensitive("pluck"));
+        assert!(is_key_sensitive("stab"));
+        assert!(is_key_sensitive("acid"));
+        assert!(is_key_sensitive("atmos"));
         assert!(is_key_sensitive("vocal"));
+        assert!(is_key_sensitive("vocal_phrase"));
         assert!(is_key_sensitive("schranz_drive"));
         
+        // Atonal categories
         assert!(!is_key_sensitive("kick"));
         assert!(!is_key_sensitive("clap"));
         assert!(!is_key_sensitive("closed_hat"));
-        assert!(!is_key_sensitive("fx_riser"));
+        assert!(!is_key_sensitive("open_hat"));
+        assert!(!is_key_sensitive("ride"));
         assert!(!is_key_sensitive("perc"));
+        assert!(!is_key_sensitive("noise"));
+        assert!(!is_key_sensitive("fx_riser"));
+        assert!(!is_key_sensitive("fx_downer"));
+        assert!(!is_key_sensitive("fx_crash"));
+        assert!(!is_key_sensitive("fx_impact"));
+    }
+
+    #[test]
+    fn test_distribute_fx() {
+        let fx = distribute_fx(12);
+        assert_eq!(fx.crashes, 3);
+        assert_eq!(fx.risers, 4);
+        assert_eq!(fx.impacts, 2);
+        assert_eq!(fx.downers, 2);
+        assert_eq!(fx.fills, 3);
+        assert_eq!(fx.glitches, 1);
+        
+        let fx_min = distribute_fx(1);
+        assert_eq!(fx_min.crashes, 1);
+        assert_eq!(fx_min.risers, 1);
+        assert_eq!(fx_min.impacts, 1);
+        assert_eq!(fx_min.downers, 0);
+        assert_eq!(fx_min.fills, 1);
+        assert_eq!(fx_min.glitches, 0);
     }
 
     #[test]

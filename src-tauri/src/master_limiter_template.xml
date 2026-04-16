@@ -1,0 +1,118 @@
+<Limiter Id="5">
+	<LomId Value="0" />
+	<LomIdView Value="0" />
+	<IsExpanded Value="true" />
+	<On>
+		<LomId Value="0" />
+		<Manual Value="true" />
+		<AutomationTarget Id="35062">
+			<LockEnvelope Value="0" />
+		</AutomationTarget>
+		<MidiCCOnOffThresholds>
+			<Min Value="64" />
+			<Max Value="127" />
+		</MidiCCOnOffThresholds>
+	</On>
+	<ModulationSourceCount Value="0" />
+	<ParametersListWrapper LomId="0" />
+	<Pointee Id="35063" />
+	<LastSelectedTimeableIndex Value="0" />
+	<LastSelectedClipEnvelopeIndex Value="0" />
+	<LastPresetRef>
+		<Value>
+			<AbletonDefaultPresetRef Id="1">
+				<FileRef>
+					<RelativePathType Value="5" />
+					<RelativePath Value="Devices/Audio Effects/Limiter" />
+					<Path Value="D:/ABLETONLIVE11/Resources/Core Library/Devices/Audio Effects/Limiter" />
+					<Type Value="1" />
+					<LivePackName Value="Core Library" />
+					<LivePackId Value="www.ableton.com/0" />
+					<OriginalFileSize Value="0" />
+					<OriginalCrc Value="0" />
+				</FileRef>
+				<DeviceId Name="Limiter" />
+			</AbletonDefaultPresetRef>
+		</Value>
+	</LastPresetRef>
+	<LockedScripts />
+	<IsFolded Value="true" />
+	<ShouldShowPresetName Value="true" />
+	<UserName Value="" />
+	<Annotation Value="" />
+	<SourceContext>
+		<Value />
+	</SourceContext>
+	<OverwriteProtectionNumber Value="2816" />
+	<Gain>
+		<LomId Value="0" />
+		<Manual Value="0" />
+		<MidiControllerRange>
+			<Min Value="-24" />
+			<Max Value="24" />
+		</MidiControllerRange>
+		<AutomationTarget Id="35064">
+			<LockEnvelope Value="0" />
+		</AutomationTarget>
+		<ModulationTarget Id="35065">
+			<LockEnvelope Value="0" />
+		</ModulationTarget>
+	</Gain>
+	<Ceiling>
+		<LomId Value="0" />
+		<Manual Value="-0.3000000119" />
+		<MidiControllerRange>
+			<Min Value="-24" />
+			<Max Value="0" />
+		</MidiControllerRange>
+		<AutomationTarget Id="35066">
+			<LockEnvelope Value="0" />
+		</AutomationTarget>
+		<ModulationTarget Id="35067">
+			<LockEnvelope Value="0" />
+		</ModulationTarget>
+	</Ceiling>
+	<Release>
+		<LomId Value="0" />
+		<Manual Value="300.000061" />
+		<MidiControllerRange>
+			<Min Value="0.009999999776" />
+			<Max Value="3000" />
+		</MidiControllerRange>
+		<AutomationTarget Id="35068">
+			<LockEnvelope Value="0" />
+		</AutomationTarget>
+		<ModulationTarget Id="35069">
+			<LockEnvelope Value="0" />
+		</ModulationTarget>
+	</Release>
+	<AutoRelease>
+		<LomId Value="0" />
+		<Manual Value="true" />
+		<AutomationTarget Id="35070">
+			<LockEnvelope Value="0" />
+		</AutomationTarget>
+		<MidiCCOnOffThresholds>
+			<Min Value="64" />
+			<Max Value="127" />
+		</MidiCCOnOffThresholds>
+	</AutoRelease>
+	<LinkChannels>
+		<LomId Value="0" />
+		<Manual Value="true" />
+		<AutomationTarget Id="35071">
+			<LockEnvelope Value="0" />
+		</AutomationTarget>
+		<MidiCCOnOffThresholds>
+			<Min Value="64" />
+			<Max Value="127" />
+		</MidiCCOnOffThresholds>
+	</LinkChannels>
+	<Lookahead>
+		<LomId Value="0" />
+		<Manual Value="1" />
+		<AutomationTarget Id="35072">
+			<LockEnvelope Value="0" />
+		</AutomationTarget>
+	</Lookahead>
+</Limiter>

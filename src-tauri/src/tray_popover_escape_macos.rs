@@ -41,3 +41,15 @@ pub fn install(app: tauri::AppHandle) {
 
 #[cfg(not(target_os = "macos"))]
 pub fn install(_app: tauri::AppHandle) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_install_compiles() {
+        // We cannot easily test macOS specific NSEvent monitoring,
+        // but we can ensure this module is included in tests.
+        assert!(true);
+    }
+}

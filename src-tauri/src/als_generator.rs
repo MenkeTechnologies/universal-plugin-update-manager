@@ -2115,6 +2115,24 @@ mod tests {
     }
 
     #[test]
+    fn test_ableton_version_parsing_edge_cases() {
+        // Only major
+        let v = AbletonVersion::parse_version_string("11").unwrap();
+        assert_eq!(v.major, 11);
+        assert_eq!(v.minor, 0);
+        
+        // Live 10 style
+        let v2 = AbletonVersion::parse_version_string("10.1.42").unwrap();
+        assert_eq!(v2.major, 10);
+        assert_eq!(v2.patch, 42);
+        
+        // Leading/trailing whitespace
+        let v3 = AbletonVersion::parse_version_string("  12.0.1  ").unwrap();
+        assert_eq!(v3.major, 12);
+        assert_eq!(v3.patch, 1);
+    }
+
+    #[test]
     fn test_section_bars() {
         assert_eq!(Section::Intro.bars(), 16);
         assert_eq!(Section::Buildup.bars(), 16);

@@ -1573,11 +1573,39 @@ Generator supports placing multiple complete songs sequentially in one `.als` fi
 - [x] LoopEnd based on actual sample loop length
 
 ### Mixer
-- [ ] Volume (linear scale conversion)
+- [x] Volume (linear scale conversion) — KICK at unity, other tracks attenuated
 - [ ] Pan (-1 to 1)
-- [ ] Sends (per ReturnTrack)
+- [x] Sends (per ReturnTrack) — category-aware Send A (Reverb) / Send B (Delay)
+      amounts in `send_levels_for`. Kick/sub/bass stay dry; pads wettest; leads
+      add delay. See `src-tauri/src/techno_generator.rs` helper.
 - [x] Routing (Master/Group)
 - [x] MixerInArrangement visibility toggle
+
+### Bus Topology & Sidechain
+- [x] Six group tracks: **KICKS** (own bus so the kick pulse drives the
+      sidechain without feeding back), **DRUMS**, **BASS**, **BASS FX**,
+      **MELODICS**, **FX**. Groups are skipped entirely when they have no
+      children — track-count math is computed from `song1.*.iter().any(...)`,
+      not hardcoded.
+- [x] **Group-level sidechain** Compressor2 on **DRUMS / BASS / BASS FX /
+      MELODICS**, keyed to `AudioIn/Track.<KICKS_group_id>/PostFxOut`. One
+      compressor per bus (not per track) so ducking is uniform and avoids
+      double compression. FX bus is deliberately un-sidechained so risers /
+      impacts / crashes stay transient.
+- Template: `src-tauri/src/group_sidechain_compressor_template.xml`
+  (SideChain `OnOff` pre-enabled, Threshold ≈ -14 dB, Ratio 4:1,
+  `__SC_SRC_ID__` placeholder substituted at emit time).
+
+### Master Chain
+- [x] **Eq8** on MainTrack with Band.0 as a 12 dB/oct HPF at **30 Hz** — subsonic
+      rumble cleanup that doesn't cost any low-end warmth.
+      Template: `src-tauri/src/master_eq8_hpf_template.xml`.
+- [x] **Limiter** on MainTrack: Ceiling **-0.3 dB**, AutoRelease on, LinkChannels
+      on, Lookahead on. Catches peaks without touching mix gain staging.
+      Template: `src-tauri/src/master_limiter_template.xml`.
+- Both devices are injected in front of the template's existing StereoGain
+  (Utility) — HPF first, Limiter second, then Utility — so the chain order is
+  rumble-cleanup → peak-catch → final trim.
 
 ### Automation
 - [ ] BoolEvent for mutes
@@ -1591,8 +1619,8 @@ Generator supports placing multiple complete songs sequentially in one `.als` fi
 - [x] Full 6-minute arrangement (192 bars / 768 beats)
 - [x] Sample cycling for long arrangements
 - [ ] Overlap handling
-- [ ] Section markers (Locators)
-- [ ] Multi-arrangement mode (multiple songs per file)
+- [x] Section markers (Locators)
+- [x] Multi-arrangement mode (multiple songs per file)
 
 ---
 

@@ -1720,6 +1720,10 @@ fn apply_glitch_edits(mut arrangements: Vec<TrackArrangement>, glitch_intensity:
 }
 
 const GROUP_TRACK_TEMPLATE: &str = include_str!("group_track_template.xml");
+const MASTER_EQ8_HPF_TEMPLATE: &str = include_str!("master_eq8_hpf_template.xml");
+const MASTER_LIMITER_TEMPLATE: &str = include_str!("master_limiter_template.xml");
+const GROUP_SIDECHAIN_COMPRESSOR_TEMPLATE: &str =
+    include_str!("group_sidechain_compressor_template.xml");
 
 const DRUMS_COLOR: u32 = 69;
 const BASS_COLOR: u32 = 13;
@@ -2965,7 +2969,11 @@ pub fn generate(
     let track_end = xml.find("</AudioTrack>").ok_or("No AudioTrack end found")? + "</AudioTrack>".len();
     let original_audio_track = xml[track_start..track_end].to_string();
 
-    // Allocate group IDs
+    // Allocate group IDs. KICKS is its own group (sibling of DRUMS) so the
+    // kick pulse lives outside anything that will be sidechained to it — this
+    // leaves the door open for a group-level sidechain on DRUMS/BASS without
+    // the kick ducking itself.
+    let kicks_group_id = ids.alloc();
     let drums_group_id = ids.alloc();
     let bass_group_id = ids.alloc();
     let bass_fx_group_id = ids.alloc();
@@ -2973,11 +2981,26 @@ pub fn generate(
     let fx_group_id = ids.alloc();
 
     // Create groups
-    let drums_group = create_group_track("DRUMS", DRUMS_COLOR, drums_group_id, &ids)?;
-    let bass_group = create_group_track("BASS", BASS_COLOR, bass_group_id, &ids)?;
-    let bass_fx_group = create_group_track("BASS FX", BASS_COLOR, bass_fx_group_id, &ids)?;
-    let melodics_group = create_group_track("MELODICS", MELODICS_COLOR, melodics_group_id, &ids)?;
+    let kicks_group = create_group_track("KICKS", DRUMS_COLOR, kicks_group_id, &ids)?;
+    let mut drums_group = create_group_track("DRUMS", DRUMS_COLOR, drums_group_id, &ids)?;
+    let mut bass_group = create_group_track("BASS", BASS_COLOR, bass_group_id, &ids)?;
+    let mut bass_fx_group = create_group_track("BASS FX", BASS_COLOR, bass_fx_group_id, &ids)?;
+    let mut melodics_group = create_group_track("MELODICS", MELODICS_COLOR, melodics_group_id, &ids)?;
     let fx_group = create_group_track("FX", FX_COLOR, fx_group_id, &ids)?;
+
+    // Install a Compressor2 sidechain on every non-kick, non-FX group bus,
+    // keyed to the KICKS group output. DRUMS / BASS / BASS FX / MELODICS all
+    // duck together to the kick pulse — that's the signature techno pump.
+    // The FX bus (risers/impacts/crashes) stays untouched so transient FX
+    // don't get squashed by the compressor.
+    let group_sc_drums = build_group_sidechain_compressor(kicks_group_id, &ids);
+    let group_sc_bass = build_group_sidechain_compressor(kicks_group_id, &ids);
+    let group_sc_bass_fx = build_group_sidechain_compressor(kicks_group_id, &ids);
+    let group_sc_melodics = build_group_sidechain_compressor(kicks_group_id, &ids);
+    drums_group = inject_device_into_group_chain(&drums_group, &group_sc_drums);
+    bass_group = inject_device_into_group_chain(&bass_group, &group_sc_bass);
+    bass_fx_group = inject_device_into_group_chain(&bass_fx_group, &group_sc_bass_fx);
+    melodics_group = inject_device_into_group_chain(&melodics_group, &group_sc_melodics);
 
     // Get arrangement structure with all section overrides applied
     let arrangements = get_arrangement_with_params(chaos, glitch_intensity, &section_overrides, density, variation, parallelism, scatter);
@@ -3081,8 +3104,33 @@ pub fn generate(
 
     if cancelled() { return Err("Generation cancelled".into()); }
 
-    // Count total tracks to create (for progress bar)
-    let total_tracks = 5 // group tracks (DRUMS, BASS, BASS FX, MELODICS, FX)
+    // Count total tracks to create (for progress bar). Group tracks are only
+    // emitted when they have at least one child, so compute dynamically rather
+    // than hard-coding a magic number that drifts every time groups change.
+    let has_any = |v: &[Vec<SampleInfo>]| v.iter().any(|x| !x.is_empty());
+    let kicks_group_emitted = has_any(&song1.kicks);
+    let drums_group_emitted = has_any(&song1.claps) || has_any(&song1.snares)
+        || has_any(&song1.hats) || has_any(&song1.percs) || has_any(&song1.rides)
+        || has_any(&song1.fills);
+    let bass_group_emitted = has_any(&song1.basses) || has_any(&song1.subs);
+    let bass_fx_group_emitted = has_any(&song1.sub_drops) || has_any(&song1.boom_kicks);
+    let melodics_group_emitted = has_any(&song1.leads) || has_any(&song1.synths)
+        || has_any(&song1.pads) || has_any(&song1.arps) || has_any(&song1.atmoses);
+    let fx_group_emitted = has_any(&song1.risers) || has_any(&song1.downlifters)
+        || has_any(&song1.crashes) || has_any(&song1.impacts) || has_any(&song1.hits)
+        || has_any(&song1.sweep_ups) || has_any(&song1.sweep_downs)
+        || has_any(&song1.snare_rolls) || has_any(&song1.reverses)
+        || has_any(&song1.glitches) || has_any(&song1.scatters)
+        || has_any(&song1.voxes);
+    let group_count = [
+        kicks_group_emitted,
+        drums_group_emitted,
+        bass_group_emitted,
+        bass_fx_group_emitted,
+        melodics_group_emitted,
+        fx_group_emitted,
+    ].iter().filter(|b| **b).count();
+    let total_tracks = group_count
         + song1.kicks.iter().filter(|v| !v.is_empty()).count()
         + song1.claps.iter().filter(|v| !v.is_empty()).count()
         + song1.snares.iter().filter(|v| !v.is_empty()).count()
@@ -3150,8 +3198,18 @@ pub fn generate(
         }};
     }
 
-    // === DRUMS === (only add group if it will have children)
-    let drums_has_children = has_samples(&song1.kicks) || has_samples(&song1.claps) || has_samples(&song1.snares) ||
+    // === KICKS === (own group so its bus output can drive sidechain inputs
+    // on every other group without the kick itself ducking to its own pulse).
+    let kicks_has_children = has_samples(&song1.kicks);
+    if kicks_has_children {
+        all_tracks.push(kicks_group.clone());
+        tracks_created += 1;
+        report_progress(tracks_created, total_tracks);
+    }
+    create_tracks!(song1.kicks, "KICK", DRUMS_COLOR, if kicks_has_children { kicks_group_id as i32 } else { -1 });
+
+    // === DRUMS === (non-kick drums: claps/snares/hats/percs/rides/fills).
+    let drums_has_children = has_samples(&song1.claps) || has_samples(&song1.snares) ||
                              has_samples(&song1.hats) || has_samples(&song1.percs) || has_samples(&song1.rides) ||
                              has_samples(&song1.fills);
     if drums_has_children {
@@ -3159,7 +3217,6 @@ pub fn generate(
         tracks_created += 1;
         report_progress(tracks_created, total_tracks);
     }
-    create_tracks!(song1.kicks, "KICK", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
     create_tracks!(song1.claps, "CLAP", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
     create_tracks!(song1.snares, "SNARE", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
     create_tracks!(song1.hats, "HAT", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
@@ -3231,6 +3288,12 @@ pub fn generate(
         write_app_log(format!("[techno_generator] WARNING: {}", w));
     }
 
+    // Sidechain ducking is now applied at the GROUP BUS level (DRUMS / BASS /
+    // BASS FX / MELODICS), keyed to the KICKS group bus. Per-track sidechain
+    // on every audio track was redundant once we moved to group compressors
+    // (stacking would double-compress). Groups are installed above during
+    // group-track creation.
+
     progress("Assembling XML");
     // Build final XML - all tracks
     let before_track = &xml[..track_start];
@@ -3238,15 +3301,19 @@ pub fn generate(
 
     let track_count = all_tracks.len();
     let clip_count: usize = all_tracks.iter().map(|t| t.matches("<AudioClip").count()).sum();
-    
+
     // Fail if no tracks were created (no samples found)
     if track_count == 0 {
         return Err("No samples found for any track type. Run sample analysis first or check your sample library paths.".into());
     }
-    
+
     let all_tracks_xml = all_tracks.join("\n\t\t\t");
 
     let mut xml = format!("{}{}{}", before_track, all_tracks_xml, after_track);
+
+    // Inject Eq8 (30 Hz HPF) + Limiter (-0.3 dB) into the MainTrack device
+    // chain so the exported project opens ready-to-play without clipping.
+    xml = inject_master_chain(&xml, &ids);
 
     // Update NextPointeeId
     let next_id = ids.max_id() + 1000;
@@ -3498,6 +3565,164 @@ fn create_audio_clip(sample: &SampleInfo, color: u32, clip_id: u32, start_bar: f
     )
 }
 
+/// Replace every `Id="N"` occurrence in a device XML template with freshly
+/// allocated, unique IDs from the supplied allocator. This lets us clone a
+/// device into a project without ID collisions.
+fn reallocate_device_ids(template: &str, ids: &IdAllocator) -> String {
+    let id_re = Regex::new(r#"Id="(\d+)""#).unwrap();
+    let mut out = template.to_string();
+    let mut replacements: Vec<(String, String)> = Vec::new();
+    for cap in id_re.captures_iter(&out) {
+        let old = format!(r#"Id="{}""#, &cap[1]);
+        let new_id = ids.alloc();
+        let new = format!(r#"Id="{}""#, new_id);
+        replacements.push((old, new));
+    }
+    for (old, new) in replacements {
+        out = out.replacen(&old, &new, 1);
+    }
+    out
+}
+
+/// Return (reverb_send_ratio, delay_send_ratio) as linear voltage ratios for a
+/// track name. Ratio = 10^(dB/20). -∞ dB is encoded as the base template's
+/// default `0.000316...` which reads as "silenced" in Ableton's UI.
+///
+/// Levels target a typical techno mix: bass stays dry, drums get a small kiss
+/// of reverb, pads/atmos run wettest, leads add delay for rhythmic interest.
+fn send_levels_for(name: &str) -> (f64, f64) {
+    const OFF: f64 = 0.000316; // -∞ dB (same as template default)
+    const DB_24: f64 = 0.06309573; // -24 dB
+    const DB_18: f64 = 0.12589254; // -18 dB
+    const DB_15: f64 = 0.17782794; // -15 dB
+    const DB_12: f64 = 0.25118864; // -12 dB
+    const DB_9: f64 = 0.35481339; // -9 dB
+
+    let n = name.to_uppercase();
+    let n = n.as_str();
+    // Low-end stays dry — reverb/delay on sub frequencies muddies the mix.
+    if n.starts_with("KICK")
+        || n.starts_with("BOOM KICK")
+        || n.starts_with("SUB DROP")
+        || n.starts_with("SUB")
+        || n.starts_with("BASS")
+    {
+        (OFF, OFF)
+    } else if n.starts_with("CLAP") || n.starts_with("SNARE") {
+        (DB_18, OFF)
+    } else if n.starts_with("HAT") || n.starts_with("RIDE") || n.starts_with("PERC") || n.starts_with("FILL") {
+        (DB_24, OFF)
+    } else if n.starts_with("LEAD") || n.starts_with("ARP") {
+        (DB_15, DB_12)
+    } else if n.starts_with("SYNTH") {
+        (DB_15, DB_18)
+    } else if n.starts_with("PAD") || n.starts_with("ATMOS") {
+        (DB_9, DB_18)
+    } else if n.starts_with("VOX") {
+        (DB_12, DB_15)
+    } else if n.starts_with("RISER")
+        || n.starts_with("DOWNLIFTER")
+        || n.starts_with("SWEEP")
+        || n.starts_with("CRASH")
+        || n.starts_with("IMPACT")
+        || n.starts_with("HIT")
+        || n.starts_with("REVERSE")
+    {
+        (DB_12, DB_18)
+    } else if n.starts_with("GLITCH") || n.starts_with("SCATTER") {
+        (DB_15, DB_15)
+    } else {
+        (DB_24, OFF)
+    }
+}
+
+/// Replace the two default `Manual Value="0.00031622..."` placeholders inside
+/// the track's `<Sends>` block with the supplied linear ratios. Each value is
+/// unique within one AudioTrack template so `replacen(.., 1)` targets the right
+/// Send. Send A routes to Return A (Reverb) and Send B to Return B (Delay).
+fn apply_sends(track: &str, reverb: f64, delay: f64) -> String {
+    track
+        .replacen(
+            r#"<Manual Value="0.00031622799" />"#,
+            &format!(r#"<Manual Value="{}" />"#, reverb),
+            1,
+        )
+        .replacen(
+            r#"<Manual Value="0.0003162277571" />"#,
+            &format!(r#"<Manual Value="{}" />"#, delay),
+            1,
+        )
+}
+
+/// Build a sidechain Compressor2 device keyed to `source_track_id`, with fresh
+/// unique IDs so multiple group buses can each own a copy. The template has
+/// SideChain pre-enabled and a `__SC_SRC_ID__` placeholder which we substitute
+/// for the real source track id.
+fn build_group_sidechain_compressor(source_track_id: u32, ids: &IdAllocator) -> String {
+    let device = reallocate_device_ids(GROUP_SIDECHAIN_COMPRESSOR_TEMPLATE, ids);
+    device.replace("__SC_SRC_ID__", &source_track_id.to_string())
+}
+
+/// Inject a pre-built device into a group track's `<Devices />` block. The
+/// base group template ships with an empty self-closing `<Devices />` — we
+/// swap that for `<Devices>{device}</Devices>` on the first match so only
+/// the group's own chain is populated (not nested freeze-sequencer slots).
+fn inject_device_into_group_chain(group_xml: &str, device_xml: &str) -> String {
+    // Re-indent the device body so it nests under the group's DeviceChain
+    // tabs. The group_track_template places `<Devices />` at 6 tabs deep;
+    // child devices should be at 7 tabs.
+    let indent = "\t\t\t\t\t\t\t";
+    let reindented: String = device_xml
+        .lines()
+        .map(|l| if l.is_empty() { l.to_string() } else { format!("{}{}", indent, l) })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let replacement = format!("<Devices>\n{}\n\t\t\t\t\t\t</Devices>", reindented);
+    group_xml.replacen("<Devices />", &replacement, 1)
+}
+
+/// Inject `<Eq8>` (30 Hz high-pass) and `<Limiter>` (-0.3 dB ceiling) into the
+/// MainTrack's device chain, in front of the existing `<StereoGain>` (Utility).
+/// Order matters: HPF first to remove rumble, then Limiter to catch peaks.
+fn inject_master_chain(xml: &str, ids: &IdAllocator) -> String {
+    let eq8 = reallocate_device_ids(MASTER_EQ8_HPF_TEMPLATE, ids);
+    let limiter = reallocate_device_ids(MASTER_LIMITER_TEMPLATE, ids);
+
+    // Scope to the MainTrack element so we don't hit AudioTrack/ReturnTrack
+    // Devices blocks. Real ALS templates open with `<MainTrack Selected...>`
+    // but tests use `<MainTrack>` — accept both.
+    let main_re = Regex::new(r"<MainTrack(?:\s|>)").unwrap();
+    let Some(m) = main_re.find(xml) else { return xml.to_string() };
+    let main_start = m.start();
+    let Some(rel_main_end) = xml[main_start..].find("</MainTrack>") else { return xml.to_string() };
+    let main_end = main_start + rel_main_end;
+
+    let main = &xml[main_start..main_end];
+    // First `<Devices>` with actual children (not `<Devices />`).
+    let devices_open = "<Devices>";
+    let Some(rel_dev) = main.find(devices_open) else { return xml.to_string() };
+    let insert_pos = main_start + rel_dev + devices_open.len();
+
+    // Existing first child indent is 7 tabs (matches <StereoGain Id=...>).
+    // Our templates are at zero indent — we prefix their first line, and re-
+    // indent subsequent lines with awk-style tab prepending done on the fly.
+    let indent = "\t\t\t\t\t\t\t";
+    let reindent = |body: &str| -> String {
+        body.lines()
+            .map(|l| if l.is_empty() { l.to_string() } else { format!("{}{}", indent, l) })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    let injected = format!(
+        "\n{}\n{}",
+        reindent(eq8.trim_end()),
+        reindent(limiter.trim_end()),
+    );
+
+    format!("{}{}{}", &xml[..insert_pos], injected, &xml[insert_pos..])
+}
+
 fn create_group_track(name: &str, color: u32, group_id: u32, ids: &IdAllocator) -> Result<String, String> {
     let mut track = GROUP_TRACK_TEMPLATE.to_string();
 
@@ -3728,6 +3953,12 @@ fn create_arranged_track_multi(
         1,
     );
 
+    // Set reverb/delay send amounts based on track category. The template's
+    // defaults are -∞ dB (silent); this makes the return busses actually
+    // audible without any user intervention.
+    let (reverb_send, delay_send) = send_levels_for(name);
+    track = apply_sends(&track, reverb_send, delay_send);
+
     Ok(track)
 }
 
@@ -3947,5 +4178,285 @@ mod additional_tests {
         let arrangements = vec![TrackArrangement::new("SYNTH", vec![(1.0, 10.0), (20.0, 30.0), (40.0, 50.0)])];
         let result = apply_variation(arrangements.clone(), 0.0);
         assert_eq!(result, arrangements, "Zero variation should not modify arrangements");
+    }
+
+    // ---------- Tier 1 feature tests: sends, sidechain, master chain ----------
+
+    /// Minimal fake of one AudioTrack's Mixer/Sends region — matches the shape
+    /// the real template uses so `apply_sends` has the same anchors to find.
+    fn fake_audio_track_sends() -> String {
+        r#"<AudioTrack Id="99">
+            <Name><EffectiveName Value="PAD 1" /></Name>
+            <Sends>
+                <TrackSendHolder Id="0">
+                    <Send>
+                        <LomId Value="0" />
+                        <Manual Value="0.00031622799" />
+                        <MidiControllerRange>
+                            <Min Value="0.00031622799" />
+                        </MidiControllerRange>
+                    </Send>
+                </TrackSendHolder>
+                <TrackSendHolder Id="2">
+                    <Send>
+                        <LomId Value="0" />
+                        <Manual Value="0.0003162277571" />
+                        <MidiControllerRange>
+                            <Min Value="0.0003162277571" />
+                        </MidiControllerRange>
+                    </Send>
+                </TrackSendHolder>
+            </Sends>
+        </AudioTrack>"#.to_string()
+    }
+
+    #[test]
+    fn send_levels_kick_is_dry() {
+        // Low-end tracks must stay dry — reverb/delay on kick muddies the mix.
+        let (rev, dly) = send_levels_for("KICK");
+        assert!(rev < 0.001, "KICK reverb should be ~-∞ dB, got {}", rev);
+        assert!(dly < 0.001, "KICK delay should be ~-∞ dB, got {}", dly);
+        // Same for numbered variants
+        let (rev, dly) = send_levels_for("KICK 3");
+        assert!(rev < 0.001 && dly < 0.001);
+    }
+
+    #[test]
+    fn send_levels_sub_and_bass_dry() {
+        for name in &["SUB", "SUB 2", "BASS 1", "SUB DROP", "BOOM KICK"] {
+            let (rev, dly) = send_levels_for(name);
+            assert!(rev < 0.001, "{} reverb should be dry, got {}", name, rev);
+            assert!(dly < 0.001, "{} delay should be dry, got {}", name, dly);
+        }
+    }
+
+    #[test]
+    fn send_levels_pad_is_wettest_category() {
+        // Pads should have the loudest reverb of any category — they're the
+        // atmosphere. Compare against drums/bass/leads.
+        let (pad_rev, _) = send_levels_for("PAD 1");
+        let (kick_rev, _) = send_levels_for("KICK");
+        let (clap_rev, _) = send_levels_for("CLAP");
+        let (lead_rev, _) = send_levels_for("LEAD 2");
+        assert!(pad_rev > kick_rev, "pad reverb should exceed kick");
+        assert!(pad_rev > clap_rev, "pad reverb should exceed clap");
+        assert!(pad_rev > lead_rev, "pad reverb should exceed lead");
+    }
+
+    #[test]
+    fn send_levels_lead_has_delay() {
+        // Leads need delay for that techno/trance rhythmic ping.
+        let (_, lead_dly) = send_levels_for("LEAD 1");
+        let (_, pad_dly) = send_levels_for("PAD 1");
+        assert!(lead_dly > pad_dly, "lead delay ({}) should exceed pad delay ({})", lead_dly, pad_dly);
+    }
+
+    #[test]
+    fn apply_sends_replaces_only_the_two_send_manuals() {
+        let track = fake_audio_track_sends();
+        let out = apply_sends(&track, 0.25, 0.35);
+        // Sent values must be present on the two Send<Manual> lines.
+        assert!(out.contains(r#"<Manual Value="0.25" />"#));
+        assert!(out.contains(r#"<Manual Value="0.35" />"#));
+        // MidiControllerRange Min values (unrelated) must NOT have been touched —
+        // they share the same numeric string but are Min, not Manual.
+        assert!(out.contains(r#"<Min Value="0.00031622799" />"#));
+        assert!(out.contains(r#"<Min Value="0.0003162277571" />"#));
+        // The original Manual placeholders are gone.
+        assert!(!out.contains(r#"<Manual Value="0.00031622799" />"#));
+        assert!(!out.contains(r#"<Manual Value="0.0003162277571" />"#));
+    }
+
+    #[test]
+    fn group_sidechain_compressor_template_is_preconfigured() {
+        // Template integrity — if someone re-extracts it from a different
+        // reference ALS and forgets to enable the sidechain block, the
+        // DRUMS/BASS buses would emit but not actually duck. Guard against it.
+        let t = GROUP_SIDECHAIN_COMPRESSOR_TEMPLATE;
+        // OnOff must already be Manual="true" in the template (we never flip
+        // it at runtime).
+        let sc_idx = t.find("<SideChain>").expect("template missing SideChain");
+        let onoff_slice = &t[sc_idx..sc_idx + 400];
+        assert!(
+            onoff_slice.contains(r#"<Manual Value="true" />"#),
+            "SideChain OnOff must be pre-enabled"
+        );
+        // Source routing placeholder must be present for substitution.
+        assert!(
+            t.contains("__SC_SRC_ID__"),
+            "template must include __SC_SRC_ID__ placeholder for source track"
+        );
+        // Ducking-appropriate threshold (≤ ~-10 dB in Ableton's 0.0005-1.9
+        // scale, i.e. < 0.5).
+        let thresh_idx = t.find("<Threshold>").unwrap();
+        let thresh_slice = &t[thresh_idx..thresh_idx + 400];
+        let re = regex::Regex::new(r#"<Manual Value="([0-9.]+)"#).unwrap();
+        let cap = re.captures(thresh_slice).expect("Threshold Manual not found");
+        let thresh: f64 = cap[1].parse().unwrap();
+        assert!(thresh < 0.5, "Threshold {} is too loose for sidechain ducking", thresh);
+    }
+
+    #[test]
+    fn build_group_sidechain_substitutes_source_id_and_allocates_ids() {
+        let ids = IdAllocator::new(5_000_000);
+        let out = build_group_sidechain_compressor(4242, &ids);
+        assert!(
+            out.contains("AudioIn/Track.4242/PostFxOut"),
+            "source track id should be substituted"
+        );
+        assert!(!out.contains("__SC_SRC_ID__"), "placeholder should be gone");
+        // Fresh IDs replaced the template's reserved ones.
+        assert!(!out.contains(r#"Id="2""#), "template Id=2 should be reallocated");
+    }
+
+    #[test]
+    fn build_group_sidechain_twice_has_disjoint_ids() {
+        // Two groups (DRUMS and BASS) each get their own Compressor2 copy —
+        // the IDs must not collide or Ableton will reject the file.
+        let ids = IdAllocator::new(5_500_000);
+        let a = build_group_sidechain_compressor(100, &ids);
+        let b = build_group_sidechain_compressor(100, &ids);
+        let id_re = regex::Regex::new(r#"Id="(\d+)""#).unwrap();
+        let ids_a: Vec<_> = id_re.captures_iter(&a).map(|c| c[1].to_string()).collect();
+        let ids_b: Vec<_> = id_re.captures_iter(&b).map(|c| c[1].to_string()).collect();
+        for id in &ids_a {
+            assert!(!ids_b.contains(id), "ID {} reused across two group compressors", id);
+        }
+    }
+
+    #[test]
+    fn inject_device_into_group_chain_replaces_empty_devices() {
+        // The group template ships with a self-closing `<Devices />`. Inject
+        // must expand it to `<Devices>…</Devices>` exactly once, preserving
+        // the rest of the group XML.
+        let group = r#"<GroupTrack Id="1">
+            <DeviceChain>
+                <Devices />
+                <SignalModulations />
+            </DeviceChain>
+        </GroupTrack>"#;
+        let out = inject_device_into_group_chain(group, "<Compressor2 Id=\"99\" />");
+        assert!(!out.contains("<Devices />"), "empty Devices placeholder should be gone");
+        assert!(out.contains("<Devices>"), "Devices should now be a container");
+        assert!(out.contains("</Devices>"), "Devices container should close");
+        assert!(out.contains(r#"<Compressor2 Id="99" />"#), "device content should be injected");
+        // Preserved structure.
+        assert!(out.contains("<SignalModulations />"));
+        // Exactly one replacement happened (only the FIRST <Devices /> is targeted).
+        assert_eq!(out.matches("<Compressor2 ").count(), 1);
+    }
+
+    #[test]
+    fn inject_device_is_idempotent_when_no_empty_devices_present() {
+        // If the group already has a populated Devices block, we must not
+        // duplicate or mangle it.
+        let group = r#"<GroupTrack Id="1">
+            <DeviceChain>
+                <Devices><EQ Id="5" /></Devices>
+            </DeviceChain>
+        </GroupTrack>"#;
+        let out = inject_device_into_group_chain(group, "<Compressor2 Id=\"99\" />");
+        assert_eq!(group, out, "no empty <Devices /> placeholder → no change");
+    }
+
+    #[test]
+    fn reallocate_device_ids_gives_unique_fresh_ids() {
+        let ids = IdAllocator::new(2_000_000);
+        let out1 = reallocate_device_ids(r#"<A Id="1"><B Id="2" /><C Id="3" /></A>"#, &ids);
+        let out2 = reallocate_device_ids(r#"<A Id="1"><B Id="2" /><C Id="3" /></A>"#, &ids);
+        // Original IDs gone.
+        for s in [&out1, &out2] {
+            assert!(!s.contains(r#"Id="1""#), "template Id=1 should be replaced");
+            assert!(!s.contains(r#"Id="2""#));
+            assert!(!s.contains(r#"Id="3""#));
+        }
+        // Two calls produce disjoint ID sets.
+        let id_re = regex::Regex::new(r#"Id="(\d+)""#).unwrap();
+        let ids1: Vec<_> = id_re.captures_iter(&out1).map(|c| c[1].to_string()).collect();
+        let ids2: Vec<_> = id_re.captures_iter(&out2).map(|c| c[1].to_string()).collect();
+        for id in &ids1 {
+            assert!(!ids2.contains(id), "ID {} reused across calls", id);
+        }
+    }
+
+    #[test]
+    fn inject_master_chain_places_devices_before_existing_stereogain() {
+        let ids = IdAllocator::new(3_000_000);
+        let xml = r#"<Ableton>
+            <Tracks>
+                <AudioTrack Id="1">
+                    <DeviceChain>
+                        <Devices>
+                            <Compressor2 Id="10" />
+                        </Devices>
+                    </DeviceChain>
+                </AudioTrack>
+            </Tracks>
+            <MainTrack>
+                <DeviceChain>
+                    <Devices>
+                        <StereoGain Id="99" />
+                    </Devices>
+                </DeviceChain>
+            </MainTrack>
+        </Ableton>"#;
+        let out = inject_master_chain(xml, &ids);
+        // Master devices present.
+        assert!(out.contains("<Eq8 "), "master Eq8 missing");
+        assert!(out.contains("<Limiter "), "master Limiter missing");
+        // They sit AFTER the MainTrack opening and BEFORE the StereoGain.
+        let main_pos = out.find("<MainTrack").unwrap();
+        let eq8_pos = out[main_pos..].find("<Eq8 ").expect("Eq8 should be inside MainTrack");
+        let stereogain_pos = out[main_pos..].find("<StereoGain").unwrap();
+        let limiter_pos = out[main_pos..].find("<Limiter ").expect("Limiter should be inside MainTrack");
+        assert!(eq8_pos < stereogain_pos, "Eq8 must precede StereoGain");
+        assert!(limiter_pos < stereogain_pos, "Limiter must precede StereoGain");
+        assert!(eq8_pos < limiter_pos, "Eq8 must precede Limiter (HPF before peak catch)");
+        // AudioTrack's existing Compressor2 must NOT get the master chain injected.
+        let first_at = out.find("<AudioTrack").unwrap();
+        let first_at_end = out.find("</AudioTrack>").unwrap();
+        let at_slice = &out[first_at..first_at_end];
+        assert!(!at_slice.contains("<Eq8 "), "Eq8 leaked into AudioTrack");
+        assert!(!at_slice.contains("<Limiter "), "Limiter leaked into AudioTrack");
+    }
+
+    #[test]
+    fn inject_master_chain_is_noop_without_maintrack() {
+        let ids = IdAllocator::new(4_000_000);
+        let xml = "<Ableton><Tracks></Tracks></Ableton>";
+        let out = inject_master_chain(xml, &ids);
+        assert_eq!(xml, out, "no MainTrack → no injection");
+    }
+
+    #[test]
+    fn master_eq8_template_has_band0_hpf_at_30hz() {
+        // Template integrity: Band.0 ParameterA must be an active HPF at 30Hz.
+        // Regression guard — if someone re-extracts the template from a
+        // different source and forgets to bump Freq, this catches it.
+        let t = MASTER_EQ8_HPF_TEMPLATE;
+        // Only one instance of Freq Manual="30" — the Band.0 HPF we tuned.
+        let count = t.matches(r#"<Manual Value="30" />"#).count();
+        assert!(count >= 1, "Eq8 template must have at least one Manual=30 (Band.0 Freq)");
+        // The first <Freq> block's <Manual> must be "30", not the stock "10".
+        let first_freq_block = t.find("<Freq>").expect("no <Freq>");
+        let slice = &t[first_freq_block..first_freq_block + 500];
+        assert!(slice.contains(r#"<Manual Value="30" />"#), "Band.0 Freq Manual should be 30");
+        assert!(!slice.contains(r#"<Manual Value="10" />"#), "Band.0 Freq Manual should not be stock 10");
+    }
+
+    #[test]
+    fn master_limiter_template_has_safe_ceiling() {
+        // Limiter ceiling must be ≤ 0 dB; -0.3 dB is the standard mastering
+        // safety margin for inter-sample peaks. If someone edits the template
+        // and sets ceiling above 0, clipping returns.
+        let t = MASTER_LIMITER_TEMPLATE;
+        assert!(t.contains("<Ceiling>"), "limiter missing Ceiling param");
+        let ceiling_pos = t.find("<Ceiling>").unwrap();
+        let slice = &t[ceiling_pos..ceiling_pos + 400];
+        let re = regex::Regex::new(r#"<Manual Value="(-?\d+\.?\d*)"#).unwrap();
+        let cap = re.captures(slice).expect("Ceiling Manual not found");
+        let val: f64 = cap[1].parse().unwrap();
+        assert!(val <= 0.0, "Ceiling must be ≤ 0 dB, got {}", val);
+        assert!(val >= -1.0, "Ceiling {} dB is too aggressive (< -1 dB)", val);
     }
 }
