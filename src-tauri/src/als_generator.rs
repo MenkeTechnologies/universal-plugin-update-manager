@@ -1693,62 +1693,6 @@ pub fn generate_techno_als(
     generate_als(output_path, &tracks, bpm)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-    #[test]
-    fn test_generate_minimal_als() {
-        let output = std::env::temp_dir().join("test_techno.als");
-
-        let kick = SampleInfo {
-            path: "/Applications/Ableton Live 12 Suite.app/Contents/App-Resources/Core Library/Samples/Multisamples/Drum Machines/808/Kick 808 Tone1.wav".to_string(),
-            name: "Kick 808".to_string(),
-            duration_secs: 0.2,
-            sample_rate: 96000,
-            file_size: 50000,
-            bpm: None,
-        };
-
-        let clap = SampleInfo {
-            path: "/Applications/Ableton Live 12 Suite.app/Contents/App-Resources/Core Library/Samples/Multisamples/Drum Machines/808/Snare 808 Tone1 k.wav".to_string(),
-            name: "Snare 808".to_string(),
-            duration_secs: 0.3,
-            sample_rate: 96000,
-            file_size: 60000,
-            bpm: None,
-        };
-
-        let hat = SampleInfo {
-            path: "/Applications/Ableton Live 12 Suite.app/Contents/App-Resources/Core Library/Samples/One Shots/Drums/Hihat/Hihat Closed Argus.wav".to_string(),
-            name: "Hihat Closed".to_string(),
-            duration_secs: 0.15,
-            sample_rate: 44100,
-            file_size: 30000,
-            bpm: None,
-        };
-
-        let config = TechnoConfig {
-            bpm: 130.0,
-            kick,
-            clap,
-            hat,
-        };
-
-        let tracks = config.generate_arrangement();
-        let result = generate_als(&output, &tracks, 130.0);
-
-        assert!(result.is_ok(), "Failed to generate ALS: {:?}", result);
-        assert!(output.exists(), "Output file not created");
-
-        let metadata = fs::metadata(&output).unwrap();
-        assert!(metadata.len() > 0, "Output file is empty");
-
-        println!("Generated ALS at: {}", output.display());
-        println!("File size: {} bytes", metadata.len());
-    }
-}
 
 /// Generate an empty Ableton project using the embedded template.
 /// This is guaranteed to open in Ableton Live 12.x without errors.
@@ -2107,4 +2051,196 @@ pub fn generate_empty_als_with_bpm(output_path: &Path, bpm: f64) -> Result<(), S
         .map_err(|e| format!("Failed to finish compression: {}", e))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Read;
+    use flate2::read::GzDecoder;
+
+    #[test]
+    fn test_xml_escape() {
+        assert_eq!(xml_escape("hello"), "hello");
+        assert_eq!(xml_escape("at&t"), "at&amp;t");
+        assert_eq!(xml_escape("quote \""), "quote &quot;");
+        assert_eq!(xml_escape("tag <br>"), "tag &lt;br&gt;");
+    }
+
+    #[test]
+    fn test_sample_info_loop_bars() {
+        let sample = SampleInfo {
+            path: "test.wav".to_string(),
+            name: "test".to_string(),
+            duration_secs: 2.0, // 2 seconds at 120 bpm = 1 bar
+            sample_rate: 44100,
+            file_size: 1000,
+            bpm: Some(120.0),
+        };
+        assert_eq!(sample.loop_bars(120.0), 1);
+
+        let long_sample = SampleInfo {
+            path: "test.wav".to_string(),
+            name: "test".to_string(),
+            duration_secs: 8.0, // 8 seconds at 120 bpm = 4 bars
+            sample_rate: 44100,
+            file_size: 1000,
+            bpm: Some(120.0),
+        };
+        assert_eq!(long_sample.loop_bars(120.0), 4);
+    }
+
+    #[test]
+    fn test_generate_empty_als() {
+        let output = std::env::temp_dir().join("empty_test.als");
+        let result = generate_empty_als(&output);
+        assert!(result.is_ok());
+        assert!(output.exists());
+
+        // Verify it's a valid gzip and contains Ableton tag
+        let file = File::open(&output).unwrap();
+        let mut decoder = GzDecoder::new(file);
+        let mut xml = String::new();
+        decoder.read_to_string(&mut xml).expect("Failed to decompress");
+        assert!(xml.contains("<Ableton"));
+        
+        fs::remove_file(output).ok();
+    }
+
+    #[test]
+    fn test_generate_empty_als_with_bpm() {
+        let output = std::env::temp_dir().join("empty_bpm_test.als");
+        let result = generate_empty_als_with_bpm(&output, 145.0);
+        assert!(result.is_ok());
+
+        let file = File::open(&output).unwrap();
+        let mut decoder = GzDecoder::new(file);
+        let mut xml = String::new();
+        decoder.read_to_string(&mut xml).unwrap();
+        
+        assert!(xml.contains("145"));
+        assert!(xml.contains("<Tempo"));
+        
+        fs::remove_file(output).ok();
+    }
+
+    #[test]
+    fn test_generate_als_from_template() {
+        let output = std::env::temp_dir().join("template_test.als");
+        
+        let sample = SampleInfo {
+            path: "mock_kick.wav".to_string(),
+            name: "Mock Kick".to_string(),
+            duration_secs: 0.5,
+            sample_rate: 44100,
+            file_size: 1000,
+            bpm: None,
+        };
+        
+        let track = TrackInfo {
+            name: "Kick".to_string(),
+            color: 1,
+            clips: vec![
+                ClipPlacement {
+                    sample: sample.clone(),
+                    start_beat: 0.0,
+                    duration_beats: 4.0,
+                }
+            ],
+        };
+        
+        let result = generate_als_from_template(&output, &[track], 130.0);
+        assert!(result.is_ok());
+        assert!(output.exists());
+
+        let file = File::open(&output).unwrap();
+        let mut decoder = GzDecoder::new(file);
+        let mut xml = String::new();
+        decoder.read_to_string(&mut xml).unwrap();
+        
+        assert!(xml.contains("Mock Kick"));
+        assert!(xml.contains("mock_kick.wav"));
+        assert!(xml.contains("<AudioClip"));
+        
+        fs::remove_file(output).ok();
+    }
+
+    #[test]
+    fn test_generate_minimal_als() {
+        let output = std::env::temp_dir().join("test_techno.als");
+
+        let kick = SampleInfo {
+            path: "/tmp/mock_kick.wav".to_string(),
+            name: "Kick 808".to_string(),
+            duration_secs: 0.2,
+            sample_rate: 96000,
+            file_size: 50000,
+            bpm: None,
+        };
+
+        let clap = SampleInfo {
+            path: "/tmp/mock_clap.wav".to_string(),
+            name: "Snare 808".to_string(),
+            duration_secs: 0.3,
+            sample_rate: 96000,
+            file_size: 60000,
+            bpm: None,
+        };
+
+        let hat = SampleInfo {
+            path: "/tmp/mock_hat.wav".to_string(),
+            name: "Hihat Closed".to_string(),
+            duration_secs: 0.15,
+            sample_rate: 44100,
+            file_size: 30000,
+            bpm: None,
+        };
+
+        let config = TechnoConfig {
+            bpm: 130.0,
+            kick,
+            clap,
+            hat,
+        };
+
+        let tracks = config.generate_arrangement();
+        let result = generate_als(&output, &tracks, 130.0);
+
+        assert!(result.is_ok(), "Failed to generate ALS: {:?}", result);
+        assert!(output.exists(), "Output file not created");
+
+        let metadata = fs::metadata(&output).unwrap();
+        assert!(metadata.len() > 0, "Output file is empty");
+        
+        fs::remove_file(output).ok();
+    }
+
+    #[test]
+    fn test_generate_techno_als() {
+        let output = std::env::temp_dir().join("techno_test.als");
+        
+        // Use mock paths - the generator doesn't check if they exist during generation
+        // as it only embeds them in the XML.
+        let result = generate_techno_als(
+            &output,
+            "mock_kick.wav",
+            "mock_clap.wav",
+            "mock_hat.wav",
+            128.0
+        );
+        
+        assert!(result.is_ok());
+        assert!(output.exists());
+        
+        let file = File::open(&output).unwrap();
+        let mut decoder = GzDecoder::new(file);
+        let mut xml = String::new();
+        decoder.read_to_string(&mut xml).unwrap();
+        
+        assert!(xml.contains("mock_kick.wav"));
+        assert!(xml.contains("128"));
+        
+        fs::remove_file(output).ok();
+    }
 }
