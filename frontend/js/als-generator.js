@@ -97,11 +97,11 @@
       hardness.value = defaults.hardness;
       if (hardnessVal) hardnessVal.textContent = (defaults.hardness / 100).toFixed(2);
     }
-    const chaos = document.getElementById('alsChaos');
-    const chaosVal = document.getElementById('alsChaosValue');
-    if (chaos) {
-      chaos.value = defaults.chaos;
-      if (chaosVal) chaosVal.textContent = (defaults.chaos / 100).toFixed(2);
+    // `defaults.chaos` used to seed the global Chaos slider; that slider was
+    // retired when per-param overrides moved to the timeline. Section widths on
+    // the timeline also depend on genre, so request a repaint.
+    if (typeof window.renderAlsSectionOverridesTimeline === 'function') {
+      window.renderAlsSectionOverridesTimeline();
     }
   }
 
@@ -113,14 +113,14 @@
     const el = (id) => document.getElementById(id);
     const chk = (id) => el(id)?.checked || false;
     const num = (id, def) => parseInt(el(id)?.value || def, 10);
+    // chaos / glitch_intensity / density / variation / parallelism: the five
+    // global sliders have been retired — values now live exclusively in the
+    // Section Overrides timeline (per-section). Sections without an override
+    // fall back to the Rust serde defaults: chaos=0.3, glitch=0.0, density=0.0,
+    // variation=0.0, parallelism=0.4 (see ProjectConfig in als_project.rs).
     return {
       genre: el('alsGenre')?.value || 'techno',
       hardness: (parseInt(el('alsHardness')?.value || '30', 10)) / 100,
-      chaos: (parseInt(el('alsChaos')?.value || '30', 10)) / 100,
-      glitch_intensity: (parseInt(el('alsGlitchIntensity')?.value || '0', 10)) / 100,
-      density: (parseInt(el('alsDensity')?.value || '0', 10)) / 100,
-      variation: (parseInt(el('alsVariation')?.value || '0', 10)) / 100,
-      parallelism: (parseInt(el('alsParallelism')?.value || '40', 10)) / 100,
       bpm: parseInt(el('alsBpm')?.value || '130', 10),
       root_note: el('alsAtonal')?.checked ? null : (el('alsRootNote')?.value || 'A'),
       mode: el('alsAtonal')?.checked ? null : (el('alsMode')?.value || 'Aeolian'),
@@ -200,25 +200,13 @@
         scatter: !chk('alsTonalScatter'),
         vox: !chk('alsTonalVox'),
       },
-      // Per-section glitch overrides (null means use global)
-      section_glitch: {
-        intro: getSectionGlitch('alsGlitchIntro'),
-        build: getSectionGlitch('alsGlitchBuild'),
-        breakdown: getSectionGlitch('alsGlitchBreakdown'),
-        drop1: getSectionGlitch('alsGlitchDrop1'),
-        drop2: getSectionGlitch('alsGlitchDrop2'),
-        fadedown: getSectionGlitch('alsGlitchFadedown'),
-        outro: getSectionGlitch('alsGlitchOutro'),
-      },
+      // Per-section overrides for chaos/glitch/density/variation/parallelism
+      // (each missing key = "use global scalar"). Sourced from the timeline editor
+      // in als-timeline.js; shape matches Rust `SectionOverridesConfig`.
+      section_overrides: typeof window.alsSectionOverridesForIpc === 'function'
+        ? window.alsSectionOverridesForIpc()
+        : { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {} },
     };
-  }
-
-  // Get section glitch value - returns null if slider is at -1 (use global)
-  function getSectionGlitch(id) {
-    const el = document.getElementById(id);
-    if (!el) return null;
-    const val = parseInt(el.value, 10);
-    return val < 0 ? null : val / 100;
   }
 
   // ---------------------------------------------------------------------------
@@ -271,17 +259,22 @@
       tc.snare_roll + tc.reverse + tc.sub_drop + tc.boom_kick + tc.atmos + tc.glitch + tc.scatter +
       tc.vox;
 
+    // Section override counts (per-param) replace the old scalar rows — the
+    // 5 global sliders were retired when the Section Overrides timeline shipped.
+    const so = config.section_overrides || {};
+    const oCount = (p) => (so[p] ? Object.keys(so[p]).length : 0);
+    const overridesLine = ['chaos', 'glitch', 'density', 'variation', 'parallelism']
+      .map((p) => `${p[0].toUpperCase() + p.slice(1)}:${oCount(p)}`).join(' · ');
+
     summary.innerHTML = `
       <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;">
         <span style="color:var(--text-dim);">Genre:</span><span>${config.genre}</span>
         <span style="color:var(--text-dim);">Hardness:</span><span>${config.hardness.toFixed(2)}</span>
-        <span style="color:var(--text-dim);">Chaos:</span><span>${config.chaos.toFixed(2)}</span>
-        <span style="color:var(--text-dim);">Glitch:</span><span>${config.glitch_intensity.toFixed(2)}</span>
-        <span style="color:var(--text-dim);">Density:</span><span>${config.density.toFixed(2)}</span>
         <span style="color:var(--text-dim);">BPM:</span><span>${config.bpm}</span>
         <span style="color:var(--text-dim);">Key:</span><span>${keyStr}</span>
         <span style="color:var(--text-dim);">Songs:</span><span>${config.num_songs}</span>
         <span style="color:var(--text-dim);">Tracks (incl. groups):</span><span>${totalTracks}</span>
+        <span style="color:var(--text-dim);">Section overrides:</span><span>${overridesLine}</span>
       </div>`;
 
     // Set default output path
@@ -557,11 +550,8 @@
   const ALS_PREF_FIELDS = [
     { id: 'alsGenre', type: 'value' },
     { id: 'alsHardness', type: 'value' },
-    { id: 'alsChaos', type: 'value' },
-    { id: 'alsGlitchIntensity', type: 'value' },
-    { id: 'alsDensity', type: 'value' },
-    { id: 'alsVariation', type: 'value' },
-    { id: 'alsParallelism', type: 'value' },
+    // chaos/glitch/density/variation/parallelism persist through the timeline
+    // (als-timeline.js → prefs key `alsSectionOverrides`), not through here.
     { id: 'alsBpm', type: 'value' },
     { id: 'alsRootNote', type: 'value' },
     { id: 'alsMode', type: 'value' },
@@ -627,14 +617,8 @@
     { id: 'alsTonalGlitch', type: 'checked' },
     { id: 'alsTonalScatter', type: 'checked' },
     { id: 'alsTonalVox', type: 'checked' },
-    // Per-section glitch overrides
-    { id: 'alsGlitchIntro', type: 'value' },
-    { id: 'alsGlitchBuild', type: 'value' },
-    { id: 'alsGlitchBreakdown', type: 'value' },
-    { id: 'alsGlitchDrop1', type: 'value' },
-    { id: 'alsGlitchDrop2', type: 'value' },
-    { id: 'alsGlitchFadedown', type: 'value' },
-    { id: 'alsGlitchOutro', type: 'value' },
+    // Per-section overrides now live in the canvas timeline (als-timeline.js);
+    // that module persists to prefs under `alsSectionOverrides`.
   ];
 
   function saveAlsPrefs() {
@@ -666,31 +650,6 @@
       const hv = document.getElementById('alsHardnessValue');
       const h = document.getElementById('alsHardness');
       if (hv && h) hv.textContent = (parseInt(h.value, 10) / 100).toFixed(2);
-      const cv = document.getElementById('alsChaosValue');
-      const c = document.getElementById('alsChaos');
-      if (cv && c) cv.textContent = (parseInt(c.value, 10) / 100).toFixed(2);
-      const gv = document.getElementById('alsGlitchIntensityValue');
-      const g = document.getElementById('alsGlitchIntensity');
-      if (gv && g) gv.textContent = (parseInt(g.value, 10) / 100).toFixed(2);
-      const dv = document.getElementById('alsDensityValue');
-      const d = document.getElementById('alsDensity');
-      if (dv && d) dv.textContent = (parseInt(d.value, 10) / 100).toFixed(2);
-      const vv = document.getElementById('alsVariationValue');
-      const v = document.getElementById('alsVariation');
-      if (vv && v) vv.textContent = (parseInt(v.value, 10) / 100).toFixed(2);
-      const pv = document.getElementById('alsParallelismValue');
-      const p = document.getElementById('alsParallelism');
-      if (pv && p) pv.textContent = (parseInt(p.value, 10) / 100).toFixed(2);
-      // Update section glitch labels
-      const sectionIds = ['alsGlitchIntro', 'alsGlitchBuild', 'alsGlitchBreakdown', 'alsGlitchDrop1', 'alsGlitchDrop2', 'alsGlitchFadedown', 'alsGlitchOutro'];
-      for (const id of sectionIds) {
-        const slider = document.getElementById(id);
-        const label = document.getElementById(id + 'Value');
-        if (slider && label) {
-          const v = parseInt(slider.value, 10);
-          label.textContent = v < 0 ? '—' : (v / 100).toFixed(2);
-        }
-      }
     } catch (_) {}
   }
 
@@ -709,6 +668,10 @@
     restoreAlsPrefs();
     updateTrackCountLabels();
     updateEstimatedTracks();
+    // Section overrides timeline (canvas) — must init after its canvas is in the DOM.
+    if (typeof window.initAlsSectionOverridesTimeline === 'function') {
+      window.initAlsSectionOverridesTimeline();
+    }
     loadPreviews();
     updateSummary();
     checkAnalysisStatus();
@@ -1238,40 +1201,14 @@
     }
   });
 
-  // Character sliders + track count inputs — save prefs on every change
+  // Hardness slider + track count inputs — save prefs on every change.
+  // Chaos/Glitch/Density/Variation/Parallelism are now handled by the timeline
+  // canvas (als-timeline.js), so no input listeners here for those IDs.
   document.addEventListener('input', (e) => {
     const id = e.target.id;
     if (id === 'alsHardness') {
       const val = document.getElementById('alsHardnessValue');
       if (val) val.textContent = (parseInt(e.target.value, 10) / 100).toFixed(2);
-    }
-    if (id === 'alsChaos') {
-      const val = document.getElementById('alsChaosValue');
-      if (val) val.textContent = (parseInt(e.target.value, 10) / 100).toFixed(2);
-    }
-    if (id === 'alsGlitchIntensity') {
-      const val = document.getElementById('alsGlitchIntensityValue');
-      if (val) val.textContent = (parseInt(e.target.value, 10) / 100).toFixed(2);
-    }
-    if (id === 'alsDensity') {
-      const val = document.getElementById('alsDensityValue');
-      if (val) val.textContent = (parseInt(e.target.value, 10) / 100).toFixed(2);
-    }
-    if (id === 'alsVariation') {
-      const val = document.getElementById('alsVariationValue');
-      if (val) val.textContent = (parseInt(e.target.value, 10) / 100).toFixed(2);
-    }
-    if (id === 'alsParallelism') {
-      const val = document.getElementById('alsParallelismValue');
-      if (val) val.textContent = (parseInt(e.target.value, 10) / 100).toFixed(2);
-    }
-    // Section glitch sliders
-    if (id?.startsWith('alsGlitch') && id !== 'alsGlitchIntensity') {
-      const val = document.getElementById(id + 'Value');
-      if (val) {
-        const v = parseInt(e.target.value, 10);
-        val.textContent = v < 0 ? '—' : (v / 100).toFixed(2);
-      }
     }
     if (id === 'alsGenre') onGenreChange();
     if (id?.startsWith('alsCount')) {
@@ -1287,18 +1224,6 @@
   document.addEventListener('change', (e) => {
     if (e.target.id === 'alsGenre') onGenreChange();
     if (e.target.id?.startsWith('als')) {
-      saveAlsPrefs();
-      updateSummary();
-    }
-  });
-
-  // Double-click section glitch sliders to reset to "use global" (-1)
-  document.addEventListener('dblclick', (e) => {
-    const id = e.target.id;
-    if (id?.startsWith('alsGlitch') && id !== 'alsGlitchIntensity') {
-      e.target.value = -1;
-      const val = document.getElementById(id + 'Value');
-      if (val) val.textContent = '—';
       saveAlsPrefs();
       updateSummary();
     }

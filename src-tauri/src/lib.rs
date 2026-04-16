@@ -3498,8 +3498,12 @@ async fn generate_als_project(
             scatter: ta.scatter,
             vox: ta.vox,
         };
-        // Map frontend section_glitch config to generator SectionGlitch
-        let sg = &config.section_glitch;
+        // Map the glitch per-section overrides from the new SectionOverridesConfig into the
+        // generator's SectionGlitch type. Chaos/density/variation/parallelism per-section
+        // values (also carried in `config.section_overrides`) are UI-stored but not yet
+        // routed into the generator; follow-up will extend `techno_generator::generate` to
+        // accept them and thread them through `apply_chaos`/`generate_scatter_hits`/etc.
+        let sg = &config.section_overrides.glitch;
         let section_glitch = techno_generator::SectionGlitch {
             intro: sg.intro,
             build: sg.build,

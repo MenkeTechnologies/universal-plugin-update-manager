@@ -1,0 +1,519 @@
+// ──────────────────────────────────────────────────────────────────────────
+// ALS Generator — Section Overrides Timeline Editor (Ableton-arrangement style)
+//
+// Replaces the old 7-slider "Section Glitch Override" row. Lets the user drag
+// regions inside 5 stacked lanes (Chaos, Glitch, Density, Variation, Parallelism),
+// each region overriding one parameter across one-or-more song sections.
+//
+// Model:
+//   _overrides = {
+//     chaos: { intro: 0.5, drop1: 0.8, ... },   // section-name → float 0..1
+//     glitch: { ... }, density: { ... }, variation: { ... }, parallelism: { ... }
+//   }
+// Missing section key = "use global scalar".
+//
+// Regions in the UI are visual groupings of consecutive sections with the same
+// value in the same lane. The model stores per-section; rendering coalesces
+// adjacent identical values into one block and edit actions apply to the block.
+//
+// Persisted to prefs under `alsSectionOverrides`; serialized for IPC into the
+// `section_overrides` field of the ProjectConfig payload.
+// ──────────────────────────────────────────────────────────────────────────
+
+(function () {
+    'use strict';
+
+    const PARAMS = ['chaos', 'glitch', 'density', 'variation', 'parallelism'];
+    const PARAM_LABELS = {
+        chaos: 'CHAOS',
+        glitch: 'GLITCH',
+        density: 'DENSITY',
+        variation: 'VARIATION',
+        parallelism: 'PARALLELISM',
+    };
+    const SECTIONS = ['intro', 'build', 'breakdown', 'drop1', 'drop2', 'fadedown', 'outro'];
+    const SECTION_LABELS = {
+        intro: 'INTRO',
+        build: 'BUILD',
+        breakdown: 'BREAKDOWN',
+        drop1: 'DROP 1',
+        drop2: 'DROP 2',
+        fadedown: 'FADEDOWN',
+        outro: 'OUTRO',
+    };
+
+    // Bar ranges per genre — MUST match src-tauri/src/als_project.rs::get_sections_for_genre.
+    // Inclusive lo, exclusive hi.
+    const GENRE_SECTION_BARS = {
+        techno:  { intro: [1, 33],  build: [33, 65],  breakdown: [65, 97],   drop1: [97, 129],  drop2: [129, 161], fadedown: [161, 193], outro: [193, 225]  },
+        trance:  { intro: [1, 33],  build: [33, 65],  breakdown: [65, 113],  drop1: [113, 145], drop2: [145, 177], fadedown: [177, 209], outro: [209, 257]  },
+        schranz: { intro: [1, 33],  build: [33, 65],  breakdown: [65, 81],   drop1: [81, 113],  drop2: [113, 161], fadedown: [161, 193], outro: [193, 209]  },
+    };
+
+    // Per-lane color (matches existing cyberpunk palette used elsewhere).
+    const LANE_COLORS = {
+        chaos:       { fill: 'rgba(255, 42, 109, 0.45)',  stroke: '#ff2a6d' },   // accent pink
+        glitch:      { fill: 'rgba(211, 0, 197, 0.45)',   stroke: '#d300c5' },   // magenta
+        density:     { fill: 'rgba(249, 240, 2, 0.35)',   stroke: '#f9f002' },   // yellow
+        variation:   { fill: 'rgba(57, 255, 20, 0.35)',   stroke: '#39ff14' },   // green
+        parallelism: { fill: 'rgba(5, 217, 232, 0.45)',   stroke: '#05d9e8' },   // cyan
+    };
+
+    // ── Mutable state ──────────────────────────────────────────────────────
+    let _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {} };
+    let _selected = null;   // { param: string, section: string }
+    let _drag = null;       // { mode: 'create'|'resize-l'|'resize-r'|'move'|'value', ... }
+    let _ro = null;         // ResizeObserver
+    let _popoverDragging = false;
+
+    function getGenre() {
+        const el = document.getElementById('alsGenre');
+        return (el && GENRE_SECTION_BARS[el.value]) ? el.value : 'techno';
+    }
+
+    function sectionBars(genre) {
+        return GENRE_SECTION_BARS[genre] || GENRE_SECTION_BARS.techno;
+    }
+
+    // Layout computes pixel geometry for the current canvas size + genre.
+    // Stable for one paint/hit-test cycle; recomputed on every render/event.
+    function layout(canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        const cssW = canvas.clientWidth || 600;
+        const cssH = canvas.clientHeight || 220;
+        // Resize backing store if needed
+        if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
+            canvas.width = Math.round(cssW * dpr);
+            canvas.height = Math.round(cssH * dpr);
+        }
+        const W = cssW;
+        const H = cssH;
+
+        const padL = 108;           // left gutter for lane labels
+        const padR = 8;
+        const headerH = 24;         // section marker row
+        const laneGap = 2;
+        const lanesY = headerH + 4;
+        const laneAreaH = H - lanesY - 18;  // leave 18px for hint at bottom
+        const laneH = Math.max(16, Math.floor((laneAreaH - laneGap * (PARAMS.length - 1)) / PARAMS.length));
+
+        const gridX = padL;
+        const gridW = Math.max(60, W - padL - padR);
+
+        const genre = getGenre();
+        const bars = sectionBars(genre);
+        // Total bar span for this genre's arrangement (out of outro, exclusive)
+        const totalBars = bars.outro[1] - bars.intro[0];
+
+        const sections = SECTIONS.map((name) => {
+            const [lo, hi] = bars[name];
+            const offsetLo = lo - bars.intro[0];
+            const offsetHi = hi - bars.intro[0];
+            const x = gridX + (offsetLo / totalBars) * gridW;
+            const w = ((offsetHi - offsetLo) / totalBars) * gridW;
+            return { name, lo, hi, x, w };
+        });
+
+        const lanes = PARAMS.map((param, i) => ({
+            param,
+            top: lanesY + i * (laneH + laneGap),
+            bottom: lanesY + i * (laneH + laneGap) + laneH,
+            height: laneH,
+        }));
+
+        return { dpr, W, H, padL, padR, headerH, lanesY, laneH, laneGap, gridX, gridW, sections, lanes, bars, genre, totalBars };
+    }
+
+    // Hit-test: returns { param, section } or null. Lane labels/header are not interactive.
+    function hit(x, y, L) {
+        if (x < L.gridX) return null;
+        const lane = L.lanes.find((ln) => y >= ln.top && y <= ln.bottom);
+        if (!lane) return null;
+        const sec = L.sections.find((s) => x >= s.x && x < s.x + s.w);
+        if (!sec) return null;
+        return { param: lane.param, section: sec.name, lane, sec };
+    }
+
+    // ── Paint ──────────────────────────────────────────────────────────────
+    function renderTimeline() {
+        const canvas = document.getElementById('alsSectionTimeline');
+        if (!canvas || canvas.offsetWidth === 0) return;
+        const L = layout(canvas);
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+        ctx.clearRect(0, 0, L.W, L.H);
+
+        // Background — slightly lighter than outer card so lanes read as tracks.
+        ctx.fillStyle = '#05050a';
+        ctx.fillRect(0, 0, L.W, L.H);
+
+        // Left label gutter divider
+        ctx.fillStyle = '#0a0a14';
+        ctx.fillRect(0, 0, L.padL, L.H);
+        ctx.strokeStyle = '#1a1a28';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(L.padL + 0.5, 0);
+        ctx.lineTo(L.padL + 0.5, L.H);
+        ctx.stroke();
+
+        // Section header row (▷ SECTIONNAME) — Ableton-style
+        ctx.font = 'bold 10px "Share Tech Mono", monospace';
+        ctx.textBaseline = 'middle';
+        for (const s of L.sections) {
+            const sy = L.headerH / 2;
+            // Divider line at each section start
+            ctx.strokeStyle = '#1e1e2e';
+            ctx.beginPath();
+            ctx.moveTo(Math.round(s.x) + 0.5, 0);
+            ctx.lineTo(Math.round(s.x) + 0.5, L.H);
+            ctx.stroke();
+            // ▷ marker + label
+            ctx.fillStyle = '#7a8ba8';
+            ctx.textAlign = 'left';
+            ctx.fillText('\u25B7 ' + SECTION_LABELS[s.name], s.x + 4, sy);
+            // Bar-range sublabel under it (first 2 chars offset)
+            ctx.fillStyle = '#3a4858';
+            ctx.font = '9px "Share Tech Mono", monospace';
+            ctx.fillText(`${s.lo}\u2013${s.hi - 1}`, s.x + 4, sy + 10);
+            ctx.font = 'bold 10px "Share Tech Mono", monospace';
+        }
+
+        // Lanes
+        for (const ln of L.lanes) {
+            // Lane background (alternating stripe)
+            const isEven = L.lanes.indexOf(ln) % 2 === 0;
+            ctx.fillStyle = isEven ? '#0c0c18' : '#0a0a14';
+            ctx.fillRect(L.padL, ln.top, L.gridW, ln.height);
+
+            // Lane label (left gutter)
+            ctx.fillStyle = LANE_COLORS[ln.param].stroke;
+            ctx.font = 'bold 11px "Orbitron", sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(PARAM_LABELS[ln.param], L.padL - 8, ln.top + ln.height / 2);
+
+            // Section dividers inside lane
+            ctx.strokeStyle = '#141422';
+            ctx.beginPath();
+            for (const s of L.sections) {
+                const gx = Math.round(s.x) + 0.5;
+                ctx.moveTo(gx, ln.top);
+                ctx.lineTo(gx, ln.bottom);
+            }
+            ctx.stroke();
+
+            // Regions (one rectangle per section with an override value)
+            const laneOverrides = _overrides[ln.param] || {};
+            const color = LANE_COLORS[ln.param];
+            for (const s of L.sections) {
+                const v = laneOverrides[s.name];
+                if (typeof v !== 'number') continue;
+                const clamped = Math.max(0, Math.min(1, v));
+                const fillH = Math.max(2, Math.round(clamped * (ln.height - 2)));
+                const fy = ln.bottom - fillH;
+                ctx.fillStyle = color.fill;
+                ctx.fillRect(s.x + 1, fy, s.w - 1, fillH);
+                ctx.strokeStyle = color.stroke;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(s.x + 1.5, fy + 0.5, s.w - 2, fillH - 1);
+                // Value label inside if wide enough
+                if (s.w > 40) {
+                    ctx.fillStyle = '#05050a';
+                    ctx.fillRect(s.x + 3, ln.top + 1, 32, 10);
+                    ctx.fillStyle = color.stroke;
+                    ctx.font = '9px "Share Tech Mono", monospace';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(clamped.toFixed(2), s.x + 4, ln.top + 2);
+                }
+            }
+
+            // Selected outline
+            if (_selected && _selected.param === ln.param) {
+                const s = L.sections.find((sx) => sx.name === _selected.section);
+                if (s) {
+                    ctx.strokeStyle = '#05d9e8';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(s.x + 1, ln.top + 1, s.w - 2, ln.height - 2);
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = 'rgba(5, 217, 232, 0.6)';
+                    ctx.strokeRect(s.x + 1, ln.top + 1, s.w - 2, ln.height - 2);
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
+        // Bottom hint bar
+        ctx.fillStyle = '#7a8ba8';
+        ctx.font = '10px "Share Tech Mono", monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        const hint = _selected
+            ? `Selected: ${PARAM_LABELS[_selected.param]} / ${SECTION_LABELS[_selected.section]}  ·  drag top edge to set value  ·  scroll \u00B10.05  ·  right-click to delete`
+            : 'Shift-click a section to add an override  \u00B7  Click to edit  \u00B7  Drag top-edge to set value  \u00B7  Scroll wheel to fine-tune  \u00B7  Right-click to delete';
+        ctx.fillText(hint, L.padL, L.H - 4);
+    }
+
+    // ── Interactions ───────────────────────────────────────────────────────
+    function setOverride(param, section, value) {
+        if (value == null) {
+            delete _overrides[param][section];
+        } else {
+            _overrides[param][section] = Math.max(0, Math.min(1, value));
+        }
+        saveOverrides();
+        renderTimeline();
+    }
+
+    function currentValue(param, section) {
+        const v = _overrides[param] && _overrides[param][section];
+        return typeof v === 'number' ? v : null;
+    }
+
+    function openPopover(canvas, L, param, section) {
+        const pop = document.getElementById('alsTimelinePopover');
+        if (!pop) return;
+        pop.hidden = false;
+        const title = pop.querySelector('.als-timeline-popover-title');
+        const range = document.getElementById('alsTimelinePopoverValue');
+        const label = document.getElementById('alsTimelinePopoverValueLabel');
+        if (title) title.textContent = `${PARAM_LABELS[param]} · ${SECTION_LABELS[section]}`;
+        const v = currentValue(param, section);
+        const pct = v == null ? 50 : Math.round(v * 100);
+        if (range) range.value = String(pct);
+        if (label) label.textContent = (pct / 100).toFixed(2);
+        // Position popover under the section rect, within the wrap
+        const s = L.sections.find((x) => x.name === section);
+        const lane = L.lanes.find((ln) => ln.param === param);
+        if (s && lane) {
+            const popW = 220;
+            const wrap = canvas.parentElement;
+            const wrapW = wrap ? wrap.clientWidth : L.W;
+            let left = s.x + s.w / 2 - popW / 2;
+            if (left < 4) left = 4;
+            if (left + popW > wrapW - 4) left = wrapW - popW - 4;
+            let top = lane.bottom + 6;
+            const popH = 68;
+            if (top + popH > L.H - 4) top = lane.top - popH - 6;
+            pop.style.left = left + 'px';
+            pop.style.top = top + 'px';
+        }
+    }
+
+    function closePopover() {
+        const pop = document.getElementById('alsTimelinePopover');
+        if (pop) pop.hidden = true;
+    }
+
+    function onMouseDown(e) {
+        const canvas = e.currentTarget;
+        const r = canvas.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+        const L = layout(canvas);
+        const h = hit(x, y, L);
+        if (!h) {
+            _selected = null;
+            closePopover();
+            renderTimeline();
+            return;
+        }
+
+        // Shift-click = create (or toggle default .5 if already present)
+        if (e.shiftKey) {
+            setOverride(h.param, h.section, 0.5);
+            _selected = { param: h.param, section: h.section };
+            openPopover(canvas, L, h.param, h.section);
+            return;
+        }
+
+        // Drag top-edge band (top 6px of lane) = "set value by height"
+        const topBand = y - h.lane.top < 6;
+        if (topBand && currentValue(h.param, h.section) != null) {
+            _drag = { mode: 'value', param: h.param, section: h.section, laneTop: h.lane.top, laneH: h.lane.height };
+            e.preventDefault();
+            return;
+        }
+
+        // Regular click = select + open popover (creates region with default if none)
+        if (currentValue(h.param, h.section) == null) {
+            setOverride(h.param, h.section, 0.5);
+        }
+        _selected = { param: h.param, section: h.section };
+        renderTimeline();
+        openPopover(canvas, L, h.param, h.section);
+    }
+
+    function onMouseMove(e) {
+        if (!_drag || _drag.mode !== 'value') return;
+        const canvas = e.currentTarget;
+        const r = canvas.getBoundingClientRect();
+        const y = e.clientY - r.top;
+        // Map y within lane to value (top=1, bottom=0)
+        const rel = 1 - (y - _drag.laneTop) / _drag.laneH;
+        setOverride(_drag.param, _drag.section, rel);
+    }
+
+    function onMouseUp() {
+        _drag = null;
+    }
+
+    function onWheel(e) {
+        const canvas = e.currentTarget;
+        const r = canvas.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+        const L = layout(canvas);
+        const h = hit(x, y, L);
+        if (!h) return;
+        const cur = currentValue(h.param, h.section);
+        if (cur == null) return;
+        e.preventDefault();
+        const step = e.deltaY < 0 ? 0.05 : -0.05;
+        setOverride(h.param, h.section, cur + step);
+        _selected = { param: h.param, section: h.section };
+        openPopover(canvas, L, h.param, h.section);
+    }
+
+    function onContext(e) {
+        const canvas = e.currentTarget;
+        const r = canvas.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+        const L = layout(canvas);
+        const h = hit(x, y, L);
+        if (!h) return;
+        e.preventDefault();
+        // Right-click = delete this override
+        if (currentValue(h.param, h.section) != null) {
+            setOverride(h.param, h.section, null);
+            if (_selected && _selected.param === h.param && _selected.section === h.section) {
+                _selected = null;
+                closePopover();
+            }
+        }
+    }
+
+    // ── Popover slider wiring ─────────────────────────────────────────────
+    function onPopoverInput(e) {
+        if (!_selected) return;
+        const pct = parseInt(e.target.value, 10);
+        const v = pct / 100;
+        const label = document.getElementById('alsTimelinePopoverValueLabel');
+        if (label) label.textContent = v.toFixed(2);
+        setOverride(_selected.param, _selected.section, v);
+    }
+
+    function onDeleteClick() {
+        if (!_selected) return;
+        setOverride(_selected.param, _selected.section, null);
+        _selected = null;
+        closePopover();
+    }
+
+    function onClearAllClick() {
+        _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {} };
+        _selected = null;
+        closePopover();
+        saveOverrides();
+        renderTimeline();
+    }
+
+    // ── Persistence ────────────────────────────────────────────────────────
+    function saveOverrides() {
+        try {
+            if (typeof prefs !== 'undefined') {
+                prefs.setItem('alsSectionOverrides', JSON.stringify(_overrides));
+            }
+        } catch { /* ignore */ }
+    }
+
+    function restoreOverrides() {
+        try {
+            if (typeof prefs === 'undefined') return;
+            const raw = prefs.getItem('alsSectionOverrides');
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                for (const p of PARAMS) {
+                    if (parsed[p] && typeof parsed[p] === 'object') {
+                        _overrides[p] = {};
+                        for (const s of SECTIONS) {
+                            const v = parsed[p][s];
+                            if (typeof v === 'number' && v >= 0 && v <= 1) _overrides[p][s] = v;
+                        }
+                    }
+                }
+            }
+        } catch { /* ignore bad JSON */ }
+    }
+
+    // ── IPC payload — matches Rust SectionOverridesConfig shape ───────────
+    function buildIpcPayload() {
+        // Rust expects: { chaos:{intro:0.5|null,...}, glitch:{...}, ... }.
+        // Our internal object skips missing keys; serde treats absent as None.
+        // We return a copy so callers can't mutate our state.
+        const out = {};
+        for (const p of PARAMS) {
+            out[p] = {};
+            const lane = _overrides[p] || {};
+            for (const s of SECTIONS) {
+                if (typeof lane[s] === 'number') out[p][s] = lane[s];
+            }
+        }
+        return out;
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────
+    function init() {
+        const canvas = document.getElementById('alsSectionTimeline');
+        if (!canvas || canvas._alsTimelineInit) return;
+        canvas._alsTimelineInit = true;
+        restoreOverrides();
+        canvas.addEventListener('mousedown', onMouseDown);
+        canvas.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        canvas.addEventListener('wheel', onWheel, { passive: false });
+        canvas.addEventListener('contextmenu', onContext);
+
+        const popInput = document.getElementById('alsTimelinePopoverValue');
+        if (popInput) popInput.addEventListener('input', onPopoverInput);
+
+        // Delegated button clicks (data-action)
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const act = btn.dataset.action;
+            if (act === 'alsOverrideDelete') onDeleteClick();
+            else if (act === 'alsOverridesClearAll') onClearAllClick();
+        });
+
+        // Genre changes → section bar ranges change → repaint
+        const genreSel = document.getElementById('alsGenre');
+        if (genreSel) genreSel.addEventListener('change', renderTimeline);
+
+        // ResizeObserver so the canvas reflows with its container
+        if (typeof ResizeObserver === 'function') {
+            _ro = new ResizeObserver(() => renderTimeline());
+            _ro.observe(canvas);
+        } else {
+            window.addEventListener('resize', renderTimeline);
+        }
+
+        // Paint once DOM is settled
+        requestAnimationFrame(() => requestAnimationFrame(renderTimeline));
+    }
+
+    // Public
+    window.initAlsSectionOverridesTimeline = init;
+    window.renderAlsSectionOverridesTimeline = renderTimeline;
+    window.alsSectionOverridesForIpc = buildIpcPayload;
+    window.alsSectionOverridesReset = () => {
+        _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {} };
+        _selected = null;
+        closePopover();
+        saveOverrides();
+        renderTimeline();
+    };
+})();

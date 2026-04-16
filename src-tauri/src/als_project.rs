@@ -84,9 +84,11 @@ pub struct ProjectConfig {
     /// 0.0 = clean, 1.0 = heavily glitched (micro-edits, stutters, beat dropouts)
     #[serde(default)]
     pub glitch_intensity: f32,
-    /// Per-section glitch intensity overrides (0.0-1.0 each, None uses global glitch_intensity)
+    /// Per-section overrides for all 5 dynamics params (chaos, glitch, density, variation, parallelism).
+    /// Each per-section value is `Option<f32>` — `None` falls back to the global scalar above.
+    /// Replaces the legacy single-param `section_glitch: SectionGlitchConfig` (removed).
     #[serde(default)]
-    pub section_glitch: SectionGlitchConfig,
+    pub section_overrides: SectionOverridesConfig,
     /// 0.0 = none, 1.0 = dense scattered one-shot hits on 1/16 grid
     #[serde(default)]
     pub density: f32,
@@ -161,31 +163,56 @@ fn default_4() -> u32 { 4 }
 fn default_chaos() -> f32 { 0.3 }
 fn default_parallelism() -> f32 { 0.4 }
 
-/// Per-section glitch intensity configuration.
-/// Each value is 0.0-1.0, with None meaning "use global glitch_intensity".
+/// Per-section values for a single dynamics parameter.
+/// Each value is 0.0-1.0, with None meaning "use the global scalar for this param".
+/// Bar ranges are genre-specific (see `get_sections_for_genre`); the 7 names are fixed.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SectionGlitchConfig {
-    /// Intro (bars 1-32)
+pub struct SectionValues {
     #[serde(default)]
     pub intro: Option<f32>,
-    /// Build (bars 33-64)
     #[serde(default)]
     pub build: Option<f32>,
-    /// Breakdown (bars 65-96)
     #[serde(default)]
     pub breakdown: Option<f32>,
-    /// Drop 1 (bars 97-128)
     #[serde(default)]
     pub drop1: Option<f32>,
-    /// Drop 2 (bars 129-160)
     #[serde(default)]
     pub drop2: Option<f32>,
-    /// Fadedown (bars 161-192)
     #[serde(default)]
     pub fadedown: Option<f32>,
-    /// Outro (bars 193-224)
     #[serde(default)]
     pub outro: Option<f32>,
+}
+
+impl SectionValues {
+    /// Any override set? (used to skip resolver work when the param has no overrides)
+    pub fn any(&self) -> bool {
+        self.intro.is_some()
+            || self.build.is_some()
+            || self.breakdown.is_some()
+            || self.drop1.is_some()
+            || self.drop2.is_some()
+            || self.fadedown.is_some()
+            || self.outro.is_some()
+    }
+}
+
+/// Per-section overrides for all 5 dynamics params. Drives the ALS Generator timeline editor.
+/// Replaces legacy `SectionGlitchConfig` (which only covered glitch). An empty config means
+/// "use the global scalar for everything" — the same behavior as before for users who don't
+/// touch the timeline.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SectionOverridesConfig {
+    #[serde(default)]
+    pub chaos: SectionValues,
+    #[serde(default)]
+    pub glitch: SectionValues,
+    #[serde(default)]
+    pub density: SectionValues,
+    #[serde(default)]
+    pub variation: SectionValues,
+    #[serde(default)]
+    pub parallelism: SectionValues,
 }
 
 impl Default for TrackCountsConfig {
@@ -1190,7 +1217,7 @@ mod tests {
             hardness: 0.3,
             chaos: 0.3,
             glitch_intensity: 0.0,
-            section_glitch: SectionGlitchConfig::default(),
+            section_overrides: SectionOverridesConfig::default(),
             density: 0.0,
             variation: 0.0,
             parallelism: 0.4,
@@ -1224,7 +1251,7 @@ mod tests {
             hardness: 0.8,
             chaos: 0.3,
             glitch_intensity: 0.0,
-            section_glitch: SectionGlitchConfig::default(),
+            section_overrides: SectionOverridesConfig::default(),
             density: 0.0,
             variation: 0.0,
             parallelism: 0.4,
@@ -1261,7 +1288,7 @@ mod tests {
             hardness: 0.5,
             chaos: 0.3,
             glitch_intensity: 0.0,
-            section_glitch: SectionGlitchConfig::default(),
+            section_overrides: SectionOverridesConfig::default(),
             density: 0.0,
             variation: 0.0,
             parallelism: 0.4,
