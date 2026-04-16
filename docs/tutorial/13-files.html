@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>AUDIO_HAXOR — 13 · Files browser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&amp;family=Share+Tech+Mono&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../hud-static.css">
+  <link rel="stylesheet" href="tutorial.css">
+</head>
+<body>
+  <div class="app tutorial-app" id="docsApp">
+    <div class="crt-scanline" id="crtH" aria-hidden="true"></div>
+    <div class="crt-scanline-v" id="crtV" aria-hidden="true"></div>
+
+    <header class="tutorial-header">
+      <div class="tutorial-header-inner">
+        <div>
+          <h1 class="tutorial-brand">// AUDIO_HAXOR — WALKTHROUGH</h1>
+          <nav class="tutorial-crumbs" aria-label="Breadcrumb">
+            <a href="../index.html">Docs</a>
+            <span class="sep">/</span>
+            <a href="index.html">Tutorial</a>
+            <span class="sep">/</span>
+            <span class="current">13 · Files</span>
+          </nav>
+        </div>
+        <div class="tutorial-toolbar">
+          <button type="button" class="btn btn-secondary" id="btnTheme">Theme</button>
+          <button type="button" class="btn btn-secondary active" id="btnCrt">CRT</button>
+          <button type="button" class="btn btn-secondary active" id="btnNeon">Neon</button>
+          <a class="btn btn-secondary" href="index.html">Tutorial index</a>
+          <a class="btn btn-secondary" href="../index.html">Docs hub</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="tutorial-main">
+      <nav class="tutorial-nav tutorial-nav-top">
+        <a class="nav-prev" href="12-favorites-notes-tags.html">
+          <span class="nav-label">Prev</span>
+          <span class="nav-title">12 · Favorites / Notes / Tags</span>
+        </a>
+        <a class="nav-index" href="index.html">
+          <span class="nav-label">Index</span>
+          <span class="nav-title">All 19 steps</span>
+        </a>
+        <a class="nav-next" href="14-history.html">
+          <span class="nav-label">Next</span>
+          <span class="nav-title">14 · History &amp; diffs</span>
+        </a>
+      </nav>
+
+      <div class="step-meter">
+        <span class="meter-label">Progress</span>
+        <div class="meter-bar"><div class="meter-fill" style="width:68.42%"></div></div>
+        <span class="meter-count">13 / 19</span>
+      </div>
+
+      <h2 class="tutorial-title"><span class="step-hash">13.</span>Files browser — <code>Cmd+0</code></h2>
+      <p class="tutorial-subtitle">A raw filesystem window with breadcrumbs, quick-nav, directory bookmarks, lazy-rendered waveforms for audio files, and native drag-out to any app. Not a scanned inventory — a direct view.</p>
+
+      <figure class="tutorial-shot">
+        <img src="../assets/files.png" alt="Files browser tab with breadcrumbs, quick-nav buttons, and file list" loading="lazy">
+        <figcaption>assets/files.png · Files browser</figcaption>
+      </figure>
+
+      <section class="tutorial-section">
+        <h2>Navigation</h2>
+        <p>The header carries a full toolbar (<code>frontend/js/file-browser.js</code>):</p>
+        <ul>
+          <li><strong>Up</strong> — <code>fileUp</code>. Parent directory.</li>
+          <li><strong>Home</strong> — <code>fileHome</code>. Jumps to <code>get_home_dir</code> result.</li>
+          <li><strong>Quick nav buttons</strong> — <code>fileQuickNav</code> with <code>data-dir="Desktop"</code>, <code>Downloads</code>, <code>Music</code>, <code>Documents</code>. One click, one IPC call, one directory switch.</li>
+          <li><strong>Bookmark</strong> — <code>btnFileFav</code>. Toggles the current directory in your favorite-directories list (<code>fileFavs</code>).</li>
+          <li><strong>Breadcrumb</strong> — <code>fileBreadcrumb</code>. Each crumb is a clickable <code>data-file-nav</code> link — jump straight to any ancestor.</li>
+        </ul>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Search &amp; filter</h2>
+        <p>Above the list: fuzzy search (<code>fileSearchInput</code>) with the regex toggle (<code>regexFiles</code>). Matches are highlighted and the list paginates in chunks of <code>FILE_LIST_CHUNK = 80</code> rows to keep the scroll buffer snappy even in huge directories. A monotonic <code>_fileListRenderSeq</code> invalidates stale renders so switching directories mid-render never shows the wrong listing.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Bookmarked directories</h2>
+        <p>The <strong>Favorite Directories</strong> strip (<code>#fileFavs</code>) sits above the list when you have any bookmarks. Each bookmark is a chip:</p>
+        <ul>
+          <li>Folder icon + directory basename (<code>.fav-chip-name</code>)</li>
+          <li>Remove button (<code>data-remove-fav-dir</code>)</li>
+        </ul>
+        <p>Click a chip to jump straight there. The grid is compact — meant for the 4–8 directories you touch every day.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>File list rows</h2>
+        <p>Each file row is built by <code>buildFileListRowHtml()</code> (~line 198 of <code>file-browser.js</code>). Columns shown:</p>
+        <ul>
+          <li><strong>Icon</strong> — <code>.file-icon</code>, chosen by extension: 📁 folder, 🎵 audio, 🎛 DAW, ⚡ plugin, 📄 PDF, etc.</li>
+          <li><strong>Mini waveform</strong> — for audio files, a <code>.file-waveform</code> canvas lazy-loaded by an <code>IntersectionObserver</code> (<code>_fbWfObserver</code>). The canvas decodes a few hundred peaks and draws an inline waveform strip.</li>
+          <li><strong>File name</strong> — with search highlight.</li>
+          <li><strong>Extension chip</strong> — or <em>"DIR"</em> for directories.</li>
+          <li><strong>File size</strong>.</li>
+          <li><strong>Modified date</strong>.</li>
+          <li><strong>Meta badges</strong> — star (if favorited), note icon, tag pills, plus cached BPM / key / duration badges for audio files whose analysis is already in the cache. So scanned and un-scanned files look identical if they've been analyzed before.</li>
+        </ul>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Row actions</h2>
+        <ul>
+          <li><strong>Single click</strong> — select the row.</li>
+          <li><strong>Double click</strong> — for directories, navigate into them. For files, open in the default OS app via <code>open_file_default({ filePath })</code>.</li>
+          <li><strong>Right click</strong> — context menu: <em>Open with...</em>, <em>Reveal</em>, <em>Rename</em>, <em>Delete</em>, <em>Copy path</em>, <em>Favorite</em>, <em>Add note</em>, <em>Tag</em>.</li>
+        </ul>
+        <p>Rename / delete work via <code>rename_file({ oldPath, newPath })</code> and <code>delete_file({ filePath })</code>. <em>Open with...</em> calls <code>open_with_app({ filePath, appName })</code> and honors your system's default app list.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>Native drag-out</h2>
+        <p><code>frontend/js/native-file-drag.js</code>. Files can be dragged into any other native application — a DAW, Finder, Terminal, Dropbox, you name it. Detection is pointer-based:</p>
+        <ol>
+          <li><code>pointerdown</code> on a row arms the drag.</li>
+          <li><code>pointermove</code> with a delta &gt; 8 px² triggers <code>startNativeFileDrag()</code>.</li>
+          <li>The drag cursor shows a custom 128×128 cyberpunk drag icon (neon border, scanlines, spectrum bars, generated on the fly in ~line 21–143).</li>
+          <li>Drop anywhere outside the app to copy the file there (mode is always <em>copy</em> — read-only for the source).</li>
+        </ol>
+        <p>If the dragged row is part of a batch selection (via checkbox), every selected path is dragged at once. This works in every inventory tab, not just the Files browser — the drag machinery is shared with Samples, DAW, Presets, MIDI, PDF, Plugins, Favorites, and Notes rows.</p>
+      </section>
+
+      <section class="tutorial-section">
+        <h2>IPC surface</h2>
+        <ul>
+          <li><code>fs_list_dir({ dirPath })</code> — list entries in a directory.</li>
+          <li><code>delete_file({ filePath })</code></li>
+          <li><code>rename_file({ oldPath, newPath })</code></li>
+          <li><code>read_text_file({ filePath })</code> / <code>write_text_file({ filePath, content })</code></li>
+          <li><code>open_file_default({ filePath })</code></li>
+          <li><code>open_with_app({ filePath, appName })</code></li>
+          <li><code>get_home_dir()</code></li>
+        </ul>
+      </section>
+
+      <section class="tutorial-callout">
+        <strong>Tip</strong>Need to pull a one-off file into a DAW that isn't in any of your scan roots? Files browser + native drag-out is the shortest path. Bookmark the directory once, then drag out of the app forever.
+      </section>
+
+      <nav class="tutorial-nav">
+        <a class="nav-prev" href="12-favorites-notes-tags.html">
+          <span class="nav-label">Prev</span>
+          <span class="nav-title">12 · Favorites / Notes / Tags</span>
+        </a>
+        <a class="nav-index" href="index.html">
+          <span class="nav-label">Index</span>
+          <span class="nav-title">All 19 steps</span>
+        </a>
+        <a class="nav-next" href="14-history.html">
+          <span class="nav-label">Next</span>
+          <span class="nav-title">14 · History &amp; diffs</span>
+        </a>
+      </nav>
+    </main>
+  </div>
+
+  <script src="../build-meta.js"></script>
+  <script src="../hud-theme.js"></script>
+</body>
+</html>
