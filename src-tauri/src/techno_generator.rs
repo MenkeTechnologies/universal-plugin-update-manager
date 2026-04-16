@@ -33,6 +33,7 @@ const OUTRO_START: u32 = 193;
 // Element entry/exit positions (in bars, supports fractional for beat precision)
 // 16.75 = bar 16, beat 4 (last beat of bar 16)
 // 17.0 = bar 17, beat 1 (downbeat)
+#[derive(Clone, Debug, PartialEq)]
 struct TrackArrangement {
     name: String,
     sections: Vec<(f64, f64)>, // (start_bar, end_bar) pairs where element plays
@@ -2781,6 +2782,17 @@ pub struct SectionValues {
 }
 
 impl SectionValues {
+    /// Any override set?
+    pub fn any(&self) -> bool {
+        self.intro.is_some()
+            || self.build.is_some()
+            || self.breakdown.is_some()
+            || self.drop1.is_some()
+            || self.drop2.is_some()
+            || self.fadedown.is_some()
+            || self.outro.is_some()
+    }
+
     /// Get value for a given bar number, falling back to global value.
     pub fn value_at_bar(&self, bar: u32, global: f32) -> f32 {
         let section_val = if bar < BUILD1_START {
@@ -3717,4 +3729,170 @@ fn create_arranged_track_multi(
     );
 
     Ok(track)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_section_values_any() {
+        let mut sv = SectionValues::default();
+        assert!(!sv.any());
+        
+        sv.intro = Some(0.5);
+        assert!(sv.any());
+        
+        sv.intro = None;
+        sv.outro = Some(0.1);
+        assert!(sv.any());
+    }
+
+    #[test]
+    fn test_section_values_at_bar() {
+        let mut sv = SectionValues::default();
+        let global = 0.3;
+        
+        // No overrides: always returns global
+        assert_eq!(sv.value_at_bar(1, global), global);
+        assert_eq!(sv.value_at_bar(100, global), global);
+        assert_eq!(sv.value_at_bar(200, global), global);
+        
+        // Single section override
+        sv.intro = Some(0.8);
+        assert_eq!(sv.value_at_bar(1, global), 0.8);
+        assert_eq!(sv.value_at_bar(32, global), 0.8);
+        assert_eq!(sv.value_at_bar(33, global), global); // BUILD1_START
+        
+        // Multiple overrides
+        sv.build = Some(0.1);
+        sv.breakdown = Some(0.0);
+        sv.drop1 = Some(1.0);
+        sv.drop2 = Some(0.9);
+        sv.fadedown = Some(0.4);
+        sv.outro = Some(0.2);
+        
+        assert_eq!(sv.value_at_bar(10, global), 0.8);   // Intro
+        assert_eq!(sv.value_at_bar(40, global), 0.1);   // Build
+        assert_eq!(sv.value_at_bar(70, global), 0.0);   // Breakdown
+        assert_eq!(sv.value_at_bar(100, global), 1.0);  // Drop1
+        assert_eq!(sv.value_at_bar(140, global), 0.9);  // Drop2
+        assert_eq!(sv.value_at_bar(170, global), 0.4);  // Fadedown
+        assert_eq!(sv.value_at_bar(200, global), 0.2);  // Outro
+    }
+
+    #[test]
+    fn test_section_bounds_alignment() {
+        // Verify constants align with expected structure
+        assert_eq!(INTRO_START, 1);
+        assert_eq!(BUILD1_START, 33);
+        assert_eq!(BREAKDOWN_START, 65);
+        assert_eq!(DROP1_START, 97);
+        assert_eq!(DROP2_START, 129);
+        assert_eq!(FADEDOWN_START, 161);
+        assert_eq!(OUTRO_START, 193);
+        assert_eq!(SONG_LENGTH_BARS, 224);
+    }
+
+    #[test]
+    fn test_apply_parallelism_per_section_effective_vals() {
+        let mut p_vals = SectionValues::default();
+        let v_vals = SectionValues::default();
+        let global_p = 0.5;
+        let global_v = 0.3;
+        
+        // Mocking behavior of average-based effective values
+        p_vals.intro = Some(1.0);
+        p_vals.outro = Some(1.0);
+        
+        // Effective parallelism = (1.0 + 1.0) / 2 = 1.0
+        // Result should be arrangements unchanged if effective_p >= 1.0
+        let arrangements = vec![TrackArrangement::new("KICK", vec![(1.0, 33.0)])];
+        let result = apply_parallelism_per_section(arrangements.clone(), &p_vals, global_p, &v_vals, global_v);
+        assert_eq!(result.len(), arrangements.len());
+        assert_eq!(result[0].sections, arrangements[0].sections);
+    }
+
+    #[test]
+    fn test_apply_variation_per_section_effective_vals() {
+        let mut v_vals = SectionValues::default();
+        let global_v = 0.0;
+        
+        v_vals.intro = Some(0.0);
+        v_vals.outro = Some(0.0);
+        
+        // Effective variation = (0.0 + 0.0) / 2 = 0.0
+        // Result should be arrangements unchanged if effective_v <= 0.0
+        let arrangements = vec![TrackArrangement::new("KICK", vec![(1.0, 33.0)])];
+        let result = apply_variation_per_section(arrangements.clone(), &v_vals, global_v);
+        assert_eq!(result.len(), arrangements.len());
+        assert_eq!(result[0].sections, arrangements[0].sections);
+    }
+
+    #[test]
+    fn test_apply_glitch_edits_no_intensity() {
+        let arrangements = vec![TrackArrangement::new("KICK", vec![(1.0, 33.0)])];
+        let section_glitch = SectionValues::default();
+        let result = apply_glitch_edits(arrangements.clone(), 0.0, &section_glitch);
+        assert_eq!(result, arrangements);
+    }
+
+    #[test]
+    fn test_apply_density_per_section_no_intensity() {
+        let arrangements = vec![TrackArrangement::new("HAT", vec![(1.0, 33.0)])];
+        let section_density = SectionValues::default();
+        let result = apply_density_per_section(arrangements.clone(), &section_density, 0.0);
+        assert_eq!(result, arrangements);
+    }
+
+    #[test]
+    fn test_has_any_logic_in_arrangement_params() {
+        let mut overrides = SectionOverrides::default();
+        
+        // Helper to check if any chaos is detected
+        let has_any_chaos = |overrides: &SectionOverrides, chaos: f32| -> bool {
+            chaos > 0.0 || overrides.chaos.intro.is_some() ||
+            overrides.chaos.build.is_some() || overrides.chaos.breakdown.is_some() ||
+            overrides.chaos.drop1.is_some() || overrides.chaos.drop2.is_some() ||
+            overrides.chaos.fadedown.is_some() || overrides.chaos.outro.is_some()
+        };
+
+        assert!(!has_any_chaos(&overrides, 0.0));
+        assert!(has_any_chaos(&overrides, 0.1));
+        
+        overrides.chaos.breakdown = Some(0.5);
+        assert!(has_any_chaos(&overrides, 0.0));
+    }
+
+    #[test]
+    fn test_apply_glitch_edits_heavy_intensity() {
+        // Use a track that is NOT protected (KICK)
+        let arrangements = vec![TrackArrangement::new("KICK", vec![(1.0, 5.0)])];
+        let mut section_glitch = SectionValues::default();
+        section_glitch.intro = Some(1.0); // Heavy glitch in intro
+        
+        let result = apply_glitch_edits(arrangements.clone(), 1.0, &section_glitch);
+        
+        // At 1.0 intensity, it should almost certainly modify the arrangement
+        // (unless we get extremely unlucky with RNG)
+        assert_ne!(result, arrangements, "Heavy glitch should have modified the arrangement");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "KICK");
+        // It should have split the 4-bar section into many smaller segments
+        assert!(result[0].sections.len() > 1);
+    }
+
+    #[test]
+    fn test_apply_density_per_section_with_overrides() {
+        // Use a densifiable track (HAT)
+        let arrangements = vec![TrackArrangement::new("HAT", vec![(1.0, 5.0)])];
+        let mut section_density = SectionValues::default();
+        section_density.intro = Some(1.0); // High density in intro
+        
+        let result = apply_density_per_section(arrangements.clone(), &section_density, 1.0);
+        
+        // At 1.0 density, it should likely add accent clips
+        assert!(result[0].sections.len() >= arrangements[0].sections.len());
+        assert_eq!(result[0].name, "HAT");
+    }
 }

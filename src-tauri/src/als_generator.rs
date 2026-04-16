@@ -125,7 +125,7 @@ impl IdAllocator {
 }
 
 /// Represents an audio sample to be placed in the arrangement
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SampleInfo {
     pub path: String,
     pub name: String,
@@ -136,7 +136,7 @@ pub struct SampleInfo {
 }
 
 /// An audio clip placement in the arrangement
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ClipPlacement {
     pub sample: SampleInfo,
     pub start_beat: f64,
@@ -144,7 +144,7 @@ pub struct ClipPlacement {
 }
 
 /// A track containing multiple clip placements
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TrackInfo {
     pub name: String,
     pub color: u8,
@@ -170,7 +170,7 @@ impl SampleInfo {
 }
 
 /// Techno arrangement section
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Section {
     Intro,
     Buildup,
@@ -194,6 +194,7 @@ impl Section {
 }
 
 /// Configuration for generating a techno track
+#[derive(Debug, Clone, PartialEq)]
 pub struct TechnoConfig {
     pub bpm: f64,
     pub kick: SampleInfo,
