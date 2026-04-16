@@ -98,6 +98,9 @@ pub struct ProjectConfig {
     /// 0.0 = one track at a time per group, 1.0 = all tracks play together
     #[serde(default = "default_parallelism")]
     pub parallelism: f32,
+    /// 0.0 = no scatter hits, 1.0 = dense scattered one-shot hits on 1/16 grid
+    #[serde(default)]
+    pub scatter: f32,
     pub bpm: u32,
     /// e.g. "A" — root note
     pub root_note: Option<String>,
@@ -197,7 +200,7 @@ impl SectionValues {
     }
 }
 
-/// Per-section overrides for all 5 dynamics params. Drives the ALS Generator timeline editor.
+/// Per-section overrides for all 6 dynamics params. Drives the ALS Generator timeline editor.
 /// Replaces legacy `SectionGlitchConfig` (which only covered glitch). An empty config means
 /// "use the global scalar for everything" — the same behavior as before for users who don't
 /// touch the timeline.
@@ -213,6 +216,8 @@ pub struct SectionOverridesConfig {
     pub variation: SectionValues,
     #[serde(default)]
     pub parallelism: SectionValues,
+    #[serde(default)]
+    pub scatter: SectionValues,
 }
 
 impl Default for TrackCountsConfig {

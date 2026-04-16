@@ -2,13 +2,13 @@
 // ALS Generator — Section Overrides Timeline Editor (Ableton-arrangement style)
 //
 // Replaces the old 7-slider "Section Glitch Override" row. Lets the user drag
-// regions inside 5 stacked lanes (Chaos, Glitch, Density, Variation, Parallelism),
+// regions inside 6 stacked lanes (Chaos, Glitch, Density, Variation, Parallelism, Scatter),
 // each region overriding one parameter across one-or-more song sections.
 //
 // Model:
 //   _overrides = {
 //     chaos: { intro: 0.5, drop1: 0.8, ... },   // section-name → float 0..1
-//     glitch: { ... }, density: { ... }, variation: { ... }, parallelism: { ... }
+//     glitch: { ... }, density: { ... }, variation: { ... }, parallelism: { ... }, scatter: { ... }
 //   }
 // Missing section key = "use global scalar".
 //
@@ -23,13 +23,14 @@
 (function () {
     'use strict';
 
-    const PARAMS = ['chaos', 'glitch', 'density', 'variation', 'parallelism'];
+    const PARAMS = ['chaos', 'glitch', 'density', 'variation', 'parallelism', 'scatter'];
     const PARAM_LABELS = {
         chaos: 'CHAOS',
         glitch: 'GLITCH',
         density: 'DENSITY',
         variation: 'VARIATION',
         parallelism: 'PARALLELISM',
+        scatter: 'SCATTER',
     };
     const SECTIONS = ['intro', 'build', 'breakdown', 'drop1', 'drop2', 'fadedown', 'outro'];
     const SECTION_LABELS = {
@@ -57,10 +58,11 @@
         density:     { fill: 'rgba(249, 240, 2, 0.35)',   stroke: '#f9f002' },   // yellow
         variation:   { fill: 'rgba(57, 255, 20, 0.35)',   stroke: '#39ff14' },   // green
         parallelism: { fill: 'rgba(5, 217, 232, 0.45)',   stroke: '#05d9e8' },   // cyan
+        scatter:     { fill: 'rgba(255, 165, 0, 0.45)',   stroke: '#ffa500' },   // orange
     };
 
     // ── Mutable state ──────────────────────────────────────────────────────
-    let _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {} };
+    let _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {}, scatter: {} };
     let _selected = null;   // { param: string, section: string }
     let _drag = null;       // { mode: 'create'|'resize-l'|'resize-r'|'move'|'value', ... }
     let _ro = null;         // ResizeObserver
@@ -413,7 +415,7 @@
     }
 
     function onClearAllClick() {
-        _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {} };
+        _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {}, scatter: {} };
         _selected = null;
         closePopover();
         saveOverrides();
@@ -510,7 +512,7 @@
     window.renderAlsSectionOverridesTimeline = renderTimeline;
     window.alsSectionOverridesForIpc = buildIpcPayload;
     window.alsSectionOverridesReset = () => {
-        _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {} };
+        _overrides = { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {}, scatter: {} };
         _selected = null;
         closePopover();
         saveOverrides();

@@ -200,12 +200,12 @@
         scatter: !chk('alsTonalScatter'),
         vox: !chk('alsTonalVox'),
       },
-      // Per-section overrides for chaos/glitch/density/variation/parallelism
+      // Per-section overrides for chaos/glitch/density/variation/parallelism/scatter
       // (each missing key = "use global scalar"). Sourced from the timeline editor
       // in als-timeline.js; shape matches Rust `SectionOverridesConfig`.
       section_overrides: typeof window.alsSectionOverridesForIpc === 'function'
         ? window.alsSectionOverridesForIpc()
-        : { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {} },
+        : { chaos: {}, glitch: {}, density: {}, variation: {}, parallelism: {}, scatter: {} },
     };
   }
 
@@ -260,10 +260,10 @@
       tc.vox;
 
     // Section override counts (per-param) replace the old scalar rows — the
-    // 5 global sliders were retired when the Section Overrides timeline shipped.
+    // 6 global sliders were retired when the Section Overrides timeline shipped.
     const so = config.section_overrides || {};
     const oCount = (p) => (so[p] ? Object.keys(so[p]).length : 0);
-    const overridesLine = ['chaos', 'glitch', 'density', 'variation', 'parallelism']
+    const overridesLine = ['chaos', 'glitch', 'density', 'variation', 'parallelism', 'scatter']
       .map((p) => `${p[0].toUpperCase() + p.slice(1)}:${oCount(p)}`).join(' · ');
 
     summary.innerHTML = `
@@ -720,8 +720,12 @@
       const result = await window.vstUpdater.clearAlsSampleBlacklist();
       console.log(`Cleared ${result.cleared} samples from blacklist`);
       await updateBlacklistCount();
+      if (typeof showToast === 'function') {
+        showToast(toastFmt('toast.blacklist_cleared', { count: result.cleared }), 2000);
+      }
     } catch (e) {
       console.error('Failed to clear blacklist:', e);
+      if (typeof showToast === 'function') showToast(toastFmt('toast.blacklist_clear_failed'), 3000, 'error');
     }
   }
 
@@ -1084,10 +1088,15 @@
   async function clearWhitelist() {
     if (typeof window.vstUpdater?.clearAlsWhitelist !== 'function') return;
     try {
+      const prevCount = parseInt(document.getElementById('alsWhitelistCount')?.textContent || '0', 10);
       await window.vstUpdater.clearAlsWhitelist();
       await updateWhitelistCount();
+      if (typeof showToast === 'function') {
+        showToast(toastFmt('toast.whitelist_cleared', { count: prevCount }), 2000);
+      }
     } catch (e) {
       console.error('Failed to clear whitelist:', e);
+      if (typeof showToast === 'function') showToast(toastFmt('toast.whitelist_clear_failed'), 3000, 'error');
     }
   }
 

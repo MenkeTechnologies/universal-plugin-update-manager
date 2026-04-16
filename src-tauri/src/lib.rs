@@ -3498,20 +3498,25 @@ async fn generate_als_project(
             scatter: ta.scatter,
             vox: ta.vox,
         };
-        // Map the glitch per-section overrides from the new SectionOverridesConfig into the
-        // generator's SectionGlitch type. Chaos/density/variation/parallelism per-section
-        // values (also carried in `config.section_overrides`) are UI-stored but not yet
-        // routed into the generator; follow-up will extend `techno_generator::generate` to
-        // accept them and thread them through `apply_chaos`/`generate_scatter_hits`/etc.
-        let sg = &config.section_overrides.glitch;
-        let section_glitch = techno_generator::SectionGlitch {
-            intro: sg.intro,
-            build: sg.build,
-            breakdown: sg.breakdown,
-            drop1: sg.drop1,
-            drop2: sg.drop2,
-            fadedown: sg.fadedown,
-            outro: sg.outro,
+        // Map all 6 per-section overrides from SectionOverridesConfig into the generator's SectionOverrides type
+        let map_section = |sv: &als_project::SectionValues| -> techno_generator::SectionValues {
+            techno_generator::SectionValues {
+                intro: sv.intro,
+                build: sv.build,
+                breakdown: sv.breakdown,
+                drop1: sv.drop1,
+                drop2: sv.drop2,
+                fadedown: sv.fadedown,
+                outro: sv.outro,
+            }
+        };
+        let section_overrides = techno_generator::SectionOverrides {
+            chaos: map_section(&config.section_overrides.chaos),
+            glitch: map_section(&config.section_overrides.glitch),
+            density: map_section(&config.section_overrides.density),
+            variation: map_section(&config.section_overrides.variation),
+            parallelism: map_section(&config.section_overrides.parallelism),
+            scatter: map_section(&config.section_overrides.scatter),
         };
         let result = techno_generator::generate(
             &output_path,
@@ -3523,10 +3528,11 @@ async fn generate_als_project(
             config.hardness,
             config.chaos,
             config.glitch_intensity,
-            section_glitch,
+            section_overrides,
             config.density,
             config.variation,
             config.parallelism,
+            config.scatter,
             config.atonal,
             track_counts,
             type_atonal,

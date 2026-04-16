@@ -167,14 +167,10 @@ fn generate_swoosh_arrangements() -> Vec<TrackArrangement> {
 /// 
 /// Creates random hit patterns over 32-bar sections that repeat throughout the track.
 /// Multiple SCATTER tracks with different samples fire at random 1/16th positions.
-/// Density controls how many hits per 32 bars (0.0 = none, 1.0 = ~1 hit per bar average).
+/// Per-section scatter values control density in each section (0.0 = none, 1.0 = dense).
 /// 
 /// Ableton supports fractional beat values (e.g., 480.5, 95.75) for 1/16th grid precision.
-fn generate_scatter_hits(density: f32) -> Vec<TrackArrangement> {
-    if density <= 0.0 {
-        return vec![];
-    }
-    
+fn generate_scatter_hits(section_scatter: &SectionValues, global_scatter: f32) -> Vec<TrackArrangement> {
     let mut rng = rand::rng();
     
     // Work on 1/16th grid (16 sixteenths per bar)
@@ -182,51 +178,63 @@ fn generate_scatter_hits(density: f32) -> Vec<TrackArrangement> {
     const PATTERN_BARS: u32 = 32;
     const SIXTEENTHS_PER_PATTERN: u32 = PATTERN_BARS * SIXTEENTHS_PER_BAR; // 512 sixteenths
     
-    // Song sections where scatter hits play (breakdown + drops mainly)
-    let sections: Vec<(u32, u32)> = vec![
-        (65, 96),   // breakdown
-        (97, 128),  // drop 1
-        (129, 160), // drop 2
-        (161, 192), // fadedown
+    // All song sections with their bar ranges and per-section scatter values
+    let sections: Vec<(&str, u32, u32, f32)> = vec![
+        ("intro",     1,   32,  section_scatter.intro.unwrap_or(global_scatter)),
+        ("build",     33,  64,  section_scatter.build.unwrap_or(global_scatter)),
+        ("breakdown", 65,  96,  section_scatter.breakdown.unwrap_or(global_scatter)),
+        ("drop1",     97,  128, section_scatter.drop1.unwrap_or(global_scatter)),
+        ("drop2",     129, 160, section_scatter.drop2.unwrap_or(global_scatter)),
+        ("fadedown",  161, 192, section_scatter.fadedown.unwrap_or(global_scatter)),
+        ("outro",     193, 224, section_scatter.outro.unwrap_or(global_scatter)),
     ];
+    
+    // Filter to only sections with scatter > 0
+    let active_sections: Vec<_> = sections.iter()
+        .filter(|(_, _, _, density)| *density > 0.0)
+        .collect();
+    
+    if active_sections.is_empty() {
+        return vec![];
+    }
     
     // Generate 4 scatter tracks with different patterns
     let mut results: Vec<TrackArrangement> = Vec::new();
     
     for track_num in 1..=4u32 {
-        // Hits per 32 bars based on density (density 1.0 = ~32 hits, density 0.5 = ~16 hits)
-        let target_hits = ((density * 32.0) as u32).max(2);
-        
-        // Generate a 32-bar pattern of random 1/16th positions (0-511)
-        let mut pattern_sixteenths: Vec<u32> = Vec::new();
-        
-        // Each track has different density - track 1 most dense, track 4 least
-        let track_density = target_hits / track_num;
-        
-        // Pick random 1/16th positions, avoiding hits too close together
-        let mut attempts = 0;
-        while pattern_sixteenths.len() < track_density as usize && attempts < 1000 {
-            let sixteenth: u32 = rng.random_range(0..SIXTEENTHS_PER_PATTERN);
-            
-            // Avoid hits within 4 sixteenths (1 beat) of each other for this track
-            let too_close = pattern_sixteenths.iter().any(|&s| {
-                let diff = if sixteenth > s { sixteenth - s } else { s - sixteenth };
-                diff < 4
-            });
-            
-            if !too_close {
-                pattern_sixteenths.push(sixteenth);
-            }
-            attempts += 1;
-        }
-        
-        pattern_sixteenths.sort();
-        
         // Convert pattern to actual clip positions for each section
         let mut sections_out: Vec<(f64, f64)> = Vec::new();
         
-        for (section_start, section_end) in &sections {
-            let section_bars = section_end - section_start;
+        for (_, section_start, section_end, density) in &active_sections {
+            // Hits per 32 bars based on density (density 1.0 = ~32 hits, density 0.5 = ~16 hits)
+            let target_hits = ((**density * 32.0) as u32).max(2);
+            
+            // Generate a 32-bar pattern of random 1/16th positions (0-511)
+            let mut pattern_sixteenths: Vec<u32> = Vec::new();
+            
+            // Each track has different density - track 1 most dense, track 4 least
+            let track_density = target_hits / track_num;
+            
+            // Pick random 1/16th positions, avoiding hits too close together
+            let mut attempts = 0;
+            while pattern_sixteenths.len() < track_density as usize && attempts < 1000 {
+                let sixteenth: u32 = rng.random_range(0..SIXTEENTHS_PER_PATTERN);
+                
+                // Avoid hits within 4 sixteenths (1 beat) of each other for this track
+                let too_close = pattern_sixteenths.iter().any(|&s| {
+                    let diff = if sixteenth > s { sixteenth - s } else { s - sixteenth };
+                    diff < 4
+                });
+                
+                if !too_close {
+                    pattern_sixteenths.push(sixteenth);
+                }
+                attempts += 1;
+            }
+            
+            pattern_sixteenths.sort();
+            
+            let section_bars = *section_end - *section_start;
             
             // Repeat the 32-bar pattern across the section
             let mut bar_offset = 0u32;
@@ -240,7 +248,7 @@ fn generate_scatter_hits(density: f32) -> Vec<TrackArrangement> {
                         continue;
                     }
                     
-                    let abs_bar = section_start + bar_offset + sixteenth_bar;
+                    let abs_bar = *section_start + bar_offset + sixteenth_bar;
                     
                     if abs_bar >= *section_end {
                         continue;
@@ -967,7 +975,7 @@ fn get_arrangement(chaos: f32) -> Vec<TrackArrangement> {
     base
 }
 
-fn get_arrangement_with_params(chaos: f32, glitch_intensity: f32, section_glitch: &SectionGlitch, density: f32, variation: f32, parallelism: f32) -> Vec<TrackArrangement> {
+fn get_arrangement_with_params(chaos: f32, glitch_intensity: f32, section_overrides: &SectionOverrides, density: f32, variation: f32, parallelism: f32, scatter: f32) -> Vec<TrackArrangement> {
     let mut arrangements = get_arrangement(chaos);
     
     // Apply parallelism - limit how many tracks of same type play at once
@@ -981,14 +989,25 @@ fn get_arrangement_with_params(chaos: f32, glitch_intensity: f32, section_glitch
         arrangements = apply_variation(arrangements, variation);
     }
     
-    // Add scattered one-shot hits on 1/16 grid (density-controlled)
-    if density > 0.0 {
-        arrangements.extend(generate_scatter_hits(density));
+    // Add scattered one-shot hits on 1/16 grid
+    // Uses per-section scatter overrides, falling back to global scatter parameter
+    // Also check density for backwards compat (density used to drive scatter)
+    let has_any_scatter = scatter > 0.0 || density > 0.0 ||
+                          section_overrides.scatter.intro.is_some() ||
+                          section_overrides.scatter.build.is_some() ||
+                          section_overrides.scatter.breakdown.is_some() ||
+                          section_overrides.scatter.drop1.is_some() ||
+                          section_overrides.scatter.drop2.is_some() ||
+                          section_overrides.scatter.fadedown.is_some() ||
+                          section_overrides.scatter.outro.is_some();
+    if has_any_scatter {
+        // Pass section overrides and global scatter (use max of scatter/density for backwards compat)
+        arrangements.extend(generate_scatter_hits(&section_overrides.scatter, scatter.max(density)));
     }
     
     // Apply glitch edits (beat-level micro-edits, stutters, dropouts)
-    // Now uses per-section intensity from section_glitch config
-    arrangements = apply_glitch_edits(arrangements, glitch_intensity, section_glitch);
+    // Now uses per-section intensity from section_overrides.glitch
+    arrangements = apply_glitch_edits(arrangements, glitch_intensity, &section_overrides.glitch);
     
     arrangements
 }
@@ -1091,6 +1110,11 @@ fn apply_parallelism(arrangements: Vec<TrackArrangement>, parallelism: f32, vari
                     let slot_start = min_start + (slot_idx as f64 * switch_bars as f64);
                     let slot_end = (slot_start + switch_bars as f64).min(max_end);
                     
+                    // Guard against infinite loop: if slot_end didn't advance past current, break
+                    if slot_end <= current {
+                        break;
+                    }
+                    
                     let section_start = current.max(start);
                     let section_end = slot_end.min(end);
                     
@@ -1165,6 +1189,11 @@ fn apply_variation(mut arrangements: Vec<TrackArrangement>, variation: f32) -> V
             
             while pos < end {
                 let chunk_end = (pos + chunk_size).min(end);
+                
+                // Guard against infinite loop: if chunk_end didn't advance, break
+                if chunk_end <= pos {
+                    break;
+                }
                 
                 // Randomly decide to play or skip this chunk
                 // Higher variation = more skips
@@ -1341,7 +1370,7 @@ fn apply_chaos_to_arrangements(mut arrangements: Vec<TrackArrangement>, chaos: f
 /// 
 /// IMPORTANT: All positions must be multiples of 0.25 bars (1 beat) to produce valid ALS XML.
 /// Ableton expects integer beat values for CurrentStart/CurrentEnd.
-fn apply_glitch_edits(mut arrangements: Vec<TrackArrangement>, glitch_intensity: f32, section_glitch: &SectionGlitch) -> Vec<TrackArrangement> {
+fn apply_glitch_edits(mut arrangements: Vec<TrackArrangement>, glitch_intensity: f32, section_glitch: &SectionValues) -> Vec<TrackArrangement> {
     // Check if any glitch is enabled at all
     let has_any_glitch = glitch_intensity > 0.05 
         || section_glitch.intro.map_or(false, |v| v > 0.05)
@@ -1399,11 +1428,16 @@ fn apply_glitch_edits(mut arrangements: Vec<TrackArrangement>, glitch_intensity:
             let end_snapped = snap(end);
             while current < end_snapped {
                 let bar_end = snap((current + 1.0).min(end_snapped));
+                // Guard against infinite loop: if bar_end didn't advance, force it forward
+                if bar_end <= current {
+                    current = end_snapped;
+                    break;
+                }
                 let bar_num = current as u32;
                 
                 // Get section-aware glitch intensity for this bar
                 // Bar numbers in arrangement are 1-based (INTRO starts at bar 1)
-                let gi = section_glitch.intensity_at_bar(bar_num, glitch_intensity) as f64;
+                let gi = section_glitch.value_at_bar(bar_num, glitch_intensity) as f64;
                 
                 // Skip this bar if no glitch intensity
                 if gi < 0.05 {
@@ -2598,10 +2632,10 @@ impl Default for TrackCounts {
     }
 }
 
-/// Per-section glitch intensity configuration.
-/// Each value is 0.0-1.0, with None meaning "use global glitch_intensity".
+/// Per-section values for a single parameter.
+/// Each value is 0.0-1.0, with None meaning "use global value".
 #[derive(Debug, Clone, Default)]
-pub struct SectionGlitch {
+pub struct SectionValues {
     pub intro: Option<f32>,
     pub build: Option<f32>,
     pub breakdown: Option<f32>,
@@ -2611,9 +2645,9 @@ pub struct SectionGlitch {
     pub outro: Option<f32>,
 }
 
-impl SectionGlitch {
-    /// Get glitch intensity for a given bar number, falling back to global intensity.
-    pub fn intensity_at_bar(&self, bar: u32, global: f32) -> f32 {
+impl SectionValues {
+    /// Get value for a given bar number, falling back to global value.
+    pub fn value_at_bar(&self, bar: u32, global: f32) -> f32 {
         let section_val = if bar < BUILD1_START {
             self.intro
         } else if bar < BREAKDOWN_START {
@@ -2632,6 +2666,20 @@ impl SectionGlitch {
         section_val.unwrap_or(global)
     }
 }
+
+/// Per-section overrides for all 6 dynamics params.
+#[derive(Debug, Clone, Default)]
+pub struct SectionOverrides {
+    pub chaos: SectionValues,
+    pub glitch: SectionValues,
+    pub density: SectionValues,
+    pub variation: SectionValues,
+    pub parallelism: SectionValues,
+    pub scatter: SectionValues,
+}
+
+/// Legacy type alias for backwards compatibility
+pub type SectionGlitch = SectionValues;
 
 /// Per-type atonal flags - when true, skip key filtering for that sample type
 #[derive(Debug, Clone, Default)]
@@ -2681,10 +2729,11 @@ pub fn generate(
     hardness: f32,
     chaos: f32,
     glitch_intensity: f32,
-    section_glitch: SectionGlitch,
+    section_overrides: SectionOverrides,
     density: f32,
     variation: f32,
     parallelism: f32,
+    scatter: f32,
     atonal: bool,
     track_counts: TrackCounts,
     type_atonal: TypeAtonal,
@@ -2693,8 +2742,8 @@ pub fn generate(
 ) -> Result<GenerationResult, String> {
     let gen_start = std::time::Instant::now();
     write_app_log(format!(
-        "[techno_generator] generate: INPUT PARAMS: output={:?}, bpm={}, num_songs={}, root_note={:?}, mode={:?}, genre={:?}, hardness={}, chaos={}, glitch_intensity={}, density={}, variation={}, parallelism={}, atonal={}, tracks={:?}, type_atonal={:?}",
-        output_path, bpm, num_songs, root_note, mode, genre, hardness, chaos, glitch_intensity, density, variation, parallelism, atonal, track_counts, type_atonal
+        "[techno_generator] generate: INPUT PARAMS: output={:?}, bpm={}, num_songs={}, root_note={:?}, mode={:?}, genre={:?}, hardness={}, chaos={}, glitch_intensity={}, density={}, variation={}, parallelism={}, scatter={}, atonal={}, tracks={:?}, type_atonal={:?}",
+        output_path, bpm, num_songs, root_note, mode, genre, hardness, chaos, glitch_intensity, density, variation, parallelism, scatter, atonal, track_counts, type_atonal
     ));
 
     let cancelled = || cancel.map_or(false, |c| c.load(std::sync::atomic::Ordering::Relaxed));
@@ -2783,8 +2832,8 @@ pub fn generate(
     let melodics_group = create_group_track("MELODICS", MELODICS_COLOR, melodics_group_id, &ids)?;
     let fx_group = create_group_track("FX", FX_COLOR, fx_group_id, &ids)?;
 
-    // Get arrangement structure with chaos, glitch, density, variation, and parallelism applied
-    let arrangements = get_arrangement_with_params(chaos, glitch_intensity, &section_glitch, density, variation, parallelism);
+    // Get arrangement structure with all section overrides applied
+    let arrangements = get_arrangement_with_params(chaos, glitch_intensity, &section_overrides, density, variation, parallelism, scatter);
     
     // Default full-song arrangement for extra loop tracks (play throughout most of the song)
     let full_arrangement: Vec<(f64, f64)> = vec![
@@ -2929,84 +2978,107 @@ pub fn generate(
     let mut warnings: Vec<String> = Vec::new();
     let mut all_tracks: Vec<String> = Vec::new();
 
+    // Helper to check if a sample vec has any non-empty entries
+    let has_samples = |samples: &[Vec<SampleInfo>]| -> bool {
+        samples.iter().any(|v| !v.is_empty())
+    };
+
     // Macro to reduce repetition in track creation
     // Always use numbered names (e.g., "HAT 1", "HAT 2") for consistent arrangement lookup
+    // Returns the number of tracks created
     macro_rules! create_tracks {
-        ($samples:expr, $base_name:expr, $color:expr, $group_id:expr) => {
+        ($samples:expr, $base_name:expr, $color:expr, $group_id:expr) => {{
+            let mut created = 0usize;
             for i in 0..$samples.len() {
                 let name = format!("{} {}", $base_name, i + 1);
                 if !$samples[i].is_empty() {
                     match create_arranged_track_multi(&original_audio_track, &name, $color, $group_id, &all_songs, &find_arr(&name), &ids, bpm, bars_per_song) {
-                        Ok(track) => all_tracks.push(track),
+                        Ok(track) => { all_tracks.push(track); created += 1; },
                         Err(e) => warnings.push(format!("{}: {}", name, e)),
                     }
                     tracks_created += 1;
                     report_progress(tracks_created, total_tracks);
                 }
             }
-        };
+            created
+        }};
     }
 
-    // Add group tracks first
-    all_tracks.push(drums_group.clone());
-    tracks_created += 1;
-    report_progress(tracks_created, total_tracks);
-    
-    // === DRUMS ===
-    create_tracks!(song1.kicks, "KICK", DRUMS_COLOR, drums_group_id as i32);
-    create_tracks!(song1.claps, "CLAP", DRUMS_COLOR, drums_group_id as i32);
-    create_tracks!(song1.snares, "SNARE", DRUMS_COLOR, drums_group_id as i32);
-    create_tracks!(song1.hats, "HAT", DRUMS_COLOR, drums_group_id as i32);
-    create_tracks!(song1.percs, "PERC", DRUMS_COLOR, drums_group_id as i32);
-    create_tracks!(song1.rides, "RIDE", DRUMS_COLOR, drums_group_id as i32);
-    create_tracks!(song1.fills, "FILL", DRUMS_COLOR, drums_group_id as i32);
+    // === DRUMS === (only add group if it will have children)
+    let drums_has_children = has_samples(&song1.kicks) || has_samples(&song1.claps) || has_samples(&song1.snares) ||
+                             has_samples(&song1.hats) || has_samples(&song1.percs) || has_samples(&song1.rides) ||
+                             has_samples(&song1.fills);
+    if drums_has_children {
+        all_tracks.push(drums_group.clone());
+        tracks_created += 1;
+        report_progress(tracks_created, total_tracks);
+    }
+    create_tracks!(song1.kicks, "KICK", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
+    create_tracks!(song1.claps, "CLAP", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
+    create_tracks!(song1.snares, "SNARE", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
+    create_tracks!(song1.hats, "HAT", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
+    create_tracks!(song1.percs, "PERC", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
+    create_tracks!(song1.rides, "RIDE", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
+    create_tracks!(song1.fills, "FILL", DRUMS_COLOR, if drums_has_children { drums_group_id as i32 } else { -1 });
 
-    // === BASS ===
-    all_tracks.push(bass_group.clone());
-    tracks_created += 1;
-    report_progress(tracks_created, total_tracks);
-    
-    create_tracks!(song1.basses, "BASS", BASS_COLOR, bass_group_id as i32);
-    create_tracks!(song1.subs, "SUB", BASS_COLOR, bass_group_id as i32);
+    // === BASS === (only add group if it will have children)
+    let bass_has_children = has_samples(&song1.basses) || has_samples(&song1.subs);
+    if bass_has_children {
+        all_tracks.push(bass_group.clone());
+        tracks_created += 1;
+        report_progress(tracks_created, total_tracks);
+    }
+    create_tracks!(song1.basses, "BASS", BASS_COLOR, if bass_has_children { bass_group_id as i32 } else { -1 });
+    create_tracks!(song1.subs, "SUB", BASS_COLOR, if bass_has_children { bass_group_id as i32 } else { -1 });
 
-    // === BASS FX ===
-    all_tracks.push(bass_fx_group.clone());
-    tracks_created += 1;
-    report_progress(tracks_created, total_tracks);
-    
-    create_tracks!(song1.sub_drops, "SUB DROP", BASS_COLOR, bass_fx_group_id as i32);
-    create_tracks!(song1.boom_kicks, "BOOM KICK", BASS_COLOR, bass_fx_group_id as i32);
+    // === BASS FX === (only add group if it will have children)
+    let bass_fx_has_children = has_samples(&song1.sub_drops) || has_samples(&song1.boom_kicks);
+    if bass_fx_has_children {
+        all_tracks.push(bass_fx_group.clone());
+        tracks_created += 1;
+        report_progress(tracks_created, total_tracks);
+    }
+    create_tracks!(song1.sub_drops, "SUB DROP", BASS_COLOR, if bass_fx_has_children { bass_fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.boom_kicks, "BOOM KICK", BASS_COLOR, if bass_fx_has_children { bass_fx_group_id as i32 } else { -1 });
 
-    // === MELODICS ===
-    all_tracks.push(melodics_group.clone());
-    tracks_created += 1;
-    report_progress(tracks_created, total_tracks);
-    
-    create_tracks!(song1.leads, "LEAD", MELODICS_COLOR, melodics_group_id as i32);
-    create_tracks!(song1.synths, "SYNTH", MELODICS_COLOR, melodics_group_id as i32);
-    create_tracks!(song1.pads, "PAD", MELODICS_COLOR, melodics_group_id as i32);
-    create_tracks!(song1.arps, "ARP", MELODICS_COLOR, melodics_group_id as i32);
-    create_tracks!(song1.atmoses, "ATMOS", MELODICS_COLOR, melodics_group_id as i32);
+    // === MELODICS === (only add group if it will have children)
+    let melodics_has_children = has_samples(&song1.leads) || has_samples(&song1.synths) || has_samples(&song1.pads) ||
+                                has_samples(&song1.arps) || has_samples(&song1.atmoses);
+    if melodics_has_children {
+        all_tracks.push(melodics_group.clone());
+        tracks_created += 1;
+        report_progress(tracks_created, total_tracks);
+    }
+    create_tracks!(song1.leads, "LEAD", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+    create_tracks!(song1.synths, "SYNTH", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+    create_tracks!(song1.pads, "PAD", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+    create_tracks!(song1.arps, "ARP", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+    create_tracks!(song1.atmoses, "ATMOS", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
 
-    // === FX ===
-    all_tracks.push(fx_group.clone());
-    tracks_created += 1;
-    report_progress(tracks_created, total_tracks);
-    
-    create_tracks!(song1.risers, "RISER", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.downlifters, "DOWNLIFTER", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.crashes, "CRASH", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.impacts, "IMPACT", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.hits, "HIT", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.sweep_ups, "SWEEP UP", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.sweep_downs, "SWEEP DOWN", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.snare_rolls, "SNARE ROLL", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.reverses, "REVERSE", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.glitches, "GLITCH", FX_COLOR, fx_group_id as i32);
-    create_tracks!(song1.scatters, "SCATTER", FX_COLOR, fx_group_id as i32);
+    // === FX === (only add group if it will have children)
+    let fx_has_children = has_samples(&song1.risers) || has_samples(&song1.downlifters) || has_samples(&song1.crashes) ||
+                          has_samples(&song1.impacts) || has_samples(&song1.hits) || has_samples(&song1.sweep_ups) ||
+                          has_samples(&song1.sweep_downs) || has_samples(&song1.snare_rolls) || has_samples(&song1.reverses) ||
+                          has_samples(&song1.glitches) || has_samples(&song1.scatters) || has_samples(&song1.voxes);
+    if fx_has_children {
+        all_tracks.push(fx_group.clone());
+        tracks_created += 1;
+        report_progress(tracks_created, total_tracks);
+    }
+    create_tracks!(song1.risers, "RISER", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.downlifters, "DOWNLIFTER", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.crashes, "CRASH", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.impacts, "IMPACT", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.hits, "HIT", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.sweep_ups, "SWEEP UP", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.sweep_downs, "SWEEP DOWN", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.snare_rolls, "SNARE ROLL", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.reverses, "REVERSE", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.glitches, "GLITCH", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
+    create_tracks!(song1.scatters, "SCATTER", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
 
-    // === VOCALS ===
-    create_tracks!(song1.voxes, "VOX", FX_COLOR, fx_group_id as i32);
+    // === VOCALS === (part of FX group)
+    create_tracks!(song1.voxes, "VOX", FX_COLOR, if fx_has_children { fx_group_id as i32 } else { -1 });
 
     // Log warnings
     for w in &warnings {
@@ -3020,6 +3092,12 @@ pub fn generate(
 
     let track_count = all_tracks.len();
     let clip_count: usize = all_tracks.iter().map(|t| t.matches("<AudioClip").count()).sum();
+    
+    // Fail if no tracks were created (no samples found)
+    if track_count == 0 {
+        return Err("No samples found for any track type. Run sample analysis first or check your sample library paths.".into());
+    }
+    
     let all_tracks_xml = all_tracks.join("\n\t\t\t");
 
     let mut xml = format!("{}{}{}", before_track, all_tracks_xml, after_track);

@@ -2764,6 +2764,80 @@
             margin-bottom: 4px;
         }
 
+        /* Cyberpunk tonal checkboxes (Track Counts rightmost column). Native rendering
+           is overridden via `appearance: none`; off-state is a cyan-dimmed outline, hover
+           brightens + glows, checked = cyan gradient fill with a dark diagonal tick made
+           from a rotated border-pseudo. Select / Deselect links restyled as matching
+           square micro-buttons. */
+        #tabAlsGenerator .als-type-grid input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            padding: 0;
+            border: 1.5px solid var(--cyan-dim);
+            background: transparent;
+            justify-self: center;
+            cursor: pointer;
+            position: relative;
+            transition: border-color 0.12s, box-shadow 0.12s, background 0.12s, transform 0.08s;
+        }
+        #tabAlsGenerator .als-type-grid input[type="checkbox"]:hover {
+            border-color: var(--cyan);
+            box-shadow: 0 0 6px var(--cyan-glow);
+        }
+        #tabAlsGenerator .als-type-grid input[type="checkbox"]:active {
+            transform: scale(0.92);
+        }
+        #tabAlsGenerator .als-type-grid input[type="checkbox"]:focus-visible {
+            outline: none;
+            box-shadow: 0 0 10px var(--cyan-glow), 0 0 0 1px var(--cyan);
+        }
+        #tabAlsGenerator .als-type-grid input[type="checkbox"]:checked {
+            background: linear-gradient(135deg, var(--cyan), rgba(5, 217, 232, 0.55));
+            border-color: var(--cyan);
+            box-shadow: 0 0 8px var(--cyan-glow), inset 0 0 3px rgba(255, 255, 255, 0.35);
+        }
+        #tabAlsGenerator .als-type-grid input[type="checkbox"]:checked::after {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 0px;
+            width: 4px;
+            height: 9px;
+            border-style: solid;
+            border-color: var(--bg-primary);
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        #tabAlsGenerator .als-type-grid input[type="checkbox"]:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        #tabAlsGenerator #alsTonalSelectAll,
+        #tabAlsGenerator #alsTonalDeselectAll {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            line-height: 14px;
+            text-align: center;
+            border: 1px solid var(--cyan-dim);
+            color: var(--cyan);
+            font-weight: 700;
+            font-family: 'Share Tech Mono', monospace;
+            text-decoration: none;
+            margin-left: 2px;
+            transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+        }
+        #tabAlsGenerator #alsTonalSelectAll:hover,
+        #tabAlsGenerator #alsTonalDeselectAll:hover {
+            border-color: var(--cyan);
+            box-shadow: 0 0 6px var(--cyan-glow);
+            background: rgba(5, 217, 232, 0.08);
+        }
+
         /* Ableton-style section-override timeline editor.
            Canvas paints ruler + 5 lanes; popover overlays the canvas for per-region editing.
            The pane spans every grid column so it gets the full tab width — 5 lanes × 7 sections
@@ -12411,6 +12485,31 @@
 
     <div class="tab-content" id="tabAlsGenerator">
         <div class="settings-container als-generator-tab">
+            <!-- Full-width pane: per-section override timeline (Ableton-arrangement style).
+                 Spans every grid column via `.als-overrides-section`. 5 lanes × 7 sections.
+                 All 5 params (Chaos/Glitch/Density/Variation/Parallelism) are edited here —
+                 the old global sliders have been retired. `als-timeline.js` binds the canvas. -->
+            <div class="settings-section als-overrides-section" data-section="als-overrides">
+                <h2 class="settings-heading">&#9776; Section Overrides</h2>
+                <div class="settings-desc als-overrides-desc">Per-section overrides for Chaos / Glitch / Density / Variation / Parallelism / Scatter. Shift-click a section to add an override · click to edit · drag top edge to set value · scroll wheel for ±0.05 · right-click to delete. Sections without an override fall back to the genre-aware defaults.</div>
+                <div class="als-timeline-wrap">
+                    <canvas id="alsSectionTimeline" class="als-section-timeline" height="300"></canvas>
+                    <div id="alsTimelinePopover" class="als-timeline-popover" hidden>
+                        <div class="als-timeline-popover-head">
+                            <span class="als-timeline-popover-title">—</span>
+                            <button type="button" class="btn-small" data-action="alsOverrideDelete" title="Delete override">&#10005;</button>
+                        </div>
+                        <label class="als-timeline-popover-range">
+                            <input type="range" min="0" max="100" step="1" value="50" id="alsTimelinePopoverValue">
+                            <span id="alsTimelinePopoverValueLabel">0.50</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="als-timeline-actions">
+                    <button type="button" class="btn-small" data-action="alsOverridesClearAll">Clear All Overrides</button>
+                </div>
+            </div>
+
             <!-- Section 1: Project Basics -->
             <div class="settings-section" data-section="als-basics">
                 <h2 class="settings-heading">&#9776; Project Basics</h2>
@@ -12440,7 +12539,7 @@
                 </div>
 
                 <!-- Chaos / Glitch / Density / Variation / Parallelism moved to the
-                     Section Overrides timeline pane below the 4-column grid. The backend
+                     Section Overrides timeline pane at the top of the tab. The backend
                      falls back to its defaults (chaos=0.3, glitch=0.0, density=0.0,
                      variation=0.0, parallelism=0.4) for any section without an override. -->
 
@@ -12484,6 +12583,23 @@
                     <div class="settings-label"><span class="settings-title">Songs per project</span></div>
                     <div class="settings-control">
                         <input type="number" class="settings-input" id="alsNumSongs" min="1" max="10" value="1" style="width:60px;">
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-label"><span class="settings-title">Blacklist</span></div>
+                    <div class="settings-control" style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:11px;color:var(--text-dim);"><strong id="alsBlacklistCount">0</strong> samples</span>
+                        <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" id="alsViewBlacklist" title="View and manage blacklisted samples">View</button>
+                        <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" id="alsClearBlacklist" title="Allow previously used samples again">Clear All</button>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-label"><span class="settings-title">Source Dirs</span></div>
+                    <div class="settings-control" style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:11px;color:var(--text-dim);"><strong id="alsWhitelistCount">0</strong></span>
+                        <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" id="alsViewWhitelist" title="Only use samples from these directories">View</button>
+                        <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" id="alsClearWhitelist" title="Use samples from all directories">Clear All</button>
                     </div>
                 </div>
             </div>
@@ -12559,14 +12675,6 @@
                 <div style="padding:12px 0 0;color:var(--text-dim);font-size:12px;">
                     Total (incl. groups): <strong id="alsEstimatedTracks">40</strong> tracks
                 </div>
-                <div style="padding:8px 0 0;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-dim);flex-wrap:wrap;">
-                    <span>Blacklist: <strong id="alsBlacklistCount">0</strong> samples</span>
-                    <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" id="alsViewBlacklist" title="View and manage blacklisted samples">View</button>
-                    <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" id="alsClearBlacklist" title="Allow previously used samples again">Clear All</button>
-                    <span style="margin-left:12px;">Source Dirs: <strong id="alsWhitelistCount">0</strong></span>
-                    <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" id="alsViewWhitelist" title="Only use samples from these directories">View</button>
-                    <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px;" id="alsClearWhitelist" title="Use samples from all directories">Clear All</button>
-                </div>
             </div>
 
             <!-- Section 3: Preview -->
@@ -12627,31 +12735,6 @@
                 </div>
             </div>
 
-            <!-- Full-width pane: per-section override timeline (Ableton-arrangement style).
-                 Spans every grid column via `.als-overrides-section`. 5 lanes × 7 sections.
-                 All 5 params (Chaos/Glitch/Density/Variation/Parallelism) are edited here —
-                 the old global sliders have been retired. `als-timeline.js` binds the canvas. -->
-            <div class="settings-section als-overrides-section" data-section="als-overrides">
-                <h2 class="settings-heading">&#9776; Section Overrides</h2>
-                <div class="settings-desc als-overrides-desc">Per-section overrides for Chaos / Glitch / Density / Variation / Parallelism. Shift-click a section to add an override · click to edit · drag top edge to set value · scroll wheel for ±0.05 · right-click to delete. Sections without an override fall back to the genre-aware defaults.</div>
-                <div class="als-timeline-wrap">
-                    <canvas id="alsSectionTimeline" class="als-section-timeline" height="260"></canvas>
-                    <div id="alsTimelinePopover" class="als-timeline-popover" hidden>
-                        <div class="als-timeline-popover-head">
-                            <span class="als-timeline-popover-title">—</span>
-                            <button type="button" class="btn-small" data-action="alsOverrideDelete" title="Delete override">&#10005;</button>
-                        </div>
-                        <label class="als-timeline-popover-range">
-                            <input type="range" min="0" max="100" step="1" value="50" id="alsTimelinePopoverValue">
-                            <span id="alsTimelinePopoverValueLabel">0.50</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="als-timeline-actions">
-                    <button type="button" class="btn-small" data-action="alsOverridesClearAll">Clear All Overrides</button>
-                </div>
-            </div>
-
             <!-- Full-width Sample Analysis pane (bottom of tab). Spans every grid column
                  via `.als-analysis-section`. Status + Run / Stop controls live here. -->
             <div class="settings-section als-analysis-section" data-section="als-analysis">
@@ -12706,40 +12789,40 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=40625"></script>
-<script src="js/utils.js?v=40625"></script>
-<script src="js/ui-idle.js?v=40625"></script>
-<script src="js/ipc.js?v=40625"></script>
-<script src="js/tooltip-hover.js?v=40625"></script>
-<script src="js/drag-reorder.js?v=40625"></script>
-<script src="js/modal-drag.js?v=40625"></script>
-<script src="js/columns.js?v=40625"></script>
-<script src="js/notes.js?v=40625"></script>
-<script src="js/favorites.js?v=40625"></script>
-<script src="js/export.js?v=40625"></script>
-<script src="js/plugins.js?v=40625"></script>
-<script src="js/settings.js?v=40625"></script>
-<script src="js/history.js?v=40625"></script>
-<script src="js/kvr.js?v=40625"></script>
-<script src="js/graph-freeze.js?v=40625"></script>
-<script src="js/audio.js?v=40625"></script>
-<script src="js/daw.js?v=40625"></script>
-<script src="js/disk-usage.js?v=40625"></script>
-<script src="js/presets.js?v=40625"></script>
-<script src="js/batch-select.js?v=40625"></script>
-<script src="js/native-file-drag.js?v=40625"></script>
-<script src="js/sort-persist.js?v=40625"></script>
-<script src="js/multi-filter.js?v=40625"></script>
-<script src="js/file-browser.js?v=40625"></script>
-<script src="js/duplicates.js?v=40625"></script>
-<script src="js/command-palette.js?v=40625"></script>
-<script src="js/xref.js?v=40625"></script>
-<script src="js/dep-graph.js?v=40625"></script>
-<script src="js/smart-playlists.js?v=40625"></script>
-<script src="js/heatmap-dashboard.js?v=40625"></script>
-<script src="js/midi.js?v=40625"></script>
-<script src="js/pdf.js?v=40625"></script>
-<script src="js/video.js?v=40625"></script>
+<script src="js/i18n-ui.js?v=12080"></script>
+<script src="js/utils.js?v=12080"></script>
+<script src="js/ui-idle.js?v=12080"></script>
+<script src="js/ipc.js?v=12080"></script>
+<script src="js/tooltip-hover.js?v=12080"></script>
+<script src="js/drag-reorder.js?v=12080"></script>
+<script src="js/modal-drag.js?v=12080"></script>
+<script src="js/columns.js?v=12080"></script>
+<script src="js/notes.js?v=12080"></script>
+<script src="js/favorites.js?v=12080"></script>
+<script src="js/export.js?v=12080"></script>
+<script src="js/plugins.js?v=12080"></script>
+<script src="js/settings.js?v=12080"></script>
+<script src="js/history.js?v=12080"></script>
+<script src="js/kvr.js?v=12080"></script>
+<script src="js/graph-freeze.js?v=12080"></script>
+<script src="js/audio.js?v=12080"></script>
+<script src="js/daw.js?v=12080"></script>
+<script src="js/disk-usage.js?v=12080"></script>
+<script src="js/presets.js?v=12080"></script>
+<script src="js/batch-select.js?v=12080"></script>
+<script src="js/native-file-drag.js?v=12080"></script>
+<script src="js/sort-persist.js?v=12080"></script>
+<script src="js/multi-filter.js?v=12080"></script>
+<script src="js/file-browser.js?v=12080"></script>
+<script src="js/duplicates.js?v=12080"></script>
+<script src="js/command-palette.js?v=12080"></script>
+<script src="js/xref.js?v=12080"></script>
+<script src="js/dep-graph.js?v=12080"></script>
+<script src="js/smart-playlists.js?v=12080"></script>
+<script src="js/heatmap-dashboard.js?v=12080"></script>
+<script src="js/midi.js?v=12080"></script>
+<script src="js/pdf.js?v=12080"></script>
+<script src="js/video.js?v=12080"></script>
 <!-- Blacklist Modal -->
 <div id="blacklistModal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-width:600px;">
@@ -12798,16 +12881,16 @@
     </div>
 </div>
 
-<script src="js/settings-search.js?v=40625"></script>
-<script src="js/visualizer.js?v=40625"></script>
-<script src="js/walker-status.js?v=40625"></script>
-<script src="js/audio-engine.js?v=40625"></script>
-<script src="js/als-timeline.js?v=40625"></script>
-<script src="js/als-generator.js?v=40625"></script>
-<script src="js/context-menu.js?v=40625"></script>
-<script src="js/shortcuts.js?v=40625"></script>
-<script src="js/help-overlay.js?v=40625"></script>
-<script src="js/keyboard-nav.js?v=40625"></script>
-<script src="js/app.js?v=40625"></script>
+<script src="js/settings-search.js?v=12080"></script>
+<script src="js/visualizer.js?v=12080"></script>
+<script src="js/walker-status.js?v=12080"></script>
+<script src="js/audio-engine.js?v=12080"></script>
+<script src="js/als-timeline.js?v=12080"></script>
+<script src="js/als-generator.js?v=12080"></script>
+<script src="js/context-menu.js?v=12080"></script>
+<script src="js/shortcuts.js?v=12080"></script>
+<script src="js/help-overlay.js?v=12080"></script>
+<script src="js/keyboard-nav.js?v=12080"></script>
+<script src="js/app.js?v=12080"></script>
 </body>
 </html>
