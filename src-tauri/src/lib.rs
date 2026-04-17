@@ -38,6 +38,7 @@ pub mod midi_scanner;
 pub mod native_menu;
 pub mod video_scanner;
 mod waveform_container_extract;
+pub mod waveform_prefetch;
 mod open_with_app;
 pub mod path_norm;
 pub mod pdf_meta;
@@ -456,6 +457,11 @@ struct PdfScanState {
 }
 
 struct SampleAnalysisState {
+    running: AtomicBool,
+    stop: std::sync::Arc<AtomicBool>,
+}
+
+struct WaveformPrefetchState {
     running: AtomicBool,
     stop: std::sync::Arc<AtomicBool>,
 }
@@ -3658,6 +3664,208 @@ async fn als_query_samples(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+// ── Crate Tab IPC — the sample-browser surface driven by sample_analysis + favorite_sample_packs ──
+
+#[tauri::command]
+async fn crate_category_counts() -> Result<Vec<db::CrateCategoryCount>, String> {
+    blocking_res(|| db::global().crate_category_counts()).await
+}
+
+#[tauri::command]
+async fn crate_facets() -> Result<db::CrateFacets, String> {
+    blocking_res(|| db::global().crate_facets()).await
+}
+
+#[tauri::command]
+async fn crate_query(params: db::CrateQueryParams) -> Result<db::CrateQueryResult, String> {
+    blocking_res(move || db::global().crate_query(&params)).await
+}
+
+#[tauri::command]
+async fn crate_favorite_pack_toggle(pack_id: i64) -> Result<bool, String> {
+    blocking_res(move || db::global().crate_favorite_pack_toggle(pack_id)).await
+}
+
+#[tauri::command]
+async fn crate_favorite_packs_list() -> Result<Vec<i64>, String> {
+    blocking_res(|| db::global().crate_favorite_packs_list()).await
+}
+
+/// "More like this" candidate list for the Crate tab: returns paths of samples in the
+/// same category as the reference. Frontend chains this into `find_similar_samples` so
+/// the existing fingerprint cache + rayon scoring path stays the single source of truth.
+#[tauri::command]
+async fn crate_similar_candidates(
+    sample_id: i64,
+    candidate_limit: u64,
+) -> Result<Vec<String>, String> {
+    blocking_res(move || db::global().crate_similar_candidates(sample_id, candidate_limit)).await
+}
+
+// ── Waveform prefetch — bulk background fill of `waveform_cache` so Crate/Samples rows never wait on decode ──
+
+/// Start the background waveform prefetch. Rayon-parallel across cores using the
+/// pure-Rust `bpm::*_pub` decoders (no audio-engine roundtrip). Emits
+/// `waveform-prefetch-progress` events — same shape as `sample-analysis-progress`.
+#[tauri::command]
+async fn waveform_prefetch_start(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let state = app.state::<WaveformPrefetchState>();
+    if state.running.swap(true, Ordering::SeqCst) {
+        return Err("Waveform prefetch already running".into());
+    }
+    state.stop.store(false, Ordering::SeqCst);
+
+    let (cached0, total) = db::global().waveform_cache_stats().unwrap_or((0, 0));
+    let _ = app.emit(
+        "waveform-prefetch-progress",
+        serde_json::json!({
+            "phase": "started",
+            "total": total,
+            "cached": cached0,
+        }),
+    );
+    append_log(format!(
+        "WAVEFORM PREFETCH START — total {total} | already cached {cached0}"
+    ));
+
+    let stop_flag = Arc::clone(&state.stop);
+    let app_handle = app.clone();
+
+    tokio::task::spawn_blocking(move || {
+        use rayon::prelude::*;
+        // Smaller batches → more frequent progress emissions so the UI moves visibly.
+        const BATCH_SIZE: u64 = 50;
+        let mut total_built: u64 = 0;
+        let mut total_failed: u64 = 0;
+        let start = std::time::Instant::now();
+
+        loop {
+            if stop_flag.load(Ordering::Relaxed) {
+                break;
+            }
+            let paths = match db::global().unwaveformed_sample_paths(BATCH_SIZE) {
+                Ok(p) => p,
+                Err(e) => {
+                    let _ = app_handle.emit(
+                        "waveform-prefetch-progress",
+                        serde_json::json!({ "phase": "error", "message": e }),
+                    );
+                    break;
+                }
+            };
+            if paths.is_empty() {
+                break;
+            }
+
+            // Parallel decode + peak bucket. `yield_if_playback_active` defers work when
+            // the user is auditioning so prefetch doesn't fight the audio thread for cores.
+            let results: Vec<(String, Option<Vec<waveform_prefetch::Peak>>)> = paths
+                .par_iter()
+                .map(|p| {
+                    yield_if_playback_active();
+                    if stop_flag.load(Ordering::Relaxed) {
+                        return (p.clone(), None);
+                    }
+                    (
+                        p.clone(),
+                        waveform_prefetch::compute_peaks(p, waveform_prefetch::WAVEFORM_WIDTH_PX),
+                    )
+                })
+                .collect();
+
+            for (path, maybe_peaks) in &results {
+                match maybe_peaks {
+                    Some(peaks) => {
+                        let value = serde_json::to_value(peaks).unwrap_or(serde_json::json!([]));
+                        match db::global().upsert_waveform_cache_row(path, &value) {
+                            Ok(()) => total_built += 1,
+                            Err(_) => total_failed += 1,
+                        }
+                    }
+                    None => {
+                        // Tombstone unsupported / unreadable files so the same 50 bad
+                        // paths don't come back out of `unwaveformed_sample_paths` every
+                        // iteration and pin the job at 0% forever. `_isUsableWaveformPeaks`
+                        // in audio.js rejects this sentinel so the frontend falls through
+                        // to the audio-engine path (which handles more formats) on demand.
+                        let tombstone = serde_json::json!({ "failed": true });
+                        let _ = db::global().upsert_waveform_cache_row(path, &tombstone);
+                        total_failed += 1;
+                    }
+                }
+            }
+
+            let (cached_now, total_now) = db::global().waveform_cache_stats().unwrap_or((0, 0));
+            let _ = app_handle.emit(
+                "waveform-prefetch-progress",
+                serde_json::json!({
+                    "phase": "building",
+                    "cached": cached_now,
+                    "total": total_now,
+                    "built": total_built,
+                    "failed": total_failed,
+                    "elapsed_ms": start.elapsed().as_millis() as u64,
+                }),
+            );
+        }
+
+        let (cached_end, total_end) = db::global().waveform_cache_stats().unwrap_or((0, 0));
+        let stopped = stop_flag.load(Ordering::Relaxed);
+        let _ = app_handle.emit(
+            "waveform-prefetch-progress",
+            serde_json::json!({
+                "phase": if stopped { "stopped" } else { "completed" },
+                "cached": cached_end,
+                "total": total_end,
+                "built": total_built,
+                "failed": total_failed,
+                "elapsed_ms": start.elapsed().as_millis() as u64,
+            }),
+        );
+        append_log(format!(
+            "WAVEFORM PREFETCH END — built {total_built} | failed {total_failed} | cached {cached_end}/{total_end} | stopped: {stopped}"
+        ));
+
+        app_handle
+            .state::<WaveformPrefetchState>()
+            .running
+            .store(false, Ordering::SeqCst);
+    });
+
+    Ok(serde_json::json!({
+        "total": total,
+        "already_cached": cached0,
+    }))
+}
+
+/// Request stop for the in-flight waveform prefetch (honored before the next batch).
+#[tauri::command]
+async fn waveform_prefetch_stop(app: tauri::AppHandle) -> Result<(), String> {
+    app.state::<WaveformPrefetchState>()
+        .stop
+        .store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+/// `(cached, total, pending, running)` snapshot for the UI status line / badge.
+#[tauri::command]
+async fn waveform_prefetch_stats(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let running = app
+        .state::<WaveformPrefetchState>()
+        .running
+        .load(Ordering::Relaxed);
+    blocking_res(move || {
+        let (cached, total) = db::global().waveform_cache_stats()?;
+        Ok(serde_json::json!({
+            "cached": cached,
+            "total": total,
+            "pending": total.saturating_sub(cached),
+            "running": running,
+        }))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -8815,6 +9023,10 @@ pub fn run() {
             running: AtomicBool::new(false),
             stop: std::sync::Arc::new(AtomicBool::new(false)),
         })
+        .manage(WaveformPrefetchState {
+            running: AtomicBool::new(false),
+            stop: std::sync::Arc::new(AtomicBool::new(false)),
+        })
         .manage(WalkerStatus {
             plugin_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
             audio_dirs: Arc::new(std::sync::Mutex::new(Vec::new())),
@@ -9072,6 +9284,15 @@ pub fn run() {
             remove_from_als_whitelist,
             clear_als_whitelist,
             als_query_samples,
+            crate_category_counts,
+            crate_facets,
+            crate_query,
+            crate_favorite_pack_toggle,
+            crate_favorite_packs_list,
+            crate_similar_candidates,
+            waveform_prefetch_start,
+            waveform_prefetch_stop,
+            waveform_prefetch_stats,
         ])
         .setup(|app| {
             // Restore window size/position

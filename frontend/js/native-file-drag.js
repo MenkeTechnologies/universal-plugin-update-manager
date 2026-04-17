@@ -292,6 +292,13 @@ function resolveNativeDragPathsFromTarget(t) {
         return p ? {paths: [p]} : null;
     }
 
+    if (id === 'tabCrate') {
+        const row = t.closest('#crateResults .crate-row[data-sample-path]');
+        if (!row || t.closest('.crate-row-actions') || t.closest('.crate-row-btn')) return null;
+        const p = row.dataset.samplePath;
+        return p ? {paths: [p]} : null;
+    }
+
     return null;
 }
 

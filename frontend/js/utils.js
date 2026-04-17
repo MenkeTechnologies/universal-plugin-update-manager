@@ -917,6 +917,10 @@ async function triggerStartAllBackgroundJobs() {
         triggerStartFingerprintCacheBuild();
         await new Promise(r => setTimeout(r, 50));
     }
+    if (typeof triggerStartWaveformPrefetch === 'function') {
+        triggerStartWaveformPrefetch();
+        await new Promise(r => setTimeout(r, 50));
+    }
     if (typeof checkUpdates === 'function') {
         checkUpdates();
     }
@@ -932,6 +936,7 @@ function triggerStopAllBackgroundJobs() {
     if (typeof stopPdfMetadataExtractionUser === 'function') void stopPdfMetadataExtractionUser();
     const vu = window.vstUpdater;
     if (vu && typeof vu.stopFingerprintCache === 'function') void vu.stopFingerprintCache();
+    if (vu && typeof vu.waveformPrefetchStop === 'function') void vu.waveformPrefetchStop();
     if (vu && typeof vu.stopUpdates === 'function') void vu.stopUpdates();
     if (typeof stopKvrResolve === 'function') stopKvrResolve();
 }
@@ -1305,7 +1310,7 @@ function _ensureTabButtonCache() {
 const _tabPanels = {};
 const _tabPanelIds = [
     'plugins', 'history', 'samples', 'daw', 'presets', 'favorites',
-    'notes', 'tags', 'files', 'midi', 'pdf', 'videos', 'visualizer', 'walkers', 'audioEngine', 'alsGenerator', 'settings',
+    'notes', 'tags', 'files', 'midi', 'pdf', 'videos', 'visualizer', 'walkers', 'audioEngine', 'alsGenerator', 'crate', 'settings',
 ];
 
 function _ensureTabCache() {
@@ -1371,6 +1376,7 @@ function switchTab(tab) {
                 if (expectedTab === 'pdf' && typeof loadPdfPagesForVisible === 'function') void loadPdfPagesForVisible();
                 if (expectedTab === 'videos' && typeof loadVideoFiles === 'function' && typeof _videoLoaded !== 'undefined' && !_videoLoaded) void loadVideoFiles();
                 if (expectedTab === 'alsGenerator' && typeof loadAlsGenerator === 'function') loadAlsGenerator();
+                if (expectedTab === 'crate' && typeof loadCrateTab === 'function') void loadCrateTab();
                 if (expectedTab === 'settings') {
                     refreshSettingsUI();
                     if (typeof renderCacheStats === 'function') renderCacheStats();
@@ -1462,6 +1468,7 @@ const BG_JOB_BADGE_KIND_TO_LABEL_KEY = {
     pdfScan: 'ui.stats.bg_job_type_pdf_scan',
     fingerprint: 'ui.stats.bg_job_type_fingerprint',
     sampleAnalysis: 'ui.stats.bg_job_type_sample_analysis',
+    waveformPrefetch: 'ui.stats.bg_job_type_waveform_prefetch',
 };
 
 /**
@@ -1480,7 +1487,7 @@ function formatBgJobBadgeLine(kind, detailCatalogKey, vars) {
     return `${job}: ${detail}`;
 }
 
-const STATUS_BG_JOB_BADGE_IDS = ['bgAnalysisBadge', 'bgContentDupBadge', 'bgPdfMetaBadge', 'bgPdfScanBadge', 'bgFingerprintBadge', 'bgSampleAnalysisBadge'];
+const STATUS_BG_JOB_BADGE_IDS = ['bgAnalysisBadge', 'bgContentDupBadge', 'bgPdfMetaBadge', 'bgPdfScanBadge', 'bgFingerprintBadge', 'bgSampleAnalysisBadge', 'bgWaveformPrefetchBadge'];
 
 /** Show/hide each `.status-bg-job-row` from job flags + badge text (spinners live in the row). */
 function syncStatusBgJobRows() {
@@ -1497,6 +1504,7 @@ function syncStatusBgJobRows() {
             else if (id === 'bgPdfScanBadge') jobFlag = !!window.__statusBarPdfScanJob;
             else if (id === 'bgFingerprintBadge') jobFlag = !!window.__statusBarFingerprintJob;
             else if (id === 'bgSampleAnalysisBadge') jobFlag = !!window.__statusBarSampleAnalysisJob;
+            else if (id === 'bgWaveformPrefetchBadge') jobFlag = !!window.__statusBarWaveformPrefetchJob;
         }
         const hasText = !!(badge.textContent && String(badge.textContent).trim());
         row.style.display = jobFlag || hasText ? 'flex' : 'none';

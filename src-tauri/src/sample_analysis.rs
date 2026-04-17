@@ -321,11 +321,17 @@ pub static CATEGORY_PATTERNS: &[(&str, &str, Option<&str>, bool, bool, bool)] = 
 
     // === DRUMS (specific first) ===
     ("kick",        r"(?i)kick|kik|(?:^|[\s_\-])bd(?:[\s_\-]|$)|(?:^|[\s_\-])kck(?:[\s_\-]|$)", Some("drums"), false, false, true),
-    ("clap",        r"(?i)clap|snare|(?:^|[\s_\-])(?:clp|snr|sd)(?:[\s_\-]|$)", Some("drums"), false, false, true),
+    // Snare before clap so "snare.wav" doesn't get captured by the clap regex.
+    ("snare",       r"(?i)snare|(?:^|[\s_\-])(?:snr|sd)(?:[\s_\-]|$)|rim[\s_]*shot|rimshot", Some("drums"), false, false, true),
+    ("clap",        r"(?i)clap|(?:^|[\s_\-])(?:clp|cp)(?:[\s_\-]|$)", Some("drums"), false, false, true),
     ("closed_hat",  r"(?i)closed.?hat|closed.?hh|(?:^|[\s_\-])chh(?:[\s_\-]|$)", Some("drums"), false, false, true),
     ("open_hat",    r"(?i)open.?hat|open.?hh|(?:^|[\s_\-])ohh(?:[\s_\-]|$)", Some("drums"), false, false, true),
+    ("hat",         r"(?i)(?:^|[\s_\-])(?:hat|hh|hihat|hi[\s_\-]hat)(?:[\s_\-]|$)", Some("drums"), false, false, true),
+    ("cymbal",      r"(?i)cymbal|(?:^|[\s_\-])(?:cym|crash)(?:[\s_\-]|$)", Some("drums"), false, false, true),
+    ("tom",         r"(?i)(?:^|[\s_\-])(?:tom|floor[\s_\-]*tom|rack[\s_\-]*tom)(?:[\s_\-]|$)", Some("drums"), false, false, true),
     ("ride",        r"(?i)(?:^|[\s_\-])ride(?:[\s_\-.]|$)", Some("drums"), false, false, true),
-    ("perc",        r"(?i)perc|(?:^|[\s_\-])(?:tom|conga|bongo|shaker|rim|tambourine)(?:[\s_\-]|$)", Some("drums"), false, false, true),
+    ("shaker",      r"(?i)(?:^|[\s_\-])(?:shaker|maraca|tambourine|tamb)(?:[\s_\-]|$)", Some("drums"), false, false, true),
+    ("perc",        r"(?i)perc|(?:^|[\s_\-])(?:conga|bongo|rim|woodblock|cowbell)(?:[\s_\-]|$)", Some("drums"), false, false, true),
 
     // === SCHRANZ-SPECIFIC ===
     ("schranz_kick",  r"(?i)schranz.*kick|kick.*schranz|hard[\s_]*techno.*kick", Some("drums"), false, false, true),

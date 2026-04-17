@@ -128,6 +128,93 @@ fn default_limit() -> u64 {
     200
 }
 
+// ── Crate Tab types (sample browser by type/pack/bpm/key) ──
+
+#[derive(Debug, Deserialize, Default)]
+pub struct CrateQueryParams {
+    #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
+    pub is_loop: Option<bool>,
+    #[serde(default)]
+    pub pack_id: Option<i64>,
+    #[serde(default)]
+    pub manufacturer_id: Option<i64>,
+    #[serde(default)]
+    pub bpm_min: Option<u32>,
+    #[serde(default)]
+    pub bpm_max: Option<u32>,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub favorite_packs_only: bool,
+    #[serde(default)]
+    pub search: Option<String>,
+    /// When true, `search` is a Rust regex matched against `name` + `path` via the
+    /// shared SQLite `REGEXP` user function. Falls through to LIKE substring otherwise.
+    #[serde(default)]
+    pub search_regex: bool,
+    #[serde(default = "default_limit")]
+    pub limit: u64,
+    #[serde(default)]
+    pub offset: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CrateRow {
+    pub sample_id: i64,
+    pub path: String,
+    pub name: String,
+    pub size: i64,
+    pub duration: f64,
+    pub format: String,
+    pub parsed_bpm: Option<i64>,
+    pub parsed_key: Option<String>,
+    pub is_loop: bool,
+    pub category: Option<String>,
+    pub category_parent: Option<String>,
+    pub category_confidence: Option<f64>,
+    pub pack_id: Option<i64>,
+    pub pack_name: Option<String>,
+    pub manufacturer_name: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CrateQueryResult {
+    pub rows: Vec<CrateRow>,
+    pub total: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CrateCategoryCount {
+    pub name: String,
+    pub parent_name: Option<String>,
+    pub count: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CratePack {
+    pub id: i64,
+    pub name: String,
+    pub manufacturer_name: Option<String>,
+    pub sample_count: u64,
+    pub is_favorite: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CrateManufacturer {
+    pub id: i64,
+    pub name: String,
+    pub sample_count: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CrateFacets {
+    pub packs: Vec<CratePack>,
+    pub manufacturers: Vec<CrateManufacturer>,
+    pub keys: Vec<String>,
+}
+
 /// Exact FTS match counts above this force a bounded count and skip heavy aggregates (GROUP BY /
 /// size histogram over every hit) — common substrings like "loop" can match hundreds of
 /// thousands of library rows. Shared by audio, presets, MIDI, and PDF inventory queries.
@@ -2497,6 +2584,29 @@ DROP TABLE _pl_refresh_paths;"#;
                 .map_err(|e| format!("Migration v26 schema_version failed: {e}"))?;
         }
 
+        // Migration v27: favorite_sample_packs for the Crate tab.
+        // Pack id FK → sample_packs(id); row exists iff the pack is favorited.
+        let has_v27 = conn
+            .query_row(
+                "SELECT 1 FROM schema_version WHERE version = 27",
+                [],
+                |_| Ok(()),
+            )
+            .is_ok();
+        if !has_v27 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS favorite_sample_packs (
+                    pack_id  INTEGER PRIMARY KEY REFERENCES sample_packs(id) ON DELETE CASCADE,
+                    added_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_fav_pack_added ON favorite_sample_packs(added_at);
+                ",
+            )
+            .map_err(|e| format!("Migration v27 (favorite_sample_packs) failed: {e}"))?;
+            conn.execute("INSERT INTO schema_version (version) VALUES (27)", [])
+                .map_err(|e| format!("Migration v27 schema_version failed: {e}"))?;
+        }
+
         if conn
             .query_row(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_i18n'",
@@ -2630,6 +2740,365 @@ DROP TABLE _pl_refresh_paths;"#;
             .execute("DELETE FROM directory_whitelist", [])
             .map_err(|e| e.to_string())?;
         Ok(changes)
+    }
+
+    // ── Crate Tab (sample browser by type/pack/bpm/key with favorite packs) ──
+
+    pub fn crate_category_counts(&self) -> Result<Vec<CrateCategoryCount>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare(
+                "SELECT sc.name, sc.parent_name, COUNT(*) AS n
+                 FROM sample_analysis sa
+                 JOIN sample_categories sc ON sa.category_id = sc.id
+                 GROUP BY sc.id
+                 ORDER BY sc.parent_name, sc.name",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(CrateCategoryCount {
+                    name: row.get(0)?,
+                    parent_name: row.get(1)?,
+                    count: row.get::<_, i64>(2)? as u64,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(out)
+    }
+
+    /// One-shot facets call for the filter bar: packs, manufacturers, distinct keys.
+    /// Packs carry sample counts + favorite flag so the UI can sort/star in one pass.
+    pub fn crate_facets(&self) -> Result<CrateFacets, String> {
+        let conn = self.read_conn();
+
+        let mut pack_stmt = conn
+            .prepare(
+                "SELECT sp.id, sp.name, mfr.name, COUNT(sa.sample_id) AS n,
+                        CASE WHEN fp.pack_id IS NOT NULL THEN 1 ELSE 0 END AS is_fav
+                 FROM sample_packs sp
+                 LEFT JOIN sample_pack_manufacturers mfr ON sp.manufacturer_id = mfr.id
+                 LEFT JOIN sample_analysis sa ON sa.pack_id = sp.id
+                 LEFT JOIN favorite_sample_packs fp ON fp.pack_id = sp.id
+                 GROUP BY sp.id
+                 HAVING n > 0
+                 ORDER BY is_fav DESC, sp.name COLLATE NOCASE",
+            )
+            .map_err(|e| e.to_string())?;
+        let packs: Vec<CratePack> = pack_stmt
+            .query_map([], |row| {
+                Ok(CratePack {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    manufacturer_name: row.get(2)?,
+                    sample_count: row.get::<_, i64>(3)? as u64,
+                    is_favorite: row.get::<_, i64>(4)? != 0,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut mfr_stmt = conn
+            .prepare(
+                "SELECT mfr.id, mfr.name, COUNT(sa.sample_id) AS n
+                 FROM sample_pack_manufacturers mfr
+                 LEFT JOIN sample_analysis sa ON sa.manufacturer_id = mfr.id
+                 GROUP BY mfr.id
+                 HAVING n > 0
+                 ORDER BY mfr.name COLLATE NOCASE",
+            )
+            .map_err(|e| e.to_string())?;
+        let manufacturers: Vec<CrateManufacturer> = mfr_stmt
+            .query_map([], |row| {
+                Ok(CrateManufacturer {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    sample_count: row.get::<_, i64>(2)? as u64,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut key_stmt = conn
+            .prepare(
+                "SELECT DISTINCT parsed_key FROM sample_analysis
+                 WHERE parsed_key IS NOT NULL AND parsed_key <> ''
+                 ORDER BY parsed_key",
+            )
+            .map_err(|e| e.to_string())?;
+        let keys: Vec<String> = key_stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(CrateFacets {
+            packs,
+            manufacturers,
+            keys,
+        })
+    }
+
+    /// Main Crate query: returns rows + total count with every filter optional.
+    /// `category` matches `sample_categories.name` exactly OR `sample_categories.parent_name`
+    /// (so selecting the "drums" parent node returns all drum subcategory samples).
+    pub fn crate_query(&self, params: &CrateQueryParams) -> Result<CrateQueryResult, String> {
+        let conn = self.read_conn();
+
+        let mut where_parts: Vec<String> = Vec::new();
+        let mut binds: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if let Some(cat) = params.category.as_deref().filter(|s| !s.is_empty()) {
+            where_parts.push("(sc.name = ? OR sc.parent_name = ?)".into());
+            binds.push(Box::new(cat.to_string()));
+            binds.push(Box::new(cat.to_string()));
+        }
+        if let Some(is_loop) = params.is_loop {
+            where_parts.push("sa.is_loop = ?".into());
+            binds.push(Box::new(is_loop as i64));
+        }
+        if params.favorite_packs_only {
+            where_parts.push("sa.pack_id IN (SELECT pack_id FROM favorite_sample_packs)".into());
+        }
+        if let Some(pid) = params.pack_id {
+            where_parts.push("sa.pack_id = ?".into());
+            binds.push(Box::new(pid));
+        }
+        if let Some(mid) = params.manufacturer_id {
+            where_parts.push("sa.manufacturer_id = ?".into());
+            binds.push(Box::new(mid));
+        }
+        if let (Some(lo), Some(hi)) = (params.bpm_min, params.bpm_max) {
+            where_parts.push("sa.parsed_bpm BETWEEN ? AND ?".into());
+            binds.push(Box::new(lo as i64));
+            binds.push(Box::new(hi as i64));
+        }
+        if let Some(k) = params.key.as_deref().filter(|s| !s.is_empty()) {
+            where_parts.push("sa.parsed_key = ?".into());
+            binds.push(Box::new(k.to_string()));
+        }
+        if let Some(q) = params.search.as_deref().filter(|s| !s.is_empty()) {
+            if params.search_regex {
+                // SQLite REGEXP hits a user-defined function (registered globally); same path as db_query_audio regex mode.
+                where_parts.push("(s.name REGEXP ? OR s.path REGEXP ?)".into());
+                binds.push(Box::new(q.to_string()));
+                binds.push(Box::new(q.to_string()));
+            } else {
+                let like = format!(
+                    "%{}%",
+                    q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+                );
+                where_parts.push("(s.name LIKE ? ESCAPE '\\' OR s.path LIKE ? ESCAPE '\\')".into());
+                binds.push(Box::new(like.clone()));
+                binds.push(Box::new(like));
+            }
+        }
+
+        let where_sql = if where_parts.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", where_parts.join(" AND "))
+        };
+
+        let count_sql = format!(
+            "SELECT COUNT(*) FROM audio_samples s
+             JOIN sample_analysis sa ON sa.sample_id = s.id
+             LEFT JOIN sample_categories sc ON sa.category_id = sc.id
+             LEFT JOIN sample_packs sp ON sa.pack_id = sp.id
+             LEFT JOIN sample_pack_manufacturers mfr ON sa.manufacturer_id = mfr.id
+             {where_sql}"
+        );
+        let total: u64 = {
+            let mut stmt = conn.prepare(&count_sql).map_err(|e| e.to_string())?;
+            let refs: Vec<&dyn rusqlite::ToSql> = binds.iter().map(|b| b.as_ref()).collect();
+            stmt.query_row(rusqlite::params_from_iter(refs), |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(|e| e.to_string())? as u64
+        };
+
+        let sql = format!(
+            "SELECT s.id, s.path, s.name, s.size, s.duration, s.format,
+                    sa.parsed_bpm, sa.parsed_key, sa.is_loop,
+                    sc.name, sc.parent_name, sa.category_confidence,
+                    sa.pack_id, sp.name, mfr.name
+             FROM audio_samples s
+             JOIN sample_analysis sa ON sa.sample_id = s.id
+             LEFT JOIN sample_categories sc ON sa.category_id = sc.id
+             LEFT JOIN sample_packs sp ON sa.pack_id = sp.id
+             LEFT JOIN sample_pack_manufacturers mfr ON sa.manufacturer_id = mfr.id
+             {where_sql}
+             ORDER BY sa.category_confidence DESC NULLS LAST, s.name COLLATE NOCASE
+             LIMIT ? OFFSET ?"
+        );
+
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut bind_refs: Vec<&dyn rusqlite::ToSql> = binds.iter().map(|b| b.as_ref()).collect();
+        let limit_i = params.limit as i64;
+        let offset_i = params.offset as i64;
+        bind_refs.push(&limit_i);
+        bind_refs.push(&offset_i);
+
+        let rows = stmt
+            .query_map(rusqlite::params_from_iter(bind_refs), |row| {
+                Ok(CrateRow {
+                    sample_id: row.get(0)?,
+                    path: row.get(1)?,
+                    name: row.get(2)?,
+                    size: row.get(3)?,
+                    duration: row.get::<_, Option<f64>>(4)?.unwrap_or(0.0),
+                    format: row.get(5)?,
+                    parsed_bpm: row.get(6)?,
+                    parsed_key: row.get(7)?,
+                    is_loop: row.get::<_, i64>(8)? != 0,
+                    category: row.get(9)?,
+                    category_parent: row.get(10)?,
+                    category_confidence: row.get(11)?,
+                    pack_id: row.get(12)?,
+                    pack_name: row.get(13)?,
+                    manufacturer_name: row.get(14)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(CrateQueryResult { rows: out, total })
+    }
+
+    pub fn crate_favorite_pack_toggle(&self, pack_id: i64) -> Result<bool, String> {
+        let conn = self.write_conn();
+        let exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM favorite_sample_packs WHERE pack_id = ?1",
+                [pack_id],
+                |_| Ok(()),
+            )
+            .map(|_| true)
+            .or_else(|e| {
+                if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
+                    Ok(false)
+                } else {
+                    Err(e.to_string())
+                }
+            })?;
+        if exists {
+            conn.execute(
+                "DELETE FROM favorite_sample_packs WHERE pack_id = ?1",
+                [pack_id],
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(false)
+        } else {
+            conn.execute(
+                "INSERT OR IGNORE INTO favorite_sample_packs (pack_id) VALUES (?1)",
+                [pack_id],
+            )
+            .map_err(|e| e.to_string())?;
+            Ok(true)
+        }
+    }
+
+    pub fn crate_favorite_packs_list(&self) -> Result<Vec<i64>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare("SELECT pack_id FROM favorite_sample_packs ORDER BY added_at DESC")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, i64>(0))
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(out)
+    }
+
+    /// Paths of library samples that don't yet have a row in `waveform_cache`.
+    /// Restricted to decodable formats that `waveform_prefetch::compute_peaks` handles
+    /// (symphonia-covered + WAV/AIFF). Returns `limit` rows per batch call so the
+    /// background job can stream-process a large library without loading every path
+    /// into memory.
+    pub fn unwaveformed_sample_paths(&self, limit: u64) -> Result<Vec<String>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare(
+                "SELECT DISTINCT s.path
+                 FROM audio_samples s
+                 LEFT JOIN waveform_cache w ON w.path = s.path
+                 WHERE w.path IS NULL
+                   AND UPPER(s.format) IN ('WAV','AIFF','AIF','MP3','FLAC','OGG','M4A','AAC','OPUS')
+                 LIMIT ?1",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([limit as i64], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(out)
+    }
+
+    /// `(cached_rows, total_decodable_library_paths)` pair for the prefetch progress UI.
+    /// `cached_rows` only counts library paths (ignores orphan cache rows from deleted files).
+    pub fn waveform_cache_stats(&self) -> Result<(u64, u64), String> {
+        let conn = self.read_conn();
+        let cached: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM waveform_cache
+                 WHERE path IN (SELECT DISTINCT path FROM audio_samples)",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap_or(0) as u64;
+        let total: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM (
+                    SELECT DISTINCT path FROM audio_samples
+                    WHERE UPPER(format) IN ('WAV','AIFF','AIF','MP3','FLAC','OGG','M4A','AAC','OPUS')
+                 )",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap_or(0) as u64;
+        Ok((cached, total))
+    }
+
+    /// Candidate paths for "More like this" similarity: same category as reference sample.
+    /// Uses the `sample_analysis` category link so the similarity scorer runs over a
+    /// pre-narrowed set (kick→other kicks, not the whole library).
+    pub fn crate_similar_candidates(&self, sample_id: i64, limit: u64) -> Result<Vec<String>, String> {
+        let conn = self.read_conn();
+        let mut stmt = conn
+            .prepare(
+                "SELECT s2.path
+                 FROM sample_analysis sa
+                 JOIN sample_analysis sa2 ON sa2.category_id = sa.category_id
+                 JOIN audio_samples s2 ON s2.id = sa2.sample_id
+                 WHERE sa.sample_id = ?1 AND s2.id <> ?1
+                 LIMIT ?2",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(rusqlite::params![sample_id, limit as i64], |row| {
+                row.get::<_, String>(0)
+            })
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r.map_err(|e| e.to_string())?);
+        }
+        Ok(out)
     }
 
     // ── Favorites ──
@@ -9667,11 +10136,20 @@ DROP TABLE _pl_refresh_paths;"#;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         let mut count: u32 = 0;
         {
+            // UPSERT on `name` — inserts new categories and refreshes existing patterns
+            // so regex edits in CATEGORY_PATTERNS propagate to already-seeded DBs without
+            // changing the category_id (which is FK'd from sample_analysis).
             let mut stmt = tx
                 .prepare_cached(
-                    "INSERT OR IGNORE INTO sample_categories
+                    "INSERT INTO sample_categories
                          (name, parent_name, is_oneshot, is_key_sensitive, is_loop_preferred, pattern)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                     ON CONFLICT(name) DO UPDATE SET
+                         parent_name       = excluded.parent_name,
+                         is_oneshot        = excluded.is_oneshot,
+                         is_key_sensitive  = excluded.is_key_sensitive,
+                         is_loop_preferred = excluded.is_loop_preferred,
+                         pattern           = excluded.pattern",
                 )
                 .map_err(|e| e.to_string())?;
             for &(name, pattern, parent, oneshot, key_sens, loop_pref) in
