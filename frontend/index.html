@@ -13046,13 +13046,13 @@
                             <button type="button" class="btn-small" data-action="alsOverrideDelete" title="Delete override" data-i18n-title="ui.tt.delete_override">&#10005;</button>
                         </div>
                         <label class="als-timeline-popover-range">
-                            <input type="range" min="0" max="100" step="1" value="50" id="alsTimelinePopoverValue">
+                            <input type="range" min="0" max="100" step="1" value="50" id="alsTimelinePopoverValue" data-i18n-title="ui.tt.als_override_value">
                             <span id="alsTimelinePopoverValueLabel">0.50</span>
                         </label>
                     </div>
                 </div>
                 <div class="als-timeline-actions">
-                    <button type="button" class="btn-small" data-action="alsOverridesClearAll" data-i18n="ui.btn.clear_all_overrides">Clear All Overrides</button>
+                    <button type="button" class="btn-small" data-action="alsOverridesClearAll" data-i18n="ui.btn.clear_all_overrides" data-i18n-title="ui.tt.clear_all_overrides">Clear All Overrides</button>
                 </div>
             </div>
 
@@ -13063,7 +13063,7 @@
                 <div class="settings-row">
                     <div class="settings-label"><span class="settings-title" data-i18n="ui.st.genre">Genre</span></div>
                     <div class="settings-control">
-                        <select class="settings-select" id="alsGenre">
+                        <select class="settings-select" id="alsGenre" data-i18n-title="ui.tt.als_genre">
                             <option value="techno" data-i18n="ui.opt.techno_120_140_bpm">Techno (120-140 BPM)</option>
                             <option value="schranz" data-i18n="ui.opt.schranz_145_165_bpm">Schranz (145-165 BPM)</option>
                             <option value="trance" data-i18n="ui.opt.trance_130_160_bpm">Trance (130-160 BPM)</option>
@@ -13078,7 +13078,7 @@
                     </div>
                     <div class="settings-control">
                         <div class="settings-range-wrap">
-                            <input class="settings-range" type="range" min="0" max="100" step="1" id="alsHardness" value="30">
+                            <input class="settings-range" type="range" min="0" max="100" step="1" id="alsHardness" value="30" data-i18n-title="ui.tt.als_hardness">
                             <span class="settings-range-value" id="alsHardnessValue">0.30</span>
                         </div>
                     </div>
@@ -13092,14 +13092,14 @@
                 <div class="settings-row">
                     <div class="settings-label"><span class="settings-title" data-i18n="ui.st.bpm">BPM</span></div>
                     <div class="settings-control">
-                        <input type="number" class="settings-input" id="alsBpm" min="80" max="180" value="132" style="width:80px;">
+                        <input type="number" class="settings-input" id="alsBpm" min="80" max="180" value="132" style="width:80px;" data-i18n-title="ui.tt.als_bpm">
                     </div>
                 </div>
 
                 <div class="settings-row">
                     <div class="settings-label"><span class="settings-title" data-i18n="ui.st.root_note">Root Note</span></div>
                     <div class="settings-control">
-                        <select class="settings-select" id="alsRootNote" style="width:80px;">
+                        <select class="settings-select" id="alsRootNote" style="width:80px;" data-i18n-title="ui.tt.als_root_note">
                             <option value="C" data-i18n="ui.opt.c">C</option><option value="C#" data-i18n="ui.opt.c_1">C#</option>
                             <option value="D" data-i18n="ui.opt.d">D</option><option value="D#" data-i18n="ui.opt.d_1">D#</option>
                             <option value="E" data-i18n="ui.opt.e">E</option><option value="F" data-i18n="ui.opt.f">F</option>
@@ -13113,7 +13113,7 @@
                 <div class="settings-row">
                     <div class="settings-label"><span class="settings-title" data-i18n="ui.st.mode">Mode</span></div>
                     <div class="settings-control">
-                        <select class="settings-select" id="alsMode">
+                        <select class="settings-select" id="alsMode" data-i18n-title="ui.tt.als_mode">
                             <option value="Ionian" data-i18n="ui.opt.ionian_major">Ionian (Major)</option>
                             <option value="Dorian" data-i18n="ui.opt.dorian">Dorian</option>
                             <option value="Phrygian" data-i18n="ui.opt.phrygian">Phrygian</option>
@@ -13128,7 +13128,7 @@
                 <div class="settings-row">
                     <div class="settings-label"><span class="settings-title" data-i18n="ui.st.songs_per_project">Songs per project</span></div>
                     <div class="settings-control">
-                        <input type="number" class="settings-input" id="alsNumSongs" min="1" max="10" value="1" style="width:60px;">
+                        <input type="number" class="settings-input" id="alsNumSongs" min="1" max="10" value="1" style="width:60px;" data-i18n-title="ui.tt.als_num_songs">
                     </div>
                 </div>
 
@@ -13163,59 +13163,59 @@
                 <!-- DRUMS -->
                 <div style="font-weight:600;color:var(--cyan);padding:8px 0 4px;border-bottom:1px solid var(--border);margin-bottom:8px;">Drums</div>
                 <div class="als-type-grid">
-                    <span>Kick</span><input type="range" min="0" max="50" value="1" id="alsCountKick" class="als-type-slider"><span id="alsCountKickLabel">1</span><input type="checkbox" id="alsTonalKick" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Clap</span><input type="range" min="0" max="50" value="1" id="alsCountClap" class="als-type-slider"><span id="alsCountClapLabel">1</span><input type="checkbox" id="alsTonalClap" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Snare</span><input type="range" min="0" max="50" value="1" id="alsCountSnare" class="als-type-slider"><span id="alsCountSnareLabel">1</span><input type="checkbox" id="alsTonalSnare" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Hat</span><input type="range" min="0" max="50" value="2" id="alsCountHat" class="als-type-slider"><span id="alsCountHatLabel">2</span><input type="checkbox" id="alsTonalHat" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Perc</span><input type="range" min="0" max="50" value="2" id="alsCountPerc" class="als-type-slider"><span id="alsCountPercLabel">2</span><input type="checkbox" id="alsTonalPerc" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Ride</span><input type="range" min="0" max="50" value="1" id="alsCountRide" class="als-type-slider"><span id="alsCountRideLabel">1</span><input type="checkbox" id="alsTonalRide" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Fill</span><input type="range" min="0" max="50" value="4" id="alsCountFill" class="als-type-slider"><span id="alsCountFillLabel">4</span><input type="checkbox" id="alsTonalFill" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Kick</span><input type="range" min="0" max="50" value="1" id="alsCountKick" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountKickLabel">1</span><input type="checkbox" id="alsTonalKick" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Clap</span><input type="range" min="0" max="50" value="1" id="alsCountClap" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountClapLabel">1</span><input type="checkbox" id="alsTonalClap" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Snare</span><input type="range" min="0" max="50" value="1" id="alsCountSnare" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountSnareLabel">1</span><input type="checkbox" id="alsTonalSnare" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Hat</span><input type="range" min="0" max="50" value="2" id="alsCountHat" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountHatLabel">2</span><input type="checkbox" id="alsTonalHat" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Perc</span><input type="range" min="0" max="50" value="2" id="alsCountPerc" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountPercLabel">2</span><input type="checkbox" id="alsTonalPerc" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Ride</span><input type="range" min="0" max="50" value="1" id="alsCountRide" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountRideLabel">1</span><input type="checkbox" id="alsTonalRide" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Fill</span><input type="range" min="0" max="50" value="4" id="alsCountFill" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountFillLabel">4</span><input type="checkbox" id="alsTonalFill" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
                 </div>
 
                 <!-- BASS -->
                 <div style="font-weight:600;color:var(--cyan);padding:8px 0 4px;border-bottom:1px solid var(--border);margin:12px 0 8px;">Bass</div>
                 <div class="als-type-grid">
-                    <span>High Bass</span><input type="range" min="0" max="50" value="1" id="alsCountBass" class="als-type-slider"><span id="alsCountBassLabel">1</span><input type="checkbox" id="alsTonalBass" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Sub</span><input type="range" min="0" max="50" value="1" id="alsCountSub" class="als-type-slider"><span id="alsCountSubLabel">1</span><input type="checkbox" id="alsTonalSub" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>High Bass</span><input type="range" min="0" max="50" value="1" id="alsCountBass" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountBassLabel">1</span><input type="checkbox" id="alsTonalBass" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Sub</span><input type="range" min="0" max="50" value="1" id="alsCountSub" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountSubLabel">1</span><input type="checkbox" id="alsTonalSub" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
                 </div>
 
                 <!-- BASS FX -->
                 <div style="font-weight:600;color:var(--cyan);padding:8px 0 4px;border-bottom:1px solid var(--border);margin:12px 0 8px;">Bass FX</div>
                 <div class="als-type-grid">
-                    <span>Sub Drop</span><input type="range" min="0" max="50" value="2" id="alsCountSubDrop" class="als-type-slider"><span id="alsCountSubDropLabel">2</span><input type="checkbox" id="alsTonalSubDrop" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Boom Kick</span><input type="range" min="0" max="50" value="2" id="alsCountBoomKick" class="als-type-slider"><span id="alsCountBoomKickLabel">2</span><input type="checkbox" id="alsTonalBoomKick" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Sub Drop</span><input type="range" min="0" max="50" value="2" id="alsCountSubDrop" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountSubDropLabel">2</span><input type="checkbox" id="alsTonalSubDrop" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Boom Kick</span><input type="range" min="0" max="50" value="2" id="alsCountBoomKick" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountBoomKickLabel">2</span><input type="checkbox" id="alsTonalBoomKick" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
                 </div>
 
                 <!-- MELODICS -->
                 <div style="font-weight:600;color:var(--cyan);padding:8px 0 4px;border-bottom:1px solid var(--border);margin:12px 0 8px;">Melodics</div>
                 <div class="als-type-grid">
-                    <span>Lead</span><input type="range" min="0" max="50" value="1" id="alsCountLead" class="als-type-slider"><span id="alsCountLeadLabel">1</span><input type="checkbox" id="alsTonalLead" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Synth</span><input type="range" min="0" max="50" value="3" id="alsCountSynth" class="als-type-slider"><span id="alsCountSynthLabel">3</span><input type="checkbox" id="alsTonalSynth" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Pad</span><input type="range" min="0" max="50" value="2" id="alsCountPad" class="als-type-slider"><span id="alsCountPadLabel">2</span><input type="checkbox" id="alsTonalPad" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Arp</span><input type="range" min="0" max="50" value="2" id="alsCountArp" class="als-type-slider"><span id="alsCountArpLabel">2</span><input type="checkbox" id="alsTonalArp" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Atmos</span><input type="range" min="0" max="50" value="2" id="alsCountAtmos" class="als-type-slider"><span id="alsCountAtmosLabel">2</span><input type="checkbox" id="alsTonalAtmos" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Lead</span><input type="range" min="0" max="50" value="1" id="alsCountLead" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountLeadLabel">1</span><input type="checkbox" id="alsTonalLead" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Synth</span><input type="range" min="0" max="50" value="3" id="alsCountSynth" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountSynthLabel">3</span><input type="checkbox" id="alsTonalSynth" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Pad</span><input type="range" min="0" max="50" value="2" id="alsCountPad" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountPadLabel">2</span><input type="checkbox" id="alsTonalPad" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Arp</span><input type="range" min="0" max="50" value="2" id="alsCountArp" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountArpLabel">2</span><input type="checkbox" id="alsTonalArp" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Atmos</span><input type="range" min="0" max="50" value="2" id="alsCountAtmos" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountAtmosLabel">2</span><input type="checkbox" id="alsTonalAtmos" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
                 </div>
 
                 <!-- FX -->
                 <div style="font-weight:600;color:var(--cyan);padding:8px 0 4px;border-bottom:1px solid var(--border);margin:12px 0 8px;">FX</div>
                 <div class="als-type-grid">
-                    <span>Riser</span><input type="range" min="0" max="50" value="3" id="alsCountRiser" class="als-type-slider"><span id="alsCountRiserLabel">3</span><input type="checkbox" id="alsTonalRiser" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Downlifter</span><input type="range" min="0" max="50" value="1" id="alsCountDownlifter" class="als-type-slider"><span id="alsCountDownlifterLabel">1</span><input type="checkbox" id="alsTonalDownlifter" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Crash</span><input type="range" min="0" max="50" value="2" id="alsCountCrash" class="als-type-slider"><span id="alsCountCrashLabel">2</span><input type="checkbox" id="alsTonalCrash" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Impact</span><input type="range" min="0" max="50" value="2" id="alsCountImpact" class="als-type-slider"><span id="alsCountImpactLabel">2</span><input type="checkbox" id="alsTonalImpact" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Hit</span><input type="range" min="0" max="50" value="2" id="alsCountHit" class="als-type-slider"><span id="alsCountHitLabel">2</span><input type="checkbox" id="alsTonalHit" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Sweep Up</span><input type="range" min="0" max="50" value="4" id="alsCountSweepUp" class="als-type-slider"><span id="alsCountSweepUpLabel">4</span><input type="checkbox" id="alsTonalSweepUp" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Sweep Down</span><input type="range" min="0" max="50" value="4" id="alsCountSweepDown" class="als-type-slider"><span id="alsCountSweepDownLabel">4</span><input type="checkbox" id="alsTonalSweepDown" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Snare Roll</span><input type="range" min="0" max="50" value="1" id="alsCountSnareRoll" class="als-type-slider"><span id="alsCountSnareRollLabel">1</span><input type="checkbox" id="alsTonalSnareRoll" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Reverse</span><input type="range" min="0" max="50" value="2" id="alsCountReverse" class="als-type-slider"><span id="alsCountReverseLabel">2</span><input type="checkbox" id="alsTonalReverse" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Glitch</span><input type="range" min="0" max="50" value="2" id="alsCountGlitch" class="als-type-slider"><span id="alsCountGlitchLabel">2</span><input type="checkbox" id="alsTonalGlitch" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
-                    <span>Scatter</span><input type="range" min="0" max="50" value="4" id="alsCountScatter" class="als-type-slider"><span id="alsCountScatterLabel">4</span><input type="checkbox" id="alsTonalScatter" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Riser</span><input type="range" min="0" max="50" value="3" id="alsCountRiser" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountRiserLabel">3</span><input type="checkbox" id="alsTonalRiser" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Downlifter</span><input type="range" min="0" max="50" value="1" id="alsCountDownlifter" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountDownlifterLabel">1</span><input type="checkbox" id="alsTonalDownlifter" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Crash</span><input type="range" min="0" max="50" value="2" id="alsCountCrash" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountCrashLabel">2</span><input type="checkbox" id="alsTonalCrash" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Impact</span><input type="range" min="0" max="50" value="2" id="alsCountImpact" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountImpactLabel">2</span><input type="checkbox" id="alsTonalImpact" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Hit</span><input type="range" min="0" max="50" value="2" id="alsCountHit" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountHitLabel">2</span><input type="checkbox" id="alsTonalHit" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Sweep Up</span><input type="range" min="0" max="50" value="4" id="alsCountSweepUp" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountSweepUpLabel">4</span><input type="checkbox" id="alsTonalSweepUp" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Sweep Down</span><input type="range" min="0" max="50" value="4" id="alsCountSweepDown" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountSweepDownLabel">4</span><input type="checkbox" id="alsTonalSweepDown" checked title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Snare Roll</span><input type="range" min="0" max="50" value="1" id="alsCountSnareRoll" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountSnareRollLabel">1</span><input type="checkbox" id="alsTonalSnareRoll" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Reverse</span><input type="range" min="0" max="50" value="2" id="alsCountReverse" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountReverseLabel">2</span><input type="checkbox" id="alsTonalReverse" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Glitch</span><input type="range" min="0" max="50" value="2" id="alsCountGlitch" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountGlitchLabel">2</span><input type="checkbox" id="alsTonalGlitch" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Scatter</span><input type="range" min="0" max="50" value="4" id="alsCountScatter" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountScatterLabel">4</span><input type="checkbox" id="alsTonalScatter" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
                 </div>
 
                 <!-- VOCALS -->
                 <div style="font-weight:600;color:var(--cyan);padding:8px 0 4px;border-bottom:1px solid var(--border);margin:12px 0 8px;">Vocals</div>
                 <div class="als-type-grid">
-                    <span>Vox</span><input type="range" min="0" max="50" value="1" id="alsCountVox" class="als-type-slider"><span id="alsCountVoxLabel">1</span><input type="checkbox" id="alsTonalVox" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
+                    <span>Vox</span><input type="range" min="0" max="50" value="1" id="alsCountVox" class="als-type-slider" data-i18n-title="ui.tt.als_sample_type_count"><span id="alsCountVoxLabel">1</span><input type="checkbox" id="alsTonalVox" title="Tonal" style="justify-self:center;" data-i18n-title="ui.tt.tonal">
                 </div>
 
                 <div style="padding:12px 0 0;color:var(--text-dim);font-size:12px;">
@@ -13242,15 +13242,15 @@
                             <span class="settings-desc" data-i18n="ui.sd.leave_blank_for_auto_generated">Leave blank for auto-generated</span>
                         </div>
                         <div class="settings-control">
-                            <input type="text" class="settings-input" id="alsProjectName" placeholder="Auto-generated" style="width:200px;" data-i18n-placeholder="ui.ph.auto_generated">
+                            <input type="text" class="settings-input" id="alsProjectName" placeholder="Auto-generated" style="width:200px;" data-i18n-placeholder="ui.ph.auto_generated" data-i18n-title="ui.tt.als_project_name">
                         </div>
                     </div>
 
                     <div class="settings-row">
                         <div class="settings-label"><span class="settings-title" data-i18n="ui.st.output_folder">Output folder</span></div>
                         <div class="settings-control" style="display:flex;gap:8px;">
-                            <input type="text" class="settings-input" id="alsOutputPath" style="flex:1;" readonly>
-                            <button class="btn btn-secondary" data-action="alsPickOutput" data-i18n="ui.btn.browse">Browse</button>
+                            <input type="text" class="settings-input" id="alsOutputPath" style="flex:1;" readonly data-i18n-title="ui.tt.als_output_path">
+                            <button class="btn btn-secondary" data-action="alsPickOutput" data-i18n="ui.btn.browse" data-i18n-title="ui.tt.browse_output_directory">Browse</button>
                         </div>
                     </div>
 
@@ -13260,10 +13260,10 @@
                             <span class="settings-desc" data-i18n="ui.sd.als_seed">Lock the seed to regenerate the same arrangement</span>
                         </div>
                         <div class="settings-control" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                            <input type="text" class="settings-input" id="alsSeed" placeholder="(random each generation)" style="width:220px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" data-i18n-placeholder="ui.ph.als_seed" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+                            <input type="text" class="settings-input" id="alsSeed" placeholder="(random each generation)" style="width:220px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;" data-i18n-placeholder="ui.ph.als_seed" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-i18n-title="ui.tt.als_seed_value">
                             <button type="button" class="btn btn-secondary btn-compact" data-action="alsRandomizeSeed" id="alsRandomizeSeedBtn" title="Generate a new random seed" data-i18n-title="ui.tt.als_randomize_seed" aria-label="Randomize seed">&#127922;</button>
                             <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);cursor:pointer;" title="Keep this seed for the next generation" data-i18n-title="ui.tt.als_lock_seed">
-                                <input type="checkbox" id="alsSeedLocked" style="margin:0;">
+                                <input type="checkbox" id="alsSeedLocked" style="margin:0;" data-i18n-title="ui.tt.als_seed_locked">
                                 <span data-i18n="ui.st.als_lock_seed">Lock</span>
                             </label>
                         </div>
@@ -13289,7 +13289,7 @@
 
                 <div style="display:flex;align-items:center;gap:8px;padding-top:12px;">
                     <span id="alsOutputFilename" style="font-size:12px;color:var(--cyan);display:none;"></span>
-                    <button class="btn btn-primary" data-action="alsGenerate" id="alsGenerateBtn" data-i18n="ui.btn.generate_als">Generate ALS</button>
+                    <button class="btn btn-primary" data-action="alsGenerate" id="alsGenerateBtn" data-i18n="ui.btn.generate_als" data-i18n-title="ui.tt.generate_als">Generate ALS</button>
                     <button class="btn btn-stop" data-action="alsCancelGenerate" id="alsCancelBtn" style="display:none;" data-i18n="ui.btn.cancel">Cancel</button>
                 </div>
             </div>
@@ -13300,8 +13300,8 @@
                 <h2 class="settings-heading">&#9776; Sample Analysis</h2>
                 <div class="als-analysis-row">
                     <span id="alsAnalysisStatus" class="als-analysis-status">checking...</span>
-                    <button class="btn btn-secondary btn-compact" data-action="alsStartAnalysis" id="alsAnalysisBtn" data-i18n="ui.btn.run_analysis">Run Analysis</button>
-                    <button class="btn btn-stop btn-compact" data-action="alsStopAnalysis" id="alsStopAnalysisBtn" hidden data-i18n="ui.btn.9632_stop">Stop</button>
+                    <button class="btn btn-secondary btn-compact" data-action="alsStartAnalysis" id="alsAnalysisBtn" data-i18n="ui.btn.run_analysis" data-i18n-title="ui.tt.run_analysis">Run Analysis</button>
+                    <button class="btn btn-stop btn-compact" data-action="alsStopAnalysis" id="alsStopAnalysisBtn" hidden data-i18n="ui.btn.9632_stop" data-i18n-title="ui.tt.stop_analysis">Stop</button>
                 </div>
             </div>
         </div>
@@ -13472,46 +13472,46 @@
     </div>
 </div>
 
-<script src="js/i18n-ui.js?v=46117"></script>
-<script src="js/utils.js?v=46117"></script>
-<script src="js/ui-idle.js?v=46117"></script>
-<script src="js/ipc.js?v=46117"></script>
-<script src="js/tooltip-hover.js?v=46117"></script>
-<script src="js/drag-reorder.js?v=46117"></script>
-<script src="js/modal-drag.js?v=46117"></script>
-<script src="js/columns.js?v=46117"></script>
-<script src="js/notes.js?v=46117"></script>
-<script src="js/favorites.js?v=46117"></script>
-<script src="js/export.js?v=46117"></script>
-<script src="js/plugins.js?v=46117"></script>
-<script src="js/settings.js?v=46117"></script>
-<script src="js/history.js?v=46117"></script>
-<script src="js/kvr.js?v=46117"></script>
-<script src="js/graph-freeze.js?v=46117"></script>
-<script src="js/audio.js?v=46117"></script>
-<script src="js/daw.js?v=46117"></script>
-<script src="js/disk-usage.js?v=46117"></script>
-<script src="js/presets.js?v=46117"></script>
-<script src="js/batch-select.js?v=46117"></script>
-<script src="js/native-file-drag.js?v=46117"></script>
-<script src="js/sort-persist.js?v=46117"></script>
-<script src="js/multi-filter.js?v=46117"></script>
-<script src="js/file-browser.js?v=46117"></script>
-<script src="js/duplicates.js?v=46117"></script>
-<script src="js/command-palette.js?v=46117"></script>
-<script src="js/xref.js?v=46117"></script>
-<script src="js/dep-graph.js?v=46117"></script>
-<script src="js/smart-playlists.js?v=46117"></script>
-<script src="js/heatmap-dashboard.js?v=46117"></script>
-<script src="js/midi.js?v=46117"></script>
-<script src="js/pdf.js?v=46117"></script>
-<script src="js/video.js?v=46117"></script>
+<script src="js/i18n-ui.js?v=28703"></script>
+<script src="js/utils.js?v=28703"></script>
+<script src="js/ui-idle.js?v=28703"></script>
+<script src="js/ipc.js?v=28703"></script>
+<script src="js/tooltip-hover.js?v=28703"></script>
+<script src="js/drag-reorder.js?v=28703"></script>
+<script src="js/modal-drag.js?v=28703"></script>
+<script src="js/columns.js?v=28703"></script>
+<script src="js/notes.js?v=28703"></script>
+<script src="js/favorites.js?v=28703"></script>
+<script src="js/export.js?v=28703"></script>
+<script src="js/plugins.js?v=28703"></script>
+<script src="js/settings.js?v=28703"></script>
+<script src="js/history.js?v=28703"></script>
+<script src="js/kvr.js?v=28703"></script>
+<script src="js/graph-freeze.js?v=28703"></script>
+<script src="js/audio.js?v=28703"></script>
+<script src="js/daw.js?v=28703"></script>
+<script src="js/disk-usage.js?v=28703"></script>
+<script src="js/presets.js?v=28703"></script>
+<script src="js/batch-select.js?v=28703"></script>
+<script src="js/native-file-drag.js?v=28703"></script>
+<script src="js/sort-persist.js?v=28703"></script>
+<script src="js/multi-filter.js?v=28703"></script>
+<script src="js/file-browser.js?v=28703"></script>
+<script src="js/duplicates.js?v=28703"></script>
+<script src="js/command-palette.js?v=28703"></script>
+<script src="js/xref.js?v=28703"></script>
+<script src="js/dep-graph.js?v=28703"></script>
+<script src="js/smart-playlists.js?v=28703"></script>
+<script src="js/heatmap-dashboard.js?v=28703"></script>
+<script src="js/midi.js?v=28703"></script>
+<script src="js/pdf.js?v=28703"></script>
+<script src="js/video.js?v=28703"></script>
 <!-- Blacklist Modal -->
 <div id="blacklistModal" class="modal-overlay">
     <div class="modal-content" style="max-width:600px;">
         <div class="modal-header">
             <h2 data-i18n="ui.h2.sample_blacklist">Sample Blacklist</h2>
-            <button class="modal-close" id="blacklistModalClose">&times;</button>
+            <button class="modal-close" id="blacklistModalClose" data-i18n-title="ui.tt.close_modal">&times;</button>
         </div>
         <div class="modal-body modal-body-list">
             <div class="modal-row-inline">
@@ -13538,7 +13538,7 @@
     <div class="modal-content" style="max-width:600px;">
         <div class="modal-header">
             <h2 data-i18n="ui.h2.source_directories">Source Directories</h2>
-            <button class="modal-close" id="whitelistModalClose">&times;</button>
+            <button class="modal-close" id="whitelistModalClose" data-i18n-title="ui.tt.close_modal">&times;</button>
         </div>
         <div class="modal-body modal-body-list">
             <div class="modal-list-desc" data-i18n="ui.crate.whitelist_desc">
@@ -13564,17 +13564,17 @@
     </div>
 </div>
 
-<script src="js/settings-search.js?v=46117"></script>
-<script src="js/visualizer.js?v=46117"></script>
-<script src="js/walker-status.js?v=46117"></script>
-<script src="js/audio-engine.js?v=46117"></script>
-<script src="js/als-timeline.js?v=46117"></script>
-<script src="js/als-generator.js?v=46117"></script>
-<script src="js/sample-browser.js?v=46117"></script>
-<script src="js/context-menu.js?v=46117"></script>
-<script src="js/shortcuts.js?v=46117"></script>
-<script src="js/help-overlay.js?v=46117"></script>
-<script src="js/keyboard-nav.js?v=46117"></script>
-<script src="js/app.js?v=46117"></script>
+<script src="js/settings-search.js?v=28703"></script>
+<script src="js/visualizer.js?v=28703"></script>
+<script src="js/walker-status.js?v=28703"></script>
+<script src="js/audio-engine.js?v=28703"></script>
+<script src="js/als-timeline.js?v=28703"></script>
+<script src="js/als-generator.js?v=28703"></script>
+<script src="js/sample-browser.js?v=28703"></script>
+<script src="js/context-menu.js?v=28703"></script>
+<script src="js/shortcuts.js?v=28703"></script>
+<script src="js/help-overlay.js?v=28703"></script>
+<script src="js/keyboard-nav.js?v=28703"></script>
+<script src="js/app.js?v=28703"></script>
 </body>
 </html>

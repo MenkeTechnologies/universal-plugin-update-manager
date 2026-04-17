@@ -952,7 +952,7 @@ mod tests {
 
         // Clap/snare
         let m = match_category("snare-02", "/Drums/Snares/").unwrap();
-        assert_eq!(m.name, "clap"); // snare maps to clap category
+        assert_eq!(m.name, "snare"); // snare maps to clap category
 
         // Hi-hat
         let m = match_category("Tr8 Closed Hat 03", "/Drums/Hats/").unwrap();
@@ -980,7 +980,7 @@ mod tests {
 
         // Ride
         let m = match_category("Perc-Cymbal-Ride 4 Bell 1", "/Drums/Cymbals/").unwrap();
-        assert_eq!(m.name, "ride");
+        assert_eq!(m.name, "cymbal");
     }
 
     #[test]

@@ -159,9 +159,10 @@ pub fn remap_bar_range(
 
     let new_start = u_lo as f64 + offset_start;
     let new_end = (u_lo as f64 + offset_end).min(u_hi as f64);
-    if new_end <= new_start {
+    if new_end < new_start {
         None
     } else {
+        // new_end == new_start is a valid one-shot placement (single hit)
         Some((new_start, new_end))
     }
 }
@@ -307,106 +308,73 @@ fn generate_swoosh_arrangements() -> Vec<TrackArrangement> {
 /// Per-section scatter values control density in each section (0.0 = none, 1.0 = dense).
 /// 
 /// Ableton supports fractional beat values (e.g., 480.5, 95.75) for 1/16th grid precision.
-fn generate_scatter_hits(section_scatter: &SectionValues, global_scatter: f32) -> Vec<TrackArrangement> {
+fn generate_scatter_hits(section_scatter: &SectionValues, global_scatter: f32, track_count: u32) -> Vec<TrackArrangement> {
     with_gen_rng(|rng| {
-        // Work on 1/16th grid (16 sixteenths per bar)
         const SIXTEENTHS_PER_BAR: u32 = 16;
-        const PATTERN_BARS: u32 = 32;
-        const SIXTEENTHS_PER_PATTERN: u32 = PATTERN_BARS * SIXTEENTHS_PER_BAR; // 512 sixteenths
+        const BLOCK_BARS: u32 = 8;
+        const SIXTEENTHS_PER_BLOCK: u32 = BLOCK_BARS * SIXTEENTHS_PER_BAR; // 128
 
-        // All song sections with their bar ranges. Per-section scatter is now
-        // resolved by bar via the 8-bar-block map — we sample the block at the
-        // section's start bar as representative of the section's scatter level.
-        // Over- or under-density inside a section (when blocks differ within it)
-        // is acceptable for this coarse generator; fine-grained variance comes
-        // from apply_density_per_section, which walks blocks directly.
-        let sections: Vec<(&str, u32, u32, f32)> = vec![
-            ("intro",     1,   32,  section_scatter.value_at_bar(1,   global_scatter)),
-            ("build",     33,  64,  section_scatter.value_at_bar(33,  global_scatter)),
-            ("breakdown", 65,  96,  section_scatter.value_at_bar(65,  global_scatter)),
-            ("drop1",     97,  128, section_scatter.value_at_bar(97,  global_scatter)),
-            ("drop2",     129, 160, section_scatter.value_at_bar(129, global_scatter)),
-            ("fadedown",  161, 192, section_scatter.value_at_bar(161, global_scatter)),
-            ("outro",     193, 224, section_scatter.value_at_bar(193, global_scatter)),
-        ];
+        // Walk every 8-bar block in the canonical 224-bar layout, matching the
+        // section-overrides grid granularity. Each block gets its own density
+        // from `value_at_bar`, so painted blocks produce hits and unpainted ones
+        // stay silent.
+        let total_bars: u32 = 224;
+        let mut blocks: Vec<(u32, u32, f32)> = Vec::new(); // (start, end_exclusive, density)
+        let mut bar = 1u32;
+        while bar <= total_bars {
+            let block_end = (bar + BLOCK_BARS).min(total_bars + 1);
+            let density = section_scatter.value_at_bar(bar, global_scatter);
+            if density > 0.0 {
+                blocks.push((bar, block_end, density));
+            }
+            bar = block_end;
+        }
 
-        // Filter to only sections with scatter > 0
-        let active_sections: Vec<_> = sections.iter()
-            .filter(|(_, _, _, density)| *density > 0.0)
-            .collect();
-
-        if active_sections.is_empty() {
+        if blocks.is_empty() {
             return vec![];
         }
 
-        // Generate 4 scatter tracks with different patterns
         let mut results: Vec<TrackArrangement> = Vec::new();
 
-        for track_num in 1..=4u32 {
-            // Convert pattern to actual clip positions for each section
+        // Generate unique patterns for every scatter track. Each track
+        // gets its own random 1/16th positions; higher tracks are sparser.
+        let n = track_count.max(1);
+        for track_num in 1..=n {
             let mut sections_out: Vec<(f64, f64)> = Vec::new();
 
-            for (_, section_start, section_end, density) in &active_sections {
-                // Hits per 32 bars based on density (density 1.0 = ~32 hits, density 0.5 = ~16 hits)
-                let target_hits = ((*density * 32.0) as u32).max(2);
+            for &(block_start, block_end, density) in &blocks {
+                let block_len = block_end - block_start;
+                // Hits per 8-bar block scales quadratically for perceptible
+                // density difference: 0.1 → ~1, 0.3 → ~3, 0.5 → ~8, 1.0 → ~32
+                let max_hits_per_block = (block_len * SIXTEENTHS_PER_BAR / 4) as f32; // 32 for 8 bars
+                let target_hits = ((density * density * max_hits_per_block).round() as u32).max(1);
+                // Higher track numbers are sparser — track 1 full, track N minimal
+                let track_hits = ((target_hits as f32 / track_num as f32).ceil() as u32).max(1);
 
-                // Generate a 32-bar pattern of random 1/16th positions (0-511)
-                let mut pattern_sixteenths: Vec<u32> = Vec::new();
-
-                // Each track has different density - track 1 most dense, track 4 least
-                let track_density = target_hits / track_num;
-
-                // Pick random 1/16th positions, avoiding hits too close together
-                let mut attempts = 0;
-                while pattern_sixteenths.len() < track_density as usize && attempts < 1000 {
-                    let sixteenth: u32 = rng.random_range(0..SIXTEENTHS_PER_PATTERN);
-
-                    // Avoid hits within 4 sixteenths (1 beat) of each other for this track
-                    let too_close = pattern_sixteenths.iter().any(|&s| {
-                        let diff = sixteenth.abs_diff(s);
-                        diff < 4
-                    });
-
+                let sixteenths_in_block = block_len * SIXTEENTHS_PER_BAR;
+                let mut pattern: Vec<u32> = Vec::new();
+                let mut attempts = 0u32;
+                while pattern.len() < track_hits as usize && attempts < 500 {
+                    let s = rng.random_range(0..sixteenths_in_block);
+                    let too_close = pattern.iter().any(|&p| s.abs_diff(p) < 4);
                     if !too_close {
-                        pattern_sixteenths.push(sixteenth);
+                        pattern.push(s);
                     }
                     attempts += 1;
                 }
 
-                pattern_sixteenths.sort();
-
-                let section_bars = *section_end - *section_start;
-
-                // Repeat the 32-bar pattern across the section
-                let mut bar_offset = 0u32;
-                while bar_offset < section_bars {
-                    for &sixteenth in &pattern_sixteenths {
-                        // Convert sixteenth to bar position
-                        let sixteenth_bar = sixteenth / SIXTEENTHS_PER_BAR;
-                        let sixteenth_within_bar = sixteenth % SIXTEENTHS_PER_BAR;
-
-                        if sixteenth_bar >= PATTERN_BARS.min(section_bars - bar_offset) {
-                            continue;
-                        }
-
-                        let abs_bar = *section_start + bar_offset + sixteenth_bar;
-
-                        if abs_bar >= *section_end {
-                            continue;
-                        }
-
-                        // Position as bar + fraction (0.0625 per 1/16th = 1/16 of a bar)
-                        // This produces values like 65.0625, 65.125, 65.1875, etc.
-                        let abs_pos: f64 = abs_bar as f64 + (sixteenth_within_bar as f64 * 0.0625);
-
-                        // One-shot = start and end at same position (single hit)
-                        sections_out.push((abs_pos, abs_pos));
-                    }
-                    bar_offset += PATTERN_BARS;
+                for &s in &pattern {
+                    let bar_in_block = s / SIXTEENTHS_PER_BAR;
+                    let sixteenth_in_bar = s % SIXTEENTHS_PER_BAR;
+                    let abs_bar = block_start + bar_in_block;
+                    if abs_bar >= block_end { continue; }
+                    let abs_pos = abs_bar as f64 + (sixteenth_in_bar as f64 * 0.0625);
+                    sections_out.push((abs_pos, abs_pos));
                 }
             }
 
             if !sections_out.is_empty() {
+                sections_out.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                 results.push(TrackArrangement::new(&format!("SCATTER {}", track_num), sections_out));
             }
         }
@@ -989,7 +957,7 @@ fn get_arrangement(chaos: f32) -> Vec<TrackArrangement> {
             ]),
 
         // === FX - SUB DROP (layered in breakdown: 65, 73, 81, 89) ===
-        TrackArrangement::new("SUB DROP", vec![
+        TrackArrangement::new("SUB DROP 1", vec![
                 (65.0, 65.0), (73.0, 73.0), (81.0, 81.0), (89.0, 89.0),
             ]),
         TrackArrangement::new("SUB DROP 2", vec![
@@ -1003,7 +971,7 @@ fn get_arrangement(chaos: f32) -> Vec<TrackArrangement> {
             ]),
 
         // === FX - BOOM KICK (layered in breakdown: 65, 73, 81, 89) ===
-        TrackArrangement::new("BOOM KICK", vec![
+        TrackArrangement::new("BOOM KICK 1", vec![
                 (65.0, 65.0), (73.0, 73.0), (81.0, 81.0), (89.0, 89.0),
             ]),
         TrackArrangement::new("BOOM KICK 2", vec![
@@ -1111,13 +1079,14 @@ fn get_arrangement(chaos: f32) -> Vec<TrackArrangement> {
     
     // Apply chaos to arrangements (bar-level gaps)
     if chaos > 0.0 {
-        base = apply_chaos_to_arrangements(base, chaos);
+        let uniform_chaos = SectionValues::default();
+        base = apply_chaos_to_arrangements(base, &uniform_chaos, chaos);
     }
     
     base
 }
 
-fn get_arrangement_with_params(chaos: f32, glitch_intensity: f32, section_overrides: &SectionOverrides, density: f32, variation: f32, parallelism: f32, scatter: f32) -> Vec<TrackArrangement> {
+fn get_arrangement_with_params(chaos: f32, glitch_intensity: f32, section_overrides: &SectionOverrides, density: f32, variation: f32, parallelism: f32, scatter: f32, scatter_track_count: u32) -> Vec<TrackArrangement> {
     let mut arrangements = get_arrangement(chaos);
     
     // Apply chaos per-section (bar-level gaps within sections)
@@ -1148,7 +1117,7 @@ fn get_arrangement_with_params(chaos: f32, glitch_intensity: f32, section_overri
     // Uses per-section scatter overrides, falling back to global scatter parameter
     let has_any_scatter = scatter > 0.0 || section_overrides.scatter.any();
     if has_any_scatter {
-        arrangements.extend(generate_scatter_hits(&section_overrides.scatter, scatter));
+        arrangements.extend(generate_scatter_hits(&section_overrides.scatter, scatter, scatter_track_count));
     }
     
     // Apply glitch edits (beat-level micro-edits, stutters, dropouts)
@@ -1161,7 +1130,7 @@ fn get_arrangement_with_params(chaos: f32, glitch_intensity: f32, section_overri
 /// Apply parallelism - limit how many tracks of the same type play simultaneously
 /// parallelism 0.0 = one track at a time, 1.0 = all tracks play together
 /// variation controls switch interval: 0.0 = every 16 bars, 1.0 = every 4 bars
-fn apply_parallelism(arrangements: Vec<TrackArrangement>, parallelism: f32, variation: f32) -> Vec<TrackArrangement> {
+fn apply_parallelism(arrangements: Vec<TrackArrangement>, section_parallelism: &SectionValues, global_parallelism: f32, section_variation: &SectionValues, global_variation: f32) -> Vec<TrackArrangement> {
     use std::collections::HashMap;
 
     // Group tracks by their base type (strip trailing numbers)
@@ -1184,9 +1153,8 @@ fn apply_parallelism(arrangements: Vec<TrackArrangement>, parallelism: f32, vari
         groups.entry(base).or_default().push(idx);
     }
 
-    // Switch interval based on variation: low variation = long intervals, high = short
-    // Range: 16 bars (variation=0) down to 4 bars (variation=1)
-    let switch_bars = (16.0 - variation * 12.0).max(4.0) as u32;
+    // Switch interval: use 8 bars to match the section-overrides block grid
+    let switch_bars: u32 = 8;
 
     let mut result = arrangements;
 
@@ -1195,13 +1163,6 @@ fn apply_parallelism(arrangements: Vec<TrackArrangement>, parallelism: f32, vari
         let group_size = indices.len();
         if group_size <= 1 {
             continue; // Single track, nothing to thin
-        }
-
-        // How many can play at once: at least 1, at most all
-        let max_concurrent = ((group_size as f32 * parallelism).ceil() as usize).max(1).min(group_size);
-
-        if max_concurrent >= group_size {
-            continue; // All can play, no thinning needed
         }
 
         // Find the overall time range across all tracks in group
@@ -1226,11 +1187,22 @@ fn apply_parallelism(arrangements: Vec<TrackArrangement>, parallelism: f32, vari
         let mut track_active_slots: Vec<Vec<bool>> = vec![vec![false; num_slots as usize]; group_size];
 
         // Build the slot assignments with a single borrow of the seeded RNG.
-        // Inline closure so the RefCell borrow stays scoped to this chunk;
-        // the section-splitting logic below is pure math and doesn't need rng.
+        // Resolve parallelism per 8-bar slot from section overrides.
         with_gen_rng(|rng| {
             #[allow(clippy::needless_range_loop)]
             for slot in 0..num_slots as usize {
+                let slot_bar = (min_start as u32) + (slot as u32 * switch_bars);
+                let parallelism = section_parallelism.value_at_bar(slot_bar.max(1), global_parallelism);
+                let max_concurrent = ((group_size as f32 * parallelism).ceil() as usize).max(1).min(group_size);
+
+                if max_concurrent >= group_size {
+                    // All tracks active this slot
+                    for track_idx in 0..group_size {
+                        track_active_slots[track_idx][slot] = true;
+                    }
+                    continue;
+                }
+
                 // Randomly pick which tracks are active this slot
                 let mut candidates: Vec<usize> = (0..group_size).collect();
 
@@ -1295,7 +1267,7 @@ fn apply_parallelism(arrangements: Vec<TrackArrangement>, parallelism: f32, vari
 
 /// Apply variation to arrangements - elements drop in/out within sections
 /// variation 0.0 = elements play full sections, 1.0 = constant movement
-fn apply_variation(mut arrangements: Vec<TrackArrangement>, variation: f32) -> Vec<TrackArrangement> {
+fn apply_variation(mut arrangements: Vec<TrackArrangement>, section_variation: &SectionValues, global_variation: f32) -> Vec<TrackArrangement> {
     with_gen_rng(|rng| {
         // Tracks that should NOT have variation applied (core rhythm, fills, one-shots)
         let protected = ["KICK", "FILL", "IMPACT", "CRASH", "RISER", "DOWNLIFTER", "SUB DROP",
@@ -1314,7 +1286,6 @@ fn apply_variation(mut arrangements: Vec<TrackArrangement>, variation: f32) -> V
             }
 
             let is_light = light_variation.iter().any(|p| arr.name.starts_with(p));
-            let effective_variation = if is_light { variation * 0.3 } else { variation };
 
             let mut new_sections: Vec<(f64, f64)> = Vec::new();
 
@@ -1326,6 +1297,10 @@ fn apply_variation(mut arrangements: Vec<TrackArrangement>, variation: f32) -> V
                     new_sections.push((start, end));
                     continue;
                 }
+
+                // Resolve variation for the 8-bar block at this section's midpoint
+                let variation = section_variation.value_at_bar(((start + end) / 2.0) as u32, global_variation);
+                let effective_variation = if is_light { variation * 0.3 } else { variation };
 
                 // Probability of breaking up this section increases with variation
                 if !rng.random_bool(effective_variation as f64 * 0.7) {
@@ -1398,7 +1373,7 @@ fn apply_variation(mut arrangements: Vec<TrackArrangement>, variation: f32) -> V
 
 /// Apply chaos to arrangements: random gaps + call-and-response patterns
 /// chaos 0.0 = no changes, 1.0 = maximum randomization
-fn apply_chaos_to_arrangements(mut arrangements: Vec<TrackArrangement>, chaos: f32) -> Vec<TrackArrangement> {
+fn apply_chaos_to_arrangements(mut arrangements: Vec<TrackArrangement>, section_chaos: &SectionValues, global_chaos: f32) -> Vec<TrackArrangement> {
     with_gen_rng(|rng| {
         // Tracks that should NOT be chaotified (fills, one-shots, FX impacts)
         let protected_prefixes = ["FILL", "IMPACT", "CRASH", "RISER", "DOWNLIFTER", "SUB DROP", "BOOM KICK", "SNARE ROLL", "GLITCH", "REVERSE", "SWEEP"];
@@ -1439,6 +1414,9 @@ fn apply_chaos_to_arrangements(mut arrangements: Vec<TrackArrangement>, chaos: f
                     continue;
                 }
 
+                // Resolve chaos for the 8-bar block at this section's midpoint
+                let chaos = section_chaos.value_at_bar(((start + end) / 2.0) as u32, global_chaos);
+
                 // Chance to add a micro-gap in this section
                 let gap_chance = chaos * 0.4;
                 if !rng.random_bool(gap_chance as f64) {
@@ -1471,11 +1449,16 @@ fn apply_chaos_to_arrangements(mut arrangements: Vec<TrackArrangement>, chaos: f
                 }
             }
 
+            // Representative chaos for track-level decisions (midpoint of first section)
+            let track_chaos = arr.sections.first()
+                .map(|(s, e)| section_chaos.value_at_bar(((s + e) / 2.0) as u32, global_chaos))
+                .unwrap_or(global_chaos);
+
             // 2. Call-and-response: for melodic tracks, shift some sections by 2-4 bars
             if call_response_prefixes.iter().any(|p| arr.name.starts_with(p)) {
                 let has_number = arr.name.chars().last().map(|c| c.is_ascii_digit()).unwrap_or(false);
                 if has_number {
-                    let shift_chance = chaos * 0.3;
+                    let shift_chance = track_chaos * 0.3;
                     new_sections = new_sections.iter().map(|(start, end)| {
                         if rng.random_bool(shift_chance as f64) && *start >= 8.0 {
                             let shift = if rng.random_bool(0.5) { 2.0 } else { 4.0 };
@@ -1490,7 +1473,7 @@ fn apply_chaos_to_arrangements(mut arrangements: Vec<TrackArrangement>, chaos: f
             // 3. Staggered entry: for non-primary tracks, slightly delay first section
             let has_number = arr.name.chars().last().map(|c| c.is_ascii_digit()).unwrap_or(false);
             if has_number && !new_sections.is_empty() && !is_core_rhythm {
-                let stagger_chance = chaos * 0.25;
+                let stagger_chance = track_chaos * 0.25;
                 if rng.random_bool(stagger_chance as f64) {
                     // Delay first section by 2-4 bars (not remove it entirely)
                     let delay = if rng.random_bool(0.5) { 2.0 } else { 4.0 };
@@ -1515,12 +1498,9 @@ fn apply_chaos_to_arrangements(mut arrangements: Vec<TrackArrangement>, chaos: f
 
 /// Apply chaos per-section - uses section-specific chaos values
 fn apply_chaos_per_section(arrangements: Vec<TrackArrangement>, section_chaos: &SectionValues, global_chaos: f32) -> Vec<TrackArrangement> {
-    // Effective chaos = mean of every pinned 8-bar block value, falling back
-    // to the global scalar when nothing is pinned.
-    let vals: Vec<f32> = section_chaos.values().collect();
-    let effective = if vals.is_empty() { global_chaos } else { vals.iter().sum::<f32>() / vals.len() as f32 };
-    if effective > 0.0 {
-        apply_chaos_to_arrangements(arrangements, effective)
+    let has_any = global_chaos > 0.0 || section_chaos.any();
+    if has_any {
+        apply_chaos_to_arrangements(arrangements, section_chaos, global_chaos)
     } else {
         arrangements
     }
@@ -1528,16 +1508,9 @@ fn apply_chaos_per_section(arrangements: Vec<TrackArrangement>, section_chaos: &
 
 /// Apply parallelism per-section - uses section-specific parallelism values
 fn apply_parallelism_per_section(arrangements: Vec<TrackArrangement>, section_parallelism: &SectionValues, global_parallelism: f32, section_variation: &SectionValues, global_variation: f32) -> Vec<TrackArrangement> {
-    // Effective parallelism = mean of every pinned 8-bar block value.
-    let p_vals: Vec<f32> = section_parallelism.values().collect();
-    let effective_p = if p_vals.is_empty() { global_parallelism } else { p_vals.iter().sum::<f32>() / p_vals.len() as f32 };
-
-    // Switch interval is driven by variation — same averaging rule.
-    let v_vals: Vec<f32> = section_variation.values().collect();
-    let effective_v = if v_vals.is_empty() { global_variation } else { v_vals.iter().sum::<f32>() / v_vals.len() as f32 };
-
-    if effective_p < 1.0 {
-        apply_parallelism(arrangements, effective_p, effective_v)
+    let has_any = global_parallelism < 1.0 || section_parallelism.any();
+    if has_any {
+        apply_parallelism(arrangements, section_parallelism, global_parallelism, section_variation, global_variation)
     } else {
         arrangements
     }
@@ -1545,11 +1518,9 @@ fn apply_parallelism_per_section(arrangements: Vec<TrackArrangement>, section_pa
 
 /// Apply variation per-section - uses section-specific variation values
 fn apply_variation_per_section(arrangements: Vec<TrackArrangement>, section_variation: &SectionValues, global_variation: f32) -> Vec<TrackArrangement> {
-    // Effective variation = mean of every pinned 8-bar block value.
-    let vals: Vec<f32> = section_variation.values().collect();
-    let effective = if vals.is_empty() { global_variation } else { vals.iter().sum::<f32>() / vals.len() as f32 };
-    if effective > 0.0 {
-        apply_variation(arrangements, effective)
+    let has_any = global_variation > 0.0 || section_variation.any();
+    if has_any {
+        apply_variation(arrangements, section_variation, global_variation)
     } else {
         arrangements
     }
@@ -1653,7 +1624,7 @@ fn apply_glitch_edits(mut arrangements: Vec<TrackArrangement>, glitch_intensity:
 
     // Tracks that should NOT be glitched (one-shots, FX)
     let protected = ["FILL", "IMPACT", "CRASH", "RISER", "DOWNLIFTER", "SUB DROP", "BOOM KICK",
-                     "SNARE ROLL", "GLITCH", "REVERSE", "SWEEP", "ATMOS", "VOX"];
+                     "SNARE ROLL", "GLITCH", "REVERSE", "SWEEP", "ATMOS", "VOX", "SCATTER"];
     
     for arr in arrangements.iter_mut() {
         // Skip protected tracks
@@ -1825,10 +1796,11 @@ fn apply_glitch_edits(mut arrangements: Vec<TrackArrangement>, glitch_intensity:
         }
         
         // Filter out invalid sections (don't merge - we want the gaps!)
+        // Keep one-shots (e == s) — they're valid single-hit placements.
         let filtered: Vec<(f64, f64)> = new_sections
             .into_iter()
             .map(|(s, e)| (snap(s), snap(e)))
-            .filter(|(s, e)| e > s)
+            .filter(|(s, e)| e >= s)
             .collect();
         
         arr.sections = filtered;
@@ -2379,10 +2351,28 @@ fn query_samples_with_key(
     key: Option<&str>,
 ) -> Vec<SampleInfo> {
     // Strict key filtering - no fallback to wrong keys
-    let results = query_samples_internal(label, include_patterns, require_loop, count, key);
+    let results = query_samples_internal(label, include_patterns, require_loop, count, key, false);
 
     if results.is_empty() && key.is_some() {
         write_app_log(format!("[techno_generator] {}: No samples with key in filename - track will be empty", label));
+    }
+
+    results
+}
+
+/// Like `query_samples_with_key` but also accepts samples with no detected key.
+/// Use for types like scatter where tonal matching is preferred but not required.
+fn query_samples_with_key_optional(
+    label: &str,
+    include_patterns: &[&str],
+    require_loop: bool,
+    count: usize,
+    key: Option<&str>,
+) -> Vec<SampleInfo> {
+    let results = query_samples_internal(label, include_patterns, require_loop, count, key, true);
+
+    if results.is_empty() {
+        write_app_log(format!("[techno_generator] {}: No samples found", label));
     }
 
     results
@@ -2401,6 +2391,7 @@ fn query_samples_internal(
     require_loop: bool,
     count: usize,
     key: Option<&str>,
+    key_optional: bool,
 ) -> Vec<SampleInfo> {
     // Use 128 BPM as reference for loop detection (typical techno tempo)
     const REFERENCE_BPM: f64 = 128.0;
@@ -2537,7 +2528,8 @@ fn query_samples_internal(
                     // Check if parsed key matches any compatible key
                     compatible_keys.iter().any(|ck| ck.eq_ignore_ascii_case(&parsed_key))
                 } else {
-                    false // No key in filename = skip when key filtering
+                    // No key in filename: include if key_optional, skip otherwise
+                    key_optional
                 }
             })
             .collect()
@@ -2820,7 +2812,22 @@ fn load_song_samples(song_num: u32, target_key: Option<&str>, atonal: bool, hard
         "click", "tick", "snap", "pop", "chirp", "ping", "spike",
         "impact", "transient", "accent", "chop", "cut"
     ];
-    let scatters = query_n_keyed!("SCATTER", scatter_inc, false, track_counts.scatter, key_for(type_atonal.scatter));
+    let scatters = {
+        let mut results = Vec::new();
+        let scatter_key = key_for(type_atonal.scatter);
+        for i in 0..track_counts.scatter as usize {
+            samples_searched += 1;
+            progress(&format!("SAMPLE_PROGRESS:{}:{}", samples_searched, total_samples));
+            let track_label = format!("SCATTER {}", i + 1);
+            progress(&format!("Searching {}...", track_label));
+            let samples = query_samples_with_key_optional(&track_label, scatter_inc, false, 1, scatter_key);
+            if !samples.is_empty() {
+                progress(&format!("Found {}: {}", track_label, samples[0].name));
+            }
+            results.push(samples);
+        }
+        results
+    };
 
     // === VOCALS ===
     let vox_inc = &["vox", "vocal", "voice", "vocals/", "vocal_cut", "vocal cut", "vocal_loop", "choir", "chant"];
@@ -3120,31 +3127,21 @@ fn generate_inner(
 
     // Create groups
     let kicks_group = create_group_track("KICKS", DRUMS_COLOR, kicks_group_id, &ids)?;
-    let mut drums_group = create_group_track("DRUMS", DRUMS_COLOR, drums_group_id, &ids)?;
-    let mut bass_group = create_group_track("BASS", BASS_COLOR, bass_group_id, &ids)?;
-    let mut bass_fx_group = create_group_track("BASS FX", BASS_COLOR, bass_fx_group_id, &ids)?;
-    let mut melodics_group = create_group_track("MELODICS", MELODICS_COLOR, melodics_group_id, &ids)?;
+    let drums_group = create_group_track("DRUMS", DRUMS_COLOR, drums_group_id, &ids)?;
+    let bass_group = create_group_track("BASS", BASS_COLOR, bass_group_id, &ids)?;
+    let bass_fx_group = create_group_track("BASS FX", BASS_COLOR, bass_fx_group_id, &ids)?;
+    let melodics_group = create_group_track("MELODICS", MELODICS_COLOR, melodics_group_id, &ids)?;
     let fx_group = create_group_track("FX", FX_COLOR, fx_group_id, &ids)?;
 
-    // Install a Compressor2 sidechain on every non-kick, non-FX group bus,
-    // keyed to the KICKS group output. DRUMS / BASS / BASS FX / MELODICS all
-    // duck together to the kick pulse — that's the signature techno pump.
-    // The FX bus (risers/impacts/crashes) stays untouched so transient FX
-    // don't get squashed by the compressor.
-    let group_sc_drums = build_group_sidechain_compressor(kicks_group_id, &ids);
-    let group_sc_bass = build_group_sidechain_compressor(kicks_group_id, &ids);
-    let group_sc_bass_fx = build_group_sidechain_compressor(kicks_group_id, &ids);
-    let group_sc_melodics = build_group_sidechain_compressor(kicks_group_id, &ids);
-    drums_group = inject_device_into_group_chain(&drums_group, &group_sc_drums);
-    bass_group = inject_device_into_group_chain(&bass_group, &group_sc_bass);
-    bass_fx_group = inject_device_into_group_chain(&bass_fx_group, &group_sc_bass_fx);
-    melodics_group = inject_device_into_group_chain(&melodics_group, &group_sc_melodics);
+    // Device injection (sidechain compressors, master EQ/limiter) is disabled
+    // because Ableton's ALS parser crashes on programmatically injected device
+    // XML — the user can add devices manually in Live.
 
     // Get arrangement structure with all section overrides applied. The
     // templates are in the canonical 224-bar layout; we remap onto the user's
     // `lengths` immediately after so everything downstream (clip placement,
     // find_arr fallback, full_arrangement) speaks in user bars.
-    let mut arrangements = get_arrangement_with_params(chaos, glitch_intensity, &section_overrides, density, variation, parallelism, scatter);
+    let mut arrangements = get_arrangement_with_params(chaos, glitch_intensity, &section_overrides, density, variation, parallelism, scatter, track_counts.scatter);
     for arr in arrangements.iter_mut() {
         let mut remapped: Vec<(f64, f64)> = Vec::with_capacity(arr.sections.len());
         for &(s, e) in arr.sections.iter() {
@@ -3193,8 +3190,8 @@ fn generate_inner(
             ("BASS ", "BASS 1"),
             ("SUB ", "SUB 1"),
             // Bass FX
-            ("SUB DROP ", "SUB DROP"),
-            ("BOOM KICK ", "BOOM KICK"),
+            ("SUB DROP ", "SUB DROP 1"),
+            ("BOOM KICK ", "BOOM KICK 1"),
             // Melodics
             ("LEAD ", "LEAD 1"),
             ("SYNTH ", "SYNTH 1"),
@@ -3465,9 +3462,8 @@ fn generate_inner(
 
     let mut xml = format!("{}{}{}", before_track, all_tracks_xml, after_track);
 
-    // Inject Eq8 (30 Hz HPF) + Limiter (-0.3 dB) into the MainTrack device
-    // chain so the exported project opens ready-to-play without clipping.
-    xml = inject_master_chain(&xml, &ids);
+    // Master chain device injection (Eq8 HPF + Limiter) is disabled — Ableton
+    // crashes on programmatically injected device XML in the MainTrack.
 
     // Update NextPointeeId
     let next_id = ids.max_id() + 1000;
@@ -4304,18 +4300,18 @@ mod tests {
         let global_scatter = 0.0;
         
         // No scatter anywhere: should return empty
-        let results = generate_scatter_hits(&section_scatter, global_scatter);
+        let results = generate_scatter_hits(&section_scatter, global_scatter, 4);
         assert!(results.is_empty());
         
         // Global scatter enabled
-        let results = generate_scatter_hits(&section_scatter, 0.5);
+        let results = generate_scatter_hits(&section_scatter, 0.5, 4);
         assert!(!results.is_empty());
         assert_eq!(results.len(), 4); // It always generates 4 tracks if active
         assert!(results[0].name.contains("SCATTER"));
         
         // Per-section scatter
         section_scatter.set(1, 1.0); // Intro
-        let results = generate_scatter_hits(&section_scatter, 0.0);
+        let results = generate_scatter_hits(&section_scatter, 0.0, 4);
         assert!(!results.is_empty());
         // Check that hits are only in the intro (bars 1-32)
         for track in results {
@@ -4436,7 +4432,8 @@ mod additional_tests {
     #[test]
     fn test_apply_chaos_to_arrangements_protected() {
         let arrangements = vec![TrackArrangement::new("FILL 1", vec![(1.0, 10.0), (20.0, 30.0)])];
-        let result = apply_chaos_to_arrangements(arrangements.clone(), 1.0);
+        let sv = SectionValues::default();
+        let result = apply_chaos_to_arrangements(arrangements.clone(), &sv, 1.0);
         assert_eq!(result, arrangements, "Protected FILL track should not be modified by chaos");
     }
 
@@ -4447,14 +4444,16 @@ mod additional_tests {
             TrackArrangement::new("IMPACT 2", vec![(1.0, 10.0)]),
         ];
         // Parallelism 0.0 usually thins out to 1 track, but IMPACT is exempt
-        let result = apply_parallelism(arrangements.clone(), 0.0, 0.0);
+        let sv = SectionValues::default();
+        let result = apply_parallelism(arrangements.clone(), &sv, 0.0, &sv, 0.0);
         assert_eq!(result.len(), 2, "Exempt IMPACT tracks should not be thinned by parallelism");
     }
 
     #[test]
     fn test_apply_variation_zero() {
         let arrangements = vec![TrackArrangement::new("SYNTH", vec![(1.0, 10.0), (20.0, 30.0), (40.0, 50.0)])];
-        let result = apply_variation(arrangements.clone(), 0.0);
+        let sv = SectionValues::default();
+        let result = apply_variation(arrangements.clone(), &sv, 0.0);
         assert_eq!(result, arrangements, "Zero variation should not modify arrangements");
     }
 
