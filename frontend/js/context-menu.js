@@ -213,7 +213,7 @@ function buildFallbackShellContextMenu(e) {
 function getVideoTableRowContextMenuItems(videoRow) {
     const path = videoRow.dataset.videoPath;
     const name = videoRow.querySelector('.col-name')?.getAttribute('title')?.trim() ||
-        videoRow.querySelector('.col-name')?.textContent?.trim() || '';
+        (typeof cellNameText === 'function' ? cellNameText(videoRow.querySelector('.col-name')) : (videoRow.querySelector('.col-name')?.textContent?.trim() || ''));
     const isPlaying =
         typeof audioPlayerPath !== 'undefined' &&
         audioPlayerPath === path &&
@@ -592,7 +592,7 @@ document.addEventListener('contextmenu', (e) => {
         const audioRow = e.target.closest('#audioTableBody tr[data-audio-path]');
         if (audioRow) {
             const path = audioRow.getAttribute('data-audio-path');
-            const name = audioRow.querySelector('.col-name')?.textContent || '';
+            const name = typeof cellNameText === 'function' ? cellNameText(audioRow.querySelector('.col-name')) : (audioRow.querySelector('.col-name')?.textContent || '');
             const isPlaying = audioPlayerPath === path && (typeof isAudioPlaying === 'function' ? isAudioPlaying() : !audioPlayer.paused);
             const items = [
                 {
@@ -713,7 +713,7 @@ document.addEventListener('contextmenu', (e) => {
         if (crateRow) {
             const path = crateRow.dataset.samplePath;
             const sampleId = crateRow.dataset.sampleId ? Number(crateRow.dataset.sampleId) : null;
-            const name = crateRow.querySelector('.crate-row-name')?.textContent || '';
+            const name = crateRow.dataset.sampleName || '';
             const packId = (() => {
                 const btn = crateRow.querySelector('[data-pack-id]');
                 return btn ? Number(btn.dataset.packId) : null;
@@ -808,7 +808,7 @@ document.addEventListener('contextmenu', (e) => {
         const midiRow = e.target.closest('#midiTableBody tr[data-midi-path]');
         if (midiRow) {
             const path = midiRow.getAttribute('data-midi-path');
-            const name = midiRow.querySelector('.col-name')?.textContent || '';
+            const name = typeof cellNameText === 'function' ? cellNameText(midiRow.querySelector('.col-name')) : (midiRow.querySelector('.col-name')?.textContent || '');
             const items = [
                 {
                     icon: '&#9654;',
@@ -879,7 +879,7 @@ document.addEventListener('contextmenu', (e) => {
         const dawRow = e.target.closest('#dawTableBody tr[data-daw-path]');
         if (dawRow) {
             const path = dawRow.dataset.dawPath;
-            const name = dawRow.querySelector('.col-name')?.textContent || '';
+            const name = typeof cellNameText === 'function' ? cellNameText(dawRow.querySelector('.col-name')) : (dawRow.querySelector('.col-name')?.textContent || '');
             const dawName = dawRow.querySelector('.format-badge')?.textContent || 'DAW';
             const items = [
                 {
@@ -974,7 +974,7 @@ document.addEventListener('contextmenu', (e) => {
         if (pdfRow) {
             const path = pdfRow.dataset.pdfPath;
             const name = pdfRow.querySelector('.col-name')?.getAttribute('title')?.trim() ||
-                pdfRow.querySelector('.col-name')?.textContent?.trim() || '';
+                (typeof cellNameText === 'function' ? cellNameText(pdfRow.querySelector('.col-name')) : (pdfRow.querySelector('.col-name')?.textContent?.trim() || ''));
             const items = [
                 {
                     icon: '&#128193;',
@@ -1032,7 +1032,7 @@ document.addEventListener('contextmenu', (e) => {
         const presetRow = e.target.closest('#presetTableBody tr[data-preset-path]');
         if (presetRow) {
             const path = presetRow.dataset.presetPath;
-            const name = presetRow.querySelector('td')?.textContent || '';
+            const name = typeof cellNameText === 'function' ? cellNameText(presetRow.querySelector('td')) : (presetRow.querySelector('td')?.textContent || '');
             const items = [
                 {
                     icon: '&#128193;',
@@ -1617,7 +1617,7 @@ document.addEventListener('contextmenu', (e) => {
         const favItem = e.target.closest('.fav-item');
         if (favItem) {
             const path = favItem.dataset.path || '';
-            const name = favItem.querySelector('.fav-name')?.textContent?.trim() || '';
+            const name = typeof cellNameText === 'function' ? cellNameText(favItem.querySelector('.fav-name')) : (favItem.querySelector('.fav-name')?.textContent?.trim() || '');
             const type = favItem.dataset.type || '';
             const items = [];
 
@@ -1743,7 +1743,7 @@ document.addEventListener('contextmenu', (e) => {
         const noteItem = e.target.closest('.note-item');
         if (noteItem) {
             const path = noteItem.dataset.path || '';
-            const name = noteItem.querySelector('.note-item-name')?.textContent?.trim() || '';
+            const name = typeof cellNameText === 'function' ? cellNameText(noteItem.querySelector('.note-item-name')) : (noteItem.querySelector('.note-item-name')?.textContent?.trim() || '');
             const items = [
                 {icon: '&#128221;', label: appFmt('menu.edit_note'), ...shortcutTip('addNote'), action: () => showNoteEditor(path, name)},
                 {icon: '&#128193;', label: appFmt('menu.reveal_in_finder'), ..._noEcho, ...shortcutTip('revealFile'), action: () => openFolder(path)},

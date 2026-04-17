@@ -3766,10 +3766,15 @@ async fn waveform_prefetch_start(app: tauri::AppHandle) -> Result<serde_json::Va
         // engine processes one request at a time via stdin/stdout JSON lines.
         const BATCH_SIZE: u64 = 100;
         const WIDTH_PX: u64 = 800;
+        /// Recycle the JUCE preview engine every N files to release accumulated decoder
+        /// memory. Without this, the preview child's RSS grows unboundedly over thousands
+        /// of files and macOS jetsam kills the app during overnight runs.
+        const RECYCLE_INTERVAL: u64 = 500;
         let mut total_built: u64 = 0;
         let mut total_failed: u64 = 0;
         let start = std::time::Instant::now();
         let mut emit_counter: u64 = 0;
+        let mut since_recycle: u64 = 0;
 
         loop {
             if stop_flag.load(Ordering::Relaxed) {
@@ -3794,6 +3799,14 @@ async fn waveform_prefetch_start(app: tauri::AppHandle) -> Result<serde_json::Va
                     break;
                 }
                 yield_if_playback_active();
+
+                // Periodically kill+respawn the preview engine so JUCE decoder memory
+                // doesn't accumulate across thousands of files in overnight runs.
+                since_recycle += 1;
+                if since_recycle >= RECYCLE_INTERVAL {
+                    audio_engine::restart_preview_engine_child();
+                    since_recycle = 0;
+                }
 
                 let req = serde_json::json!({
                     "cmd": "waveform_preview",

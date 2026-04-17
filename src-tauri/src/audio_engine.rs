@@ -85,7 +85,24 @@ pub fn dedicated_audio_engine_request(
             .map_err(|_| "main IPC thread dead")?;
     }
     
-    resp_rx.recv().map_err(|_| "IPC response channel closed")?
+    if is_preview {
+        // Preview decodes (waveform/spectrogram) get a 60 s timeout so a hung JUCE decoder
+        // on a corrupt file doesn't block the waveform prefetch loop forever overnight.
+        resp_rx
+            .recv_timeout(Duration::from_secs(60))
+            .map_err(|e| match e {
+                std::sync::mpsc::RecvTimeoutError::Timeout => {
+                    log_ipc_failure("preview IPC response timed out after 60 s", None);
+                    "preview IPC response timed out".to_string()
+                }
+                std::sync::mpsc::RecvTimeoutError::Disconnected => {
+                    "IPC response channel closed".to_string()
+                }
+            })?
+    } else {
+        // Main engine (playback, transport) — no timeout; transport commands must not be dropped.
+        resp_rx.recv().map_err(|_| "IPC response channel closed")?
+    }
 }
 
 /// Async wrapper that spawns the blocking wait on a short-lived thread.
@@ -562,6 +579,24 @@ pub fn restart_audio_engine_child() -> Result<(), String> {
         }
     });
     Ok(())
+}
+
+/// Kill only the **preview** `audio-engine` child so the next preview IPC spawns a fresh process.
+/// Used by the waveform prefetch loop to periodically release JUCE decoder memory that accumulates
+/// over thousands of file decodes. Does **not** touch the main engine (playback stays live).
+///
+/// Synchronous: waits up to 30 s for the mutex (the `ae-preview-ipc` thread may hold it while
+/// blocked on `read_line`; SIGKILL makes that return quickly).
+pub fn restart_preview_engine_child() {
+    let pid = PREVIEW_ENGINE_CHILD_PID.swap(0, Ordering::SeqCst);
+    if pid != 0 {
+        kill_pid_raw(pid);
+    }
+    if clear_preview_engine_slot_after_os_kill() {
+        crate::write_app_log(
+            "audio-engine: preview process recycled (periodic memory relief)".to_string(),
+        );
+    }
 }
 
 /// Reap `Child` handles after the OS process is gone. Never uses blocking `Mutex::lock()`.

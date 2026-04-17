@@ -51,7 +51,7 @@ describe('frontend/js/multi-filter.js (vm-loaded)', () => {
       _select: select,
     };
     M.syncMultiToSelect(wrapper);
-    assert.strictEqual(select.value, 'all');
+    assert.strictEqual(select.value, ''); // empty = "all" (no filter)
 
     wrapper._selected.add('vst3');
     wrapper._selected.add('au');

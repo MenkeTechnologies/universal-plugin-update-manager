@@ -245,19 +245,29 @@ function noteIndicator(path) {
 
 // Rich badge: star + tags + note icon for any path (sync — uses _badgeCtx)
 function rowBadges(path) {
-    let html = '';
+    let inner = '';
     if (_badgeCtx.favPaths.has(path)) {
-        html += '<span class="row-badge row-badge-fav" title="Favorited">&#9733;</span>';
+        inner += '<span class="row-badge row-badge-fav" title="Favorited">&#9733;</span>';
     }
     const note = _badgeCtx.notes[path] || null;
     if (note) {
-        if (note.note) html += '<span class="row-badge row-badge-note" title="Has note">&#128221;</span>';
+        if (note.note) inner += '<span class="row-badge row-badge-note" title="Has note">&#128221;</span>';
         if (note.tags?.length) {
-            html += note.tags.slice(0, 3).map(t => `<span class="row-badge row-badge-tag" title="Tag: ${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('');
-            if (note.tags.length > 3) html += `<span class="row-badge row-badge-tag" title="${escapeHtml(note.tags.join(', '))}">+${note.tags.length - 3}</span>`;
+            inner += note.tags.slice(0, 3).map(t => `<span class="row-badge row-badge-tag" title="Tag: ${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('');
+            if (note.tags.length > 3) inner += `<span class="row-badge row-badge-tag" title="${escapeHtml(note.tags.join(', '))}">+${note.tags.length - 3}</span>`;
         }
     }
-    return html;
+    if (!inner) return '';
+    return `<span class="row-badges-wrap">${inner}</span>`;
+}
+
+/// Extract the display name from a name cell, stripping badge text.
+/// Use this instead of raw `.textContent` when copying names to clipboard.
+function cellNameText(el) {
+    if (!el) return '';
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('.row-badges-wrap').forEach(b => b.remove());
+    return (clone.textContent || '').trim();
 }
 
 // Update badges on all visible rows for a given path

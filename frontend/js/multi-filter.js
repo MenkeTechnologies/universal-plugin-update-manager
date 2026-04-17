@@ -1,13 +1,15 @@
 // ── Multi-select filter dropdowns ──
-// Converts .filter-select elements into multi-select checkbox dropdowns
+// Converts .filter-select elements into multi-select checkbox dropdowns.
+// Large option lists (>200) get a search input and capped rendering so
+// 17k sample packs don't create 17k DOM nodes.
+
+const MULTI_FILTER_RENDER_CAP = 200;
 
 function initMultiFilters() {
     document.querySelectorAll('.filter-select').forEach(select => {
         if (select.dataset.multiInit) return;
         select.dataset.multiInit = '1';
 
-        const options = [...select.options].filter(o => o.value !== 'all');
-        const allLabel = select.options[0]?.text || 'All';
         const action = select.dataset.action;
 
         // Hide original select
@@ -21,57 +23,44 @@ function initMultiFilters() {
         const btn = document.createElement('button');
         btn.className = 'multi-filter-btn';
         btn.type = 'button';
-        btn.innerHTML = `<span class="multi-filter-label">${allLabel}</span><span class="multi-filter-arrow">&#9660;</span>`;
+        btn.innerHTML = `<span class="multi-filter-label">All</span><span class="multi-filter-arrow">&#9660;</span>`;
         wrapper.appendChild(btn);
 
         const dropdown = document.createElement('div');
         dropdown.className = 'multi-filter-dropdown';
-
-        // "All" toggle
-        const allItem = document.createElement('label');
-        allItem.className = 'multi-filter-item multi-filter-all';
-        allItem.innerHTML = `<input type="checkbox" checked data-value="all"> <span>${allLabel}</span>`;
-        dropdown.appendChild(allItem);
-
-        // Separator
-        const sep = document.createElement('div');
-        sep.className = 'multi-filter-sep';
-        dropdown.appendChild(sep);
-
-        // Individual options
-        for (const opt of options) {
-            const item = document.createElement('label');
-            item.className = 'multi-filter-item';
-            item.innerHTML = `<input type="checkbox" data-value="${opt.value}"> <span>${opt.text}</span>`;
-            dropdown.appendChild(item);
-        }
-
         wrapper.appendChild(dropdown);
+
         select.parentNode.insertBefore(wrapper, select.nextSibling);
 
         // State
         wrapper._selected = new Set(); // empty = all
         wrapper._select = select;
         wrapper._action = action;
+        wrapper._allOptions = []; // {value, text} — full list, never in DOM
+        wrapper._allLabel = 'All';
+        wrapper._search = '';
 
         // Toggle dropdown
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            // Close other open dropdowns
             document.querySelectorAll('.multi-filter-dropdown.open').forEach(d => {
                 if (d !== dropdown) d.classList.remove('open');
             });
             dropdown.classList.toggle('open');
+            // Focus search input when opening
+            if (dropdown.classList.contains('open')) {
+                const input = dropdown.querySelector('.multi-filter-search');
+                if (input) input.focus();
+            }
         });
 
-        // Checkbox change
+        // Delegated change handler for checkboxes
         dropdown.addEventListener('change', (e) => {
             const cb = e.target;
             if (!cb.matches('input[type="checkbox"]')) return;
             const val = cb.dataset.value;
 
             if (val === 'all') {
-                // Toggle all off/on
                 if (cb.checked) {
                     wrapper._selected.clear();
                     dropdown.querySelectorAll('input[data-value]').forEach(c => {
@@ -79,28 +68,28 @@ function initMultiFilters() {
                     });
                 }
             } else {
-                const allCb = dropdown.querySelector('input[data-value="all"]');
                 if (cb.checked) {
                     wrapper._selected.add(val);
                 } else {
                     wrapper._selected.delete(val);
                 }
-                // If nothing selected, revert to all
+                const allCb = dropdown.querySelector('input[data-value="all"]');
                 if (wrapper._selected.size === 0) {
-                    allCb.checked = true;
+                    if (allCb) allCb.checked = true;
                 } else {
-                    allCb.checked = false;
+                    if (allCb) allCb.checked = false;
                 }
             }
 
-            updateMultiFilterLabel(wrapper, allLabel);
-            // Sync back to hidden select for compat
+            updateMultiFilterLabel(wrapper, wrapper._allLabel);
             syncMultiToSelect(wrapper);
             triggerFilter(wrapper._action);
         });
 
-        // Prevent dropdown close on click inside
         dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+        // Build initial content from current <select> options
+        _rebuildDropdown(wrapper);
     });
 
     // Close all dropdowns on outside click
@@ -109,13 +98,122 @@ function initMultiFilters() {
     });
 }
 
+/// Internal: rebuild dropdown DOM from wrapper._allOptions, filtered by wrapper._search.
+/// Only renders up to MULTI_FILTER_RENDER_CAP items; shows a "N more" hint when truncated.
+function _rebuildDropdown(wrapper) {
+    const dropdown = wrapper.querySelector('.multi-filter-dropdown');
+    if (!dropdown) return;
+    const opts = wrapper._allOptions;
+    const allLabel = wrapper._allLabel;
+    const search = wrapper._search.toLowerCase();
+    const needsSearch = opts.length > MULTI_FILTER_RENDER_CAP;
+
+    // Filter
+    const filtered = search
+        ? opts.filter(o => o.text.toLowerCase().includes(search))
+        : opts;
+    const capped = filtered.slice(0, MULTI_FILTER_RENDER_CAP);
+    const overflow = filtered.length - capped.length;
+
+    // Build HTML in one shot — no per-item createElement
+    let html = '';
+
+    // Search input (only for large lists)
+    if (needsSearch) {
+        const v = wrapper._search.replace(/"/g, '&quot;');
+        html += `<div class="multi-filter-search-row"><input type="text" class="multi-filter-search" placeholder="Search\u2026" value="${v}" spellcheck="false"></div>`;
+    }
+
+    // "All" toggle
+    const allChecked = wrapper._selected.size === 0 ? ' checked' : '';
+    html += `<label class="multi-filter-item multi-filter-all"><input type="checkbox"${allChecked} data-value="all"> <span>${allLabel}</span></label>`;
+    html += `<div class="multi-filter-sep"></div>`;
+
+    // Selected items always shown at top (regardless of search/cap)
+    const selectedInView = new Set();
+    if (wrapper._selected.size > 0) {
+        for (const val of wrapper._selected) {
+            const opt = opts.find(o => o.value === val);
+            if (opt) {
+                html += `<label class="multi-filter-item multi-filter-pinned"><input type="checkbox" checked data-value="${opt.value}"> <span>${opt.text}</span></label>`;
+                selectedInView.add(val);
+            }
+        }
+        if (selectedInView.size > 0) {
+            html += `<div class="multi-filter-sep"></div>`;
+        }
+    }
+
+    // Visible items (skip those already pinned)
+    for (const opt of capped) {
+        if (selectedInView.has(opt.value)) continue;
+        const chk = wrapper._selected.has(opt.value) ? ' checked' : '';
+        html += `<label class="multi-filter-item"><input type="checkbox"${chk} data-value="${opt.value}"> <span>${opt.text}</span></label>`;
+    }
+
+    if (overflow > 0) {
+        html += `<div class="multi-filter-overflow">${overflow.toLocaleString()} more \u2014 type to search</div>`;
+    }
+
+    dropdown.innerHTML = html;
+
+    // Wire up search input
+    if (needsSearch) {
+        const input = dropdown.querySelector('.multi-filter-search');
+        if (input) {
+            let debounce;
+            input.addEventListener('input', () => {
+                clearTimeout(debounce);
+                debounce = setTimeout(() => {
+                    wrapper._search = input.value;
+                    _rebuildDropdown(wrapper);
+                    // Re-focus after rebuild
+                    const newInput = dropdown.querySelector('.multi-filter-search');
+                    if (newInput) {
+                        newInput.focus();
+                        newInput.selectionStart = newInput.selectionEnd = newInput.value.length;
+                    }
+                }, 150);
+            });
+            // Prevent dropdown close on typing
+            input.addEventListener('click', (e) => e.stopPropagation());
+        }
+    }
+}
+
+/// Rebuild the multi-filter dropdown options from the current `<select>` options.
+/// Call after `renderCrateFacets()` or any time the hidden `<select>` innerHTML changes.
+function refreshMultiFilter(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const wrapper = select.nextElementSibling;
+    if (!wrapper || !wrapper.classList.contains('multi-filter')) return;
+
+    const options = [...select.options].filter(o => o.value !== '' && o.value !== 'all');
+    wrapper._allLabel = select.options[0]?.text || 'All';
+    wrapper._allOptions = options.map(o => ({value: o.value, text: o.text}));
+    wrapper._search = '';
+
+    // Prune stale selections
+    const validValues = new Set(options.map(o => o.value));
+    for (const v of wrapper._selected) {
+        if (!validValues.has(v)) wrapper._selected.delete(v);
+    }
+
+    _rebuildDropdown(wrapper);
+    updateMultiFilterLabel(wrapper, wrapper._allLabel);
+}
+
 function updateMultiFilterLabel(wrapper, allLabel) {
     const label = wrapper.querySelector('.multi-filter-label');
+    if (!label) return;
     if (wrapper._selected.size === 0) {
         label.textContent = allLabel;
         label.classList.remove('multi-filter-active');
-       } else if (wrapper._selected.size === 1) {
-        label.textContent = [...wrapper._selected][0];
+    } else if (wrapper._selected.size === 1) {
+        const val = [...wrapper._selected][0];
+        const opt = (wrapper._allOptions || []).find(o => o.value === val);
+        label.textContent = opt ? opt.text : val;
         label.classList.add('multi-filter-active');
     } else {
         const n = wrapper._selected.size;
@@ -128,12 +226,14 @@ function updateMultiFilterLabel(wrapper, allLabel) {
 
 function syncMultiToSelect(wrapper) {
     const select = wrapper._select;
-    // Set a custom property for the filter functions to read
     if (wrapper._selected.size === 0) {
-        select.value = 'all';
+        select.value = '';
     } else {
-        // Set to first selected value (for single-value compat)
         select.value = [...wrapper._selected][0];
+    }
+    // Fire change on the hidden <select> so listeners (e.g. crate tab filters) pick it up.
+    if (typeof Event !== 'undefined' && typeof select.dispatchEvent === 'function') {
+        select.dispatchEvent(new Event('change', {bubbles: true}));
     }
 }
 
@@ -162,22 +262,15 @@ function setMultiFilterValue(selectId, value) {
     if (!select) return;
     const wrapper = select.nextElementSibling;
     if (!wrapper || !wrapper.classList.contains('multi-filter')) return;
-    const dropdown = wrapper.querySelector('.multi-filter-dropdown');
-    if (!dropdown) return;
 
     if (value === 'all') {
         wrapper._selected.clear();
-        dropdown.querySelectorAll('input[data-value]').forEach(c => {
-            c.checked = c.dataset.value === 'all';
-        });
     } else {
-        wrapper._selected.add(value);
-        const allCb = dropdown.querySelector('input[data-value="all"]');
-        if (allCb) allCb.checked = false;
-        const cb = dropdown.querySelector(`input[data-value="${value}"]`);
-        if (cb) cb.checked = true;
+        wrapper._selected.add(String(value));
+        // Remove 'all' from selected
     }
-    const allLabel = select.options[0]?.text || 'All';
+    const allLabel = wrapper._allLabel || select.options[0]?.text || 'All';
+    _rebuildDropdown(wrapper);
     updateMultiFilterLabel(wrapper, allLabel);
     syncMultiToSelect(wrapper);
 }

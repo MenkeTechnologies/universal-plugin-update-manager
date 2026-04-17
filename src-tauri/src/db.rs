@@ -2873,8 +2873,12 @@ DROP TABLE _pl_refresh_paths;"#;
             binds.push(Box::new(hi as i64));
         }
         if let Some(k) = params.key.as_deref().filter(|s| !s.is_empty()) {
-            where_parts.push("sa.parsed_key = ?".into());
-            binds.push(Box::new(k.to_string()));
+            // Dropdown sends short form ("Bm", "C#m", "C"). Both extract_key and
+            // detect_key store "X Minor" / "X Major" format, so exact match works.
+            let db_key = crate::sample_analysis::short_key_to_db(k);
+            where_parts.push("(sa.parsed_key = ? OR s.key_name = ?)".into());
+            binds.push(Box::new(db_key.clone()));
+            binds.push(Box::new(db_key));
         }
         if let Some(q) = params.search.as_deref().filter(|s| !s.is_empty()) {
             if params.search_regex {

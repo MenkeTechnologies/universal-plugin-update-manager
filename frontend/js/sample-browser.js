@@ -21,7 +21,12 @@ const _crate = {
     },
     // Data caches
     categoryCounts: [],  // [{name, parent_name, count}]
-    facets: null,        // {packs, manufacturers, keys}
+    facets: {            // {packs, manufacturers, keys}
+        packs: [],
+        manufacturers: [],
+        keys: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B',
+               'Cm','C#m','Dm','D#m','Em','Fm','F#m','Gm','G#m','Am','A#m','Bm'],
+    },
     favoritePackIds: new Set(),
     rows: [],            // currently displayed rows
     totalRows: 0,
@@ -82,25 +87,25 @@ window.runCrateSampleAnalysis = runCrateSampleAnalysis;
 window.stopCrateSampleAnalysis = stopCrateSampleAnalysis;
 
 async function refreshCrateAll() {
-    try {
-        // Seed categories + manufacturers first so the tree always lists every known drum/bass/
-        // melodic/fx category even before any sample_analysis rows exist. Safe to re-run — it's
-        // an upsert on `name`.
-        if (window.vstUpdater?.sampleAnalysisSeed) {
-            try { await window.vstUpdater.sampleAnalysisSeed(); } catch { /* non-fatal */ }
-        }
-        const [counts, facets, favIds] = await Promise.all([
-            window.vstUpdater.crateCategoryCounts(),
-            window.vstUpdater.crateFacets(),
-            window.vstUpdater.crateFavoritePacksList(),
-        ]);
-        _crate.categoryCounts = Array.isArray(counts) ? counts : [];
-        _crate.facets = facets || {packs: [], manufacturers: [], keys: []};
-        _crate.favoritePackIds = new Set(Array.isArray(favIds) ? favIds : []);
-    } catch (err) {
-        _crate.categoryCounts = [];
-        _crate.facets = {packs: [], manufacturers: [], keys: []};
-        _crate.favoritePackIds = new Set();
+    // Seed categories + manufacturers first so the tree always lists every known drum/bass/
+    // melodic/fx category even before any sample_analysis rows exist. Safe to re-run — it's
+    // an upsert on `name`.
+    if (window.vstUpdater?.sampleAnalysisSeed) {
+        try { await window.vstUpdater.sampleAnalysisSeed(); } catch { /* non-fatal */ }
+    }
+    // Fetch each independently — a transient failure in one (e.g. DB lock from bg jobs)
+    // must not nuke the others. Promise.all previously zeroed all three facets including
+    // the hardcoded key list when any single call failed.
+    const [counts, facets, favIds] = await Promise.allSettled([
+        window.vstUpdater.crateCategoryCounts(),
+        window.vstUpdater.crateFacets(),
+        window.vstUpdater.crateFavoritePacksList(),
+    ]);
+    _crate.categoryCounts = counts.status === 'fulfilled' && Array.isArray(counts.value) ? counts.value : _crate.categoryCounts;
+    _crate.facets = facets.status === 'fulfilled' && facets.value ? facets.value : _crate.facets;
+    _crate.favoritePackIds = favIds.status === 'fulfilled' && Array.isArray(favIds.value) ? new Set(favIds.value) : _crate.favoritePackIds;
+    if (counts.status === 'rejected' || facets.status === 'rejected' || favIds.status === 'rejected') {
+        const err = (counts.reason || facets.reason || favIds.reason) ?? 'unknown';
         if (typeof showToast === 'function') showToast(toastFmt('toast.crate_load_failed', {err}), 4000, 'error');
     }
     renderCrateCategoryTree();
@@ -408,6 +413,15 @@ function renderCrateFacets() {
         `<option value="${_crateEsc(k)}">${_crateEsc(k)}</option>`
     ).join('');
     if (_crate.filters.key) keySel.value = _crate.filters.key;
+
+    // Sync the custom multi-filter widgets from the updated <select> options.
+    // initMultiFilters() reads options once at init when the selects are still empty;
+    // this refresh pushes the real pack/mfr/key options into the visible widgets.
+    if (typeof refreshMultiFilter === 'function') {
+        refreshMultiFilter('cratePackSelect');
+        refreshMultiFilter('crateMfrSelect');
+        refreshMultiFilter('crateKeySelect');
+    }
 }
 
 function renderCrateFavoritePacks() {
@@ -464,6 +478,10 @@ async function runCrateQuery() {
     _crate.totalRows = result?.total || 0;
     _crate.navIndex = _crate.rows.length > 0 ? 0 : -1;
 
+    // Pre-fetch favorites/notes/tags so rowBadges() has data for star/tag/note icons.
+    if (typeof prepareBadgeContext === 'function') {
+        try { await prepareBadgeContext(); } catch { /* non-fatal */ }
+    }
     renderCrateResults();
     host.classList.remove('loading');
 
@@ -514,12 +532,12 @@ function renderCrateRow(r, idx) {
     // Highlight matches on name + trailing path segment using the shared highlightMatch helper.
     const nameHl = _hl(r.name);
     const pathHl = _hl(r.path);
-    return `<div class="crate-row" data-idx="${idx}" data-sample-id="${r.sample_id}" data-sample-path="${_crateEsc(r.path)}" role="button" tabindex="-1">
+    return `<div class="crate-row" data-idx="${idx}" data-sample-id="${r.sample_id}" data-sample-path="${_crateEsc(r.path)}" data-sample-name="${_crateEsc(r.name)}" role="button" tabindex="-1">
         <div class="crate-row-wave" data-wave-path="${_crateEsc(r.path)}">
             <canvas class="crate-row-wave-canvas" width="200" height="40"></canvas>
         </div>
         <div class="crate-row-body">
-            <div class="crate-row-name" title="${_crateEsc(r.path)}">${nameHl}</div>
+            <div class="crate-row-name" title="${_crateEsc(r.path)}">${nameHl}${typeof rowBadges === 'function' ? rowBadges(r.path) : ''}</div>
             <div class="crate-row-meta">
                 ${loopTag}
                 ${cat}
@@ -532,6 +550,7 @@ function renderCrateRow(r, idx) {
             ${confBar}
         </div>
         <div class="crate-row-actions">
+            <button type="button" class="crate-row-btn crate-row-sample-fav ${typeof _badgeCtx !== 'undefined' && _badgeCtx?.favPaths?.has(r.path) ? 'on' : ''}" data-action="crate-sample-fav" data-sample-path="${_crateEsc(r.path)}" data-sample-name="${_crateEsc(r.name)}" title="Toggle favorite (F)">&#9733;</button>
             <button type="button" class="crate-row-btn" data-action="crate-similar" data-sample-id="${r.sample_id}" title="Find similar (s)">≈</button>
             ${r.pack_id != null ? `<button type="button" class="crate-row-btn crate-row-star ${_crate.favoritePackIds.has(r.pack_id) ? 'on' : ''}" data-action="crate-fav-toggle" data-pack-id="${r.pack_id}" title="Toggle favorite pack (f)">★</button>` : ''}
         </div>
@@ -786,17 +805,15 @@ function initCrateTab() {
             updateCrateSampleAnalysisBadge(payload);
 
             if (!isCrateTabActive()) return;
-            try {
-                const [counts, facets] = await Promise.all([
-                    window.vstUpdater.crateCategoryCounts(),
-                    window.vstUpdater.crateFacets(),
-                ]);
-                _crate.categoryCounts = Array.isArray(counts) ? counts : _crate.categoryCounts;
-                _crate.facets = facets || _crate.facets;
-                renderCrateCategoryTree();
-                renderCrateFacets();
-                updateCrateAnalyzedStatus();
-            } catch { /* ignore */ }
+            const [counts, facets] = await Promise.allSettled([
+                window.vstUpdater.crateCategoryCounts(),
+                window.vstUpdater.crateFacets(),
+            ]);
+            if (counts.status === 'fulfilled' && Array.isArray(counts.value)) _crate.categoryCounts = counts.value;
+            if (facets.status === 'fulfilled' && facets.value) _crate.facets = facets.value;
+            renderCrateCategoryTree();
+            renderCrateFacets();
+            updateCrateAnalyzedStatus();
         });
     }
 
@@ -884,6 +901,13 @@ function initCrateTab() {
         const actionBtn = e.target.closest('[data-action]');
         if (actionBtn) {
             const action = actionBtn.dataset.action;
+            if (action === 'crate-sample-fav') {
+                e.stopPropagation();
+                const path = actionBtn.dataset.samplePath;
+                const name = actionBtn.dataset.sampleName || '';
+                if (path) await toggleCrateSampleFavorite(actionBtn, path, name);
+                return;
+            }
             if (action === 'crate-fav-toggle') {
                 e.stopPropagation();
                 const pid = Number(actionBtn.dataset.packId);
@@ -1009,6 +1033,34 @@ function onCrateGlobalKeydown(e) {
 
 function isCrateTabActive() {
     return document.querySelector('.tab-content.active')?.id === 'tabCrate';
+}
+
+async function toggleCrateSampleFavorite(btn, path, name) {
+    const vu = window.vstUpdater;
+    if (!vu) return;
+    const isFav = typeof _badgeCtx !== 'undefined' && _badgeCtx?.favPaths?.has(path);
+    try {
+        if (isFav) {
+            await vu.favoritesRemove(path);
+            if (_badgeCtx?.favPaths) _badgeCtx.favPaths.delete(path);
+        } else {
+            await vu.favoritesAdd('audio', path, name, '', '', new Date().toISOString());
+            if (_badgeCtx?.favPaths) _badgeCtx.favPaths.add(path);
+        }
+        btn.classList.toggle('on', !isFav);
+        // Update inline badges for this row
+        const row = btn.closest('.crate-row');
+        if (row && typeof rowBadges === 'function') {
+            const nameEl = row.querySelector('.crate-row-name');
+            if (nameEl) {
+                // Strip old badges, re-render
+                nameEl.querySelectorAll('.row-badge').forEach(b => b.remove());
+                nameEl.insertAdjacentHTML('beforeend', rowBadges(path));
+            }
+        }
+    } catch (err) {
+        if (typeof showToast === 'function') showToast(toastFmt('toast.favorite_failed', {err}), 4000, 'error');
+    }
 }
 
 async function toggleCrateFavoritePack(packId) {

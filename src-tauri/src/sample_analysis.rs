@@ -238,6 +238,20 @@ pub fn extract_key(name: &str) -> Option<String> {
     None
 }
 
+/// Convert short dropdown key ("Bm", "C#m", "C#", "D") to the DB format
+/// ("B Minor", "C# Minor"). Both `extract_key` and `detect_key` always store
+/// in "X Minor" / "X Major" format. Bare notes default to minor (same
+/// convention as `extract_key`).
+pub fn short_key_to_db(short: &str) -> String {
+    let s = short.trim();
+    if s.ends_with('m') {
+        let note = &s[..s.len() - 1];
+        format!("{note} Minor")
+    } else {
+        format!("{s} Minor")
+    }
+}
+
 /// Regex to strip minor key indicators, capturing surrounding delimiters
 static STRIP_MINOR_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -316,76 +330,82 @@ pub struct CategoryPattern {
 /// All category patterns ordered by specificity (most specific first).
 /// When matching, the first match wins, so specific patterns must come before
 /// general ones (e.g., `fx_riser` before `fx_misc`).
+/// Shorthand for the delimiter boundary used in patterns below.
+/// Leading: `(?:^|[\s_\-./])` — start of string, whitespace, `_`, `-`, `.`, `/`.
+/// Trailing: `(?:[\s_\-./]|$)` — same set or end of string.
+/// `match_category` normalises camelCase ("TechKick" → "Tech_Kick") before matching
+/// so these delimiters also catch camelCase transitions.
+///   B = `(?:^|[\s_\-./])`   E = `(?:[\s_\-./]|$)`
 pub static CATEGORY_PATTERNS: &[(&str, &str, Option<&str>, bool, bool, bool)] = &[
     // (name, regex_pattern, parent, is_oneshot, is_key_sensitive, is_loop_preferred)
 
     // === DRUMS (specific first) ===
-    ("kick",        r"(?i)kick|kik|(?:^|[\s_\-])bd(?:[\s_\-]|$)|(?:^|[\s_\-])kck(?:[\s_\-]|$)", Some("drums"), false, false, true),
+    ("kick",        r"(?i)(?:^|[\s_\-./])(?:kicks?|kik|bd|kck)(?:[\s_\-./]|$)", Some("drums"), false, false, true),
     // Snare before clap so "snare.wav" doesn't get captured by the clap regex.
-    ("snare",       r"(?i)snare|(?:^|[\s_\-])(?:snr|sd)(?:[\s_\-]|$)|rim[\s_]*shot|rimshot", Some("drums"), false, false, true),
-    ("clap",        r"(?i)clap|(?:^|[\s_\-])(?:clp|cp)(?:[\s_\-]|$)", Some("drums"), false, false, true),
-    ("closed_hat",  r"(?i)closed.?hat|closed.?hh|(?:^|[\s_\-])chh(?:[\s_\-]|$)", Some("drums"), false, false, true),
-    ("open_hat",    r"(?i)open.?hat|open.?hh|(?:^|[\s_\-])ohh(?:[\s_\-]|$)", Some("drums"), false, false, true),
-    ("hat",         r"(?i)(?:^|[\s_\-])(?:hat|hh|hihat|hi[\s_\-]hat)(?:[\s_\-]|$)", Some("drums"), false, false, true),
-    ("cymbal",      r"(?i)cymbal|(?:^|[\s_\-])(?:cym|crash)(?:[\s_\-]|$)", Some("drums"), false, false, true),
-    ("tom",         r"(?i)(?:^|[\s_\-])(?:tom|floor[\s_\-]*tom|rack[\s_\-]*tom)(?:[\s_\-]|$)", Some("drums"), false, false, true),
-    ("ride",        r"(?i)(?:^|[\s_\-])ride(?:[\s_\-.]|$)", Some("drums"), false, false, true),
-    ("shaker",      r"(?i)(?:^|[\s_\-])(?:shaker|maraca|tambourine|tamb)(?:[\s_\-]|$)", Some("drums"), false, false, true),
-    ("perc",        r"(?i)perc|(?:^|[\s_\-])(?:conga|bongo|rim|woodblock|cowbell)(?:[\s_\-]|$)", Some("drums"), false, false, true),
+    ("snare",       r"(?i)(?:^|[\s_\-./])(?:snares?|snr|sd)(?:[\s_\-./]|$)|rimshot|rim[\s_]*shot", Some("drums"), false, false, true),
+    ("clap",        r"(?i)(?:^|[\s_\-./])(?:claps?|clp|cp)(?:[\s_\-./]|$)", Some("drums"), false, false, true),
+    ("closed_hat",  r"(?i)closed.?hats?|closed.?hh|(?:^|[\s_\-./])chh(?:[\s_\-./]|$)", Some("drums"), false, false, true),
+    ("open_hat",    r"(?i)open.?hats?|open.?hh|(?:^|[\s_\-./])ohh(?:[\s_\-./]|$)", Some("drums"), false, false, true),
+    ("hat",         r"(?i)(?:^|[\s_\-./])(?:hats?|hh|hihats?|hi[\s_\-]hats?)(?:[\s_\-./]|$)", Some("drums"), false, false, true),
+    ("cymbal",      r"(?i)(?:^|[\s_\-./])(?:cymbals?|cym|crash)(?:[\s_\-./]|$)", Some("drums"), false, false, true),
+    ("tom",         r"(?i)(?:^|[\s_\-./])(?:toms?|floor[\s_\-]*toms?|rack[\s_\-]*toms?)(?:[\s_\-./]|$)", Some("drums"), false, false, true),
+    ("ride",        r"(?i)(?:^|[\s_\-./])rides?(?:[\s_\-./]|$)", Some("drums"), false, false, true),
+    ("shaker",      r"(?i)(?:^|[\s_\-./])(?:shakers?|maracas?|tambourines?|tamb)(?:[\s_\-./]|$)", Some("drums"), false, false, true),
+    ("perc",        r"(?i)(?:^|[\s_\-./])(?:percs?|congas?|bongos?|rim|woodblock|cowbell)(?:[\s_\-./]|$)", Some("drums"), false, false, true),
 
     // === SCHRANZ-SPECIFIC ===
     ("schranz_kick",  r"(?i)schranz.*kick|kick.*schranz|hard[\s_]*techno.*kick", Some("drums"), false, false, true),
-    ("schranz_drive", r"(?i)(?:^|[\s_\-])drive(?:[\s_\-]|$)|rumble[\s_]*(?:bass|loop)|schranz.*bass", Some("bass"), false, false, true),
+    ("schranz_drive", r"(?i)schranz.*drive|drive.*schranz|hard[\s_]*techno.*drive|rumble[\s_]*(?:bass|loop)|schranz.*bass", Some("bass"), false, false, true),
     ("schranz_roll",  r"(?i)kick[\s_]*roll|roll[\s_]*kick|schranz[\s_]*roll", Some("drums"), false, false, true),
 
     // === BASS ===
-    ("sub_bass",    r"(?i)(?:^|[\s_\-])sub(?:[\s_\-]|$)|(?:^|[\s_\-])808(?:[\s_\-]|$)|bass[\s_]*sub|low[\s_]*end", Some("bass"), true, true, false),
-    ("mid_bass",    r"(?i)(?:^|[\s_\-])bass(?:[\s_\-]|$)|reese|hoover|wobble", Some("bass"), false, true, true),
+    ("sub_bass",    r"(?i)(?:^|[\s_\-./])(?:sub|808)(?:[\s_\-./]|$)|bass[\s_]*sub|low[\s_]*end", Some("bass"), true, true, false),
+    ("mid_bass",    r"(?i)(?:^|[\s_\-./])(?:bass|reese|hoover|wobble)(?:[\s_\-./]|$)", Some("bass"), false, true, true),
 
     // === MELODIC ===
-    ("lead",        r"(?i)(?:^|[\s_\-])lead(?:[\s_\-]|$)|(?:^|[\s_\-])ld[_\-]|synth[\s_]*lead|(?:^|[\s_\-])riff(?:[\s_\-]|$)", Some("melodic"), false, true, true),
-    ("pad",         r"(?i)(?:^|[\s_\-])pad(?:[\s_\-]|$)|(?:^|[\s_\-])string(?:s?)(?:[\s_\-]|$)|(?:^|[\s_\-])chord(?:[\s_\-]|$)|evolve", Some("melodic"), false, true, true),
-    ("arp",         r"(?i)(?:^|[\s_\-])arp(?:[\s_\-]|$)|sequence|(?:^|[\s_\-])seq[_\-]", Some("melodic"), false, true, true),
-    ("pluck",       r"(?i)pluck|pizz|picked|marimba", Some("melodic"), true, true, false),
-    ("stab",        r"(?i)(?:^|[\s_\-])stab(?:[\s_\-]|$)|(?:^|[\s_\-])brass(?:[\s_\-]|$)", Some("melodic"), true, true, false),
-    ("acid",        r"(?i)(?:^|[\s_\-])acid(?:[\s_\-]|$)|(?:^|[\s_\-])303(?:[\s_\-]|$)|squelch", Some("melodic"), false, true, true),
+    ("lead",        r"(?i)(?:^|[\s_\-./])(?:leads?|riffs?)(?:[\s_\-./]|$)|(?:^|[\s_\-])ld[_\-]|synth[\s_]*lead", Some("melodic"), false, true, true),
+    ("pad",         r"(?i)(?:^|[\s_\-./])(?:pads?|strings?|chords?|evolve)(?:[\s_\-./]|$)", Some("melodic"), false, true, true),
+    ("arp",         r"(?i)(?:^|[\s_\-./])(?:arps?|sequences?)(?:[\s_\-./]|$)|(?:^|[\s_\-])seq[_\-]", Some("melodic"), false, true, true),
+    ("pluck",       r"(?i)(?:^|[\s_\-./])(?:plucks?|pizz|picked|marimba)(?:[\s_\-./]|$)", Some("melodic"), true, true, false),
+    ("stab",        r"(?i)(?:^|[\s_\-./])(?:stabs?|brass)(?:[\s_\-./]|$)", Some("melodic"), true, true, false),
+    ("acid",        r"(?i)(?:^|[\s_\-./])(?:acid|303|squelch)(?:[\s_\-./]|$)", Some("melodic"), false, true, true),
 
     // === ATMOS ===
-    ("atmos",       r"(?i)atmos|ambient|drone|soundscape|background", Some("atmos"), false, true, false),
-    ("texture",     r"(?i)texture|foley|field[\s_]*rec", Some("atmos"), false, false, false),
-    ("noise",       r"(?i)(?:^|[\s_\-])noise(?:[\s_\-]|$)|(?:^|[\s_\-])static(?:[\s_\-]|$)|hiss|crackle", Some("atmos"), false, false, false),
-    ("tape",        r"(?i)(?:^|[\s_\-])tape(?:[\s_\-]|$)|vinyl|lo-?fi|cassette", Some("atmos"), false, false, false),
+    ("atmos",       r"(?i)(?:^|[\s_\-./])(?:atmos|ambient|drone|soundscape|background)(?:[\s_\-./]|$)", Some("atmos"), false, true, false),
+    ("texture",     r"(?i)(?:^|[\s_\-./])(?:texture|foley)(?:[\s_\-./]|$)|field[\s_]*rec", Some("atmos"), false, false, false),
+    ("noise",       r"(?i)(?:^|[\s_\-./])(?:noise|static|hiss|crackle)(?:[\s_\-./]|$)", Some("atmos"), false, false, false),
+    ("tape",        r"(?i)(?:^|[\s_\-./])(?:tape|vinyl|lo-?fi|cassette)(?:[\s_\-./]|$)", Some("atmos"), false, false, false),
 
     // === FX — Transitions ===
-    ("fx_riser",    r"(?i)riser|(?:^|[\s_\-])rise(?:[\s_\-]|$)|sweep[\s_]*up|uplifter|build[\s_]*up|(?:^|[\s_\-])tension(?:[\s_\-]|$)|ascend", Some("fx"), false, false, false),
-    ("fx_downer",   r"(?i)downer|downlifter|sweep[\s_]*down|down[\s_]*sweep|descend", Some("fx"), false, false, false),
-    ("fx_swell",    r"(?i)swell|bloom|expand", Some("fx"), false, false, false),
+    ("fx_riser",    r"(?i)(?:^|[\s_\-./])(?:riser|rise|tension|ascend)(?:[\s_\-./]|$)|sweep[\s_]*up|uplifter|build[\s_]*up", Some("fx"), false, false, false),
+    ("fx_downer",   r"(?i)(?:^|[\s_\-./])(?:downer|downlifter|descend)(?:[\s_\-./]|$)|sweep[\s_]*down|down[\s_]*sweep", Some("fx"), false, false, false),
+    ("fx_swell",    r"(?i)(?:^|[\s_\-./])(?:swell|bloom|expand)(?:[\s_\-./]|$)", Some("fx"), false, false, false),
 
     // === FX — Impacts ===
-    ("fx_crash",    r"(?i)crash|(?:^|[\s_\-])china(?:[\s_\-]|$)|splash", Some("fx"), true, false, false),
-    ("fx_impact",   r"(?i)impact|(?:^|[\s_\-])slam(?:[\s_\-]|$)|(?:^|[\s_\-])boom(?:[\s_\-]|$)|thud", Some("fx"), true, false, false),
-    ("fx_explosion",r"(?i)explo|burst|detonate|blast", Some("fx"), true, false, false),
+    ("fx_crash",    r"(?i)(?:^|[\s_\-./])(?:crash|china|splash)(?:[\s_\-./]|$)", Some("fx"), true, false, false),
+    ("fx_impact",   r"(?i)(?:^|[\s_\-./])(?:impact|slam|boom|thud)(?:[\s_\-./]|$)", Some("fx"), true, false, false),
+    ("fx_explosion",r"(?i)(?:^|[\s_\-./])(?:explo|burst|detonate|blast)(?:[\s_\-./]|$)", Some("fx"), true, false, false),
 
     // === FX — Rhythmic ===
-    ("fx_fill",     r"(?i)(?:^|[\s_\-])fill(?:[\s_\-]|$)|snare[\s_]*roll|drum[\s_]*break|buildup", Some("fx"), false, false, true),
-    ("fx_glitch",   r"(?i)glitch|stutter|(?:^|[\s_\-])chop(?:[\s_\-]|$)|(?:^|[\s_\-])slice(?:[\s_\-]|$)|granular|buffer", Some("fx"), false, false, true),
+    ("fx_fill",     r"(?i)(?:^|[\s_\-./])(?:fill|buildup)(?:[\s_\-./]|$)|snare[\s_]*roll|drum[\s_]*break", Some("fx"), false, false, true),
+    ("fx_glitch",   r"(?i)(?:^|[\s_\-./])(?:glitch|stutter|chop|slice|granular|buffer)(?:[\s_\-./]|$)", Some("fx"), false, false, true),
 
     // === FX — Tonal ===
-    ("fx_whoosh",   r"(?i)whoosh|swish|swoosh", Some("fx"), true, false, false),
-    ("fx_laser",    r"(?i)laser|(?:^|[\s_\-])zap(?:[\s_\-]|$)|(?:^|[\s_\-])beam(?:[\s_\-]|$)|sci-?fi|blaster", Some("fx"), true, false, false),
-    ("fx_reverse",  r"(?i)reverse|(?:^|[\s_\-])rev[_\-]|backwards|reversed", Some("fx"), true, false, false),
+    ("fx_whoosh",   r"(?i)(?:^|[\s_\-./])(?:whoosh|swish|swoosh)(?:[\s_\-./]|$)", Some("fx"), true, false, false),
+    ("fx_laser",    r"(?i)(?:^|[\s_\-./])(?:laser|zap|beam|blaster)(?:[\s_\-./]|$)|sci-?fi", Some("fx"), true, false, false),
+    ("fx_reverse",  r"(?i)(?:^|[\s_\-./])(?:reverse|reversed|backwards)(?:[\s_\-./]|$)|(?:^|[\s_\-])rev[_\-]", Some("fx"), true, false, false),
 
     // === FX — Misc ===
     ("fx_sub_drop", r"(?i)sub[\s_]*drop|808[\s_]*drop|bass[\s_]*drop", Some("fx"), true, false, false),
     ("fx_white_noise", r"(?i)white[\s_]*noise|noise[\s_]*sweep|filtered[\s_]*noise", Some("fx"), false, false, false),
     ("fx_vocal",    r"(?i)fx[\s_]*vox|vocal[\s_]*fx|processed[\s_]*vocal|vocal[\s_]*chop", Some("fx"), false, false, true),
-    ("fx_misc",     r"(?i)(?:^|[\s_\-])fx(?:[\s_\-]|$)|(?:^|[\s_\-])sfx(?:[\s_\-]|$)|transition|cinematic", Some("fx"), false, false, false),
+    ("fx_misc",     r"(?i)(?:^|[\s_\-./])(?:fx|sfx|transition|cinematic)(?:[\s_\-./]|$)", Some("fx"), false, false, false),
 
     // === VOCAL ===
     ("vocal_chop",  r"(?i)vocal[\s_]*chop|chop[\s_]*vocal|vox[\s_]*chop", Some("vocal"), false, false, true),
-    ("vocal_phrase", r"(?i)vocal[\s_]*phrase|(?:^|[\s_\-])phrase(?:[\s_\-]|$)|spoken|speech", Some("vocal"), false, true, false),
-    ("vocal_adlib", r"(?i)adlib|(?:^|[\s_\-])shout(?:[\s_\-]|$)|(?:^|[\s_\-])scream(?:[\s_\-]|$)", Some("vocal"), true, false, false),
-    ("vocal",       r"(?i)(?:^|[\s_\-])vox(?:[\s_\-]|$)|vocal|voice|chant|acapella", Some("vocal"), false, true, false),
+    ("vocal_phrase", r"(?i)vocal[\s_]*phrase|(?:^|[\s_\-./])(?:phrase|spoken|speech)(?:[\s_\-./]|$)", Some("vocal"), false, true, false),
+    ("vocal_adlib", r"(?i)(?:^|[\s_\-./])(?:adlib|shout|scream)(?:[\s_\-./]|$)", Some("vocal"), true, false, false),
+    ("vocal",       r"(?i)(?:^|[\s_\-./])(?:vox|vocals?|voices?|chants?|acapella)(?:[\s_\-./]|$)", Some("vocal"), false, true, false),
 ];
 
 /// Compiled category regex cache.
@@ -417,16 +437,47 @@ pub struct CategoryMatch {
     pub is_loop_preferred: bool,
 }
 
+/// Insert `_` at camelCase transitions (lowercase → uppercase) so delimiter-based
+/// regex patterns match compound names like "TechKick" → "Tech_Kick".
+/// Also inserts at `/` boundaries in directory paths ("Kicks/" → "Kicks/").
+fn normalize_for_matching(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 8);
+    let mut prev_lower = false;
+    for ch in s.chars() {
+        if prev_lower && ch.is_ascii_uppercase() {
+            out.push('_');
+        }
+        out.push(ch);
+        prev_lower = ch.is_ascii_lowercase();
+    }
+    out
+}
+
 /// Match a sample to its category using filename first, directory as fallback.
 ///
 /// Returns the best match with a confidence score:
 /// - 1.0 = matched in filename (high confidence)
 /// - 0.6 = matched in directory only (lower confidence)
 /// - None = no match
+/// Check if a regex match at `start` in `text` is preceded by a negation word
+/// ("No", "Non", "Without" + delimiter). Prevents "No Kick" from matching as kick.
+fn is_negated(text: &str, start: usize) -> bool {
+    let prefix = &text[..start].to_ascii_lowercase();
+    let prefix = prefix.trim_end_matches(|c: char| c == '_' || c == '-' || c == ' ' || c == '.');
+    prefix.ends_with("no") || prefix.ends_with("non") || prefix.ends_with("without")
+}
+
 pub fn match_category(name: &str, directory: &str) -> Option<CategoryMatch> {
+    // Normalize camelCase so "TechKick" → "Tech_Kick" and delimiter-based
+    // boundaries in the regex patterns fire correctly. Without this,
+    // bare substring patterns like `snare` match inside "Ensnared".
+    let norm_name = normalize_for_matching(name);
+    let norm_dir = normalize_for_matching(directory);
+
     // Try filename first (higher confidence)
     for (cat_name, re, parent, oneshot, key_sens, loop_pref) in COMPILED_PATTERNS.iter() {
-        if re.is_match(name) {
+        if let Some(m) = re.find(&norm_name) {
+            if is_negated(&norm_name, m.start()) { continue; }
             return Some(CategoryMatch {
                 name: cat_name.to_string(),
                 parent: parent.map(|s| s.to_string()),
@@ -440,7 +491,8 @@ pub fn match_category(name: &str, directory: &str) -> Option<CategoryMatch> {
 
     // Fallback to directory (lower confidence)
     for (cat_name, re, parent, oneshot, key_sens, loop_pref) in COMPILED_PATTERNS.iter() {
-        if re.is_match(directory) {
+        if let Some(m) = re.find(&norm_dir) {
+            if is_negated(&norm_dir, m.start()) { continue; }
             return Some(CategoryMatch {
                 name: cat_name.to_string(),
                 parent: parent.map(|s| s.to_string()),
@@ -981,6 +1033,20 @@ mod tests {
         // Ride
         let m = match_category("Perc-Cymbal-Ride 4 Bell 1", "/Drums/Cymbals/").unwrap();
         assert_eq!(m.name, "cymbal");
+
+        // CamelCase: "TechSnare" should still match snare via normalisation
+        let m = match_category("TechSnare_01.wav", "/Drums/").unwrap();
+        assert_eq!(m.name, "snare");
+
+        // Word boundary: "Ensnared" must NOT match snare
+        let m = match_category("10_Ensnared_Loop.wav", "/Samples/Loops/");
+        assert!(m.is_none() || m.as_ref().unwrap().name != "snare",
+            "Ensnared should not categorise as snare, got {:?}", m);
+
+        // Negation: "No Kick" must NOT match kick
+        let m = match_category("009 Drum Loop 128 No Kick - TH Zenhiser.wav", "/Samples/");
+        assert!(m.is_none() || m.as_ref().unwrap().name != "kick",
+            "'No Kick' should not categorise as kick, got {:?}", m);
     }
 
     #[test]
