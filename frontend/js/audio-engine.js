@@ -5,12 +5,11 @@ function aeReflow() {
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             const c = document.querySelector('#tabAudioEngine .ae-main-stack');
-            if (!c || !c.parentNode) return;
-            const parent = c.parentNode;
-            const next = c.nextSibling;
-            parent.removeChild(c);
-            void parent.offsetHeight;
-            parent.insertBefore(c, next);
+            if (!c) return;
+            const tmp = document.createElement('div');
+            c.appendChild(tmp);
+            void c.offsetHeight;
+            tmp.remove();
         });
     });
 }
