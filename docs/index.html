@@ -186,6 +186,7 @@
           <li><strong>Context menus</strong> — row actions across tabs (<code>js/context-menu.js</code>).</li>
           <li><strong>Tooltips</strong> — hover titles for dense controls (<code>js/tooltip-hover.js</code>).</li>
           <li><strong>Keyboard</strong> — navigable tables (<code>js/keyboard-nav.js</code>), batch selection (<code>js/batch-select.js</code>), drag-reorder for sections/tabs (<code>js/drag-reorder.js</code>).</li>
+          <li><strong>Embedded terminal</strong> — PTY-backed xterm.js terminal (<code>js/terminal.js</code>, <code>src-tauri/src/terminal.rs</code>). Login shell, 256-color + truecolor, drag-to-dock corners, resizable, Ctrl+T toggle. <a href="assets/terminal.png">Screenshot →</a></li>
           <li><strong>Modals</strong> — draggable custom dialogs where enabled (<code>js/modal-drag.js</code>).</li>
           <li><strong>UI idle</strong> — <code>js/ui-idle.js</code> sets <code>html.ui-idle-heavy-cpu</code> when the window is backgrounded/minimized/hidden to pause scanlines and suppress toasts.</li>
           <li><strong>Native menus</strong> — macOS/Windows menu bar mirrors many actions; <strong>GitHub</strong> / <strong>Docs</strong> items open external links.</li>
@@ -486,6 +487,9 @@ SQLite (queries, stats, maintenance, analysis backfill)
   db_get_analysis, db_unanalyzed_paths, db_audio_library_paths, db_migrate_json
   db_cache_stats, db_clear_caches, db_clear_cache_table
 
+Embedded terminal
+  terminal_spawn, terminal_write, terminal_resize, terminal_kill
+
 Folder watch
   start_file_watcher, stop_file_watcher, get_file_watcher_status</pre>
       </section>
@@ -507,6 +511,7 @@ Folder watch
           <li><strong>midi.rs</strong>, <strong>pdf_meta.rs</strong> — format-specific metadata extraction.</li>
           <li><strong>path_norm.rs</strong>, <strong>scanner_skip_dirs.rs</strong>, <strong>audio_extensions.rs</strong>, <strong>bulk_stat.rs</strong> — path rules, skipping, and IO batching.</li>
           <li><strong>open_with_app.rs</strong> — platform “open with” / reveal patterns.</li>
+          <li><strong>terminal.rs</strong> — embedded PTY terminal: <code>terminal_spawn</code>, <code>terminal_write</code>, <code>terminal_resize</code>, <code>terminal_kill</code>.</li>
           <li><strong>app_i18n.rs</strong> — loads catalogs for <code>get_app_strings</code>; <strong>native_menu.rs</strong>, <strong>tray_menu.rs</strong> — menu bar + tray popover wiring.</li>
         </ul>
       </section>
@@ -570,6 +575,7 @@ Folder watch
           <li><strong>keyboard-nav.js</strong>, <strong>batch-select.js</strong>, <strong>drag-reorder.js</strong>, <strong>sort-persist.js</strong>, <strong>columns.js</strong>.</li>
           <li><strong>multi-filter.js</strong>, <strong>favorites.js</strong>, <strong>notes.js</strong>, <strong>export.js</strong>.</li>
           <li><strong>ui-idle.js</strong> — backs off animations when the window is not visible.</li>
+          <li><strong>terminal.js</strong> — embedded PTY terminal (xterm.js, drag-to-dock, resize, Ctrl+T).</li>
           <li><strong>tray-popover.js</strong> — separate WebView HUD (loaded from <code>tray-popover.html</code>).</li>
         </ul>
       </section>

@@ -192,6 +192,8 @@
   "menu.file": "File",
   "menu.filter_by_this_tag": "Filter by This Tag",
   "menu.find": "Find...",
+  "menu.hide_terminal": "Hide Terminal",
+  "menu.kill_terminal": "Kill & Close",
   "menu.find_duplicates": "Find Duplicates",
   "menu.find_in_plugins_tab": "Find in Plugins Tab",
   "menu.find_projects_using": "Find Projects Using This",

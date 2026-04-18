@@ -301,7 +301,7 @@ function getVideoTableRowContextMenuItems(videoRow) {
 // ── Right-click handlers ──
 document.addEventListener('contextmenu', (e) => {
     // Always suppress default browser menu on app content
-    if (e.target.closest('.app, .audio-now-playing, .header, .stats-bar, .tab-nav, #dockOverlay, .dock-zone-overlay, #splashScreen')) {
+    if (e.target.closest('.app, .audio-now-playing, .terminal-pane, .header, .stats-bar, .tab-nav, #dockOverlay, .dock-zone-overlay, #splashScreen')) {
         e.preventDefault();
     }
 
@@ -2682,6 +2682,65 @@ document.addEventListener('contextmenu', (e) => {
                     }
                 },
             ];
+            showContextMenu(e, items);
+            return;
+        }
+
+        // ── Embedded terminal pane ──
+        const termPane = e.target.closest('.terminal-pane');
+        if (termPane) {
+            e.preventDefault();
+            const hasSel = _termInstance && _termInstance.hasSelection && _termInstance.hasSelection();
+            const items = [];
+            if (hasSel) {
+                items.push({
+                    icon: '&#128203;', label: appFmt('menu.copy') || 'Copy',
+                    ..._noEcho,
+                    action: () => {
+                        if (_termInstance) {
+                            const text = _termInstance.getSelection();
+                            if (text && navigator.clipboard) navigator.clipboard.writeText(text);
+                            _termInstance.clearSelection();
+                        }
+                    },
+                });
+            }
+            items.push({
+                icon: '&#128203;', label: appFmt('menu.paste') || 'Paste',
+                ..._noEcho,
+                action: async () => {
+                    if (_termInstance && navigator.clipboard) {
+                        const text = await navigator.clipboard.readText();
+                        if (text && _termSessionAlive) {
+                            const {invoke} = window.__TAURI__.core;
+                            invoke('terminal_write', {data: text}).catch(() => {});
+                        }
+                    }
+                },
+            });
+            items.push('---');
+            items.push({
+                icon: '&#128260;', label: appFmt('menu.clear') || 'Clear',
+                ..._noEcho,
+                action: () => { if (_termInstance) _termInstance.clear(); },
+            });
+            items.push({
+                icon: '&#8634;', label: appFmt('menu.reset') || 'Reset',
+                ..._noEcho,
+                action: () => { if (_termInstance) _termInstance.reset(); },
+            });
+            items.push('---');
+            items.push({
+                icon: '&#10005;', label: appFmt('menu.kill_terminal') || 'Kill & close',
+                ..._noEcho,
+                action: () => { if (typeof killTerminal === 'function') killTerminal(); hideTerminal(); },
+            });
+            items.push({
+                icon: '&#9868;', label: appFmt('menu.hide_terminal') || 'Hide',
+                ..._noEcho,
+                ...shortcutTip('toggleTerminal'),
+                action: () => { if (typeof hideTerminal === 'function') hideTerminal(); },
+            });
             showContextMenu(e, items);
             return;
         }

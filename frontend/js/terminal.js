@@ -131,20 +131,26 @@ function _termOnDragStart(e) {
     pane.style.bottom = 'auto';
     pane.classList.add('dragging');
 
-    // Show dock zones
-    let overlay = document.getElementById('termDockZoneOverlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'termDockZoneOverlay';
-        overlay.className = 'dock-zone-overlay';
-        overlay.innerHTML =
-            '<div class="dock-zone" style="top:4px;left:4px;width:calc(50% - 8px);height:calc(50% - 8px)">TL</div>' +
-            '<div class="dock-zone" style="top:4px;right:4px;width:calc(50% - 8px);height:calc(50% - 8px)">TR</div>' +
-            '<div class="dock-zone" style="bottom:4px;left:4px;width:calc(50% - 8px);height:calc(50% - 8px)">BL</div>' +
-            '<div class="dock-zone" style="bottom:4px;right:4px;width:calc(50% - 8px);height:calc(50% - 8px)">BR</div>';
-        document.body.appendChild(overlay);
+    // Reuse the shared dock overlay (same as audio player) with pixel-based positioning
+    // CSS calc() with percentages doesn't resolve in release WebView
+    const overlay = document.getElementById('dockOverlay');
+    if (overlay) {
+        const vw = window.innerWidth, vh = window.innerHeight, gap = 4;
+        const zw = Math.floor(vw / 2 - gap * 1.5) + 'px';
+        const zh = Math.floor(vh / 2 - gap * 1.5) + 'px';
+        const mid = Math.ceil(vw / 2 + gap / 2) + 'px';
+        const midY = Math.ceil(vh / 2 + gap / 2) + 'px';
+        const g = gap + 'px';
+        const tl = document.getElementById('dockTL');
+        const tr = document.getElementById('dockTR');
+        const bl = document.getElementById('dockBL');
+        const br = document.getElementById('dockBR');
+        if (tl) tl.style.cssText = `top:${g};left:${g};width:${zw};height:${zh}`;
+        if (tr) tr.style.cssText = `top:${g};left:${mid};width:${zw};height:${zh}`;
+        if (bl) bl.style.cssText = `top:${midY};left:${g};width:${zw};height:${zh}`;
+        if (br) br.style.cssText = `top:${midY};left:${mid};width:${zw};height:${zh}`;
+        overlay.classList.add('visible');
     }
-    overlay.classList.add('visible');
 
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'grabbing';
@@ -160,14 +166,16 @@ document.addEventListener('mousemove', (e) => {
     pane.style.left = (_termDragState.origLeft + dx) + 'px';
     pane.style.top = (_termDragState.origTop + dy) + 'px';
 
-    // Highlight nearest dock zone
+    // Highlight nearest dock zone (shared overlay)
     const nearest = _termNearestDock(e.clientX, e.clientY);
-    const overlay = document.getElementById('termDockZoneOverlay');
-    if (overlay) {
-        const zones = overlay.querySelectorAll('.dock-zone');
-        const map = ['dock-tl', 'dock-tr', 'dock-bl', 'dock-br'];
-        zones.forEach((z, i) => z.classList.toggle('active', map[i] === nearest));
-    }
+    const zoneMap = {
+        'dock-tl': 'dockTL', 'dock-tr': 'dockTR',
+        'dock-bl': 'dockBL', 'dock-br': 'dockBR',
+    };
+    Object.entries(zoneMap).forEach(([dock, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', dock === nearest);
+    });
 });
 
 document.addEventListener('mouseup', (e) => {
@@ -177,8 +185,14 @@ document.addEventListener('mouseup', (e) => {
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
 
-    const overlay = document.getElementById('termDockZoneOverlay');
-    if (overlay) overlay.classList.remove('visible');
+    const overlay = document.getElementById('dockOverlay');
+    if (overlay) {
+        overlay.classList.remove('visible');
+        ['dockTL', 'dockTR', 'dockBL', 'dockBR'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+        });
+    }
 
     if (!pane) return;
     pane.classList.remove('dragging');
@@ -253,6 +267,60 @@ async function _termSpawnSession() {
 
     term.open(container);
     _termInstance = term;
+
+    // Release WebKit ignores setAttribute("style", ...) on dynamically-created
+    // elements under tauri://localhost. xterm.js DOM renderer uses setAttribute
+    // for truecolor (24-bit RGB) via _addStyle(). Monkey-patch to use the DOM
+    // .style API instead, which DOES work (proven by letter-spacing).
+    // Release WebKit ignores setAttribute("style",...) on dynamically-created
+    // elements. xterm.js uses setAttribute for truecolor via _addStyle().
+    // Monkey-patch to use DOM .style API which works (proven by letter-spacing).
+    // Walk the _core tree to find _rowFactory regardless of nesting depth.
+    try {
+        const core = term._core;
+        let rf = null;
+        // Try common paths — xterm.js v5 minified structure varies
+        const candidates = [
+            core._renderService?._rowFactory,
+            core._renderService?._renderer?._rowFactory,
+        ];
+        // Deep scan: find any object with _addStyle method
+        if (!candidates.some(c => c)) {
+            const scan = (obj, depth) => {
+                if (!obj || depth > 4 || rf) return;
+                if (typeof obj._addStyle === 'function') { rf = obj; return; }
+                for (const k of Object.keys(obj)) {
+                    if (k.startsWith('_') && typeof obj[k] === 'object' && obj[k]) {
+                        scan(obj[k], depth + 1);
+                    }
+                }
+            };
+            scan(core, 0);
+        } else {
+            rf = candidates.find(c => c);
+        }
+        if (rf && typeof rf._addStyle === 'function') {
+            rf._addStyle = function (el, styleStr) {
+                const colorMatch = styleStr.match(/^color:(#[0-9a-fA-F]{3,8})/);
+                if (colorMatch) { el.style.color = colorMatch[1]; return; }
+                const bgMatch = styleStr.match(/^background-color:(#[0-9a-fA-F]{3,8})/);
+                if (bgMatch) { el.style.backgroundColor = bgMatch[1]; return; }
+                const parts = styleStr.split(':');
+                if (parts.length === 2) {
+                    const prop = parts[0].trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+                    el.style[prop] = parts[1].trim().replace(/;$/, '');
+                }
+            };
+        }
+    } catch (_) { /* xterm internals may change — fail gracefully */ }
+
+    // Force xterm.js to re-measure font metrics after static CSS takes effect.
+    requestAnimationFrame(() => {
+        if (_termInstance) {
+            _termInstance.resize(_termInstance.cols, _termInstance.rows);
+            _termInstance.refresh(0, _termInstance.rows - 1);
+        }
+    });
 
     // Initial fit
     const dims = _termFit(term, container);
