@@ -50,7 +50,8 @@ pub mod sample_filters;
 pub mod scanner;
 pub mod scanner_skip_dirs;
 pub mod similarity;
-pub mod techno_generator;
+pub mod track_generator;
+pub mod trance_generator;
 pub mod trance_starter;
 pub mod tray_menu;
 mod tray_popover_escape_macos;
@@ -187,7 +188,7 @@ static CONTENT_DUP_SCAN_CANCEL: AtomicBool = AtomicBool::new(false);
 /// Set by `stop_fingerprint_cache`; checked between fingerprint cache chunks (~500 files).
 static FINGERPRINT_BUILD_CANCEL: AtomicBool = AtomicBool::new(false);
 
-/// Set by `cancel_als_generation`; checked by techno_generator between sample queries.
+/// Set by `cancel_als_generation`; checked by track_generator between sample queries.
 static ALS_GENERATION_CANCEL: AtomicBool = AtomicBool::new(false);
 
 /// Set while audio is actively playing. Background jobs check this and yield/pause
@@ -3474,7 +3475,7 @@ async fn generate_als_project(
         let genre_str = format!("{:?}", config.genre).to_lowercase();
         // Use per-type track counts directly from frontend
         let tc = &config.track_counts;
-        let track_counts = techno_generator::TrackCounts {
+        let track_counts = track_generator::TrackCounts {
             kick: tc.kick,
             clap: tc.clap,
             snare: tc.snare,
@@ -3507,7 +3508,7 @@ async fn generate_als_project(
         };
         // Map frontend per-type atonal config to generator TypeAtonal
         let ta = &config.type_atonal;
-        let type_atonal = techno_generator::TypeAtonal {
+        let type_atonal = track_generator::TypeAtonal {
             kick: ta.kick,
             clap: ta.clap,
             snare: ta.snare,
@@ -3541,10 +3542,11 @@ async fn generate_als_project(
         // The generator's `SectionOverrides` is a type alias for
         // `als_project::SectionOverridesConfig` since the 8-bar-block refactor,
         // so a plain clone is the whole mapping.
-        let section_overrides: techno_generator::SectionOverrides = config.section_overrides.clone();
+        let section_overrides: track_generator::SectionOverrides = config.section_overrides.clone();
         // Sanity: clamp BPM to a valid range to avoid division-by-zero or broken audio
         let bpm = (config.bpm as f64).clamp(20.0, 999.0);
-        let result = techno_generator::generate(
+
+        let result = track_generator::generate(
             &output_path,
             bpm,
             num_songs,
@@ -3564,6 +3566,8 @@ async fn generate_als_project(
             type_atonal,
             config.section_lengths,
             seed,
+            config.midi_tracks,
+            config.midi_settings.as_ref(),
             Some(&ALS_GENERATION_CANCEL),
             Some(&progress_cb),
         )?;
@@ -3689,8 +3693,8 @@ async fn find_trance_samples(
 /// Clear the sample blacklist so previously used samples can be reused.
 #[tauri::command]
 async fn clear_als_sample_blacklist() -> Result<serde_json::Value, String> {
-    let count_before = techno_generator::get_blacklist_count();
-    techno_generator::clear_sample_blacklist();
+    let count_before = track_generator::get_blacklist_count();
+    track_generator::clear_sample_blacklist();
     Ok(serde_json::json!({
         "cleared": count_before
     }))
@@ -3699,26 +3703,26 @@ async fn clear_als_sample_blacklist() -> Result<serde_json::Value, String> {
 /// Get the number of samples in the blacklist.
 #[tauri::command]
 async fn get_als_blacklist_count() -> Result<usize, String> {
-    Ok(techno_generator::get_blacklist_count())
+    Ok(track_generator::get_blacklist_count())
 }
 
 /// Get all blacklisted sample entries (key-stripped paths).
 #[tauri::command]
 async fn get_als_blacklist_entries() -> Result<Vec<String>, String> {
-    Ok(techno_generator::get_blacklist_entries())
+    Ok(track_generator::get_blacklist_entries())
 }
 
 /// Add a sample path to the blacklist.
 #[tauri::command]
 async fn add_to_als_blacklist(path: String) -> Result<(), String> {
-    techno_generator::add_to_blacklist(&path);
+    track_generator::add_to_blacklist(&path);
     Ok(())
 }
 
 /// Remove an entry from the blacklist.
 #[tauri::command]
 async fn remove_from_als_blacklist(entry: String) -> Result<bool, String> {
-    Ok(techno_generator::remove_from_blacklist(&entry))
+    Ok(track_generator::remove_from_blacklist(&entry))
 }
 
 // ── Directory Whitelist Commands ──
@@ -3726,33 +3730,33 @@ async fn remove_from_als_blacklist(entry: String) -> Result<bool, String> {
 /// Get all whitelisted directories.
 #[tauri::command]
 async fn get_als_whitelist_entries() -> Result<Vec<String>, String> {
-    Ok(techno_generator::get_whitelist_entries())
+    Ok(track_generator::get_whitelist_entries())
 }
 
 /// Get the number of directories in the whitelist.
 #[tauri::command]
 async fn get_als_whitelist_count() -> Result<usize, String> {
-    Ok(techno_generator::get_whitelist_count())
+    Ok(track_generator::get_whitelist_count())
 }
 
 /// Add a directory to the whitelist.
 #[tauri::command]
 async fn add_to_als_whitelist(path: String) -> Result<(), String> {
-    techno_generator::add_to_whitelist(&path);
+    track_generator::add_to_whitelist(&path);
     Ok(())
 }
 
 /// Remove a directory from the whitelist.
 #[tauri::command]
 async fn remove_from_als_whitelist(path: String) -> Result<bool, String> {
-    Ok(techno_generator::remove_from_whitelist(&path))
+    Ok(track_generator::remove_from_whitelist(&path))
 }
 
 /// Clear the directory whitelist.
 #[tauri::command]
 async fn clear_als_whitelist() -> Result<usize, String> {
-    techno_generator::clear_whitelist();
-    Ok(techno_generator::get_whitelist_count())
+    track_generator::clear_whitelist();
+    Ok(track_generator::get_whitelist_count())
 }
 
 /// Query available samples for a category (for preview in wizard).

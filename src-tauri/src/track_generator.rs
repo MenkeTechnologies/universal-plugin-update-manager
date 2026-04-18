@@ -1,5 +1,5 @@
-//! Techno arrangement generator — extracted from generate_true_techno example.
-//! Produces valid ALS files using the embedded template approach.
+//! Track arrangement generator — produces valid ALS files with audio sample tracks.
+//! Handles all genres (Techno, Schranz, Trance audio layers) using the embedded template approach.
 
 use crate::als_generator::generate_empty_als;
 use crate::write_app_log;
@@ -2103,11 +2103,11 @@ fn open_dedicated_conn() -> Result<rusqlite::Connection, String> {
 }
 
 fn pick_random_key() -> String {
-    write_app_log("[techno_generator] pick_random_key: start".into());
+    write_app_log("[track_generator] pick_random_key: start".into());
     let conn = match open_dedicated_conn() {
         Ok(c) => c,
         Err(e) => {
-            write_app_log(format!("[techno_generator] pick_random_key: DB error: {}", e));
+            write_app_log(format!("[track_generator] pick_random_key: DB error: {}", e));
             return "A Minor".to_string();
         }
     };
@@ -2126,7 +2126,7 @@ fn pick_random_key() -> String {
 
     let key = conn.query_row(query, [], |row| row.get(0))
         .unwrap_or_else(|_| "A Minor".to_string());
-    write_app_log(format!("[techno_generator] pick_random_key: selected '{}'", key));
+    write_app_log(format!("[track_generator] pick_random_key: selected '{}'", key));
     key
 }
 
@@ -2177,7 +2177,7 @@ fn ensure_blacklist_loaded() {
                 blacklist.insert(entry);
             }
         }
-        write_app_log(format!("[techno_generator] Loaded {} blacklist entries from DB", 
+        write_app_log(format!("[track_generator] Loaded {} blacklist entries from DB", 
             GENERATION_BLACKLIST.lock().map(|b| b.len()).unwrap_or(0)));
     }
 }
@@ -2193,7 +2193,7 @@ fn ensure_whitelist_loaded() {
                 whitelist.insert(entry);
             }
         }
-        write_app_log(format!("[techno_generator] Loaded {} whitelist entries from DB", 
+        write_app_log(format!("[track_generator] Loaded {} whitelist entries from DB", 
             DIRECTORY_WHITELIST.lock().map(|w| w.len()).unwrap_or(0)));
     }
 }
@@ -2297,7 +2297,7 @@ pub fn clear_sample_blacklist() {
     if let Ok(mut blacklist) = GENERATION_BLACKLIST.lock() {
         let count = blacklist.len();
         blacklist.clear();
-        write_app_log(format!("[techno_generator] Cleared sample blacklist ({} samples)", count));
+        write_app_log(format!("[track_generator] Cleared sample blacklist ({} samples)", count));
     }
     // Clear from DB
     let _ = crate::db::global().blacklist_clear();
@@ -2399,7 +2399,7 @@ pub fn add_to_whitelist(path: &str) {
     }
     // Persist to DB
     let _ = crate::db::global().whitelist_add(normalized);
-    write_app_log(format!("[techno_generator] Added to whitelist: {}", normalized));
+    write_app_log(format!("[track_generator] Added to whitelist: {}", normalized));
 }
 
 /// Remove a directory from the whitelist
@@ -2413,7 +2413,7 @@ pub fn remove_from_whitelist(path: &str) -> bool {
     // Remove from DB
     let _ = crate::db::global().whitelist_remove(path);
     if removed {
-        write_app_log(format!("[techno_generator] Removed from whitelist: {}", path));
+        write_app_log(format!("[track_generator] Removed from whitelist: {}", path));
     }
     removed
 }
@@ -2424,7 +2424,7 @@ pub fn clear_whitelist() {
     if let Ok(mut whitelist) = DIRECTORY_WHITELIST.lock() {
         let count = whitelist.len();
         whitelist.clear();
-        write_app_log(format!("[techno_generator] Cleared directory whitelist ({} directories)", count));
+        write_app_log(format!("[track_generator] Cleared directory whitelist ({} directories)", count));
     }
     // Clear from DB
     let _ = crate::db::global().whitelist_clear();
@@ -2441,7 +2441,7 @@ fn query_samples_with_key(
     let results = query_samples_internal(label, include_patterns, require_loop, count, key, false);
 
     if results.is_empty() && key.is_some() {
-        write_app_log(format!("[techno_generator] {}: No samples with key in filename - track will be empty", label));
+        write_app_log(format!("[track_generator] {}: No samples with key in filename - track will be empty", label));
     }
 
     results
@@ -2459,7 +2459,7 @@ fn query_samples_with_key_optional(
     let results = query_samples_internal(label, include_patterns, require_loop, count, key, true);
 
     if results.is_empty() {
-        write_app_log(format!("[techno_generator] {}: No samples found", label));
+        write_app_log(format!("[track_generator] {}: No samples found", label));
     }
 
     results
@@ -2484,12 +2484,12 @@ fn query_samples_internal(
     const REFERENCE_BPM: f64 = 128.0;
 
     let start = std::time::Instant::now();
-    write_app_log(format!("[techno_generator] {}: patterns=[{}] key={:?} require_loop={}", label, include_patterns.join(","), key, require_loop));
+    write_app_log(format!("[track_generator] {}: patterns=[{}] key={:?} require_loop={}", label, include_patterns.join(","), key, require_loop));
 
     let conn = match open_dedicated_conn() {
         Ok(c) => c,
         Err(e) => {
-            write_app_log(format!("[techno_generator] query_samples_internal: DB error: {}", e));
+            write_app_log(format!("[track_generator] query_samples_internal: DB error: {}", e));
             return vec![];
         }
     };
@@ -2535,7 +2535,7 @@ fn query_samples_internal(
     let mut stmt = match conn.prepare(&query) {
         Ok(s) => s,
         Err(e) => {
-            write_app_log(format!("[techno_generator] query_samples_internal: prepare error: {}", e));
+            write_app_log(format!("[track_generator] query_samples_internal: prepare error: {}", e));
             return vec![];
         }
     };
@@ -2701,7 +2701,7 @@ fn query_samples_internal(
     }
 
     let sample_names: Vec<&str> = results.iter().map(|s| s.name.as_str()).collect();
-    write_app_log(format!("[techno_generator] {}: found {} in {:?}: {:?}", label, results.len(), start.elapsed(), sample_names));
+    write_app_log(format!("[track_generator] {}: found {} in {:?}: {:?}", label, results.len(), start.elapsed(), sample_names));
     results
 }
 
@@ -2780,16 +2780,16 @@ fn create_locators_xml_multi(
     )
 }
 
-fn load_song_samples(song_num: u32, target_key: Option<&str>, atonal: bool, hardness: f32, track_counts: &TrackCounts, type_atonal: &TypeAtonal, on_progress: Option<&dyn Fn(&str)>) -> SongSamples {
+fn load_song_samples(song_num: u32, target_key: Option<&str>, atonal: bool, hardness: f32, track_counts: &TrackCounts, type_atonal: &TypeAtonal, midi_tracks: bool, on_progress: Option<&dyn Fn(&str)>) -> SongSamples {
     let start = std::time::Instant::now();
     // Set thread-local hardness for query functions
     set_hardness(hardness);
     // NOTE: Don't clear used samples here - cleared once in generate() so songs don't reuse samples
-    write_app_log(format!("[techno_generator] load_song_samples: song {} starting, target_key={:?}, atonal={}", song_num, target_key, atonal));
+    write_app_log(format!("[track_generator] load_song_samples: song {} starting, target_key={:?}, atonal={}", song_num, target_key, atonal));
     // When global atonal is set, all types are atonal
     let track_key = target_key.map(|k| k.to_string()).unwrap_or_else(pick_random_key);
     let key_filter: Option<&str> = if atonal { None } else { Some(&track_key) };
-    write_app_log(format!("[techno_generator] load_song_samples: song {} using key={}, key_filter={:?} (took {:?})", song_num, track_key, key_filter, start.elapsed()));
+    write_app_log(format!("[track_generator] load_song_samples: song {} using key={}, key_filter={:?} (took {:?})", song_num, track_key, key_filter, start.elapsed()));
     
     let progress = |msg: &str| { if let Some(cb) = on_progress { cb(msg); } };
     
@@ -2855,33 +2855,37 @@ fn load_song_samples(song_num: u32, target_key: Option<&str>, atonal: bool, hard
     let fill_inc = &["drum_fill", "drum fill", "fills/", "fill/", "drum_break", "breaks/"];
     let fills = query_n_keyed!("FILL", fill_inc, false, track_counts.fill, key_for(type_atonal.fill));
 
-    // === BASS (key matched unless atonal) ===
-    let bass_inc = &["bass_loop", "bass loop", "bass_loops/", "bassline", "basslines/", "reeses_and_hoovers"];
-    let basses = query_n_keyed!("BASS", bass_inc, true, track_counts.bass, key_for(type_atonal.bass));
+    // === BASS + MELODICS ===
+    // When midi_tracks is enabled, skip audio sample loading for melodic layers —
+    // MIDI tracks will be generated instead (see MIDI injection below).
+    let (basses, subs, pads, leads, synths, arps, keyss): (Vec<Vec<SampleInfo>>, Vec<Vec<SampleInfo>>, Vec<Vec<SampleInfo>>, Vec<Vec<SampleInfo>>, Vec<Vec<SampleInfo>>, Vec<Vec<SampleInfo>>, Vec<Vec<SampleInfo>>) = if midi_tracks {
+        (vec![], vec![], vec![], vec![], vec![], vec![], vec![])
+    } else {
+        let bass_inc = &["bass_loop", "bass loop", "bass_loops/", "bassline", "basslines/", "reeses_and_hoovers"];
+        let basses = query_n_keyed!("BASS", bass_inc, true, track_counts.bass, key_for(type_atonal.bass));
 
-    let sub_inc = &["sub_loop", "sub loop", "sub_bass", "808_loop", "808 loop"];
-    let subs = query_n_keyed!("SUB", sub_inc, true, track_counts.sub, key_for(type_atonal.sub));
+        let sub_inc = &["sub_loop", "sub loop", "sub_bass", "808_loop", "808 loop"];
+        let subs = query_n_keyed!("SUB", sub_inc, true, track_counts.sub, key_for(type_atonal.sub));
 
-    // === MELODICS (key matched unless atonal) ===
-    // Query pads FIRST so synth_pad/pad_synth samples go to pads, not synths
-    let pad_inc = &["pad_loop", "pad loop", "pad_loops/", "pad/", "pads/", "drone_loop", "atmosphere_loop",
-                    "synth_pad", "synth pad", "pad_synth", "pad synth"];
-    let pads = query_n_keyed!("PAD", pad_inc, true, track_counts.pad, key_for(type_atonal.pad));
+        let pad_inc = &["pad_loop", "pad loop", "pad_loops/", "pad/", "pads/", "drone_loop", "atmosphere_loop",
+                        "synth_pad", "synth pad", "pad_synth", "pad synth"];
+        let pads = query_n_keyed!("PAD", pad_inc, true, track_counts.pad, key_for(type_atonal.pad));
 
-    let lead_inc = &["lead_loop", "lead loop", "synth_lead", "lead/"];
-    let leads = query_n_keyed!("LEAD", lead_inc, true, track_counts.lead, key_for(type_atonal.lead));
+        let lead_inc = &["lead_loop", "lead loop", "synth_lead", "lead/"];
+        let leads = query_n_keyed!("LEAD", lead_inc, true, track_counts.lead, key_for(type_atonal.lead));
 
-    // Exclude pad/drone patterns - those go to PAD category
-    let synth_inc = &["synth_loop", "synth loop", "synth_loops/", "music_loops/", "melody_loop", "acid_loop"];
-    let synths = query_n_keyed!("SYNTH", synth_inc, true, track_counts.synth, key_for(type_atonal.synth));
+        let synth_inc = &["synth_loop", "synth loop", "synth_loops/", "music_loops/", "melody_loop", "acid_loop"];
+        let synths = query_n_keyed!("SYNTH", synth_inc, true, track_counts.synth, key_for(type_atonal.synth));
 
-    // pluck_loop stays but pluck/ alone is too broad (one-shots), piano/ might not be arps
-    let arp_inc = &["arp_loop", "arp loop", "arpegg", "arpeggio", "arp/", "arps/", "pluck_loop", "sequence_loop"];
-    let arps = query_n_keyed!("ARP", arp_inc, true, track_counts.arp, key_for(type_atonal.arp));
+        let arp_inc = &["arp_loop", "arp loop", "arpegg", "arpeggio", "arp/", "arps/", "pluck_loop", "sequence_loop"];
+        let arps = query_n_keyed!("ARP", arp_inc, true, track_counts.arp, key_for(type_atonal.arp));
 
-    let keys_inc = &["keys", "keys/", "piano", "piano/", "piano_loop", "keyboard", "keyboard/", 
-                     "electric_piano", "rhodes", "wurlitzer", "organ_loop", "organ/"];
-    let keyss = query_n_keyed!("KEYS", keys_inc, true, track_counts.keys, key_for(type_atonal.keys));
+        let keys_inc = &["keys", "keys/", "piano", "piano/", "piano_loop", "keyboard", "keyboard/",
+                         "electric_piano", "rhodes", "wurlitzer", "organ_loop", "organ/"];
+        let keyss = query_n_keyed!("KEYS", keys_inc, true, track_counts.keys, key_for(type_atonal.keys));
+
+        (basses, subs, pads, leads, synths, arps, keyss)
+    };
 
     // === FX (mixed - some tonal, some not) ===
     // "build" alone could match "buildup" for snare rolls - use more specific
@@ -2919,9 +2923,11 @@ fn load_song_samples(song_num: u32, target_key: Option<&str>, atonal: bool, hard
     let boom_kick_inc = &["kick fx", "kick_fx", "impact fx", "impact_fx", "boom kick", "boom_kick", "reverb kick", "reverb_kick", "impacts___bombs"];
     let boom_kicks = query_n_keyed!("BOOM_KICK", boom_kick_inc, false, track_counts.boom_kick, key_for(type_atonal.boom_kick));
 
-    let atmos_inc = &["atmos", "atmosphere", "atmospheres/", "ambient", "texture", "drone", "soundscape",
-                      "foley", "foley/", "synth_drone", "synth drone"];
-    let atmoses = query_n_keyed!("ATMOS", atmos_inc, false, track_counts.atmos, key_for(type_atonal.atmos));
+    let atmoses = if midi_tracks { vec![] } else {
+        let atmos_inc = &["atmos", "atmosphere", "atmospheres/", "ambient", "texture", "drone", "soundscape",
+                          "foley", "foley/", "synth_drone", "synth drone"];
+        query_n_keyed!("ATMOS", atmos_inc, false, track_counts.atmos, key_for(type_atonal.atmos))
+    };
 
     let glitch_inc = &["glitch", "glitches/", "glitch_fx", "glitch fx", "stutter_fx", "stutter fx", "stutters/", "glitch_loop", "glitch loop"];
     let glitches = query_n_keyed!("GLITCH", glitch_inc, false, track_counts.glitch, key_for(type_atonal.glitch));
@@ -2959,7 +2965,7 @@ fn load_song_samples(song_num: u32, target_key: Option<&str>, atonal: bool, hard
     // Log non-empty counts for debugging
     let count_nonempty = |v: &[Vec<SampleInfo>]| v.iter().filter(|x| !x.is_empty()).count();
     write_app_log(format!(
-        "[techno_generator] load_song_samples: song {} completed in {:?} - non-empty: bass={}/{} lead={}/{} pad={}/{}",
+        "[track_generator] load_song_samples: song {} completed in {:?} - non-empty: bass={}/{} lead={}/{} pad={}/{}",
         song_num, start.elapsed(),
         count_nonempty(&basses), basses.len(),
         count_nonempty(&leads), leads.len(),
@@ -3113,6 +3119,8 @@ pub fn generate(
     // is called, so we can always echo the seed back in the result for
     // "regenerate with same seed".
     seed: u64,
+    midi_tracks: bool,
+    midi_settings: Option<&crate::als_project::MidiSettings>,
     cancel: Option<&std::sync::atomic::AtomicBool>,
     on_progress: Option<&dyn Fn(&str)>,
 ) -> Result<GenerationResult, String> {
@@ -3125,8 +3133,8 @@ pub fn generate(
     let r = generate_inner(
         output_path, bpm, num_songs, root_note, mode, genre, hardness, chaos,
         glitch_intensity, section_overrides, density, variation, parallelism,
-        scatter, atonal, track_counts, type_atonal, section_lengths, cancel,
-        on_progress,
+        scatter, atonal, track_counts, type_atonal, section_lengths, seed,
+        midi_tracks, midi_settings, cancel, on_progress,
     );
     clear_gen_rng();
     r
@@ -3152,6 +3160,9 @@ fn generate_inner(
     track_counts: TrackCounts,
     type_atonal: TypeAtonal,
     section_lengths: crate::als_project::SectionLengths,
+    seed: u64,
+    midi_tracks: bool,
+    midi_settings: Option<&crate::als_project::MidiSettings>,
     cancel: Option<&std::sync::atomic::AtomicBool>,
     on_progress: Option<&dyn Fn(&str)>,
 ) -> Result<GenerationResult, String> {
@@ -3163,7 +3174,7 @@ fn generate_inner(
     let user_starts = lengths.starts();
     let song_length_bars = lengths.total_bars();
     write_app_log(format!(
-        "[techno_generator] generate: INPUT PARAMS: output={:?}, bpm={}, num_songs={}, root_note={:?}, mode={:?}, genre={:?}, hardness={}, chaos={}, glitch_intensity={}, density={}, variation={}, parallelism={}, scatter={}, atonal={}, tracks={:?}, type_atonal={:?}, lengths={:?} ({} bars)",
+        "[track_generator] generate: INPUT PARAMS: output={:?}, bpm={}, num_songs={}, root_note={:?}, mode={:?}, genre={:?}, hardness={}, chaos={}, glitch_intensity={}, density={}, variation={}, parallelism={}, scatter={}, atonal={}, tracks={:?}, type_atonal={:?}, lengths={:?} ({} bars)",
         output_path, bpm, num_songs, root_note, mode, genre, hardness, chaos, glitch_intensity, density, variation, parallelism, scatter, atonal, track_counts, type_atonal, lengths, song_length_bars
     ));
 
@@ -3174,7 +3185,7 @@ fn generate_inner(
     let bars_per_song = song_length_bars + GAP_BETWEEN_SONGS;
     let total_bars = bars_per_song * num_songs;
     write_app_log(format!(
-        "[techno_generator] generate: COMPUTED: bars_per_song={}, total_bars={}, song_length={} bars, gap={} bars",
+        "[track_generator] generate: COMPUTED: bars_per_song={}, total_bars={}, song_length={} bars, gap={} bars",
         bars_per_song, total_bars, song_length_bars, GAP_BETWEEN_SONGS
     ));
 
@@ -3191,25 +3202,25 @@ fn generate_inner(
         }
         _ => None,
     };
-    write_app_log(format!("[techno_generator] generate: target_key={:?}", target_key));
+    write_app_log(format!("[track_generator] generate: target_key={:?}", target_key));
 
     // Load samples for each song
     // Clear used samples once at the start so songs don't reuse samples
     clear_used_samples();
-    write_app_log("[techno_generator] generate: starting sample loading loop".into());
+    write_app_log("[track_generator] generate: starting sample loading loop".into());
     let mut all_songs: Vec<SongSamples> = Vec::new();
     for song_num in 1..=num_songs {
         if cancelled() {
-            write_app_log("[techno_generator] generate: cancelled".into());
+            write_app_log("[track_generator] generate: cancelled".into());
             return Err("Generation cancelled".into());
         }
         progress(&format!("Loading samples for song {}/{}...", song_num, num_songs));
-        write_app_log(format!("[techno_generator] generate: calling load_song_samples({}) with hardness={}, track_counts={:?}", song_num, hardness, track_counts));
-        let song_samples = load_song_samples(song_num, target_key.as_deref(), atonal, hardness, &track_counts, &type_atonal, on_progress);
+        write_app_log(format!("[track_generator] generate: calling load_song_samples({}) with hardness={}, track_counts={:?}", song_num, hardness, track_counts));
+        let song_samples = load_song_samples(song_num, target_key.as_deref(), atonal, hardness, &track_counts, &type_atonal, midi_tracks, on_progress);
         all_songs.push(song_samples);
-        write_app_log(format!("[techno_generator] generate: load_song_samples({}) done", song_num));
+        write_app_log(format!("[track_generator] generate: load_song_samples({}) done", song_num));
     }
-    write_app_log(format!("[techno_generator] generate: sample loading complete, elapsed {:?}", gen_start.elapsed()));
+    write_app_log(format!("[track_generator] generate: sample loading complete, elapsed {:?}", gen_start.elapsed()));
 
     // Collect keys for locators
     let song_keys: Vec<String> = all_songs.iter().map(|s| s.key.clone()).collect();
@@ -3234,10 +3245,14 @@ fn generate_inner(
         }
     }
 
-    // Extract audio track template
-    let track_start = xml.find("<AudioTrack").ok_or("No AudioTrack found")?;
-    let track_end = xml.find("</AudioTrack>").ok_or("No AudioTrack end found")? + "</AudioTrack>".len();
-    let original_audio_track = xml[track_start..track_end].to_string();
+    // Use embedded track templates (extracted from Ableton Live 12.3.7 project).
+    // The main ALS template has NO Audio/MIDI tracks — only ReturnTracks and global state.
+    let original_audio_track = include_str!("audio_track_template.xml").to_string();
+
+    // Find <Tracks> section — template only has ReturnTracks, we insert before them.
+    let tracks_section_start = xml.find("<Tracks>").ok_or("No <Tracks>")? + "<Tracks>".len();
+    let tracks_section_end = xml.find("</Tracks>").ok_or("No </Tracks>")?;
+    let kept_tracks = xml[tracks_section_start..tracks_section_end].to_string();
 
     // Allocate group IDs. KICKS is its own group (sibling of DRUMS) so the
     // kick pulse lives outside anything that will be sidechained to it — this
@@ -3524,20 +3539,102 @@ fn generate_inner(
     create_tracks!(song1.sub_drops, "SUB DROP", BASS_COLOR, if bass_fx_has_children { bass_fx_group_id as i32 } else { -1 });
     create_tracks!(song1.boom_kicks, "BOOM KICK", BASS_COLOR, if bass_fx_has_children { bass_fx_group_id as i32 } else { -1 });
 
-    // === MELODICS === (only add group if it will have children)
-    let melodics_has_children = has_requested(&song1.leads) || has_requested(&song1.synths) || has_requested(&song1.pads) ||
-                                has_requested(&song1.arps) || has_requested(&song1.keyss) || has_requested(&song1.atmoses);
-    if melodics_has_children {
-        all_tracks.push(melodics_group.clone());
-        tracks_created += 1;
-        report_progress(tracks_created, total_tracks);
+    // === MELODICS === (audio tracks OR MIDI tracks depending on midi_tracks flag)
+    if midi_tracks {
+        // Bridge ID allocator: start MIDI IDs well above audio track IDs
+        let midi_id_start = ids.next_id.load(Ordering::SeqCst) as u64 + 500_000;
+        let mut ids_pub = crate::als_generator::IdAllocatorPub::new(midi_id_start);
+
+        // Create MIDI group tracks (using audio id allocator for group IDs)
+        let midi_bass_group_id = ids.alloc();
+        let midi_leads_group_id = ids.alloc();
+        let midi_pads_group_id = ids.alloc();
+        let midi_keys_group_id = ids.alloc();
+
+        let midi_bass_group = create_group_track("BASS", BASS_COLOR, midi_bass_group_id, &ids)?;
+        let midi_leads_group = create_group_track("LEADS", MELODICS_COLOR, midi_leads_group_id, &ids)?;
+        let midi_pads_group = create_group_track("PADS", MELODICS_COLOR, midi_pads_group_id, &ids)?;
+        let midi_keys_group = create_group_track("KEYS", MELODICS_COLOR, midi_keys_group_id, &ids)?;
+
+        // Generate MIDI tracks for melodic layers
+        let midi_result = crate::trance_generator::generate_midi_tracks_for_arrangement(
+            root_note, mode, &midi_settings, seed, bpm as u16,
+            &section_lengths,
+        );
+        if let Ok(midi_trks) = midi_result {
+            // Track name → group mapping
+            let group_for = |name: &str| -> (u32, bool) {
+                match name {
+                    "SUB BASS" | "MID BASS" | "HI BASS" | "BASS PAD" => (midi_bass_group_id, true),
+                    "LEAD" | "LEAD 2" => (midi_leads_group_id, true),
+                    "PAD" | "ARP" | "PLUCK" => (midi_pads_group_id, true),
+                    "PIANO" | "TRILL" => (midi_keys_group_id, true),
+                    _ => (melodics_group_id, true),
+                }
+            };
+
+            // Track which groups have children
+            let mut bass_has = false;
+            let mut leads_has = false;
+            let mut pads_has = false;
+            let mut keys_has = false;
+
+            for mt in &midi_trks {
+                let (gid, _) = group_for(&mt.name);
+                if gid == midi_bass_group_id { bass_has = true; }
+                else if gid == midi_leads_group_id { leads_has = true; }
+                else if gid == midi_pads_group_id { pads_has = true; }
+                else if gid == midi_keys_group_id { keys_has = true; }
+            }
+
+            // Emit groups that have children, then their tracks
+            if bass_has {
+                all_tracks.push(midi_bass_group);
+                tracks_created += 1;
+            }
+            if leads_has {
+                all_tracks.push(midi_leads_group);
+                tracks_created += 1;
+            }
+            if pads_has {
+                all_tracks.push(midi_pads_group);
+                tracks_created += 1;
+            }
+            if keys_has {
+                all_tracks.push(midi_keys_group);
+                tracks_created += 1;
+            }
+
+            for mt in &midi_trks {
+                let (gid, _) = group_for(&mt.name);
+                let midi_xml = crate::als_generator::generate_midi_track(
+                    &original_audio_track, mt, &mut ids_pub,
+                );
+                let midi_xml = midi_xml.replacen(
+                    r#"<TrackGroupId Value="-1" />"#,
+                    &format!(r#"<TrackGroupId Value="{}" />"#, gid),
+                    1,
+                );
+                all_tracks.push(midi_xml);
+                tracks_created += 1;
+                report_progress(tracks_created, total_tracks);
+            }
+        }
+    } else {
+        let melodics_has_children = has_requested(&song1.leads) || has_requested(&song1.synths) || has_requested(&song1.pads) ||
+                                    has_requested(&song1.arps) || has_requested(&song1.keyss) || has_requested(&song1.atmoses);
+        if melodics_has_children {
+            all_tracks.push(melodics_group.clone());
+            tracks_created += 1;
+            report_progress(tracks_created, total_tracks);
+        }
+        create_tracks!(song1.leads, "LEAD", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+        create_tracks!(song1.synths, "SYNTH", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+        create_tracks!(song1.pads, "PAD", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+        create_tracks!(song1.arps, "ARP", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+        create_tracks!(song1.keyss, "KEYS", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
+        create_tracks!(song1.atmoses, "ATMOS", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
     }
-    create_tracks!(song1.leads, "LEAD", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
-    create_tracks!(song1.synths, "SYNTH", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
-    create_tracks!(song1.pads, "PAD", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
-    create_tracks!(song1.arps, "ARP", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
-    create_tracks!(song1.keyss, "KEYS", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
-    create_tracks!(song1.atmoses, "ATMOS", MELODICS_COLOR, if melodics_has_children { melodics_group_id as i32 } else { -1 });
 
     // === FX === (only add group if it will have children)
     let fx_has_children = has_requested(&song1.risers) || has_requested(&song1.downlifters) || has_requested(&song1.crashes) ||
@@ -3574,7 +3671,7 @@ fn generate_inner(
 
     // Log warnings
     for w in &warnings {
-        write_app_log(format!("[techno_generator] WARNING: {}", w));
+        write_app_log(format!("[track_generator] WARNING: {}", w));
     }
 
     // Sidechain ducking is now applied at the GROUP BUS level (DRUMS / BASS /
@@ -3585,26 +3682,37 @@ fn generate_inner(
 
     progress("Assembling XML");
     // Build final XML - all tracks
-    let before_track = &xml[..track_start];
-    let after_track = &xml[track_end..];
+    let before_tracks = &xml[..tracks_section_start];
+    let after_tracks = &xml[tracks_section_end..];
 
     let track_count = all_tracks.len();
-    let clip_count: usize = all_tracks.iter().map(|t| t.matches("<AudioClip").count()).sum();
+    let clip_count: usize = all_tracks.iter().map(|t| {
+        t.matches("<AudioClip").count() + t.matches("<MidiClip").count()
+    }).sum();
 
     // Fail if no tracks were created (no samples found)
-    if track_count == 0 {
+    if track_count == 0 && !midi_tracks {
         return Err("No samples found for any track type. Run sample analysis first or check your sample library paths.".into());
     }
 
     let all_tracks_xml = all_tracks.join("\n\t\t\t");
 
-    let mut xml = format!("{}{}{}", before_track, all_tracks_xml, after_track);
+    // Insert generated tracks + kept tracks (ReturnTracks) into the Tracks section
+    let mut xml = format!("{}\n\t\t\t{}\n{}{}", before_tracks, all_tracks_xml, kept_tracks, after_tracks);
 
     // Master chain device injection (Eq8 HPF + Limiter) is disabled — Ableton
     // crashes on programmatically injected device XML in the MainTrack.
 
-    // Update NextPointeeId
-    let next_id = ids.max_id() + 1000;
+    // Update NextPointeeId — must be higher than ALL IDs in the file,
+    // including MIDI track IDs which use a separate allocator starting above audio IDs.
+    let mut next_id = ids.max_id() + 1000;
+    // Scan for the actual highest Id in the XML to be safe
+    let id_scan_re = Regex::new(r#"Id="(\d+)""#).unwrap();
+    for cap in id_scan_re.captures_iter(&xml) {
+        if let Ok(v) = cap[1].parse::<u32>() {
+            if v >= next_id { next_id = v + 1000; }
+        }
+    }
     let next_id_re = Regex::new(r#"<NextPointeeId Value="\d+" />"#).unwrap();
     xml = next_id_re.replace(&xml, format!(r#"<NextPointeeId Value="{}" />"#, next_id)).to_string();
 
@@ -3621,9 +3729,9 @@ fn generate_inner(
     let inner_locators_re = Regex::new(r#"<Locators\s*/>"#).unwrap();
     if inner_locators_re.is_match(&xml) {
         xml = inner_locators_re.replace(&xml, locators_xml.as_str()).to_string();
-        write_app_log(format!("[techno_generator] Inserted {} locators", locators_xml.matches("<Locator ").count()));
+        write_app_log(format!("[track_generator] Inserted {} locators", locators_xml.matches("<Locator ").count()));
     } else {
-        write_app_log("[techno_generator] WARNING: Could not find inner <Locators /> placeholder in XML".into());
+        write_app_log("[track_generator] WARNING: Could not find inner <Locators /> placeholder in XML".into());
     }
 
     // Set tempo to specified BPM
@@ -3638,12 +3746,12 @@ fn generate_inner(
 
     let output_name = output_path.file_name().and_then(|n| n.to_str()).unwrap_or("project.als");
     progress(&format!("Writing {}", output_name));
-    write_app_log(format!("[techno_generator] Writing output: {:?}", output_path));
+    write_app_log(format!("[track_generator] Writing output: {:?}", output_path));
     let output_file = File::create(output_path).map_err(|e| e.to_string())?;
     let mut encoder = GzEncoder::new(output_file, Compression::default());
     encoder.write_all(xml.as_bytes()).map_err(|e| e.to_string())?;
     encoder.finish().map_err(|e| e.to_string())?;
-    write_app_log(format!("[techno_generator] Completed: {:?} ({} tracks, {} clips)", output_path, track_count, clip_count));
+    write_app_log(format!("[track_generator] Completed: {:?} ({} tracks, {} clips)", output_path, track_count, clip_count));
 
     Ok(GenerationResult {
         tracks: track_count,
@@ -4263,11 +4371,15 @@ fn create_arranged_track_multi(
     }
 
     let clips_xml = clips.join("\n");
-    track = track.replacen(
-        "<Events />",
-        &format!("<Events>\n{}\n\t\t\t\t\t\t\t\t\t\t\t\t\t</Events>", clips_xml),
-        1,
-    );
+    let new_events = format!("<Events>\n{}\n\t\t\t\t\t\t\t\t\t\t\t\t\t</Events>", clips_xml);
+    // Replace empty Events or Events with template clips
+    if track.contains("<Events />") {
+        track = track.replacen("<Events />", &new_events, 1);
+    } else {
+        // Template has <Events>...clips...</Events> — replace the first one
+        let events_re = Regex::new(r"(?s)<Events>.*?</Events>").unwrap();
+        track = events_re.replacen(&track, 1, new_events.as_str()).to_string();
+    }
 
     // Set reverb/delay send amounts based on track category. The template's
     // defaults are -∞ dB (silent); this makes the return busses actually

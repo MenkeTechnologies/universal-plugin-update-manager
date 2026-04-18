@@ -122,9 +122,30 @@
       genre: el('alsGenre')?.value || 'techno',
       hardness: (parseInt(el('alsHardness')?.value || '30', 10)) / 100,
       bpm: parseInt(el('alsBpm')?.value || '130', 10),
-      root_note: el('alsAtonal')?.checked ? null : (el('alsRootNote')?.value || 'A'),
-      mode: el('alsAtonal')?.checked ? null : (el('alsMode')?.value || 'Aeolian'),
+      root_note: (() => {
+        if (el('alsAtonal')?.checked) return null;
+        // When MIDI tracks enabled, use Trance Lead key if set
+        if (chk('alsMidiTracks') && el('tlKey')) {
+          const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+          return NOTES[parseInt(el('tlKey').value || '9', 10)] || 'A';
+        }
+        return el('alsRootNote')?.value || 'A';
+      })(),
+      mode: (() => {
+        if (el('alsAtonal')?.checked) return null;
+        if (chk('alsMidiTracks') && el('tlScale')) {
+          return el('tlScale').value === 'major' ? 'Ionian' : 'Aeolian';
+        }
+        return el('alsMode')?.value || 'Aeolian';
+      })(),
       atonal: el('alsAtonal')?.checked || false,
+      midi_tracks: chk('alsMidiTracks'),
+      midi_settings: {
+        progression: (el('tlProgression')?.value || '').trim().split(/[\s,]+/).filter(Boolean),
+        barsPerChord: num('tlBarsPerChord', '2'),
+        chromaticism: num('tlChromaticism', '15'),
+        lengthBars: num('tlLengthBars', '0') > 0 ? num('tlLengthBars', '0') : null,
+      },
       keywords: [],
       element_keywords: {},
       // Per-type track counts
@@ -571,6 +592,7 @@
     { id: 'alsRootNote', type: 'value' },
     { id: 'alsMode', type: 'value' },
     { id: 'alsAtonal', type: 'checked' },
+    { id: 'alsMidiTracks', type: 'checked' },
     { id: 'alsOutputPath', type: 'value' },
     { id: 'alsProjectName', type: 'value' },
     { id: 'alsNumSongs', type: 'value' },

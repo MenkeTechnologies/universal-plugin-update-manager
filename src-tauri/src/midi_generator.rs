@@ -259,6 +259,19 @@ pub fn generate_batch(config: &MidiGenConfig) -> Result<Vec<Vec<u8>>, String> {
     Ok(out)
 }
 
+/// Generate raw note events without wrapping in a MIDI file.
+/// Used by the trance arrangement generator to get events for ALS MidiClips.
+pub fn generate_events(config: &MidiGenConfig) -> Result<Vec<NoteEvent>, String> {
+    let config = resolve_config(config);
+    validate(&config)?;
+    let mut rng = StdRng::seed_from_u64(config.seed);
+    let scale_pcs = build_scale_pcs(config.key_root, config.minor);
+    Ok(dispatch(&config, &scale_pcs, &mut rng))
+}
+
+/// PPQN constant — needed by ALS generator for tick-to-beat conversion.
+pub const MIDI_PPQN: u32 = PPQN;
+
 // ── Kit generation ──────────────────────────────────────────────────
 
 /// Which layers to include in a kit.
@@ -483,11 +496,12 @@ fn dispatch(config: &MidiGenConfig, pcs: &[u8], rng: &mut StdRng) -> Vec<NoteEve
 
 // ── Note event ───────────────────────────────────────────────────────
 
-struct NoteEvent {
-    tick: u32,
-    pitch: u8,
-    vel: u8,
-    dur: u32,
+#[derive(Debug, Clone)]
+pub struct NoteEvent {
+    pub tick: u32,
+    pub pitch: u8,
+    pub vel: u8,
+    pub dur: u32,
 }
 
 // ── Scale / chord helpers ────────────────────────────────────────────

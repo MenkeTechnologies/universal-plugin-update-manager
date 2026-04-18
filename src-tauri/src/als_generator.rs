@@ -21,9 +21,15 @@ fn xml_escape(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
+/// Public wrapper for xml_escape (used by trance_generator).
+pub fn xml_escape_pub(s: &str) -> String { xml_escape(s) }
+
 /// Embedded empty project template (gzipped) from Ableton Live 12.3.7
 /// This is a valid minimal project that Ableton will open without errors.
 const EMPTY_PROJECT_TEMPLATE: &[u8] = include_bytes!("empty_project_template.als.gz");
+
+/// Public access to the embedded template bytes.
+pub const EMPTY_TEMPLATE_BYTES: &[u8] = EMPTY_PROJECT_TEMPLATE;
 
 /// Ableton Live version info extracted from installed app
 #[derive(Debug, Clone)]
@@ -89,13 +95,22 @@ impl AbletonVersion {
         let minor: u32 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
         let patch: u32 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
 
-        // Use Live 11.0 creator string for compatibility
-        let creator = "Ableton Live 11.0".to_string();
-        
-        // Use Live 11 format for maximum compatibility.
-        // Live 12 can open Live 11 files, but not vice versa.
-        // The XML structure differs significantly between versions.
-        let minor_version_string = "11.0_433".to_string();
+        // Live 12+ uses its own schema (MidiEditorLaneModel, etc.).
+        // Live 11 format is used as fallback for older installations.
+        let (creator, minor_version_string) = if major >= 12 {
+            // The minor version string encodes the schema version:
+            // e.g. "12.0_12300" for Live 12.3.x, "12.0_12100" for Live 12.1.x
+            let schema = major * 1000 + minor * 100;
+            (
+                format!("Ableton Live {major}.{minor}.{patch}"),
+                format!("{major}.0_{schema}"),
+            )
+        } else {
+            (
+                "Ableton Live 11.0".to_string(),
+                "11.0_433".to_string(),
+            )
+        };
 
         Some(Self {
             major,
@@ -122,6 +137,24 @@ impl IdAllocator {
         self.next_id += 1;
         id
     }
+}
+
+/// Public ID allocator for use by trance_generator.
+pub struct IdAllocatorPub {
+    inner: IdAllocator,
+}
+
+impl IdAllocatorPub {
+    pub fn new(start: u64) -> Self {
+        Self { inner: IdAllocator::new(start) }
+    }
+    pub fn next(&mut self) -> u64 { self.inner.next() }
+    pub fn max_val(&self) -> u64 { self.inner.next_id }
+}
+
+/// Public wrapper for generate_audio_clip.
+pub fn generate_audio_clip_pub(clip: &ClipPlacement, ids: &mut IdAllocatorPub) -> String {
+    generate_audio_clip(clip, &mut ids.inner)
 }
 
 /// Represents an audio sample to be placed in the arrangement
@@ -992,8 +1025,9 @@ fn generate_audio_clip(clip: &ClipPlacement, ids: &mut IdAllocator) -> String {
     let clip_id = ids.next();
     let sample = &clip.sample;
 
-    // Calculate sample duration in samples
-    let default_duration = (sample.duration_secs * sample.sample_rate as f64) as u64;
+    // Calculate sample duration in samples (clamp to max 5 minutes to avoid corrupt metadata)
+    let clamped_duration = sample.duration_secs.clamp(0.01, 300.0);
+    let default_duration = (clamped_duration * sample.sample_rate.max(1) as f64) as u64;
 
     format!(
         r#"									<AudioClip Id="{clip_id}" Time="{start_beat}">
@@ -1140,6 +1174,251 @@ fn generate_audio_clip(clip: &ClipPlacement, ids: &mut IdAllocator) -> String {
         sample_rate = sample.sample_rate,
         duration_secs = sample.duration_secs,
     )
+}
+
+// ── MIDI clip/track generation ────────────────────────────────────────
+
+/// A MIDI clip placement in the arrangement.
+#[derive(Debug, Clone)]
+pub struct MidiClipPlacement {
+    pub events: Vec<crate::midi_generator::NoteEvent>,
+    pub start_bar: u32,
+    pub length_bars: u32,
+    pub name: String,
+    pub color: u8,
+}
+
+/// A MIDI track containing multiple clip placements.
+#[derive(Debug, Clone)]
+pub struct MidiTrackInfo {
+    pub name: String,
+    pub color: u8,
+    pub clips: Vec<MidiClipPlacement>,
+}
+
+/// Convert NoteEvents to ALS MidiClip XML.
+/// Note times are in PPQN=96 ticks; ALS uses quarter-note (beat) time.
+fn generate_midi_clip_xml(clip: &MidiClipPlacement, ids: &mut IdAllocator) -> String {
+    let clip_id = ids.next();
+    let ppqn = crate::midi_generator::MIDI_PPQN as f64;
+    let start_beat = clip.start_bar as f64 * 4.0;
+    let length_beats = clip.length_bars as f64 * 4.0;
+    let end_beat = start_beat + length_beats;
+
+    // Group notes by pitch → KeyTracks
+    let mut by_pitch: std::collections::BTreeMap<u8, Vec<&crate::midi_generator::NoteEvent>> =
+        std::collections::BTreeMap::new();
+    for ev in &clip.events {
+        by_pitch.entry(ev.pitch).or_default().push(ev);
+    }
+
+    let mut key_tracks_xml = String::new();
+    let mut note_id: u32 = 1;
+    for (kt_idx, (&pitch, notes)) in by_pitch.iter().enumerate() {
+        let kt_id = ids.next();
+        let mut notes_xml = String::new();
+        for ev in notes {
+            let time = ev.tick as f64 / ppqn;
+            let dur = (ev.dur.max(1) as f64 / ppqn).max(0.01);
+            let vel = ev.vel.min(127);
+            notes_xml.push_str(&format!(
+                r#"
+														<MidiNoteEvent Time="{time}" Duration="{dur}" Velocity="{vel}" VelocityDeviation="0" OffVelocity="64" Probability="1" IsEnabled="true" NoteId="{note_id}" />"#,
+            ));
+            note_id += 1;
+        }
+
+        key_tracks_xml.push_str(&format!(
+            r#"
+												<KeyTrack Id="{kt_id}">
+													<Notes>{notes_xml}
+													</Notes>
+													<MidiKey Value="{pitch}" />
+												</KeyTrack>"#,
+        ));
+    }
+
+    format!(
+        r#"<MidiClip Id="{clip_id}" Time="{start_beat}">
+										<LomId Value="0" />
+										<LomIdView Value="0" />
+										<CurrentStart Value="{start_beat}" />
+										<CurrentEnd Value="{end_beat}" />
+										<Loop>
+											<LoopStart Value="0" />
+											<LoopEnd Value="{length_beats}" />
+											<StartRelative Value="0" />
+											<LoopOn Value="true" />
+											<OutMarker Value="{length_beats}" />
+											<HiddenLoopStart Value="0" />
+											<HiddenLoopEnd Value="{length_beats}" />
+										</Loop>
+										<Name Value="{name}" />
+										<Annotation Value="" />
+										<Color Value="{color}" />
+										<LaunchMode Value="0" />
+										<LaunchQuantisation Value="0" />
+										<TimeSignature>
+											<TimeSignatures>
+												<RemoteableTimeSignature Id="0">
+													<Numerator Value="4" />
+													<Denominator Value="4" />
+													<Time Value="0" />
+												</RemoteableTimeSignature>
+											</TimeSignatures>
+										</TimeSignature>
+										<Envelopes><Envelopes /></Envelopes>
+										<ScrollerTimePreserver>
+											<LeftTime Value="0" />
+											<RightTime Value="{length_beats}" />
+										</ScrollerTimePreserver>
+										<TimeSelection>
+											<AnchorTime Value="0" />
+											<OtherTime Value="0" />
+										</TimeSelection>
+										<Legato Value="false" />
+										<Ram Value="false" />
+										<GrooveSettings>
+											<GrooveId Value="-1" />
+										</GrooveSettings>
+										<Disabled Value="false" />
+										<VelocityAmount Value="0" />
+										<FollowAction>
+											<FollowTime Value="4" />
+											<IsLinked Value="true" />
+											<LoopIterations Value="1" />
+											<FollowActionA Value="4" />
+											<FollowActionB Value="0" />
+											<FollowChanceA Value="100" />
+											<FollowChanceB Value="0" />
+											<JumpIndexA Value="1" />
+											<JumpIndexB Value="1" />
+											<FollowActionEnabled Value="false" />
+										</FollowAction>
+										<Grid>
+											<FixedNumerator Value="1" />
+											<FixedDenominator Value="16" />
+											<GridIntervalPixel Value="20" />
+											<Ntoles Value="2" />
+											<SnapToGrid Value="true" />
+											<Fixed Value="false" />
+										</Grid>
+										<FreezeStart Value="0" />
+										<FreezeEnd Value="0" />
+										<IsWarped Value="true" />
+										<TakeId Value="-1" />
+										<IsInKey Value="false" />
+										<ScaleInformation>
+											<Root Value="0" />
+											<Name Value="0" />
+										</ScaleInformation>
+										<Notes>
+											<KeyTracks>{key_tracks_xml}
+											</KeyTracks>
+											<PerNoteEventStore>
+												<EventLists />
+											</PerNoteEventStore>
+											<NoteProbabilityGroups />
+											<ProbabilityGroupIdGenerator>
+												<NextId Value="1" />
+											</ProbabilityGroupIdGenerator>
+											<NoteIdGenerator>
+												<NextId Value="{next_note_id}" />
+											</NoteIdGenerator>
+										</Notes>
+									</MidiClip>"#,
+        name = xml_escape(&clip.name),
+        color = clip.color,
+        next_note_id = note_id,
+    )
+}
+
+/// Build a full MidiTrack XML by converting an AudioTrack template.
+/// Takes the AudioTrack template XML from the embedded ALS, changes the tag,
+/// and replaces the clip content with MIDI clips.
+pub fn generate_midi_track(
+    audio_track_template: &str,
+    track: &MidiTrackInfo,
+    ids: &mut IdAllocatorPub,
+) -> String {
+    generate_midi_track_inner(audio_track_template, track, &mut ids.inner)
+}
+
+/// Embedded MidiTrack template extracted from a real Ableton Live 12.3.7 project.
+const MIDI_TRACK_TEMPLATE: &str = include_str!("midi_track_template.xml");
+
+fn generate_midi_track_inner(
+    _audio_track_template: &str,
+    track: &MidiTrackInfo,
+    ids: &mut IdAllocator,
+) -> String {
+    let mut t = MIDI_TRACK_TEMPLATE.to_string();
+
+    // Replace all IDs with fresh unique ones
+    let id_re = regex::Regex::new(r#"Id="(\d+)""#).unwrap();
+    let mut replacements: Vec<(String, String)> = Vec::new();
+    for cap in id_re.captures_iter(&t) {
+        let old = format!(r#"Id="{}""#, &cap[1]);
+        let new = format!(r#"Id="{}""#, ids.next());
+        replacements.push((old, new));
+    }
+    for (old, new) in replacements {
+        t = t.replacen(&old, &new, 1);
+    }
+
+    // Set name
+    let name_re = regex::Regex::new(r#"<EffectiveName Value="[^"]*" />"#).unwrap();
+    t = name_re
+        .replace(&t, format!(r#"<EffectiveName Value="{}" />"#, xml_escape(&track.name)))
+        .to_string();
+    let username_re = regex::Regex::new(
+        r#"(<EffectiveName Value="[^"]*" />\s*<UserName Value=")[^"]*(" />)"#,
+    )
+    .unwrap();
+    t = username_re
+        .replace(&t, format!(r#"${{1}}{}${{2}}"#, xml_escape(&track.name)))
+        .to_string();
+
+    // Set color
+    let color_re = regex::Regex::new(r#"<Color Value="\d+" />"#).unwrap();
+    t = color_re
+        .replace_all(&t, format!(r#"<Color Value="{}" />"#, track.color))
+        .to_string();
+
+    // Build MIDI clips XML
+    let mut clips_xml = String::new();
+    for clip in &track.clips {
+        clips_xml.push_str(&generate_midi_clip_xml(clip, ids));
+        clips_xml.push('\n');
+    }
+
+    // Replace the template's MidiClip (the "pd" clip) with our generated clips.
+    // The arrangement clips live in: ClipTimeable > ArrangerAutomation > Events
+    // Find <Events> inside ClipTimeable and replace its content.
+    let ct_pos = t.find("<ClipTimeable>").unwrap_or(0);
+    let events_start_tag = "<Events>";
+    let events_end_tag = "</Events>";
+    if let Some(ev_start) = t[ct_pos..].find(events_start_tag) {
+        let abs_start = ct_pos + ev_start;
+        if let Some(ev_end) = t[abs_start..].find(events_end_tag) {
+            let abs_end = abs_start + ev_end + events_end_tag.len();
+            let replacement = if clips_xml.is_empty() {
+                "<Events />".to_string()
+            } else {
+                format!("<Events>\n{}</Events>", clips_xml)
+            };
+            t.replace_range(abs_start..abs_end, &replacement);
+        }
+    }
+
+    // Also clear the session clip slot (the "pd" clip in slot 0)
+    // Replace the ClipSlot's MidiClip with empty Value
+    let clip_slot_re = regex::Regex::new(
+        r#"(?s)<ClipSlot>\s*<Value>\s*<MidiClip.*?</MidiClip>\s*</Value>"#
+    ).unwrap();
+    t = clip_slot_re.replace(&t, "<ClipSlot>\n\t\t\t\t\t\t\t\t\t<Value />").to_string();
+
+    t
 }
 
 fn generate_master_track(ids: &mut IdAllocator) -> String {
@@ -2038,20 +2317,20 @@ pub fn generate_empty_als_with_bpm(output_path: &Path, bpm: f64) -> Result<(), S
         .read_to_string(&mut xml)
         .map_err(|e| format!("Failed to decompress template: {}", e))?;
 
-    // Replace the default tempo (120) with the requested BPM
-    // The template has: <Manual Value="120" /> in the Tempo section
-    // We need to be careful to only replace the tempo value, not other 120s
-    let xml = xml.replace(
+    // Replace the tempo in the Tempo section (regex to handle any default BPM)
+    let tempo_re = regex::Regex::new(
+        r#"(?s)<Tempo>\s*<LomId Value="0" />\s*<Manual Value="[^"]*" />"#
+    ).unwrap();
+    let xml = tempo_re.replace(&xml, format!(
         r#"<Tempo>
 						<LomId Value="0" />
-						<Manual Value="120" />"#,
-        &format!(
-            r#"<Tempo>
-						<LomId Value="0" />
-						<Manual Value="{}" />"#,
-            bpm
-        ),
-    );
+						<Manual Value="{}" />"#, bpm
+    )).to_string();
+    // Also set PhaseNudgeTempo and SessionTempo
+    let pnt_re = regex::Regex::new(r#"<PhaseNudgeTempo Value="[^"]+" />"#).unwrap();
+    let xml = pnt_re.replace_all(&xml, format!(r#"<PhaseNudgeTempo Value="{}" />"#, bpm)).to_string();
+    let st_re = regex::Regex::new(r#"<SessionTempo Value="[^"]+" />"#).unwrap();
+    let xml = st_re.replace_all(&xml, format!(r#"<SessionTempo Value="{}" />"#, bpm)).to_string();
 
     // Re-compress and write to output
     let file = File::create(output_path)
@@ -2192,7 +2471,7 @@ mod tests {
         // Very long sample
         let mut sample_long = sample.clone();
         sample_long.duration_secs = 120.0;
-        assert_eq!(sample_long.loop_bars(120.0), 16);
+        assert_eq!(sample_long.loop_bars(120.0), 32);
         
         // No BPM provided, use project BPM
         let mut sample_no_bpm = sample.clone();

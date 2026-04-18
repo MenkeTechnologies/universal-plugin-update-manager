@@ -73,6 +73,26 @@ impl Default for TrackConfig {
     }
 }
 
+/// MIDI generation settings from the Trance Lead Generator pane.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MidiSettings {
+    /// Chord progression as chord names: ["Am", "Dm", "Em", "C"].
+    #[serde(default)]
+    pub progression: Vec<String>,
+    /// Bars per chord (1, 2, 4, 8...).
+    #[serde(default = "default_bpc")]
+    pub bars_per_chord: u8,
+    /// 0 = strictly in key, 50 = very chromatic.
+    #[serde(default = "default_chrom")]
+    pub chromaticism: u8,
+    /// Total bars override (0 = auto from chords × bars_per_chord).
+    #[serde(default)]
+    pub length_bars: Option<u32>,
+}
+fn default_bpc() -> u8 { 2 }
+fn default_chrom() -> u8 { 15 }
+
 /// Full project configuration from the wizard.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectConfig {
@@ -114,6 +134,9 @@ pub struct ProjectConfig {
     /// e.g. "Aeolian" — mode
     pub mode: Option<String>,
     pub atonal: bool,
+    /// Generate MIDI tracks for melodic layers (pad, lead, arp, bass).
+    #[serde(default = "default_true")]
+    pub midi_tracks: bool,
     pub keywords: Vec<String>,
     pub element_keywords: std::collections::HashMap<String, String>,
     /// Optional base path to filter samples - only use samples under this directory
@@ -143,6 +166,10 @@ pub struct ProjectConfig {
     /// Accepts either a JSON number or a string form — the wizard always
     /// sends a string so seeds above `Number.MAX_SAFE_INTEGER` round-trip
     /// through JS without precision loss.
+    /// MIDI generation settings from the Trance Lead Generator pane.
+    /// Overrides key, progression, lead types, chromaticism, etc. for MIDI tracks.
+    #[serde(default)]
+    pub midi_settings: Option<MidiSettings>,
     #[serde(default, deserialize_with = "deserialize_seed")]
     pub seed: Option<u64>,
 }
@@ -212,6 +239,7 @@ pub struct TrackCountsConfig {
     #[serde(default = "default_1")] pub vox: u32,
 }
 
+fn default_true() -> bool { true }
 fn default_1() -> u32 { 1 }
 fn default_2() -> u32 { 2 }
 fn default_3() -> u32 { 3 }
@@ -280,9 +308,9 @@ impl SectionValues {
 /// frontend ships this in `ProjectConfig.section_lengths` keyed per-genre
 /// under prefs `alsSectionLengthsByGenre`. The backend previously used the
 /// compile-time consts `INTRO_START`, `BUILD1_START`, … from
-/// `techno_generator` (all 32 bars); those still exist as the *canonical*
+/// `track_generator` (all 32 bars); those still exist as the *canonical*
 /// layout for arrangement templates, which remap onto user layouts at
-/// generation time via `techno_generator::remap_bar_range`.
+/// generation time via `track_generator::remap_bar_range`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SectionLengths {
     pub intro: u32,
@@ -884,6 +912,8 @@ mod tests {
             root_note: Some("A".into()),
             mode: Some("Aeolian".into()),
             atonal: false,
+            midi_tracks: true,
+            midi_settings: None,
             keywords: vec![],
             element_keywords: Default::default(),
             sample_source_path: None,
@@ -986,6 +1016,8 @@ mod tests {
             root_note: Some("C".into()),
             mode: Some("Aeolian".into()),
             atonal: false,
+            midi_tracks: true,
+            midi_settings: None,
             keywords: vec![],
             element_keywords: Default::default(),
             sample_source_path: None,
@@ -1044,6 +1076,8 @@ mod tests {
             root_note: Some("A".into()),
             mode: Some("Aeolian".into()),
             atonal: false,
+            midi_tracks: true,
+            midi_settings: None,
             keywords: vec![],
             element_keywords: Default::default(),
             sample_source_path: None,
@@ -1081,6 +1115,8 @@ mod tests {
             root_note: Some("C".into()),
             mode: Some("Ionian".into()),
             atonal: false,
+            midi_tracks: true,
+            midi_settings: None,
             keywords: vec![],
             element_keywords: Default::default(),
             sample_source_path: None,
