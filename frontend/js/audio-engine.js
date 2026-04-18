@@ -2266,6 +2266,8 @@ async function refreshAudioEnginePanel() {
         fillAeStreamsFromEngineState(null);
         fillAeEngineStatusFromError(statusEl, e);
     } finally {
+        const stack = document.querySelector('#tabAudioEngine .ae-main-stack');
+        if (stack) stack.style.display = '';
         void refreshAeProcessStats();
         aeReflow();
     }

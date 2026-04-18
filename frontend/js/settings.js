@@ -596,11 +596,15 @@ async function renderCacheStats() {
         const rows = Array.isArray(stats) ? stats : [];
         _lastDbCacheStatsRows = rows;
         grid.innerHTML = buildCacheStatsTableHtml(rows);
+        const cachesPane = grid.closest('.settings-section');
+        if (cachesPane) cachesPane.style.display = '';
         settingsReflow();
     } catch (e) {
         if (gen !== _cacheStatsFetchGen) return;
         const msg = catalogFmt('ui.settings.cache_load_failed', {err: e.message || String(e)});
         grid.innerHTML = `<span style="color:var(--red);font-size:11px;">${typeof escapeHtml === 'function' ? escapeHtml(msg) : msg}</span>`;
+        const cachesPane = grid.closest('.settings-section');
+        if (cachesPane) cachesPane.style.display = '';
     }
 }
 
