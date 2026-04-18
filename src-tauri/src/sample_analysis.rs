@@ -596,7 +596,7 @@ pub const MANUFACTURER_SIGNALS: &[(&str, f32, f32)] = &[
     ("Singomakers",       0.0,  0.0),
     ("Function Loops",    0.0,  0.0),
     ("Producer Loops",    0.0,  0.0),
-    ("Zenhiser",         -0.3,  0.3),
+    ("Zenhiser",          0.0,  0.1),
     ("Freshly Squeezed",  0.7,  0.3),
     ("Mutekki",          -0.6,  0.4),
     ("Toolroom",         -0.4,  0.2),
@@ -633,6 +633,7 @@ pub const MANUFACTURER_SIGNALS: &[(&str, f32, f32)] = &[
     ("Soundtrack Loops",  0.0,  0.0),
     ("soundtrack_loops",  0.0,  0.0),
     ("glitchmach",       -0.3,  0.5),
+    ("glitchtone",       -0.3,  0.5),
     ("Asonic",            0.0,  0.0),
     ("Computer Music",    0.0,  0.0),
     ("sonicacademy",     -0.3,  0.3),
@@ -688,6 +689,81 @@ pub const MANUFACTURER_SIGNALS: &[(&str, f32, f32)] = &[
     ("Alex Di Stefano",   0.8,  0.6),
     ("Airbase",           0.9,  0.3),
     ("Bart Skils",       -0.8,  0.6),
+    ("Sean Truby",        0.9,  0.4),
+    ("Ryan K",            0.8,  0.5),
+    ("Laura May",         0.0,  0.5),
+    ("Tom Exo",           0.9,  0.4),
+    ("MAG Signature",     0.9,  0.5),
+
+    // === TRANCE SAMPLE LABELS ===
+    ("Trance Euphoria",   0.9,  0.4),
+    ("HighLife Samples",  0.7,  0.3),
+    ("Nano Musik Loops",  0.6,  0.2),
+
+    // === TECHNO SAMPLE LABELS ===
+    ("Wave Alchemy",     -0.5,  0.3),
+    ("ModeAudio",        -0.4,  0.2),
+    ("Mind Flux",        -0.6,  0.4),
+    ("Noise Design",     -0.6,  0.5),
+    ("Element One",      -0.5,  0.3),
+    ("CONNECTD Audio",   -0.5,  0.3),
+    ("Artisan Audio",    -0.5,  0.3),
+    ("Samplestate",      -0.5,  0.3),
+    ("Push Button Bang", -0.4,  0.3),
+    ("Leitmotif",        -0.5,  0.3),
+    ("Konturi",          -0.6,  0.4),
+    ("EST Studios",      -0.5,  0.3),
+    ("Blind Audio",      -0.5,  0.3),
+    ("Form Audioworks",  -0.4,  0.2),
+    ("THICK Sounds",     -0.6,  0.5),
+    ("BFractal Music",   -0.5,  0.3),
+    ("ODD SMPLS",        -0.5,  0.4),
+    ("Rankin Audio",     -0.4,  0.3),
+    ("Production Music Live", -0.5, 0.2),
+
+    // === HOUSE / TECH HOUSE LABELS ===
+    ("Sample Tools By Cr2", -0.3, 0.2),
+    ("Cr2 Records",      -0.3,  0.2),
+    ("Defected",         -0.2,  0.0),
+    ("Deeperfect",       -0.4,  0.3),
+    ("House Of Loop",    -0.3,  0.2),
+    ("Hot Creations",    -0.3,  0.2),
+    ("Looptone",         -0.3,  0.2),
+    ("Bass Boutique",    -0.2,  0.3),
+    ("Class A Samples",  -0.3,  0.2),
+
+    // === DnB / DUBSTEP / BASS ===
+    ("Ghost Syndicate",  -0.3,  0.5),
+    ("Production Master",-0.2,  0.4),
+    ("Renegade Audio",   -0.3,  0.4),
+    ("Soul Rush Records",-0.2,  0.3),
+    ("5Pin Media",       -0.2,  0.2),
+    ("LP24 Audio",       -0.2,  0.3),
+    ("Capsun ProAudio",  -0.1,  0.3),
+    ("IQ Samples",       -0.3,  0.3),
+
+    // === HARD DANCE / HARDCORE ===
+    ("VIPZONE Samples",   0.3,  0.8),
+
+    // === GENERAL SAMPLE PACK COMPANIES ===
+    ("Cymatics",          0.0,  0.0),
+    ("Big Fish Audio",    0.0,  0.0),
+    ("Loopcloud",         0.0,  0.0),
+    ("Beatport Sounds",   0.0,  0.0),
+    ("Touch Loops",       0.0,  0.0),
+    ("Prime Loops",       0.0,  0.0),
+    ("Cinetools",         0.0,  0.0),
+    ("Audentity Records", 0.1,  0.2),
+    ("Vandalism",         0.2,  0.3),
+    ("Equinox Sounds",    0.0,  0.0),
+    ("EarthMoments",      0.0,  0.0),
+    ("Bingoshakerz",      0.0,  0.0),
+    ("Frontline Producer", 0.0, 0.0),
+    ("Apollo Sound",      0.0,  0.0),
+    ("Famous Audio",      0.0,  0.0),
+    ("Niche Audio",      -0.4,  0.2),
+    ("Sample Diggers",   -0.4,  0.2),
+    ("Raw Cutz",         -0.4,  0.3),
 ];
 
 /// Result of manufacturer/pack detection from a directory path.
@@ -1521,6 +1597,23 @@ mod tests {
             assert!(m.is_some(), "no manufacturer for: {}", path);
             assert_eq!(m.unwrap().manufacturer_pattern, expected, "wrong for: {}", path);
         }
+    }
+
+    #[test]
+    fn detect_manufacturer_glitchtone_folder() {
+        // "glitchtone" is the folder name; "Glitchedtones" is the full label in subfolder names
+        let m = detect_manufacturer(
+            "/Samples/glitchtone/Glitchedtones_Drones/sample.wav"
+        ).unwrap();
+        // "Glitchedtones" (13 chars) > "glitchtone" (10), both non-neutral → Glitchedtones wins
+        assert!(m.genre_score < 0.0 || m.hardness_score > 0.0,
+            "glitchtone/Glitchedtones should be non-neutral");
+
+        // Folder name alone (no "Glitchedtones" in subpath) should still match
+        let m = detect_manufacturer(
+            "/Samples/glitchtone/Custom Pack/Loops/"
+        ).unwrap();
+        assert_eq!(m.manufacturer_pattern, "glitchtone");
     }
 
     #[test]
