@@ -398,7 +398,7 @@ pub static CATEGORY_PATTERNS: &[(&str, &str, Option<&str>, bool, bool, bool)] = 
     ("fx_feedback",   r"(?i)(?:^|[\s_\-./])(?:feedback|resonance|self[\s_]*osc|screech|squeal)(?:[\s_\-./]|$)", Some("fx"), false, false, false),
 
     // === FX — Rhythmic ===
-    ("fx_fill",     r"(?i)(?:^|[\s_\-./])(?:fill|buildup)(?:[\s_\-./]|$)|snare[\s_]*roll|drum[\s_]*break", Some("fx"), false, false, true),
+    ("fx_fill",     r"(?i)(?:^|[\s_\-./])(?:fill|buildup|pre[\s_]*drop|drop[\s_]*fill)(?:[\s_\-./]|$)|snare[\s_]*roll|drum[\s_]*break", Some("fx"), false, false, true),
     ("fx_glitch",   r"(?i)(?:^|[\s_\-./])(?:glitch|stutter|slice|granular|buffer)(?:[\s_\-./]|$)", Some("fx"), false, false, true),
 
     // === FX — Tonal ===
