@@ -3307,7 +3307,12 @@ async fn sample_analysis_start(app: tauri::AppHandle) -> Result<serde_json::Valu
                 }
                 yield_if_playback_active();
 
-                let analysis = sample_analysis::analyze_sample(name, directory);
+                let mut analysis = sample_analysis::analyze_sample(name, directory);
+
+                // Audio-based category fallback when filename/directory parsing fails
+                if analysis.category.is_none() {
+                    analysis.category = sample_analysis::infer_category_from_audio(path);
+                }
 
                 // Determine the key to store:
                 // 1. Use existing audio_samples.key_name if already detected

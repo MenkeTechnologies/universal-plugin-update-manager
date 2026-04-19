@@ -1144,6 +1144,88 @@ pub fn extract_pack_name(directory: &str) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
+// Audio-based category inference (fallback when regex matching fails)
+// ---------------------------------------------------------------------------
+
+/// Infer a sample category from audio content using spectral fingerprinting.
+///
+/// Uses the existing `similarity::compute_fingerprint` feature vector to classify
+/// samples into parent categories based on energy distribution and transient shape.
+/// Returns a CategoryMatch with confidence 0.4 (lower than directory match at 0.6).
+///
+/// Classification rules:
+/// - **drums**: fast attack (<15ms) + high energy + low spectral centroid
+/// - **bass**: high low-band energy (>55%) + slow-ish attack
+/// - **melodic**: dominant mid-band energy (>40%) + low ZCR
+/// - **atmos**: very low RMS or high low-energy ratio (>70%) + slow attack
+/// - **fx**: high ZCR (>0.15) or high-band dominant or very fast attack with high energy
+/// - **vocal**: mid-band dominant (>45%) + moderate ZCR (0.05-0.15) + moderate attack
+pub fn infer_category_from_audio(file_path: &str) -> Option<CategoryMatch> {
+    let fp = crate::similarity::compute_fingerprint(file_path)?;
+
+    let (name, parent) = if fp.attack_time < 0.015 && fp.rms > 0.02 && fp.low_band_energy > 0.35 {
+        // Fast transient + significant low energy = drum hit
+        if fp.low_band_energy > 0.6 {
+            ("kick", "drums")
+        } else if fp.high_band_energy > 0.3 {
+            ("hat", "drums")
+        } else {
+            ("perc", "drums")
+        }
+    } else if fp.low_band_energy > 0.55 {
+        // Low-frequency dominant = bass
+        ("mid_bass", "bass")
+    } else if fp.zero_crossing_rate > 0.15 || fp.high_band_energy > 0.45 {
+        // High frequency content or noisy = FX
+        if fp.rms < 0.01 {
+            ("noise", "atmos")
+        } else {
+            ("fx_misc", "fx")
+        }
+    } else if fp.rms < 0.005 || fp.low_energy_ratio > 0.70 {
+        // Very quiet or mostly silence = atmosphere/texture
+        ("atmos", "atmos")
+    } else if fp.mid_band_energy > 0.45 && fp.zero_crossing_rate > 0.05 && fp.zero_crossing_rate < 0.15 && fp.attack_time > 0.02 {
+        // Mid-band dominant + moderate ZCR + not percussive = vocal
+        ("vocal", "vocal")
+    } else if fp.mid_band_energy > 0.35 {
+        // Mid-frequency dominant = melodic content
+        if fp.attack_time < 0.03 {
+            ("pluck", "melodic")
+        } else if fp.low_energy_ratio > 0.5 {
+            ("pad", "melodic")
+        } else {
+            ("lead", "melodic")
+        }
+    } else {
+        // Fallback: use energy balance for best guess
+        if fp.low_band_energy > fp.mid_band_energy && fp.low_band_energy > fp.high_band_energy {
+            ("mid_bass", "bass")
+        } else if fp.high_band_energy > fp.mid_band_energy {
+            ("fx_misc", "fx")
+        } else {
+            ("lead", "melodic")
+        }
+    };
+
+    // Look up the full category definition from CATEGORY_PATTERNS
+    let (is_oneshot, is_key_sensitive, is_loop_preferred) = CATEGORY_PATTERNS
+        .iter()
+        .find(|(n, ..)| *n == name)
+        .map(|(_, _, _, oneshot, key_sens, loop_pref)| (*oneshot, *key_sens, *loop_pref))
+        .unwrap_or((false, false, false));
+
+    Some(CategoryMatch {
+        name: name.to_string(),
+        parent: Some(parent.to_string()),
+        confidence: 0.4, // lower than directory (0.6) and filename (1.0)
+        is_oneshot,
+        is_key_sensitive,
+        is_loop_preferred,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Full sample analysis
 // ---------------------------------------------------------------------------
 
