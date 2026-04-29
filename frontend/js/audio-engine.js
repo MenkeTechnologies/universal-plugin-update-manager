@@ -4293,13 +4293,20 @@ async function enginePlaybackStart(filePath, opts) {
     if (typeof window !== 'undefined' && typeof window.resetEnginePlaybackEofFlag === 'function') {
         window.resetEnginePlaybackEofFlag();
     }
-    // Signal background jobs to PAUSE and wait for in-flight I/O to complete.
-    // SMB shares have no I/O priority; bg jobs must fully stop before audio loads.
-    if (typeof window.vstUpdater?.setPlaybackActiveAndWait === 'function') {
-        await window.vstUpdater.setPlaybackActiveAndWait(true, 3000);
-    } else if (typeof window.vstUpdater?.setPlaybackActiveFlag === 'function') {
-        await window.vstUpdater.setPlaybackActiveFlag(true);
-        await new Promise(r => setTimeout(r, 500)); // Fallback delay
+    /* Signal background jobs to pause — fire-and-forget.  Was previously a synchronous
+     * `setPlaybackActiveAndWait(true, 3000)` that polled `BG_WORKERS_ACTIVE` in a
+     * sleep loop until it drained: every BG analysis (BPM/key/LUFS in `bpm.rs`) /
+     * content-hash / waveform-prefetch / etc. job holds a `BgIoGuard` for the duration
+     * of its SMB read, and each read can take 100 ms–1 s — so when the user clicked
+     * play with a few BG jobs in flight, the click → audio path stalled for ~1 s
+     * waiting for them to drain.  That made sense when the audio thread streamed
+     * directly from disk and any SMB stall = dropout.  Now the playback path is
+     * `LockFreeStreamSource`-fronted with a 22 s ring buffer and a high-priority
+     * `TimeSliceThread` doing the SMB reads on the engine side; brief BG-job
+     * contention is invisible to audio.  Just flip the flag and proceed — BG jobs
+     * yield asynchronously on their next `should_yield_for_playback()` check. */
+    if (typeof window.vstUpdater?.setPlaybackActiveFlag === 'function') {
+        void window.vstUpdater.setPlaybackActiveFlag(true);
     }
     // Pause waveform loading during playback load (competes for SMB bandwidth)
     if (typeof window.setWaveformPausedForPlayback === 'function') {
@@ -4307,8 +4314,34 @@ async function enginePlaybackStart(filePath, opts) {
     }
     const inv = getAeAudioEngineInvoke();
     if (!inv) throw new Error('audio engine IPC unavailable');
-    let r = await inv({cmd: 'playback_load', path: filePath});
-    throwIfAeNotOk(r, 'playback_load failed');
+    /* Compound IPC: `playback_load_and_start` collapses what used to be two
+     * back-to-back `playback_load` + `start_output_stream` round-trips into a single
+     * Tauri-→host-→engine hop, saving ~20–50 ms of round-trip latency per click.
+     * Engine-side handler (Engine.cpp `cmd == "playback_load_and_start"`) calls
+     * `playbackLoad` then `startOutputStreamLocked`, splices load metadata
+     * (`duration_sec`, `sample_rate_hz`, `track_id`) onto the start response. */
+    const deviceId =
+        typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
+            ? prefs.getItem(AE_PREFS_DEVICE) || ''
+            : '';
+    const bufOut = document.getElementById('aeBufferFramesOutput');
+    const bfRaw = bufOut && typeof bufOut.value === 'string' ? bufOut.value : '';
+    const bufferFrames = parseAeBufferFramesPref(bfRaw);
+    const payload = {
+        cmd: 'playback_load_and_start',
+        path: filePath,
+        device_id: deviceId,
+        tone: false,
+        start_playback: true,
+    };
+    if (bufferFrames !== undefined) {
+        payload.buffer_frames = bufferFrames;
+    }
+    if (opts && opts.streamFromDisk) {
+        payload.stream_from_disk = true;
+    }
+    let r = await inv(payload);
+    throwIfAeNotOk(r, 'playback_load_and_start failed');
     /* Push next-autoplay candidate to Rust so the EOF watchdog can drive the next
      * `playback_load` itself while the WebView is suspended (see
      * `audio_engine::set_next_track_hint` + `take_next_track_hint`). Best-effort: if
@@ -4334,28 +4367,6 @@ async function enginePlaybackStart(filePath, opts) {
     if (typeof window.refreshNpLoopRegionUI === 'function') {
         window.refreshNpLoopRegionUI();
     }
-    const deviceId =
-        typeof prefs !== 'undefined' && typeof prefs.getItem === 'function'
-            ? prefs.getItem(AE_PREFS_DEVICE) || ''
-            : '';
-    const bufOut = document.getElementById('aeBufferFramesOutput');
-    const bfRaw = bufOut && typeof bufOut.value === 'string' ? bufOut.value : '';
-    const bufferFrames = parseAeBufferFramesPref(bfRaw);
-    /* `start_output_stream` stops any existing stream and validates `device_id` — avoid extra IPC round-trips. */
-    const payload = {
-        cmd: 'start_output_stream',
-        device_id: deviceId,
-        tone: false,
-        start_playback: true,
-    };
-    if (bufferFrames !== undefined) {
-        payload.buffer_frames = bufferFrames;
-    }
-    if (opts && opts.streamFromDisk) {
-        payload.stream_from_disk = true;
-    }
-    r = await inv(payload);
-    throwIfAeNotOk(r, 'start_output_stream failed');
     // Audio is now playing — allow background jobs to resume (they'll still be throttled by nice/iopol)
     if (typeof window.vstUpdater?.setPlaybackActiveFlag === 'function') {
         window.vstUpdater.setPlaybackActiveFlag(false).catch(() => {});

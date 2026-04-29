@@ -649,6 +649,118 @@ if (!bin) {
       assert.equal(j.loop, false);
     });
 
+    /* Regression: in loop mode the playback cursor must reset on every loop wrap.
+     *
+     * Bug fixed in `Engine.cpp::LockFreeStreamSource::getNextReadPosition` — was
+     * returning the cumulative `basePos + readCount` of consumed samples, which
+     * grew past `lengthInSamples` after each loop wrap because JUCE's
+     * `AudioFormatReaderSource::getNextAudioBlock` sets `nextPlayPos = 0`
+     * internally on wrap *without* calling our `setNextReadPosition`.  The engine
+     * already clamps `position_sec = jlimit(0, sessionDurationSec, pos)` before
+     * emitting it, so the bug surfaces as `position_sec` getting *pinned* at
+     * exactly `duration_sec` after the first wrap (cursor stuck at end) instead of
+     * cycling back to ~0.  Fix: when the underlying source `isLooping()`, modulo
+     * the position by `getTotalLength()` before returning.
+     *
+     * `tmpWav` is 8192 mono samples @ 44.1 kHz ≈ 186 ms.  Sleeping 800 ms after
+     * `playback_set_loop true` gives ~4 loop wraps; sampled `position_sec` must
+     * be strictly less than `duration_sec` (i.e., wrapped, not pinned at end). */
+    it('playback_set_loop wraps position_sec — no cursor stuck at end (LockFreeStreamSource regression)', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [
+          jl({
+            cmd: 'playback_load_and_start',
+            path: tmpWav,
+            start_playback: true,
+            tone: false,
+          }),
+          jl({ cmd: 'playback_set_loop', loop: true }),
+          jl({ cmd: 'playback_status' }),
+        ],
+        {
+          timeoutMs: 30_000,
+          expectedOutputLines: 3,
+          writePauseAfterIdx: 1,
+          writePauseMs: 800,
+        },
+      );
+      const start = JSON.parse(outLines[0]);
+      if (!start.ok) {
+        assertOkOrNoAudioDevice(start, 'output');
+        return;
+      }
+      const setLoop = JSON.parse(outLines[1]);
+      assert.equal(setLoop.ok, true);
+      assert.equal(setLoop.loop, true);
+      const status = JSON.parse(outLines[2]);
+      assert.equal(status.ok, true);
+      assert.equal(status.loaded, true);
+      assert.equal(typeof status.position_sec, 'number');
+      assert.equal(typeof status.duration_sec, 'number');
+      assert.ok(status.duration_sec > 0, 'duration_sec must be positive');
+      /* The bug: `position_sec` jumps to `duration_sec` after the first wrap and
+       * sticks there.  The fix wraps it back to ~0 and the cursor cycles.  Allow
+       * a small grace at the very tail of a cycle (2 % of duration) so the
+       * occasional sample that lands ~5 ms before a wrap doesn't false-positive
+       * the regression. */
+      const tail = status.duration_sec * 0.98;
+      assert.ok(
+        status.position_sec >= 0 && status.position_sec < tail,
+        `position_sec ${status.position_sec} pinned near duration ${status.duration_sec}; ` +
+          'cursor failed to reset on loop wrap',
+      );
+      // EOF must NOT be set in loop mode — the source keeps producing samples.
+      assert.equal(
+        status.eof,
+        false,
+        'eof must be false while looping — cursor wrap implies playback continues',
+      );
+    });
+
+    /* Companion: same setup without `playback_set_loop true` — `position_sec`
+     * should park at `duration_sec` (clamped by engine) and EOF flips true once
+     * the underlying source runs out.  Locks down the non-looping branch of
+     * `LockFreeStreamSource::getNextReadPosition` (which still returns the raw
+     * cumulative position) so a future "always modulo" misfix can't sneak through. */
+    it('playback_status without loop: eof true and position_sec at end after track finishes', async () => {
+      const { outLines } = await runEngineExchange(
+        bin,
+        [
+          jl({
+            cmd: 'playback_load_and_start',
+            path: tmpWav,
+            start_playback: true,
+            tone: false,
+          }),
+          jl({ cmd: 'playback_status' }),
+        ],
+        {
+          timeoutMs: 30_000,
+          expectedOutputLines: 2,
+          writePauseAfterIdx: 0,
+          writePauseMs: 800,
+        },
+      );
+      const start = JSON.parse(outLines[0]);
+      if (!start.ok) {
+        assertOkOrNoAudioDevice(start, 'output');
+        return;
+      }
+      const status = JSON.parse(outLines[1]);
+      assert.equal(status.ok, true);
+      assert.equal(status.loaded, true);
+      assert.equal(typeof status.position_sec, 'number');
+      assert.equal(typeof status.duration_sec, 'number');
+      assert.ok(status.position_sec >= 0, 'position_sec must be non-negative');
+      // After 800 ms on a 186 ms track without looping, eof must be true.
+      assert.equal(
+        status.eof,
+        true,
+        `eof should be true on a finished non-looping ${status.duration_sec}s track after 800ms`,
+      );
+    });
+
     it('playback_status returns ok with loaded false when no file loaded', async () => {
       const { outLines } = await runEngineExchange(bin, [jl({ cmd: 'playback_status' })], {
         timeoutMs: 90_000,
