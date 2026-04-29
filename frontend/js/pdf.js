@@ -917,7 +917,14 @@ async function buildPdfPagesCache() {
     document.addEventListener('ui-idle-heavy-cpu', (e) => {
         const idle = e && e.detail && e.detail.idle;
         if (idle) {
-            if (!isPdfMetadataAutoExtractOn()) void abortPdfMetadataExtraction();
+            // Only abort when a job is actually running. Without the `_pdfMetaRunning`
+            // guard this fires on EVERY background transition (the `ui-idle-heavy-cpu`
+            // event from `js/ui-idle.js`) regardless of whether anything is in flight,
+            // logging spurious `PDF META EXTRACT STOP — user requested` lines when no
+            // PDF bg jobs are running.
+            if (_pdfMetaRunning && !isPdfMetadataAutoExtractOn()) {
+                void abortPdfMetadataExtraction();
+            }
         } else {
             if (_pdfMetaRunning && _pdfMetaLastProgress) {
                 applyPdfMetaBadgePayload(_pdfMetaLastProgress);

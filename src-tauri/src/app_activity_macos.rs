@@ -103,6 +103,25 @@ fn install_bg_observers() {
     {
         let block = RcBlock::new(move |_n: NonNull<NSNotification>| {
             crate::write_app_log("APP BG: becomeActive (returning to foreground)".to_string());
+            /* Pre-warm the audio-engine the moment the user starts focusing the app —
+             * before the WKWebView's WebContent helper has even finished thawing. The
+             * first IPC after long idle has been observed at ~2 s in HEALTH log
+             * (`ipc_main max=2064ms`); paying that cost here, off the JS thread, means
+             * the user's first click — expand a row, advance to next track — does not
+             * sit on a cold engine. The `engine_state` request is the cheapest valid
+             * IPC (no audio device touched, just returns transport state). Spawned on
+             * a worker thread so the AppKit notification block stays non-blocking. */
+            std::thread::Builder::new()
+                .name("ah-engine-prewarm".to_string())
+                .spawn(|| {
+                    if crate::audio_engine::audio_engine_child_pid() == 0 {
+                        return;
+                    }
+                    let _ = crate::audio_engine::dedicated_audio_engine_request(
+                        &serde_json::json!({ "cmd": "engine_state" }),
+                    );
+                })
+                .ok();
         });
         let block_ref: &block2::DynBlock<dyn Fn(NonNull<NSNotification>)> = &block;
         let name = NSString::from_str("NSApplicationDidBecomeActiveNotification");

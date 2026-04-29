@@ -43,7 +43,32 @@
             if (typeof document !== 'undefined' && document.documentElement) {
                 document.documentElement.classList.toggle('ui-idle-heavy-cpu', idle);
             }
-            document.dispatchEvent(new CustomEvent('ui-idle-heavy-cpu', {detail: {idle}}));
+            /* Going idle (BG): dispatch SYNCHRONOUSLY so rAF / setInterval / FFT loops
+             * stop the moment the WebView is hidden — every frame of work past this point
+             * is wasted CPU under macOS suspension and risks WindowServer queue backup.
+             *
+             * Coming OUT of idle (FG resume): defer the dispatch by one animation frame
+             * so the user's queued click / keypress events are processed by the JS event
+             * loop *before* the 14 listeners run their burst of polling-restart, FFT-rAF,
+             * playback-status setInterval rewires, etc. Without this, the first click
+             * after focus return can appear to "not register" — the click event lands in
+             * the queue behind the synchronous listener burst, and the row click handler
+             * can't fetch waveform / spectrogram until tens of ms of foreground sync work
+             * completes. CSS-side animations (scanlines, spinners) still resume the same
+             * frame because the `ui-idle-heavy-cpu` class on `documentElement` was toggled
+             * synchronously above. */
+            const evt = new CustomEvent('ui-idle-heavy-cpu', {detail: {idle}});
+            if (idle) {
+                document.dispatchEvent(evt);
+            } else if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => {
+                    try { document.dispatchEvent(evt); } catch (_) { /* ignore */ }
+                });
+            } else {
+                setTimeout(() => {
+                    try { document.dispatchEvent(evt); } catch (_) { /* ignore */ }
+                }, 0);
+            }
         } catch (_) {
             /* ignore */
         }

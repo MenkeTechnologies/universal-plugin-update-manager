@@ -143,6 +143,20 @@ listen('audio-engine-playback-eof', () => {
     }
 });
 
+/* Rust-driven advance: the Rust EOF watchdog already issued `playback_load` +
+ * `start_playback` for the next track in BG (using the hint pushed by JS via
+ * `setAudioEngineNextTrackHint`). JS only needs to sync UI state — `handleEngineRustAdvanced`
+ * does NOT re-issue the load. Cuts the foreground-resume gap from "wait for WebContent
+ * thaw + N IPCs" to "audio is already playing the next track when the window thaws". */
+listen('audio-engine-rust-advanced', (event) => {
+    const payload = (event && event.payload) || {};
+    const path = typeof payload.path === 'string' ? payload.path : null;
+    if (!path) return;
+    if (typeof window.handleEngineRustAdvanced === 'function') {
+        window.handleEngineRustAdvanced(path);
+    }
+});
+
 // ── Menu bar event handler ──
 listen('menu-action', (event) => {
     const raw = event && event.payload !== undefined ? event.payload : event;
@@ -1852,6 +1866,10 @@ window.vstUpdater = {
     cancelContentDuplicateScan: () => invoke('cancel_content_duplicate_scan', {}),
     pdfMetadataGet: (paths) => invoke('pdf_metadata_get', {paths}),
     pdfMetadataExtractAbort: () => invoke('pdf_metadata_extract_abort'),
+    /** Push the next-autoplay candidate path so the Rust EOF watchdog can drive
+     *  `playback_load` + `start_playback` itself while the WebView is suspended in BG.
+     *  Pass `null` / empty to clear. See `audio_engine::set_next_track_hint`. */
+    setAudioEngineNextTrackHint: (path) => invoke('set_audio_engine_next_track_hint', {path: path || null}),
     pdfMetadataExtractBatch: (paths) => invoke('pdf_metadata_extract_batch', {paths}),
     pdfMetadataUnindexed: (limit) => invoke('pdf_metadata_unindexed', {limit: limit || 100000}),
     onPdfMetadataProgress: (callback) => listen('pdf-metadata-progress', (event) => callback(event.payload)),

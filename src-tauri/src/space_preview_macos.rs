@@ -35,7 +35,20 @@ use objc2_foundation::{
 use objc2_web_kit::{WKSnapshotConfiguration, WKWebView};
 use tauri::Manager;
 
-const SNAPSHOT_REFRESH_MS: u64 = 1500;
+/// Periodic refresh interval. Was 1500 ms originally; that was the cause of an overnight
+/// kernel panic via `userspace watchdog timeout: no successful checkins from WindowServer
+/// in 122 seconds`. ~33 000 snapshots over 14 hours of overnight idle accumulated enough
+/// IOSurface / GPU compositor pressure to make WindowServer miss its 122-second watchdog
+/// window, forcing a SoC-wide reset.
+///
+/// The periodic refresh is in fact mostly redundant — the `NSWindowDidResignKey` and
+/// `NSWindowDidChangeOcclusionState` notification handlers already call
+/// `capture_snapshot_into` synchronously *at the moment* the window loses focus or
+/// becomes occluded, so the bitmap that Mission Control / Spaces / Cmd-Tab capture is
+/// always fresh. The periodic loop is kept only as a defense against pathological cases
+/// where the window changes Space without firing either notification, but the cadence is
+/// now a much gentler 30 s.
+const SNAPSHOT_REFRESH_MS: u64 = 30_000;
 
 /// Install once. Idempotent. Schedules `install_main` onto the main thread *after a
 /// short delay* so it cannot run during `applicationDidFinishLaunching:` — that callback

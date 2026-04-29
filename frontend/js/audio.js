@@ -1932,9 +1932,46 @@ function handleEnginePlaybackEofFromPoll() {
     }
 }
 
+/**
+ * Rust EOF watchdog already issued `playback_load` + `start_playback` for `nextPath`
+ * (see `audio_engine.rs::audio_engine_eof_watchdog_start` + `take_next_track_hint`).
+ * JS only needs to sync the world: mark EOF handled so the next `playback_status` poll
+ * does not re-fire `nextTrack`, point the engine-resume tracker at the new path, refresh
+ * the tray HUD + recently-played list, and push the *following* next-track hint so the
+ * autoplay cascade survives further BG transitions. No `playback_load` IPC issued here.
+ */
+function handleEngineRustAdvanced(nextPath) {
+    if (typeof nextPath !== 'string' || nextPath.length === 0) return;
+    if (!_enginePlaybackActive) return;
+    _enginePlaybackEofHandled = true;
+    if (typeof window !== 'undefined') {
+        window._enginePlaybackResumePath = nextPath;
+    }
+    /* History (`addToRecentlyPlayed`) needs a `sample` object we do not have here;
+     * the next `playback_status` poll picks up the new path and the existing UI
+     * synchronizers reconcile state from there. */
+    if (typeof syncTrayNowPlayingFromPlayback === 'function') {
+        syncTrayNowPlayingFromPlayback();
+    }
+    if (typeof updatePlayBtnStates === 'function') updatePlayBtnStates();
+    if (typeof updateNowPlayingBtn === 'function') updateNowPlayingBtn();
+    /* Cascade: push the *next* candidate after `nextPath` so a chain of BG advances stays
+     * Rust-driven without waiting on JS to thaw between every track. */
+    try {
+        const u = (typeof window !== 'undefined') ? window.vstUpdater : null;
+        if (u && typeof u.setAudioEngineNextTrackHint === 'function') {
+            const after = (typeof getAutoplayNextPathAfter === 'function')
+                ? getAutoplayNextPathAfter(nextPath, {autoplay: true})
+                : null;
+            void u.setAudioEngineNextTrackHint(after || null);
+        }
+    } catch { /* non-Tauri */ }
+}
+
 if (typeof window !== 'undefined') {
     window.resetEnginePlaybackEofFlag = resetEnginePlaybackEofFlag;
     window.handleEnginePlaybackEofFromPoll = handleEnginePlaybackEofFromPoll;
+    window.handleEngineRustAdvanced = handleEngineRustAdvanced;
 }
 // Use rAF loop instead of timeupdate for smooth 60fps playhead
 let _playbackRafId = null;
@@ -5189,10 +5226,20 @@ function setSpeedMode(value) {
 }
 
 // ── Metadata Panel ──
-/** Expand the metadata panel for a given file path (no toggle, always opens). */
-async function expandMetaForPath(filePath) {
+/**
+ * Synchronous prep for {@link expandMetaForPath}: closes any prior meta row, applies the
+ * `row-expanded` class to the clicked row, inserts a spinner placeholder, scrolls into
+ * view. No IPC, no `await` — runs in the same micro-task as the click handler so the user
+ * sees instant feedback even when the engine is cold and the subsequent `previewAudio`
+ * IPC chain blocks for 1–2 s. Without this, clicks on sample rows immediately after
+ * foreground-resume looked dead — the click *had* registered, but `toggleMetadata`'s
+ * `await previewAudio` ran first and the visible expand happened only after playback
+ * loaded. Returns the inserted `metaRow` (or `null` if the row wasn't found) so callers
+ * can short-circuit subsequent population if state changed in between.
+ */
+function prepareExpandMetaForPath(filePath) {
     const tbody = document.getElementById('audioTableBody');
-    if (!tbody) return;
+    if (!tbody) return null;
 
     // Close any existing meta row
     const existingMeta = document.getElementById('audioMetaRow');
@@ -5208,10 +5255,9 @@ async function expandMetaForPath(filePath) {
     expandedMetaPath = filePath;
 
     const row = tbody.querySelector(`tr[data-audio-path="${CSS.escape(filePath)}"]`);
-    if (!row) return;
+    if (!row) return null;
     row.classList.add('row-expanded');
 
-    // Insert loading row
     const metaRow = document.createElement('tr');
     metaRow.id = 'audioMetaRow';
     metaRow.className = 'audio-meta-row';
@@ -5221,6 +5267,27 @@ async function expandMetaForPath(filePath) {
 
     // Scroll the expanded row into view
     row.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    return metaRow;
+}
+
+/** Expand the metadata panel for a given file path (no toggle, always opens). */
+async function expandMetaForPath(filePath) {
+    const tbody = document.getElementById('audioTableBody');
+    if (!tbody) return;
+
+    /* Sync prep is idempotent: when called from `toggleMetadata` after that path has
+     * already run `prepareExpandMetaForPath`, the prior meta row was just inserted and
+     * the row is already `.row-expanded` — `prepareExpandMetaForPath` will detect the
+     * existing meta row, remove it, and re-insert (cheap; same DOM nodes). When called
+     * from any other entry point (`syncExpandedMetaWithKeyboardSelection`, prev/next
+     * track, etc.) the prep has not yet run and this is the first chance. */
+    if (expandedMetaPath !== filePath || !document.getElementById('audioMetaRow')) {
+        if (!prepareExpandMetaForPath(filePath)) return;
+    }
+    const row = tbody.querySelector(`tr[data-audio-path="${CSS.escape(filePath)}"]`);
+    if (!row) return;
+    const metaRow = document.getElementById('audioMetaRow');
+    if (!metaRow) return;
 
     // Fetch metadata
     try {
@@ -5373,6 +5440,21 @@ async function toggleMetadata(filePath, event) {
     // Don't toggle if clicking buttons
     if (event.target.closest('.col-actions')) return;
 
+    // If the same row is already expanded, toggle it off (handle before any IPC).
+    if (expandedMetaPath === filePath) {
+        closeMetaRow();
+        return;
+    }
+
+    /* Sync visual feedback FIRST — apply `.row-expanded`, drop in spinner placeholder,
+     * scroll into view. Without this, the user clicks → `await previewAudio` blocks for
+     * 1–2 s on a cold engine → the expand row only becomes visible after playback starts
+     * → it looks like the click "didn't register". The actual `getAudioMetadata` /
+     * waveform / spectrogram IPCs still defer behind playback (below) so they don't
+     * compete with `playback_load` for SMB bandwidth — only the cosmetic prep runs early. */
+    const expandOnClick = prefs.getItem('expandOnClick') !== 'off';
+    if (expandOnClick) prepareExpandMetaForPath(filePath);
+
     // Single-click: play unless explicitly off (null/undefined before prefs.load() → play; matches default-on)
     {
         const sc = prefs.getItem('singleClickPlay');
@@ -5383,13 +5465,7 @@ async function toggleMetadata(filePath, event) {
         }
     }
 
-    if (prefs.getItem('expandOnClick') === 'off') return;
-
-    // If the same row is already expanded, toggle it off
-    if (expandedMetaPath === filePath) {
-        closeMetaRow();
-        return;
-    }
+    if (!expandOnClick) return;
 
     await expandMetaForPath(filePath);
 }
@@ -8432,3 +8508,8 @@ function _loopRegionPathForBox(box) {
 window.triggerBackgroundBpmKeyLufsAnalysis = triggerBackgroundBpmKeyLufsAnalysis;
 window.triggerStopBackgroundBpmKeyLufsAnalysis = triggerStopBackgroundBpmKeyLufsAnalysis;
 window.triggerStartFingerprintCacheBuild = triggerStartFingerprintCacheBuild;
+/* Exported so `audio-engine.js` can compute and push the next-autoplay path to Rust
+ * (`vstUpdater.setAudioEngineNextTrackHint`) right after each successful library
+ * `playback_load`. The Rust EOF watchdog uses the hint to drive the next track itself
+ * when the WebView is suspended in BG. */
+window.getAutoplayNextPathAfter = getAutoplayNextPathAfter;

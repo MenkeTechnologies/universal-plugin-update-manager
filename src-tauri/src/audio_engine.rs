@@ -211,6 +211,31 @@ static EOF_WATCHDOG_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// does not run this thread.
 const EOF_WATCHDOG_POLL_MS: u64 = 1000;
 
+/// Pre-resolved next-track path pushed from JS after every successful `playback_load`. The
+/// EOF watchdog reads this on a `loaded && eof` rising edge and, if set, eagerly drives
+/// `playback_load` + `start_output_stream { start_playback: true }` against the engine
+/// itself — *before* emitting the JS event. Rationale: when the WKWebView is suspended
+/// (backgrounded app), Tauri events queue until the WebContent process resumes. By the
+/// time JS catches up on foreground, the next file is already loaded and playing, so the
+/// user does not perceive the EOF→load→play IPC chain as a gap. JS receives
+/// `audio-engine-rust-advanced { path }` and syncs UI without re-issuing the load.
+static NEXT_TRACK_HINT: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Push the next-autoplay candidate path (computed from `getAutoplayNextPathAfter` in
+/// `audio.js`). Called after each `playback_load` and on autoplay-source / shuffle / queue
+/// changes. Pass `None` to clear (e.g. autoplay disabled, end of list).
+pub fn set_next_track_hint(path: Option<String>) {
+    if let Ok(mut g) = NEXT_TRACK_HINT.lock() {
+        *g = path;
+    }
+}
+
+/// Atomically take the hint (clearing it). Used by the EOF watchdog so a single EOF rising
+/// edge cannot trigger two advances. JS pushes a fresh hint after the next `playback_load`.
+fn take_next_track_hint() -> Option<String> {
+    NEXT_TRACK_HINT.lock().ok().and_then(|mut g| g.take())
+}
+
 
 #[inline]
 fn record_engine_pid(child: &Child) {
@@ -772,7 +797,30 @@ pub fn audio_engine_eof_watchdog_start(app: AppHandle) {
             let eof = v.get("eof").and_then(|v| v.as_bool()).unwrap_or(false);
             let at_eof = loaded && eof;
             if at_eof && !prev_eof {
-                let _ = app.emit("audio-engine-playback-eof", serde_json::Value::Null);
+                /* Rust-driven advance: when JS has pushed a next-track hint, drive the
+                 * engine load + start here, in BG, before the WKWebView's queued JS event
+                 * gets a chance to handle EOF. The user's perceived gap on focus return
+                 * shrinks from "waited for WebContent thaw + N IPCs" to "audio is already
+                 * playing the next file by the time the window regains key focus". JS
+                 * receives `audio-engine-rust-advanced` and updates UI state without
+                 * re-loading. Falls back to the legacy `audio-engine-playback-eof` event
+                 * (full JS-driven advance) when no hint is available — autoplay-off,
+                 * end-of-list, or a queue change race. */
+                if let Some(next_path) = take_next_track_hint() {
+                    let _ = dedicated_audio_engine_request(&serde_json::json!({
+                        "cmd": "playback_load",
+                        "path": next_path,
+                    }));
+                    let _ = dedicated_audio_engine_request(&serde_json::json!({
+                        "cmd": "start_playback",
+                    }));
+                    let _ = app.emit(
+                        "audio-engine-rust-advanced",
+                        serde_json::json!({ "path": next_path }),
+                    );
+                } else {
+                    let _ = app.emit("audio-engine-playback-eof", serde_json::Value::Null);
+                }
             }
             prev_eof = at_eof;
         }

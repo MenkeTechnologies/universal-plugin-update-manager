@@ -4753,6 +4753,14 @@ fn audio_engine_eof_watchdog_stop() -> Result<(), String> {
     Ok(())
 }
 
+/// Push the next-autoplay candidate path from JS for Rust-driven EOF advance — see
+/// `audio_engine::set_next_track_hint`. Pass `None` (or an empty string) to clear.
+#[tauri::command]
+fn set_audio_engine_next_track_hint(path: Option<String>) -> Result<(), String> {
+    audio_engine::set_next_track_hint(path.filter(|p| !p.is_empty()));
+    Ok(())
+}
+
 #[tauri::command]
 fn append_log(msg: String) {
     write_app_log(msg);
@@ -9268,6 +9276,7 @@ pub fn run() {
             audio_engine_invoke,
             audio_engine_restart,
             audio_engine_eof_watchdog_start,
+            set_audio_engine_next_track_hint,
             audio_engine_eof_watchdog_stop,
             set_playback_active_flag,
             set_playback_active_and_wait,
@@ -9670,6 +9679,24 @@ pub fn run() {
                                 &serde_json::json!({ "cmd": "ping" }),
                             );
                         }
+
+                        /* WAL checkpoint — `PRAGMA wal_checkpoint(TRUNCATE)` writes the
+                         * WAL back into the main DB and shrinks the WAL file. Without
+                         * this the WAL accumulates dirty pages over hours of activity
+                         * (default `wal_autocheckpoint=1000` pages × heavy writes ×
+                         * 17 GB DB) and macOS eventually decides to flush them all in
+                         * one burst — a microstackshot diag from a kernel panic on
+                         * 2026-04-29 captured 2.1 GB / 153 MB·s of file-backed memory
+                         * dirtied across 14 s, with the heaviest stack pointing at
+                         * `pwrite` from `walWriteOneFrame`. That I/O storm starves
+                         * WindowServer, it misses its 122 s checkin watchdog, and the
+                         * kernel forces a SoC-wide reset (`userspace watchdog timeout`).
+                         * Calling checkpoint every 30 s spreads the same writeback
+                         * across many small bursts the disk and WindowServer can
+                         * absorb in stride. The op is read-conn-friendly (it serializes
+                         * against active writers but not readers) and a no-op when the
+                         * WAL is already empty. */
+                        db::global().checkpoint();
 
                         std::thread::sleep(std::time::Duration::from_secs(30));
                     }

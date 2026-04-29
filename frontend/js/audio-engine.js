@@ -4309,6 +4309,19 @@ async function enginePlaybackStart(filePath, opts) {
     if (!inv) throw new Error('audio engine IPC unavailable');
     let r = await inv({cmd: 'playback_load', path: filePath});
     throwIfAeNotOk(r, 'playback_load failed');
+    /* Push next-autoplay candidate to Rust so the EOF watchdog can drive the next
+     * `playback_load` itself while the WebView is suspended (see
+     * `audio_engine::set_next_track_hint` + `take_next_track_hint`). Best-effort: if
+     * `getAutoplayNextPathAfter` is missing or autoplay is off, just clear the hint. */
+    try {
+        const u = (typeof window !== 'undefined') ? window.vstUpdater : null;
+        if (u && typeof u.setAudioEngineNextTrackHint === 'function') {
+            const nextPath = (typeof window.getAutoplayNextPathAfter === 'function')
+                ? window.getAutoplayNextPathAfter(filePath, {autoplay: true})
+                : null;
+            void u.setAudioEngineNextTrackHint(nextPath || null);
+        }
+    } catch { /* non-Tauri or hint API unavailable */ }
     /* Seek math (`seekPlaybackToPercent`) needs duration before the first `playback_status` poll (see `ENGINE_PLAYBACK_POLL_MS`). */
     window._enginePlaybackPosSec = 0;
     window._enginePlaybackDurSec =
