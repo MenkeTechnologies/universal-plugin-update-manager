@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Esiasetetut skannaushakemistot tallennettu",
   "toast.preset_scan_failed": "Esiasetusten tarkistus epäonnistui – {err}",
   "toast.preset_sort": "Preset sort: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Tätä muotoa ei voi esikatsella soittimessa ({ext})",
   "toast.prune_old_scans": "Leikkaa vanhat skannauksen tilannekuvat: {state}",
   "toast.prune_old_scans_keep_set": "Säilytettävä skannaushistoria: {val} per tyyppi (seuraava julkaisu)",

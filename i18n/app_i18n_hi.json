@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "प्रीसेट स्कैन निर्देशिकाएँ सहेजी गईं",
   "toast.preset_scan_failed": "प्रीसेट स्कैन विफल - {err}",
   "toast.preset_sort": "Preset sort: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "इस प्रारूप का पूर्वावलोकन प्लेयर में नहीं किया जा सकता ({ext})",
   "toast.prune_old_scans": "पुराने स्कैन स्नैपशॉट की छँटाई करें: {state}",
   "toast.prune_old_scans_keep_set": "रखने के लिए इतिहास को स्कैन करें: {val} प्रति प्रकार (अगला लॉन्च)",

@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Forudindstillede scanningsmapper gemt",
   "toast.preset_scan_failed": "Forudindstillet scanning mislykkedes — {err}",
   "toast.preset_sort": "Forudindstillet sortering: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Dette format kan ikke forhåndsvises i afspilleren ({ext})",
   "toast.prune_old_scans": "Prune old scan snapshots: {state}",
   "toast.prune_old_scans_keep_set": "Scan historik for at beholde: {val} pr. type (næste lancering)",

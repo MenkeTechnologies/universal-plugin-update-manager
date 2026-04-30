@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Directory di scansione preimpostate salvate",
   "toast.preset_scan_failed": "Scansione preimpostata non riuscita: {err}",
   "toast.preset_sort": "Preset sort: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Questo formato non può essere visualizzato in anteprima nel lettore ({ext})",
   "toast.prune_old_scans": "Elimina i vecchi snapshot di scansione: {state}",
   "toast.prune_old_scans_keep_set": "Cronologia delle scansioni da conservare: {val} per tipo (prossimo avvio)",

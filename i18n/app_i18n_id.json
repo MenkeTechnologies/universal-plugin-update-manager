@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Direktori pemindaian preset disimpan",
   "toast.preset_scan_failed": "Pemindaian prasetel gagal — {err}",
   "toast.preset_sort": "Pengurutan preset: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Format ini tidak dapat dipratinjau di pemutar ({ext})",
   "toast.prune_old_scans": "Pangkas cuplikan pindaian lama: {state}",
   "toast.prune_old_scans_keep_set": "Pindai riwayat yang ingin disimpan: {val} per jenis (peluncuran berikutnya)",

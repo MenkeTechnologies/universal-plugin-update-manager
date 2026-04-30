@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Přednastavené adresáře skenování byly uloženy",
   "toast.preset_scan_failed": "Přednastavené skenování se nezdařilo – {err}",
   "toast.preset_sort": "Přednastavené řazení: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Náhled tohoto formátu nelze v přehrávači zobrazit ({ext})",
   "toast.prune_old_scans": "Oříznout staré snímky skenování: {state}",
   "toast.prune_old_scans_keep_set": "Uchovat historii skenování: {val} na typ (příští spuštění)",

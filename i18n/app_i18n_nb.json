@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Forhåndsinnstilte skannekataloger er lagret",
   "toast.preset_scan_failed": "Forhåndsinnstilt skanning mislyktes – {err}",
   "toast.preset_sort": "Forhåndsinnstilt sortering: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Dette formatet kan ikke forhåndsvises i spilleren ({ext})",
   "toast.prune_old_scans": "Beskjær gamle skanningsbilder: {state}",
   "toast.prune_old_scans_keep_set": "Skannlogg for å beholde: {val} per type (neste lansering)",

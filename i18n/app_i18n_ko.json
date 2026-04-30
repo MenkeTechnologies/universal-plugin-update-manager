@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "사전 설정 스캔 디렉토리가 저장되었습니다.",
   "toast.preset_scan_failed": "사전 설정 스캔 실패 — {err}",
   "toast.preset_sort": "사전 설정 정렬: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "이 형식은 플레이어에서 미리 볼 수 없습니다({ext}).",
   "toast.prune_old_scans": "이전 스캔 스냅샷 정리: {state}",
   "toast.prune_old_scans_keep_set": "보관할 스캔 기록: 유형당 {val}(다음 출시)",

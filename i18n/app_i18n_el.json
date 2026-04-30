@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Οι προκαθορισμένοι κατάλογοι σάρωσης αποθηκεύτηκαν",
   "toast.preset_scan_failed": "Η προκαθορισμένη σάρωση απέτυχε — {err}",
   "toast.preset_sort": "Προκαθορισμένη ταξινόμηση: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Δεν είναι δυνατή η προεπισκόπηση αυτής της μορφής στο πρόγραμμα αναπαραγωγής ({ext})",
   "toast.prune_old_scans": "Κλάδεψε παλιά στιγμιότυπα σάρωσης: {state}",
   "toast.prune_old_scans_keep_set": "Ιστορικό σάρωσης για διατήρηση: {val} ανά τύπο (επόμενη κυκλοφορία)",

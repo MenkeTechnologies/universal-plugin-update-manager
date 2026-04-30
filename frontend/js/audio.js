@@ -498,6 +498,19 @@ let audioPlaybackRAF = null;
 let expandedMetaPath = null;
 let recentlyPlayed = [];
 const MAX_RECENT = 50;
+
+/** Circuit breaker for the autoplay-next-on-failure chain (`tryPreviewAutoplayNextOnFailureAsync`).
+ *  When an SMB share is unmounted but the library still references paths under it, every
+ *  `playback_load` against those paths fails fast — the chain churns through the entire
+ *  playlist at JS-event-loop rate, spraying error toasts and engine.log entries by the
+ *  thousand.  Counter increments on each `tryPreview…` invocation; once it crosses
+ *  `MAX_CONSECUTIVE_PREVIEW_FAILURES` the chain bails (one summary toast, no more
+ *  recursion) until a manual user action lands a successful playback that resets it. */
+let _consecutivePreviewFailures = 0;
+const MAX_CONSECUTIVE_PREVIEW_FAILURES = 5;
+function _resetPreviewFailureCounter() {
+    _consecutivePreviewFailures = 0;
+}
 let audioShuffling = false;
 let audioMuted = false;
 let savedVolume = 1;
@@ -3671,6 +3684,8 @@ async function previewAudio(filePath, opts) {
                 }
                 throw e;
             }
+            // Successful start — clear the autoplay-on-failure circuit breaker counter.
+            _resetPreviewFailureCounter();
             if (prefs.getItem('audioReverse') === 'on' && typeof window.engineApplyReversePrefPlayback === 'function') {
                 await window.engineApplyReversePrefPlayback();
                 audioReverseMode = true;
@@ -3745,6 +3760,9 @@ async function previewAudio(filePath, opts) {
 
         // Track recently played
         addToRecentlyPlayed(filePath, sample, o);
+
+        // Successful WebAudio playback — clear the autoplay-on-failure circuit breaker.
+        _resetPreviewFailureCounter();
 
         updatePlayBtnStates();
         updateNowPlayingBtn();
@@ -6209,6 +6227,27 @@ function getAutoplayNextPathAfter(currentPath, opts) {
  */
 async function tryPreviewAutoplayNextOnFailureAsync(failedPath, errDetail, previewOpts) {
     if (!canAutoplayAdvanceTrack()) return false;
+    /* Circuit breaker.  Bumps once per failure regardless of outcome.  When an SMB
+     * share is unmounted, every `playback_load` against that share fails immediately,
+     * so without this guard the chain recurses through the entire library at
+     * JS-event-loop rate — thousands of toasts and engine.log entries per second.
+     * After `MAX_CONSECUTIVE_PREVIEW_FAILURES` failures we emit one summary toast and
+     * return false so the chain stops.  A manual user action that lands a successful
+     * playback (`previewAudio` reaching its post-`enginePlaybackStart` block) resets
+     * the counter via `_resetPreviewFailureCounter`. */
+    _consecutivePreviewFailures++;
+    if (_consecutivePreviewFailures > MAX_CONSECUTIVE_PREVIEW_FAILURES) {
+        if (typeof showToast === 'function' && typeof toastFmt === 'function') {
+            showToast(
+                toastFmt('toast.preview_chain_stopped', {
+                    count: _consecutivePreviewFailures - 1,
+                }),
+                6000,
+                'error',
+            );
+        }
+        return false;
+    }
     const nextPath = getAutoplayNextPathAfter(failedPath, { autoplay: true });
     if (!nextPath || nextPath === failedPath) return false;
     /** Same as {@link nextTrack}: keep expanded metadata under the playing row; only when this hop is the one that stuck (see chained failures below). */

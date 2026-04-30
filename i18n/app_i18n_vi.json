@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Đã lưu các thư mục quét cài sẵn",
   "toast.preset_scan_failed": "Quét cài sẵn không thành công — {err}",
   "toast.preset_sort": "Sắp xếp đặt trước: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Không thể xem trước định dạng này trong trình phát ({ext})",
   "toast.prune_old_scans": "Cắt bớt các ảnh chụp nhanh quét cũ: {state}",
   "toast.prune_old_scans_keep_set": "Lịch sử quét cần lưu giữ: {val} mỗi loại (lần khởi chạy tiếp theo)",

@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Az előre beállított keresési könyvtárak mentve",
   "toast.preset_scan_failed": "Az előre beállított keresés nem sikerült – {err}",
   "toast.preset_sort": "Preset sort: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Ennek a formátumnak az előnézete nem tekinthető meg a lejátszóban ({ext})",
   "toast.prune_old_scans": "Régi vizsgálati pillanatképek levágása: {state}",
   "toast.prune_old_scans_keep_set": "Megőrizendő szkennelési előzmények: {val} típusonként (következő indítás)",

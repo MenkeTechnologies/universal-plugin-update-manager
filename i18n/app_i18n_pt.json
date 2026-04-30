@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Diretórios de verificação predefinidos salvos",
   "toast.preset_scan_failed": "Falha na verificação predefinida — {err}",
   "toast.preset_sort": "Classificação predefinida: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Este formato não pode ser visualizado no player ({ext})",
   "toast.prune_old_scans": "Remover instantâneos de verificação antigos: {state}",
   "toast.prune_old_scans_keep_set": "Histórico de verificação a ser mantido: {val} por tipo (próximo lançamento)",

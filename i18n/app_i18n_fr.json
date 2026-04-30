@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Répertoires d'analyse prédéfinis enregistrés",
   "toast.preset_scan_failed": "Échec de l'analyse des préréglages — {err}",
   "toast.preset_sort": "Preset sort: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Ce format ne peut pas être prévisualisé dans le lecteur ({ext})",
   "toast.prune_old_scans": "Supprimez les anciens instantanés d'analyse : {state}",
   "toast.prune_old_scans_keep_set": "Historique des analyses à conserver : {val} par type (prochain lancement)",

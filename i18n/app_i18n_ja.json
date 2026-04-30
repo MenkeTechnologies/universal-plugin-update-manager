@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "プリセットスキャンディレクトリが保存されました",
   "toast.preset_scan_failed": "プリセット スキャンに失敗しました — {err}",
   "toast.preset_sort": "Preset sort: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "この形式はプレーヤー ({ext}) でプレビューできません",
   "toast.prune_old_scans": "古いスキャン スナップショットを削除します: {state}",
   "toast.prune_old_scans_keep_set": "保存するスキャン履歴: タイプごとに {val} (次回起動)",

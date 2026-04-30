@@ -696,6 +696,7 @@
   "toast.preset_scan_dirs_saved": "Önceden ayarlanmış tarama dizinleri kaydedildi",
   "toast.preset_scan_failed": "Ön ayar taraması başarısız oldu — {err}",
   "toast.preset_sort": "Ön ayarlı sıralama: {value}",
+  "toast.preview_chain_stopped": "Stopped autoplay after {count} consecutive playback failures. Check that audio source paths are accessible.",
   "toast.preview_not_supported_format": "Bu format oynatıcıda önizlenemez ({ext})",
   "toast.prune_old_scans": "Eski tarama anlık görüntülerini budama: {state}",
   "toast.prune_old_scans_keep_set": "Saklanacak tarama geçmişi: tür başına {val} (sonraki başlatma)",
