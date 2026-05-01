@@ -101,6 +101,11 @@ function loadAudioSandbox() {
       addEventListener: () => {},
       body: { insertAdjacentHTML: () => {} },
     },
+    // No-op `window.addEventListener` / `removeEventListener`. Production code (e.g.
+    // `multi-filter.js`) registers top-level `resize`/`scroll` listeners on `window`;
+    // the sandbox aliases `window` to itself below, so these need to live here.
+    addEventListener: () => {},
+    removeEventListener: () => {},
     window: {},
   };
   sandbox.window = sandbox;

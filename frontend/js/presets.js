@@ -125,9 +125,9 @@ function buildPresetRow(p) {
         : _presetFmt('ui.tt.row_double_click_reveal_finder');
     return `<tr data-preset-path="${hp}" data-preset-format="${escapeHtml(p.format)}" data-preset-name="${escapeHtml((p.name || '').toLowerCase())}" style="cursor: pointer;" title="${rowTt}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
-    <td class="col-name" title="${escapeHtml(p.name)}">${_lastPresetSearch ? highlightMatch(p.name, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
+    <td class="col-name" title="${escapeHtml(p.name)}">${_lastPresetSearch ? highlightMatch(p.name, _lastPresetSearch, _lastPresetMode, 'name') : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
     <td class="col-format"><span class="format-badge format-default">${p.format}</span></td>
-    <td class="col-path" title="${hp}">${_lastPresetSearch ? highlightMatch(p.directory, _lastPresetSearch, _lastPresetMode) : escapeHtml(p.directory)}</td>
+    <td class="col-path" title="${hp}">${_lastPresetSearch ? highlightMatch(p.directory, _lastPresetSearch, _lastPresetMode, 'path') : escapeHtml(p.directory)}</td>
     <td class="col-size">${p.sizeFormatted || formatPresetSize(p.size)}</td>
     <td class="col-date">${p.modified}</td>
     <td class="col-actions" data-action-stop>

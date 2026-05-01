@@ -561,22 +561,122 @@ function highlightWithIndices(text, indices) {
     return result;
 }
 
-// Highlight matched characters in text
-function highlightMatch(text, query, mode) {
+/**
+ * Mirror of `parse_name_path_prefixes` (Rust `db.rs`) — keeps the highlight in sync
+ * with what the server-side filter actually applies. Strips `name:<value>` and
+ * `path:<value>` (quoted with `"..."` or bare) tokens out of the input and returns
+ * them alongside the residual general search. In regex mode the input is passed
+ * through unchanged because `name:` could be intentional regex syntax.
+ */
+function parseNamePathPrefixes(rawQuery, mode) {
+    const empty = {residual: '', nameValues: [], pathValues: []};
+    if (!rawQuery) return empty;
+    if (mode === 'regex') return {residual: rawQuery, nameValues: [], pathValues: []};
+
+    const nameValues = [];
+    const pathValues = [];
+    const residualParts = [];
+    const chars = Array.from(rawQuery);
+    let i = 0;
+    while (i < chars.length) {
+        while (i < chars.length && /\s/.test(chars[i])) i++;
+        if (i >= chars.length) break;
+        const lower = chars.slice(i, i + 5).join('').toLowerCase();
+        let prefix = null;
+        if (lower === 'name:') prefix = 'name';
+        else if (lower === 'path:') prefix = 'path';
+        if (prefix) {
+            i += 5;
+            const v = readNamePathTokenValue(chars, () => i, (n) => { i = n; });
+            if (v) (prefix === 'name' ? nameValues : pathValues).push(v);
+            continue;
+        }
+        const v = readNamePathTokenValue(chars, () => i, (n) => { i = n; });
+        if (v) residualParts.push(v);
+    }
+    return {
+        residual: residualParts.join(' '),
+        nameValues,
+        pathValues,
+    };
+}
+
+function readNamePathTokenValue(chars, getI, setI) {
+    let i = getI();
+    if (i >= chars.length) return '';
+    if (chars[i] === '"') {
+        i++;
+        let out = '';
+        while (i < chars.length) {
+            const c = chars[i];
+            if (c === '\\' && i + 1 < chars.length) {
+                out += chars[i + 1];
+                i += 2;
+                continue;
+            }
+            if (c === '"') {
+                setI(i + 1);
+                return out.trim();
+            }
+            out += c;
+            i++;
+        }
+        setI(i);
+        return out.trim();
+    }
+    const start = i;
+    while (i < chars.length && !/\s/.test(chars[i])) i++;
+    setI(i);
+    return chars.slice(start, i).join('').trim();
+}
+
+/**
+ * Build a column-specific highlight query for a row text cell. `column` is one of:
+ *   - `'name'`  — residual + `name:<val>` tokens
+ *   - `'path'`  — residual + `path:<val>` tokens
+ *   - `'other'` — residual only (e.g. format / size / bpm columns the prefix doesn't touch)
+ *   - undefined — pass through unchanged (callers without prefix awareness)
+ *
+ * Multi-word values are re-quoted so `parseFzfQuery` keeps them as a single phrase.
+ */
+function buildColumnHighlightQuery(rawQuery, mode, column) {
+    if (!rawQuery || !column) return rawQuery || '';
+    if (mode === 'regex') return rawQuery;
+    const plan = parseNamePathPrefixes(rawQuery, mode);
+    if (plan.nameValues.length === 0 && plan.pathValues.length === 0) return rawQuery;
+    const tokens =
+        column === 'name' ? plan.nameValues :
+        column === 'path' ? plan.pathValues :
+        [];
+    const parts = [];
+    if (plan.residual) parts.push(plan.residual);
+    for (const t of tokens) parts.push(t.includes(' ') ? `"${t}"` : t);
+    return parts.join(' ');
+}
+
+// Highlight matched characters in text. Optional `column` ('name' | 'path' | 'other')
+// makes the highlight aware of `name:` / `path:` prefix syntax — see
+// `buildColumnHighlightQuery`.
+function highlightMatch(text, query, mode, column) {
     if (!query || !text) return escapeHtml(text);
-    return highlightWithIndices(text, getMatchIndices(query, text, mode));
+    const eff = column ? buildColumnHighlightQuery(query, mode, column) : query;
+    if (!eff) return escapeHtml(text);
+    return highlightWithIndices(text, getMatchIndices(eff, text, mode));
 }
 
 /**
  * When the DB matches on full `path` (FTS) but the UI shows only the basename, match indices may
- * exist only on `path`. Map those indices onto `name` when basename equals `name`.
+ * exist only on `path`. Map those indices onto `name` when basename equals `name`. Optional
+ * `column` argument enables `name:` / `path:` prefix-aware highlighting.
  */
-function highlightBasenameFromPath(path, name, query, mode) {
+function highlightBasenameFromPath(path, name, query, mode, column) {
     if (!query || !name) return escapeHtml(name);
-    let idx = getMatchIndices(query, name, mode);
+    const eff = column ? buildColumnHighlightQuery(query, mode, column) : query;
+    if (!eff) return escapeHtml(name);
+    let idx = getMatchIndices(eff, name, mode);
     if (idx.length) return highlightWithIndices(name, idx);
     if (!path) return escapeHtml(name);
-    idx = getMatchIndices(query, path, mode);
+    idx = getMatchIndices(eff, path, mode);
     if (!idx.length) return escapeHtml(name);
     const basenameStart = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1;
     const pBase = path.slice(basenameStart);
@@ -587,14 +687,17 @@ function highlightBasenameFromPath(path, name, query, mode) {
 }
 
 /**
- * Same idea for the directory column: matches may only appear in the full path prefix.
+ * Same idea for the directory column: matches may only appear in the full path prefix. Optional
+ * `column` argument enables `name:` / `path:` prefix-aware highlighting.
  */
-function highlightPathPrefixFromPath(path, dirField, query, mode) {
+function highlightPathPrefixFromPath(path, dirField, query, mode, column) {
     if (!query || !dirField) return escapeHtml(dirField);
-    let idx = getMatchIndices(query, dirField, mode);
+    const eff = column ? buildColumnHighlightQuery(query, mode, column) : query;
+    if (!eff) return escapeHtml(dirField);
+    let idx = getMatchIndices(eff, dirField, mode);
     if (idx.length) return highlightWithIndices(dirField, idx);
     if (!path) return escapeHtml(dirField);
-    idx = getMatchIndices(query, path, mode);
+    idx = getMatchIndices(eff, path, mode);
     if (!idx.length) return escapeHtml(dirField);
     const nPath = path.replace(/\\/g, '/');
     const nDir = dirField.replace(/\\/g, '/');

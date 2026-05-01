@@ -707,7 +707,7 @@ function buildMidiRow(s) {
         : _midiFmt('menu.reveal_in_finder');
     return `<tr data-midi-path="${hp}" title="${rowTitle}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
-    <td class="col-name" title="${hn}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.name, _midiSearch, _lastMidiMode) : hn}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
+    <td class="col-name" title="${hn}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.name, _midiSearch, _lastMidiMode, 'name') : hn}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
     <td style="text-align:center;">${info ? info.trackCount : ''}</td>
     <td style="text-align:center;color:var(--cyan);">${info ? info.tempo : ''}</td>
     <td style="text-align:center;">${info ? info.timeSignature : ''}</td>
@@ -716,7 +716,7 @@ function buildMidiRow(s) {
     <td style="text-align:center;">${info ? info.channelsUsed : ''}</td>
     <td style="text-align:center;">${dur}</td>
     <td class="col-size">${s.sizeFormatted}</td>
-    <td class="col-path" title="${hp}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.directory, _midiSearch, _lastMidiMode) : (typeof escapeHtml === 'function' ? escapeHtml(s.directory) : s.directory)}</td>
+    <td class="col-path" title="${hp}">${_midiSearch && typeof highlightMatch === 'function' ? highlightMatch(s.directory, _midiSearch, _lastMidiMode, 'path') : (typeof escapeHtml === 'function' ? escapeHtml(s.directory) : s.directory)}</td>
     <td class="col-actions" data-action-stop>
       <button class="btn-small btn-folder" data-action="openAudioFolder" data-path="${hp}" title="${revealT}">&#128193;</button>
     </td>

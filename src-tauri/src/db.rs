@@ -301,6 +301,201 @@ fn classify_fts_name_path_search(
     }
 }
 
+/// Parsed `name:` / `path:` prefix tokens extracted from a search input.
+///
+/// Users type `name:thuggin tomm` in any FTS-backed search field; this struct splits
+/// the input into the residual general search ("tomm") and column-specific LIKE
+/// values ("thuggin"). The residual feeds the normal name+path FTS / LIKE / REGEXP
+/// pipeline; each `name_likes` / `path_likes` entry adds one `<col> LIKE ? ESCAPE '\\'`
+/// predicate AND'd into the WHERE clause. Multiple entries narrow further
+/// (`name:foo name:bar` → both must appear).
+///
+/// Quoted values are supported: `name:"foo bar"` extracts `foo bar`. Unterminated
+/// quotes consume to end-of-input. In regex mode the parser is bypassed — `name:` in
+/// a regex pattern is a literal token, not a prefix.
+pub struct NamePathSearchPlan {
+    /// Search text with `name:`/`path:` tokens removed; passes through to the existing
+    /// `classify_fts_name_path_search` (FTS5 phrase / short-LIKE / regex).
+    pub residual: String,
+    /// Extracted `name:<value>` substrings (already trimmed; never empty).
+    pub name_likes: Vec<String>,
+    /// Extracted `path:<value>` substrings (already trimmed; never empty).
+    pub path_likes: Vec<String>,
+}
+
+impl NamePathSearchPlan {
+    /// True when neither `name:` nor `path:` filters are present (caller can skip
+    /// extra LIKE plumbing).
+    pub fn is_empty(&self) -> bool {
+        self.name_likes.is_empty() && self.path_likes.is_empty()
+    }
+}
+
+/// Tokenize the search input into `name:<value>` / `path:<value>` prefix tokens and
+/// general residual tokens. Quoted values (`name:"foo bar"`) are supported. In regex
+/// mode the input is preserved unchanged — column prefixes there would conflict with
+/// regex syntax (e.g. a literal `name:` capture in the user's pattern).
+pub fn parse_name_path_prefixes(search: Option<&str>, search_regex: bool) -> NamePathSearchPlan {
+    let raw = search.unwrap_or("");
+    if raw.trim().is_empty() {
+        return NamePathSearchPlan {
+            residual: String::new(),
+            name_likes: Vec::new(),
+            path_likes: Vec::new(),
+        };
+    }
+    if search_regex {
+        return NamePathSearchPlan {
+            residual: raw.to_string(),
+            name_likes: Vec::new(),
+            path_likes: Vec::new(),
+        };
+    }
+
+    let mut name_likes = Vec::new();
+    let mut path_likes = Vec::new();
+    let mut residual = String::new();
+    let chars: Vec<char> = raw.chars().collect();
+    let n = chars.len();
+    let mut i = 0;
+
+    while i < n {
+        // Skip whitespace.
+        while i < n && chars[i].is_whitespace() {
+            i += 1;
+        }
+        if i >= n {
+            break;
+        }
+
+        // Try to match `name:` or `path:` (case-insensitive) at the start of a token.
+        let prefix = match_prefix_ci(&chars, i, "name:")
+            .map(|len| ("name", len))
+            .or_else(|| match_prefix_ci(&chars, i, "path:").map(|len| ("path", len)));
+
+        if let Some((kind, prefix_len)) = prefix {
+            i += prefix_len;
+            let value = read_token_value(&chars, &mut i);
+            if !value.is_empty() {
+                match kind {
+                    "name" => name_likes.push(value),
+                    "path" => path_likes.push(value),
+                    _ => {}
+                }
+            }
+            continue;
+        }
+
+        // Not a prefix — read a residual token (quoted or bare). Quoted residuals
+        // collapse to their inner text (the FTS layer wraps the whole residual in a
+        // phrase quote anyway, so re-emitting raw quotes would corrupt the FTS query).
+        let value = read_token_value(&chars, &mut i);
+        if !value.is_empty() {
+            if !residual.is_empty() {
+                residual.push(' ');
+            }
+            residual.push_str(&value);
+        }
+    }
+
+    NamePathSearchPlan {
+        residual,
+        name_likes,
+        path_likes,
+    }
+}
+
+/// Case-insensitive ASCII prefix match against a `&[char]` slice starting at `start`.
+/// Returns `Some(len_in_chars)` on match, where `len_in_chars` equals `prefix.len()`
+/// because the prefix is ASCII.
+fn match_prefix_ci(chars: &[char], start: usize, prefix: &str) -> Option<usize> {
+    let pb = prefix.as_bytes();
+    if start + pb.len() > chars.len() {
+        return None;
+    }
+    for (k, pc) in pb.iter().enumerate() {
+        if !chars[start + k].eq_ignore_ascii_case(&(*pc as char)) {
+            return None;
+        }
+    }
+    Some(pb.len())
+}
+
+/// Read a single token value starting at `*i`. Handles `"quoted strings"` (with simple
+/// `\"` escape) and bare non-whitespace runs. Advances `*i` past the consumed input.
+fn read_token_value(chars: &[char], i: &mut usize) -> String {
+    let n = chars.len();
+    if *i >= n {
+        return String::new();
+    }
+    if chars[*i] == '"' {
+        *i += 1;
+        let mut out = String::new();
+        while *i < n {
+            let c = chars[*i];
+            if c == '\\' && *i + 1 < n {
+                out.push(chars[*i + 1]);
+                *i += 2;
+                continue;
+            }
+            if c == '"' {
+                *i += 1;
+                return out.trim().to_string();
+            }
+            out.push(c);
+            *i += 1;
+        }
+        // Unterminated quote — accept what we have.
+        return out.trim().to_string();
+    }
+    let start = *i;
+    while *i < n && !chars[*i].is_whitespace() {
+        *i += 1;
+    }
+    chars[start..*i].iter().collect::<String>().trim().to_string()
+}
+
+/// Build a `LIKE` pattern (`%escaped%`) for a `name:` / `path:` prefix value.
+/// Escapes the SQLite LIKE wildcards (`%`, `_`) and the escape-char (`\`) itself.
+pub fn name_path_like_pattern(value: &str) -> String {
+    let escaped = value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    format!("%{escaped}%")
+}
+
+/// Append `<alias.>name LIKE ?N ESCAPE '\\'` and `<alias.>path LIKE ?N ESCAPE '\\'`
+/// conditions for each `plan` entry, advancing `bind_idx`. Returns the LIKE pattern
+/// values to bind in order. `alias` is e.g. `"s"` for FTS-joined SELECTs (`s.name`),
+/// or `None` for bare-table queries.
+pub fn build_name_path_like_conditions(
+    plan: &NamePathSearchPlan,
+    bind_idx: &mut usize,
+    alias: Option<&str>,
+) -> (Vec<String>, Vec<String>) {
+    let prefix = alias.map(|a| format!("{a}.")).unwrap_or_default();
+    let mut conditions = Vec::with_capacity(plan.name_likes.len() + plan.path_likes.len());
+    let mut binds = Vec::with_capacity(plan.name_likes.len() + plan.path_likes.len());
+    for v in &plan.name_likes {
+        conditions.push(format!(
+            "{prefix}name LIKE ?{idx} ESCAPE '\\'",
+            idx = *bind_idx
+        ));
+        binds.push(name_path_like_pattern(v));
+        *bind_idx += 1;
+    }
+    for v in &plan.path_likes {
+        conditions.push(format!(
+            "{prefix}path LIKE ?{idx} ESCAPE '\\'",
+            idx = *bind_idx
+        ));
+        binds.push(name_path_like_pattern(v));
+        *bind_idx += 1;
+    }
+    (conditions, binds)
+}
+
 /// Plugins tab (name, manufacturer, path): `(regex_pat, like_pat)` — when `regex_pat` is `Some`,
 /// use `REGEXP` on all three columns; otherwise `like_pat` is fuzzy interleaved or invalid-regex
 /// fallback (same binding shape).
@@ -4122,18 +4317,67 @@ DROP TABLE _pl_refresh_paths;"#;
         conn: &Connection,
         fts_match: &str,
         scan_id: &str,
+        np_plan: &NamePathSearchPlan,
     ) -> Result<(u64, bool), String> {
         let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
-        let raw: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM (
+        // When `name:` / `path:` filters are present we must JOIN audio_samples to apply
+        // the LIKE conditions; without them the FTS-only path is faster.
+        if np_plan.is_empty() {
+            let raw: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM (
   SELECT 1 FROM audio_samples_fts
   WHERE audio_samples_fts MATCH ?1 AND scan_id = ?2
   LIMIT ?3)",
-                params![fts_match, scan_id, cap],
-                |row| row.get::<_, i64>(0),
-            )
+                    params![fts_match, scan_id, cap],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|e| e.to_string())?;
+            let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
+            let count = if capped {
+                FTS_INVENTORY_MATCH_COUNT_CAP as u64
+            } else {
+                raw as u64
+            };
+            return Ok((count, capped));
+        }
+        let mut next_ph = 3usize;
+        let (np_conds, np_binds) =
+            build_name_path_like_conditions(np_plan, &mut next_ph, Some("s"));
+        let cap_ph = next_ph;
+        let extra = if np_conds.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {}", np_conds.join(" AND "))
+        };
+        let sql = format!(
+            "SELECT COUNT(*) FROM (
+  SELECT 1 FROM audio_samples_fts
+  INNER JOIN audio_samples s ON s.id = audio_samples_fts.rowid
+  WHERE audio_samples_fts MATCH ?1 AND s.scan_id = ?2{extra}
+  LIMIT ?{cap_ph})"
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut idx = 1;
+        stmt.raw_bind_parameter(idx, fts_match)
             .map_err(|e| e.to_string())?;
+        idx += 1;
+        stmt.raw_bind_parameter(idx, scan_id)
+            .map_err(|e| e.to_string())?;
+        idx += 1;
+        for v in &np_binds {
+            stmt.raw_bind_parameter(idx, v)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
+        stmt.raw_bind_parameter(idx, cap)
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.raw_query();
+        let row = rows
+            .next()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "COUNT returned no rows".to_string())?;
+        let raw = row.get::<_, i64>(0).map_err(|e| e.to_string())?;
         let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
             FTS_INVENTORY_MATCH_COUNT_CAP as u64
@@ -4148,61 +4392,70 @@ DROP TABLE _pl_refresh_paths;"#;
         conn: &Connection,
         fts_match: &str,
         format_filter: Option<&str>,
+        np_plan: &NamePathSearchPlan,
     ) -> Result<(u64, bool), String> {
         let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
-        let raw: i64 = match format_filter {
-            None => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM audio_samples_fts
-  INNER JOIN audio_samples s ON s.id = audio_samples_fts.rowid
-  INNER JOIN audio_library lib ON lib.sample_id = s.id
-  WHERE audio_samples_fts MATCH ?1
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
-            Some(f) if f.trim().is_empty() || f == "all" => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM audio_samples_fts
-  INNER JOIN audio_samples s ON s.id = audio_samples_fts.rowid
-  INNER JOIN audio_library lib ON lib.sample_id = s.id
-  WHERE audio_samples_fts MATCH ?1
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
+        // Build extra `name:` / `path:` LIKE conditions; binds get appended after the
+        // FTS match parameter (?1) and any format-equality bind.
+        let mut next_ph = 2usize; // ?1 = fts_match
+        let mut format_eq_ph: Option<usize> = None;
+        let format_in_clause: Option<String> = match format_filter {
+            None => None,
+            Some(f) if f.trim().is_empty() || f == "all" => None,
             Some(f) if f.contains(',') => {
                 let in_list = Self::in_list_sql(f);
-                let sql = format!(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM audio_samples_fts
-  INNER JOIN audio_samples s ON s.id = audio_samples_fts.rowid
-  INNER JOIN audio_library lib ON lib.sample_id = s.id
-  WHERE audio_samples_fts MATCH ?1
-  AND s.format IN ({in_list})
-  LIMIT ?2)"
-                );
-                conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
-                    .map_err(|e| e.to_string())?
+                Some(format!(" AND s.format IN ({in_list})"))
             }
-            Some(f) => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
+            Some(_) => {
+                let ph = next_ph;
+                next_ph += 1;
+                format_eq_ph = Some(ph);
+                Some(format!(" AND s.format = ?{ph}"))
+            }
+        };
+        let (np_conds, np_binds) =
+            build_name_path_like_conditions(np_plan, &mut next_ph, Some("s"));
+        let cap_ph = next_ph;
+        let np_extra = if np_conds.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {}", np_conds.join(" AND "))
+        };
+        let format_extra = format_in_clause.unwrap_or_default();
+        let sql = format!(
+            "SELECT COUNT(*) FROM (
   SELECT 1 FROM audio_samples_fts
   INNER JOIN audio_samples s ON s.id = audio_samples_fts.rowid
   INNER JOIN audio_library lib ON lib.sample_id = s.id
-  WHERE audio_samples_fts MATCH ?1
-  AND s.format = ?2
-  LIMIT ?3)",
-                    params![fts_match, f, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
-        };
+  WHERE audio_samples_fts MATCH ?1{format_extra}{np_extra}
+  LIMIT ?{cap_ph})"
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut idx = 1;
+        stmt.raw_bind_parameter(idx, fts_match)
+            .map_err(|e| e.to_string())?;
+        idx += 1;
+        if let Some(ph) = format_eq_ph {
+            debug_assert_eq!(idx, ph);
+            if let Some(f) = format_filter {
+                stmt.raw_bind_parameter(idx, f)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(idx, v)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
+        stmt.raw_bind_parameter(idx, cap)
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.raw_query();
+        let row = rows
+            .next()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "COUNT returned no rows".to_string())?;
+        let raw = row.get::<_, i64>(0).map_err(|e| e.to_string())?;
         let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
             FTS_INVENTORY_MATCH_COUNT_CAP as u64
@@ -4217,65 +4470,68 @@ DROP TABLE _pl_refresh_paths;"#;
         conn: &Connection,
         fts_match: &str,
         format_filter: Option<&str>,
+        np_plan: &NamePathSearchPlan,
     ) -> Result<(u64, bool), String> {
         let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
-        let raw: i64 = match format_filter {
-            None => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM presets_fts
-  INNER JOIN presets p ON p.id = presets_fts.rowid
-  INNER JOIN preset_library lib ON lib.preset_id = p.id
-  WHERE presets_fts MATCH ?1
-  AND p.format NOT IN ('MID','MIDI')
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
-            Some(f) if f.trim().is_empty() || f == "all" => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM presets_fts
-  INNER JOIN presets p ON p.id = presets_fts.rowid
-  INNER JOIN preset_library lib ON lib.preset_id = p.id
-  WHERE presets_fts MATCH ?1
-  AND p.format NOT IN ('MID','MIDI')
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
+        let mut next_ph = 2usize;
+        let mut format_eq_ph: Option<usize> = None;
+        let format_extra: String = match format_filter {
+            None => String::new(),
+            Some(f) if f.trim().is_empty() || f == "all" => String::new(),
             Some(f) if f.contains(',') => {
                 let in_list = Self::in_list_sql(f);
-                let sql = format!(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM presets_fts
-  INNER JOIN presets p ON p.id = presets_fts.rowid
-  INNER JOIN preset_library lib ON lib.preset_id = p.id
-  WHERE presets_fts MATCH ?1
-  AND p.format NOT IN ('MID','MIDI')
-  AND p.format IN ({in_list})
-  LIMIT ?2)"
-                );
-                conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
-                    .map_err(|e| e.to_string())?
+                format!(" AND p.format IN ({in_list})")
             }
-            Some(f) => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
+            Some(_) => {
+                let ph = next_ph;
+                next_ph += 1;
+                format_eq_ph = Some(ph);
+                format!(" AND p.format = ?{ph}")
+            }
+        };
+        let (np_conds, np_binds) =
+            build_name_path_like_conditions(np_plan, &mut next_ph, Some("p"));
+        let np_extra = if np_conds.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {}", np_conds.join(" AND "))
+        };
+        let cap_ph = next_ph;
+        let sql = format!(
+            "SELECT COUNT(*) FROM (
   SELECT 1 FROM presets_fts
   INNER JOIN presets p ON p.id = presets_fts.rowid
   INNER JOIN preset_library lib ON lib.preset_id = p.id
   WHERE presets_fts MATCH ?1
-  AND p.format NOT IN ('MID','MIDI')
-  AND p.format = ?2
-  LIMIT ?3)",
-                    params![fts_match, f, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
-        };
+  AND p.format NOT IN ('MID','MIDI'){format_extra}{np_extra}
+  LIMIT ?{cap_ph})"
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut idx = 1;
+        stmt.raw_bind_parameter(idx, fts_match)
+            .map_err(|e| e.to_string())?;
+        idx += 1;
+        if let Some(ph) = format_eq_ph {
+            debug_assert_eq!(idx, ph);
+            if let Some(f) = format_filter {
+                stmt.raw_bind_parameter(idx, f)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(idx, v)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
+        stmt.raw_bind_parameter(idx, cap)
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.raw_query();
+        let row = rows
+            .next()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "COUNT returned no rows".to_string())?;
+        let raw = row.get::<_, i64>(0).map_err(|e| e.to_string())?;
         let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
             FTS_INVENTORY_MATCH_COUNT_CAP as u64
@@ -4290,57 +4546,79 @@ DROP TABLE _pl_refresh_paths;"#;
         conn: &Connection,
         fts_match: &str,
         format_filter: Option<&str>,
+        np_plan: &NamePathSearchPlan,
     ) -> Result<(u64, bool), String> {
         let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
-        let raw: i64 = match format_filter {
-            None => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM midi_files_fts
-  INNER JOIN midi_library AS lib ON lib.midi_id = midi_files_fts.rowid
-  WHERE midi_files_fts MATCH ?1
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
-            Some(f) if f.trim().is_empty() || f == "all" => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM midi_files_fts
-  INNER JOIN midi_library AS lib ON lib.midi_id = midi_files_fts.rowid
-  WHERE midi_files_fts MATCH ?1
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
+        let mut next_ph = 2usize;
+        let mut format_eq_ph: Option<usize> = None;
+        let needs_join =
+            !np_plan.is_empty() || matches!(format_filter, Some(f) if !f.trim().is_empty() && f != "all");
+        let format_extra: String = match format_filter {
+            None => String::new(),
+            Some(f) if f.trim().is_empty() || f == "all" => String::new(),
             Some(f) if f.contains(',') => {
                 let in_list = Self::in_list_sql(f);
-                let sql = format!(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM midi_files_fts
-  INNER JOIN midi_files AS m ON m.id = midi_files_fts.rowid
-  INNER JOIN midi_library AS lib ON lib.midi_id = m.id
-  WHERE midi_files_fts MATCH ?1 AND m.format IN ({in_list})
-  LIMIT ?2)"
-                );
-                conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
-                    .map_err(|e| e.to_string())?
+                format!(" AND m.format IN ({in_list})")
             }
-            Some(f) => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
+            Some(_) => {
+                let ph = next_ph;
+                next_ph += 1;
+                format_eq_ph = Some(ph);
+                format!(" AND m.format = ?{ph}")
+            }
+        };
+        let (np_conds, np_binds) =
+            build_name_path_like_conditions(np_plan, &mut next_ph, Some("m"));
+        let np_extra = if np_conds.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {}", np_conds.join(" AND "))
+        };
+        let cap_ph = next_ph;
+        let sql = if needs_join {
+            format!(
+                "SELECT COUNT(*) FROM (
   SELECT 1 FROM midi_files_fts
   INNER JOIN midi_files AS m ON m.id = midi_files_fts.rowid
   INNER JOIN midi_library AS lib ON lib.midi_id = m.id
-  WHERE midi_files_fts MATCH ?1 AND m.format = ?2
-  LIMIT ?3)",
-                    params![fts_match, f, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
+  WHERE midi_files_fts MATCH ?1{format_extra}{np_extra}
+  LIMIT ?{cap_ph})"
+            )
+        } else {
+            format!(
+                "SELECT COUNT(*) FROM (
+  SELECT 1 FROM midi_files_fts
+  INNER JOIN midi_library AS lib ON lib.midi_id = midi_files_fts.rowid
+  WHERE midi_files_fts MATCH ?1
+  LIMIT ?{cap_ph})"
+            )
         };
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut idx = 1;
+        stmt.raw_bind_parameter(idx, fts_match)
+            .map_err(|e| e.to_string())?;
+        idx += 1;
+        if let Some(ph) = format_eq_ph {
+            debug_assert_eq!(idx, ph);
+            if let Some(f) = format_filter {
+                stmt.raw_bind_parameter(idx, f)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(idx, v)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
+        stmt.raw_bind_parameter(idx, cap)
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.raw_query();
+        let row = rows
+            .next()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "COUNT returned no rows".to_string())?;
+        let raw = row.get::<_, i64>(0).map_err(|e| e.to_string())?;
         let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
             FTS_INVENTORY_MATCH_COUNT_CAP as u64
@@ -4355,57 +4633,79 @@ DROP TABLE _pl_refresh_paths;"#;
         conn: &Connection,
         fts_match: &str,
         format_filter: Option<&str>,
+        np_plan: &NamePathSearchPlan,
     ) -> Result<(u64, bool), String> {
         let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
-        let raw: i64 = match format_filter {
-            None => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM video_files_fts
-  INNER JOIN video_library AS lib ON lib.video_id = video_files_fts.rowid
-  WHERE video_files_fts MATCH ?1
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
-            Some(f) if f.trim().is_empty() || f == "all" => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM video_files_fts
-  INNER JOIN video_library AS lib ON lib.video_id = video_files_fts.rowid
-  WHERE video_files_fts MATCH ?1
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
+        let mut next_ph = 2usize;
+        let mut format_eq_ph: Option<usize> = None;
+        let needs_join =
+            !np_plan.is_empty() || matches!(format_filter, Some(f) if !f.trim().is_empty() && f != "all");
+        let format_extra: String = match format_filter {
+            None => String::new(),
+            Some(f) if f.trim().is_empty() || f == "all" => String::new(),
             Some(f) if f.contains(',') => {
                 let in_list = Self::in_list_sql(f);
-                let sql = format!(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM video_files_fts
-  INNER JOIN video_files AS v ON v.id = video_files_fts.rowid
-  INNER JOIN video_library AS lib ON lib.video_id = v.id
-  WHERE video_files_fts MATCH ?1 AND v.format IN ({in_list})
-  LIMIT ?2)"
-                );
-                conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
-                    .map_err(|e| e.to_string())?
+                format!(" AND v.format IN ({in_list})")
             }
-            Some(f) => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
+            Some(_) => {
+                let ph = next_ph;
+                next_ph += 1;
+                format_eq_ph = Some(ph);
+                format!(" AND v.format = ?{ph}")
+            }
+        };
+        let (np_conds, np_binds) =
+            build_name_path_like_conditions(np_plan, &mut next_ph, Some("v"));
+        let np_extra = if np_conds.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {}", np_conds.join(" AND "))
+        };
+        let cap_ph = next_ph;
+        let sql = if needs_join {
+            format!(
+                "SELECT COUNT(*) FROM (
   SELECT 1 FROM video_files_fts
   INNER JOIN video_files AS v ON v.id = video_files_fts.rowid
   INNER JOIN video_library AS lib ON lib.video_id = v.id
-  WHERE video_files_fts MATCH ?1 AND v.format = ?2
-  LIMIT ?3)",
-                    params![fts_match, f, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
+  WHERE video_files_fts MATCH ?1{format_extra}{np_extra}
+  LIMIT ?{cap_ph})"
+            )
+        } else {
+            format!(
+                "SELECT COUNT(*) FROM (
+  SELECT 1 FROM video_files_fts
+  INNER JOIN video_library AS lib ON lib.video_id = video_files_fts.rowid
+  WHERE video_files_fts MATCH ?1
+  LIMIT ?{cap_ph})"
+            )
         };
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut idx = 1;
+        stmt.raw_bind_parameter(idx, fts_match)
+            .map_err(|e| e.to_string())?;
+        idx += 1;
+        if let Some(ph) = format_eq_ph {
+            debug_assert_eq!(idx, ph);
+            if let Some(f) = format_filter {
+                stmt.raw_bind_parameter(idx, f)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(idx, v)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
+        stmt.raw_bind_parameter(idx, cap)
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.raw_query();
+        let row = rows
+            .next()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "COUNT returned no rows".to_string())?;
+        let raw = row.get::<_, i64>(0).map_err(|e| e.to_string())?;
         let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
             FTS_INVENTORY_MATCH_COUNT_CAP as u64
@@ -4419,19 +4719,50 @@ DROP TABLE _pl_refresh_paths;"#;
     fn pdf_fts_bounded_count_library(
         conn: &Connection,
         fts_match: &str,
+        np_plan: &NamePathSearchPlan,
     ) -> Result<(u64, bool), String> {
         let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
-        let raw: i64 = conn
-            .query_row(
+        let mut next_ph = 2usize;
+        let (np_conds, np_binds) =
+            build_name_path_like_conditions(np_plan, &mut next_ph, Some("p"));
+        let cap_ph = next_ph;
+        let sql = if np_conds.is_empty() {
+            format!(
                 "SELECT COUNT(*) FROM (
   SELECT 1 FROM pdfs_fts
   INNER JOIN pdf_library AS lib ON lib.pdf_id = pdfs_fts.rowid
   WHERE pdfs_fts MATCH ?1
-  LIMIT ?2)",
-                params![fts_match, cap],
-                |row| row.get::<_, i64>(0),
+  LIMIT ?{cap_ph})"
             )
+        } else {
+            let np_extra = format!(" AND {}", np_conds.join(" AND "));
+            format!(
+                "SELECT COUNT(*) FROM (
+  SELECT 1 FROM pdfs_fts
+  INNER JOIN pdfs p ON p.id = pdfs_fts.rowid
+  INNER JOIN pdf_library AS lib ON lib.pdf_id = p.id
+  WHERE pdfs_fts MATCH ?1{np_extra}
+  LIMIT ?{cap_ph})"
+            )
+        };
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut idx = 1;
+        stmt.raw_bind_parameter(idx, fts_match)
             .map_err(|e| e.to_string())?;
+        idx += 1;
+        for v in &np_binds {
+            stmt.raw_bind_parameter(idx, v)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
+        stmt.raw_bind_parameter(idx, cap)
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.raw_query();
+        let row = rows
+            .next()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "COUNT returned no rows".to_string())?;
+        let raw = row.get::<_, i64>(0).map_err(|e| e.to_string())?;
         let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
             FTS_INVENTORY_MATCH_COUNT_CAP as u64
@@ -4446,61 +4777,67 @@ DROP TABLE _pl_refresh_paths;"#;
         conn: &Connection,
         fts_match: &str,
         daw_filter: Option<&str>,
+        np_plan: &NamePathSearchPlan,
     ) -> Result<(u64, bool), String> {
         let cap = FTS_INVENTORY_MATCH_COUNT_CAP + 1;
-        let raw: i64 = match daw_filter {
-            None => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM daw_projects_fts
-  INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
-  INNER JOIN daw_library lib ON lib.project_id = d.id
-  WHERE daw_projects_fts MATCH ?1
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
-            Some(f) if f.trim().is_empty() || f == "all" => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM daw_projects_fts
-  INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
-  INNER JOIN daw_library lib ON lib.project_id = d.id
-  WHERE daw_projects_fts MATCH ?1
-  LIMIT ?2)",
-                    params![fts_match, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
+        let mut next_ph = 2usize;
+        let mut daw_eq_ph: Option<usize> = None;
+        let daw_extra: String = match daw_filter {
+            None => String::new(),
+            Some(f) if f.trim().is_empty() || f == "all" => String::new(),
             Some(f) if f.contains(',') => {
                 let in_list = Self::in_list_sql(f);
-                let sql = format!(
-                    "SELECT COUNT(*) FROM (
-  SELECT 1 FROM daw_projects_fts
-  INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
-  INNER JOIN daw_library lib ON lib.project_id = d.id
-  WHERE daw_projects_fts MATCH ?1
-  AND d.daw IN ({in_list})
-  LIMIT ?2)"
-                );
-                conn.query_row(&sql, params![fts_match, cap], |row| row.get::<_, i64>(0))
-                    .map_err(|e| e.to_string())?
+                format!(" AND d.daw IN ({in_list})")
             }
-            Some(f) => conn
-                .query_row(
-                    "SELECT COUNT(*) FROM (
+            Some(_) => {
+                let ph = next_ph;
+                next_ph += 1;
+                daw_eq_ph = Some(ph);
+                format!(" AND d.daw = ?{ph}")
+            }
+        };
+        let (np_conds, np_binds) =
+            build_name_path_like_conditions(np_plan, &mut next_ph, Some("d"));
+        let np_extra = if np_conds.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {}", np_conds.join(" AND "))
+        };
+        let cap_ph = next_ph;
+        let sql = format!(
+            "SELECT COUNT(*) FROM (
   SELECT 1 FROM daw_projects_fts
   INNER JOIN daw_projects d ON d.id = daw_projects_fts.rowid
   INNER JOIN daw_library lib ON lib.project_id = d.id
-  WHERE daw_projects_fts MATCH ?1
-  AND d.daw = ?2
-  LIMIT ?3)",
-                    params![fts_match, f, cap],
-                    |row| row.get::<_, i64>(0),
-                )
-                .map_err(|e| e.to_string())?,
-        };
+  WHERE daw_projects_fts MATCH ?1{daw_extra}{np_extra}
+  LIMIT ?{cap_ph})"
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut idx = 1;
+        stmt.raw_bind_parameter(idx, fts_match)
+            .map_err(|e| e.to_string())?;
+        idx += 1;
+        if let Some(ph) = daw_eq_ph {
+            debug_assert_eq!(idx, ph);
+            if let Some(f) = daw_filter {
+                stmt.raw_bind_parameter(idx, f)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(idx, v)
+                .map_err(|e| e.to_string())?;
+            idx += 1;
+        }
+        stmt.raw_bind_parameter(idx, cap)
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.raw_query();
+        let row = rows
+            .next()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "COUNT returned no rows".to_string())?;
+        let raw = row.get::<_, i64>(0).map_err(|e| e.to_string())?;
         let capped = raw > FTS_INVENTORY_MATCH_COUNT_CAP;
         let count = if capped {
             FTS_INVENTORY_MATCH_COUNT_CAP as u64
@@ -4596,10 +4933,21 @@ DROP TABLE _pl_refresh_paths;"#;
         };
         let mut bind_idx = if single_scan { 2 } else { 1 };
 
-        // FTS5 trigram for ≥3 char searches; LIKE fallback for 1–2 chars.
+        // Parse `name:` / `path:` prefix tokens out of the search input. The residual
+        // (whatever is left after pulling those tokens) flows through the normal
+        // FTS / LIKE / REGEXP pipeline; each extracted prefix value adds an extra
+        // `<col> LIKE %value% ESCAPE '\\'` AND'd into the WHERE clause.
+        let np_plan = parse_name_path_prefixes(params.search.as_deref(), params.search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+
+        // FTS5 trigram for ≥3 char residuals; LIKE fallback for 1–2 chars.
         // Regex mode (UI `.*` toggle): real ECMA-style regex via SQLite `REGEXP`, not FTS phrase.
         let (fts_match, like_pat, regex_pat) =
-            classify_fts_name_path_search(params.search.as_deref(), params.search_regex);
+            classify_fts_name_path_search(residual_search, params.search_regex);
         if fts_match.is_some() {
             if single_scan {
                 conditions.push(format!(
@@ -4626,6 +4974,13 @@ DROP TABLE _pl_refresh_paths;"#;
                 "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
             ));
             bind_idx += 1;
+        }
+
+        // `name:` / `path:` prefix LIKE conditions — bare-table form (no alias).
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            conditions.push(c.clone());
         }
 
         if let Some(fmt) = &params.format_filter
@@ -4680,10 +5035,20 @@ DROP TABLE _pl_refresh_paths;"#;
         // hundreds of thousands of rows; exact `COUNT(*)` over that set dominated latency.
         let count_sql = format!("SELECT COUNT(*) FROM audio_samples WHERE {where_clause}");
         let (total_count, total_count_capped) = if let Some(m) = fts_match.as_ref() {
+            // FTS bounded count subquery — append name/path LIKE conditions inside the
+            // subquery so the cap honors the narrowing from `name:` / `path:` filters.
+            // Without `s.` alias here because the helper already aliases via `s`.
+            let mut np_idx = 1usize; // local idx used only as a placeholder; helper rebuilds binds
+            let _ = np_idx;
             if single_scan {
-                Self::audio_fts_bounded_count_scan(&conn, m, &scan_id)?
+                Self::audio_fts_bounded_count_scan(&conn, m, &scan_id, &np_plan)?
             } else {
-                Self::audio_fts_bounded_count_library(&conn, m, params.format_filter.as_deref())?
+                Self::audio_fts_bounded_count_library(
+                    &conn,
+                    m,
+                    params.format_filter.as_deref(),
+                    &np_plan,
+                )?
             }
         } else {
             let mut count_stmt = conn.prepare(&count_sql).map_err(|e| e.to_string())?;
@@ -4702,6 +5067,12 @@ DROP TABLE _pl_refresh_paths;"#;
             } else if let Some(ref pat) = like_pat {
                 count_stmt
                     .raw_bind_parameter(idx, pat)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+            for v in &np_binds {
+                count_stmt
+                    .raw_bind_parameter(idx, v)
                     .map_err(|e| e.to_string())?;
                 idx += 1;
             }
@@ -4749,6 +5120,13 @@ DROP TABLE _pl_refresh_paths;"#;
                     2usize,
                 )
             };
+            // `name:` / `path:` LIKE filters (FTS branch — alias `s.`).
+            let (np_fts_conditions, _) =
+                build_name_path_like_conditions(&np_plan, &mut next_ph, Some("s"));
+            for c in &np_fts_conditions {
+                w.push_str(" AND ");
+                w.push_str(c);
+            }
             if let Some(fmt) = &params.format_filter
                 && !fmt.is_empty() && fmt != "all" {
                     if fmt.contains(',') {
@@ -4792,6 +5170,11 @@ DROP TABLE _pl_refresh_paths;"#;
                     .map_err(|e| e.to_string())?;
                 idx += 1;
             }
+            for v in &np_binds {
+                stmt.raw_bind_parameter(idx, v)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
             if let Some(ref fmt) = params.format_filter
                 && !fmt.is_empty() && fmt != "all" && !fmt.contains(',') {
                     stmt.raw_bind_parameter(idx, fmt)
@@ -4813,6 +5196,11 @@ DROP TABLE _pl_refresh_paths;"#;
                 idx += 1;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(idx, pat)
+                    .map_err(|e| e.to_string())?;
+                idx += 1;
+            }
+            for v in &np_binds {
+                stmt.raw_bind_parameter(idx, v)
                     .map_err(|e| e.to_string())?;
                 idx += 1;
             }
@@ -5527,7 +5915,14 @@ DROP TABLE _pl_refresh_paths;"#;
 
         let mut where_parts = vec![DAW_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         if fts_match.is_some() {
             // Library scope is already `DAW_LIBRARY_IDS`; do not nest a second
             // `MAX(id) GROUP BY path` inside the FTS subquery (same semantics, worse plan).
@@ -5545,6 +5940,11 @@ DROP TABLE _pl_refresh_paths;"#;
                 "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
             ));
             bind_idx += 1;
+        }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
         }
         if let Some(f) = daw_filter
             && !f.is_empty() && f != "all" {
@@ -5578,7 +5978,7 @@ DROP TABLE _pl_refresh_paths;"#;
         let use_fts_rank_page = fts_match.is_some();
 
         let (total_count, total_count_capped) = if let Some(m) = fts_match.as_ref() {
-            Self::daw_fts_bounded_count_library(&conn, m, daw_filter)?
+            Self::daw_fts_bounded_count_library(&conn, m, daw_filter, &np_plan)?
         } else {
             let n: u64 = {
                 let sql = format!("SELECT COUNT(*) FROM daw_projects WHERE {where_cl}");
@@ -5590,6 +5990,10 @@ DROP TABLE _pl_refresh_paths;"#;
                 } else if let Some(ref pat) = like_pat {
                     stmt.raw_bind_parameter(bi, pat)
                         .map_err(|e| e.to_string())?;
+                    bi += 1;
+                }
+                for v in &np_binds {
+                    stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
                     bi += 1;
                 }
                 if let Some(f) = daw_filter
@@ -5614,6 +6018,12 @@ DROP TABLE _pl_refresh_paths;"#;
                  WHERE daw_projects_fts MATCH ?1",
             );
             let mut next_ph = 2usize;
+            let (np_fts_conditions, _) =
+                build_name_path_like_conditions(&np_plan, &mut next_ph, Some("d"));
+            for c in &np_fts_conditions {
+                w.push_str(" AND ");
+                w.push_str(c);
+            }
             if let Some(f) = daw_filter
                 && !f.is_empty() && f != "all" {
                     if f.contains(',') {
@@ -5645,6 +6055,10 @@ DROP TABLE _pl_refresh_paths;"#;
             let m = fts_match.as_ref().expect("fts");
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
             bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = daw_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -5657,6 +6071,10 @@ DROP TABLE _pl_refresh_paths;"#;
         } else if let Some(ref r) = regex_pat {
             stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = daw_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -5670,6 +6088,10 @@ DROP TABLE _pl_refresh_paths;"#;
             stmt.raw_bind_parameter(bi, pat)
                 .map_err(|e| e.to_string())?;
             bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = daw_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -5680,6 +6102,10 @@ DROP TABLE _pl_refresh_paths;"#;
             stmt.raw_bind_parameter(bi + 1, offset as i64)
                 .map_err(|e| e.to_string())?;
         } else {
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = daw_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -5740,7 +6166,14 @@ DROP TABLE _pl_refresh_paths;"#;
             "format NOT IN ('MID', 'MIDI')".to_string(),
         ];
         let mut bind_idx = 1usize;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         if fts_match.is_some() {
             // Library scope is already `PRESET_LIBRARY_IDS`; do not nest a second
             // `MAX(id) GROUP BY path` inside the FTS subquery (same semantics, worse plan).
@@ -5758,6 +6191,11 @@ DROP TABLE _pl_refresh_paths;"#;
                 "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
             ));
             bind_idx += 1;
+        }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
         }
         if let Some(f) = format_filter
             && !f.is_empty() && f != "all" {
@@ -5785,7 +6223,7 @@ DROP TABLE _pl_refresh_paths;"#;
         let dir = if sort_asc { "ASC" } else { "DESC" };
 
         let (total_count, total_count_capped) = if let Some(m) = fts_match.as_ref() {
-            Self::preset_fts_bounded_count_library(&conn, m, format_filter)?
+            Self::preset_fts_bounded_count_library(&conn, m, format_filter, &np_plan)?
         } else {
             let sql = format!("SELECT COUNT(*) FROM presets WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -5796,6 +6234,10 @@ DROP TABLE _pl_refresh_paths;"#;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat)
                     .map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
                 bi += 1;
             }
             if let Some(f) = format_filter
@@ -5825,6 +6267,12 @@ DROP TABLE _pl_refresh_paths;"#;
                  AND p.format NOT IN ('MID','MIDI')",
             );
             let mut next_ph = 2usize;
+            let (np_fts_conditions, _) =
+                build_name_path_like_conditions(&np_plan, &mut next_ph, Some("p"));
+            for c in &np_fts_conditions {
+                w.push_str(" AND ");
+                w.push_str(c);
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" {
                     if f.contains(',') {
@@ -5856,6 +6304,10 @@ DROP TABLE _pl_refresh_paths;"#;
             let m = fts_match.as_ref().expect("fts");
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
             bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -5868,6 +6320,10 @@ DROP TABLE _pl_refresh_paths;"#;
         } else if let Some(ref r) = regex_pat {
             stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
             bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -5881,6 +6337,10 @@ DROP TABLE _pl_refresh_paths;"#;
             stmt.raw_bind_parameter(bi, pat)
                 .map_err(|e| e.to_string())?;
             bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -5891,6 +6351,10 @@ DROP TABLE _pl_refresh_paths;"#;
             stmt.raw_bind_parameter(bi + 1, offset as i64)
                 .map_err(|e| e.to_string())?;
         } else {
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -7345,7 +7809,14 @@ DROP TABLE _pl_refresh_paths;"#;
 
         let mut where_parts = vec![MIDI_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         if fts_match.is_some() {
             // Library scope is already `MIDI_LIBRARY_IDS`; do not nest a second
             // `MAX(id) GROUP BY path` inside the FTS subquery (same semantics, worse plan).
@@ -7363,6 +7834,11 @@ DROP TABLE _pl_refresh_paths;"#;
                 "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
             ));
             bind_idx += 1;
+        }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
         }
         if let Some(f) = format_filter
             && !f.is_empty() && f != "all" {
@@ -7397,7 +7873,7 @@ DROP TABLE _pl_refresh_paths;"#;
         let use_fts_rank_page = fts_match.is_some();
 
         let (total_count, total_count_capped) = if let Some(m) = fts_match.as_ref() {
-            Self::midi_fts_bounded_count_library(&conn, m, format_filter)?
+            Self::midi_fts_bounded_count_library(&conn, m, format_filter, &np_plan)?
         } else {
             let sql = format!("SELECT COUNT(*) FROM midi_files WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -7408,6 +7884,10 @@ DROP TABLE _pl_refresh_paths;"#;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat)
                     .map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
                 bi += 1;
             }
             if let Some(f) = format_filter
@@ -7432,6 +7912,12 @@ DROP TABLE _pl_refresh_paths;"#;
                  WHERE midi_files_fts MATCH ?1",
             );
             let mut next_ph = 2usize;
+            let (np_fts_conditions, _) =
+                build_name_path_like_conditions(&np_plan, &mut next_ph, Some("m"));
+            for c in &np_fts_conditions {
+                w.push_str(" AND ");
+                w.push_str(c);
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" {
                     if f.contains(',') {
@@ -7466,6 +7952,10 @@ DROP TABLE _pl_refresh_paths;"#;
             let m = fts_match.as_ref().expect("fts");
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
             bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -7487,6 +7977,10 @@ DROP TABLE _pl_refresh_paths;"#;
             bi += 1;
         }
         if !use_fts_rank_page {
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -7526,7 +8020,14 @@ DROP TABLE _pl_refresh_paths;"#;
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = self.midi_library_total_rows(&conn)?;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         let mut where_parts = vec![MIDI_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
@@ -7547,6 +8048,11 @@ DROP TABLE _pl_refresh_paths;"#;
             ));
             bind_idx += 1;
         }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
+        }
         if let Some(f) = format_filter
             && !f.is_empty() && f != "all" {
                 if f.contains(',') {
@@ -7557,7 +8063,8 @@ DROP TABLE _pl_refresh_paths;"#;
             }
         let where_cl = where_parts.join(" AND ");
         if let Some(m) = fts_match.as_ref() {
-            let (bc, capped) = Self::midi_fts_bounded_count_library(&conn, m, format_filter)?;
+            let (bc, capped) =
+                Self::midi_fts_bounded_count_library(&conn, m, format_filter, &np_plan)?;
             if bc == 0 {
                 return Ok(FilterStatsResult {
                     count: 0,
@@ -7597,6 +8104,10 @@ DROP TABLE _pl_refresh_paths;"#;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat)
                 .map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter
@@ -7790,7 +8301,14 @@ DROP TABLE _pl_refresh_paths;"#;
 
         let mut where_parts = vec![VIDEO_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         if fts_match.is_some() {
             where_parts.push(format!(
                 "id IN (SELECT rowid FROM video_files_fts WHERE video_files_fts MATCH ?{bind_idx})",
@@ -7806,6 +8324,11 @@ DROP TABLE _pl_refresh_paths;"#;
                 "(name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')"
             ));
             bind_idx += 1;
+        }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
         }
         if let Some(f) = format_filter
             && !f.is_empty() && f != "all" {
@@ -7837,7 +8360,7 @@ DROP TABLE _pl_refresh_paths;"#;
         let use_fts_rank_page = fts_match.is_some();
 
         let (total_count, total_count_capped) = if let Some(m) = fts_match.as_ref() {
-            Self::video_fts_bounded_count_library(&conn, m, format_filter)?
+            Self::video_fts_bounded_count_library(&conn, m, format_filter, &np_plan)?
         } else {
             let sql = format!("SELECT COUNT(*) FROM video_files WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -7848,6 +8371,10 @@ DROP TABLE _pl_refresh_paths;"#;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat)
                     .map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
                 bi += 1;
             }
             if let Some(f) = format_filter
@@ -7872,6 +8399,12 @@ DROP TABLE _pl_refresh_paths;"#;
                  WHERE video_files_fts MATCH ?1",
             );
             let mut next_ph = 2usize;
+            let (np_fts_conditions, _) =
+                build_name_path_like_conditions(&np_plan, &mut next_ph, Some("v"));
+            for c in &np_fts_conditions {
+                w.push_str(" AND ");
+                w.push_str(c);
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" {
                     if f.contains(',') {
@@ -7906,6 +8439,10 @@ DROP TABLE _pl_refresh_paths;"#;
             let m = fts_match.as_ref().expect("fts");
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
             bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -7927,6 +8464,10 @@ DROP TABLE _pl_refresh_paths;"#;
             bi += 1;
         }
         if !use_fts_rank_page {
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             if let Some(f) = format_filter
                 && !f.is_empty() && f != "all" && !f.contains(',') {
                     stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -7966,7 +8507,14 @@ DROP TABLE _pl_refresh_paths;"#;
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = self.video_library_total_rows(&conn)?;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         let mut where_parts = vec![VIDEO_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
@@ -7985,6 +8533,11 @@ DROP TABLE _pl_refresh_paths;"#;
             ));
             bind_idx += 1;
         }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
+        }
         if let Some(f) = format_filter
             && !f.is_empty() && f != "all" {
                 if f.contains(',') {
@@ -7995,7 +8548,8 @@ DROP TABLE _pl_refresh_paths;"#;
             }
         let where_cl = where_parts.join(" AND ");
         if let Some(m) = fts_match.as_ref() {
-            let (bc, capped) = Self::video_fts_bounded_count_library(&conn, m, format_filter)?;
+            let (bc, capped) =
+                Self::video_fts_bounded_count_library(&conn, m, format_filter, &np_plan)?;
             if bc == 0 {
                 return Ok(FilterStatsResult {
                     count: 0,
@@ -8035,6 +8589,10 @@ DROP TABLE _pl_refresh_paths;"#;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat)
                 .map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter
@@ -8674,7 +9232,14 @@ DROP TABLE _pl_refresh_paths;"#;
 
         let mut where_parts = vec![PDF_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         if fts_match.is_some() {
             // Library scope is already `PDF_LIBRARY_IDS`; do not nest a second
             // `MAX(id) GROUP BY path` inside the FTS subquery (same semantics, worse plan).
@@ -8693,6 +9258,11 @@ DROP TABLE _pl_refresh_paths;"#;
             ));
             bind_idx += 1;
         }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
+        }
         let where_cl = where_parts.join(" AND ");
 
         let sort_col = match sort_key {
@@ -8705,16 +9275,22 @@ DROP TABLE _pl_refresh_paths;"#;
         let dir = if sort_asc { "ASC" } else { "DESC" };
 
         let (total_count, total_count_capped) = if let Some(m) = fts_match.as_ref() {
-            Self::pdf_fts_bounded_count_library(&conn, m)?
+            Self::pdf_fts_bounded_count_library(&conn, m, &np_plan)?
         } else {
             let sql = format!("SELECT COUNT(*) FROM pdfs WHERE {where_cl}");
             let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-            let bi = 1;
+            let mut bi = 1;
             if let Some(ref r) = regex_pat {
                 stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
+                bi += 1;
             } else if let Some(ref pat) = like_pat {
                 stmt.raw_bind_parameter(bi, pat)
                     .map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
             }
             let _ = bi;
             let mut rows = stmt.raw_query();
@@ -8731,14 +9307,26 @@ DROP TABLE _pl_refresh_paths;"#;
         // `FTS_INVENTORY_MATCH_COUNT_CAP`, so ORDER BY + LIMIT stays bounded.
         let use_fts = fts_match.is_some();
         let sql = if use_fts {
-            format!(
+            let mut w = String::from(
                 "SELECT p.name, p.path, p.directory, p.size, p.size_formatted, p.modified
                  FROM pdfs_fts
                  INNER JOIN pdfs p ON p.id = pdfs_fts.rowid
                  INNER JOIN pdf_library lib ON lib.pdf_id = p.id
-                 WHERE pdfs_fts MATCH ?1
-                 ORDER BY p.{sort_col} {dir} NULLS LAST LIMIT ?2 OFFSET ?3",
-            )
+                 WHERE pdfs_fts MATCH ?1",
+            );
+            let mut next_ph = 2usize;
+            let (np_fts_conditions, _) =
+                build_name_path_like_conditions(&np_plan, &mut next_ph, Some("p"));
+            for c in &np_fts_conditions {
+                w.push_str(" AND ");
+                w.push_str(c);
+            }
+            let li = next_ph;
+            let oi = next_ph + 1;
+            w.push_str(&format!(
+                " ORDER BY p.{sort_col} {dir} NULLS LAST LIMIT ?{li} OFFSET ?{oi}"
+            ));
+            w
         } else {
             format!(
                 "SELECT name, path, directory, size, size_formatted, modified FROM pdfs WHERE {where_cl} ORDER BY {sort_col} {dir} LIMIT ?{bind_idx} OFFSET ?{}",
@@ -8750,9 +9338,14 @@ DROP TABLE _pl_refresh_paths;"#;
         if use_fts {
             let m = fts_match.as_ref().expect("fts");
             stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
-            stmt.raw_bind_parameter(bi + 1, limit as i64)
+            bi += 1;
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
+            stmt.raw_bind_parameter(bi, limit as i64)
                 .map_err(|e| e.to_string())?;
-            stmt.raw_bind_parameter(bi + 2, offset as i64)
+            stmt.raw_bind_parameter(bi + 1, offset as i64)
                 .map_err(|e| e.to_string())?;
         } else if let Some(ref r) = regex_pat {
             stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
@@ -8763,6 +9356,10 @@ DROP TABLE _pl_refresh_paths;"#;
             bi += 1;
         }
         if !use_fts {
+            for v in &np_binds {
+                stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+                bi += 1;
+            }
             stmt.raw_bind_parameter(bi, limit as i64)
                 .map_err(|e| e.to_string())?;
             stmt.raw_bind_parameter(bi + 1, offset as i64)
@@ -9015,7 +9612,14 @@ DROP TABLE _pl_refresh_paths;"#;
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = self.audio_library_total_rows(&conn)?;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         let mut where_parts = vec![AUDIO_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
@@ -9034,6 +9638,11 @@ DROP TABLE _pl_refresh_paths;"#;
             ));
             bind_idx += 1;
         }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
+        }
         if let Some(f) = format_filter
             && !f.is_empty() && f != "all" {
                 if f.contains(',') {
@@ -9044,7 +9653,8 @@ DROP TABLE _pl_refresh_paths;"#;
             }
         let where_cl = where_parts.join(" AND ");
         if let Some(m) = fts_match.as_ref() {
-            let (bc, capped) = Self::audio_fts_bounded_count_library(&conn, m, format_filter)?;
+            let (bc, capped) =
+                Self::audio_fts_bounded_count_library(&conn, m, format_filter, &np_plan)?;
             if bc == 0 {
                 return Ok(FilterStatsResult {
                     count: 0,
@@ -9084,6 +9694,10 @@ DROP TABLE _pl_refresh_paths;"#;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat)
                 .map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter
@@ -9183,7 +9797,14 @@ DROP TABLE _pl_refresh_paths;"#;
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = self.daw_library_total_rows(&conn)?;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         let mut where_parts = vec![DAW_LIBRARY_IDS.to_string()];
         let mut bind_idx = 1usize;
         if fts_match.is_some() {
@@ -9204,6 +9825,11 @@ DROP TABLE _pl_refresh_paths;"#;
             ));
             bind_idx += 1;
         }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
+        }
         if let Some(f) = daw_filter
             && !f.is_empty() && f != "all" {
                 if f.contains(',') {
@@ -9214,7 +9840,8 @@ DROP TABLE _pl_refresh_paths;"#;
             }
         let where_cl = where_parts.join(" AND ");
         if let Some(m) = fts_match.as_ref() {
-            let (bc, capped) = Self::daw_fts_bounded_count_library(&conn, m, daw_filter)?;
+            let (bc, capped) =
+                Self::daw_fts_bounded_count_library(&conn, m, daw_filter, &np_plan)?;
             if bc == 0 {
                 return Ok(FilterStatsResult {
                     count: 0,
@@ -9256,6 +9883,10 @@ DROP TABLE _pl_refresh_paths;"#;
                 .map_err(|e| e.to_string())?;
             bi += 1;
         }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
         if let Some(f) = daw_filter
             && !f.is_empty() && f != "all" && !f.contains(',') {
                 stmt.raw_bind_parameter(bi, f).map_err(|e| e.to_string())?;
@@ -9295,7 +9926,14 @@ DROP TABLE _pl_refresh_paths;"#;
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = self.preset_inventory_total_rows(&conn)?;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         let mut where_parts = vec![
             PRESET_LIBRARY_IDS.to_string(),
             "format NOT IN ('MID','MIDI')".to_string(),
@@ -9319,6 +9957,11 @@ DROP TABLE _pl_refresh_paths;"#;
             ));
             bind_idx += 1;
         }
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        for c in &np_conditions {
+            where_parts.push(c.clone());
+        }
         if let Some(f) = format_filter
             && !f.is_empty() && f != "all" {
                 if f.contains(',') {
@@ -9329,7 +9972,8 @@ DROP TABLE _pl_refresh_paths;"#;
             }
         let where_cl = where_parts.join(" AND ");
         if let Some(m) = fts_match.as_ref() {
-            let (bc, capped) = Self::preset_fts_bounded_count_library(&conn, m, format_filter)?;
+            let (bc, capped) =
+                Self::preset_fts_bounded_count_library(&conn, m, format_filter, &np_plan)?;
             if bc == 0 {
                 return Ok(FilterStatsResult {
                     count: 0,
@@ -9369,6 +10013,10 @@ DROP TABLE _pl_refresh_paths;"#;
         } else if let Some(ref pat) = like_pat {
             stmt.raw_bind_parameter(bi, pat)
                 .map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
             bi += 1;
         }
         if let Some(f) = format_filter
@@ -9510,9 +10158,16 @@ DROP TABLE _pl_refresh_paths;"#;
     ) -> Result<FilterStatsResult, String> {
         let conn = self.read_conn();
         let total_unfiltered: u64 = self.pdf_library_total_rows(&conn)?;
-        let (fts_match, like_pat, regex_pat) = classify_fts_name_path_search(search, search_regex);
+        let np_plan = parse_name_path_prefixes(search, search_regex);
+        let residual_search = if np_plan.residual.is_empty() {
+            None
+        } else {
+            Some(np_plan.residual.as_str())
+        };
+        let (fts_match, like_pat, regex_pat) =
+            classify_fts_name_path_search(residual_search, search_regex);
         if let Some(m) = fts_match.as_ref() {
-            let (bc, capped) = Self::pdf_fts_bounded_count_library(&conn, m)?;
+            let (bc, capped) = Self::pdf_fts_bounded_count_library(&conn, m, &np_plan)?;
             if bc == 0 {
                 return Ok(FilterStatsResult {
                     count: 0,
@@ -9538,23 +10193,52 @@ DROP TABLE _pl_refresh_paths;"#;
                 });
             }
         }
-        let sql = if fts_match.is_some() {
-            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library) AND id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?1)"
+        // Build SQL with optional name/path LIKE additions. All branches share the
+        // `FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library)` floor; layer on
+        // search-mode predicate then any np-plan predicates.
+        let mut bind_idx = 1usize;
+        let search_extra: String = if fts_match.is_some() {
+            let p = format!(" AND id IN (SELECT rowid FROM pdfs_fts WHERE pdfs_fts MATCH ?{bind_idx})");
+            bind_idx += 1;
+            p
         } else if regex_pat.is_some() {
-            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library) AND ((name REGEXP ?1) OR (path REGEXP ?1))"
+            let p = format!(" AND ((name REGEXP ?{bind_idx}) OR (path REGEXP ?{bind_idx}))");
+            bind_idx += 1;
+            p
         } else if like_pat.is_some() {
-            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library) AND (name LIKE ?1 ESCAPE '\\' OR path LIKE ?1 ESCAPE '\\')"
+            let p = format!(" AND (name LIKE ?{bind_idx} ESCAPE '\\' OR path LIKE ?{bind_idx} ESCAPE '\\')");
+            bind_idx += 1;
+            p
         } else {
-            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library)"
+            String::new()
         };
-        let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+        let (np_conditions, np_binds) =
+            build_name_path_like_conditions(&np_plan, &mut bind_idx, None);
+        let np_extra = if np_conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {}", np_conditions.join(" AND "))
+        };
+        let sql = format!(
+            "SELECT COUNT(*), COALESCE(SUM(size),0) FROM pdfs WHERE id IN (SELECT pdf_id FROM pdf_library){search_extra}{np_extra}"
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let mut bi = 1;
         if let Some(ref m) = fts_match {
-            stmt.raw_bind_parameter(1, m).map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi, m).map_err(|e| e.to_string())?;
+            bi += 1;
         } else if let Some(ref r) = regex_pat {
-            stmt.raw_bind_parameter(1, r).map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi, r).map_err(|e| e.to_string())?;
+            bi += 1;
         } else if let Some(ref pat) = like_pat {
-            stmt.raw_bind_parameter(1, pat).map_err(|e| e.to_string())?;
+            stmt.raw_bind_parameter(bi, pat).map_err(|e| e.to_string())?;
+            bi += 1;
         }
+        for v in &np_binds {
+            stmt.raw_bind_parameter(bi, v).map_err(|e| e.to_string())?;
+            bi += 1;
+        }
+        let _ = bi;
         let mut rows = stmt.raw_query();
         let (count, total_bytes) = if let Some(row) = rows.next().map_err(|e| e.to_string())? {
             (
@@ -10820,6 +11504,76 @@ mod tests {
     static MIGRATE_JSON_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
+    fn parse_name_path_prefixes_extracts_simple_tokens() {
+        let plan = parse_name_path_prefixes(Some("name:thuggin tomm"), false);
+        assert_eq!(plan.residual, "tomm");
+        assert_eq!(plan.name_likes, vec!["thuggin".to_string()]);
+        assert!(plan.path_likes.is_empty());
+    }
+
+    #[test]
+    fn parse_name_path_prefixes_supports_quoted_values_on_both_sides() {
+        let plan =
+            parse_name_path_prefixes(Some(r#"path:"testing space" "tommy was here""#), false);
+        assert_eq!(plan.residual, "tommy was here");
+        assert_eq!(plan.path_likes, vec!["testing space".to_string()]);
+        assert!(plan.name_likes.is_empty());
+    }
+
+    #[test]
+    fn parse_name_path_prefixes_multiple_tokens_and_together() {
+        let plan = parse_name_path_prefixes(Some("name:foo name:bar path:beats baz"), false);
+        assert_eq!(plan.residual, "baz");
+        assert_eq!(
+            plan.name_likes,
+            vec!["foo".to_string(), "bar".to_string()]
+        );
+        assert_eq!(plan.path_likes, vec!["beats".to_string()]);
+    }
+
+    #[test]
+    fn parse_name_path_prefixes_only_prefix_no_residual() {
+        let plan = parse_name_path_prefixes(Some("name:thuggin"), false);
+        assert_eq!(plan.residual, "");
+        assert_eq!(plan.name_likes, vec!["thuggin".to_string()]);
+    }
+
+    #[test]
+    fn parse_name_path_prefixes_regex_mode_bypasses_parser() {
+        // In regex mode, `name:` is a literal regex token, not a prefix.
+        let plan = parse_name_path_prefixes(Some("name:foo.*bar"), true);
+        assert_eq!(plan.residual, "name:foo.*bar");
+        assert!(plan.name_likes.is_empty());
+        assert!(plan.path_likes.is_empty());
+    }
+
+    #[test]
+    fn parse_name_path_prefixes_case_insensitive_prefix() {
+        let plan = parse_name_path_prefixes(Some("NAME:foo PATH:bar"), false);
+        assert_eq!(plan.name_likes, vec!["foo".to_string()]);
+        assert_eq!(plan.path_likes, vec!["bar".to_string()]);
+    }
+
+    #[test]
+    fn parse_name_path_prefixes_empty_input_is_empty_plan() {
+        let plan = parse_name_path_prefixes(Some(""), false);
+        assert!(plan.is_empty());
+        assert_eq!(plan.residual, "");
+        let plan = parse_name_path_prefixes(Some("   "), false);
+        assert!(plan.is_empty());
+        let plan = parse_name_path_prefixes(None, false);
+        assert!(plan.is_empty());
+    }
+
+    #[test]
+    fn name_path_like_pattern_escapes_sqlite_wildcards() {
+        assert_eq!(name_path_like_pattern("foo"), "%foo%");
+        assert_eq!(name_path_like_pattern("100%"), "%100\\%%");
+        assert_eq!(name_path_like_pattern("a_b"), "%a\\_b%");
+        assert_eq!(name_path_like_pattern("a\\b"), "%a\\\\b%");
+    }
+
+    #[test]
     fn read_pool_cache_splits_budget_when_extra_is_32_readers() {
         let one = read_pool_cache_kib(1);
         let thirty_three = read_pool_cache_kib(33);
@@ -11156,6 +11910,109 @@ mod tests {
             .unwrap();
         assert_eq!(by_size.samples[0].name, "big_kick.wav");
         assert_eq!(by_size.samples[0].size, 9_999);
+    }
+
+    /// `name:` / `path:` prefix tokens narrow the search to specific columns. Validates the
+    /// end-to-end SQL bind ordering through `query_audio` (FTS branch — search is ≥3 chars).
+    #[test]
+    fn test_query_audio_name_prefix_filters_by_name_only() {
+        use std::collections::HashSet;
+        let db = test_db();
+        let samples = vec![
+            // "kick" appears in path but NOT name → must be filtered out by `name:kick`.
+            sample("snare.wav", "/kick_drums/snare.wav", "WAV", 100),
+            // "kick" in name → should match.
+            sample("kick_punchy.wav", "/loops/kick_punchy.wav", "WAV", 200),
+        ];
+        db.save_scan("s1", "2024-01-01T00:00:00", 2, 300, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &samples).unwrap();
+
+        let result = db
+            .query_audio(&AudioQueryParams {
+                scan_id: Some("s1".into()),
+                search: Some("name:kick".into()),
+                search_regex: false,
+                format_filter: None,
+                sort_key: "name".into(),
+                sort_asc: true,
+                offset: 0,
+                limit: 10,
+            })
+            .unwrap();
+
+        assert_eq!(result.total_count, 1);
+        let names: HashSet<&str> = result.samples.iter().map(|s| s.name.as_str()).collect();
+        assert!(
+            names.contains("kick_punchy.wav") && !names.contains("snare.wav"),
+            "name:kick must NOT match rows where 'kick' only appears in path"
+        );
+    }
+
+    /// `name:<prefix> <residual>` — prefix narrows by name AND residual still searches name+path.
+    #[test]
+    fn test_query_audio_name_prefix_with_residual_search() {
+        use std::collections::HashSet;
+        let db = test_db();
+        let samples = vec![
+            sample("thuggin_kick.wav", "/loops/thuggin_kick.wav", "WAV", 100),
+            sample("thuggin_pad.wav", "/loops/thuggin_pad.wav", "WAV", 200),
+            // residual "kick" not in name or path under thuggin
+            sample("clap.wav", "/thuggin/clap.wav", "WAV", 300),
+        ];
+        db.save_scan("s1", "2024-01-01T00:00:00", 3, 600, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &samples).unwrap();
+
+        let result = db
+            .query_audio(&AudioQueryParams {
+                scan_id: Some("s1".into()),
+                search: Some("name:thuggin kick".into()),
+                search_regex: false,
+                format_filter: None,
+                sort_key: "name".into(),
+                sort_asc: true,
+                offset: 0,
+                limit: 10,
+            })
+            .unwrap();
+
+        assert_eq!(result.total_count, 1);
+        let names: HashSet<&str> = result.samples.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains("thuggin_kick.wav"));
+    }
+
+    /// `path:` only (empty residual) — verifies the non-FTS branch with bare-table aliasing.
+    #[test]
+    fn test_query_audio_path_prefix_only_no_residual() {
+        let db = test_db();
+        let samples = vec![
+            sample("a.wav", "/loops/thuggin/a.wav", "WAV", 100),
+            sample("b.wav", "/loops/thuggin/b.wav", "WAV", 200),
+            sample("c.wav", "/loops/other/c.wav", "WAV", 300),
+        ];
+        db.save_scan("s1", "2024-01-01T00:00:00", 3, 600, &HashMap::new(), &[])
+            .unwrap();
+        db.insert_audio_batch("s1", &samples).unwrap();
+
+        let result = db
+            .query_audio(&AudioQueryParams {
+                scan_id: Some("s1".into()),
+                search: Some("path:thuggin".into()),
+                search_regex: false,
+                format_filter: None,
+                sort_key: "name".into(),
+                sort_asc: true,
+                offset: 0,
+                limit: 10,
+            })
+            .unwrap();
+
+        assert_eq!(result.total_count, 2);
+        assert!(
+            result.samples.iter().all(|s| s.path.contains("thuggin")),
+            "path: prefix must filter to paths containing the value"
+        );
     }
 
     #[test]

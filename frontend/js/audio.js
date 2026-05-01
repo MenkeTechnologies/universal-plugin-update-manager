@@ -3512,8 +3512,8 @@ function buildAudioRow(s) {
     const revealBtnT = esc(_audioFmt('menu.reveal_in_finder'));
     return `<tr${rowClass} data-audio-path="${hp}" data-audio-format="${escapeHtml(s.format)}" data-audio-name="${escapeHtml((s.name || '').toLowerCase())}" data-action="toggleMetadata" data-path="${hp}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
-    <td class="col-name" title="${escapeHtml(s.name)}">${_lastAudioSearch ? highlightBasenameFromPath(s.path, s.name, _lastAudioSearch, _lastAudioMode) : escapeHtml(s.name)}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
-    <td class="col-format"><span class="format-badge ${fmtClass}">${_lastAudioSearch ? highlightMatch(s.format, _lastAudioSearch, _lastAudioMode) : escapeHtml(s.format)}</span></td>
+    <td class="col-name" title="${escapeHtml(s.name)}">${_lastAudioSearch ? highlightBasenameFromPath(s.path, s.name, _lastAudioSearch, _lastAudioMode, 'name') : escapeHtml(s.name)}${typeof rowBadges === 'function' ? rowBadges(s.path) : ''}</td>
+    <td class="col-format"><span class="format-badge ${fmtClass}">${_lastAudioSearch ? highlightMatch(s.format, _lastAudioSearch, _lastAudioMode, 'other') : escapeHtml(s.format)}</span></td>
     <td class="col-size">${s.sizeFormatted}</td>
     <td class="col-bpm" title="${bpmTitle}">${typeof escapeHtml === 'function' ? escapeHtml(bpmDisplay) : bpmDisplay}</td>
     <td class="col-key" title="${keyTitle}">${escapeHtml(key)}</td>
@@ -3521,7 +3521,7 @@ function buildAudioRow(s) {
     <td class="col-ch" title="${chTitle}">${ch}</td>
     <td class="col-lufs${lufs !== '' && lufs < -25 ? ' lufs-low' : ''}" title="${lufsTitle}">${lufs}</td>
     <td class="col-date">${s.modified}</td>
-    <td class="col-path" title="${hp}">${_lastAudioSearch ? highlightPathPrefixFromPath(s.path, s.directory, _lastAudioSearch, _lastAudioMode) : escapeHtml(s.directory)}</td>
+    <td class="col-path" title="${hp}">${_lastAudioSearch ? highlightPathPrefixFromPath(s.path, s.directory, _lastAudioSearch, _lastAudioMode, 'path') : escapeHtml(s.directory)}</td>
     <td class="col-actions" data-action-stop>
       <span class="table-row-actions">
       <button type="button" class="btn-small btn-play${isPlaying ? ' playing' : ''}" data-action="previewAudio" data-path="${hp}" title="${previewBtnT}">

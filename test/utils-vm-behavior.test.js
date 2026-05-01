@@ -142,6 +142,99 @@ describe('frontend/js/utils.js (vm-loaded)', () => {
     });
   });
 
+  describe('parseNamePathPrefixes', () => {
+    it('extracts simple bare-token prefixes', () => {
+      const p = U.parseNamePathPrefixes('name:thuggin tomm', 'fuzzy');
+      assert.strictEqual(p.residual, 'tomm');
+      assert.deepStrictEqual([...p.nameValues], ['thuggin']);
+      assert.deepStrictEqual([...p.pathValues], []);
+    });
+
+    it('supports quoted values on both prefix and residual', () => {
+      const p = U.parseNamePathPrefixes('path:"testing space" "tommy was here"', 'fuzzy');
+      assert.strictEqual(p.residual, 'tommy was here');
+      assert.deepStrictEqual([...p.pathValues], ['testing space']);
+    });
+
+    it('multiple prefix tokens AND together', () => {
+      const p = U.parseNamePathPrefixes('name:foo name:bar path:beats baz', 'fuzzy');
+      assert.deepStrictEqual([...p.nameValues], ['foo', 'bar']);
+      assert.deepStrictEqual([...p.pathValues], ['beats']);
+      assert.strictEqual(p.residual, 'baz');
+    });
+
+    it('regex mode bypasses parsing entirely', () => {
+      const p = U.parseNamePathPrefixes('name:.*foo', 'regex');
+      assert.strictEqual(p.residual, 'name:.*foo');
+      assert.deepStrictEqual([...p.nameValues], []);
+    });
+
+    it('case-insensitive prefix recognition', () => {
+      const p = U.parseNamePathPrefixes('NAME:foo PATH:bar', 'fuzzy');
+      assert.deepStrictEqual([...p.nameValues], ['foo']);
+      assert.deepStrictEqual([...p.pathValues], ['bar']);
+    });
+  });
+
+  describe('buildColumnHighlightQuery', () => {
+    it('column=name keeps residual + name values, drops path values', () => {
+      const q = U.buildColumnHighlightQuery('name:thuggin path:beats kick', 'fuzzy', 'name');
+      // Residual "kick" stays; name value "thuggin" is added; "beats" (path) is dropped.
+      assert.ok(q.includes('kick'));
+      assert.ok(q.includes('thuggin'));
+      assert.ok(!q.includes('beats'));
+    });
+
+    it('column=path keeps residual + path values, drops name values', () => {
+      const q = U.buildColumnHighlightQuery('name:thuggin path:beats kick', 'fuzzy', 'path');
+      assert.ok(q.includes('kick'));
+      assert.ok(q.includes('beats'));
+      assert.ok(!q.includes('thuggin'));
+    });
+
+    it('column=other keeps residual only', () => {
+      const q = U.buildColumnHighlightQuery('name:thuggin kick', 'fuzzy', 'other');
+      assert.strictEqual(q, 'kick');
+    });
+
+    it('multi-word prefix value re-quoted as a phrase', () => {
+      const q = U.buildColumnHighlightQuery('path:"hip hop" kick', 'fuzzy', 'path');
+      assert.ok(q.includes('"hip hop"'));
+      assert.ok(q.includes('kick'));
+    });
+
+    it('regex mode passes through unchanged', () => {
+      const q = U.buildColumnHighlightQuery('name:.*foo', 'regex', 'name');
+      assert.strictEqual(q, 'name:.*foo');
+    });
+
+    it('no prefix tokens => returns raw query unchanged', () => {
+      const q = U.buildColumnHighlightQuery('plain search', 'fuzzy', 'name');
+      assert.strictEqual(q, 'plain search');
+    });
+  });
+
+  describe('highlightMatch with column hint', () => {
+    it('column=name highlights only the name value, not stray "name:" chars', () => {
+      // Without column hint: would fuzzy-match "n","a","m","e" against text.
+      // With column='name': only "kick" (residual) + "" (no name vals) is highlighted —
+      // actually here name:kick puts "kick" into name highlight set.
+      const html = U.highlightMatch('snare_kick.wav', 'name:kick', 'fuzzy', 'name');
+      // No mark on "n","a","m","e" of "snare_..." just because user typed "name:".
+      // (snare contains 'n','a','e' so a stray-fuzzy-match would mark them.)
+      // Safer assertion: only "kick" is wrapped in <mark>.
+      const markCount = (html.match(/<mark/g) || []).length;
+      assert.strictEqual(markCount, 1, 'only one mark span for kick, not stray prefix chars');
+      assert.ok(html.includes('<mark class="fzf-hl">kick</mark>'));
+    });
+
+    it('column=other (e.g. format col) ignores name:/path: tokens entirely', () => {
+      const html = U.highlightMatch('WAV', 'name:kick wav', 'fuzzy', 'other');
+      // Only "wav" residual highlights against "WAV".
+      assert.ok(html.toLowerCase().includes('<mark class="fzf-hl">wav</mark>'));
+    });
+  });
+
   describe('formatTime', () => {
     it('zero and non-finite', () => {
       assert.strictEqual(U.formatTime(0), '0:00');

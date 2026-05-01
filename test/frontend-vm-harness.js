@@ -63,6 +63,12 @@ function loadFrontendScripts(relativePaths, overrides = {}) {
       if (typeof cb === 'function') cb();
       return 0;
     },
+    // No-op `window.addEventListener` / `removeEventListener`. Production code (e.g.
+    // `multi-filter.js`) registers `resize`/`scroll` listeners on `window` at module
+    // load; in the real WebView these always exist. The sandbox is its own `window`
+    // (see assignment below), so the listener APIs need to live on the sandbox itself.
+    addEventListener: () => {},
+    removeEventListener: () => {},
     batchSetForTabId,
     ...overrides,
   };

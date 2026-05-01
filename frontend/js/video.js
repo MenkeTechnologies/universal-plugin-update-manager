@@ -182,8 +182,8 @@ function buildVideoRow(v) {
     const rowClass = isPlaying ? ' class="row-playing"' : '';
     return `<tr${rowClass} data-video-path="${hp}" data-video-name="${escapeHtml((v.name || '').toLowerCase())}" data-action="toggleVideoMeta" data-path="${hp}" data-video-size="${Number(v.size) || 0}" style="cursor: pointer;" title="${rowTt}">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
-    <td class="col-name" title="${escapeHtml(v.name)}">${_lastVideoSearch ? highlightMatch(v.name, _lastVideoSearch, _lastVideoMode) : escapeHtml(v.name)}${typeof rowBadges === 'function' ? rowBadges(v.path) : ''}</td>
-    <td class="col-path" title="${hp}">${_lastVideoSearch ? highlightMatch(v.directory, _lastVideoSearch, _lastVideoMode) : escapeHtml(v.directory)}</td>
+    <td class="col-name" title="${escapeHtml(v.name)}">${_lastVideoSearch ? highlightMatch(v.name, _lastVideoSearch, _lastVideoMode, 'name') : escapeHtml(v.name)}${typeof rowBadges === 'function' ? rowBadges(v.path) : ''}</td>
+    <td class="col-path" title="${hp}">${_lastVideoSearch ? highlightMatch(v.directory, _lastVideoSearch, _lastVideoMode, 'path') : escapeHtml(v.directory)}</td>
     <td class="col-format">${escapeHtml(v.format || '')}</td>
     <td class="col-size">${v.sizeFormatted}</td>
     <td class="col-date">${v.modified}</td>

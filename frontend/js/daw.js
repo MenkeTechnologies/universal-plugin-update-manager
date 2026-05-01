@@ -272,12 +272,12 @@ function buildDawRow(p) {
         : _dawFmt('menu.reveal_in_finder');
     return `<tr data-daw-path="${hp}" data-daw-name="${escapeHtml(p.daw)}" data-daw-search="${escapeHtml((p.name || '').toLowerCase())}" title="${rowTt}" style="cursor: pointer;">
     <td class="col-cb" data-action-stop><input type="checkbox" class="batch-cb"${checked}></td>
-    <td class="col-name" title="${escapeHtml(p.name)}">${_lastDawSearch ? highlightMatch(p.name, _lastDawSearch, _lastDawMode) : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
+    <td class="col-name" title="${escapeHtml(p.name)}">${_lastDawSearch ? highlightMatch(p.name, _lastDawSearch, _lastDawMode, 'name') : escapeHtml(p.name)}${typeof rowBadges === 'function' ? rowBadges(p.path) : ''}</td>
     <td class="col-format"><span class="format-badge ${dawClass}">${escapeHtml(p.daw)}</span></td>
     <td class="col-format"><span class="format-badge format-default">${p.format}</span>${xrefBtn}</td>
     <td class="col-size">${p.sizeFormatted}</td>
     <td class="col-date">${p.modified}</td>
-    <td class="col-path" title="${escapeHtml(p.path)}">${_lastDawSearch ? highlightMatch(p.directory, _lastDawSearch, _lastDawMode) : escapeHtml(p.directory)}</td>
+    <td class="col-path" title="${escapeHtml(p.path)}">${_lastDawSearch ? highlightMatch(p.directory, _lastDawSearch, _lastDawMode, 'path') : escapeHtml(p.directory)}</td>
     <td class="col-actions" data-action-stop>
       <button class="btn-small btn-folder" data-action="openDawFolder" data-path="${hp}" title="${revealT}">&#128193;</button>
     </td>
